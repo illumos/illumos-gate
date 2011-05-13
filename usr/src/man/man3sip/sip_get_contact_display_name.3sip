@@ -1,0 +1,1111 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_get_contact_display_name 3SIP "10 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_get_contact_display_name, sip_get_from_display_name,
+sip_get_to_display_name, sip_get_from_tag, sip_get_to_tag, sip_get_callid,
+sip_get_callseq_num, sip_get_callseq_method, sip_get_via_sent_by_host,
+sip_get_via_sent_by_port, sip_get_via_sent_protocol_version,
+sip_get_via_sent_protocol_name, sip_get_via_sent_transport, sip_get_maxforward,
+sip_get_content_length, sip_get_content_type, sip_get_content_sub_type,
+sip_get_content, sip_get_accept_type, sip_get_accept_sub_type,
+sip_get_accept_enc, sip_get_accept_lang, sip_get_alert_info_uri,
+sip_get_allow_method, sip_get_min_expires, sip_get_mime_version, sip_get_org,
+sip_get_priority, sip_get_replyto_display_name, sip_get_replyto_uri_str,
+sip_get_date_time, sip_get_date_day, sip_get_date_month, sip_get_date_wkday,
+sip_get_date_year, sip_get_date_timezone, sip_get_content_disp,
+sip_get_content_enc, sip_get_error_info_uri, sip_get_expires, sip_get_require,
+sip_get_subject, sip_get_supported, sip_get_tstamp_delay, sip_get_unsupported,
+sip_get_server, sip_get_user_agent, sip_get_warning_code,
+sip_get_warning_agent, sip_get_warning_text, sip_get_call_info_uri,
+sip_get_in_reply_to, sip_get_retry_after_time, sip_get_retry_after_cmts,
+sip_get_rack_resp_num, sip_get_rack_cseq_num, sip_get_rack_method,
+sip_get_rseq_resp_num, sip_get_priv_value, sip_get_passertedid_display_name,
+sip_get_passertedid_uri_str, sip_get_ppreferredid_display_name,
+sip_get_ppreferredid_uri_str, sip_get_author_scheme, sip_get_author_param,
+sip_get_authen_info, sip_get_proxy_authen_scheme, sip_get_proxy_authen_param,
+sip_get_proxy_author_scheme, sip_get_proxy_author_param, sip_get_proxy_require,
+sip_get_www_authen_scheme, sip_get_www_authen_param, sip_get_allow_events,
+sip_get_event, sip_get_substate, sip_get_content_lang, sip_get_tstamp_value,
+sip_get_route_uri_str, sip_get_route_display_name, sip_get_contact_uri_str,
+sip_get_from_uri_str, sip_get_to_uri_str \- obtain header specific attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBconst sip_str_t *\fR\fIsip_get_contact_display_name\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_from_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_to_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_contact_uri_str\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_from_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_to_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_from_tag\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_to_tag\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_callid\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_callseq_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBsip_method_t\fR \fIsip_get_callseq_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_via_sent_by_host\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_via_sent_by_port\fR (\fBsip_header_value_t\fR \fIvalue\fR,
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_via_sent_protocol_version\fR
+     (\fBsip_header_value_t\fR \fIvalue\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_via_sent_transport\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_maxforward\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_content_length\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_content_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_content_sub_type\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fIsip_get_content\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_accept_type\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_accept_sub_type\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_accept_enc\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_accept_lang\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_alert_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBsip_method_t\fR \fIsip_get_allow_method\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_min_expire\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_mime_version\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_org\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_priority\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_replyto_display_name\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_replyto_uri_str\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_date_time\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_date_day\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_date_month\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_date_year\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_date_wkday\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_date_timezone\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_content_disp\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_content_enc\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_error_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_expires\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_require\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_subject\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_supported\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_tstamp_delay\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_unsupported\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_server\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_user_agent\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_warning_code\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_warning_agent\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_warning_text\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_call_info_uri\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_in_reply_to\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_retry_after_time\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_retry_after_cmts\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_passertedid_display_name\fR
+     (\fBsip_header_value_t\fR \fIvalue\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_passertedid_uri_str\fR
+     (\fBsip_header_value_t\fR \fIvalue\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_rack_resp_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR sip_get_rack_cseq_num\fI\fR(\fBsip_msg_t\fR \fIsip_msg, int *error);\fR
+.fi
+
+.LP
+.nf
+sip_method_t\fB\fR \fIsip_get_rack_method\fR(\fBsip_msg_t\fR \fIsip_msg\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fIsip_get_rseq_resp_num\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_priv_value\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_author_scheme\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_author_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBchar *\fR\fIname\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_authen_info\fR(\fBsip_header_value_t\fR \fIvalue\fR,
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_proxy_authen_scheme\fR(\fBsip_msg_t\fR \fImsg\fR,
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_proxy_authen_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBchar *\fR\fIname\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_proxy_author_scheme\fR(\fBsip_msg_t\fR \fImsg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_proxy_author_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
+     \fBchar *\fR\fIname\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_proxy_require\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_www_authen_scheme\fR(\fBsip_msg_t\fR \fImsg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_www_authen_param\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
+     \fBchar *\fR\fIname\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_allow_events\fR(\fBsip_header_value_t\fR \fIvalue,
+     int *error);\fR
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_event\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_substate\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_content_lang\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_tstamp_value\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_route_uri_str\fR(\fBsip_header_value_t\fR \fIvalue\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_route_display_name\fR(\fBsip_header_value_t\fR \fIvalue\fR,
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For functions that return a pointer of type \fBsip_str_t\fR, \fBsip_str_t\fR is
+supplied by:
+.sp
+.in +2
+.nf
+typedef struct sip_str {
+     char	*sip_str_ptr;
+     int	sip_str_len;
+}sip_str_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fIsip_str_ptr\fR parameter points to the start of the returned value and
+\fIsip_str_len\fR supplies the length of the returned value.
+.sp
+.LP
+For example, given the following request line in a \fBSIP\fR message
+\fIsip_msg\fR that is input to \fBsip_get_request_uri_str()\fR:
+.sp
+.in +2
+.nf
+FROM : <Alice sip:alice@atlanta.com>;tag=1928301774
+.fi
+.in -2
+
+.sp
+.LP
+the return is a pointer to \fIsip_str_t\fR with the \fIsip_str_ptr\fR member
+pointing to "\fBA\fR" of \fBAlice\fR and \fIsip_str_len\fR being set to
+\fB5\fR, the length of \fBAlice\fR.
+.sp
+.LP
+Access functions for headers that can have multiple values take the value as
+the input, while those that can have only one value take the \fBSIP\fR message
+\fIsip_msg\fR as the input.
+.sp
+.LP
+The \fBsip_get_contact_display_name()\fR, \fBsip_get_from_display_name()\fR,
+and \fBsip_get_to_display_name()\fR functions will return the display name, if
+present, from the \fBCONTACT\fR header value, \fBFROM\fR and \fBTO\fR header
+respectively.
+.sp
+.LP
+The \fBsip_get_contact_uri_str()\fR, \fBsip_get_from_uri_str()\fR, and
+\fBsip_get_to_uri_str()\fR functions will return the \fBURI\fR string from the
+\fBCONTACT\fR value, \fBFROM\fR and \fBTO\fR header respectively.
+.sp
+.LP
+The \fBsip_get_from_tag()\fR and \fBsip_get_to_tag()\fR functions will return
+the \fBTAG\fR parameter value, if present, from the \fBFROM\fR and \fBTO\fR
+header, respectively, in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_callid()\fR function will return the value from the
+\fBCALL-ID\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_callseq_num()\fR function will return the call sequence number
+from the \fBCSEQ\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_callseq_method()\fR function will return the method from the
+\fBCSEQ\fR header in the provided \fBSIP\fR message \fIsip_msg\fR. The method
+can be one of the following:
+.br
+.in +2
+INVITE
+.in -2
+.br
+.in +2
+ACK
+.in -2
+.br
+.in +2
+OPTIONS
+.in -2
+.br
+.in +2
+BYE
+.in -2
+.br
+.in +2
+CANCEL
+.in -2
+.br
+.in +2
+REGISTER
+.in -2
+.br
+.in +2
+REFER
+.in -2
+.br
+.in +2
+INFO
+.in -2
+.br
+.in +2
+SUBSCRIBE
+.in -2
+.br
+.in +2
+NOTIFY
+.in -2
+.br
+.in +2
+PRACK
+.in -2
+.br
+.in +2
+UNKNOWN
+.in -2
+.sp
+.LP
+The \fBsip_get_via_sent_by_host()\fR, \fBsip_get_via_sent_by_port()\fR,
+\fBsip_get_via_sent_protocol_version()\fR,
+\fBsip_get_via_sent_protocol_name()\fR, and \fBsip_get_via_sent_transport()\fR
+functions will return the sent-by host, port (if present), protocol version,
+protocol name and transport information from the provided \fBVIA\fR header
+value. Example, if the \fBVIA\fR value is given by \fBSIP/2.0/UDP
+bobspc.biloxi.com:5060\fR, then the sent-by host is "\fBbobspc.biloxi.com\fR",
+protocol name is "\fBSIP\fR", protocol version is "\fB2.0\fR", port is
+\fB5060\fR and transport is \fBUDP\fR.
+.sp
+.LP
+The \fBsip_get_maxforward()\fR function will return the value of the
+\fBMAX-FORWARDS\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.br
+.in +2
+INVITE
+.in -2
+.br
+.in +2
+ACK
+.in -2
+.br
+.in +2
+OPTIONS
+.in -2
+.br
+.in +2
+BYE
+.in -2
+.br
+.in +2
+CANCEL
+.in -2
+.br
+.in +2
+REGISTER
+.in -2
+.br
+.in +2
+REFER
+.in -2
+.br
+.in +2
+INFO
+.in -2
+.br
+.in +2
+SUBSCRIBE
+.in -2
+.br
+.in +2
+NOTIFY
+.in -2
+.br
+.in +2
+PRACK
+.in -2
+.br
+.in +2
+UNKNOWN
+.in -2
+.sp
+.LP
+The \fBsip_get_content_length()\fR function will return the value of the
+\fBCONTENT-LENGTH\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+The method can return one of the following:
+.sp
+.LP
+The \fBsip_get_content_type()\fR and \fBsip_get_content_sub_type()\fR functions
+will return the value of the Type and Sub-Type field, respectively, from the
+\fBCONTENT-TYPE\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_content()\fR function will return the message body from the
+provided \fBSIP\fR message \fIsip_msg\fR. The returned string is a copy of the
+message body and the caller is responsible for freeing the string after use.
+.sp
+.LP
+The \fBsip_get_accept_type()\fR and \fBsip_get_accept_sub_type()\fR functions
+will return the value of the Type and Sub-Type field, respectively, from the
+provided \fBACCEPT\fR header value.
+.sp
+.LP
+The \fBsip_get_accept_enc()\fR function will return the content-coding from the
+provided \fBACCEPT-ENCODING\fR header value.
+.sp
+.LP
+The \fBsip_get_accept_lang()\fR function will return the language  from the
+provided \fBACCEPT-LANGUAGE\fR header value.
+.sp
+.LP
+The \fBsip_get_alert_info_uri()\fR function will return the \fBURI\fR string
+from the provided \fBALERT-INFO\fR header value.
+.sp
+.LP
+The \fBsip_get_allow_method()\fR function will return the \fBSIP\fR method from
+the provided \fBALLOW\fR header value. The method can return one of the
+following:
+.br
+.in +2
+INVITE
+.in -2
+.br
+.in +2
+ACK
+.in -2
+.br
+.in +2
+OPTIONS
+.in -2
+.br
+.in +2
+BYE
+.in -2
+.br
+.in +2
+CANCEL
+.in -2
+.br
+.in +2
+REGISTER
+.in -2
+.br
+.in +2
+REFER
+.in -2
+.br
+.in +2
+INFO
+.in -2
+.br
+.in +2
+SUBSCRIBE
+.in -2
+.br
+.in +2
+NOTIFY
+.in -2
+.br
+.in +2
+PRACK
+.in -2
+.br
+.in +2
+UNKNOWN
+.in -2
+.sp
+.LP
+The \fBsip_get_min_expire()\fR function will return the time in seconds from
+the \fBMIN-EXPIRES\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_mime_version()\fR function will return the \fBMIME\fR version
+string from the \fBMIME-VERSION\fR header in the provided \fBSIP\fR message
+\fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_org()\fR function will return the organization string value from
+the \fBORGANIZATION\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_priority()\fR function will return the priority string value
+from the \fBPRIORITY\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_replyto_display_name()\fR and \fBsip_get_replyto_uri_str()\fR
+functions will return the display name (if present) and the \fBURI\fR string,
+respectively, from the \fBREPLY-TO\fR header in the provided \fBSIP\fR message
+\fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_date_time()\fR, \fBsip_get_date_day()\fR,
+\fBsip_get_date_month()\fR, \fBsip_get_date_wkday()\fR,
+\fBsip_get_date_year()\fR and \fBsip_get_date_timezone()\fR functions will
+return the time, day, month, week day, year and timezone value from the
+\fBDATE\fR header in the provided \fBSIP\fR message \fIsip_msg\fR. Example, if
+the DATE header has the following value:
+.sp
+.in +2
+.nf
+Sat, 13 Nov 2010 23:29:00 GMT
+.fi
+.in -2
+
+.sp
+.LP
+the time is "\fB23:29:00\fR ", week day is "\fBSat\fR", day is "\fB13\fR",
+month is  "\fBNov\fR", year is "\fB2010\fR", timezone is "\fBGMT\fR".
+.sp
+.LP
+The \fBsip_get_content_disp()\fR function will return the content-disposition
+type from the \fBCONTENT-DISPOSITION\fR header in the provided \fBSIP\fR
+message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_content_enc()\fR function will return the content-coding value
+from the \fBCONTENT-ENCODING\fR header value.
+.sp
+.LP
+The \fBsip_get_error_info_uri()\fR function will return the \fBURI\fR string
+from the provided \fBERROR-INFO\fR header value.
+.sp
+.LP
+The \fBsip_get_expires()\fR function will return the time in seconds from the
+\fBEXPIRES\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_require()\fR function will return the option-tag value from the
+provided \fBREQUIRE\fR header value.
+.sp
+.LP
+The \fBsip_get_subject()\fR function will return the value of the \fBSUBJECT\fR
+header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_supported()\fR function will return the extension value from the
+provided \fBSUPPORTED\fR header value.
+.sp
+.LP
+The \fBsip_get_tstamp_delay()\fR function will return the value from the
+\fBTIMESTAMP\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_unsupported()\fR function will return the extension value from
+the provided \fBUNSUPPORTED\fR header value.
+.sp
+.LP
+The \fBsip_get_server()\fR function will return the value from the \fBSERVER\fR
+header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_user_agent()\fR function will return the value from the
+\fBUSER-AGENT\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_warning_code()\fR, \fBsip_get_warning_agent()\fR, and
+\fBsip_get_warning_text()\fR functions will return the value of the warn-code,
+warn-agent and warn-text, respectively, in the provided \fBWARNING\fR header
+value.
+.sp
+.LP
+The \fBsip_get_call_info_uri()\fR function will return the \fBURI\fR string in
+the provided \fBCALL-INFO\fR header value.
+.sp
+.LP
+The \fBsip_get_in_reply_to()\fR function will return the Call-Id value in the
+provided \fBIN-REPLY-TO\fR header value.
+.sp
+.LP
+The \fBsip_get_retry_after_time()\fR, and \fBsip_get_retry_after_cmts()\fR
+functions return the time and comments (if any), respectively, from the
+\fBRETRY-AFTER\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_passertedid_display_name()\fR and
+\fBsip_get_passertedid_uri_str()\fR functions will return the display name (if
+any) and the \fBURI\fR string, respectively, in the provided
+\fBP-ASSERTED-IDENTITY\fR header value.
+.sp
+.LP
+The \fBsip_get_ppreferredid_display_name()\fR and
+\fBsip_get_ppreferredid_uri_str()\fR functions will return the display name (if
+any) and the \fBURI\fR string, respectively, in the provided
+\fBP-PREFERRED-IDENTITY\fR header value.
+.sp
+.LP
+The \fBsip_get_rack_resp_num()\fR, \fBsip_get_rack_cseq_num()\fR, and
+\fBsip_get_rack_method()\fR functions will return the response-number, the
+\fBCSEQ\fR number and the \fBSIP\fR method from the \fBRACK\fR header in the
+provided \fBSIP\fR message \fIsip_msg\fR. The method can return one of the
+following:
+.br
+.in +2
+INVITE
+.in -2
+.br
+.in +2
+ACK
+.in -2
+.br
+.in +2
+OPTIONS
+.in -2
+.br
+.in +2
+BYE
+.in -2
+.br
+.in +2
+CANCEL
+.in -2
+.br
+.in +2
+REGISTER
+.in -2
+.br
+.in +2
+REFER
+.in -2
+.br
+.in +2
+INFO
+.in -2
+.br
+.in +2
+SUBSCRIBE
+.in -2
+.br
+.in +2
+NOTIFY
+.in -2
+.br
+.in +2
+PRACK
+.in -2
+.br
+.in +2
+UNKNOWN
+.in -2
+.sp
+.LP
+The \fBsip_get_rseq_resp_num()\fR function will return the response-number, the
+\fBRSEQ\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_priv_value()\fR function will return the priv-value in the
+provided \fBPRIVACY\fR header value.
+.sp
+.LP
+The \fBsip_get_route_uri_str()\fR and \fBsip_get_route_display_name()\fR
+functions will return the \fBURI\fR string, and display name (if present) from
+the provided \fBROUTE\fR or \fBRECORD-ROUTE\fR header value.
+.sp
+.LP
+The \fBsip_get_author_scheme()\fR function will return the scheme from the
+\fBAUTHORIZATION\fR header in the provided \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_author_param()\fR function will return the value of the
+parameter specified in name from the \fBAUTHORIZATION\fR header in the
+\fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_authen_info()\fR function will return the authentication
+information from the provided \fBAUTHORIZATION-INFO\fR header value.
+.sp
+.LP
+The \fBsip_get_proxy_authen_scheme()\fR function will return the scheme from
+the \fBPROXY-AUTHENTICATE\fR header in the \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_proxy_authen_param()\fR function will return the value of the
+parameter in name from the \fBPROXY-AUTHENTICATE\fR header in the \fBSIP\fR
+message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_proxy_author_scheme()\fR function will return the value of the
+scheme from the \fBPROXY-AUTHORIZATION\fR header in the \fBSIP\fR message
+\fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_proxy_author_param()\fR function will return the value of the
+parameter specified in name from the \fBPROXY-AUTHORIZATION\fR header in the
+\fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_proxy_require()\fR function will return the option-tag from the
+provided \fBPROXY-REQUIRE\fR header value.
+.sp
+.LP
+The \fBsip_get_www_authen_scheme()\fR function will return the challenge from
+the \fBWWW-AUTHENTICATE\fR header in the \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_www_authen_param()\fR function will return the value of the
+parameter specified in name from the \fBWWW-AUTHENTICATE\fR header in the
+\fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_allow_events()\fR function returns the value of the allowed
+event from the provided \fBALLOW-EVENTS\fR header value.
+.sp
+.LP
+The \fBsip_get_event()\fR function returns the event in the \fBEVENT\fR header
+in the \fBSIP\fR message \fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_substate()\fR function the subscription state from the
+\fBSUBSCRIPTION-STATE\fR header in the provided \fBSIP\fR message
+\fIsip_msg\fR.
+.sp
+.LP
+The \fBsip_get_content_lang()\fR function will return the language from the
+provided \fBCONTENT-LANGUAGE\fR value.
+.sp
+.LP
+The \fBsip_get_tstamp_value()\fR function will return the timestamp value from
+the \fBTIMESTAMP\fR header in the \fBSIP\fR message \fIsip_msg\fR.
+.SH RETURN VALUES
+.sp
+.LP
+For functions that return a pointer to \fIsip_str_t\fR, the return value is the
+specified value on success or \fBNULL\fR in case of error. For functions that
+return an integer, the return value is the specified value on success and
+\fB-1\fR on error.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+These functions take a pointer to an integer \fIerror\fR as an argument. If the
+error is non-null, one of the following values is set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The input \fBSIP\fR message \fIsip_msg\fR or the header value is null; or the
+specified header/header value is deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPROTO\fR\fR
+.ad
+.RS 10n
+.rt  
+The header value is not present or invalid. The parser could not parse it
+correctly.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is an error allocating memory for the return value.
+.RE
+
+.sp
+.LP
+On success, the value of the location pointed to by \fIerror\fR is set to
+\fB0\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

@@ -1,0 +1,117 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mkstemp 3C "22 Feb 2006" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mkstemp, mkstemps, mkdtemp \- make a unique file name from a template and open
+the file
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBint\fR \fBmkstemp\fR(\fBchar *\fR\fItemplate\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmkstemps\fR(\fBchar *\fR\fItemplate\fR, \fBint\fR \fIslen\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBmkdtemp\fR(\fBchar *\fR\fItemplate\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmkstemp()\fR function replaces the contents of the string pointed to by
+\fItemplate\fR by a unique file name, and returns a file descriptor for the
+file open for reading and writing. The function thus prevents any possible race
+condition between testing whether the file exists and opening it for use. The
+string in \fItemplate\fR should look like a file name with six trailing 'X's;
+\fBmkstemp()\fR replaces each 'X' with a character from the portable file name
+character set. The characters are chosen such that the resulting name does not
+duplicate the name of an existing file.
+.sp
+.LP
+The \fBmkstemps()\fR function behaves the same as \fBmkstemp()\fR, except it
+permits a suffix to exist in the template. The template should be of the form
+/\fBtmp\fR/\fBtmp\fR\fIXXXXXX\fR\fIsuffix\fR. The \fIslen\fR parameter
+specifies the length of the suffix string.
+.sp
+.LP
+The \fBmkdtemp()\fR function makes the same replacement to the template as in
+\fBmktemp\fR(3C) and creates the template directory using \fBmkdir\fR(2),
+passing a \fImode\fR argument of 0700.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBmkstemp()\fR returns an open file descriptor.
+Otherwise \(mi1 is returned if no suitable file could be created.
+.SH ERRORS
+.sp
+.LP
+The \fBmkstemp()\fR, \fBmkstemps()\fR, and \fBmkdtemp()\fR functions can set
+\fBerrno\fR to the same values as \fBlstat\fR(2).
+.sp
+.LP
+The \fBmkstemp()\fR and \fBmkstemps()\fR functions can set \fBerrno\fR to the
+same values as \fBopen\fR(2).
+.sp
+.LP
+The \fBmkdtemp()\fR function can set \fBerrno\fR to the same values as
+\fBmkdir\fR(2).
+.SH USAGE
+.sp
+.LP
+It is possible to run out of letters.
+.sp
+.LP
+The \fBmkstemp()\fR function does not check to determine whether the file name
+part of \fItemplate\fR exceeds the maximum allowable file name length.
+.sp
+.LP
+The \fBtmpfile\fR(3C) function is preferred over this function.
+.sp
+.LP
+The \fBmkstemp()\fR function is frequently used to create a temporary file that
+will be removed by the application before the application terminates.
+.sp
+.LP
+The \fBmkstemp()\fR function has a transitional interface for 64-bit file
+offsets. See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The \fBmkstemp()\fR function is Standard. The \fBmkstemps()\fR and
+\fBmkdtemp()\fR functions are Stable.
+.SH SEE ALSO
+.sp
+.LP
+\fBgetpid\fR(2), \fBlstat\fR(2), \fBmkdir\fR(2), \fBopen\fR(2),
+\fBtmpfile\fR(3C), \fBmktemp\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,494 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc. , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_inquiry 9S "5 Nov 2008" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+scsi_inquiry \- SCSI inquiry structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_inquiry\fR structure contains 36 required bytes, followed by a
+variable number of vendor-specific parameters. Bytes 59 through 95, if
+returned, are reserved for future standardization. This structure is part of
+\fBscsi_device\fR(9S) structure and typically filled in by
+\fBscsi_probe\fR(9F).
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+Lines that start with an 'X' will be deleted before submission; 
+they are being classified as unstable at this time.
+
+uchar_t  inq_dtype;         /* Periph. qualifier, dev. type */
+uchar_t  inq_rmb      :1;   /* Removable media */
+uchar_t  inq_qual     :7;   /* Dev. type qualifier */
+uchar_t  inq_iso      :2;   /* ISO version */
+uchar_t  inq_ecma     :3;   /* EMCA version */
+uchar_t  inq_ansi     :3;   /* ANSII version */
+uchar_t  inq_aenc     :1;   /* Async event notif. cap. */
+uchar_t  inq_trmiop   :1;   /* Supports TERMINATE I/O PROC msg */
+uchar_t  inq_normaca  :1;   /* setting NACA bit supported */
+uchar_t  inq_hisup    :1;   /* hierarchical addressing model */
+uchar_t  inq_rdf      :4;   /* Response data format */
+uchar_t  inq_len            /* Additional length */
+uchar_t  inq_sccs     :1;   /* embedded storage array */
+Xuchar_t inq_acc      :1;   /* access controls coordinator */
+uchar_t  inq_tpgse    :1;   /* explicit asymmetric lun access */
+uchar_t  inq_tpgsi    :1;   /* implicit asymmetric lun access */
+Xuchar_t inq_3pc      :1;   /* third-party copy */
+Xuchar_t inq_protect  :1;   /* supports protection information */
+uchar_t  inq_bque     :1;   /* basic queueing */
+uchar_t  inq_encserv  :1;   /* embedded enclosure services */
+uchar_t  inq_dualp    :1;   /* dual port device */
+uchar_t  inq_mchngr   :1;   /* embedded/attached to medium chngr */
+uchar_t  inq_addr16   :1;   /* SPI: supports 16 bit wide SCSI addr */
+uchar_t  inq_wbus16   :1;   /* SPI: Supports 16 bit wide data xfers */
+uchar_t  inq_sync     :1;   /* SPI: Supports synchronous data xfers */
+uchar_t  inq_linked   :1;   /* Supports linked commands */
+uchar_t  inq_cmd_que  :1;   /* Supports command queueing */
+uchar_t  inq_sftre    :1;   /* Supports Soft Reset option */
+char     inq_vid[8];        /* Vendor ID */
+char     inq_pid[16];       /* Product ID */
+char     inq_revision[4];   /* Revision level */
+uchar_t  inq_clk      :2;   /* SPI3 clocking */
+uchar_t  inq_qas      :1;   /* SPI3: quick arb sel */
+uchar_t  inq_ius      :1;   /* SPI3: information units */
+.fi
+.in -2
+
+.sp
+.LP
+\fBinq_dtype\fR identifies the type of device. Bits 0 - 4 represent the
+Peripheral Device Type and bits 5 - 7 represent the Peripheral Qualifier. The
+following values are appropriate for Peripheral Device Type field:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_DIRECT\fR\fR
+.ad
+.RS 20n
+.rt  
+Direct-access device (for example, magnetic disk).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_SEQUENTIAL\fR\fR
+.ad
+.RS 20n
+.rt  
+Sequential-access device (for example, magnetic tape).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_PRINTER\fR\fR
+.ad
+.RS 20n
+.rt  
+Printer device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_PROCESSOR\fR\fR
+.ad
+.RS 20n
+.rt  
+Processor device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_WORM\fR\fR
+.ad
+.RS 20n
+.rt  
+Write-once device (for example, some optical disks).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_RODIRECT\fR\fR
+.ad
+.RS 20n
+.rt  
+CD-ROM device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_SCANNER\fR\fR
+.ad
+.RS 20n
+.rt  
+Scanner device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_OPTICAL\fR\fR
+.ad
+.RS 20n
+.rt  
+Optical memory device (for example, some optical disks).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_CHANGER\fR\fR
+.ad
+.RS 20n
+.rt  
+Medium Changer device (for example, jukeboxes).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_COMM\fR\fR
+.ad
+.RS 20n
+.rt  
+Communications device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_ARRAY_CTRL\fR\fR
+.ad
+.RS 20n
+.rt  
+Array controller device (for example, \fBRAID\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_ESI\fR\fR
+.ad
+.RS 20n
+.rt  
+Enclosure services device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_RBC\fR\fR
+.ad
+.RS 20n
+.rt  
+Simplified direct-access device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_OCRW\fR\fR
+.ad
+.RS 20n
+.rt  
+Optical card reader/writer device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_BRIDGE\fR\fR
+.ad
+.RS 20n
+.rt  
+Bridge.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_OSD\fR\fR
+.ad
+.RS 20n
+.rt  
+Object-based storage device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_UNKNOWN\fR\fR
+.ad
+.RS 20n
+.rt  
+Unknown or no device type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDTYPE_MASK\fR\fR
+.ad
+.RS 20n
+.rt  
+Mask to isolate Peripheral Device Type field.
+.RE
+
+.sp
+.LP
+The following values are appropriate for the Peripheral Qualifier field:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDPQ_POSSIBLE\fR\fR
+.ad
+.RS 17n
+.rt  
+The specified peripheral device type is currently connected to this logical
+unit. If the target cannot determine whether or not a physical device is
+currently connected, it uses this peripheral qualifier when returning the
+\fBINQUIRY\fR data. This peripheral qualifier does not imply that the device is
+ready for access by the initiator.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDPQ_SUPPORTED\fR\fR
+.ad
+.RS 17n
+.rt  
+The target is capable of supporting the specified peripheral device type on
+this logical unit. However, the physical device is not currently connected to
+this logical unit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDPQ_NEVER\fR\fR
+.ad
+.RS 17n
+.rt  
+The target is not capable of supporting a physical device on this logical unit.
+For this peripheral qualifier, the peripheral device type shall be set to
+\fBDTYPE_UNKNOWN\fR to provide compatibility with previous versions of
+\fBSCSI\fR. For all other peripheral device type values, this peripheral
+qualifier is reserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDPQ_VUNIQ\fR\fR
+.ad
+.RS 17n
+.rt  
+This is a vendor-unique qualifier.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDPQ_MASK\fR\fR
+.ad
+.RS 17n
+.rt  
+Mask to isolate Peripheral Qualifier field.
+.RE
+
+.sp
+.LP
+\fBDTYPE_NOTPRESENT\fR is the peripheral qualifier \fBDPQ_NEVER\fR and the
+peripheral device type \fBDTYPE_UNKNOWN\fR combined.
+.sp
+.LP
+\fBinq_rmb\fR, if set, indicates that the medium is removable.
+.sp
+.LP
+\fBinq_qual\fR is a device type qualifier.
+.sp
+.LP
+\fBinq_iso\fR indicates \fBISO \fRversion.
+.sp
+.LP
+\fBinq_ecma\fR indicates \fBECMA \fRversion.
+.sp
+.LP
+\fBinq_ansi\fR indicates \fBANSI \fRversion.
+.sp
+.LP
+\fBinq_aenc\fR, if set, indicates that the device supports asynchronous event
+notification capability as defined in \fBSCSI-2 \fRspecification.
+.sp
+.LP
+\fBinq_trmiop\fR, if set, indicates that the device supports the \fBTERMINATE
+I/O PROCESS\fRmessage.
+.sp
+.LP
+\fBinq_normaca\fR, if set, indicates that the device supports setting the
+\fBNACA\fR bit to 1 in \fBCDB\fR.
+.sp
+.LP
+\fBinq_hisip\fR, if set, indicates the \fBSCSI\fR target device uses the
+hierarchical addressing model to assign \fBLUN\fRs to logical units.
+.sp
+.LP
+\fBinq_rdf\fR, if set, indicates the \fBINQUIRY\fR data response data format:
+"\fBRDF_LEVEL0\fR" means that this structure complies with the \fBSCSI-1\fR
+spec, "\fBRDF_CCS\fR" means that this structure complies with the \fBCCS\fR
+pseudo-spec, and "\fBRDF_SCSI2\fR" means that the structure complies with the
+\fBSCSI-2\fR/3 spec.
+.sp
+.LP
+\fBinq_len\fR, if set, is the additional length field that specifies the length
+in bytes of the parameters.
+.sp
+.LP
+\fBinq_sccs\fR, if set, indicates the target device contains an embedded
+storage array controller component.
+.sp
+.LP
+\fBinq_acc\fR, if set, indicates that the logical unit contains an access
+controls coordinator (this structure member will be deleted before submission.
+It is being classified as unstable at this time).
+.sp
+.LP
+\fBinq_tpgse\fR, if set, indicates that implicit asymmetric logical unit access
+is supported.
+.sp
+.LP
+\fBinq_tpgsi\fR, if set, indicates that explicit asymmetric logical unit access
+is supported.
+.sp
+.LP
+\fBinq_3pc\fR, if set, indicates that the \fBSCSI\fR target device supports
+third-party copy commands (this structure member will be deleted before
+submission. It is being classified as unstable at this time).
+.sp
+.LP
+\fBinq_protect\fR, if set, indicates that the logical unit supports protection
+information (this structure member will be deleted before submission. It is
+being classified as unstable at this time).
+.sp
+.LP
+\fBinq_bque\fR, if set, indicates that the logical unit supports basic task
+management.
+.sp
+.LP
+\fBinq_encserv\fR, if set, indicates that the device contains an embedded
+enclosure services component (\fBses\fR(7D)).
+.sp
+.LP
+\fBinq_dualp\fR, if set, indicates that the \fBSCSI\fR target device supports
+two or more ports.
+.sp
+.LP
+\fBinq_mchngr\fR, if set, indicates that the \fBSCSI\fR target device supports
+commands to control an attached media changer.
+.sp
+.LP
+\fBinq_addr16\fR, if set, indicates that the device supports 16-bit wide
+\fBSCSI\fR addresses.
+.sp
+.LP
+\fBinq_wbus16\fR, if set, indicates that the device supports 16-bit wide data
+transfers.
+.sp
+.LP
+\fBinq_sync\fR, if set, indicates that the device supports synchronous data
+transfers.
+.sp
+.LP
+\fBinq_linked\fR, if set, indicates that the device supports linked commands
+for this logical unit.
+.sp
+.LP
+\fBinq_cmdque\fR, if set, indicates that the device supports tagged command
+queueing.
+.sp
+.LP
+\fBinq_sftre\fR, if reset, indicates that the device responds to the
+\fBRESET\fR condition with the hard \fBRESET\fR alternative. If this bit is
+set, this indicates that the device responds with the soft \fBRESET\fR
+alternative.
+.sp
+.LP
+\fBinq_vid\fR contains eight bytes of \fBASCII \fRdata identifying the vendor
+of the product.
+.sp
+.LP
+\fBinq_pid\fR contains sixteen bytes of \fBASCII \fRdata as defined by the
+vendor.
+.sp
+.LP
+\fBinq_revision\fR contains four bytes of \fBASCII \fRdata as defined by the
+vendor.
+.sp
+.LP
+\fBinq_clk\fR clocking of the \fBSPI3\fR target port.
+.sp
+.LP
+\fBinq_gas\fR the \fBSPI3\fR target port supports quick arbitration and
+selection.
+.sp
+.LP
+\fBinq_ius\fR the \fBSPI3\fR target device supports information unit transfers.
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_probe\fR(9F), \fBscsi_device\fR(9S)
+.sp
+.LP
+\fIANSI Small Computer System Interface-2 (SCSI-2)\fR
+.sp
+.LP
+\fIANSI SCSI Primary Commands-3 (SPC-3)\fR
+.sp
+.LP
+http://t10.org/drafts.htm#spc3
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,0 +1,434 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gprof 1 "8 Feb 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+gprof \- display call-graph profile data
+.SH SYNOPSIS
+.LP
+.nf
+\fBgprof\fR [\fB-abcCDlsz\fR] [\fB-e\fR \fIfunction-name\fR] [\fB-E\fR \fIfunction-name\fR] 
+     [\fB-f\fR \fIfunction-name\fR] [\fB-F\fR \fIfunction-name\fR] 
+     [\fIimage-file\fR [\fIprofile-file\fR...]] 
+     [\fB-n\fR \fInumber of functions\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgprof\fR utility produces an execution profile of a program. The effect
+of called routines is incorporated in the profile of each caller.  The profile
+data is taken from the call graph profile file that is created by programs
+compiled with the \fB-xpg\fR option of \fBcc\fR(1), or by the  \fB-pg\fR option
+with other compilers, or by setting the  \fBLD_PROFILE\fR environment variable
+for shared objects. See \fBld.so.1\fR(1). These compiler options also link in
+versions of the library routines which are compiled for profiling.  The symbol
+table in the executable image file \fIimage-file\fR (\fBa.out\fR by default) is
+read and correlated with the call graph profile file \fIprofile-file\fR
+(\fBgmon.out\fR by default).
+.sp
+.LP
+First, execution times for each routine are propagated along the edges of the
+call graph. Cycles are discovered, and calls into a cycle are made to share the
+time of the cycle.  The first listing shows the functions sorted according to
+the time they represent, including the time of their call graph descendants.
+Below each function entry is shown its (direct) call-graph children and how
+their times are propagated to this function.  A similar display above the
+function shows how this function's time and the time of its descendants are
+propagated to its (direct) call-graph parents.
+.sp
+.LP
+Cycles are also shown, with an entry for the cycle as a whole and a listing of
+the members of the cycle and their contributions to the time and call counts of
+the cycle.
+.sp
+.LP
+Next, a flat profile is given, similar to that provided by \fBprof\fR(1). This
+listing gives the total execution times and call counts for each of the
+functions in the program, sorted by decreasing time. Finally, an index is
+given, which shows the correspondence between function names and call-graph
+profile index numbers.
+.sp
+.LP
+A single function may be split into subfunctions for profiling by means of the
+\fBMARK\fR macro. See  \fBprof\fR(5).
+.sp
+.LP
+Beware of quantization errors.  The granularity of the sampling is shown, but
+remains statistical at best.  It is assumed that the time for each execution of
+a function can be expressed by the total time for the function divided by the
+number of times the function is called.  Thus the time propagated along the
+call-graph arcs to parents of that function is directly proportional to the
+number of times that arc is traversed.
+.sp
+.LP
+The profiled program must call \fBexit\fR(2) or return normally for the
+profiling information to be saved in the \fBgmon.out\fR file.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 19n
+.rt  
+Suppress printing statically declared functions.  If this option is given, all
+relevant information about the static function (for instance, time samples,
+calls to other functions, calls from other functions) belongs to the function
+loaded just before the static function in the \fBa.out\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 19n
+.rt  
+Brief.  Suppress descriptions of each field in the profile.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 19n
+.rt  
+Discover the static call-graph of the program by a heuristic which examines the
+text space of the object file.  Static-only parents or children are indicated
+with call counts of 0. Note that for dynamically linked executables, the linked
+shared objects' text segments are not examined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 19n
+.rt  
+Demangle C++ symbol names before printing them out.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 19n
+.rt  
+Produce a profile file \fBgmon.sum\fR that represents the difference of the
+profile information in all specified profile files.  This summary profile file
+may be given to subsequent executions of  \fBgprof\fR (also with \fB-D\fR) to
+summarize profile data across several runs of an \fBa.out\fR file.  See also
+the \fB-s\fR option.
+.sp
+As an example, suppose function A calls function B  \fBn\fR times in profile
+file \fBgmon.sum\fR, and \fBm\fR times in profile file  \fBgmon.out\fR. With
+\fB-D\fR, a new \fBgmon.sum\fR file will be created showing the number of calls
+from A to B as \fBn-m\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fIfunction-name\fR\fR
+.ad
+.RS 19n
+.rt  
+Suppress printing the graph profile entry for routine \fIfunction-name\fR and
+all its descendants (unless they have other ancestors that are not suppressed).
+More than one \fB-e\fR option may be given.  Only one \fIfunction-name\fR may
+be given with each \fB-e\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fIfunction-name\fR\fR
+.ad
+.RS 19n
+.rt  
+Suppress printing the graph profile entry for routine \fIfunction-name\fR (and
+its descendants) as \fB-e\fR, below, and also exclude the time spent in
+\fIfunction-name\fR (and its descendants) from the total and percentage time
+computations. More than one \fB-E\fR option may be given.  For example:
+.sp
+\fB-E\fR \fImcount\fR \fB-E\fR \fImcleanup\fR
+.sp
+is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fIfunction-name\fR\fR
+.ad
+.RS 19n
+.rt  
+Print the graph profile entry only for routine \fIfunction-name\fR and its
+descendants.  More than one \fB-f\fR option may be given.  Only one
+\fIfunction-name\fR may be given with each \fB-f\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fIfunction-name\fR\fR
+.ad
+.RS 19n
+.rt  
+Print the graph profile entry only for routine \fIfunction-name\fR and its
+descendants (as \fB-f\fR, below) and also use only the times of the printed
+routines in total time and percentage computations.  More than one \fB-F\fR
+option may be given.  Only one \fIfunction-name\fR may be given with each
+\fB-F\fR option.  The \fB-F\fR option overrides the \fB-E\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 19n
+.rt  
+Suppress the reporting of graph profile entries for all local symbols.  This
+option would be the equivalent of placing all of the local symbols for the
+specified executable image on the \fB-E\fR exclusion list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 19n
+.rt  
+Limits the size of flat and graph profile listings to the top \fBn\fR offending
+functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 19n
+.rt  
+Produce a profile file \fBgmon.sum\fR which represents the sum of the profile
+information in all of the specified profile files.  This summary profile file
+may be given to subsequent executions of \fBgprof\fR (also with  \fB-s\fR) to
+accumulate profile data across several runs of an \fBa.out\fR file.  See also
+the \fB-D\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR\fR
+.ad
+.RS 19n
+.rt  
+Display routines which have zero usage (as indicated by call counts and
+accumulated time). This is useful in conjunction with the \fB-c\fR option for
+discovering which routines were never called. Note that this has restricted use
+for dynamically linked executables, since shared object text space will not be
+examined by the \fB-c\fR option.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPROFDIR\fR\fR
+.ad
+.RS 11n
+.rt  
+If this environment variable contains a value, place profiling output within
+that directory, in a file named \fIpid\fR\fB\&.\fR\fIprogramname\fR. \fIpid\fR
+is the process \fBID\fR and \fIprogramname\fR is the name of the program being
+profiled, as determined by removing any path prefix from the \fBargv[0]\fR with
+which the program was called. If the variable contains a null value, no
+profiling output is produced.  Otherwise, profiling output is placed in the
+file \fBgmon.out\fR.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa.out\fR\fR
+.ad
+.RS 30n
+.rt  
+executable file containing namelist
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgmon.out\fR\fR
+.ad
+.RS 30n
+.rt  
+dynamic call-graph and profile
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgmon.sum\fR\fR
+.ad
+.RS 30n
+.rt  
+summarized dynamic call-graph and profile
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$PROFDIR/\fR\fIpid\fR\fB\&.\fR\fIprogramname\fR\fR
+.ad
+.RS 30n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcc\fR(1), \fBld.so.1\fR(1), \fBprof\fR(1), \fBexit\fR(2), \fBpcsample\fR(2),
+\fBprofil\fR(2), \fBmalloc\fR(3C), \fBmalloc\fR(3MALLOC), \fBmonitor\fR(3C),
+\fBattributes\fR(5), \fBprof\fR(5)
+.sp
+.LP
+Graham, S.L., Kessler, P.B., McKusick, M.K., \fIgprof: A Call Graph Execution
+Profiler Proceedings of the SIGPLAN '82 Symposium on Compiler Construction\fR,
+\fBSIGPLAN\fR Notices, Vol. 17, No. 6, pp. 120-126, June 1982.
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.SH NOTES
+.sp
+.LP
+If the executable image has been stripped and does not have the \fB\&.symtab\fR
+symbol table, \fBgprof\fR reads the global dynamic symbol tables
+\fB\&.dynsym\fR and \fB\&.SUNW_ldynsym\fR, if present.  The symbols in the
+dynamic symbol tables are a subset of the symbols that are found in
+\fB\&.symtab\fR. The \fB\&.dynsym\fR symbol table contains the global symbols
+used by the runtime linker. \fB\&.SUNW_ldynsym\fR augments the information in
+\fB\&.dynsym\fR with local function symbols. In the case where \fB\&.dynsym\fR
+is found and \fB\&.SUNW_ldynsym\fR is not, only the  information for the global
+symbols is available. Without local symbols, the behavior is as described for
+the  \fB-a\fR option.
+.sp
+.LP
+\fBLD_LIBRARY_PATH\fR must not contain \fB/usr/lib\fR as a component when
+compiling a program for profiling.   If  \fBLD_LIBRARY_PATH\fR contains
+\fB/usr/lib\fR, the program will not be linked correctly with the profiling
+versions of  the system libraries in \fB/usr/lib/libp\fR.
+.sp
+.LP
+The times reported in successive identical runs may show variances because of
+varying cache-hit ratios that result from sharing the cache with other
+processes. Even if a program seems to be the only one using the machine, hidden
+background or asynchronous processes may blur the data. In rare cases, the
+clock ticks initiating recording of the program counter may \fBbeat\fR with
+loops in a program, grossly distorting measurements. Call counts are always
+recorded precisely, however.
+.sp
+.LP
+Only programs that call \fBexit\fR or return from \fBmain\fR are guaranteed to
+produce a profile file, unless a final call to \fBmonitor\fR is explicitly
+coded.
+.sp
+.LP
+Functions such as \fBmcount()\fR, \fB_mcount()\fR, \fBmoncontrol()\fR,
+\fB_moncontrol()\fR, \fBmonitor()\fR, and \fB_monitor()\fR may appear in the
+\fBgprof\fR report.  These functions are part of the profiling implementation
+and thus account for some amount of the runtime overhead.  Since these
+functions are not present in an unprofiled application, time accumulated and
+call counts for these functions may be ignored when evaluating the performance
+of an application.
+.SS "64-bit profiling"
+.sp
+.LP
+64-bit profiling may be used freely with dynamically linked executables, and
+profiling information is collected for the shared objects if the objects are
+compiled for profiling. Care must be applied to interpret the profile output,
+since it is possible for symbols from different shared objects to have the same
+name. If name duplication occurs in the profile output, the module id prefix
+before the symbol name in the symbol index listing can be used to identify the
+appropriate module for the symbol.
+.sp
+.LP
+When using the \fB-s\fR or \fB-D\fRoption to sum multiple profile files, care
+must be taken not to mix 32-bit profile files with 64-bit profile files.
+.SS "32-bit profiling"
+.sp
+.LP
+32-bit profiling may be used with dynamically linked executables, but care must
+be applied. In 32-bit profiling, shared objects cannot be profiled with
+\fBgprof\fR. Thus, when a profiled, dynamically linked program is executed,
+only the \fBmain\fR portion of the image is sampled. This means that all time
+spent outside of the \fBmain\fR object, that is, time spent in a shared object,
+will not be included in the profile summary; the total time reported for the
+program may be less than the total time used by the program.
+.sp
+.LP
+Because the time spent in a shared object cannot be accounted for, the use of
+shared objects should be minimized whenever a program is profiled with
+\fBgprof\fR. If desired, the program should be linked to the profiled version
+of a library (or to the standard archive version if no profiling version is
+available), instead of the shared object to get profile information on the
+functions of a library. Versions of profiled libraries may be supplied with the
+system in the \fB/usr/lib/libp\fR directory. Refer to compiler driver
+documentation on profiling.
+.sp
+.LP
+Consider an extreme case. A profiled program dynamically linked with the shared
+C library spends 100 units of time in some \fBlibc\fR routine, say,
+\fBmalloc()\fR. Suppose \fBmalloc()\fR is called only from routine \fBB\fR  and
+\fBB\fR consumes only 1 unit of time. Suppose further that routine \fBA\fR
+consumes 10 units of time, more than any other routine in the \fBmain\fR
+(profiled) portion of the image. In this case, \fBgprof\fR will conclude that
+most of the time is being spent in \fBA\fR and almost no time is being spent in
+\fBB\fR. From this it will be almost impossible to tell that the greatest
+improvement can be made by looking at routine \fBB\fR and not routine \fBA\fR.
+The value of the profiler in this case is severely degraded; the solution is to
+use archives as much as possible for profiling.
+.SH BUGS
+.sp
+.LP
+Parents which are not themselves profiled will have the time of their profiled
+children propagated to them, but they will appear to be spontaneously invoked
+in the call-graph listing, and will not have their time propagated further.
+Similarly, signal catchers, even though profiled, will appear to be spontaneous
+(although for more obscure reasons). Any profiled children of signal catchers
+should have their times propagated properly, unless the signal catcher was
+invoked during the execution of the profiling routine, in which case all is
+lost.

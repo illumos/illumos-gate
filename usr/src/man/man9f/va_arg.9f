@@ -1,0 +1,218 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH va_arg 9F "22 Mar 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+va_arg, va_start, va_copy, va_end \- handle variable argument list
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/varargs.h>
+
+
+
+\fBvoid\fR \fBva_start\fR(\fBva_list\fR \fIpvar\fR, \fB\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fB(type *)\fR \fBva_arg\fR(\fBva_list\fR \fIpvar\fR, \fB\fR\fItype\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBva_copy\fR(\fBva_list\fR \fIdest\fR, \fBva_list\fR \fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBva_end\fR(\fBva_list\fR \fIpvar\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.SS "\fBva_start()\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvar\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to variable argument list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 8n
+.rt  
+Identifier of rightmost parameter in the function definition.
+.RE
+
+.SS "\fBva_arg()\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvar\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to variable argument list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 8n
+.rt  
+Type name of the next argument to be returned.
+.RE
+
+.SS "\fBva_copy()\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdest\fR\fR
+.ad
+.RS 8n
+.rt  
+Destination variable argument list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrc\fR\fR
+.ad
+.RS 8n
+.rt  
+Source variable argument list.
+.RE
+
+.SS "\fBva_end()\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvar\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to variable argument list.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This set of macros allows portable procedures that accept variable argument
+lists to be written. Routines that have variable argument lists but do not use
+the \fBvarargs\fR macros are inherently non-portable, as different machines use
+different argument-passing conventions. Routines that accept a variable
+argument list can use these macros to traverse the list.
+.sp
+.LP
+\fBva_list\fR is the type defined for the variable used to traverse the list of
+arguments.
+.sp
+.LP
+\fBva_start()\fR is called to initialize \fIpvar\fR to the beginning of the
+variable argument list. \fBva_start()\fR must be invoked before any access to
+the unnamed arguments. The parameter \fIname\fR is the identifier of the
+rightmost parameter in the variable parameter list in the function definition
+(the one just before the "\fB, .\|.\|.\|\fR"). If this parameter is declared
+with the \fBregister\fR storage class or with a function or array type, or with
+a type that is not compatible with the type that results after application of
+the default argument promotions, the behavior is undefined.
+.sp
+.LP
+\fBva_arg()\fR expands to an expression that has the type and value of the next
+argument in the call. The parameter \fIpvar\fR must be initialized by
+\fBva_start()\fR. Each invocation of \fBva_arg()\fR modifies \fIpvar\fR so that
+the values of successive arguments are returned in turn. The parameter
+\fItype\fR is the type name of the next argument to be returned. The type name
+must be specified in such a way that the type of pointer to an object that has
+the specified type can be obtained by postfixing a \fB*\fR to \fItype\fR. If
+there is no actual next argument, or if\fBtype\fR is not compatible with the
+type of the actual next argument (as promoted according to the default argument
+promotions), the behavior is undefined.
+.sp
+.LP
+The \fBva_copy()\fR macro saves the state represented by the
+\fBva_list\fR\fIsrc\fR in the \fBva_list\fR \fIdest\fR. The \fBva_list\fR
+passed as \fIdest\fR should not be initialized by a previous call to
+\fBva_start()\fR It then must be passed to \fBva_end()\fR before being reused
+as a parameter to \fBva_start()\fR or as the \fIdest\fR parameter of a
+subsequent call to \fBva_copy()\fR. The behavior is undefined if any of these
+restrictions are not met.
+.sp
+.LP
+The \fBva_end()\fR macro is used to clean up. It invalidates \fIpvar\fR for use
+(unless \fBva_start()\fR is invoked again).
+.sp
+.LP
+Multiple traversals, each bracketed by a call to \fBva_start()\fR and
+\fBva_end()\fR, are possible.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating a Variable Length Command
+.sp
+.LP
+The following example uses these routines to create a variable length command.
+This might be useful for a device that provides for a variable-length command
+set. \fBncmdbytes\fR is the number of bytes in the command. The new command is
+written to \fBcmdp\fR.
+
+.sp
+.in +2
+.nf
+static void
+xx_write_cmd(uchar_t *cmdp, int ncmdbytes, ...)
+{
+        va_list	ap;
+        int	i;
+
+	       /*
+         * Write variable-length command to destination
+	        */
+         va_start(ap, ncmdbytes);
+         for (i = 0; i < ncmdbytes; i++) {
+                  *cmdp++ = va_arg(ap, uchar_t);
+	        }
+         va_end(ap);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBvcmn_err\fR(9F), \fBvsprintf\fR(9F)
+.SH NOTES
+.sp
+.LP
+It is up to the calling routine to specify in some manner how many arguments
+there are, since it is not always possible to determine the number of arguments
+from the stack frame.
+.sp
+.LP
+Specifying a second argument of \fBchar\fR or \fBshort\fR to \fBva_arg\fR makes
+your code non-portable, because arguments seen by the called function are not
+\fBchar\fR or \fBshort\fR. C converts \fBchar\fR and \fBshort\fR arguments to
+\fBint\fR before passing them to a function.

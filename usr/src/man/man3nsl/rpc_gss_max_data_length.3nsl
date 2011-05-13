@@ -1,0 +1,104 @@
+'\" te
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rpc_gss_max_data_length 3NSL "5 Feb 2002" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+rpc_gss_max_data_length, rpc_gss_svc_max_data_length \- get maximum data length
+for  transmission
+.SH SYNOPSIS
+.LP
+.nf
+#include <rpc/rpcsec_gss.h> 
+
+\fBint\fR \fBrpc_gss_max_data_length\fR(\fBAUTH\fR \fI*handle\fR, \fBint\fR \fImax_tp_unit_len\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrpc_gss_svc_max_data_length\fR(\fBstruct svc_req\fR \fI*req\fR, \fBint\fR \fImax_tp_unit_len\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Performing a security transformation on a piece of data generally produces
+data with a different (usually greater) length.  For some transports, such as
+UDP, there is a maximum length of data which can be sent out in one data unit.
+Applications need to know the maximum size a piece of data can be before it's
+transformed, so that the resulting data will still "fit" on the transport.
+These two functions return that maximum size.
+.sp
+.LP
+\fBrpc_gss_max_data_length()\fR is the client-side version;
+\fBrpc_gss_svc_max_data_length()\fR is the server-side version.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 20n
+.rt  
+An RPC context handle of type \fBAUTH,\fR returned when a context is created
+(for example, by \fBrpc_gss_seccreate()\fR. Security service and QOP are bound
+to this handle, eliminating any need to specify them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImax_tp_unit_len\fR \fR
+.ad
+.RS 20n
+.rt  
+The maximum size of a piece of data allowed by the transport.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIreq\fR \fR
+.ad
+.RS 20n
+.rt  
+A pointer to an RPC \fBsvc_req\fR structure, containing information on the
+context (for example, program number and credentials).
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Both functions return the maximum size of untransformed data allowed, as an
+\fBint\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrpc\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBattributes\fR(5) 
+.sp
+.LP
+\fIONC+ Developer\&'s Guide\fR 
+.sp
+.LP
+Linn, J. \fIRFC 2078, Generic Security Service Application Program Interface, Version 2\fR. Network Working Group. January 1997. 

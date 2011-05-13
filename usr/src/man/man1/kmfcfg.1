@@ -1,0 +1,897 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kmfcfg 1 "3 Feb 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+kmfcfg \- Key Management Policy and Plugin Configuration Utility
+.SH SYNOPSIS
+.LP
+.nf
+\fBkmfcfg\fR \fIsubcommand\fR [\fIoption\fR ...] 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkmfcfg\fR command allows users to configure Key Management Framework
+(KMF) policy databases. The KMF policy database (DB) restricts the use of keys
+and certificates that are managed through the KMF framework.
+.sp
+.LP
+\fBkmfcfg\fR provides the ability to list, create, modify, delete, import and
+export policy definitions either in the system default database file
+\fB/etc/security/kmfpolicy.xml\fR or a user-defined database file.
+.sp
+.LP
+For plugin configuration, \fBkmfcfg\fR allows users to display plugin
+information, install or uninstall a KMF plugin, and modify the plugin option.
+.SH SUBCOMMANDS
+.sp
+.LP
+The following subcommands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcreate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Adds a new policy into the policy database file.
+.sp
+The format for the \fBcreate\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+create [dbfile=\fIdbfile\fR] policy=\fIpolicyname\fR
+    [ignore-date=true|false]
+    [ignore-unknown-eku=true|false]
+    [ignore-trust-anchor=true|false]
+    [validity-adjusttime=\fIadjusttime\fR]
+    [ta-name=trust anchor subject DN]
+    [ta-serial=trust anchor serial number]
+    [ocsp-responder=\fIURL\fR]
+    [ocsp-proxy=\fIURL\fR]
+    [ocsp-use-cert-responder=true|false]
+    [ocsp-response-lifetime=timelimit]
+    [ocsp-ignore-response-sign=true|false]
+    [ocsp-responder-cert-name=Issuer DN]
+    [ocsp-responder-cert-serial=\fIserial number\fR]
+    [crl-basefilename=\fIbasefilename\fR]
+    [crl-directory=\fIdirectory\fR]
+    [crl-get-crl-uri=true|false]
+    [crl-proxy=\fIURL\fR]
+    [crl-ignore-crl-sign=true|false]
+    [crl-ignore-crl-date=true|false]
+    [keyusage=digitalSignature|nonRepudiation
+              |keyEncipherment | dataEncipherment |
+              keyAgreement |keyCertSign |
+              cRLSign | encipherOnly | decipherOnly],[...]
+    [ekunames=serverAuth | clientAuth |
+             codeSigning | emailProtection |
+             ipsecEndSystem | ipsecTunnel |
+             ipsecUser | timeStamping |
+             OCSPSigning],[...]
+    [ekuoids=\fIOID,OID,OID...\fR]
+.fi
+.in -2
+.sp
+
+The \fBcreate\fR subcommand supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrl-basefilename=\fR\fIfilename\fR\fR
+.ad
+.br
+.na
+\fB\fBcrl-directory=\fR\fIdirectory\fR\fR
+.ad
+.sp .6
+.RS 4n
+These two attributes are used to specify the location for CRL files. The
+\fBcrl-basefilename\fR attribute represents the base filename for a CRL file.
+The \fBcrl-directory\fR attribute represents the directory for CRL files, which
+defaults to the current directory.
+.sp
+If the \fBcrl-get-crl-uri\fR attribute is set to \fBtrue\fR and the
+\fBcrl-basefilename\fR is not specified, the \fBbasefilename\fR for the cached
+CRL file is the basename of the URI used to fetch the CRL file.
+.sp
+If the \fBcrl-get-crl-uri\fR attribute is set to \fBfalse\fR the
+\fBcrl-basefilename\fR needs to be specified to indicate an input CRL file. The
+setting for \fBcrl-get-crl-uri\fR is \fBfalse\fR by default.
+.sp
+These two attributes only apply to the file-based CRL plugins. The current
+file-based CRL plugins are \fBfile\fR and \fBpkcs11\fR keystores. For the
+\fBnss\fR keystore, the CRL location is always the NSS internal database.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrl-get-crl-uri=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+Configure if a CRL file is fetched and cached dynamically as part of the
+certificate validation, using the URI information from the certificate's
+distribution points extension.
+.sp
+The default for this attribute is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrl-ignore-crl-date=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBcrl-ignore-crl-date\fR is set to true, the validity time period of the
+CRL is not checked.
+.sp
+The default for this attribute is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrl-ignore-crl-sign=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBcrl-ignore-crl-sign\fR is set to \fBtrue\fR, the signature of the CRL is
+not checked.
+.sp
+The default for this attribute is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrl-proxy=\fR \fIURL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the proxy server name and port for dynamically retrieving a CRL file when
+\fBcrl-get-crl-uri\fR is set to \fBtrue\fR.
+.sp
+The port number is optional. If the port number is not specified, the default
+value is \fB8080\fR. An example \fBcrl-proxy\fR setting might be:
+\fBcrl-proxy=webcache.sfbay:8080\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdbfile=\fR\fIdbfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+The DB file to add the new policy. If not specified, the default is the system
+KMF policy database file \fB/etc/security/kmfpolicy.xml\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBekuoids=\fR\fIEKUOIDS\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma separated list of Extended Key Usage OIDs that are required by the
+policy being defined. The OIDs are expressed in \fBdot notation\fR, for
+example, \fB1.2.3.4\fR. An example \fBekuoids\fR setting might be:
+\fBekuoids=1.2.3.4,9.8.7.6.5\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBekunames=\fR\fIEKUNAMES\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma separated list of Extended Key Usage names that are required by the
+policy being defined. The list of values allowed for \fIEKUNAMES\fR are:
+\fBserverAuth\fR, \fBclientAuth\fR, \fBcodeSigning\fR, \fBemailProtection\fR,
+\fBipsecEndSystem\fR, \fBipsecTunnel\fR, \fBipsecUser\fR, \fBtimeStamping\fR,
+and \fBOCSPSigning\fR
+.sp
+The OCSP, CRL, key usage and extended key usage checkings are off by default.
+To turn on any one of them, specify one or more attributes for the particular
+checking. For example, if the \fBocsp-responder\fR attribute is set, then the
+OCSP checking is turned on. If the \fBekuname\fR attribute or the \fBekuoids\fR
+attribute is set, then the extended key usage checking is turned on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBignore-date=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the \fBIgnore Date\fR option for this policy. By default this value is
+\fBfalse\fR. If \fBtrue\fR is specified, the policy ignores the validity
+periods defined in the certificates when evaluating their validity.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBignore-unknown-eku=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the \fBIgnore Unknown EKU\fR option for this policy. By default this value
+is \fBfalse\fR. If \fBtrue\fR, the policy ignores any unrecognized EKU values
+in the Extended Key Usage extension.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBignore-trust-anchor=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the \fBIgnore Trust Anchor\fR option for this policy. By default this value
+is \fBfalse\fR. If \fBtrue\fR is specified, the policy does not verify the
+signature of the subject certificate using trust anchor certificate at
+validation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeyusage=\fR\fIKUVALUES\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma separated list of key usage values that are required by the policy
+being defined. The list of values allowed are: \fBdigitalSignature\fR,
+\fBnonRepudiation\fR, \fBkeyEncipherment\fR, \fBdataEncipherment\fR,
+\fBkeyAgreement\fR, \fBkeyCertSign\fR, \fBcRLSign\fR, \fBencipherOnly\fR,
+\fBdecipherOnly\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBocsp-ignore-response-sign=true | false\fR\fR
+.ad
+.sp .6
+.RS 4n
+If this attribute is set to \fBtrue\fR, the signature of the OCSP response is
+not verified. This attribute value is default to \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBocsp-proxy=\fR\fIURL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the proxy server name and port for OCSP. The port number is optional. If
+the port number is not specified, the default value is 8080. An example
+\fBocsp-proxy\fR setting might be: \fBocsp-proxy="webcache.sfbay:8080"\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBocsp-response-lifetime=\fR\fItimelimit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the \fBfreshness\fR period that a response must be. The \fItimelimit\fR can
+be specified by \fInumber-day\fR, \fInumber-hour\fR, \fInumber-minute\fR, or
+\fInumber-second\fR. An example \fBocsp-response-lifetime\fR setting might
+be:\fBocsp-response-lifetime=6-hour\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBocsp-responder-cert-name=\fR\fIIssuerDN\fR\fR
+.ad
+.br
+.na
+\fB\fBocsp-responder-cert-serial=\fR\fIserialNumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+These two attributes represent the OCSP responder certificate. The
+\fBocsp-responder-cert-name\fR is to specify the issuer name of the
+certificate. See the \fBta-name\fR option for example. The
+\fIocsp-responder-cert-serial\fR is for the serial number and must be specified
+as a hex value, for example, \fB0x0102030405060708090a0b0c0d0e0f\fR. If an OCSP
+responder is different from the issuer of the certificate and if the OCSP
+response needs to be verified, an OCSP responder certificate information should
+be provided.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBocsp-responder=\fR\fIURL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the OCSP responder URL for use with the OCSP validation method. For
+example, \fBocsp-responder=http://ocsp.verisign.com/ocsp/status\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBo\fBcsp-use-cert-responder=true | fals\fRe\fR
+.ad
+.sp .6
+.RS 4n
+Configure this policy to always use the responder defined in the certificate
+itself if possible.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpolicy=\fR\fIpolicyname\fR\fR
+.ad
+.sp .6
+.RS 4n
+The policy record to be created. \fIpolicyname\fR is required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvalidity-adjusttime=\fR\fIadjusttime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the adjust time for both ends of validity period for a certificate. The
+time can be specified by \fInumber-day, number-hour, number-minute, or
+number-second\fR. An example \fBvalidity-adjusttime\fR setting might be:
+\fBvalidity-adjusttime=6-hour. ta-name="Subject DN" ta-serial=serialNumber\fR
+.sp
+These two attributes represent the trust anchor certificate and are used to
+find the trust anchor certificate in the keystore. The \fIta-name\fR is to
+specify the distinguished name of the trust anchor certificate subject name.
+For example, \fBta-name="O=Sun Microsystems Inc., \ OU=Solaris Security
+Technologies Group, \ L=Ashburn, ST=VA, C=US, CN=John Smith"\fR The serial
+number of the TA certificate. This, along with the Issuer DN, is used to find
+the TA certificate in the keystore. The serial number must be specified as a
+hex value, for example, \fB0x0102030405060708090a0b0c0d0e\fR The trust anchor
+attributes need to be set, if the value of \fBignore-trust-anchor\fR attribute
+is false.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes any policy matching the indicated policy name. The system default
+policy (\fBdefault\fR) cannot be deleted.
+.sp
+The format for the \fBdelete\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+delete [dbfile=\fIdbfile\fR] policy=\fIpolicyname\fR
+.fi
+.in -2
+.sp
+
+The \fBdelete\fR subcommand supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fBdbfile=\fIdbfile\fR\fR
+.ad
+.RS 21n
+.rt  
+Read policy definitions from the indicated file. If \fIdbfile\fR is not
+specified, , the default is the system KMF policy database file:
+\fB/etc/security/kmfpolicy.xml\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpolicy=\fIpolicyname\fR\fR
+.ad
+.RS 21n
+.rt  
+The name of the policy to delete. \fIpolicyname\fR is required, if using the
+system database.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Exports a policy from one policy database file to another policy database file.
+.sp
+The format for the \fBexport\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+kmfcfg export policy=\fIpolicyname\fR outfile=\fInewdbfile\fR [dbfile=\fIdbfile\fR]
+.fi
+.in -2
+.sp
+
+The \fBexport\fR subcommand supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fBdbfile=\fIdbfile\fR\fR
+.ad
+.RS 24n
+.rt  
+The DB file where the exported policy is read. If \fIdbfile\fR is not
+specified, the default is the system KMF policy database file:
+\fB/etc/security/kmfpolicy.xml\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBoutfile=\fIoutputdbfile\fR\fR
+.ad
+.RS 24n
+.rt  
+The DB file where the exported policy is stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpolicy=\fIpolicyname\fR\fR
+.ad
+.RS 24n
+.rt  
+The policy record to be exported.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhelp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays help for the \fBkmfcfg\fR command.
+.sp
+The format for the \fBhelp\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+help
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Imports a policy from one policy database file to another policy database file.
+.sp
+The format for the \fBimport\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+kmfcfg import policy=\fIpolicyname\fR infile=\fIinputdbfile\fR [dbfile=\fIdbfile\fR]
+.fi
+.in -2
+.sp
+
+The \fBimport\fR subcommand supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fBpolicy=\fIpolicyname\fR\fR
+.ad
+.RS 22n
+.rt  
+The policy record to be imported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinfile=\fIinputdbfile\fR\fR
+.ad
+.RS 22n
+.rt  
+The DB file to read the policy from.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdbfile=\fIoutdbfile\fR\fR
+.ad
+.RS 22n
+.rt  
+The DB file to add the new policy. If not specified, the default is the system
+KMF policy database file \fB/etc/security/kmfpolicy.xml\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+Without arguments, lists all policy definitions from the default system
+database.
+.sp
+The format for the \fBlist\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+list [dbfile=\fIdbfile\fR] [policy=\fIpolicyname\fR]
+.fi
+.in -2
+.sp
+
+The \fBlist\fR subcommand supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fBdbfile=\fIdbfile\fR\fR
+.ad
+.RS 21n
+.rt  
+Reads policy definitions from the indicated file. If not specified, the default
+is the system KMF policy database file \fB/etc/security/kmfpolicy.xml\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpolicy=\fIpolicyname\fR\fR
+.ad
+.RS 21n
+.rt  
+Only display policy definition for the named policy.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmodify\fR\fR
+.ad
+.sp .6
+.RS 4n
+Modifies any policy matching the indicated name. The system default policy
+(\fBdefault\fR) cannot be modified.
+.sp
+The format for the \fBmodify\fR subcommand is as follows:
+.sp
+.in +2
+.nf
+modify [dbfile=\fIdbfile\fR] policy=\fIpolicyname\fR
+    [ignore-date=true|false]
+    [ignore-unknown-eku=true|false]
+    [ignore-trust-anchor=true|false]
+    [validity-adjusttime=\fIadjusttime\fR]
+    [ta-name=trust anchor subject DN]
+    [ta-serial=trust anchor serial number]
+    [ocsp-responder=\fIURL\fR]
+    [ocsp-proxy=\fIURL\fR]
+    [ocsp-use-cert-responder=true|false]
+    [ocsp-response-lifetime=timelimit]
+    [ocsp-ignore-response-sign=true|false]
+    [ocsp-responder-cert-name=Issuer DN]
+    [ocsp-responder-cert-serial=serial number]
+    [ocsp-none=true|false]
+    [crl-basefilename=\fIbasefilename\fR]
+    [crl-directory=\fIdirectory\fR]
+    [crl-get-crl-uri=true|false]
+    [crl-proxy=URL]
+    [crl-ignore-crl-sign=true|false]
+    [crl-ignore-crl-date=true|false]
+    [crl-none=true|false]
+    [keyusage=digitalSignature| nonRepudiation
+              |keyEncipherment | dataEncipherment |
+              keyAgreement |keyCertSign |
+              cRLSign | encipherOnly | decipherOnly],[...]
+    [keyusage-none=true|false]
+    [ekunames=serverAuth | clientAuth |
+             codeSigning | emailProtection |
+             ipsecEndSystem | ipsecTunnel |
+             ipsecUser | timeStamping |
+             OCSPSigning],[...]
+    [ekuoids=OID,OID,OID]
+    [eku-none=true|false]
+.fi
+.in -2
+.sp
+
+The \fBmodify\fR subcommand supports many of the same options as the
+\fBcreate\fR subcommand. For descriptions of shared options, see the create
+subcommand.
+.sp
+The \fBmodify\fR subcommand supports the following unique options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrl-none=true | false\fR\fR
+.ad
+.RS 30n
+.rt  
+If \fBcrl-none\fR is set to \fBtrue\fR, CRL checking is turned off. If this
+attribute is set to \fBtrue\fR, other CRL attributes cannot be set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdfile=[\fIdbfile\fR]\fR
+.ad
+.RS 30n
+.rt  
+The database file to modify a policy. If not specified, the default is the
+system KMF policy database file \fB/etc/security/kmfpolicy.xml\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBeku-none=true | false\fR
+.ad
+.RS 30n
+.rt  
+If \fBeku-none\fR is set to \fBtrue\fR, extended key usage checking is turned
+off. The extended key usage attributes, \fBekuname\fR and \fBekuoids\fR cannot
+be set at the same time if \fBeku-none\fR is set to \fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBkeyusage-none=true | false\fR
+.ad
+.RS 30n
+.rt  
+If \fBkeyusage-none\fR is set to true, key usage checking is turned off.
+.sp
+The \fBkeyusage\fR attribute cannot be set at the same time if this attribute
+is set to \fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBocsp-none=true | false\fR
+.ad
+.RS 30n
+.rt  
+If \fBocsp-none\fR is set to true, OCSP checking is turned off. Any other OCSP
+attribute is not set at the same time if this attribute is set to \fBtrue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpolicy=\fIpolicyname\fR\fR
+.ad
+.RS 30n
+.rt  
+The name of the policy to modify. \fIpolicyname\fR is required.
+The \fBdefault\fR policy in the system KMF policy database cannot be modified.
+.RE
+
+.RE
+
+.SS "Plugin Subcommands"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinstall keystore=\fR\fIkeystore_name\fR \fBmodulepath=\fR\fIpathname\fR\e
+\fB[option=\fR\fIoption_str\fR\fB]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Install a plugin into the system. The \fBmodulepath\fR field specifies the
+pathname to a KMF plugin shared library object. If \fIpathname\fR is not
+specified as an absolute pathname, shared library objects are assumed to be
+relative to \fB/lib/security/$ISA/\fR. The \fBISA\fR token is replaced by an
+implementation defined directory name which defines the pathname relative to
+the calling program's instruction set architecture.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist plugin\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display KMF plugin information.
+.sp
+Without the \fBplugin\fRkeyword, \fBkmfcfg list\fR shows the policy information
+as described in the \fBSUBCOMMANDS\fR section.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmodify plugin keystore=\fR\fIkeystore_name\fR
+\fBoption=\fR\fIoption_str\fR\fR
+.ad
+.sp .6
+.RS 4n
+Modify the \fBplugin\fR option. The \fBplugin\fR option is defined by the
+plugin and is interpreted by the plugin specifically, therefore this command
+accepts any option string.
+.sp
+Without the \fBplugin\fR keyword, \fBkmfcfg modify\fR updates the policy
+configuration as described in the \fBSUBCOMMANDS\fR section.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuninstall keystore=\fR\fIkeystore_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uninstall the plugin with the \fIkeystore_name\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating a New Policy
+.sp
+.LP
+The following example creates a new policy called IPSEC in the system database:
+
+.sp
+.in +2
+.nf
+$ kmfcfg create IPSEC \e
+ignore-trust-anchor=true \e
+ocsp-use-cert-responder=true \e
+keyusage=keyAgreement,keyEncipherment,dataEncipherment \e
+ekuname=ipsecTunnel,ipsecUser
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/kmfpolicy.xml\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default system policy database
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

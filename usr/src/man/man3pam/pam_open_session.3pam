@@ -1,0 +1,110 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_open_session 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_open_session, pam_close_session \- perform PAM session creation and
+termination operations
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+
+
+\fBint\fR \fBpam_open_session\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpam_close_session\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_open_session()\fR function is called after a user has been
+successfully authenticated. See  \fBpam_authenticate\fR(3PAM) and
+\fBpam_acct_mgmt\fR(3PAM). It is used to notify the session modules that a new
+session  has been initiated.  All programs that use the  \fBpam\fR(3PAM)
+library should invoke \fBpam_open_session()\fR when beginning a new session.
+Upon termination of this activity, \fBpam_close_session()\fR should be invoked
+to inform \fBpam\fR(3PAM) that the session has terminated.
+.sp
+.LP
+The \fIpamh\fR argument is an authentication handle obtained by a prior call to
+\fBpam_start()\fR. The following flag may be set in the \fIflags\fR field for
+\fBpam_open_session()\fR and \fBpam_close_session()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 14n
+.rt  
+The session service should not generate any messages.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fBPAM_SUCCESS\fR is returned.  In addition to the
+return values defined in \fBpam\fR(3PAM), the following value may be returned
+on error:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SESSION_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+Cannot make or remove an entry for the specified session.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetutxent\fR(3C), \fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM),
+\fBpam_authenticate\fR(3PAM), \fBpam_start\fR(3PAM), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+In many instances, the \fBpam_open_session()\fR and \fBpam_close_session()\fR
+calls may be made by different processes. For example, in UNIX the \fBlogin\fR
+process opens a session, while the \fBinit\fR process closes the session.  In
+this case, \fBUTMP/WTMP\fR entries may be used to link the call to
+\fBpam_close_session()\fR with an earlier call to \fBpam_open_session()\fR.
+This is possible because \fBUTMP/WTMP\fR entries are uniquely identified by a
+combination of attributes, including the user login name and device name, which
+are accessible through the  \fBPAM\fR handle, \fIpamh\fR. The call to
+\fBpam_open_session()\fR should precede  \fBUTMP/WTMP\fR entry management, and
+the call to \fBpam_close_session()\fR should follow  \fBUTMP/WTMP\fR exit
+management.
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own  \fBPAM\fR handle.

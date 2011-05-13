@@ -1,0 +1,203 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH door_info 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+door_info \- return information associated with a door descriptor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <door.h>
+
+\fBint\fR \fBdoor_info\fR(\fBint\fR \fId\fR, \fBstruct door_info *\fR\fIinfo\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdoor_info()\fR function returns information associated with a door
+descriptor. It obtains information about the door descriptor \fId\fR and places
+the information that is relevant to the door in the structure pointed to by the
+\fIinfo\fR argument.
+.sp
+.LP
+The \fBdoor_info\fR structure pointed to by the \fIinfo\fR argument contains
+the following members:
+.sp
+.in +2
+.nf
+pid_t           di_target;      /* door server pid */
+door_ptr_t      di_proc;        /* server function */
+door_ptr_t      di_data;        /* data cookie for invocation */
+door_attr_t     di_attributes;  /* door attributes */
+door_id_t       di_uniquifier;  /* unique id among all doors */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBdi_target\fR member is the process \fBID\fR of the door server, or
+\fB\(mi1\fR if the door server process has exited.
+.sp
+.LP
+The values for  \fBdi_attributes\fR may be composed of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_LOCAL\fR\fR
+.ad
+.RS 20n
+.rt  
+The door descriptor refers to a service procedure in this process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_UNREF\fR\fR
+.ad
+.RS 20n
+.rt  
+The door has requested notification when all but the last reference has gone
+away.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_UNREF_MULTI\fR\fR
+.ad
+.RS 20n
+.rt  
+Similar to \fBDOOR_UNREF\fR, except multiple unreferenced notifications may be
+delivered for this door.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_IS_UNREF\fR\fR
+.ad
+.RS 20n
+.rt  
+There is currently only one descriptor referring to the door.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_REFUSE_DESC\fR\fR
+.ad
+.RS 20n
+.rt  
+The door refuses any attempt to \fBdoor_call\fR(3C) it with argument
+descriptors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_NO_CANCEL\fR\fR
+.ad
+.RS 20n
+.rt  
+Clients who abort a \fBdoor_call\fR(3C) call on this door will not cause the
+\fBcancellation\fR(5) of the server thread handling the request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_REVOKED\fR\fR
+.ad
+.RS 20n
+.rt  
+The door descriptor refers to a door that has been revoked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_PRIVATE\fR\fR
+.ad
+.RS 20n
+.rt  
+The door has a separate pool of server threads associated with it.
+.RE
+
+.sp
+.LP
+The \fBdi_proc\fR and  \fBdi_data\fR members are returned as \fBdoor_ptr_t\fR
+objects rather than \fBvoid\fR \fB*\fR pointers to allow clients and servers to
+interoperate in environments where the pointer sizes may vary in size (for
+example, 32-bit clients and 64-bit servers). Each door has a system-wide unique
+number associated with  it that is set when the door is created by
+\fBdoor_create()\fR. This number is returned in \fBdi_uniquifier\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fB0\fR is returned. Otherwise,  \fB\(mi1\fR is
+returned and  \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBdoor_info()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The address of argument \fIinfo\fR is an invalid address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+\fId\fR is not a door descriptor.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityStable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdoor_bind\fR(3C), \fBdoor_call\fR(3C), \fBdoor_create\fR(3C),
+\fBdoor_server_create\fR(3C), \fBattributes\fR(5), \fBcancellation\fR(5)

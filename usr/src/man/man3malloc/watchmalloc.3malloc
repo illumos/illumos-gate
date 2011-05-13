@@ -1,0 +1,234 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH watchmalloc 3MALLOC "10 Jan 2007" "SunOS 5.11" "Memory Allocation Library Functions"
+.SH NAME
+watchmalloc \- debugging memory allocator
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBvoid *\fR\fBmalloc\fR(\fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfree\fR(\fBvoid *\fR\fIptr\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBrealloc\fR(\fBvoid *\fR\fIptr\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBmemalign\fR(\fBsize_t\fR \fIalignment\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBvalloc\fR(\fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBcalloc\fR(\fBsize_t\fR \fInelem\fR, \fBsize_t\fR \fIelsize\fR);
+.fi
+
+.LP
+.nf
+#include <malloc.h>
+
+\fBint\fR \fBmallopt\fR(\fBint\fR \fIcmd\fR, \fBint\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBstruct mallinfo\fR \fBmallinfo\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The collection of \fBmalloc()\fR functions in this shared object are an
+optional replacement for the standard versions of the same  functions in the
+system C library. See \fBmalloc\fR(3C). They provide a more strict interface
+than the standard versions and enable enforcement of the interface through the
+watchpoint facility of \fB/proc\fR. See \fBproc\fR(4).
+.sp
+.LP
+Any dynamically linked application can be run with these functions in place of
+the standard functions if the following string is present in the environment
+(see \fBld.so.1\fR(1)):
+.sp
+.in +2
+.nf
+ LD_PRELOAD=watchmalloc.so.1
+.fi
+.in -2
+
+.sp
+.LP
+The individual function interfaces are identical to the standard ones as
+described in \fBmalloc\fR(3C). However, laxities provided in the standard
+versions are not permitted when the watchpoint facility is enabled (see
+\fBWATCHPOINTS\fR  below):
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Memory may not be freed more than once.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A pointer to freed memory may not be used in a call to \fBrealloc()\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A call to \fBmalloc()\fR immediately following a call to \fBfree()\fR will not
+return the same space.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any reference to memory that has been freed yields undefined results.
+.RE
+.sp
+.LP
+To enforce these restrictions partially, without great loss in speed as
+compared to the watchpoint facility described below, a freed block of memory is
+overwritten with the pattern \fB0xdeadbeef\fR before returning from
+\fBfree()\fR. The \fBmalloc()\fR function returns with the allocated memory
+filled with the pattern \fB0xbaddcafe\fR as a precaution against applications
+incorrectly expecting to receive back unmodified memory from the last
+\fBfree()\fR. The \fBcalloc()\fR function always returns with the memory
+zero-filled.
+.sp
+.LP
+Entry points for \fBmallopt()\fR and \fBmallinfo()\fR are provided as empty
+routines, and are present only because some \fBmalloc()\fR implementations
+provide them.
+.SH WATCHPOINTS
+.sp
+.LP
+The watchpoint facility of \fB/proc\fR can be applied by a process to itself.
+The functions in \fBwatchmalloc.so.1\fR use this feature if the following
+string is present in the environment:
+.sp
+.LP
+MALLOC_DEBUG=WATCH
+.sp
+.LP
+This causes every block of freed memory to be covered with \fBWA_WRITE\fR
+watched areas. If the application attempts to write any part of freed memory,
+it will trigger a watchpoint trap, resulting in a \fBSIGTRAP\fR signal, which
+normally produces an  application core dump.
+.sp
+.LP
+A header is maintained before each block of allocated memory. Each header is
+covered with a watched area, thereby providing a red zone before and after each
+block of allocated memory (the header for the subsequent memory block serves as
+the trailing red zone for its preceding memory block). Writing just before or
+just after a memory block returned by \fBmalloc()\fR will trigger a watchpoint
+trap.
+.sp
+.LP
+Watchpoints incur a large performance penalty. Requesting
+\fBMALLOC_DEBUG=WATCH\fR can cause the application to run 10 to 100 times
+slower, depending on the use made of allocated memory.
+.sp
+.LP
+Further options are enabled by specifying a comma-separated string of options:
+.sp
+.LP
+MALLOC_DEBUG=WATCH,RW,STOP
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWATCH\fR\fR
+.ad
+.RS 9n
+.rt  
+Enables \fBWA_WRITE\fR watched areas as described above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRW\fR\fR
+.ad
+.RS 9n
+.rt  
+Enables both \fBWA_READ\fR and \fBWA_WRITE\fR watched areas. An attempt either
+to read or write freed memory or the red zones will trigger a watchpoint trap.
+This incurs even more overhead and can cause the application to run up to 1000
+times slower.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTOP\fR\fR
+.ad
+.RS 9n
+.rt  
+The process will stop showing a \fBFLTWATCH\fR machine fault if it triggers a
+watchpoint trap, rather than dumping core with a \fBSIGTRAP\fR signal. This
+allows a debugger to be attached to the live process at the point where it
+underwent the watchpoint trap. Also, the various \fB/proc\fR tools described in
+\fBproc\fR(1) can be used to examine the stopped process.
+.RE
+
+.sp
+.LP
+One of \fBWATCH\fR or \fBRW\fR must be specified, else the watchpoint facility
+is not engaged. \fBRW\fR overrides \fBWATCH\fR. Unrecognized options are
+silently ignored.
+.SH LIMITATIONS
+.sp
+.LP
+Sizes of memory blocks allocated by \fBmalloc()\fR are rounded up to the
+worst-case alignment size, 8 bytes for 32-bit processes and 16 bytes for 64-bit
+processes. Accessing the extra space allocated for a memory block is
+technically a memory violation but is in fact innocuous. Such accesses are not
+detected by the watchpoint facility of \fBwatchmalloc\fR.
+.sp
+.LP
+Interposition of \fBwatchmalloc.so.1\fR fails innocuously if the target
+application is statically linked with respect to its \fBmalloc()\fR functions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBproc\fR(1), \fBbsdmalloc\fR(3MALLOC), \fBcalloc\fR(3C), \fBfree\fR(3C),
+\fBmalloc\fR(3C), \fBmalloc\fR(3MALLOC), \fBmapmalloc\fR(3MALLOC),
+\fBmemalign\fR(3C), \fBrealloc\fR(3C), \fBvalloc\fR(3C),
+\fBlibmapmalloc\fR(3LIB), \fBproc\fR(4), \fBattributes\fR(5)

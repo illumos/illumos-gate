@@ -1,0 +1,181 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gld_stats 9S "7 Jun 2004" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+gld_stats \- Generic LAN Driver statistics data structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/gld.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The Generic LAN Driver (GLD) statistics (\fBgld_stats\fR) structure is used to
+communicate statistics and state information from a GLD-based driver to GLD
+when returning from a driver's \fBgldm_get_stats()\fR routine as discussed in
+\fBgld\fR(9E) and \fBgld\fR(7D). The members of this structure, filled in by
+the GLD-based driver, are used when GLD reports the statistics. In the tables
+below, the name of the statistics variable reported by GLD is noted in the
+comments. See \fBgld\fR(7D) for a more detailed description of the meaning of
+each statistic.
+.sp
+.LP
+Drivers can make no assumptions about the length of this structure, which might
+be different in different releases of Solaris and/or GLD. Structure members
+private to GLD, not documented here, should not be set or read by the device
+specific driver.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The following structure members are defined for all media types:
+.sp
+.in +2
+.nf
+uint64_t   glds_speed;               /* ifspeed */
+uint32_t   glds_media;               /* media */
+uint32_t   glds_intr;                /* intr */
+uint32_t   glds_norcvbuf;            /* norcvbuf */
+uint32_t   glds_errrcv;              /* ierrors */
+uint32_t   glds_errxmt;              /* oerrors */
+uint32_t   glds_missed;              /* missed */
+uint32_t   glds_underflow;           /* uflo */
+uint32_t   glds_overflow;            /* oflo */
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following structure members are defined for media type \fBDL_ETHER\fR:
+.sp
+.in +2
+.nf
+uint32_t   glds_frame;                   /* align_errors */
+uint32_t   glds_crc;                     /* fcs_errors */
+uint32_t   glds_duplex;                  /* duplex */
+uint32_t   glds_nocarrier;               /* carrier_errors */
+uint32_t   glds_collisions;              /* collisions */
+uint32_t   glds_excoll;                  /* ex_collisions */
+uint32_t   glds_xmtlatecoll;             /* tx_late_collisions */
+uint32_t   glds_defer;                   /* defer_xmts */
+uint32_t   glds_dot3_first_coll;         /* first_collisions */
+uint32_t   glds_dot3_multi_coll;         /* multi_collisions */
+uint32_t   glds_dot3_sqe_error;          /* sqe_errors */
+uint32_t   glds_dot3_mac_xmt_error;      /* macxmt_errors */
+uint32_t   glds_dot3_mac_rcv_error;      /* macrcv_errors */
+uint32_t   glds_dot3_frame_too_long;     /* toolong_errors */
+uint32_t   glds_short;                   /* runt_errors */
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following structure members are defined for media type \fBDL_TPR\fR:
+.sp
+.in +2
+.nf
+uint32_t   glds_dot5_line_error          /* line_errors */
+uint32_t   glds_dot5_burst_error         /* burst_errors */
+uint32_t   glds_dot5_signal_loss         /* signal_losses */
+uint32_t   glds_dot5_ace_error           /* ace_errors */
+uint32_t   glds_dot5_internal_error      /* internal_errors */
+uint32_t   glds_dot5_lost_frame_error    /* lost_frame_errors */
+uint32_t   glds_dot5_frame_copied_error  /* frame_copied_errors */
+uint32_t   glds_dot5_token_error         /* token_errors */
+uint32_t   glds_dot5_freq_error          /* freq_errors */
+.fi
+.in -2
+.sp
+
+.LP
+Note -
+.sp
+.RS 2
+Support for the DL_TPR media type is obsolete and may be removed in a future
+release of Solaris.
+.RE
+.sp
+.LP
+The following structure members are defined for media type \fBDL_FDDI\fR:
+.sp
+.in +2
+.nf
+uint32_t   glds_fddi_mac_error;          /* mac_errors */
+uint32_t   glds_fddi_mac_lost;           /* mac_lost_errors */
+uint32_t   glds_fddi_mac_token;          /* mac_tokens */
+uint32_t   glds_fddi_mac_tvx_expired;    /* mac_tvx_expired */
+uint32_t   glds_fddi_mac_late;           /* mac_late */
+uint32_t   glds_fddi_mac_ring_op;        /* mac_ring_ops */
+.fi
+.in -2
+.sp
+
+.LP
+Note -
+.sp
+.RS 2
+Support for the DL_FDDI media type is obsolete and may be removed in a future
+release of Solaris.
+.RE
+.sp
+.LP
+Most of the above statistics variables are counters denoting the number of
+times the particular event was observed. Exceptions are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBglds_speed\fR \fR
+.ad
+.RS 16n
+.rt  
+An estimate of the interface's current bandwidth in bits per second. For
+interfaces that do not vary in bandwidth or for those where no accurate
+estimation can be made, this object should contain the nominal bandwidth.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBglds_media\fR \fR
+.ad
+.RS 16n
+.rt  
+The type of media (wiring) or connector used by the hardware. Currently
+supported media names include \fBGLDM_AUI\fR, \fBGLDM_BNC\fR, \fBGLDM_TP\fR,
+\fBGLDM_10BT\fR, \fBGLDM_100BT\fR, \fBGLDM_100BTX\fR, \fBGLDM_100BT4\fR,
+\fBGLDM_RING4\fR, \fBGLDM_RING16\fR, \fBGLDM_FIBER\fR, and \fBGLDM_PHYMII\fR.
+\fBGLDM_UNKNOWN\fR can also be specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBglds_duplex\fR \fR
+.ad
+.RS 16n
+.rt  
+Current duplex state of the interface. Supported values are
+\fBGLD_DUPLEX_HALF\fR and \fBGLD_DUPLEX_FULL\fR. \fBGLD_DUPLEX_UNKNOWN\fR can
+also be specified.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgld\fR(7D), \fBgld\fR(9F), \fBgld\fR(9E), \fBgld_mac_info\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

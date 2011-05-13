@@ -1,0 +1,93 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH putbq 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+putbq \- place a message at the head of a queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBputbq\fR(\fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message block.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBputbq()\fR function places a message at the beginning of the appropriate
+section of the message queue. There are always sections for high priority and
+ordinary messages. If other priority bands are used, each will have its own
+section of the queue, in priority band order, after high priority messages and
+before ordinary messages. \fBputbq()\fR can be used for ordinary, priority
+band, and high priority messages. However, unless precautions are taken, using
+\fBputbq()\fR with a high priority message is likely to lead to an infinite
+loop of putting the message back on the queue, being rescheduled, pulling it
+off, and putting it back on.
+.sp
+.LP
+This function is usually called when \fBbcanput\fR(9F) or \fBcanput\fR(9F)
+determines that the message cannot be passed on to the next stream component.
+The flow control parameters are updated to reflect the change in the queue's
+status. If \fBQNOENB\fR is not set, the service routine is enabled.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBputbq()\fR function returns \fB1\fR upon success and \fB0\fR upon
+failure.
+.sp
+.LP
+Upon failure, the caller should call \fBfreemsg\fR(9F) to free the pointer to
+the message block.
+.SH CONTEXT
+.sp
+.LP
+The \fBputbq()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+See the \fBbufcall\fR(9F) function page for an example of \fBputbq()\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBbcanput\fR(9F), \fBbufcall\fR(9F), \fBcanput\fR(9F), \fBgetq\fR(9F),
+\fBputq\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

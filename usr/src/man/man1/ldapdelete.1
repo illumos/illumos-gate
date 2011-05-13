@@ -1,0 +1,597 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldapdelete 1 "15 Jan 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+ldapdelete \- ldap delete entry tool
+.SH SYNOPSIS
+.LP
+.nf
+\fBldapdelete\fR [\fB-n\fR] [\fB-v\fR] [\fB-c\fR] [\fB-d\fR \fIdebuglevel\fR] [\fB-f\fR \fIfile\fR] 
+     [\fB-D\fR \fIbindDN\fR] [\fB-w\fR \fIpasswd\fR | \fB-j\fR \fIfile\fR] [\fB-J\fR [:\fIcriticality\fR]] 
+     [\fB-?\fR] [\fB-H\fR] [\fB-h\fR \fIldaphost\fR] [\fB-V\fR \fIversion\fR] [\fB-i\fR \fIlocale\fR] 
+     [\fB-k\fR \fIpath\fR] [\fB-P\fR \fIpath\fR] [\fB-N\fR \fIcertificate\fR] [\fB-y\fR \fIproxyid\fR] 
+     [\fB-p\fR \fIldapport\fR] [\fB-O\fR \fIhoplimit\fR] [\fB-o\fR \fIattributename\fR=\fIvalue\fR] 
+     [\fB-W\fR \fIpassword\fR] [\fIdn\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldapdelete\fR utility opens a connection to an \fBLDAP\fR server, then
+binds and deletes one or more entries. If one or more \fIdn\fR arguments are
+provided, entries with those distinguished names are deleted. If no \fIdn\fR
+arguments are provided, a list of \fBDN\fRs is read from \fIfile\fR, if the
+\fB-f\fR option is specified, or from standard input.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Bypass confirmation question when deleting a branch.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Continuous operation mode. Errors are reported, but \fBldapdelete\fR will
+continue with deletions. The default is to exit after reporting an error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdebuglevel\fR \fR
+.ad
+.sp .6
+.RS 4n
+Sets the \fBLDAP\fR debugging level. Useful levels of debugging for
+\fBldapdelete\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 7n
+.rt  
+Trace
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 7n
+.rt  
+Packets
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 7n
+.rt  
+Arguments
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB32\fR\fR
+.ad
+.RS 7n
+.rt  
+Filters
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB128\fR\fR
+.ad
+.RS 7n
+.rt  
+Access control
+.RE
+
+To request more than one category of debugging information, add the masks. For
+example, to request trace and filter information, specify a \fIdebuglevel\fR of
+\fB33\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR \fIbindDN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses the distinguished name \fIbindDN\fR to bind to the directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ask server to expose (report) bind identity by means of authentication response
+control.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reads the entry deletion information from \fIfile\fR instead of from standard
+input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the usage help text that briefly describes all options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the usage help text that briefly describes all options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fIldaphost\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an alternate host on which the LDAP server is running.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIlocale\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the character set to use for command-line input. The default is the
+character set specified in the \fBLANG\fR environment variable. You might want
+to use this option to perform the conversion from the specified character set
+to UTF8, thus overriding the \fBLANG\fR setting.
+.sp
+Using this argument, you can input the bind DN and the target DNs in the
+specified character set. The \fBldapdelete\fR tool converts the input from
+these arguments before it processes the search request. For example, \fB-i\fR
+\fBno\fR indicates that the bind DN and target DNs are provided in Norwegian.
+.sp
+This option affects only the command-line input. That is, if you specify a file
+containing DNs (with the \fB-f\fR option), \fBldapdelete\fR will not convert
+the data in the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-j\fR \fIfilename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify a file containing the password for the bind DN or the password for the
+SSL client's key database. To protect the password, use this option in scripts
+and place the password in a secure file. This option is mutually exclusive of
+the \fB-w\fR and \fB-W\fR options. The \fB-j\fR option is the more secure
+alternative between \fB-j\fR and \fB-w\fR/\fB-W\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-J\fR [:\fIcriticality\fR[:\fIvalue\fR|::\fIb64value\fR|\fIb64value\fR|:\
+fIfileurl\fR]]\fR
+.ad
+.sp .6
+.RS 4n
+Criticality is a boolean value (default is \fBfalse\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIpath\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the path to a directory containing conversion routines. These routines
+are used if you want to specify a locale that is not supported by default by
+your directory server. This is for NLS support.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fR
+.ad
+.sp .6
+.RS 4n
+Manage smart referrals. When they are the target of the operation, delete the
+actual entry containing the referral instead of the entry obtained by following
+the referral.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Shows what would be done, but does not actually delete entries. Useful in
+conjunction with options \fB-v\fR and \fB-d\fR for debugging.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fIcertificate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the certificate name to use for certificate-based client
+authentication. For example: \fB-N\fR \fB"Directory-Cert"\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIattributename\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+For SASL mechanisms and other options such as security properties, mode of
+operation, authorization ID, authentication ID, and so forth.
+.sp
+The different attribute names and their values are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsecProp\fR=\fI"number"\fR\fR
+.ad
+.RS 20n
+.rt  
+For defining SASL security properties.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrealm\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specifies SASL realm (default is \fBrealm=none\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthzid\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specify the authorization ID name for SASL bind.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthid\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specify the authentication ID for SASL bind.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmech\fR=\fI"value"\fR\fR
+.ad
+.RS 20n
+.rt  
+Specifies the various SASL mechanisms.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-O\fR \fIhopLimit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the maximum number of referral hops to follow while finding an entry to
+delete. By default, there is no limit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIldapport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an alternate \fBTCP\fR port where the LDAP server is listening.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR \fIpath\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the path and filename of the client's certificate database. For
+example:
+.sp
+.in +2
+.nf
+-P /home/uid/.netscape/cert7.db
+.fi
+.in -2
+
+When using the command on the same host as the directory server, you can use
+the server's own certificate database. For example:
+.sp
+.in +2
+.nf
+-P \fIinstallDir\fR/lapd-serverID/alias/cert7.db
+.fi
+.in -2
+
+Use the \fB-P\fR option alone to specify server authentication only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses verbose mode, with diagnostics written to standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR \fIversion\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the LDAP protocol version number to be used for the delete operation,
+either 2 or 3. LDAP v3 is the default. Specify LDAP v2 when connecting to
+servers that do not support v3.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-W\fR \fIpassword\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the password for the client's key database given in the \fB-P\fR
+option. This option is required for certificate-based client authentication.
+Specifying \fIpassword\fR on the command line has security issues because the
+password can be seen by others on the system by means of the \fBps\fR command.
+Use the \fB-j\fR instead to specify the password from the file. This option is
+mutually exclusive of \fB-j\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fIpasswd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIpasswd\fR as the password for authentication to the directory. When you
+use \fB-w\fR\fI passwd\fR to specify the password to be used for
+authentication, the password is visible to other users of the system by means
+of the \fBps\fR command, in script files or in shell history. If you use the
+\fBldapdelete\fR command without this option, the command will prompt for the
+password and read it from standard in. When used without the \fB-w\fR option,
+the password will not be visible to other users.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Y\fR \fIproxyid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the proxy DN (proxied authorization id) to use for the delete
+operation, usually in double quotes ("") for the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Z\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify that SSL be used to provide certificate-based client authentication.
+This option requires the \fB-N\fR and SSL password and any other of the SSL
+options needed to identify the certificate and the key database.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdn\fR\fR
+.ad
+.RS 6n
+.rt  
+Specifies one or several distinguished names of entries to delete.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDeleting an Entry
+.sp
+.LP
+To delete the entry named with commonName \fBDelete Me\fR directly below the
+\fBXYZ\fR Corporation organizational entry, use the following command:
+
+.sp
+.in +2
+.nf
+example% \fBldapdelete -D "cn=Administrator, o=XYZ, c=US" \e
+  "cn=Delete Me, o=XYZ, c=US"\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDeleting an Entry Using SASL Authentication
+.sp
+.LP
+To delete the entry named with \fBcommonName\fR "Delete Me" directly below the
+XYZ Corporation organizational entry, use the following command:
+
+.sp
+.in +2
+.nf
+example% \fBldapdelete -o mech=DIGEST-MD5 -o secProp=noanonymous \e
+-o realm=none -o authid="dn:uid=foo,o=XYZ, c=US"  \e
+"cn=Delete Me, o=XYZ, c=US"\fR
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Stability LevelEvolving
+.TE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 13n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNon-zero \fR
+.ad
+.RS 13n
+.rt  
+An error occurred. A diagnostic message is written to standard error.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldapadd\fR(1), \fBldapmodify\fR(1), \fBldapmodrdn\fR(1),
+\fBldapsearch\fR(1), \fBldap_get_option\fR(3LDAP),
+\fBldap_set_option\fR(3LDAP), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fB-M\fR \fIauthentication\fR option is obsolete.

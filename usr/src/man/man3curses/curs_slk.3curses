@@ -1,0 +1,158 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_slk 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_slk, slk_init, slk_set, slk_refresh, slk_noutrefresh, slk_label,
+slk_clear, slk_restore, slk_touch, slk_attron, slk_attrset, slk_attroff \-
+curses soft label routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBslk_init\fR(\fBint\fR \fIfmt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_set\fR(\fBint\fR \fIlabnum\fR, \fBchar *\fR\fIlabel\fR, \fBint\fR \fIfmt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_refresh\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_noutrefresh\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBslk_label\fR(\fBint\fR \fIlabnum\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_clear\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_restore\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_touch\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attron\fR(\fBchtype\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attrset\fR(\fBchtype\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBslk_attroff\fR(\fBchtype\fR \fIattrs\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBcurses\fR manipulates the set of soft function-key labels that exist on many
+terminals. For those terminals that do not have soft labels, \fBcurses\fR takes
+over the bottom line of \fBstdscr\fR, reducing the size of \fBstdscr\fR and the
+variable \fBLINES\fR. \fBcurses\fR standardizes on eight labels of up to eight
+characters each.
+.sp
+.LP
+To use soft labels, the \fBslk_init()\fR routine must be called before
+\fBinitscr()\fR or \fBnewterm()\fR is called. If \fBinitscr()\fR eventually
+uses a line from \fBstdscr\fR to emulate the soft labels, then \fBfmt\fR
+determines how the labels are arranged on the screen. Setting \fBfmt\fR to
+\fB0\fR indicates a 3-2-3 arrangement of the labels; \fB1\fR indicates a 4-4
+arrangement.
+.sp
+.LP
+With the \fBslk_set()\fR routine, \fIlabnum\fR is the label number, from
+\fB1\fR to \fB8\fR. \fIlabel\fR is the string to be put on the label, up to
+eight characters in length. A null string or a null pointer sets up a blank
+label. \fBfmt\fR is either \fB0\fR, \fB1\fR, or \fB2\fR, indicating whether the
+label is to be left-justified, centered, or right-justified, respectively,
+within the label.
+.sp
+.LP
+The \fBslk_refresh()\fR and \fBslk_noutrefresh()\fR routines correspond to the
+\fBwrefresh()\fR and \fBwnoutrefresh()\fR routines.
+.sp
+.LP
+With the \fBslk_label()\fR routine, the current label for label number
+\fIlabnum\fR is returned with leading and trailing blanks stripped.
+.sp
+.LP
+With the \fBslk_clear()\fR routine, the soft labels are cleared from the
+screen.
+.sp
+.LP
+With the \fBslk_restore()\fR routine, the soft labels are restored to the
+screen after a \fBslk_clear()\fR is performed.
+.sp
+.LP
+With the \fBslk_touch()\fR routine, all the soft labels are forced to be output
+the next time a \fBslk_noutrefresh()\fR is performed.
+.sp
+.LP
+The \fBslk_attron()\fR, \fBslk_attrset()\fR, and \fBslk_attroff()\fR routines
+correspond to \fBattron()\fR, \fBattrset()\fR, and \fBattroff()\fR. They have
+an effect only if soft labels are simulated on the bottom line of the screen.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return an integer return \fBERR\fR upon failure and an integer
+value other than \fBERR\fR upon successful completion.
+.sp
+.LP
+\fBslk_label()\fR returns \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_attr\fR(3CURSES), \fBcurs_initscr\fR(3CURSES),
+\fBcurs_refresh\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Most applications would use \fBslk_noutrefresh()\fR because a \fBwrefresh()\fR
+is likely to follow soon.

@@ -1,0 +1,130 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH menu_hook 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+menu_hook, set_item_init, item_init, set_item_term, item_term, set_menu_init,
+menu_init, set_menu_term, menu_term \- assign application-specific routines for
+automatic invocation by menus
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lmenu\fR \fB -lcurses \fR [ \fIlibrary\fR... ]
+#include <menu.h>
+
+\fBint\fR \fBset_item_init\fR(\fBMENU *\fR\fImenu\fR, \fBvoid (*func)(MENU *)\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_item_term\fR(\fBMENU *\fR\fImenu\fR, \fBvoid (*func)(MENU *)\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBitem_term\fR(\fBMENU *\fR\fImenu\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_menu_init\fR(\fBMENU *\fR\fImenu\fR, \fBvoid (*func)(MENU *)\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmenu_init\fR(\fBMENU *\fR\fImenu\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_menu_term\fR(\fBMENU *\fR\fImenu\fR, \fBvoid (*func)(MENU *)\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBmenu_term\fR(\fBMENU *\fR\fImenu\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBset_item_init()\fR assigns the application-defined function to be called
+when the \fImenu\fR is posted and just after the current item changes.
+\fBitem_init()\fR returns a pointer to the item initialization routine, if any,
+called when the \fImenu\fR is posted and just after the current item changes.
+.sp
+.LP
+\fBset_item_term()\fR assigns an application-defined function to be called when
+the \fImenu\fR is unposted and just before the current item changes.
+\fBitem_term()\fR returns a pointer to the termination function, if any, called
+when the \fImenu\fR is unposted and just before the current item changes.
+.sp
+.LP
+\fBset_menu_init()\fR assigns an application-defined function to be called when
+the \fImenu\fR is posted and just after the top row changes on a posted menu.
+\fBmenu_init()\fR returns a pointer to the menu initialization routine, if any,
+called when the \fImenu\fR is posted and just after the top row changes on a
+posted menu.
+.sp
+.LP
+\fBset_menu_term()\fR assigns an application-defined function to be called when
+the \fImenu\fR is unposted and just before the top row changes on a posted
+menu. \fBmenu_term()\fR returns a pointer to the menu termination routine, if
+any, called when the \fImenu\fR is unposted and just before the top row changes
+on a posted menu.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return pointers always return \fBNULL\fR on error. Routines that
+return an integer return one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBE_OK\fR
+.ad
+.RS 18n
+.rt  
+The routine returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_SYSTEM_ERROR\fR
+.ad
+.RS 18n
+.rt  
+System error.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header \fB<menu.h>\fR automatically includes the headers  \fB<eti.h>\fR and
+\fB<curses.h>\fR\&.

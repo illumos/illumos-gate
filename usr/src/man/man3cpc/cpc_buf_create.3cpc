@@ -1,0 +1,278 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_buf_create 3CPC "30 Jan 2004" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_buf_create, cpc_buf_destroy, cpc_set_sample, cpc_buf_get, cpc_buf_set,
+cpc_buf_hrtime, cpc_buf_tick, cpc_buf_sub, cpc_buf_add, cpc_buf_copy,
+cpc_buf_zero \- sample and manipulate CPC data
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libcpc.h>
+
+\fBcpc_buf_t *\fR\fBcpc_buf_create\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_buf_destroy\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_set_sample\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR, \fBcpc_buf_t *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_buf_get\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIbuf\fR, \fBint\fR \fIindex\fR, \fBuint64_t *\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_buf_set\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIbuf\fR, \fBint\fR \fIindex\fR, \fBuint64_t\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBhrtime_t\fR \fBcpc_buf_hrtime\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBuint64_t\fR \fBcpc_buf_tick\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_buf_sub\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIds\fR, \fBcpc_buf_t *\fR\fIa\fR, \fBcpc_buf_t *\fR\fIb\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_buf_add\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIds\fR, \fBcpc_buf_t *\fR\fIa\fR, \fBcpc_buf_t *\fR\fIb\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_buf_copy\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIds\fR, \fBcpc_buf_t *\fR\fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_buf_zero\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_buf_t *\fR\fIbuf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Counter data is sampled into CPC buffers, which are represented by the opaque
+data type \fBcpc_buf_t\fR. A CPC buffer is created with \fBcpc_buf_create()\fR
+to hold the data for a specific CPC set. Once a CPC buffer has been created, it
+can only be used to store and manipulate the data of the CPC set for which it
+was created.
+.sp
+.LP
+Once a set has been successfully bound, the counter values are sampled using
+\fBcpc_set_sample()\fR. The \fBcpc_set_sample()\fR function takes a snapshot of
+the hardware performance counters counting on behalf of the requests in
+\fIset\fR and stores the 64-bit virtualized software representations of the
+counters in the supplied CPC buffer. If a set was bound with
+\fBcpc_bind_curlwp\fR(3CPC) or \fBcpc_bind_curlwp\fR(3CPC), the set can only be
+sampled by the LWP that bound it.
+.sp
+.LP
+The kernel maintains 64-bit virtual software counters to hold the counts
+accumulated for each request in the set, thereby allowing applications to count
+past the limits of the underlying physical counter, which can be significantly
+smaller than 64 bits. The kernel attempts to maintain the full 64-bit counter
+values even in the face of physical counter overflow on architectures and
+processors that can automatically detect overflow. If the processor is not
+capable of overflow detection, the caller must ensure that the counters are
+sampled often enough to avoid the physical counters wrapping. The events most
+prone to wrap are those that count processor clock cycles. If such an event is
+of interest, sampling should occur frequently so that the counter does not wrap
+between samples.
+.sp
+.LP
+The \fBcpc_buf_get()\fR function retrieves the last sampled value of a
+particular request in \fIbuf\fR. The \fIindex\fR argument specifies which
+request value in the set to retrieve. The index for each request is returned
+during set configuration by \fBcpc_set_add_request\fR(3CPC). The 64-bit
+virtualized software counter value is stored in the location pointed to by the
+\fIval\fR argument.
+.sp
+.LP
+The \fBcpc_buf_set()\fR function stores a 64-bit value to a specific request in
+the supplied buffer. This operation can be useful for performing calculations
+with CPC buffers, but it does not affect the value of the hardware counter (and
+thus will not affect the next sample).
+.sp
+.LP
+The \fBcpc_buf_hrtime()\fR function returns a high-resolution timestamp
+indicating exactly when the set was last sampled by the kernel.
+.sp
+.LP
+The\fB cpc_buf_tick()\fR function returns a 64-bit virtualized cycle counter
+indicating how long the set has been programmed into the counter since it was
+bound. The units of the values returned by \fBcpc_buf_tick()\fR are CPU clock
+cycles.
+.sp
+.LP
+The \fBcpc_buf_sub()\fR function calculates the difference between each request
+in sets \fIa\fR and \fIb\fR, storing the result in the corresponding request
+within set \fIds\fR. More specifically, for each request index \fIn\fR, this
+function performs \fIds\fR[\fIn\fR] = \fIa\fR[\fIn\fR] - \fIb\fR[n]. Similarly,
+\fBcpc_buf_add()\fR adds each request in sets \fIa\fR and \fIb\fR and stores
+the result in the corresponding request within set \fIds\fR.
+.sp
+.LP
+The \fBcpc_buf_copy()\fR function copies each value from buffer \fIsrc\fR into
+buffer \fIds\fR. Both buffers must have been created from the same
+\fBcpc_set_t\fR.
+.sp
+.LP
+The \fBcpc_buf_zero()\fR function sets each request's value in the buffer to
+zero.
+.sp
+.LP
+The \fBcpc_buf_destroy()\fR function frees all resources associated with the
+CPC buffer.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBcpc_buf_create()\fR returns a pointer to a CPC
+buffer which can be used to hold data for the set argument. Otherwise, this
+function returns \fINULL\fR and sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBcpc_set_sample()\fR, \fBcpc_buf_get()\fR, and
+\fBcpc_buf_set()\fR return 0. Otherwise, they return -1 and set \fBerrno\fR to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+For \fBcpc_set_sample()\fR, the set is not bound, the set and/or CPC buffer
+were not created with the given \fIcpc\fR handle, or the CPC buffer was not
+created with the supplied set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+When using \fBcpc_set_sample()\fR to sample a CPU-bound set, the LWP has been
+unbound from the processor it is measuring.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+The library could not allocate enough memory for its internal data structures.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc_bind_curlwp\fR(3CPC), \fBcpc_set_add_request\fR(3CPC),
+\fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Often the overhead of performing a system call can be too disruptive to the
+events being measured. Once a \fBcpc_bind_curlwp\fR(3CPC) call has been issued,
+it is possible to access directly the performance hardware registers from
+within the application. If the performance counter context is active, the
+counters will count on behalf of the current LWP.
+.sp
+.LP
+Not all processors support this type of access. On processors where direct
+access is not possible, \fBcpc_set_sample()\fR must be used to read the
+counters.
+.sp
+.ne 2
+.mk
+.na
+\fBSPARC\fR
+.ad
+.RS 9n
+.rt  
+.sp
+.in +2
+.nf
+rd %pic, %rN        ! All UltraSPARC
+wr %rN, %pic        ! (All UltraSPARC, but see text)
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBx86\fR
+.ad
+.RS 9n
+.rt  
+.sp
+.in +2
+.nf
+rdpmc               ! Pentium II, III, and 4 only
+.fi
+.in -2
+
+.RE
+
+.sp
+.LP
+If the counter context is not active or has been invalidated, the \fB%pic\fR
+register (SPARC), and the \fBrdpmc\fR instruction (Pentium) becomes
+unavailable.
+.sp
+.LP
+Pentium II and III processors support the non-privileged rdpmc instruction that
+requires that the counter of interest be specified in \fB%ecx\fR and return a
+40-bit value in the \fB%edx\fR:\fB%eax\fR register pair. There is no
+non-privileged access mechanism for Pentium I processors.

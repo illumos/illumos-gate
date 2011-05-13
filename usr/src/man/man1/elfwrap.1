@@ -1,0 +1,217 @@
+'\" te
+.\"  Copyright (c) 2008 by Sun Microsystems, Inc. All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elfwrap 1 "17 March 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+elfwrap \- wrap data in an \fBELF\fR file
+.SH SYNOPSIS
+.LP
+.nf
+\fBelfwrap\fR [\fB-64\fR] [\fB-o\fR \fIrelobj-file\fR] [\fB-z\fR target=\fBsparc\fR | \fBx86\fR]
+\fIdata-file\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelfwrap\fR utility creates an \fBELF\fR relocatable object file from one
+or more data files. The relocatable object encapsulates each data file within
+an individual section, together with symbols that can be used to reference the
+section. The relocatable object is appropriate for inclusion with a subsequent
+link-edit. Users can reference the encapsulated data using the associated
+symbols.
+.sp
+.LP
+By default, a 32-bit \fBELF\fR relocatable object is created that is
+appropriate for the machine on which \fBelfwrap\fR is executed. The \fB-64\fR
+option can be used to create a 64-bit \fBELF\fR relocatable object. The \fB-z
+target\fR option can be used to create a relocatable object for a specific
+machine type.
+.LP
+Note -
+.sp
+.RS 2
+Any data encapsulated with \fBelfwrap\fR must be in a format appropriate for
+the destination target.
+.RE
+.sp
+.LP
+By default, the relocatable object \fBa.wrap.o\fR is created. The \fB-o\fR
+option can be used to specify an alternative relocatable object name.
+.sp
+.LP
+The \fBbasename\fR(1) of each data file is used to create various pieces of
+\fBELF\fR information.  For example, if the input data file is
+\fBISV/isv-data\fR, the following \fBELF\fR information is created within the
+relocatable object.
+.sp
+.ne 2
+.mk
+.na
+\fBAn \fBELF\fR section named \fB\&.isv-data\fR\fR
+.ad
+.sp .6
+.RS 4n
+This section contains the entire contents of the input data file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBAn \fBELF\fR symbol named \fBisv-data_start\fR\fR
+.ad
+.sp .6
+.RS 4n
+This symbol reflects the starting address of the \fB\&.isv-data\fR section.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBAn \fBELF\fR symbol named \fBisv-data_end\fR\fR
+.ad
+.sp .6
+.RS 4n
+This symbol reflects the address of the first location after the
+\fB\&.isv-data\fR section.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-64\fR\fR
+.ad
+.sp .6
+.RS 4n
+Create a 64-bit \fBELF\fR relocatable object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIrelobj-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Produce a relocatable object that is named \fIrelobj-file\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR target=\fBsparc\fR | \fBx86\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the machine type for the output relocatable object. Supported targets
+are \fBsparc\fR and \fBx86\fR. The 32-bit machine type for the specified target
+is used unless the \fB-64\fR option is also present, in which case the
+corresponding 64-bit machine type is used. By default, the relocatable object
+that is generated is 32-bit for the machine one which \fBelfwrap\fR is
+executed.
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+The following example encapsulates the system \fBpasswd\fR file and the system
+\fBgroup\fR file within a relocatable object \fBpassgroup.o\fR.
+.sp
+.in +2
+.nf
+example% \fBelfwrap -o passgroup.o /etc/passwd /etc/group\fR
+example% \fBelfdump -s passgroup.o | egrep "passwd|group"\fR
+  [2]  0x00000000 0x00000000  SECT LOCL  D  0 .passwd        
+  [3]  0x00000000 0x00000000  SECT LOCL  D  0 .group         
+  [7]  0x00000000 0x000002f0  OBJT GLOB  D  0 .passwd  passwd_start
+  [8]  0x000002f0 0x00000000  OBJT GLOB  D  0 .passwd  passwd_end
+  [9]  0x00000000 0x00000121  OBJT GLOB  D  0 .group   group_start
+ [10]  0x00000121 0x00000000  OBJT GLOB  D  0 .group   group_end
+example% \fBstrings -N.passwd passgroup.o | head -1\fR
+root:x:0:0:Super-User:/:/sbin/sh
+example% \fBstrings -N.group passgroup.o | head -1\fR
+root::0:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This relocatable object can be referenced from the following user code.
+.sp
+.in +2
+.nf
+example% \fBcat main.c\fR
+#include        <stdio.h>
+
+extern char     passwd_start, passwd_end;
+
+void main()
+{
+    char    *pstart = &passwd_start, *pend = &passwd_end;
+    char    *str, *lstr;
+
+    for (lstr = str = pstart; str < pend; str++) {
+        if ((*str == '\n') && (str != (pend - 1)))  {
+            (void) printf("%.*s", (++str - lstr), lstr);
+	    lstr = str;
+        }
+    }
+}
+example% \fBcc -o main main.c passgroup.o\fR
+example% \fB\&./main\fR
+root:x:0:0:Super-User:/:/sbin/sh
+\&....
+nobody4:x:65534:65534:SunOS 4.x NFS Anonymous Access User:/:
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa.wrap.o\fR\fR
+.ad
+.RS 12n
+.rt  
+The default relocatable object file created.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelfdump\fR(1), \fBld\fR(1), \fBstrings\fR(1), \fBelf\fR(3ELF),
+\fBattributes\fR(5), \fBddi_modopen\fR(9F)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

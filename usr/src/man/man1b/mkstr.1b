@@ -1,0 +1,95 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mkstr 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+mkstr \- create an error message file by massaging C source files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/mkstr\fR [\fB-\fR] \fImessagefile\fR \fIprefix\fR \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmkstr\fR utility creates files of error messages. You can use
+\fBmkstr\fR to make programs with large numbers of error diagnostics much
+smaller, and to reduce system overhead in running the program \(em as the error
+messages do not have to be constantly swapped in and out.
+.sp
+.LP
+\fBmkstr\fR processes each of the specified \fIfilename\fRs, placing a massaged
+version of the input file in a file with a name consisting of the specified
+\fIprefix\fR and the original source file name. A typical example of using
+\fBmkstr\fR would be:
+.sp
+.in +2
+.nf
+\fBmkstr pistrings processed *.c\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This command would cause all the error messages from the C source files in the
+current directory to be placed in the file \fBpistrings\fR and processed copies
+of the source for these files to be placed in files whose names are prefixed
+with \fIprocessed\fR.
+.sp
+.LP
+To process the error messages in the source to the message file, \fBmkstr\fR
+keys on the string `\fBerror("\fR' in the input stream. Each time it occurs,
+the C string starting at the `\fB"\fR' is placed in the message file followed
+by a null character and a NEWLINE character; the null character terminates the
+message so it can be easily used when retrieved, the NEWLINE character makes it
+possible to sensibly \fBcat\fR the error message file to see its contents. The
+massaged copy of the input file then contains a \fBlseek\fR pointer into the
+file which can be used to retrieve the message, that is:
+.sp
+.in +2
+.nf
+     char efilname[\|] = "/usr/lib/pi_strings";
+     int efil = \(mi1;
+
+     error(a1, a2, a3, a4)
+     {
+
+          char
+          buf[256];
+          if (efil < 0) {
+
+                       efil = open(efilname, 0);
+                       if (efil < 0) {
+oops:
+                       perror (efilname);
+                       exit (1);
+          }
+     }
+     if (lseek(efil, (long) a1, 0) |\|| read(efil, buf, 256) <= 0)
+          goto oops;
+     printf(buf, a2, a3, a4);
+}
+.fi
+.in -2
+
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 8n
+.rt  
+Place error messages at the end of the specified message file for recompiling
+part of a large \fBmkstr\fRed program.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBxstr\fR(1), \fBattributes\fR(5)

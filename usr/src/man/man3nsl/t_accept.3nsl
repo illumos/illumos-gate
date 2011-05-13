@@ -1,0 +1,418 @@
+'\" te
+.\"  Copyright 1994, The X/Open Company Ltd., All Rights Reserved. Portions Copyright 1989 AT&T. Portions Copyright (c) 1998, Sun Microsystems, Inc. , All Rights Reserved 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_accept 3NSL "1 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_accept \- accept a connection request
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h>
+
+
+
+
+\fBint\fR \fBt_accept\fR(\fBint\fR \fIfd\fR, \fBint\fR \fIresfd\fR, \fBconst struct t_call *\fR\fIcall\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This routine is part of the \fBXTI\fR interfaces that evolved from the
+\fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
+interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
+using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, a
+different header file, \fBtiuser.h\fR, must be used.  Refer to the \fBTLI\fR
+\fBCOMPATIBILITY\fR section for a description of differences between the two
+interfaces.
+.sp
+.LP
+This function is issued by a transport user to accept a connection request.
+The parameter \fIfd\fR identifies the local transport endpoint where the
+connection indication arrived; \fIresfd\fR specifies the local transport
+endpoint where the connection is to be established, and \fIcall\fR contains
+information required by the transport provider to complete the connection.  The
+parameter \fIcall\fR points to a \fBt_call\fR structure which contains the
+following members:
+.sp
+.in +2
+.nf
+struct netbuf addr;
+struct netbuf opt;
+struct netbuf udata;
+int sequence;
+.fi
+.in -2
+
+.sp
+.LP
+In \fIcall\fR, \fIaddr\fR is the protocol address of the calling transport
+user, \fIopt\fR indicates any options associated with the connection,
+\fIudata\fR points to any user data to be returned to the caller, and
+\fIsequence\fR is the value returned by \fBt_listen\fR(3NSL) that uniquely
+associates the response with a previously received connection indication.  The
+address of the caller, \fIaddr\fR may be null (length zero). Where \fIaddr\fR
+is not null then it may optionally be checked by XTI.
+.sp
+.LP
+A transport user may accept a connection on either the same, or on a different,
+local transport endpoint than the one on which the connection indication
+arrived.  Before the connection can be accepted on the same endpoint
+(\fIresfd==fd\fR), the user must have responded to any previous connection
+indications received on that transport endpoint by means of \fBt_accept()\fR or
+\fBt_snddis\fR(3NSL). Otherwise, \fBt_accept()\fR will fail and set
+\fBt_errno\fR to \fBTINDOUT\fR.
+.sp
+.LP
+If a different transport endpoint is specified (\fIresfd!=fd\fR), then the user
+may or may not choose to bind the endpoint before the \fBt_accept()\fR is
+issued. If the endpoint is not bound prior to the  \fBt_accept()\fR, the
+endpoint must be in the  \fBT_UNBND\fR state before the  \fBt_accept()\fR is
+issued, and the transport provider will automatically bind it to an address
+that is appropriate for the protocol concerned. If the transport user chooses
+to bind the endpoint it must be bound to a protocol address with a \fIqlen\fR
+of zero and must be in the  \fBT_IDLE\fR state before the \fBt_accept()\fR is
+issued.
+.sp
+.LP
+Responding endpoints should be supplied to  \fBt_accept()\fR in the state
+\fBT_UNBND.\fR
+.sp
+.LP
+The call to  \fBt_accept()\fR may fail with t_errno set to \fBTLOOK\fR if there
+are indications (for example connect or disconnect) waiting to be received on
+endpoint  \fIfd\fR. Applications should be prepared for such a failure.
+.sp
+.LP
+The \fIudata\fR argument enables the called transport user to send user data to
+the caller and the amount of user data must not exceed the limits supported by
+the transport provider as returned in the \fIconnect\fR field of the \fIinfo\fR
+argument of \fBt_open\fR(3NSL) or \fBt_getinfo\fR(3NSL). If the \fIlen\fR field
+of \fIudata\fR is zero, no data will be sent to the caller.  All the
+\fImaxlen\fR fields are meaningless.
+.sp
+.LP
+When the user does not indicate any option (\fIcall\(->opt.len\fR = 0) the
+connection shall be accepted with the option values currently set for the
+responding endpoint  \fIresfd\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a value of  \fB0\fR is returned.  Otherwise, a
+value of -1 is returned and \fBt_errno\fR is set to indicate an error.
+.SH VALID STATES
+.sp
+.LP
+\fBfd: T_INCON\fR
+.sp
+.LP
+\fBresfd (fd!=resfd): T_IDLE, T_UNBND\fR
+.SH ERRORS
+.sp
+.LP
+On failure, \fBt_errno\fR is set to one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTACCES\fR\fR
+.ad
+.RS 17n
+.rt  
+The user does not have permission to accept a connection on the responding
+transport endpoint or to use the specified options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADADDR\fR\fR
+.ad
+.RS 17n
+.rt  
+The specified protocol address was in an incorrect format or contained illegal
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADDATA\fR\fR
+.ad
+.RS 17n
+.rt  
+The amount of user data specified was not within the bounds allowed by the
+transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 17n
+.rt  
+The file descriptor \fIfd\fR or \fIresfd\fR does not refer to a transport
+endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADOPT\fR\fR
+.ad
+.RS 17n
+.rt  
+The specified options were in an incorrect format or contained illegal
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADSEQ\fR\fR
+.ad
+.RS 17n
+.rt  
+Either an invalid sequence number was specified, or a valid sequence number was
+specified but the connection request was aborted by the peer. In the latter
+case, its  \fBT_DISCONNECT\fR event will be received on the listening endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTINDOUT\fR\fR
+.ad
+.RS 17n
+.rt  
+The function was called with \fIfd==resfd\fR but there are outstanding
+connection indications on the endpoint.  Those other connection indications
+must be handled either by rejecting them by means of  \fBt_snddis\fR(3NSL) or
+accepting them on a different endpoint by means of  \fBt_accept\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTLOOK\fR\fR
+.ad
+.RS 17n
+.rt  
+An asynchronous event has occurred on the transport endpoint referenced by
+\fIfd\fR and requires immediate attention.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTNOTSUPPORT\fR\fR
+.ad
+.RS 17n
+.rt  
+This function is not supported by the underlying transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTOUTSTATE\fR\fR
+.ad
+.RS 17n
+.rt  
+The communications endpoint referenced by  \fIfd\fR or  \fIresfd\fR is not in
+one of the states in which a call to this function is valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 17n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+(\fBt_errno\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROVMISMATCH\fR\fR
+.ad
+.RS 17n
+.rt  
+The file descriptors \fIfd\fR and \fIresfd\fR do not refer to the same
+transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRESADDR\fR\fR
+.ad
+.RS 17n
+.rt  
+This transport provider requires both \fIfd\fR and \fIresfd\fR to be bound to
+the same address. This error results if they are not.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRESQLEN\fR\fR
+.ad
+.RS 17n
+.rt  
+The endpoint referenced by \fIresfd\fR (where \fIresfd\fR != \fIfd\fR) was
+bound to a protocol address with a \fIqlen\fR that is greater than zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 17n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
+different header files. This, and other semantic differences between the two
+interfaces are described in the subsections below.
+.SS "Interface Header"
+.sp
+.LP
+The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
+should \fInot\fR use this header. They should use the header:
+.sp
+.in +2
+.nf
+#include <tiuser.h>
+.fi
+.in -2
+
+.SS "Error Description Values"
+.sp
+.LP
+The \fBt_errno\fR values that can be set by the \fBXTI\fR interface and cannot
+be set by the \fBTLI\fR interface are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR \fR
+.ad
+.RS 18n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTINDOUT\fR \fR
+.ad
+.RS 18n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROVMISMATCH\fR \fR
+.ad
+.RS 18n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRESADDR\fR \fR
+.ad
+.RS 18n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRESQLEN\fR \fR
+.ad
+.RS 18n
+.rt  
+
+.RE
+
+.SS "Option Buffer"
+.sp
+.LP
+The format of the options in an \fBopt\fR buffer is dictated by the transport
+provider. Unlike the \fBXTI\fR interface, the \fBTLI\fR interface does not
+specify the buffer format.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBt_connect\fR(3NSL), \fBt_getinfo\fR(3NSL), \fBt_getstate\fR(3NSL),
+\fBt_listen\fR(3NSL), \fBt_open\fR(3NSL), \fBt_optmgmt\fR(3NSL),
+\fBt_rcvconnect\fR(3NSL), \fBt_snddis\fR(3NSL), \fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+There may be transport provider-specific restrictions on address binding.
+.sp
+.LP
+Some transport providers do not differentiate between a connection  indication
+and the connection itself.  If the connection has already been established
+after a successful return of \fBt_listen\fR(3NSL), \fBt_accept()\fR will assign
+the existing connection to the transport endpoint specified by \fIresfd\fR.

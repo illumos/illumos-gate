@@ -630,14 +630,16 @@ end_order(void)
 		break;
 
 	case T_SYMBOL:
-		if (((ref = order_weights[i]) < 0) ||
-		    ((p = get_pri(ref)) == NULL) ||
-		    (p->pri == -1)) {
-			set_pri(currundef->ref[i], pri, RESOLVED);
-		} else {
-			set_pri(currundef->ref[i], ref, REFER);
+		for (i = 0; i < NUM_WT; i++) {
+			if (((ref = order_weights[i]) < 0) ||
+			    ((p = get_pri(ref)) == NULL) ||
+			    (p->pri == -1)) {
+				set_pri(currundef->ref[i], pri, RESOLVED);
+			} else {
+				set_pri(currundef->ref[i], ref, REFER);
+			}
+			order_weights[i] = -1;
 		}
-		order_weights[i] = -1;
 		break;
 
 	default:

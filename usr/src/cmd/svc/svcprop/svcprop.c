@@ -43,6 +43,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <assert.h>
+#include <zone.h>
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -1073,6 +1074,10 @@ main(int argc, char *argv[])
 		case 'z': {
 			scf_value_t *zone;
 			scf_handle_t *h = hndl;
+
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcprop -z may only be used "
+				    "from the global zone\n"));
 
 			if ((zone = scf_value_create(h)) == NULL)
 				scfdie();

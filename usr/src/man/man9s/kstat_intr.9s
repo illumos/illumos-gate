@@ -1,0 +1,131 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_intr 9S "4 Apr 1994" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+kstat_intr \- structure for interrupt kstats
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+Interrupt statistics are kept in the \fBkstat_intr\fR structure. When
+\fBkstat_create\fR(9F) creates an interrupt \fBkstat\fR, the \fBks_data\fR
+field is a pointer to one of these structures. The macro \fBKSTAT_INTR_PTR()\fR
+is provided to retrieve this field. It looks like this:
+.sp
+.in +2
+.nf
+#define KSTAT_INTR_PTR(kptr)	((kstat_intr_t *)(kptr)->ks_data)
+.fi
+.in -2
+
+.sp
+.LP
+An interrupt is a hard interrupt (sourced from the hardware device itself), a
+soft interrupt (induced by the system through the use of some system interrupt
+source), a watchdog interrupt (induced by a periodic timer call), spurious (an
+interrupt entry point was entered but there was no interrupt to service), or
+multiple service (an interrupt was detected and serviced just prior to
+returning from any of the other types).
+.sp
+.LP
+Drivers generally report only claimed hard interrupts and soft interrupts from
+their handlers, but measurement of the spurious class of interrupts is useful
+for auto-vectored devices in order to pinpoint any interrupt latency problems
+in a particular system configuration.
+.sp
+.LP
+Devices that have more than one interrupt of the same type should use multiple
+structures.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+ulong_t    intrs[KSTAT_NUM_INTRS];    /* interrupt counters */
+.fi
+.in -2
+
+.sp
+.LP
+The only member exposed to drivers is the \fBintrs\fR member. This field is an
+array of counters. The driver must use the appropriate counter in the array
+based on the type of interrupt condition.
+.sp
+.LP
+The following indexes are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_INTR_HARD\fR \fR
+.ad
+.RS 24n
+.rt  
+Hard interrupt
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_INTR_SOFT\fR \fR
+.ad
+.RS 24n
+.rt  
+Soft interrupt
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_INTR_WATCHDOG\fR \fR
+.ad
+.RS 24n
+.rt  
+Watchdog interrupt
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_INTR_SPURIOUS\fR \fR
+.ad
+.RS 24n
+.rt  
+Spurious interrupt
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_INTR_MULTSVC\fR \fR
+.ad
+.RS 24n
+.rt  
+Multiple service interrupt
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

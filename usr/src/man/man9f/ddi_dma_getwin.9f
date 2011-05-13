@@ -1,0 +1,171 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_getwin 9F "15 Nov 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_getwin \- activate a new DMA window
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBddi_dma_getwin\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBuint_t\fR \fIwin\fR, 
+     \fBoff_t *\fR\fIoffp\fR, \fBsize_t *\fR\fIlenp\fR, \fBddi_dma_cookie_t\fR \fI*cookiep\fR, 
+     \fBuint_t *\fR\fIccountp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 12n
+.rt  
+The  \fBDMA\fR handle previously allocated by a call to
+\fBddi_dma_alloc_handle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR \fR
+.ad
+.RS 12n
+.rt  
+Number of the window to activate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoffp\fR \fR
+.ad
+.RS 12n
+.rt  
+Pointer to an offset.  Upon a successful return,  \fIoffp\fR will contain the
+new offset indicating the  beginning of the window within the object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlenp\fR \fR
+.ad
+.RS 12n
+.rt  
+Upon a successful return,  \fIlenp\fR will contain the size, in bytes, of the
+current window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcookiep\fR \fR
+.ad
+.RS 12n
+.rt  
+A pointer to the first  \fBddi_dma_cookie\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIccountp\fR \fR
+.ad
+.RS 12n
+.rt  
+Upon a successful return,  \fIccountp\fR will contain the number of cookies for
+this  \fBDMA\fR window.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_dma_getwin()\fR activates a new  \fBDMA\fR window. If a  \fBDMA\fR
+resource allocation request returns \fBDDI_DMA_PARTIAL_MAP\fR indicating that
+resources for less than the entire object were allocated, the current
+\fBDMA\fR window can be changed by a call to  \fBddi_dma_getwin()\fR.
+.sp
+.LP
+The caller must first determine the number of  \fBDMA\fR windows,  \fIN\fR,
+using \fBddi_dma_numwin\fR(9F). \fBddi_dma_getwin()\fR takes a  \fBDMA\fR
+window number from the range  \fI[0..N-1]\fR as the parameter \fIwin\fR and
+makes it the current  \fBDMA\fR window.
+.sp
+.LP
+\fBddi_dma_getwin()\fR fills in the first \fBDMA\fR cookie pointed to by
+\fIcookiep\fR with the appropriate address, length, and bus type.
+\fB*\fR\fIccountp\fR is set to the number of \fBDMA\fR cookies representing
+this \fBDMA \fRobject. Subsequent \fBDMA\fR cookies must be retrieved using
+\fBddi_dma_nextcookie\fR(9F).
+.sp
+.LP
+\fBddi_dma_getwin()\fR takes care of underlying resource synchronizations
+required to shift the window. However accessing the data prior to or after
+moving the window requires further synchronization steps using
+\fBddi_dma_sync\fR(9F).
+.sp
+.LP
+\fBddi_dma_getwin()\fR is normally called from an interrupt routine. The first
+invocation of the  \fBDMA\fR engine is done from the driver. All subsequent
+invocations of the  \fBDMA\fR engine are done from the interrupt routine. The
+interrupt routine checks to see if the request has been completed. If it has,
+the interrupt routine returns without invoking another  \fBDMA\fR transfer.
+Otherwise, it calls  \fBddi_dma_getwin()\fR to shift the current window and
+start another \fBDMA\fR transfer.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_dma_getwin()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR \fR
+.ad
+.RS 16n
+.rt  
+Resources for the specified \fBDMA\fR window are allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR \fR
+.ad
+.RS 16n
+.rt  
+\fIwin\fR is not a valid window index.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBddi_dma_getwin()\fR can be called from user, kernel, or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
+\fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_nextcookie\fR(9F),
+\fBddi_dma_numwin\fR(9F), \fBddi_dma_sync\fR(9F),
+\fBddi_dma_unbind_handle\fR(9F), \fBddi_dma_cookie\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

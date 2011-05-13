@@ -1,0 +1,216 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007 Sun Microsystems, Inc. - All Rights Reserved.
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH exit 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+exit, return, goto \- shell built-in functions to enable the execution of the
+shell to advance beyond its sequence of steps
+.SH SYNOPSIS
+.SS "sh"
+.LP
+.nf
+\fBexit\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fBreturn\fR [\fIn\fR]
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBexit\fR [( \fIexpr\fR )]
+.fi
+
+.LP
+.nf
+\fBgoto\fR \fIlabel\fR
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fB*exit\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fB*return\fR [\fIn\fR]
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fB+exit\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fB+return\fR [\fIn\fR]
+.fi
+
+.SH DESCRIPTION
+.SS "sh"
+.sp
+.LP
+\fBexit\fR causes the calling shell or shell script to exit with the exit
+status specified by \fIn\fR. If \fIn\fR is omitted the exit status is that of
+the last command executed (an \fBEOF\fR also causes the shell to exit.)
+.sp
+.LP
+\fBreturn\fR causes a function to exit with the return value specified by
+\fIn\fR. If \fIn\fR is omitted, the return status is that of the last command
+executed.
+.SS "csh"
+.sp
+.LP
+\fBexit\fR causes the calling shell or shell script to exit, either with the
+value of the status variable or with the value specified by the expression
+\fBexpr\fR.
+.sp
+.LP
+The \fBgoto\fR built-in uses a specified \fIlabel\fR as a search string amongst
+commands. The shell rewinds its input as much as possible and searches for a
+line of the form \fIlabel\fR\fB:\fR possibly preceded by space or tab
+characters. Execution continues after the indicated line. It is an error to
+jump to a label that occurs between a \fBwhile\fR or \fBfor\fR built-in command
+and its corresponding \fBend\fR.
+.SS "ksh"
+.sp
+.LP
+\fBexit\fR causes the calling shell or shell script to exit with the exit
+status specified by \fIn\fR. The value is the least significant 8 bits of the
+specified status. If \fIn\fR is omitted then the exit status is that of the
+last command executed. When \fBexit\fR occurs when executing a trap, the last
+command refers to the command that executed before the trap was invoked. An
+end-of-file also causes the shell to exit except for a shell which has the
+\fBignoreeof\fR option (See \fBset\fR below) turned on.
+.sp
+.LP
+\fBreturn\fR causes a shell function or \fB\&'.'\fR script to return to the
+invoking script with the return status specified by \fIn\fR. The value is the
+least significant 8 bits of the specified status. If \fIn\fR is omitted then
+the return status is that of the last command executed. If \fBreturn\fR is
+invoked while not in a function or a \fB\&'.'\fR script, then it is the same as
+an \fBexit\fR.
+.sp
+.LP
+On this man page, \fBksh\fR(1) commands that are preceded by one or two \fB*\fR
+(asterisks) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+\fBI/O\fR redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Words, following a command preceded by \fB**\fR that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and word
+splitting and file name generation are not performed.
+.RE
+.SS "ksh93"
+.sp
+.LP
+\fBexit\fR is shell special built-in that causes the shell that invokes it to
+exit. Before exiting the shell, if the \fBEXIT\fR trap is set, it is invoked.
+.sp
+.LP
+If \fIn\fR is specified, it is used to set the exit status.
+.sp
+.LP
+\fBreturn\fR is a shell special built-in that causes the function or dot script
+that invokes it to exit. If \fBreturn\fR is invoked outside of a \fBfunction\fR
+or dot script it is equivalent to \fBexit\fR.
+.sp
+.LP
+If \fBreturn\fR is invoked inside a function defined with the \fBfunction\fR
+reserved word syntax, then any \fBEXIT\fR trap set within the function is
+invoked in the context of the caller before the function returns.
+.sp
+.LP
+If \fIn\fR is specified, it is used to set the exit status.
+.sp
+.LP
+On this manual page, \fBksh93\fR commands that are preceded by one or two
+\fB+\fR symbols are special built-in commands and are treated specially in the
+following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+I/O redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+They are not valid function names.
+.RE
+.RS +4
+.TP
+5.
+Words following a command preceded by \fB++\fR that are in the format of a
+variable assignment are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and
+field splitting and file name generation are not performed.
+.RE
+.SH EXIT STATUS
+.SS "ksh93"
+.sp
+.LP
+If \fIn\fR is specified for \fBexit\fR, the exit status is the least
+significant eight bits of the value of \fIn\fR. Otherwise, the exit status is
+the exit status of preceding command. When invoked inside a trap, the preceding
+command means the command that invoked the trap.
+.sp
+.LP
+If \fIn\fR is specified for \fBreturn\fR, the exit status is the least
+significant eight bits of the value of \fIn\fR. Otherwise, the exit status is
+the exit status of preceding command.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbreak\fR(1), \fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1),
+\fBattributes\fR(5)

@@ -1,0 +1,85 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH copylist 3GEN "29 Dec 1996" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+copylist \- copy a file into memory
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
+#include <libgen.h>
+
+\fBchar *\fR\fBcopylist\fR(\fBconst char *\fR\fIfilenm\fR, \fBoff_t *\fR\fIszptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcopylist()\fR function copies a list of items from a file into freshly
+allocated memory,  replacing new-lines with null characters.  It expects two
+arguments: a pointer \fIfilenm\fR to the name of the file to be copied, and a
+pointer \fIszptr\fR to a variable where the size of the file will be stored.
+.sp
+.LP
+Upon success, \fBcopylist()\fR returns a pointer to the memory allocated.
+Otherwise it returns NULL if it has trouble finding the file, calling
+\fBmalloc()\fR, or reading the file.
+.SH USAGE
+.sp
+.LP
+The \fBcopylist()\fR function has a transitional interface for 64-bit file
+offsets. See \fBlf64\fR(5).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBcopylist()\fR function.
+.sp
+.in +2
+.nf
+/* read "file" into buf */
+off_t size;
+char *buf;
+buf = copylist("file", &size);
+if (buf) {
+	for (i=0; i<size; i++)
+		if (buf[i])
+			putchar(buf[i]);
+		else
+			putchar('\en');
+	}
+} else {
+	fprintf(stderr, "%s: Copy failed for "file".\en", argv[0]);
+	exit (1);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmalloc\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multithreaded
+applications.

@@ -1,0 +1,101 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH decimal_to_floating 3C "1 Oct 2001" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+decimal_to_floating, decimal_to_single, decimal_to_double, decimal_to_extended,
+decimal_to_quadruple \- convert decimal record to floating-point value
+.SH SYNOPSIS
+.LP
+.nf
+#include <floatingpoint.h>
+
+\fBvoid\fR \fBdecimal_to_single\fR(\fBsingle *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdecimal_to_double\fR(\fBdouble *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdecimal_to_extended\fR(\fBextended *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdecimal_to_quadruple\fR(\fBquadruple *\fR\fIpx\fR, \fBdecimal_mode *\fR\fIpm\fR,
+     \fBdecimal_record *\fR\fIpd\fR, \fBfp_exception_field_type *\fR\fIps\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions convert the decimal record *\fIpd\fR to a floating-point value
+*\fIpx\fR observing the rounding direction specified in *\fIpm\fR and setting
+*\fIps\fR to reflect any floating-point exceptions that occur.
+.sp
+.LP
+When \fIpd\fR->\fBfpclass\fR is \fBfp_zero\fR, \fBfp_infinity\fR,
+\fBfp_quiet\fR, or \fBfp_signaling\fR, *\fIpx\fR is set to zero, infinity, a
+quiet NaN, or a signaling NaN, respectively, with the sign indicated by
+\fIpd\fR->\fBsign\fR. All other fields in *\fIpd\fR are ignored.
+.sp
+.LP
+When \fIpd\fR->\fBfpclass\fR is \fBfp_normal\fR or \fBfp_subnormal\fR,
+\fIpd\fR->\fBds\fR must contain a null-terminated string of one or more ASCII
+digits representing a non-zero integer \fIm\fR, and \fIpd\fR->\fBndigits\fR
+must be equal to the length of this string. Then *\fIpx\fR is set to a
+correctly rounded approximation to
+.sp
+.in +2
+.nf
+\(mi1**(pd->sign) * m * 10**(pd->exponent)
+.fi
+.in -2
+
+.sp
+.LP
+\fIpd\fR->\fBmore\fR can be set to a non-zero value to indicate that
+insignificant trailing digits were omitted from \fIpd\fR->\fBds\fR. In this
+case, \fIm\fR is replaced by \fIm\fR + \fIdelta\fR in the expression above,
+where \fIdelta\fR is some tiny positive fraction.
+.sp
+.LP
+The converted value is rounded according to the rounding direction specified in
+\fIpm\fR->\fBrd\fR. \fIpm\fR->\fBdf\fR and \fIpm\fR->\fBndigits\fR are not
+used.
+.sp
+.LP
+On exit, *\fIps\fR contains a bitwise OR of flags corresponding to any
+floating-point exceptions that occurred. The only possible exceptions are
+underflow, overflow, and inexact.  If no floating-point exceptions occurred,
+*\fIps\fR is set to zero.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBscanf\fR(3C), \fBstring_to_decimal\fR(3C), \fBstrtod\fR(3C),
+\fBattributes\fR(5)

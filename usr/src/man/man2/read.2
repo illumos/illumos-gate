@@ -1,0 +1,546 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH read 2 "13 Sep 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+read, readv, pread \- read from file
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBssize_t\fR \fBread\fR(\fBint\fR \fIfildes\fR, \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fInbyte\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBpread\fR(\fBint\fR \fIfildes\fR, \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fInbyte\fR, \fBoff_t\fR \fIoffset\fR);
+.fi
+
+.LP
+.nf
+#include <sys/uio.h>
+
+\fBssize_t\fR \fBreadv\fR(\fBint\fR \fIfildes\fR, \fBconst struct iovec *\fR\fIiov\fR, \fBint\fR \fIiovcnt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBread()\fR function attempts to read \fInbyte\fR bytes from the file
+associated with the open file descriptor, \fIfildes\fR, into the buffer pointed
+to by \fIbuf\fR.
+.sp
+.LP
+If \fInbyte\fR is 0, \fBread()\fR returns \fB0\fR and has no other results.
+.sp
+.LP
+On files that support seeking (for example, a regular file), the \fBread()\fR
+starts at a position in the file given by the file offset associated with
+\fIfildes\fR. The file offset is incremented by the number of bytes actually
+read.
+.sp
+.LP
+Files that do not support seeking (for example, terminals) always read from the
+current position. The value of a file offset associated with such a file is
+undefined.
+.sp
+.LP
+If \fIfildes\fR refers to a socket, \fBread()\fR is equivalent to
+\fBrecv\fR(3SOCKET) with no flags set.
+.sp
+.LP
+No data transfer will occur past the current end-of-file.  If the starting
+position is at or after the end-of-file, \fB0\fR will be returned. If the file
+refers to a device special file, the result of subsequent \fBread()\fR requests
+is implementation-dependent.
+.sp
+.LP
+When attempting to read from a regular file with mandatory file/record locking
+set (see \fBchmod\fR(2)), and there is a write lock owned by another process on
+the segment of the file to be read:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is set, \fBread()\fR returns \fB\(mi1\fR
+and sets \fBerrno\fR to \fBEAGAIN\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are clear, \fBread()\fR sleeps until the
+blocking record lock is removed.
+.RE
+.sp
+.LP
+When attempting to read from an empty pipe (or FIFO):
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If no process has the pipe open for writing, \fBread()\fR returns \fB0\fR to
+indicate end-of-file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If some process has the pipe open for writing and \fBO_NDELAY\fR is set,
+\fBread()\fR returns \fB0\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If some process has the pipe open for writing and \fBO_NONBLOCK\fR is set,
+\fBread()\fR returns \fB\(mi1\fR and sets \fBerrno\fR to \fBEAGAIN\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are clear, \fBread()\fR blocks until
+data is written to the pipe or the pipe is closed by all processes that had
+opened the pipe for writing.
+.RE
+.sp
+.LP
+When attempting to read a file associated with a terminal that has no data
+currently available:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR is set, \fBread()\fR returns \fB0\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NONBLOCK\fR is set, \fBread()\fR returns \fB\(mi1\fR and sets
+\fBerrno\fR to \fBEAGAIN\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are clear, \fBread()\fR blocks until
+data become available.
+.RE
+.sp
+.LP
+When attempting to read a file associated with a socket or a stream that is not
+a pipe, a FIFO, or a terminal,  and the file has no data currently available:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is set, \fBread()\fR returns \fB\(mi1\fR
+and sets \fBerrno\fR to \fBEAGAIN\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are clear, \fBread()\fR blocks until
+data becomes available.
+.RE
+.sp
+.LP
+The \fBread()\fR function reads data previously written to a file.  If any
+portion of a regular file prior to the end-of-file has not been written,
+\fBread()\fR returns bytes with value 0.  For example, \fBlseek\fR(2) allows
+the file offset to be set beyond the end of existing data in the file. If data
+is later written at this point, subsequent reads in the gap between the
+previous end of data and the newly written data will return bytes with value 0
+until data is written into the gap.
+.sp
+.LP
+For regular files, no data transfer will occur past the offset maximum
+established in the open file description associated with \fIfildes\fR.
+.sp
+.LP
+Upon successful completion, where \fInbyte\fR is greater than 0, \fBread()\fR
+will mark for update the \fBst_atime\fR field of the file, and return the
+number of bytes read. This number will never be greater than \fInbyte\fR. The
+value returned may be less than \fInbyte\fR if the number of bytes left in the
+file is less than \fInbyte\fR, if the \fBread()\fR request was interrupted by a
+signal, or if the file is a pipe or FIFO or special file and has fewer than
+\fInbyte\fR bytes immediately available for reading.  For example, a
+\fBread()\fR from a file associated with a terminal may return one typed line
+of data.
+.sp
+.LP
+If a \fBread()\fR is interrupted by a signal before it reads any data, it will
+return \fB\(mi1\fR with \fBerrno\fR set to \fBEINTR\fR.
+.sp
+.LP
+If a \fBread()\fR is interrupted by a signal after it has successfully read
+some data, it will return the number of bytes read.
+.sp
+.LP
+A \fBread()\fR from a streams file can read data in three different modes:
+byte-stream mode, message-nondiscard mode, and message-discard mode.  The
+default is byte-stream mode.  This can be changed using the \fBI_SRDOPT\fR
+\fBioctl\fR(2) request, and can be tested with the \fBI_GRDOPT\fR
+\fBioctl()\fR. In byte-stream mode, \fBread()\fR retrieves data from the stream
+until as many bytes as were requested are transferred, or until there is no
+more data to be retrieved.  Byte-stream mode ignores message boundaries.
+.sp
+.LP
+In streams message-nondiscard mode, \fBread()\fR retrieves data until as many
+bytes as were requested are transferred, or until a message boundary is
+reached.  If \fBread()\fR does not retrieve all the data in a message, the
+remaining data is left on the stream, and can be retrieved by the next
+\fBread()\fR call.  Message-discard mode also retrieves data until as many
+bytes as were requested are transferred, or a message boundary is reached.
+However, unread data remaining in a message after the  \fBread()\fR returns is
+discarded, and is not available for a subsequent \fBread()\fR, \fBreadv()\fR or
+\fBgetmsg\fR(2) call.
+.sp
+.LP
+How \fBread()\fR handles zero-byte streams messages is determined by the
+current read mode setting.  In byte-stream mode, \fBread()\fR accepts data
+until it has read \fInbyte\fR bytes, or until there is no more data to read, or
+until a zero-byte message block is encountered. The \fBread()\fR function then
+returns the number of bytes read, and places the zero-byte message back on the
+stream to be retrieved by the next \fBread()\fR, \fBreadv()\fR or
+\fBgetmsg\fR(2). In message-nondiscard mode or message-discard mode, a
+zero-byte message returns \fB0\fR and the message is removed from the stream.
+When a zero-byte message is read as the first message on a stream, the message
+is removed from the stream and \fB0\fR is returned, regardless of the read
+mode.
+.sp
+.LP
+A \fBread()\fR from a streams file returns the data in the message at the front
+of the stream head read queue, regardless of the priority band of the message.
+.sp
+.LP
+By default, streams are in control-normal mode, in which a \fBread()\fR from a
+streams file can only process messages that contain a data part but do not
+contain a control part.  The \fBread()\fR fails if a message containing a
+control part is encountered at the stream head.  This default action can be
+changed by placing the stream in either control-data mode or control-discard
+mode with the \fBI_SRDOPT\fR \fBioctl()\fR command.  In control-data mode,
+\fBread()\fR converts any control part to data and passes it to the application
+before passing any data part originally present in the same message.  In
+control-discard mode, \fBread()\fR discards message control parts but returns
+to the process any data part in the message.
+.sp
+.LP
+In addition, \fBread()\fR and \fBreadv()\fR will fail if the stream head had
+processed an asynchronous error before the call.  In this case, the value of
+\fBerrno\fR does not reflect the result of \fBread()\fR or \fBreadv()\fR but
+reflects the prior error. If a hangup occurs on the stream being read,
+\fBread()\fR continues to operate normally until the stream head read queue is
+empty. Thereafter, it returns \fB0\fR.
+.SS "\fBreadv()\fR"
+.sp
+.LP
+The \fBreadv()\fR function is equivalent to \fBread()\fR, but places the input
+data into the \fIiovcnt\fR buffers specified by the members of the \fIiov\fR
+array: \fIiov\fR[\fB0\fR], \fIiov\fR[\fB1\fR], \&.\|.\|.,
+\fIiov\fR[\fIiovcnt\fR\(mi1]. The \fIiovcnt\fR argument is valid if greater
+than 0 and less than or equal to {\fBIOV_MAX\fR}.
+.sp
+.LP
+The \fBiovec\fR structure contains the following members:
+.sp
+.in +2
+.nf
+caddr_t   iov_base;
+int       iov_len;
+.fi
+.in -2
+
+.sp
+.LP
+Each \fBiovec\fR entry specifies the base address and length of an area in
+memory where data should be placed.  The \fBreadv()\fR function always fills an
+area completely before proceeding to the next.
+.sp
+.LP
+Upon successful completion, \fBreadv()\fR marks for update the \fBst_atime\fR
+field of the file.
+.SS "\fBpread()\fR"
+.sp
+.LP
+The \fBpread()\fR function performs the same action as \fBread()\fR, except
+that it reads from a given position in the file without changing the file
+pointer. The first three arguments to \fBpread()\fR are the same as
+\fBread()\fR with the addition of a fourth argument \fIoffset\fR for the
+desired position inside the file. \fBpread()\fR will read up to the maximum
+offset value that can be represented in an \fBoff_t\fR for regular files. An
+attempt to perform a \fBpread()\fR on a file that is incapable of seeking
+results in an error.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBread()\fR and \fBreadv()\fR return a
+non-negative integer indicating the number of bytes actually read. Otherwise,
+the functions return \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBread()\fR, \fBreadv()\fR, and \fBpread()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 11n
+.rt  
+Mandatory file/record locking was set, \fBO_NDELAY\fR or \fBO_NONBLOCK\fR was
+set, and there was a blocking record lock; total amount of system memory
+available when reading using raw I/O is temporarily insufficient; no data is
+waiting to be read on a file associated with a tty device and \fBO_NONBLOCK\fR
+was set; or no message is waiting to be read on a stream and \fBO_NDELAY\fR or
+\fBO_NONBLOCK\fR was set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor open for reading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADMSG\fR\fR
+.ad
+.RS 11n
+.rt  
+Message waiting to be read on a stream is not a data message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDEADLK\fR\fR
+.ad
+.RS 11n
+.rt  
+The read was going to go to sleep and cause a deadlock to occur.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 11n
+.rt  
+A signal was caught during the read operation and no data was transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+An attempt was made to read from a stream linked to a multiplexor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 11n
+.rt  
+A physical I/O error has occurred, or the process is in a background process
+group and is attempting to read from its controlling terminal, and either the
+process is ignoring or blocking the \fBSIGTTIN\fR signal or the process group
+of the process is orphaned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEISDIR\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument refers to a directory on a file system type that does
+not support read operations on directories.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLCK\fR\fR
+.ad
+.RS 11n
+.rt  
+The system record lock table was full, so the \fBread()\fR or \fBreadv()\fR
+could not go to sleep until the blocking record lock was removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is on a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+The device associated with \fIfildes\fR is a block special or character special
+file and the value of the file pointer is out of range.
+.RE
+
+.sp
+.LP
+The \fBread()\fR and \fBpread()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fInbyte\fR argument overflowed an \fBssize_t\fR.
+.RE
+
+.sp
+.LP
+The \fBread()\fR and \fBreadv()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The file is a regular file, \fInbyte\fR is greater than 0, the starting
+position is before the end-of-file, and the starting position is greater than
+or equal to the offset maximum established in the open file description
+associated with \fIfildes\fR.
+.RE
+
+.sp
+.LP
+The \fBreadv()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIiov\fR argument points outside the allocated address space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIiovcnt\fR argument was less than or equal to \fB0\fR or greater than
+{\fBIOV_MAX\fR}. See \fBIntro\fR(2) for a definition of {\fBIOV_MAX\fR}).
+.sp
+One of the \fBiov_len\fR values in the \fIiov\fR array was negative, or the sum
+of the \fBiov_len\fR values in the \fIiov\fR array overflowed an \fBssize_t\fR.
+.RE
+
+.sp
+.LP
+The \fBpread()\fR function will fail and the file pointer remain unchanged if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is associated with a pipe or FIFO.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBpread()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-Level\fBread()\fR is Async-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBchmod\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2),
+\fBgetmsg\fR(2), \fBioctl\fR(2), \fBlseek\fR(2), \fBopen\fR(2), \fBpipe\fR(2),
+\fBrecv\fR(3SOCKET), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5),
+\fBstreamio\fR(7I), \fBtermio\fR(7I)

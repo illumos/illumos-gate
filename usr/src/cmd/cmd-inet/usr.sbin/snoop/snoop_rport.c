@@ -23,12 +23,8 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <strings.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
@@ -453,57 +449,4 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 		show_trailer();
 	}
 	return (1);
-}
-
-char *
-show_string(const char *str, int dlen, int maxlen)
-/*
- *   Prints len bytes from str enclosed in quotes.
- *   If len is negative, length is taken from strlen(str).
- *   No more than maxlen bytes will be printed.  Longer
- *   strings are flagged with ".." after the closing quote.
- *   Non-printing characters are converted to C-style escape
- *   codes or octal digits.
- */
-{
-#define	TBSIZE	256
-	static char tbuff[TBSIZE];
-	const char *p;
-	char *pp;
-	int printable = 0;
-	int c, len;
-
-	len = dlen > maxlen ? maxlen : dlen;
-	dlen = len;
-
-	for (p = str, pp = tbuff; len; p++, len--) {
-		switch (c = *p & 0xFF) {
-		case '\n': (void) strcpy(pp, "\\n"); pp += 2; break;
-		case '\b': (void) strcpy(pp, "\\b"); pp += 2; break;
-		case '\t': (void) strcpy(pp, "\\t"); pp += 2; break;
-		case '\r': (void) strcpy(pp, "\\r"); pp += 2; break;
-		case '\f': (void) strcpy(pp, "\\f"); pp += 2; break;
-		default:
-			if (isascii(c) && isprint(c)) {
-				*pp++ = c;
-				printable++;
-			} else {
-				(void) snprintf(pp, TBSIZE - (pp - tbuff),
-					isdigit(*(p + 1)) ?
-					"\\%03o" : "\\%o", c);
-				pp += strlen(pp);
-			}
-			break;
-		}
-		*pp = '\0';
-		/*
-		 * Check for overflow of temporary buffer.  Allow for
-		 * the next character to be a \nnn followed by a trailing
-		 * null.  If not, then just bail with what we have.
-		 */
-		if (pp + 5 >= &tbuff[TBSIZE]) {
-			break;
-		}
-	}
-	return (printable > dlen / 2 ? tbuff : "");
 }

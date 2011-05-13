@@ -1,0 +1,82 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sda 7D "8 Jan 2009" "SunOS 5.11" "Devices"
+.SH NAME
+sda \- SD/MMC architecture
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsda\fR module provides support services for Secure Digital (SD) and
+MultiMediaCard (MMC) slot and card device drivers.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/misc/sda\fR\fR
+.ad
+.RS 28n
+.rt  
+32-bit ELF kernel module (x86).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/misc/amd64/sda\fR\fR
+.ad
+.RS 28n
+.rt  
+64-bit ELF kernel module (x86).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/kernel/misc/sparcv9/sda\fR\fR
+.ad
+.RS 28n
+.rt  
+64-bit ELF kernel module (SPARC).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitectureSPARC, x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcfgadm_sdcard\fR(1M), \fBattributes\fR(5), \fBblk2scsa\fR(7D), \fBsd\fR(7D),
+\fBsdcard\fR(7D), \fBsdhost\fR(7D), \fBscsa2usb\fR(7D), \fBwbsd\fR(7D)
+.sp
+.LP
+\fISystem Administration Guide, Volume I\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH NOTES
+.sp
+.LP
+The \fBsda\fR module provides support only for SD/MMC devices that are
+connected via a supported slot driver. Notably, slots that are on USB busses
+are normally treated as USB mass storage devices and are serviced by the
+\fBscsa2usb\fR(7D) driver.

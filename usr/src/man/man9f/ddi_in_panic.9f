@@ -1,0 +1,57 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_in_panic 9F "23 Jun 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_in_panic \- determine if system is in panic state
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_in_panic\fR(\fBvoid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+Drivers controlling devices on which the system may write a kernel crash dump
+in the event of a panic can call \fBddi_in_panic()\fR to determine if the
+system is panicking.
+.sp
+.LP
+When the system is panicking, the calls of functions scheduled by
+\fBtimeout\fR(9F) and \fBddi_trigger_softintr\fR(9F) will never occur. Neither
+can  \fBdelay\fR(9F) be relied upon, since it is implemented via
+\fBtimeout\fR(9F).
+.sp
+.LP
+Drivers that need to enforce a time delay such as  \fBSCSI \fRbus reset delay
+time must busy-wait when the system is panicking.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_in_panic()\fR returns  \fB1\fR if the system is in panic,  or   \fB0\fR
+otherwise.
+.SH CONTEXT
+.sp
+.LP
+\fBddi_in_panic()\fR may be called from any context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdump\fR(9E), \fBdelay\fR(9F), \fBddi_trigger_softintr\fR(9F),
+\fBtimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

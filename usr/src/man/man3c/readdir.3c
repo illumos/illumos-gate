@@ -1,0 +1,304 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH readdir 3C "26 Jun 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+readdir, readdir_r \- read directory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <dirent.h>
+
+\fBstruct dirent *\fR\fBreaddir\fR(\fBDIR *\fR\fIdirp\fR);
+.fi
+
+.LP
+.nf
+\fBstruct dirent *\fR\fBreaddir_r\fR(\fBDIR *\fR\fIdirp\fR, \fBstruct dirent *\fR\fIentry\fR);
+.fi
+
+.SS "Standard conforming"
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\fR... ]
+
+\fBint\fR \fBreaddir_r\fR(\fBDIR *restrict\fR \fIdirp\fR, \fBstruct dirent *restrict\fR \fIentry\fR,
+     \fBstruct dirent **restrict\fR \fIresult\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The type \fBDIR\fR, which is defined in the header <\fBdirent.h\fR>, represents
+a \fIdirectory stream\fR, which is an ordered sequence of all the directory
+entries in a particular directory. Directory entries represent files. Files can
+be removed from a directory or added to a directory asynchronously to the
+operation of \fBreaddir()\fR and \fBreaddir_r()\fR.
+.SS "\fBreaddir()\fR"
+.sp
+.LP
+The \fBreaddir()\fR function returns a pointer to a structure representing the
+directory entry at the current position in the directory stream specified by
+the argument \fIdirp\fR, and positions the directory stream at the next entry.
+It returns a null pointer upon reaching the end of the directory stream. The
+structure \fBdirent\fR defined by the \fB<dirent.h>\fR header describes a
+directory entry.
+.sp
+.LP
+The \fBreaddir()\fR function will not return directory entries containing empty
+names. If entries for . (dot) or .. (dot-dot) exist, one entry will be returned
+for dot and one entry will be returned for dot-dot; otherwise they will not be
+returned.
+.sp
+.LP
+The pointer returned by \fBreaddir()\fR points to data that can be overwritten
+by another call to \fBreaddir()\fR on the same directory stream. These data are
+not overwritten by another call to \fBreaddir()\fR on a different directory
+stream.
+.sp
+.LP
+If a file is removed from or added to the directory after the most recent call
+to \fBopendir\fR(3C) or \fBrewinddir\fR(3C), whether a subsequent call to
+\fBreaddir()\fR returns an entry for that file is unspecified.
+.sp
+.LP
+The \fBreaddir()\fR function can buffer several directory entries per actual
+read operation. It marks for update the \fBst_atime\fR field of the directory
+each time the directory is actually read.
+.sp
+.LP
+After a call to \fBfork\fR(2), either the parent or child (but not both) can
+continue processing the directory stream using \fBreaddir()\fR,
+\fBrewinddir()\fR or \fBseekdir\fR(3C). If both the parent and child processes
+use these functions, the result is undefined.
+.sp
+.LP
+If the entry names a symbolic link, the value of the \fBd_ino\fR member is
+unspecified.
+.SS "\fBreaddir_r()\fR"
+.sp
+.LP
+Unless the end of the directory stream has been reached or an error occurred,
+the \fBreaddir_r()\fR function initializes the \fBdirent\fR structure
+referenced by \fBentry\fR to represent the directory entry at the current
+position in the directory stream referred to by \fIdirp\fR,  and positions the
+directory stream at the next entry.
+.sp
+.LP
+The caller must allocate storage pointed to by \fIentry\fR to be large enough
+for a \fBdirent\fR structure with an array of \fBchar\fR \fBd_name\fR member
+containing at least \fBNAME_MAX\fR (that is, \fBpathconf(directory,
+_PC_NAME_MAX\fR)) plus one elements. (\fB_PC_NAME_MAX\fR is defined in
+<\fBunistd.h\fR>.)
+.sp
+.LP
+The \fBreaddir_r()\fR function will not return directory entries containing
+empty names. It is unspecified whether entries are returned for . (dot) or ..
+(dot-dot).
+.sp
+.LP
+If a file is removed from or added to the directory after the most recent call
+to \fBopendir()\fR or \fBrewinddir()\fR, whether a subsequent call to
+\fBreaddir_r()\fR returns an entry for that file is unspecified.
+.sp
+.LP
+The \fBreaddir_r()\fR function can buffer several directory entries per actual
+read operation. It marks for update the \fBst_atime\fR field of the directory
+each time the directory is actually read.
+.sp
+.LP
+The standard-conforming version (see \fBstandards\fR(5)) of the
+\fBreaddir_r()\fR function performs all of the actions described above and sets
+the pointer pointed to by \fIresult\fR. If a directory entry is returned, the
+pointer will be set to the same value as the \fIentry\fR argument; otherwise,
+it will be set to \fINULL\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBreaddir()\fR and the default \fBreaddir_r()\fR
+return a pointer to an object of type \fBstruct dirent\fR. When an error is
+encountered, a null pointer is returned and \fBerrno\fR is set to indicate the
+error. When the end of the directory is encountered, a null pointer is returned
+and \fBerrno\fR is not changed.
+.sp
+.LP
+The standard-conforming \fBreaddir_r()\fR returns  \fB0\fR if the end of the
+directory is encountered or a directory entry is stored in the structure
+referenced by \fIentry\fR. Otherwise, an error number is returned to indicate
+the failure.
+.SH ERRORS
+.sp
+.LP
+The \fBreaddir()\fR and \fBreaddir_r()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+One of the values in the structure to be returned cannot be represented
+correctly.
+.RE
+
+.sp
+.LP
+The \fBreaddir()\fR and \fBreaddir_r()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIdirp\fR argument does not refer to an open directory stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The current position of the directory stream is invalid.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBreaddir()\fR  and \fBreaddir_r()\fR functions should be used in
+conjunction with \fBopendir()\fR, \fBclosedir()\fR, and \fBrewinddir()\fR to
+examine the contents of the directory.  Since \fBreaddir()\fR and the default
+\fBreaddir_r()\fR return a null pointer both at the end of the directory and on
+error, an application wanting to check for error situations should set
+\fBerrno\fR to 0 before calling either of these functions. If \fBerrno\fR is
+set to non-zero on return, an error occurred.
+.sp
+.LP
+It is safe to use \fBreaddir()\fR in a threaded application, so long as only
+one thread reads from the directory stream at any given time. The
+\fBreaddir()\fR function is generally preferred over the \fBreaddir_r()\fR
+function.
+.sp
+.LP
+The standard-conforming \fBreaddir_r()\fR returns the error number if an error
+occurred. It returns 0 on success (including reaching the end of the directory
+stream).
+.sp
+.LP
+The \fBreaddir()\fR and \fBreaddir_r()\fR functions have transitional
+interfaces for 64-bit file offsets.  See \fBlf64\fR(5).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSearch the current directory for the entry \fIname\fR.
+.sp
+.LP
+The following sample program will search the current directory for each of the
+arguments supplied on the command line:
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
+#include <stdio.h>
+#include <strings.h>
+
+static void lookup(const char *arg)
+{
+        DIR *dirp;
+        struct dirent *dp;
+
+        if ((dirp = opendir(".")) == NULL) {
+                perror("couldn't open '.'");
+                return;
+        }
+
+        do {
+                errno = 0;
+                if ((dp = readdir(dirp)) != NULL) {
+                        if (strcmp(dp->d_name, arg) != 0)
+                                continue;
+
+                        (void) printf("found %s\en", arg);
+                        (void) closedir(dirp);
+                        return;
+                }
+        } while (dp != NULL);
+
+        if (errno != 0)
+                perror("error reading directory");
+        else
+                (void) printf("failed to find %s\en", arg);
+        (void) closedir(dirp);
+        return;
+}
+
+int main(int argc, char *argv[])
+{
+        int i;
+        for (i = 1; i < argc; i++)
+                lookup(argv[i]);
+        return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSee below.
+.TE
+
+.sp
+.LP
+The \fBreaddir()\fR function is Unsafe. The \fBreaddir_r()\fR function is Safe.
+.SH SEE ALSO
+.sp
+.LP
+\fBfork\fR(2), \fBlstat\fR(2), \fBsymlink\fR(2), \fBIntro\fR(3),
+\fBclosedir\fR(3C), \fBopendir\fR(3C), \fBrewinddir\fR(3C), \fBscandir\fR(3C),
+\fBseekdir\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded programs, see the \fBMULTITHREADED APPLICATIONS\fR
+section of \fBIntro\fR(3).
+.sp
+.LP
+Solaris 2.4 and earlier releases provided a \fBreaddir_r()\fR interface as
+specified in POSIX.1c Draft 6. The final POSIX.1c standard changed the
+interface as described above. Support for the Draft 6 interface is provided for
+compatibility only and might not be supported in future releases. New
+applications and libraries should use the standard-conforming interface.
+.sp
+.LP
+For POSIX.1c-conforming applications, the \fB_POSIX_PTHREAD_SEMANTICS\fR and
+\fB_REENTRANT\fR flags are automatically turned on by defining the
+\fB_POSIX_C_SOURCE\fR flag with a value >= 199506L.

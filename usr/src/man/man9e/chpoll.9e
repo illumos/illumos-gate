@@ -1,0 +1,244 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH chpoll 9E "7 May 2008" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+chpoll \- poll entry point for a non-STREAMS character driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/poll.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBchpoll\fR(\fBdev_t\fR \fIdev\fR, \fBshort\fR \fIevents\fR, \fBint\fR \fIanyyet\fR, 
+     \fBshort *\fR\fIreventsp\fR, \fBstruct pollhead **\fR\fIphpp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+This entry point is optional. Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 12n
+.rt  
+The device number for the device to be polled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIevents\fR\fR
+.ad
+.RS 12n
+.rt  
+The events that may occur. Valid events are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Data other than high priority data may be read without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLOUT\fR\fR
+.ad
+.RS 14n
+.rt  
+Normal data may be written without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLPRI\fR\fR
+.ad
+.RS 14n
+.rt  
+High priority data may be received without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLHUP\fR\fR
+.ad
+.RS 14n
+.rt  
+A device hangup has occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLERR\fR\fR
+.ad
+.RS 14n
+.rt  
+An error has occurred on the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLRDNORM\fR\fR
+.ad
+.RS 14n
+.rt  
+Normal data (priority band = 0) may be read without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLRDBAND\fR\fR
+.ad
+.RS 14n
+.rt  
+Data from a non-zero priority band may be read without blocking
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLWRNORM\fR\fR
+.ad
+.RS 14n
+.rt  
+The same as \fBPOLLOUT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOLLWRBAND\fR\fR
+.ad
+.RS 14n
+.rt  
+Priority data (priority band > 0) may be written.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIanyyet\fR\fR
+.ad
+.RS 12n
+.rt  
+A flag that is non-zero if any other file descriptors in the \fBpollfd\fR array
+have events pending. The \fBpoll\fR(2) system call takes a pointer to an array
+of \fBpollfd\fR structures as one of its arguments. See the \fBpoll\fR(2)
+reference page for more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIreventsp\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a bitmask of the returned events satisfied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIphpp\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a pointer to a \fBpollhead\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBchpoll()\fR entry point routine is used by non-STREAMS character device
+drivers that wish to support polling. The driver must implement the polling
+discipline itself. The following rules must be followed when implementing the
+polling discipline:
+.RS +4
+.TP
+1.
+Implement the following algorithm when the \fBchpoll()\fR entry point is
+called:
+.sp
+.in +2
+.nf
+if (events_are_satisfied_now) {
+      *reventsp = satisfied_events & events;
+} else {
+      *reventsp = 0;
+      if (!anyyet)
+            *phpp = &my_local_pollhead_structure;
+}
+return (0);
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+2.
+Allocate an instance of the \fBpollhead\fR structure. This instance may be
+tied to the per-minor data structure defined by the driver. The \fBpollhead\fR
+structure should be treated as a "black box" by the driver. Initialize the
+\fBpollhead\fR structure by filling it with zeroes. The size of this structure
+is guaranteed to remain the same across releases.
+.RE
+.RS +4
+.TP
+3.
+Call the \fBpollwakeup()\fR function with \fBevents\fR listed above whenever
+pollable \fBevents\fR which the driver should monitor occur. This function can
+be called with multiple events at one time. The \fBpollwakup()\fR can be called
+regardless of whether or not the \fBchpoll()\fR entry is called; it should be
+called every time the driver detects the pollable event. The driver must not
+hold any mutex across the call to \fBpollwakeup\fR(9F) that is acquired in its
+\fBchpoll()\fR entry point, or a deadlock may result.
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+\fBchpoll()\fR should return \fB0\fR for success, or the appropriate error
+number.
+.SH SEE ALSO
+.sp
+.LP
+\fBpoll\fR(2), \fBnochpoll\fR(9F), \fBpollwakeup\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

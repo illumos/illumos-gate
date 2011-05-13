@@ -397,8 +397,12 @@ class ActiveList(object):
         if parentfile.flags() != localfile.flags():
             return True
 
-        if parentfile.cmp(localfile.data()):
-            return True
+        if Version.at_least("1.7"):
+            if parentfile.cmp(localfile):
+                return True
+        else:
+            if parentfile.cmp(localfile.data()):
+                return True
 
     def context(self, message, user):
         '''Return a Mercurial context object representing the entire

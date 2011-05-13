@@ -1,0 +1,74 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH drv_usecwait 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+drv_usecwait \- busy-wait for specified interval
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+
+
+
+\fBvoid\fR \fBdrv_usecwait\fR(\fBclock_t\fR \fImicrosecs\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImicrosecs\fR\fR
+.ad
+.RS 13n
+.rt  
+The number of microseconds to busy-wait.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdrv_usecwait()\fR function gives drivers a means of busy-waiting for a
+specified microsecond count. The amount of time spent busy-waiting may be
+greater than the microsecond count but will minimally be the number of
+microseconds specified.
+.sp
+.LP
+\fBdelay\fR(9F) can be used by a driver to delay for a specified number of
+system ticks, but it has two limitations. First, the granularity of the wait
+time is limited to one clock tick, which may be more time than is needed for
+the delay. Second, \fBdelay\fR(9F) can be invoked from user or kernel context
+and hence cannot be used at interrupt time or system initialization.
+.sp
+.LP
+Often, drivers need to delay for only a few microseconds, waiting for a write
+to a device register to be picked up by the device. In this case, even in user
+context, \fBdelay\fR(9F) produces too long a wait period.
+.SH CONTEXT
+.sp
+.LP
+The \fBdrv_usecwait()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdelay\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The driver wastes processor time by making this call since \fBdrv_usecwait()\fR
+does not block but simply busy-waits. The driver should only make calls to
+\fBdrv_usecwait()\fR as needed, and only for as much time as needed. The
+\fBdrv_usecwait()\fR function does not mask out interrupts.

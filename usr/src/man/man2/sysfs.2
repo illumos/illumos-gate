@@ -1,0 +1,140 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sysfs 2 "5 Jul 1990" "SunOS 5.11" "System Calls"
+.SH NAME
+sysfs \- get file system type information
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/fstyp.h>
+#include <sys/fsid.h>
+
+\fBint\fR \fBsysfs\fR(\fBint\fR \fIopcode\fR, \fBconst char *\fR\fIfsname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsysfs\fR(\fBint\fR \fIopcode\fR, \fBint\fR \fIfs_index\fR, \fBchar *\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsysfs\fR(\fBint\fR \fIopcode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsysfs()\fR function returns information about the file system types
+configured  in the system.  The number of arguments accepted by \fBsysfs()\fR
+depends on the \fIopcode\fR argument, which can take the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETFSIND\fR\fR
+.ad
+.RS 13n
+.rt  
+Translate \fIfsname\fR, a null-terminated file-system type identifier, into a
+file-system type index.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETFSTYP\fR\fR
+.ad
+.RS 13n
+.rt  
+Translate \fIfs_index\fR, a file-system type index, into a null-terminated
+file-system type identifier and write it into the buffer pointed to by
+\fIbuf\fR, which must be at least of size \fBFSTYPSZ\fR as defined in
+<\fBsys/fstyp.h\fR>.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETNFSTYP\fR\fR
+.ad
+.RS 13n
+.rt  
+Return the total number of file system types configured in the system.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the value returned depends upon the \fIopcode\fR
+argument as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETFSIND\fR\fR
+.ad
+.RS 13n
+.rt  
+the file-system type index
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETFSTYP\fR\fR
+.ad
+.RS 13n
+.rt  
+\fB0\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETNFSTYP\fR\fR
+.ad
+.RS 13n
+.rt  
+the number of file system types configured
+.RE
+
+.sp
+.LP
+Otherwise, \fB\(mi1\fR is returned  and \fBerrno\fR is set to indicate the
+error.
+.SH ERRORS
+.sp
+.LP
+The \fBsysfs()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuf\fR or \fIfsname\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfsname\fR argument points to an invalid file-system identifier; the
+\fIfs_index\fR argument is 0 or invalid; or the \fIopcode\fR argument is
+invalid.
+.RE
+

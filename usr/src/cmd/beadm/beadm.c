@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -95,24 +95,6 @@ enum be_fmt {
 };
 
 /*
- * command id
- */
-enum be_cmd {
-	BE_CMD_ACTIVATE,
-	BE_CMD_CREATE,
-	BE_CMD_CREATE_SNAP,
-	BE_CMD_DESTROY,
-	BE_CMD_DESTROY_SNAP,
-	BE_CMD_LIST,
-	BE_CMD_MOUNT,
-	BE_CMD_UNMOUNT,
-	BE_CMD_RENAME,
-	BE_CMD_ROLLBACK,
-
-	BE_NUM_COMMANDS
-};
-
-/*
  * command handler description
  */
 typedef struct be_command {
@@ -123,7 +105,7 @@ typedef struct be_command {
 /*
  * sorted list of be commands
  */
-static const be_command_t be_command_tbl[BE_NUM_COMMANDS] = {
+static const be_command_t be_command_tbl[] = {
 	{ "activate",		be_do_activate },
 	{ "create",		be_do_create },
 	{ "create_snap",	be_do_create_snapshot },
@@ -132,8 +114,10 @@ static const be_command_t be_command_tbl[BE_NUM_COMMANDS] = {
 	{ "list",		be_do_list },
 	{ "mount",		be_do_mount },
 	{ "unmount",		be_do_unmount },
+	{ "umount",		be_do_unmount }, /* unmount alias */
 	{ "rename",		be_do_rename },
 	{ "rollback",		be_do_rollback },
+	{ NULL,			NULL },
 };
 
 static struct hdr_info hdrs[BE_NUM_FMTS] = { 0 };
@@ -158,6 +142,7 @@ usage(void)
 	    "\tbeadm list [[-a] | [-d] [-s]] [-H] [beName]\n"
 	    "\tbeadm mount [-s ro|rw] beName [mountpoint]\n"
 	    "\tbeadm unmount [-f] beName\n"
+	    "\tbeadm umount [-f] beName\n"
 	    "\tbeadm rename origBeName newBeName\n"
 	    "\tbeadm rollback beName snapshot\n"
 	    "\tbeadm rollback beName@snapshot\n"));
@@ -166,12 +151,11 @@ usage(void)
 static int
 run_be_cmd(const char *cmdname, int argc, char **argv)
 {
-	int cmd;
-	for (cmd = 0; cmd < BE_NUM_COMMANDS; cmd++) {
-		const be_command_t *command = &be_command_tbl[cmd];
+	const be_command_t *command;
+
+	for (command = &be_command_tbl[0]; command->name != NULL; command++)
 		if (strcmp(command->name, cmdname) == 0)
 			return (command->func(argc, argv));
-	}
 
 	(void) fprintf(stderr, _("Invalid command: %s\n"), cmdname);
 	usage();
@@ -258,8 +242,15 @@ init_hdr_cols(enum be_fmt be_fmt, struct hdr_info *hdr)
 			wchar_t wname[128];
 			size_t sz = mbstowcs(wname, name, sizeof (wname) /
 			    sizeof (wchar_t));
-			if (sz > 0)
-				col[i].width = wcswidth(wname, sz);
+			if (sz > 0) {
+				int wcsw = wcswidth(wname, sz);
+				if (wcsw > 0)
+					col[i].width = wcsw;
+				else
+					col[i].width = sz;
+			} else {
+				col[i].width = strlen(name);
+			}
 		}
 	}
 }
@@ -308,14 +299,18 @@ count_widths(enum be_fmt be_fmt, struct hdr_info *hdr, be_node_list_t *be_nodes)
 		char *pos;
 		size_t node_name_len = strlen(cur_be->be_node_name);
 		size_t root_ds_len = strlen(cur_be->be_root_ds);
-		size_t mntpt_len = strlen(cur_be->be_mntpt);
-		size_t policy_len = strlen(cur_be->be_policy_type);
+		size_t mntpt_len = 0;
+		size_t policy_len = 0;
 		size_t used_len;
-
 		uint64_t used = cur_be->be_space_used;
 		be_snapshot_list_t *snap = NULL;
 
-		(void) strncpy(name, root_ds, sizeof (name));
+		if (cur_be->be_mntpt != NULL)
+			mntpt_len = strlen(cur_be->be_mntpt);
+		if (cur_be->be_policy_type != NULL)
+			policy_len = strlen(cur_be->be_policy_type);
+
+		(void) strlcpy(name, root_ds, sizeof (name));
 		pos = strstr(name, be_name);
 
 		if (be_fmt == BE_FMT_DEFAULT) {

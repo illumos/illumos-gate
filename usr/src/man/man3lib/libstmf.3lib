@@ -1,0 +1,215 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libstmf 3LIB "8 May 2009" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libstmf \- SCSI Target Mode Framework library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lstmf\fR [ \fIlibrary\fR... ]
+#include <libstmf.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in this library provide configuration management of the SCSI Target
+Mode Framework (STMF), allowing clients to manage the provisioning of logical
+units and targets to the initiator clients of the framework.
+.SS "Definitions"
+.sp
+.ne 2
+.mk
+.na
+\fBHost Group\fR
+.ad
+.sp .6
+.RS 4n
+A Host Group is a set of one or more initiator ports that are combined together
+for the purposes of applying access controls to a Logical Unit object and
+assigning a logical unit number to the Logical Unit. The assigned logical unit
+number will be reported to the members of that Host Group via the SCSI REPORT
+LUN command. Host Groups can contain initiator ports that are not visible to
+the SCSI Target Mode Framework. Initiator ports might not be a member in more
+than one group. A Host Group is associated with a given Logical Unit via a view
+entry. Host Group names are unique within the framework.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBLogical Unit\fR
+.ad
+.sp .6
+.RS 4n
+A Logical Unit object is provided to the SCSI Target Mode Framework for the
+purposes of executing SCSI commands. Library clients can manage a Logical Unit
+object's accessibility to one or more SCSI initiator clients. \fBlibstmf\fR
+library clients cannot add or remove Logical Unit objects from the system.
+Every Logical Unit object within the SCSI Target Mode Framework is owned by a
+logical unit provider whose identity is available via the properties on the
+Logical Unit object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBLogical Unit Number\fR
+.ad
+.sp .6
+.RS 4n
+A Logical Unit Number is the SCSI identifier of a logical unit within a target.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBTarget Port\fR
+.ad
+.sp .6
+.RS 4n
+A Target port object is provided to the SCSI Target Mode Framework for the
+purposes of receiving SCSI commands on a particular logical unit. Library
+clients can manage a Logical Unit object's availability to one or more Target
+port objects. Library clients cannot add or remove Target objects from the
+system. Every Target port object within the SCSI Target Mode Framework is owned
+by a Local Port provider whose identity is available via the properties on the
+Target port object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBTarget Port Group\fR
+.ad
+.sp .6
+.RS 4n
+A Target Port Group is a set of one or more Target ports that are combined
+together for the purposes of applying availability to a Logical Unit object. A
+Target Port Group may be applied to any given Logical Unit via a view entry.
+Target ports may not be a member in more than one Target Port Group. Target
+Port Group names are unique within the framework.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBView\fR
+.ad
+.sp .6
+.RS 4n
+A View is a list of logical units exposed to a list of initiator ports through
+a list of targets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBView Entry\fR
+.ad
+.sp .6
+.RS 4n
+A View Entry object defines the association of an host group, a target group
+and a logical unit number with a specified logical unit. When a view entry is
+created for a logical unit, a caller can assign all targets and/or all
+initiator ports to the logical unit thus making the logical unit accessible to
+all target ports and/or all initiator ports. A logical unit may have one or
+more view entries associated with it. Any two view entries are considered to be
+in conflict when an attempt is made to duplicate the association of any given
+initiator port, target port and logical unit. Attempting this will result in an
+error returned from the call to \fBstmfAddViewEntry\fR(3STMF).
+.RE
+
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibstmf.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBstmfAddToHostGroup\fR\fBstmfAddToTargetGroup\fR
+\fBstmfAddViewEntry\fR\fBstmfClearProviderData\fR
+\fBstmfCreateHostGroup\fR\fBstmfCreateLu\fR
+\fBstmfCreateLuResource\fR\fBstmfCreateTargetGroup\fR
+\fBstmfDeleteHostGroup\fR\fBstmfDeleteLu\fR
+\fBstmfDeleteTargetGroup\fR\fBstmfDevidFromIscsiName\fR
+\fBstmfDevidFromWwn\fR\fBstmfFreeLuResource\fR
+\fBstmfFreeMemory\fR\fBstmfGetHostGroupList\fR
+\fBstmfGetHostGroupMembers\fR\fBstmfGetLogicalUnitList\fR
+\fBstmfGetLogicalUnitProperties\fR\fBstmfGetLuProp\fR
+\fBstmfGetLuResource\fR\fBstmfGetPersistMethod\fR
+\fBstmfGetProviderData\fR\fBstmfGetProviderDataProt\fR
+\fBstmfGetState\fR\fBstmfGetTargetGroupList\fR
+\fBstmfGetTargetGroupMembers\fR\fBstmfGetTargetList\fR
+\fBstmfGetTargetProperties\fR\fBstmfGetViewEntryList\fR
+\fBstmfModifyLu\fR\fBstmfModifyLuByFname\fR
+\fBstmfOfflineLogicalUnit\fR\fBstmfOfflineTarget\fR
+\fBstmfOnlineLogicalUnit\fR\fBstmfOnlineTarget\fR
+\fBstmfRemoveFromHostGroup\fR\fBstmfRemoveFromTargetGroup\fR
+\fBstmfRemoveViewEntry\fR\fBstmfSetLuProp\fR
+\fBstmfSetPersistMethod\fR\fBstmfSetProviderData\fR
+\fBstmfSetProviderDataProt\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/libstmf.so.1\fR\fR
+.ad
+.RS 24n
+.rt  
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/64/libstmf.so.1\fR\fR
+.ad
+.RS 24n
+.rt  
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fBstmfAddViewEntry\fR(3STMF), \fBattributes\fR(5)

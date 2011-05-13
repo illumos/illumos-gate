@@ -1,0 +1,154 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH priv_getbyname 9F "11 Mar 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+priv_getbyname \- map a privilege name to a number
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/cred.h>
+
+
+
+\fBint\fR \fBpriv_getbyname\fR(\fBconst char  *\fR\fIpriv\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpriv\fR\fR
+.ad
+.RS 9n
+.rt  
+name of the privilege
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 9n
+.rt  
+flags, must be zero or \fBPRIV_ALLOC\fR
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpriv_getbyname()\fR function maps a privilege name to a privilege number
+for use with the \fBpriv_*()\fR kernel interfaces.
+.sp
+.LP
+If \fBPRIV_ALLOC\fR is passed as a flag parameter, an attempt is made to
+allocate a privilege if it is not yet defined. The newly allocated privilege
+number is returned.
+.sp
+.LP
+Privilege names can be specified with an optional \fBpriv_\fR prefix, which is
+stripped.
+.sp
+.LP
+Privilege names are case insensitive but allocated privileges preserve case.
+.sp
+.LP
+Allocated privileges can be at most \fB{PRIVNAME_MAX}\fR characters long and
+can contain only alphanumeric characters and the underscore character.
+.SH RETURN VALUES
+.sp
+.LP
+This function returns the privilege number, which is greater than or equal to
+0, if it succeeds. It returns a negative error number if an error occurs.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+This might be caused by any of the following
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fIflags\fR parameter is invalid.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The specified privilege does not exist.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fIpriv\fR parameter contains invalid characters.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 16n
+.rt  
+There is no room to allocate another privilege.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+An attempt was made to allocate a privilege that was longer than
+\fB{PRIVNAME_MAX}\fR characters.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This functions can be called from user and kernel contexts.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+ArchitectureAll
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBprivileges\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

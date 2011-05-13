@@ -1,0 +1,115 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sotruss 1 "12 May 1997" "SunOS 5.11" "User Commands"
+.SH NAME
+sotruss \- trace shared library procedure calls
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/sotruss\fR [\fB-f\fR] [\fB-F\fR \fIbindfromlist\fR] [\fB-T\fR \fIbindtolist\fR] 
+     [\fB-o\fR \fIoutputfile\fR] executable [executable arguments...]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBsotruss\fR executes the specified command and produces a trace of the
+library calls that it performs. Each line of the trace output reports what
+bindings are occurring between dynamic objects as each procedure call is
+executed. \fBsotruss\fR traces all of the procedure calls that occur between
+dynamic objects via the \fIProcedure Linkage Table\fR, so only those procedure
+calls which are bound via the \fIProcedure\fR \fILinkage\fR \fITable\fR will be
+traced. See \fILinker and Libraries Guide\fR
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fI bindfromlist\fR\fR
+.ad
+.RS 19n
+.rt  
+A colon-separated list of libraries that are to be traced.  Only calls from
+these libraries will be traced.  The default is to trace calls from the main
+executable only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR\fI bindtolist\fR\fR
+.ad
+.RS 19n
+.rt  
+A colon-separated list of libraries that are to be traced. Only calls to these
+libraries will be traced.  The default is to trace all calls.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fI outputfile\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBsotruss\fR output will be directed to the \fIoutputfile\fR. If this option
+is combined with the  \fB-f\fR option then the  \fIpid\fR of the executing
+program will be placed at the end of the filename. By default \fBsotruss\fR
+output is placed on  \fBstderr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 19n
+.rt  
+Follow all children created by  \fBfork()\fR and print  \fBtruss\fR output on
+each child process.  This option will also cause a  \fIpid\fR to be output on
+each \fBtruss\fR output line.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn example of \fBsotruss\fR.
+.sp
+.LP
+A simple example shows the tracing of a simple \fBls\fR command:
+
+.sp
+.in +2
+.nf
+% sotruss ls | more
+ls       ->     libc.so.1:*atexit(0xef7d7d1c, 0x23c00, 0x0)
+ls       ->     libc.so.1:*atexit(0x1392c, 0xef7d7d1c, 0xef621bb0)
+ls       ->     libc.so.1:*setlocale(0x6, 0x1396c, 0xef621ba8)
+ls       ->     libc.so.1:*textdomain(0x13970, 0x1396c, 0xef621ba8)
+ls       ->     libc.so.1:*time(0x0, 0xef61f6fc, 0xef621ba8)
+ls       ->     libc.so.1:*isatty(0x1, 0xef61f6fc, 0x0)
+ls       ->     libc.so.1:*getopt(0x1, 0xeffff8fc, 0x13980)
+ls       ->     libc.so.1:*malloc(0x100, 0x0, 0x0)
+ls       ->     libc.so.1:*malloc(0x9000, 0x0, 0x0)
+ls       ->     libc.so.1:*lstat64(0x23ee8, 0xeffff7a0, 0x0)
+\&...
+ls       ->     libc.so.1:*printf(0x13a64, 0x26208, 0x23ef0)
+ls       ->     libc.so.1:*printf(0x13a64, 0x26448, 0x23ef0)
+ls       ->     libc.so.1:*exit(0x0, 0x24220, 0x2421c)
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld.so.1\fR(1), \fBtruss\fR(1), \fBwhocalls\fR(1), \fBfork\fR(2),
+\fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

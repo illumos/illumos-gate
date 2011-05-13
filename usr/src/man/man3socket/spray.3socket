@@ -1,0 +1,152 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH spray 3SOCKET "30 Dec 1996" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+spray \- scatter data in order to test the network
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
+#include <rpcsvc/spray.h>
+
+\fBbool_t\fR \fBxdr_sprayarr\fR(\fBXDR *\fR\fIxdrs\fR, \fBsprayarr *\fR\fIobjp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_spraycumul\fR(\fBXDR *\fR\fIxdrs\fR, \fBspraycumul *\fR\fIobjp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The spray program sends packets to a given machine to test communications with
+that machine.
+.sp
+.LP
+The spray program is not a C function interface, per se, but it can be accessed
+using the generic remote procedure calling interface \fBclnt_call()\fR. See
+\fBrpc_clnt_calls\fR(3NSL). The program sends a packet to the called host. The
+host acknowledges receipt of the packet. The program counts the number of
+acknowledgments and can return that count.
+.sp
+.LP
+The spray program currently supports the following procedures, which should be
+called in the order given:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSPRAYPROC_CLEAR\fR\fR
+.ad
+.RS 19n
+.rt  
+This procedure clears the counter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSPRAYPROC_SPRAY\fR\fR
+.ad
+.RS 19n
+.rt  
+This procedure sends the packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSPRAYPROC_GET\fR\fR
+.ad
+.RS 19n
+.rt  
+This procedure returns the count and the amount of time since the last
+\fBSPRAYPROC_CLEAR\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBspray()\fR
+.sp
+.LP
+The following code fragment demonstrates how the spray program is used:
+
+.sp
+.in +2
+.nf
+#include <rpc/rpc.h>
+#include <rpcsvc/spray.h>
+ .  .  .
+	spraycumul	spray_result;
+	sprayarr	spray_data;
+	char		buf[100];		/* arbitrary data */
+	int		loop = 1000;
+	CLIENT	*clnt;
+	struct timeval timeout0 = {0, 0};
+	struct timeval timeout25 = {25, 0};
+	spray_data.sprayarr_len = (uint_t)100;
+	spray_data.sprayarr_val = buf;
+	clnt = clnt_create("somehost", SPRAYPROG, SPRAYVERS, "netpath");
+	if (clnt == (CLIENT *)NULL) {
+		/* handle this error */
+	}
+	if (clnt_call(clnt, SPRAYPROC_CLEAR,
+		xdr_void, NULL, xdr_void, NULL, timeout25)) {
+			/* handle this error */
+	}
+	while (loop\(mi > 0) {
+		if (clnt_call(clnt, SPRAYPROC_SPRAY,
+			xdr_sprayarr, &spray_data, xdr_void, NULL, timeout0)) {
+				/* handle this error */
+		}
+	}
+	if (clnt_call(clnt, SPRAYPROC_GET,
+		xdr_void, NULL, xdr_spraycumul, &spray_result, timeout25)) {
+			/* handle this error */
+	}
+	printf("Acknowledged %ld of 1000 packets in %d secs %d usecs\en",
+		spray_result.counter,
+		spray_result.clock.sec,
+		spray_result.clock.usec);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBspray\fR(1M), \fBrpc_clnt_calls\fR(3NSL), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+This interface is unsafe in multithreaded applications.  Unsafe interfaces
+should be called only from the main thread.
+.sp
+.LP
+A spray program is not useful as a networking benchmark as it uses  unreliable
+connectionless transports, for example, udp. It can report a large number of
+packets dropped, when the drops were caused by the program sending packets
+faster than they can be buffered locally, that is, before the packets get to
+the network medium.

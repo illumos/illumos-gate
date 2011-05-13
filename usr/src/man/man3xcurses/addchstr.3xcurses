@@ -1,0 +1,174 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH addchstr 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+addchstr, addchnstr, mvaddchstr, mvaddchnstr, mvwaddchnstr, mvwaddchstr,
+waddchstr, waddchnstr \- copy a character string (with renditions) to a window
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBaddchstr\fR(\fBconst chtype *\fR\fIchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBaddchnstr\fR(\fBconst chtype *\fR\fIchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvaddchnstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBconst chtype *\fR\fIchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvaddchstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBconst chtype *\fR\fIchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwaddchnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBconst chtype *\fR\fIchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwaddchstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBconst chtype *\fR\fIchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwaddchstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBconst chtype *\fR\fIchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwaddchnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBconst chtype *\fR\fIchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaddchstr()\fR function copies the \fBchtype\fR character string to the
+\fBstdscr\fR window at the current cursor position.  The \fBmvaddchstr()\fR and
+\fBmvwaddchstr()\fR functions copy the  character string to the starting
+position indicated by the \fIx\fR (column)  and \fIy\fR (row) parameters (the
+former to the \fBstdscr\fR window;  the latter to window \fIwin\fR).  The
+\fBwaddchstr()\fR is identical to \fBaddchstr()\fR, but writes  to the window
+specified by \fIwin\fR.
+.sp
+.LP
+The \fBaddchnstr()\fR, \fBwaddchnstr()\fR, \fBmvaddchnstr()\fR, and
+\fBmvwaddchnstr()\fR functions write \fIn\fR characters to the window,  or as
+many as will fit on the line. If \fIn\fR is less than 0, the entire string is
+written, or as much of it as  fits on the line.  The former two functions place
+the string at the current cursor position; the  latter two commands use the
+position specified by the \fIx\fR and \fIy\fR parameters.
+.sp
+.LP
+These functions differ from the \fBaddstr\fR(3XCURSES) set of functions in two
+important respects.  First, these functions do \fInot\fR advance the cursor
+after writing the string to the window. Second, the current window rendition is
+not combined with the character;  only the attributes that are already part of
+the \fBchtype\fR character  are used.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIchstr\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the \fBchtype\fR string to be copied to the window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the maximum number of characters to be copied from \fIchstr\fR.   If \fIn\fR
+is less than 0, the entire string is written or as much of it as fits on the
+line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the y (row) coordinate of the starting position of \fIchstr\fR in the
+window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the x (column) coordinate of the starting position of \fIchstr\fR  in the
+window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the window to which the string is to be copied.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On success, these functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddch\fR(3XCURSES), \fBaddnstr\fR(3XCURSES), \fBattroff\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

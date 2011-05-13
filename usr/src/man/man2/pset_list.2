@@ -1,0 +1,85 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pset_list 2 "28 Jun 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+pset_list \- get list of processor sets
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pset.h>
+
+\fBint\fR \fBpset_list\fR(\fBpsetid_t *\fR\fIpsetlist\fR, \fBuint_t *\fR\fInumpsets\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpset_list()\fR function returns a list of processor sets in the system.
+.sp
+.LP
+If \fInumpsets\fR is non-null, then on successful completion the number of
+processor sets in the system will be stored in the location pointed to by
+\fInumpsets\fR.
+.sp
+.LP
+If \fInumpsets\fR and \fIpsetlist\fR are both non-null, then \fIpsetlist\fR
+points to a buffer where a list of processor sets in the system is to be
+stored, and \fInumpsets\fR points to the maximum number of processor set IDs
+the buffer can hold.  On successful completion, the list of processor sets up
+to the maximum buffer size is stored in the buffer pointed to by
+\fIpsetlist\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, 0 is returned. Otherwise, -1  is returned and
+\fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpset_list()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The location pointed to by \fIpsetlist\fR or \fInumpsets\fR was not null and
+not writable by the user.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If the caller is in a non-global zone and the pools facility is active,
+\fBpset_list()\fR returns only the processor set of the pool to which the zone
+is bound.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBpsrset\fR(1M), \fBzoneadm\fR(1M),
+\fBprocessor_info\fR(2), \fBpset_bind\fR(2), \fBpset_create\fR(2),
+\fBpset_info\fR(2), \fBpset_getloadavg\fR(3C), \fBattributes\fR(5)

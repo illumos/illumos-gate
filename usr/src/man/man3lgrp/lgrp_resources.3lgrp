@@ -1,0 +1,99 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrp_resources 3LGRP "26 Jan 2005" "SunOS 5.11" "Locality Group Library Functions"
+.SH NAME
+lgrp_resources \- get lgroup resources of given lgroup
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.\|.\fR ] 
+#include <sys/lgrp_user.h>
+
+\fBint\fR \fBlgrp_resources\fR(\fBlgrp_cookie_t\fR \fIcookie\fR, \fBlgrp_id_t\fR \fIlgrp\fR,
+     \fBlgrp_id_t *\fR\fIlgrpids\fR, \fBuint_t\fR \fIcount\fR, \fBlgrp_rsrc_t\fR \fItype\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlgrp_resources()\fR function takes a  cookie  representing  a snapshot
+of the lgroup hierarchy obtained from \fBlgrp_init\fR(3LGRP) and returns the
+number of resources in the lgroup specified by \fIlgrp\fR.  The resources are
+represented by a set of lgroups in which each lgroup directly contains CPU
+and/or memory resources.
+.sp
+.LP
+The \fItype\fR argument should be set to one of the following values to specify
+whether the CPU or memory resources should be returned:
+.sp
+.in +2
+.nf
+LGRP_RSRC_CPU      /* CPU resources */
+LGRP_RSRC_MEM      /* Memory resources */
+.fi
+.in -2
+
+.sp
+.LP
+If the \fIlgrpids\fR[] argument is non-null and the \fIcount\fR argument is
+non-zero, \fBlgrp_resources()\fR stores up to the specified count of lgroup IDs
+into the \fIlgrpids\fR[] array.
+.SH RETURN VALUES
+.sp
+.LP
+Upon  successful  completion,  \fBlgrp_resources()\fR returns the number  of
+lgroup resources. Otherwise, -1 is returned and \fBerrno\fR is set to indicate
+the error.
+.SH ERRORS
+.sp
+.LP
+The \fBlgrp_resources()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified cookie, lgroup  ID, or type is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified lgroup ID was not found.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_children\fR(3LGRP), \fBlgrp_init\fR(3LGRP), \fBlgrp_parents\fR(3LGRP),
+\fBliblgrp\fR(3LIB), \fBattributes\fR(5)

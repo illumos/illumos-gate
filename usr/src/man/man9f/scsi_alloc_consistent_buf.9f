@@ -1,0 +1,207 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_alloc_consistent_buf 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_alloc_consistent_buf \- allocate an I/O buffer for SCSI DMA
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBstruct buf *\fR\fBscsi_alloc_consistent_buf\fR(\fBstructscsi_address*\fR\fIap\fR, 
+     \fBstruct buf *\fR\fIbp\fR, \fBsize_t\fR \fIdatalen\fR, \fBuint_t\fR \fIbflags\fR, 
+     \fBint (*\fR\fIcallback\fR)(caddr_t), \fBcaddr_t\fR \fIarg\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the \fBscsi_address\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the \fBbuf\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdatalen\fR\fR
+.ad
+.RS 12n
+.rt  
+Number of bytes for the data buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbflags\fR\fR
+.ad
+.RS 12n
+.rt  
+Flags setting for the allocated buffer header. This should either be
+\fBB_READ\fR or \fBB_WRITE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a callback function, \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 12n
+.rt  
+The callback function argument.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_alloc_consistent_buf()\fR function returns allocates a buffer
+header and the associated data buffer for direct memory access (DMA) transfer.
+This buffer is allocated from the \fBiobp\fR space, which is considered
+consistent memory. For more details, see \fBddi_dma_mem_alloc\fR(9F) and
+\fBddi_dma_sync\fR(9F).
+.sp
+.LP
+For buffers allocated via \fBscsi_alloc_consistent_buf()\fR, and marked with
+the \fBPKT_CONSISTENT\fR flag via \fBscsi_init_pkt\fR(9F), the HBA driver must
+ensure that the data transfer for the command is correctly synchronized before
+the target driver's command completion callback is performed.
+.sp
+.LP
+If \fIbp\fR is \fINULL\fR, a new buffer header will be allocated using
+\fBgetrbuf\fR(9F). In addition, if \fIdatalen\fR is non-zero, a new buffer will
+be allocated using \fBddi_dma_mem_alloc\fR(9F).
+.sp
+.LP
+\fIcallback\fR indicates what the allocator routines should do when direct
+memory access \fB(DMA)\fR resources are not available; the valid values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR\fR
+.ad
+.RS 16n
+.rt  
+Do not wait for resources. Return a \fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR\fR
+.ad
+.RS 16n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBOther Values\fR
+.ad
+.RS 16n
+.rt  
+\fIcallback\fR points to a function that is called when resources may become
+available. \fIcallback\fR must return either \fB0\fR (indicating that it
+attempted to allocate resources but failed to do so), in which case it is put
+back on a list to be called again later, or \fB1\fR indicating either success
+in allocating resources or indicating that it no longer cares for a retry. The
+last argument \fIarg\fR is supplied to the \fIcallback\fR function when it is
+invoked.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_alloc_consistent_buf()\fR function returns a pointer to a
+\fBbuf\fR(9S) structure on success. It returns \fBNULL\fR if resources are not
+available even if \fIwaitfunc\fR was not \fBSLEEP_FUNC\fR.
+.SH CONTEXT
+.sp
+.LP
+If \fIcallback\fR is \fBSLEEP_FUNC\fR, then this routine may be called only
+from user-level code. Otherwise, it may be called fromuser, interrupt, or
+kernel context. The \fIcallback\fR function may not block or call routines that
+block.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAllocate a request sense packet with consistent DMA resources
+attached.
+.sp
+.in +2
+.nf
+   bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
+         SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
+    rqpkt = scsi_init_pkt(&devp->sd_address,
+         NULL, bp, CDB_GROUP0, 1, 0,
+         PKT_CONSISTENT, SLEEP_FUNC, NULL);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRAllocate an inquiry packet with consistent DMA resources
+attached.
+.sp
+.in +2
+.nf
+    bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
+         SUN_INQSIZE, B_READ, canwait, NULL);
+    if (bp) {
+    	pkt = scsi_init_pkt(&devp->sd_address, NULL, bp,
+        	CDB_GROUP0, 1, PP_LEN, PKT_CONSISTENT, 
+		canwait, NULL);
+    }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_mem_alloc\fR(9F), \fBddi_dma_sync\fR(9F), \fBgetrbuf\fR(9F),
+\fBscsi_destroy_pkt\fR(9F), \fBscsi_init_pkt\fR(9F),
+\fBscsi_free_consistent_buf\fR(9F), \fBbuf\fR(9S), \fBscsi_address\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

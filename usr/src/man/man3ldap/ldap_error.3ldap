@@ -1,0 +1,663 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_error 3LDAP "11 Nov 2008" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_error, ldap_err2string, ldap_perror, ldap_result2error \- LDAP protocol
+error handling functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBchar *\fR\fBldap_err2string\fR(\fBint\fR \fIerr\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_perror\fR(\fBLDAP *\fR\fIld\fR, \fBconst char *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_result2error\fR(\fBLDAP *\fR\fIld\fR, \fBLDAPMessage *\fR\fIres\fR, \fBint\fR \fIfreeit\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions interpret the error codes that are returned by the LDAP API
+routines. The \fBldap_perror()\fR and \fBldap_result2error()\fR functions are
+deprecated for all new development. Use \fBldap_err2string()\fR instead.
+.sp
+.LP
+You can also use \fBldap_parse_sasl_bind_result\fR(3LDAP),
+\fBldap_parse_extended_result\fR(3LDAP), and \fBldap_parse_result\fR(3LDAP) to
+provide error handling and interpret error codes returned by LDAP API
+functions.
+.sp
+.LP
+The \fBldap_err2string()\fR function takes \fIerr\fR, a numeric LDAP error
+code, returned either by \fBldap_parse_result\fR(3LDAP) or another LDAP API
+call. It returns an informative, null-terminated, character string that
+describes the error.
+.sp
+.LP
+The \fBldap_result2error()\fR function takes \fIres\fR, a result produced by
+\fBldap_result\fR(3LDAP) or other synchronous LDAP calls, and returns the
+corresponding error code. If the \fIfreeit\fR parameter is non-zero, it
+indicates that the \fIres\fR parameter should be freed by a call to
+\fBldap_result\fR(3LDAP) after the error code has been extracted.
+.sp
+.LP
+Similar to the way \fBperror\fR(3C) works, the \fBldap_perror()\fR function can
+be called to print an indication of the error to standard error.
+.SH ERRORS
+.sp
+.LP
+The possible values for an LDAP error code are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The request was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_OPERATIONS_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An operations error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_PROTOCOL_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+A protocol violation was detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_TIMELIMIT_EXCEEDED\fR\fR
+.ad
+.sp .6
+.RS 4n
+An LDAP time limit was exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_SIZELIMIT_EXCEEDED\fR\fR
+.ad
+.sp .6
+.RS 4n
+An LDAP size limit was exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_COMPARE_FALSE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A compare operation returned false.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_COMPARE_TRUE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A compare operation returned true.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_STRONG_AUTH_NOT_SUPPORTED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The LDAP server does not support strong authentication.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_STRONG_AUTH_REQUIRED\fR\fR
+.ad
+.sp .6
+.RS 4n
+Strong authentication is required for the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_PARTIAL_RESULTS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Only partial results are returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NO_SUCH_ATTRIBUTE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The attribute type specified does not exist in the entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_UNDEFINED_TYPE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The attribute type specified is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_INAPPROPRIATE_MATCHING\fR\fR
+.ad
+.sp .6
+.RS 4n
+The filter type is not supported for the specified attribute.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_CONSTRAINT_VIOLATION\fR\fR
+.ad
+.sp .6
+.RS 4n
+An attribute value specified violates some constraint. For example, a
+\fBpostalAddress\fR has too many lines, or a line that is too long.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_TYPE_OR_VALUE_EXISTS\fR\fR
+.ad
+.sp .6
+.RS 4n
+An attribute type or attribute value specified already exists in the entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_INVALID_SYNTAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+An invalid attribute value was specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NO_SUCH_OBJECT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified object does not exist in the directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_ALIAS_PROBLEM\fR\fR
+.ad
+.sp .6
+.RS 4n
+An alias in the directory points to a nonexistent entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_INVALID_DN_SYNTAX\fR\fR
+.ad
+.sp .6
+.RS 4n
+A syntactically invalid DN was specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_IS_LEAF\fR\fR
+.ad
+.sp .6
+.RS 4n
+The object specified is a leaf.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_ALIAS_DEREF_PROBLEM\fR\fR
+.ad
+.sp .6
+.RS 4n
+A problem was encountered when dereferencing an alias.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_INAPPROPRIATE_AUTH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Inappropriate authentication was specified. For example,
+\fBLDAP_AUTH_SIMPLE\fR was specified and the entry does not have a
+\fBuserPassword\fR attribute.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_INVALID_CREDENTIALS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Invalid credentials were presented, for example, the wrong password.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_INSUFFICIENT_ACCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The user has insufficient access to perform the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_BUSY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The DSA is busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_UNAVAILABLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The DSA is unavailable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_UNWILLING_TO_PERFORM\fR\fR
+.ad
+.sp .6
+.RS 4n
+The DSA is unwilling to perform the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_LOOP_DETECT\fR\fR
+.ad
+.sp .6
+.RS 4n
+A loop was detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NAMING_VIOLATION\fR\fR
+.ad
+.sp .6
+.RS 4n
+A naming violation occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_OBJECT_CLASS_VIOLATION\fR\fR
+.ad
+.sp .6
+.RS 4n
+An object class violation occurred. For example, a \fBmust\fR attribute was
+missing from the entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NOT_ALLOWED_ON_NONLEAF\fR\fR
+.ad
+.sp .6
+.RS 4n
+The operation is not allowed on a nonleaf object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NOT_ALLOWED_ON_RDN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The operation is not allowed on an RDN.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_ALREADY_EXISTS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry already exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NO_OBJECT_CLASS_MODS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Object class modifications are not allowed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_OTHER\fR\fR
+.ad
+.sp .6
+.RS 4n
+An unknown error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_SERVER_DOWN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The LDAP library cannot contact the LDAP server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_LOCAL_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Some local error occurred. This is usually the result of a failed
+\fBmalloc\fR(3C) call or a failure to \fBfflush\fR(3C) the \fBstdio\fR stream
+to files, even when the LDAP requests were processed successfully by the remote
+server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_ENCODING_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error was encountered encoding parameters to send to the LDAP server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_DECODING_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error was encountered decoding a result from the LDAP server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_TIMEOUT\fR\fR
+.ad
+.sp .6
+.RS 4n
+A time limit was exceeded while waiting for a result.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_AUTH_UNKNOWN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The authentication method specified to \fBldap_bind\fR(3LDAP) is not known.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_FILTER_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An invalid filter was supplied to \fBldap_search\fR(3LDAP), for example,
+unbalanced parentheses.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_PARAM_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An LDAP function was called with a bad parameter, for example, a \fINULL\fR
+\fIld\fR pointer, and the like.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NO_MEMORY\fR\fR
+.ad
+.sp .6
+.RS 4n
+A memory allocation call failed in an LDAP library function, for example,
+\fBmalloc\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_CONNECT_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+The LDAP client has either lost its connetion to an LDAP server or it cannot
+establish a connection.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NOT_SUPPORTED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The requested functionality is not supported., for example, when an LDAPv2
+client requests some LDAPv3 functionality.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_CONTROL_NOT_FOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+An LDAP client requested a control not found in the list of supported controls
+sent by the server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_NO_RESULTS_RETURNED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The LDAP server sent no results.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_MORE_RESULTS_TO_RETURN\fR\fR
+.ad
+.sp .6
+.RS 4n
+More results are chained in the message chain.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_CLIENT_LOOP\fR\fR
+.ad
+.sp .6
+.RS 4n
+A loop has been detected, for example, when following referrals.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_REFERRAL_LIMIT_EXCEEDED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The referral exceeds the hop limit. The hop limit determines the number of
+servers that the client can hop through to retrieve data.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfflush\fR(3C), \fBldap\fR(3LDAP), \fBldap_bind\fR(3LDAP),
+\fBldap_result\fR(3LDAP), \fBldap_parse_extended_result\fR(3LDAP),
+\fBldap_parse_result\fR(3LDAP), \fBldap_parse_sasl_bind_result\fR(3LDAP),
+\fBldap_search\fR(3LDAP), \fBmalloc\fR(3C), \fBperror\fR(3C) ,
+\fBattributes\fR(5)

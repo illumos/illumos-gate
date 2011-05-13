@@ -1,0 +1,434 @@
+'\" te
+.\"  Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dmae 9F "04 Apr 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dmae, ddi_dmae_alloc, ddi_dmae_release, ddi_dmae_prog, ddi_dmae_disable,
+ddi_dmae_enable, ddi_dmae_stop, ddi_dmae_getcnt, ddi_dmae_1stparty,
+ddi_dmae_getlim, ddi_dmae_getattr \- system DMA engine functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBint\fR \fBddi_dmae_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR, \fBint (*\fR\fIcallback\fR) (caddr_t),
+     \fBcaddr_t\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_release\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_prog\fR(\fBdev_info_t *\fR\fIdip\fR, \fBstruct ddi_dmae_req *\fR\fIdmaereqp\fR,
+     \fBddi_dma_cookie_t *\fR\fIcookiep\fR, \fBint\fR \fIchnl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_disable\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_enable\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_stop\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_getcnt\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR, \fBint *\fR\fIcountp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_1stparty\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIchnl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_getlim\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIlimitsp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_dmae_getattr\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_attr_t *\fR\fIattrp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). The \fBddi_dmae_getlim()\fR interface,
+described below, is obsolete. Use \fBddi_dmae_getattr()\fR, also described
+below, to replace it.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+A \fBdev_info\fR pointer that identifies the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIchnl\fR\fR
+.ad
+.RS 12n
+.rt  
+A \fBDMA\fR channel number. On \fBISA\fR buses this number must be \fB0\fR,
+\fB1\fR, \fB2\fR, \fB3\fR, \fB5\fR, \fB6\fR, or \fB7\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 12n
+.rt  
+The address of a function to call back later if resources are not currently
+available. The following special function addresses may also be used:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_SLEEP\fR\fR
+.ad
+.RS 20n
+.rt  
+Wait until resources are available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_DONTWAIT\fR\fR
+.ad
+.RS 20n
+.rt  
+Do not wait until resources are available and do not schedule a callback.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 12n
+.rt  
+Argument to be passed to the callback function, if specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdmaereqp\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBDMA\fR engine request structure. See \fBddi_dmae_req\fR(9S).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcookiep\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBddi_dma_cookie\fR(9S) object, obtained from
+\fBddi_dma_segtocookie\fR(9F), which contains the address and count.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcountp\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to an integer that will receive the count of the number of bytes not
+yet transferred upon completion of a \fBDMA\fR operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlimitsp\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBDMA\fR limit structure. See \fBddi_dma_lim_x86\fR(9S).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattrp\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to a \fBDMA \fR attribute structure. See \fBddi_dma_attr\fR(9S).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+There are three possible ways that a device can perform \fBDMA\fR engine
+functions:
+.sp
+.ne 2
+.mk
+.na
+\fBBus master DMA\fR
+.ad
+.RS 19n
+.rt  
+If the device is capable of acting as a true bus master, then the driver should
+program the device's \fBDMA\fR registers directly and not make use of the
+\fBDMA\fR engine functions described here. The driver should obtain the
+\fBDMA\fR address and count from \fBddi_dma_segtocookie\fR(9F). See
+\fBddi_dma_cookie\fR(9S) for a description of a \fBDMA\fR cookie.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBThird-party \fBDMA\fR\fR
+.ad
+.RS 19n
+.rt  
+This method uses the system \fBDMA\fR engine that is resident on the main
+system board. In this model, the device cooperates with the system's \fBDMA\fR
+engine to effect the data transfers between the device and memory. The driver
+uses the functions documented here, except \fBddi_dmae_1stparty()\fR, to
+initialize and program the \fBDMA\fR engine. For each \fBDMA\fR data transfer,
+the driver programs the \fBDMA\fR engine and then gives the device  a command
+to initiate the transfer in cooperation with that engine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBFirst-party DMA\fR
+.ad
+.RS 19n
+.rt  
+Using this method, the device uses its own \fBDMA\fR bus cycles, but requires a
+channel from the system's \fBDMA\fR engine. After allocating the \fBDMA\fR
+channel, the \fBddi_dmae_1stparty()\fR function may be used to perform whatever
+configuration is necessary to enable this mode.
+.RE
+
+.SS "\fBddi_dmae_alloc()\fR"
+.sp
+.LP
+The \fBddi_dmae_alloc()\fR function is used to acquire a \fBDMA\fR channel of
+the system \fBDMA\fR engine. \fBddi_dmae_alloc()\fR allows only one device at a
+time to have a particular \fBDMA\fR channel allocated. It must be called prior
+to any other system  \fBDMA\fR engine function on a channel. If the device
+allows the channel to be shared with other devices, it must be freed using
+\fBddi_dmae_release()\fR after completion of the \fBDMA\fR operation. In any
+case, the channel must be released before the driver successfully detaches. See
+\fBdetach\fR(9E). No other driver may acquire the \fBDMA\fR channel until it is
+released.
+.sp
+.LP
+If the requested channel is not immediately available, the value of
+\fIcallback\fR determines what action will be taken. If the value of
+\fIcallback\fR is \fBDDI_DMA_DONTWAIT\fR, \fBddi_dmae_alloc()\fR will return
+immediately. The value \fBDDI_DMA_SLEEP\fR will cause the thread to sleep and
+not return until the channel has been acquired. Any other value is assumed to
+be a callback function address. In that case, \fBddi_dmae_alloc()\fR returns
+immediately, and when resources might have become available, the callback
+function is called (with the argument \fIarg\fR) from interrupt context. When
+the callback function is called, it should attempt to allocate the \fBDMA\fR
+channel again. If it succeeds or no longer needs the channel, it must return
+the value \fBDDI_DMA_CALLBACK_DONE\fR. If it tries to allocate the channel but
+fails to do so, it must return the value \fBDDI_DMA_CALLBACK_RUNOUT\fR. In this
+case, the callback function is put back on a list to be called again later.
+.SS "\fBddi_dmae_prog()\fR"
+.sp
+.LP
+The \fBddi_dmae_prog()\fR function programs the \fBDMA\fR channel for a
+\fBDMA\fR transfer. The \fBddi_dmae_req\fR structure contains all the
+information necessary to set up the channel, except for the memory address and
+count. Once the channel has been programmed, subsequent calls to
+\fBddi_dmae_prog()\fR may specify a value of \fINULL\fR for \fIdmaereqp\fR if
+no changes to the programming are required other than the address and count
+values. It disables the channel prior to setup, and enables the channel before
+returning. The \fBDMA\fR address and count are specified by passing
+\fBddi_dmae_prog()\fR a cookie obtained from \fBddi_dma_segtocookie\fR(9F).
+Other \fBDMA\fR engine parameters are specified by the \fBDMA\fR engine request
+structure passed in through \fIdmaereqp\fR. The fields of that structure are
+documented in \fBddi_dmae_req\fR(9S).
+.sp
+.LP
+Before using \fBddi_dmae_prog()\fR, you must allocate system \fBDMA\fR
+resources using \fBDMA\fR setup functions such as \fBddi_dma_buf_setup\fR(9F).
+\fBddi_dma_segtocookie\fR(9F) can then be used to retrieve a cookie which
+contains the address and count. Then this cookie is passed to
+\fBddi_dmae_prog()\fR.
+.SS "\fBddi_dmae_disable()\fR"
+.sp
+.LP
+The \fBddi_dmae_disable()\fR function disables the \fBDMA\fR channel so that it
+no longer responds to a device's  \fBDMA\fR service requests.
+.SS "\fBddi_dmae_enable()\fR"
+.sp
+.LP
+The \fBddi_dmae_enable()\fR function enables the \fBDMA\fR channel for
+operation. This may be used to re-enable the channel after a call to
+\fBddi_dmae_disable()\fR. The channel is automatically enabled after successful
+programming by \fBddi_dmae_prog()\fR.
+.SS "\fBddi_dmae_stop()\fR"
+.sp
+.LP
+The \fBddi_dmae_stop()\fR function disables the channel and terminates any
+active operation.
+.SS "\fBddi_dmae_getcnt()\fR"
+.sp
+.LP
+The \fBddi_dmae_getcnt()\fR function examines the count register of the
+\fBDMA\fR channel and sets \fI*countp\fR to the number of bytes remaining to be
+transferred.  The channel is assumed to be stopped.
+.SS "\fBddi_dmae_1stparty()\fR"
+.sp
+.LP
+In the case of \fBISA\fR buses, \fBddi_dmae_1stparty()\fR configures a channel
+in the system's \fBDMA\fR engine to operate in a ``slave'' (``cascade'') mode.
+.sp
+.LP
+When operating in \fBddi_dmae_1stparty()\fR mode, the  \fBDMA\fR channel must
+first be allocated using \fBddi_dmae_alloc()\fR and then configured using
+\fBddi_dmae_1stparty()\fR. The driver then programs the device to perform the
+I/O, including the necessary \fBDMA\fR address and count values obtained from
+\fBddi_dma_segtocookie\fR(9F).
+.SS "\fBddi_dmae_getlim()\fR"
+.sp
+.LP
+This function is obsolete. Use \fBddi_dmae_getattr()\fR, described below,
+instead.
+.sp
+.LP
+The \fBddi_dmae_getlim()\fR function fills in the \fBDMA\fR limit structure,
+pointed to by \fIlimitsp\fR, with the \fBDMA\fR limits of the system \fBDMA\fR
+engine. Drivers for devices that perform their own bus mastering or use
+first-party \fBDMA\fR must create and initialize their own \fBDMA\fR limit
+structures; they should not use \fBddi_dmae_getlim()\fR. The \fBDMA\fR limit
+structure must be passed to the \fBDMA\fR setup routines so that they will know
+how to break the \fBDMA\fR request into windows and segments (see
+\fBddi_dma_nextseg\fR(9F) and \fBddi_dma_nextwin\fR(9F)). If the device has any
+particular restrictions on transfer size or granularity (such as the size of
+disk sector), the driver should further restrict the values in the structure
+members before passing them to the \fBDMA\fR setup routines. The driver must
+not relax any of the restrictions embodied in the structure after it is filled
+in by \fBddi_dmae_getlim()\fR. After calling \fBddi_dmae_getlim()\fR, a driver
+must examine, and possibly set, the size of the \fBDMA\fR engine's
+scatter/gather list to determine whether \fBDMA\fR chaining will be used. See
+\fBddi_dma_lim_x86\fR(9S) and \fBddi_dmae_req\fR(9S) for additional information
+on scatter/gather DMA.
+.SS "\fBddi_dmae_getattr()\fR"
+.sp
+.LP
+The \fBddi_dmae_getattr()\fR function fills in the \fBDMA\fR attribute
+structure, pointed to by \fIattrp\fR, with the \fBDMA\fR attributes of the
+system \fBDMA\fR engine. Drivers for devices that perform their own bus
+mastering or use first-party \fBDMA\fR must create and initialize their own
+\fBDMA\fR attribute structures; they should not use \fBddi_dmae_getattr()\fR.
+The \fBDMA\fR attribute structure must be passed to the \fBDMA\fR resource
+allocation functions to provide the information necessary to break the
+\fBDMA\fR request into \fBDMA\fR windows and \fBDMA\fR cookies. See
+\fBddi_dma_nextcookie\fR(9F) and \fBddi_dma_getwin\fR(9F).
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 23n
+.rt  
+Upon success, for all of these routines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 23n
+.rt  
+May be returned due to invalid arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_NORESOURCES\fR\fR
+.ad
+.RS 23n
+.rt  
+May be returned by \fBddi_dmae_alloc()\fR if the requested resources are not
+available and the value of \fIdmae_waitfp\fR is not \fBDDI_DMA_SLEEP\fR.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+If \fBddi_dmae_alloc()\fR is called from interrupt context, then its
+\fIdmae_waitfp\fR argument and the callback function must not have the value
+\fBDDI_DMA_SLEEP\fR. Otherwise, all these routines can be called from user,
+interrupt, or kernel context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architecturex86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisa\fR(4), \fBattributes\fR(5), \fBddi_dma_buf_setup\fR(9F),
+\fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F),
+\fBddi_dma_nextseg\fR(9F), \fBddi_dma_nextwin\fR(9F),
+\fBddi_dma_segtocookie\fR(9F), \fBddi_dma_setup\fR(9F), \fBddi_dma_attr\fR(9S),
+\fBddi_dma_cookie\fR(9S), \fBddi_dma_lim_x86\fR(9S), \fBddi_dma_req\fR(9S),
+\fBddi_dmae_req\fR(9S)

@@ -1,0 +1,422 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_ep_create_with_srq 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_ep_create_with_srq \- create an instance of End Point with Shared Receive
+Queue
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_ep_create_with_srq (
+        IN      DAT_IA_HANDLE       ia_handle,
+        IN      DAT_PZ_HANDLE       pz_handle,
+        IN      DAT_EVD_HANDLE      recv_evd_handle,
+        IN      DAT_EVD_HANDLE      request_evd_handle,
+        IN      DAT_EVD_HANDLE      connect_evd_handle,
+        IN      DAT_SRQ_HANDLE      srq_handle,
+        IN      DAT_EP_ATTR         *ep_attributes,
+        OUT     DAT_EP_HANDLE       *ep_handle
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIia_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for an open instance of the IA to which the created Endpoint belongs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpz_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for an instance of the Protection Zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrecv_evd_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for the Event Dispatcher where events for completions of incoming
+(receive) DTOs are reported. \fBDAT_HANDLE_NULL\fR specifies that the Consumer
+is not interested in events for completions of receives.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrequest_evd_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for the Event Dispatcher where events for completions of outgoing (Send,
+RDMA Write, RDMA Read, and RMR Bind) DTOs are reported.  \fBDAT_HANDLE_NULL\fR
+specifies that the Consumer is not interested in events for completions of
+requests.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconnect_evd_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for the Event Dispatcher where Connection events are reported.
+\fBDAT_HANDLE_NULL\fR specifies that the Consumer is not interested in
+connection events for now.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrq_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for an instance of the Shared Receive Queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIep_attributes\fR\fR
+.ad
+.RS 22n
+.rt  
+Pointer to a structure that contains Consumer-requested Endpoint attributes.
+Cannot be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIep_handle\fR\fR
+.ad
+.RS 22n
+.rt  
+Handle for the created instance of an Endpoint.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_ep_create_with_srq()\fR function creates an instance of an Endpoint
+that is using SRQ for Recv buffers is provided to the Consumer as
+\fIep_handle\fR. The value of \fIep_handle\fR is not defined if the
+\fBDAT_RETURN\fR is not \fBDAT_SUCCESS\fR.
+.sp
+.LP
+The Endpoint is created in the Unconnected state.
+.sp
+.LP
+Protection Zone \fIpz_handle\fR allows Consumers to control what local memory
+the Endpoint can access for DTOs except Recv and what memory remote RDMA
+operations can access over the connection of a created Endpoint. Only memory
+referred to by LMRs and RMRs that match the Endpoint Protection Zone can be
+accessed by the Endpoint. The Recv DTO buffers PZ must match the SRQ PZ. The
+SRQ PZ might or might not be the same as the EP one. Check Provider attribute
+for the support of different PZs between SRQ and its EPs.
+.sp
+.LP
+The \fIrecv_evd_handle\fR and \fIrequest_evd_handle\fR arguments are Event
+Dispatcher instances where the Consumer collects completion notifications of
+DTOs. Completions of Receive DTOs are reported in \fIrecv_evd_handle\fR Event
+Dispatcher, and completions of Send, RDMA Read, and RDMA Write DTOs are
+reported in \fIrequest_evd_handle\fR Event Dispatcher. All completion
+notifications of RMR bindings are reported to a Consumer in
+\fIrequest_evd_handle\fR Event Dispatcher.
+.sp
+.LP
+All Connection events for the connected Endpoint are reported to the Consumer
+through \fIconnect_evd_handle\fR Event Dispatcher.
+.sp
+.LP
+Shared Receive Queue \fIsrq_handle\fR specifies where the EP will dequeue Recv
+DTO buffers.
+.sp
+.LP
+The created EP can be reset. The relationship between SRQ and EP is not
+effected by \fBdat_ep_reset\fR(3DAT).
+.sp
+.LP
+SRQ can not be disassociated or replaced from created EP. The only way to
+disassociate SRQ from EP is to destroy EP.
+.sp
+.LP
+Receive buffers cannot be posted to the created Endpoint. Receive buffers must
+be posted to the SRQ to be used for the created Endpoint.
+.sp
+.LP
+The ep_attributes parameter specifies the initial attributes of the created
+Endpoint. Consumer can not specify \fINULL\fR for \fIep_attributes\fR but can
+specify values only for the parameters needed and default for the rest.
+.sp
+.LP
+For \fImax_request_dtos\fR and \fImax_request_iov\fR, the created Endpoint will
+have at least the Consumer requested values but might have larger values.
+Consumer can query the created Endpoint to find out the actual values for these
+attributes. Created Endpoint has the exact Consumer requested values for
+\fImax_recv_dtos\fR, \fImax_message_size\fR, \fImax_rdma_size\fR, \fImax_
+rdma_read_in\fR, and \fImax_rdma_read_out\fR. For all other attributes, except
+\fImax_recv_iov\fR that is ignored, the created Endpoint has the exact values
+requested by Consumer. If Provider cannot satisfy the Consumer requested
+attribute values the operation fails.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation failed due to resource limitations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 30n
+.rt  
+Invalid DAT handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_PARAMETER\fR\fR
+.ad
+.RS 30n
+.rt  
+Invalid parameter. One of the requested EP parameters or attributes was invalid
+or a combination of attributes or parameters is invalid. For example,
+\fIpz_handle\fR specified does not match the one for SRQ or the requested
+maximum RDMA Read IOV exceeds IA capabilities..
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
+.ad
+.RS 30n
+.rt  
+The requested Provider Model was not supported.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The Consumer creates an Endpoint prior to the establishment of a connection.
+The created Endpoint is in \fBDAT_EP_STATE_UNCONNECTED\fR. Consumers can do the
+following:
+.RS +4
+.TP
+1.
+Request a connection on the Endpoint through \fBdat_ep_connect\fR(3DAT) or
+\fBdat_ep_dup_connect\fR(3DAT) for the active side of the connection model.
+.RE
+.RS +4
+.TP
+2.
+Associate the Endpoint with the Pending Connection Request that does not
+have an associated local Endpoint for accepting the Pending Connection Request
+for the passive/server side of the con-nection model.
+.RE
+.RS +4
+.TP
+3.
+Create a Reserved Service Point with the Endpoint for the passive/server
+side of the connection model. Upon arrival of a Connection Request on the
+Service Point, the Consumer accepts the Pending Connection Request that has the
+Endpoint associated with it.
+.RE
+.sp
+.LP
+The Consumer cannot specify a \fIrequest_evd_handle\fR (\fIrecv_evd_handle\fR)
+with Request Completion Flags (Recv Completion Flags) that do not match the
+other Endpoint Completion Flags for the DTO/RMR completion streams that use the
+same EVD. If \fIrequest_evd_handle\fR (\fIrecv_evd_ handle\fR) is used for
+request (recv) completions of an Endpoint whose associated Request (Recv)
+Completion Flag attribute is \fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR, the Request
+Completion Flags and Recv Completion Flags for all Endpoint completion streams
+that use the EVD must specify the same. By definition, completions of all Recv
+DTO posted to SRQ complete with Signal. Analogously, if \fIrecv_evd_handle\fR
+is used for recv completions of an Endpoint whose associated Recv Completion
+Flag attribute is \fBDAT_COMPLETION_SOLICITED_WAIT\fR, the Recv Completion
+Flags for all Endpoint Recv completion streams that use the same EVD must
+specify the same Recv Completion Flags attribute value and the EVD cannot be
+used for any other event stream types. If \fIrecv_evd_handle\fR is used for
+Recv completions of an Endpoint that uses SRQ and whose Recv Completion Flag
+attribute is \fBDAT_COMPLETION_EVD_THRESHOLD\fR then all Endpoint DTO
+completion streams (request and/or recv completion streams) that use that
+\fIrecv_evd_handle\fR must specify \fBDAT_COMPLETION_EVD_THRESHOLD\fR. Other
+event stream types can also use the same EVD.
+.sp
+.LP
+Consumers might want to use \fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR for Request
+and/or Recv completions when they control locally with posted DTO/RMR
+completion flag (not needed for Recv posted to SRQ) whether posted DTO/RMR
+completes with Signal or not. Consumers might want to use
+\fBDAT_COMPLETION_SOLICITED_WAIT\fR for Recv completions when the remote sender
+side control whether posted Recv competes with Signal or not or not. uDAPL
+Consumers might want to use \fBDAT_COMPLETION_EVD_THRESHOLD\fR for Request
+and/or Recv completions when they control waiter unblocking with the
+\fIthreshold\fR parameter of the \fBdat_evd_wait\fR(3DAT).
+.sp
+.LP
+Some Providers might restrict whether multiple EPs that share a SRQ can have
+different Protection Zones. Check the \fIsrq_ep_pz_difference_support\fR
+Provider attribute for it.
+.sp
+.LP
+Consumers might want to have a different PZ between EP and SRQ. This allows
+incoming RDMA operations to be specific to this EP PZ and not the same for all
+EPs that share SRQ. This is critical for servers that supports multiple
+independent clients.
+.sp
+.LP
+The Provider is strongly encouraged to create an EP that is ready to be
+connected. Any effects of previous connections or connection establishment
+attempts on the underlying Transport-specific Endpoint to which the DAT
+Endpoint is mapped to should be hidden from the Consumer. The methods described
+below are examples:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Provider does not create an underlying Transport Endpoint until the
+Consumer is connecting the Endpoint or accepting a connection request on it.
+This allows the Provider to accumulate Consumer requests for attribute settings
+even for attributes that the underlying transport does not allow to change
+after the Transport Endpoint is created.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Provider creates the underlying Transport Endpoint or chooses one from a
+pool of Provider-controlled Transport Endpoints when the Consumer creates the
+Endpoint. The Provider chooses the Transport Endpoint that is free from any
+underlying internal attributes that might prevent the Endpoint from being
+connected. For IB and IP, that means that the Endpoint is not in the TimeWait
+state.  Changing of some of the Endpoint attributes becomes hard and might
+potentially require mapping the Endpoint to another underlying Transport
+Endpoint that might not be feasible for all transports.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Provider allocates a Transport-specific Endpoint without worrying about
+impact on it from previous connections or connection establishment attempts.
+Hide the Transport-specific TimeWait state or CM timeout of the underlying
+transport Endpoint within \fBdat_ep_connect\fR(3DAT),
+\fBdat_ep_dup_connect\fR(3DAT), or \fBdat_cr_accept\fR(3DAT). On the Active
+side of the connection establishment, if the remnants of a previous connection
+for Transport-specific Endpoint can be hidden within the Timeout parameter, do
+so. If not, generating \fBDAT_CONNECTION_ EVENT_NON_PEER_REJECTED\fR is an
+option. For the Passive side, generating a
+\fBDAT_CONNECTION_COMPLETION_ERROR\fR event locally, while sending a
+non-peer-reject message to the active side, is a way of handling it.
+.RE
+.sp
+.LP
+Any transitions of an Endpoint into an Unconnected state can be handled
+similarly. One transition from a Disconnected to an Unconnected state is a
+special case.
+.sp
+.LP
+For \fBdat_ep_reset\fR(3DAT), the Provider can hide any remnants of the
+previous connection or failed connection establishment in the operation itself.
+Because the operation is synchronous, the Provider can block in it until the
+TimeWait state effect of the previous connection or connection setup is
+expired, or until the Connection Manager timeout of an unsuccessful connection
+establishment attempt is expired. Alternatively, the Provider can create a new
+Endpoint for the Consumer that uses the same handle.
+.sp
+.LP
+DAT Providers are required not to change any Consumer-specified Endpoint
+attributes during connection establishment. If the Consumer does not specify an
+attribute, the Provider can set it to its own default.  Some EP attributes,
+like outstanding RDMA Read incoming or outgoing, if not set up by the Consumer,
+can be changed by Providers to establish connection. It is recommended that the
+Provider pick the default for outstanding RDMA Read attributes as 0 if the
+Consumer has not specified them. This ensures that connection establishment
+does not fail due to insufficient outstanding RDMA Read resources, which is a
+requirement for the Provider.
+.sp
+.LP
+The Provider is not required to check for a mismatch between the maximum RDMA
+Read IOV and maximum RDMA Read outgoing attributes, but is allowed to do so. In
+the later case it is allowed to return \fBDAT_INVALID_ PARAMETER\fR when a
+mismatch is detected. Provider must allocate resources to satisfy the
+combination of these two EP attributes for local RDMA Read DTOs.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.2
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdat_ep_create\fR(3DAT), \fBdat_srq_create\fR(3DAT),
+\fBdat_srq_free\fR(3DAT), \fBdat_srq_query\fR(3DAT), \fBlibdat\fR(3LIB),
+\fBattributes\fR(5)

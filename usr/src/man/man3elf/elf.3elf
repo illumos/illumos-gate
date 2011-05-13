@@ -1,0 +1,476 @@
+'\" te
+.\"  Copyright 1989 AT&T  All Rights Reserved  Copyright (c) 2001 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf 3ELF "23 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf \- object file access library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+\fB#include <libelf.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in the \fBELF\fR access library let a program manipulate \fBELF\fR
+(Executable and Linking Format) object files, archive files, and archive
+members. The header provides type and function declarations for all library
+services.
+.sp
+.LP
+Programs communicate with many of the higher-level routines using an \fIELF
+descriptor\fR. That is, when the program starts working with a file,
+\fBelf_begin\fR(3ELF) creates an \fBELF\fR descriptor through which the program
+manipulates the structures and information in the file. These \fBELF\fR
+descriptors can be used both to read and to write files. After the program
+establishes an \fBELF\fR descriptor for a file, it may then obtain
+\fIsection\fR \fIdescriptors\fR to manipulate the sections of the file (see
+\fBelf_getscn\fR(3ELF)). Sections hold the bulk of an object file's real
+information, such as text, data, the symbol table, and so on. A section
+descriptor ``belongs'' to a particular \fBELF\fR descriptor, just as a section
+belongs to a file. Finally, \fIdata\fR \fIdescriptors\fR are available through
+section descriptors, allowing the program to manipulate the information
+associated with a section. A data descriptor ``belongs'' to a section
+descriptor.
+.sp
+.LP
+Descriptors provide private handles to a file and its pieces. In other words, a
+data descriptor is associated with one section descriptor, which is associated
+with one \fBELF\fR descriptor, which is associated with one file. Although
+descriptors are private, they give access to data that may be shared. Consider
+programs that combine input files, using incoming data to create or update
+another file. Such a program might get data descriptors for an input and an
+output section. It then could update the output descriptor to reuse the input
+descriptor's data. That is, the descriptors are distinct, but they could share
+the associated data bytes. This sharing avoids the space overhead for duplicate
+buffers and the performance overhead for copying data unnecessarily.
+.SS "File Classes"
+.sp
+.LP
+\fBELF\fR provides a framework in which to define a family of object files,
+supporting multiple processors and architectures. An important distinction
+among object files is the \fIclass\fR, or capacity, of the file. The 32-bit
+class supports architectures in which a 32-bit object can represent addresses,
+file sizes, and so on, as in the following:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+NamePurpose
+_
+\fBElf32_Addr\fRUnsigned address
+_
+\fBElf32_Half\fRUnsigned medium integer
+_
+\fBElf32_Off\fRUnsigned file offset
+_
+\fBElf32_Sword\fRSigned large integer
+_
+\fBElf32_Word\fRUnsigned large integer
+_
+\fBunsigned char\fRUnsigned small integer
+.TE
+
+.sp
+.LP
+The 64\(mibit class works the same as the 32\(mibit class, substituting 64 for
+32 as necessary. Other classes will be defined as necessary, to support larger
+(or smaller) machines. Some library services deal only with data objects for a
+specific class, while others are class-independent. To make this distinction
+clear, library function names reflect their status, as described below.
+.SS "Data Representation"
+.sp
+.LP
+Conceptually, two parallel sets of objects support cross compilation
+environments. One set corresponds to file contents, while the other set
+corresponds to the native memory image of the program manipulating the file.
+Type definitions supplied by the headers work on the native machine, which may
+have different data encodings (size, byte order, and so on) than the target
+machine. Although native memory objects should be at least as big as the file
+objects (to avoid information loss), they may be bigger if that is more natural
+for the host machine.
+.sp
+.LP
+Translation facilities exist to convert between file and memory
+representations. Some library routines convert data automatically, while others
+leave conversion as the program's responsibility. Either way, programs that
+create object files must write file-typed objects to those files; programs that
+read object files must take a similar view. See \fBelf32_xlatetof\fR(3ELF) and
+\fBelf32_fsize\fR(3ELF) for more information.
+.sp
+.LP
+Programs may translate data explicitly, taking full control over the object
+file layout and semantics. If the program prefers not to have and exercise
+complete control, the library provides a higher-level interface that hides many
+object file details. \fBelf_begin()\fR and related functions let a program deal
+with the native memory types, converting between memory objects and their file
+equivalents automatically when reading or writing an object file.
+.SS "ELF Versions"
+.sp
+.LP
+Object file versions allow \fBELF\fR to adapt to new requirements. \fIThree\fR
+\fIindependent\fR \fIversions\fR can be important to a program. First, an
+application program knows about a particular version by virtue of being
+compiled with certain headers. Second, the access library similarly is compiled
+with header files that control what versions it understands. Third, an
+\fBELF\fR object file holds a value identifying its version, determined by the
+\fBELF\fR version known by the file's creator. Ideally, all three versions
+would be the same, but they may differ.
+.sp
+.LP
+If a program's version is newer than the access library, the program might use
+information unknown to the library. Translation routines might not work
+properly, leading to undefined behavior. This condition merits installing a new
+library.
+.sp
+.LP
+The library's version might be newer than the program's and the file's. The
+library understands old versions, thus avoiding compatibility problems in this
+case.
+.sp
+.LP
+Finally, a file's version might be newer than either the program or the library
+understands. The program might or might not be able to process the file
+properly, depending on whether the file has extra information and whether that
+information can be safely ignored. Again, the safe alternative is to install a
+new library that understands the file's version.
+.sp
+.LP
+To accommodate these differences, a program must use \fBelf_version\fR(3ELF) to
+pass its version to the library, thus establishing the \fIworking version\fR
+for the process. Using this, the library accepts data from and presents data to
+the program in the proper representations. When the library reads object files,
+it uses each file's version to interpret the data. When writing files or
+converting memory types to the file equivalents, the library uses the program's
+working version for the file data.
+.SS "System Services"
+.sp
+.LP
+As mentioned above, \fBelf_begin()\fR and related routines provide a
+higher-level interface to \fBELF\fR files, performing input and output on
+behalf of the application program. These routines assume a program can hold
+entire files in memory, without explicitly using temporary files. When reading
+a file, the library routines bring the data into memory and perform subsequent
+operations on the memory copy. Programs that wish to read or write large object
+files with this model must execute on a machine with a large process virtual
+address space. If the underlying operating system limits the number of open
+files, a program can use \fBelf_cntl\fR(3ELF) to retrieve all necessary data
+from the file, allowing the program to close the file descriptor and reuse it.
+.sp
+.LP
+Although the \fBelf_begin()\fR interfaces are convenient and efficient for many
+programs, they might be inappropriate for some. In those cases, an application
+may invoke the \fBelf32_xlatetom\fR(3ELF) or \fBelf32_xlatetof\fR(3ELF) data
+translation routines directly. These routines perform no input or output,
+leaving that as the application's responsibility. By assuming a larger share of
+the job, an application controls its input and output model.
+.SS "Library Names"
+.sp
+.LP
+Names associated with the library take several forms.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBelf_\fR\fIname\fR\fR
+.ad
+.RS 18n
+.rt  
+These class-independent names perform some service, \fIname\fR, for the
+program.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBelf32_\fR\fIname\fR\fR
+.ad
+.RS 18n
+.rt  
+Service names with an embedded class, \fB32\fR here, indicate they work only
+for the designated class of files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBElf_\fR\fIType\fR\fR
+.ad
+.RS 18n
+.rt  
+Data types can be class-independent as well, distinguished by \fIType\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBElf32_\fR\fIType\fR\fR
+.ad
+.RS 18n
+.rt  
+Class-dependent data types have an embedded class name, \fB32\fR here.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_\fR\fICMD\fR\fR
+.ad
+.RS 18n
+.rt  
+Several functions take commands that control their actions. These values are
+members of the \fBElf_Cmd\fR enumeration; they range from zero through
+\fBELF_C_NUM\fR\(mi1\fB\&.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_F_\fR\fIFLAG\fR\fR
+.ad
+.RS 18n
+.rt  
+Several functions take flags that control library status and/or actions. Flags
+are bits that may be combined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF32_FSZ_\fR\fITYPE\fR\fR
+.ad
+.RS 18n
+.rt  
+These constants give the file sizes in bytes of the basic \fBELF\fR types for
+the 32-bit class of files. See \fBelf32_fsize()\fR for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_K_\fR\fIKIND\fR\fR
+.ad
+.RS 18n
+.rt  
+The function \fBelf_kind()\fR identifies the \fIKIND\fR of file associated with
+an \fBELF\fR descriptor. These values are members of the \fBElf_Kind\fR
+enumeration; they range from zero through \fBELF_K_NUM\fR\(mi1\fB\&.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_T_\fR\fITYPE\fR\fR
+.ad
+.RS 18n
+.rt  
+When a service function, such as \fBelf32_xlatetom()\fR or
+\fBelf32_xlatetof()\fR, deals with multiple types, names of this form specify
+the desired \fITYPE\fR. Thus, for example, \fBELF_T_EHDR\fR is directly related
+to \fBElf32_Ehdr\fR. These values are members of the \fBElf_Type\fR
+enumeration; they range from zero through \fBELF_T_NUM\fR\(mi1\fB\&.\fR
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn interpretation of elf file.
+.sp
+.LP
+The basic interpretation of an ELF file consists of:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+opening an ELF object file
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+obtaining an ELF descriptor
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+analyzing the file using the descriptor.
+.RE
+.sp
+.LP
+The following example opens the file, obtains the ELF descriptor,  and prints
+out the names of each section in the file.
+
+.sp
+.in +2
+.nf
+#include	<fcntl.h>
+#include	<stdio.h>
+#include	<libelf.h>
+#include	<stdlib.h>
+#include	<string.h>
+static void failure(void);
+void
+main(int argc, char ** argv)
+{
+    Elf32_Shdr *    shdr;
+    Elf32_Ehdr *    ehdr;
+    Elf *        elf;
+    Elf_Scn *    scn;
+    Elf_Data *    data;
+    int        fd;
+    unsigned int    cnt;
+
+         /* Open the input file */
+    if ((fd = open(argv[1], O_RDONLY)) == -1)
+        exit(1);
+
+        /* Obtain the ELF descriptor */
+    (void) elf_version(EV_CURRENT);
+    if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL)
+        failure();
+
+        /* Obtain the .shstrtab data buffer */
+    if (((ehdr = elf32_getehdr(elf)) == NULL) ||
+        ((scn = elf_getscn(elf, ehdr->e_shstrndx)) == NULL) ||
+        ((data = elf_getdata(scn, NULL)) == NULL))
+        failure();
+
+        /* Traverse input filename, printing each section */
+    for (cnt = 1, scn = NULL; scn = elf_nextscn(elf, scn); cnt++) {
+        if ((shdr = elf32_getshdr(scn)) == NULL)
+            failure();
+    (void) printf("[%d]    %s\en", cnt,
+        (char *)data->d_buf + shdr->sh_name);
+    }
+}        /* end main */
+
+static void
+failure()
+{
+    (void) fprintf(stderr, "%s\en", elf_errmsg(elf_errno()));
+    exit(1);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar.h\fR(3HEAD), \fBelf32_checksum\fR(3ELF), \fBelf32_fsize\fR(3ELF),
+\fBelf32_getshdr\fR(3ELF), \fBelf32_xlatetof\fR(3ELF), \fBelf_begin\fR(3ELF),
+\fBelf_cntl\fR(3ELF), \fBelf_errmsg\fR(3ELF), \fBelf_fill\fR(3ELF),
+\fBelf_getarhdr\fR(3ELF), \fBelf_getarsym\fR(3ELF), \fBelf_getbase\fR(3ELF),
+\fBelf_getdata\fR(3ELF), \fBelf_getident\fR(3ELF), \fBelf_getscn\fR(3ELF),
+\fBelf_hash\fR(3ELF), \fBelf_kind\fR(3ELF), \fBelf_memory\fR(3ELF),
+\fBelf_rawfile\fR(3ELF), \fBelf_strptr\fR(3ELF), \fBelf_update\fR(3ELF),
+\fBelf_version\fR(3ELF), \fBgelf\fR(3ELF), \fBlibelf\fR(3LIB),
+\fBattributes\fR(5), \fBlfcompile\fR(5)
+.sp
+.LP
+\fIANSI C Programmer's Guide\fR
+.SS "SPARC only"
+.sp
+.LP
+\fBa.out\fR(4)
+.SH NOTES
+.sp
+.LP
+Information in the \fBELF\fR headers is separated into common parts and
+processor-specific parts. A program can make a processor's information
+available by including the appropriate header:
+\fB<sys/elf_\fR\fINAME\fR\fB\&.h>\fR where \fINAME\fR matches the processor
+name as used in the \fBELF\fR file header.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+NameProcessor
+_
+\fBM32\fRAT&T WE 32100
+_
+\fBSPARC\fRSPARC
+_
+\fB386\fRIntel 80386, 80486, Pentium
+.TE
+
+.sp
+.LP
+Other processors will be added to the table as necessary.
+.sp
+.LP
+To illustrate, a program could use the following code to ``see'' the
+processor-specific information for the SPARC based system.
+.sp
+.in +2
+.nf
+\fB#include <libelf.h>
+#include <sys/elf_SPARC.h>\fR
+.fi
+.in -2
+
+.sp
+.LP
+Without the \fB<sys/elf_SPARC.h>\fR definition, only the common \fBELF\fR
+information would be visible.
+.sp
+.LP
+A program could use the following code to ``see'' the processor-specific
+information for the Intel 80386:
+.sp
+.in +2
+.nf
+\fB#include <libelf.h>
+#include <sys/elf_386.h>\fR
+.fi
+.in -2
+
+.sp
+.LP
+Without the \fB<sys/elf_386.h>\fR definition, only the common \fBELF\fR
+information would be visible.
+.sp
+.LP
+Although reading the objects is rather straightforward, writing/updating them
+can corrupt the shared offsets among sections. Upon creation, relationships are
+established among the sections that must be maintained even if the object's
+size is changed.

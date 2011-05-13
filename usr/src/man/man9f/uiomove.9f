@@ -1,0 +1,121 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uiomove 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+uiomove \- copy kernel data using uio structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/uio.h>
+
+
+
+\fBint\fR \fBuiomove\fR(\fBcaddr_t\fR \fIaddress\fR, \fBsize_t\fR \fInbytes\fR, \fBenum uio_rw\fR \fIrwflag\fR, 
+     \fBuio_t *\fR\fIuio_p\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddress\fR\fR
+.ad
+.RS 11n
+.rt  
+Source/destination kernel address of the copy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInbytes\fR\fR
+.ad
+.RS 11n
+.rt  
+Number of bytes to copy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrwflag\fR\fR
+.ad
+.RS 11n
+.rt  
+Flag indicating read or write operation. Possible values are \fBUIO_READ\fR and
+\fBUIO_WRITE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuio_p\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to the \fBuio\fR structure for the copy.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuiomove()\fR function copies \fInbytes\fR of data to or from the space
+defined by the \fBuio\fR structure (described in \fBuio\fR(9S)) and the driver.
+.sp
+.LP
+The \fBuio_segflg\fR member of the \fBuio\fR(9S) structure determines the type
+of space to or from which the transfer is being made. If it is set to
+\fBUIO_SYSSPACE\fR, the data transfer is between addresses in the kernel. If it
+is set to \fBUIO_USERSPACE\fR, the transfer is between a user program and
+kernel space.
+.sp
+.LP
+\fIrwflag\fR indicates the direction of the transfer. If \fBUIO_READ\fR is set,
+the data will be transferred from \fIaddress\fR to the buffer(s) described by
+\fIuio_p\fR. If \fBUIO_WRITE\fR is set, the data will be transferred from the
+buffer(s) described by \fIuio_p\fR to \fIaddress\fR.
+.sp
+.LP
+In addition to moving the data, \fBuiomove()\fR adds the number of bytes moved
+to the \fBiov_base\fR member of the \fBiovec\fR(9S) structure, decreases the
+\fBiov_len\fR member, increases the \fBuio_offset\fR member of the
+\fBuio\fR(9S) structure, and decreases the \fBuio_resid\fR member.
+.sp
+.LP
+This function automatically handles page faults. \fInbytes\fR does not have to
+be word-aligned.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBuiomove()\fR function returns \fB0\fR upon success or \fBEFAULT\fR on
+failure.
+.SH CONTEXT
+.sp
+.LP
+User context only, if \fBuio_segflg\fR is set to \fBUIO_USERSPACE\fR. User,
+interrupt, or kernel context, if \fBuio_segflg\fR is set to \fBUIO_SYSSPACE\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBureadc\fR(9F), \fBuwritec\fR(9F), \fBiovec\fR(9S), \fBuio\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+If \fBuio_segflg\fR is set to \fBUIO_SYSSPACE\fR and \fIaddress\fR is selected
+from user space, the system may panic.

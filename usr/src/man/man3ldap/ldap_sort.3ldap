@@ -1,0 +1,107 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_sort 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_sort, ldap_sort_entries, ldap_sort_values, ldap_sort_strcasecmp \- LDAP
+entry sorting functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fB\fR\fBldap_sort_entries\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI**chain\fR, \fBchar\fR \fI*attr\fR,
+     \fBint (\fR\fI*cmp\fR)());
+.fi
+
+.LP
+.nf
+\fB\fR\fBldap_sort_values\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI**vals\fR, \fBint (\fR\fI*cmp\fR)());
+.fi
+
+.LP
+.nf
+\fB\fR\fBldap_sort_strcasecmp\fR(\fBchar\fR \fI*a\fR, \fBchar\fR \fI*b\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to sort lists of entries and values retrieved from an
+LDAP server. \fBldap_sort_entries()\fR is used to sort a chain of entries
+retrieved from an LDAP search call either by DN or by some arbitrary attribute
+in the entries.  It takes  \fIld\fR, the LDAP structure, which is only used for
+error reporting,  \fIchain\fR, the list of entries as returned by
+\fBldap_search_s\fR(3LDAP) or \fBldap_result\fR(3LDAP). \fIattr\fR is the
+attribute to use as a key in the sort or NULL to sort by DN, and  \fIcmp\fR is
+the comparison function to use when comparing values (or individual DN
+components if sorting by DN). In this case,  \fIcmp\fR should be a function
+taking two single values of the  \fIattr\fR to sort by, and returning a value
+less than zero, equal to zero, or greater than zero, depending on whether the
+first argument is less than, equal to, or greater than the second argument. The
+convention is the same as used by \fBqsort\fR(3C), which is called to do the
+actual sorting.
+.sp
+.LP
+\fBldap_sort_values()\fR is used to sort an array of values from an entry, as
+returned by \fBldap_get_values\fR(3LDAP). It takes the LDAP connection
+structure  \fIld\fR, the array of values to sort  \fIvals\fR, and  \fIcmp\fR,
+the comparison function to use during the sort. Note that  \fIcmp\fR will be
+passed a pointer to each element in the \fIvals\fR array, so if you pass the
+normal char ** for this parameter, \fIcmp\fR should take two char **'s as
+arguments (that is, you cannot pass  \fIstrcasecmp\fR or its friends for
+\fIcmp\fR). You can, however, pass the function \fBldap_sort_strcasecmp()\fR
+for this purpose.
+.sp
+.LP
+For example:
+.sp
+.in +2
+.nf
+	LDAP *ld;
+	LDAPMessage *res;
+	/* ... call to ldap_search_s(\|), fill in res, retrieve sn attr ... */
+
+	/* now sort the entries on surname attribute */
+	if ( ldap_sort_entries( ld, &res, "sn", ldap_sort_strcasecmp ) != 0 )
+		ldap_perror( ld, "ldap_sort_entries" );
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP), \fBldap_result\fR(3LDAP),
+\fBqsort\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBldap_sort_entries()\fR function applies the comparison function to each
+value of the attribute in the array as returned by a call to
+\fBldap_get_values\fR(3LDAP), until a mismatch is found. This works fine for
+single-valued attributes, but may produce unexpected results for multi-valued
+attributes. When sorting by DN, the comparison function is applied to an
+exploded version of the DN, without types. The return values for all of these
+functions are declared in the <\fBldap.h\fR> header file.  Some functions may
+allocate memory which must be freed by the calling application.

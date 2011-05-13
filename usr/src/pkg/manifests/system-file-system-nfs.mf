@@ -53,6 +53,10 @@ dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/nfs group=sys
 dir path=usr/lib/nfs group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 dir path=var group=sys
 dir path=var/nfs
 dir path=var/nfs/v4_oldstate group=daemon owner=daemon
@@ -91,6 +95,15 @@ file path=usr/lib/nfs/lockd mode=0555
 file path=usr/lib/nfs/nfs4cbd mode=0555
 file path=usr/lib/nfs/nfsmapid mode=0555
 file path=usr/lib/nfs/statd mode=0555
+file path=usr/share/man/man1/on.1
+file path=usr/share/man/man1m/mount_nfs.1m
+file path=usr/share/man/man1m/nfs4cbd.1m
+file path=usr/share/man/man1m/nfsmapid.1m
+file path=usr/share/man/man1m/nfsstat.1m
+file path=usr/share/man/man1m/showmount.1m
+file path=usr/share/man/man1m/statd.1m
+file path=usr/share/man/man4/nfs.4
+file path=usr/share/man/man4/nfssec.conf.4
 group groupname=unknown gid=96
 hardlink path=kernel/sys/$(ARCH64)/nfs target=../../../kernel/fs/$(ARCH64)/nfs
 $(i386_ONLY)hardlink path=kernel/sys/nfs target=../../kernel/fs/nfs

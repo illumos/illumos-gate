@@ -1,0 +1,2981 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ls 1 "3 Jun 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+ls \- list contents of directory
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR] 
+     [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
+     [--block-size size] [--color[=\fIwhen\fR]] [--file-type] 
+     [--si] [--time-style \fIstyle\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR] 
+     [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
+     [--block-size size] [--color[=\fIwhen\fR]] [--file-type] 
+     [--si] [--time-style \fIstyle\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR] 
+     [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
+     [--block-size size] [--color[=\fIwhen\fR]] [--file-type] 
+     [--si] [--time-style \fIstyle\fR] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For each \fIfile\fR that is a directory, \fBls\fR lists the contents of the
+directory. For each \fIfile\fR that is an ordinary file, \fBls\fR repeats its
+name and any other information requested. The output is sorted alphabetically
+by default. When no argument is given, the current directory (\fB\&.\fR) is
+listed. When several arguments are given, the arguments are first sorted
+appropriately, but file arguments appear before directories and their contents.
+.sp
+.LP
+There are three major listing formats. The default format for output directed
+to a terminal is multi\(micolumn with entries sorted down the columns. The
+\fB-1\fR option allows single column output and \fB-m\fR enables stream output
+format. In order to determine output formats for the \fB-C\fR, \fB-x\fR, and
+\fB-m\fR options, \fBls\fR uses an environment variable, \fBCOLUMNS\fR, to
+determine the number of character positions available on one output line. If
+this variable is not set, the \fBterminfo\fR(4) database is used to determine
+the number of columns, based on the environment variable, \fBTERM\fR. If this
+information cannot be obtained, 80 columns are assumed. If the \fB-w\fR option
+is used, the argument overrides any other column width.
+.sp
+.LP
+The mode printed when the \fB-e\fR, \fB-E\fR, \fB-g\fR, \fB-l\fR, \fB-n\fR,
+\fB-o\fR, \fB-v\fR, \fB-V\fR, or \fB-@\fR option is in effect consists of
+eleven characters. The first character can be one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBD\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is a door.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is a symbolic link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is a block special file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is a character special file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is a \fBFIFO\fR (or "named pipe") special file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is an event port.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is an \fBAF_UNIX\fR address family socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.sp .6
+.RS 4n
+The entry is an ordinary file.
+.RE
+
+.sp
+.LP
+The next 9 characters are interpreted as three sets of three bits each. The
+first set refers to the owner's permissions; the next to permissions of others
+in the user-group of the file; and the last to all others. Within each set, the
+three characters indicate permission to read, to write, and to execute the file
+as a program, respectively. For a directory, \fBexecute\fR permission is
+interpreted to mean permission to search the directory for a specified file.
+The character after permissions is an ACL or extended attributes indicator.
+This character is an \fB@\fR if extended attributes are associated with the
+file and the \fB-@\fR option is in effect. Otherwise, this character is a plus
+sign (\fB+\fR) character if a non-trivial ACL is associated with the file or a
+space character if not.
+.sp
+.LP
+If \fB-/\fR and/or \fB-%\fR are in effect, then the extended system attributes
+are printed when filesystem supports extended system attributes. The display
+looks as follows:
+.sp
+.in +2
+.nf
+$ls -/ c  file   
+-rw-r--r--   1 root     root           0 May 10 14:17 file
+                {AHRSadim-u}
+
+$ls -/ v file
+-rw-r--r--   1 root     root           0 May 10 14:17 file
+                {archive,hidden,readonly,system,appendonly\e
+                 nodump,immutable, av_modified,\e
+                 noav_quarantined,nounlink}
+
+$ls -l -% all file
+-rw-r--r--   1 root     root           0 May 10 14:17 file
+                timestamp: atime    Jun 25 12:56:44 2007
+                timestamp: ctime    May 10 14:20:23 2007
+                timestamp: mtime    May 10 14:17:56 2007
+                timestamp: crtime   May 10 14:17:56 2007
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+See the option descriptions of the \fB-/\fR and \fB-%\fR option for details.
+.sp
+.LP
+\fBls\fR \fB-l\fR (the long list) prints its output as follows for the POSIX
+locale:
+.sp
+.in +2
+.nf
+-rwxrwxrwx+ 1 smith dev   10876  May 16 9:42 part2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Reading from right to left, you see that the current directory holds one file,
+named \fBpart2\fR. Next, the last time that file's contents were modified was
+\fB9:42 A.M.\fR on \fBMay 16\fR. The file contains 10,876 characters, or bytes.
+The owner of the file, or the user, belongs to the group \fBdev\fR (perhaps
+indicating \fBdevelopment\fR), and his or her login name is \fBsmith\fR. The
+number, in this case \fB1\fR, indicates the number of links to file \fBpart2\fR
+(see \fBcp\fR(1)). The plus sign indicates that there is an \fBACL\fR
+associated with the file. If the \fB-@\fR option has been specified, the
+presence of extended attributes supersede the presence of an \fBACL\fR and the
+plus sign is replaced with an 'at' sign (\fB@\fR). Finally, the dash and
+letters tell you that user, group, and others have permissions to read, write,
+and execute \fBpart2\fR.
+.sp
+.LP
+The execute (\fBx\fR) symbol occupies the third position of the three-character
+sequence. A \fB\(mi\fR in the third position would have indicated a denial of
+execution permissions.
+.sp
+.LP
+The permissions are indicated as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file is readable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBw\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file is writable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file is executable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.sp .6
+.RS 4n
+The indicated permission is \fInot\fR granted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBs\fRet-user-ID or \fBs\fRet-group-ID bit is on, and the corresponding
+user or group execution bit is also on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Undefined bit-state (the set-user-ID or set-group-id bit is on and the user or
+group execution bit is off). For group permissions, this applies only to
+non-regular files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.sp .6
+.RS 4n
+The 1000 (octal) bit, or sticky bit, is on (see \fBchmod\fR(1)), and execution
+is on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The 1000 bit is turned on, and execution is off (undefined bit-state).
+.RE
+
+.SS "/usr/bin/ls"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mandatory locking occurs during access (on a regular file, the set-group-ID bit
+is on and the group execution bit is off).
+.RE
+
+.SS "/usr/xpg4/bin/ls and /usr/xpg6/bin/ls"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mandatory locking occurs during access (on a regular file, the set-group-ID bit
+is on and the group execution bit is off).
+.RE
+
+.sp
+.LP
+For user and group permissions, the third position is sometimes occupied by a
+character other than \fBx\fR or \fB-\fR. \fBs\fR or \fBS\fR also can occupy
+this position, referring to the state of the set-ID bit, whether it be the
+user's or the group's. The ability to assume the same ID as the user during
+execution is, for example, used during login when you begin as root but need to
+assume the identity of the user you login as.
+.sp
+.LP
+In the case of the sequence of group permissions, \fBl\fR can occupy the third
+position. \fBl\fR refers to mandatory file and record locking. This permission
+describes a file's ability to allow other files to lock its reading or writing
+permissions during access.
+.sp
+.LP
+For others permissions, the third position can be occupied by \fBt\fR or
+\fBT\fR. These refer to the state of the sticky bit and execution permissions.
+.SS "Color Output"
+.sp
+.LP
+If color output is enabled, the environment variable LS_COLORS is checked.  If
+it exists, it's contents are used to control the colors used to display
+filenames.  If it is not set, a default list of colors is used. The format of
+LS_COLORS is a colon separated list of attribute specifications. Each attribute
+specification is of the format
+.sp
+.in +2
+.nf
+\fIfilespec\fR=\fIattr\fR[;\fIattr\fR..]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fIfilespec\fR is either of the form \fI*.SUFFIX\fR, for example, \fB*.jar\fR
+or \fB*.Z\fR, or one of the following file types:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBno\fR\fR
+.ad
+.sp .6
+.RS 4n
+Normal file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfi\fR\fR
+.ad
+.sp .6
+.RS 4n
+Regular file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdi\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBln\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpi\fR\fR
+.ad
+.sp .6
+.RS 4n
+FIFO or named pipe
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBso\fR\fR
+.ad
+.sp .6
+.RS 4n
+Socket
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdo\fR\fR
+.ad
+.sp .6
+.RS 4n
+Door file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Block device
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Character device
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBex\fR\fR
+.ad
+.sp .6
+.RS 4n
+Execute bit (either \fBuser\fR, \fBgroup\fR, or \fBother\fR) set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpo\fR\fR
+.ad
+.sp .6
+.RS 4n
+Event port
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBst\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sticky bit set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Orphaned symlink
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsg\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsetgid\fR binary
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsu\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBsetuid\fR binary
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBow\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBworld\fR writable
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sticky bit and \fBworld\fR writable
+.RE
+
+.sp
+.LP
+\fIattr\fR is a semicolon delimited list of color and display attributes which
+are combined to determine the final output color. Any combination of \fIattr\fR
+values can be specified. Possible \fIattr\fR values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB00\fR\fR
+.ad
+.sp .6
+.RS 4n
+All attributes off (default terminal color)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB01\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display text in bold
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB04\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display text with an underscore
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB05\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display text in bold
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB07\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display text with foreground and background colors reversed
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB08\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display using concealed text.
+.RE
+
+.sp
+.LP
+One of the following values can be chosen. If multiple values are specified,
+the last specified value is used.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB30\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBblack\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB31\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBred\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB32\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBgreen\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB33\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fByellow\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB34\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBblue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB35\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBmagenta\fR (\fBpurple\fR).
+.sp
+Set foreground to \fB\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB36\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBcyan\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB37\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBwhite\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB39\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to default terminal color.
+.RE
+
+.sp
+.LP
+One of the following can be specified. If multiple values are specified, the
+last value specified is used.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB40\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBblack\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB41\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBred\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB42\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBgreen\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB43\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fByellow\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB44\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBblue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB45\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBmagenta\fR (\fBpurple\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB46\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBcyan\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB47\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to \fBwhite\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB49\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set foreground to default terminal color.
+.RE
+
+.sp
+.LP
+On some terminals, setting the bold attribute causes the foreground colors to
+be high-intensity, that is, brighter. In such cases the low-intensity yellow is
+often displayed as a brown or orange color.
+.sp
+.LP
+At least one attribute must be listed for a file specification.
+.sp
+.LP
+The appropriate color codes are chosen by selecting the most specific match,
+starting with the file suffixes and proceeding with the file types until a
+match is found. The \fBno\fR (normal file) type matches any file.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.SS "/usr/bin/ls, /usr/xpg4/bin/ls, and /usr/xpg6/bin/ls"
+.sp
+.LP
+The following options are supported for all three versions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.br
+.na
+\fB\fB--all\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists all entries, including those that begin with a dot (\fB\&.\fR), which are
+normally not listed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.br
+.na
+\fB\fB--almost-all\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists all entries, including those that begin with a dot (\fB\&.\fR), with the
+exception of the working directory (\fB\&.\fR) and the parent directory
+(\fB\&..\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.br
+.na
+\fB\fB--escape\fR\fR
+.ad
+.sp .6
+.RS 4n
+Forces printing of non-printable characters to be in the octal
+\fB\e\fR\fIddd\fR notation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR\fR
+.ad
+.br
+.na
+\fB\fB--ignore-backups\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not display any files ending with a tilde (\fB~\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses time of last modification of the i-node (file created, mode changed, and
+so forth) for sorting (\fB-t\fR) or printing (\fB-l\fR or \fB-n\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.sp .6
+.RS 4n
+Multi-column output with entries sorted down the columns. This is the default
+output format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.sp .6
+.RS 4n
+If an argument is a directory, lists only its name (not its contents). Often
+used with \fB-l\fR to get the status of a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except displays time to the second, and with one format
+for all files regardless of age: \fImmm dd hh:mm:ss yyyy\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except displays time to the nanosecond and with one
+format for all files regardless of age: \fIyyyy-mm-dd hh:mm:ss.nnnnnnnnn\fR
+(ISO 8601:2000 format).
+.sp
+In addition, this option displays the offset from UTC in ISO 8601:2000 standard
+format (+\fIhhmm\fR or -\fIhhmm\fR) or no characters if the offset is
+indeterminable. The offset reflects the appropriate standard or alternate
+offset in force at the file's displayed date and time, under the current
+timezone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.sp .6
+.RS 4n
+Forces each argument to be interpreted as a directory and list the name found
+in each slot. This option turns off \fB-l\fR, \fB-t\fR, \fB-s\fR, \fB-S\fR, and
+\fB-r\fR, and turns on \fB-a\fR. The order is the order in which entries appear
+in the directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.br
+.na
+\fB\fB--classify\fR\fR
+.ad
+.sp .6
+.RS 4n
+Append a symbol after certain types of files to indicate the file type. The
+following symbols are used:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>\fR\fR
+.ad
+.sp .6
+.RS 4n
+Door file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB|\fR\fR
+.ad
+.sp .6
+.RS 4n
+Named pipe (\fBFIFO\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB@\fR\fR
+.ad
+.sp .6
+.RS 4n
+Symbolic link
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB=\fR\fR
+.ad
+.sp .6
+.RS 4n
+Socket
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.sp .6
+.RS 4n
+Executable
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except that the owner is not printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.br
+.na
+\fB\fB--human-readable\fR\fR
+.ad
+.sp .6
+.RS 4n
+All sizes are scaled to a human readable format, for example, \fB14K\fR,
+\fB234M\fR, \fB2.7G\fR, or \fB3.0T\fR. Scaling is done by repetitively dividing
+by \fB1024\fR. The last --si or -h option determines the divisor used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.br
+.na
+\fB\fB--dereference-command-line\fR\fR
+.ad
+.sp .6
+.RS 4n
+If an argument is a symbolic link that references a directory, this option
+evaluates the file information and file type of the directory that the link
+references, rather than those of the link itself. However, the name of the link
+is displayed, rather than the referenced directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.br
+.na
+\fB\fB--inode\fR\fR
+.ad
+.sp .6
+.RS 4n
+For each file, prints the i-node number in the first column of the report.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.sp .6
+.RS 4n
+All sizes are printed in kbytes. Equivalent to --block-size=1024.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists in long format, giving mode, \fBACL\fR indication, number of links,
+owner, group, size in bytes, and time of last modification for each file (see
+above). If the file is a special file, the size field instead contains the
+major and minor device numbers. If the time of last modification is greater
+than six months ago, it is shown in the format `month date year' for the POSIX
+locale. When the \fBLC_TIME\fR locale category is not set to the POSIX locale,
+a different format of the time field can be used. Files modified within six
+months show `month date time'. If the file is a symbolic link, the filename is
+printed followed by "\fB\(->\fR" and the path name of the referenced file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.br
+.na
+\fB\fB--dereference\fR\fR
+.ad
+.sp .6
+.RS 4n
+If an argument is a symbolic link, this option evaluates the file information
+and file type of the file or directory that the link references, rather than
+those of the link itself. However, the name of the link is displayed, rather
+than the referenced file or directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Streams output format. Files are listed across the page, separated by commas.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.br
+.na
+\fB\fB--numeric-uid-gid\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except that the owner's \fBUID\fR and group's \fBGID\fR
+numbers are printed, rather than the associated character strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.br
+.na
+\fB\fB--no-group\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except that the group is not printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Puts a slash (\fB/\fR) after each filename if the file is a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.br
+.na
+\fB\fB--hide-control-chars\fR\fR
+.ad
+.sp .6
+.RS 4n
+Forces printing of non-printable characters in file names as the character
+question mark (\fB?\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.br
+.na
+\fB\fB--reverse\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reverses the order of sort to get reverse alphabetic, oldest first, or smallest
+file size first as appropriate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.br
+.na
+\fB\fB--recursive\fR\fR
+.ad
+.sp .6
+.RS 4n
+Recursively lists subdirectories encountered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.br
+.na
+\fB\fB--size\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicate the total number of file system blocks consumed by each file
+displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sort by file size (in decreasing order) and for files with the same size by
+file name (in increasing alphabetic order) instead of just by name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sorts by time stamp (latest first) instead of by name. The default is the last
+modification time. See \fB-c\fR, \fB-u\fR and \fB-%\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses time of last access instead of last modification for sorting (with the
+\fB-t\fR option) or printing (with the \fB-l\fR option).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR\fR
+.ad
+.sp .6
+.RS 4n
+Output is unsorted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except that verbose ACL information is displayed as well
+as the \fB-l\fR output. ACL information is displayed even if the file or
+directory doesn't have an ACL.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except that compact ACL information is displayed after
+the \fB-l\fR output.
+.sp
+The \fB-V\fR option is only applicable to file systems that support NFSv4 ACLs,
+such as the Solaris ZFS file system.
+.sp
+The format of the displayed ACL is as follows:
+.sp
+.in +2
+.nf
+\fIentry_type\fR : \fIpermissions\fR : \fIinheritance_flags\fR : \fIaccess_type\fR
+.fi
+.in -2
+.sp
+
+\fIentry_type\fR is displayed as one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBuser:\fIusername\fR\fR
+.ad
+.sp .6
+.RS 4n
+Additional user access for \fIusername\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroup:\fIgroupname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Additional group access for group \fIgroupname\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBowner@\fR
+.ad
+.sp .6
+.RS 4n
+File owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgroup@\fR
+.ad
+.sp .6
+.RS 4n
+File group owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBeveryone@\fR
+.ad
+.sp .6
+.RS 4n
+Everyone access, including file owner and file group owner. This is not
+equivalent to the POSIX other class.
+.RE
+
+The following permissions, supported by the NFSv4 ACL model, are displayed by
+using the \fB-v\fR or \fB-V\fR options:
+.sp
+.ne 2
+.mk
+.na
+\fBread_data (\fBr\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to read the data of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlist_directory (\fBr\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to list the contents of a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_data (\fBw\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to modify a file's data. anywhere in the file's offset range.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBadd_file (\fBw\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to add a new file to a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBappend_data (\fBp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The ability to modify a file's data, but only starting at EOF.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBadd_subdirectory (\fBp\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to create a subdirectory to a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread_xattr (\fBR\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Ability to read the extended attributes of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_xattr (\fBW\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Ability to create extended attributes or write to the extended attribute
+directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBexecute (\fBx\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to execute a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread_attributes (\fBa\fR)\fR
+.ad
+.sp .6
+.RS 4n
+The ability to read basic attributes (non-ACLs) of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_attributes (\fBA\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to change the times associated with a file or directory to an
+arbitrary value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelete (\fBd\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to delete a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelete_child (\fBD\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to delete a file within a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread_acl (\fBc\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to read the ACL of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_acl (\fBC\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to write the ACL of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrite_owner (\fBo\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to change the owner of a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsynchronize (\fBs\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Permission to access file locally at server with synchronize reads and writes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\fR\fR
+.ad
+.sp .6
+.RS 4n
+No permission granted
+.RE
+
+The following inheritance flags, supported by the NFSv4 ACL model, are
+displayed by using the \fB-v\fR or \fB-V\fR options:
+.sp
+.ne 2
+.mk
+.na
+\fBfile_inherit (\fBf\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Inherit to all newly created files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdir_inherit (\fBd\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Inherit to all newly created directories.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinherit_only (\fBi\fR)\fR
+.ad
+.sp .6
+.RS 4n
+When placed on a directory, do not apply to the directory, only to newly
+created files and directories. This flag requires that either
+\fBfile_inherit\fR and or \fBdir_inherit\fR is also specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBno_propagate (\fBn\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that ACL entries should be inherited to objects in a directory, but
+inheritance should stop after descending one level. This flag is dependent upon
+either \fBfile_inherit\fR and or \fBdir_inherit\fR also being specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsuccessful_access (\fBS\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Indicates if an alarm or audit record should be initiated upon successful
+accesses. Used with audit/alarm ACE types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBfailed_access (\fBF\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Indicates if an alarm or audit record should be initiated when access fails.
+Used with audit/alarm ACE types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinherited (\fBI\fR)\fR
+.ad
+.sp .6
+.RS 4n
+ACE was inherited.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\fR\fR
+.ad
+.sp .6
+.RS 4n
+No permission granted.
+.RE
+
+\fIaccess_type\fR is displayed as one of the following types:
+.sp
+.ne 2
+.mk
+.na
+\fBalarm\fR
+.ad
+.RS 9n
+.rt  
+Permission field that specifies permissions that should trigger an alarm.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBallow\fR
+.ad
+.RS 9n
+.rt  
+Permission field that specifies allow permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaudit\fR
+.ad
+.RS 9n
+.rt  
+Permission field that specifies permissions that should be audited.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdeny\fR
+.ad
+.RS 9n
+.rt  
+Permission field that specifies deny permissions.
+.RE
+
+For example:
+.sp
+.in +2
+.nf
+$ ls -dV /sandbox/dir.1
+  drwxr-xr-x+  2 root     root           2 Jan 17 15:09 dir.1
+                  user:marks:r-------------:fd-----:allow
+                      owner@:--------------:-------:deny
+                      owner@:rwxp---A-W-Co-:-------:allow
+                      group@:-w-p----------:-------:deny
+                      group@:r-x-----------:-------:allow
+                   everyone@:-w-p---A-W-Co-:-------:deny
+                   everyone@:r-x---a-R-c--s:-------:allow
+$ 
+                           ||||||||||||||||:||||||+ inherited access
+                             ||||||||||||||:||||||+ failed access
+                             ||||||||||||||:|||||+--success access
+                             ||||||||||||||:||||+-- no propagate
+                             ||||||||||||||:|||+--- inherit only
+                             ||||||||||||||:||+---- directory inherit
+                             ||||||||||||||:|+----- file inherit
+                             ||||||||||||||
+                             ||||||||||||||+ sync
+                             |||||||||||||+- change owner
+                             ||||||||||||+-- write ACL
+                             |||||||||||+--- read ACL
+                             ||||||||||+---- write extended attributes
+                             |||||||||+----- read extended attributes
+                             ||||||||+------ write attributes
+                             |||||||+------- read attributes
+                             ||||||+-------- delete child
+                             |||||+--------- delete
+                             ||||+---------- append
+                             |||+----------- execute
+                             ||+------------ write data
+                             |+------------- read data
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fIcols\fR\fR
+.ad
+.br
+.na
+\fB\fB--width\fR \fIcols\fR\fR
+.ad
+.sp .6
+.RS 4n
+Multi-column output where the column width is forced to \fIcols\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Multi-column output with entries sorted across rather than down the page.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints one entry per line of output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-@\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, except that extended attribute information overrides
+\fBACL\fR information. An \fB@\fR is displayed after the file permission bits
+for files that have extended attributes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR | \fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+The same as \fB-l\fR, and in addition displays the extended system attributes
+associated with the file when extended system attributes are fully supported by
+the underlying file system. The option \fB-/\fR supports two option arguments
+\fBc\fR (compact mode) and \fBv\fR (verbose mode).
+.sp
+.ne 2
+.mk
+.na
+\fB\fBappendonly\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allows a file to be modified only at offset \fBEOF\fR. Attempts to modify a
+file at a location other than \fBEOF\fR fails with \fBEPERM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBarchive\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates if a file has been modified since it was last backed up. Whenever the
+modification time (\fBmtime\fR) of a file is changed the \fBarchive\fR
+attribute is set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBav_modified\fR\fR
+.ad
+.sp .6
+.RS 4n
+ZFS sets the anti-virus attribute which whenever a file's content or size
+changes or when the file is renamed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBav_quarantined\fR\fR
+.ad
+.sp .6
+.RS 4n
+Anti-virus software sets to mark a file as quarantined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrtime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Timestamp when a file is created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhidden\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks a file as hidden.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimmutable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prevents the content of a file from being modified. Also prevents all metadata
+changes, except for access time updates. When placed on a directory, prevents
+the deletion and creation of files in the directories. Attempts to modify the
+content of a file or directory marked as \fBimmutable\fR fail with \fBEPERM\fR.
+Attempts to modify any attributes (with the exception of access time and, with
+the proper privileges, the \fBimmutable\fR) of a file marked as \fBimmutable\fR
+fails with \fBEPERM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnodump\fR\fR
+.ad
+.sp .6
+.RS 4n
+Solaris systems have no special semantics for this attribute.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnounlink\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prevents a file from being deleted. On a directory, the attribute also prevents
+any changes to the contents of the directory. That is, no files within the
+directory can be removed or renamed. The \fBerrno\fR \fBEPERM\fR is returned
+when attempting to unlink or rename files and directories that are marked as
+\fBnounlink\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreadonly\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks a file as \fBreadonly\fR. Once a file is marked as \fBreadonly\fR the
+content data of the file cannot be modified. Other metadata for the file can
+still be modified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsystem\fR\fR
+.ad
+.sp .6
+.RS 4n
+Solaris systems have no special semantics for this attribute.
+.RE
+
+.RE
+
+.sp
+.LP
+The display characters used in compact mode (\fB-/ c\fR) are as follows:
+.sp
+.in +2
+.nf
+Attribute Name     Display
+archive            A
+hidden             H
+readonly           R
+system             S
+appendonly         a
+nodump             d
+immutable          i
+av_modified        m
+av_quarantined     q
+nounlink           u
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The display in verbose mode (/ v) uses full attribute names when it is set and
+the name prefixed by 'no' when it is not set.
+.sp
+.LP
+The attribute name \fBcrtime\fR and all other timestamps are handled by the
+option \fB-%\fR with the respective timestamp option arguments and also with
+\fBall\fR option argument. The display positions are as follows: The display in
+verbose mode (\fB-/ v\fR) uses full attribute names  when it is set and the
+name prefixed by \fBno\fR when it is not set. The attribute name \fBcrtime\fR
+and all other timestamps are handled by the option \fB-%\fR with the respective
+timestamp option arguments and also with \fBall\fR option argument.
+.sp
+.LP
+The display positions are as follows:
+.sp
+.in +2
+.nf
+{||||||||||}
+ |||||||||+- u (nounlink)
+ ||||||||+-- q (av_quarantined)
+ |||||||+--- m (av_modified)
+ ||||||+---- i (immutable)
+ |||||+----- d (nodump)
+ ||||+------ a (appendonly)
+ |||+------- S (system)
+ ||+-------- R (readonly)
+ |+--------- H (hidden)
+ +---------- A (archive) 
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+-% atime | crtime | ctime | mtime | all 
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Equivalent to \fB-u\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrtime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses the creation time of the file for sorting or printing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBctime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Equivalent to \fB-c\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmtime\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses the last modification time of the file contents for sorting or printing.
+.RE
+
+.sp
+.LP
+If extended system attributes are not supported or if the user does not have
+\fBread\fR permission on the file or if the \fBcrtime\fR extended attribute is
+not set, \fBcrtime\fR is treated as a synonym for \fBmtime\fR.
+.sp
+.LP
+When option argument \fB-all\fR is specified, all available timestamps are
+printed which includes \fB-atime\fR, \fB-ctime\fR, \fB-mtime\fR and on the
+extended system attribute supporting file systems, \fB-crtime\fR (create time).
+The option \fB-% all\fR does not effect which timestamp is displayed in long
+format and does not affect sorting.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--block-size\fR \fIsize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display sizes in multiples of size. Size can be scaled by suffixing one of
+\fBYyZzEePpTtGgMmKk\fR. Additionally, a \fBB\fR can be placed at the end to
+indicate powers of 10 instead of 2. For example, . \fB10mB\fR means blocks of
+\fB10000000\fR bytes while \fB10m\fR means blocks of \fB10*2^20 -- 10485760
+--\fR bytes. This is mutually exclusive with the \fB-h\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--color\fR \fB[=\fR\fIwhen\fR\fB]\fR\fR
+.ad
+.br
+.na
+\fB\fB--colour\fR\fB[=\fR\fIwhen\fR\fB]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display filenames using color on color-capable terminals. \fIwhen\fR is an
+optional argument that determines when to display color output.
+.sp
+Possible values for \fIwhen\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBalways\fR\fR
+.ad
+.br
+.na
+\fB\fByes\fR\fR
+.ad
+.br
+.na
+\fB\fBforce\fR\fR
+.ad
+.sp .6
+.RS 4n
+Always use color.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauto\fR\fR
+.ad
+.br
+.na
+\fB\fBtty\fR\fR
+.ad
+.br
+.na
+\fB\fBif-tty\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use color if a terminal is present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBno\fR\fR
+.ad
+.br
+.na
+\fB\fBnever\fR\fR
+.ad
+.br
+.na
+\fB\fBnone\fR\fR
+.ad
+.sp .6
+.RS 4n
+Never use color. This is the default
+.RE
+
+See \fBCOLOR OUTPUT\fR for information on how to control the output colors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--file-type\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display a suffix after a file depending on it's type, similar to the \fB-F\fR
+option, except \fB*\fR is not appended to executable files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-si\fR\fR
+.ad
+.br
+.na
+\fB\fB--\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display human scaled sizes similar to the \fB-h\fR option, except values are
+repeatedly divided by 1000 instead of 1024. The last option \fB--si\fR or
+\fB-h\fR determines the divisor used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--time-style\fR style\fR
+.ad
+.sp .6
+.RS 4n
+Display times using the specified style. This does not effect the times
+displayed for extended attributes (\fB-%\fR).
+.sp
+Possible values for \fIstyle\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfull-iso\fR\fR
+.ad
+.sp .6
+.RS 4n
+Equivalent to \fB-E\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlong-iso\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display in \fIYYYY-MM-DD HH:MM\fR for all files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBiso\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display older files using \fIYYYY-MM-DD\fR and newer files with \fIMM-DD
+HH:MM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlocale\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the default locale format for old and new files. This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+FORMAT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use a custom format. Values are the same as described in \fBstrftime\fR(3C). If
+a NEWLINE appears in the string, the first line is used for older files and the
+second line is used for newer files. Otherwise, the given format is used for
+all files.
+.RE
+
+.RE
+
+.SS "/usr/bin/ls"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks directories with a trailing slash (\fB/\fR), doors with a trailing
+greater-than sign (\fB>\fR), executable files with a trailing asterisk
+(\fB*\fR), \fBFIFO\fRs with a trailing vertical bar (\fB|\fR), symbolic links
+with a trailing "at" sign (\fB@\fR), and \fBAF_UNIX\fR address family sockets
+with a trailing equals sign (\fB=\fR). Follows \fBsymlinks\fR named as
+operands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--file-type\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks entries as with \fB-F\fR with the exception of executable files.
+Executable files are not marked. Follows symlinks named as operands.
+.RE
+
+.sp
+.LP
+Specifying more than one of the options in the following mutually exclusive
+pairs is not considered an error: \fB-C\fR and \fB-l\fR (ell), \fB-m\fR and
+\fB-l\fR (ell), \fB-x\fR and \fB-l\fR (ell), \fB-@\fR and \fB-l\fR (ell). The
+\fB-l\fR option overrides the other option specified in each pair.
+.sp
+.LP
+Specifying more than one of the options in the following mutually exclusive
+groups is not considered an error: \fB-C\fR and \fB-1\fR (one), \fB-H\fR and
+\fB-L\fR, \fB-c\fR and \fB-u\fR, and \fB-e\fR and \fB-E\fR, and \fB-t\fR and
+\fB-S\fR. The last option specifying a specific timestamp (\fB-c\fR, \fB-u\fR,
+\fB-% atime\fR , \fB-% crtime\fR, \fB-% ctime\fR, and \fB-% mtime\fR)
+determines the timestamps used for sorting or in long format listings. The last
+option \fB-t\fR, \fB-S\fR, or \fB-U\fR determines the sorting behavior.
+.SS "/usr/xpg4/bin/ls"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks directories with a trailing slash (\fB/\fR), doors with a trailing
+greater-than sign (\fB>\fR), executable files with a trailing asterisk
+(\fB*\fR), \fBFIFO\fRs with a trailing vertical bar (\fB|\fR), symbolic links
+with a trailing "at" sign (\fB@\fR), and \fBAF_UNIX\fR address family sockets
+with a trailing equals sign (\fB=\fR). Follows symlinks named as operands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--file-type\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks entries as with \fB-F\fR with the exception of executable files.
+Executable files are not marked. Follows symlinks named as operands.
+.RE
+
+.sp
+.LP
+Specifying more than one of the options in the following groups of mutually
+exclusive options is not considered an error: \fB-C\fR and \fB-l\fR (ell),
+\fB-m\fR and \fB-l\fR (ell), \fB-x\fR and \fB-l\fR (ell), \fB-@\fR and \fB-l\fR
+(ell), \fB-C\fR and \fB-1\fR (one), \fB-H\fR and \fB-L\fR, \fB-c\fR and
+\fB-u\fR, \fB-e\fR and \fB-E\fR, \fB-t\fR and \fB-S\fR and \fB-U\fR. The last
+option specifying a specific timestamp (\fB-c\fR, \fB-u\fR, \fB-% atime\fR ,
+\fB-% crtime\fR, \fB-% ctime\fR, and \fB-% mtime\fR) determines the timestamps
+used for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
+\fB-U\fR option determines the sorting behavior.
+.SS "/usr/xpg6/bin/ls"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks directories with a trailing slash (\fB/\fR), doors with a trailing
+greater-than sign (\fB>\fR), executable files with a trailing asterisk
+(\fB*\fR), \fBFIFO\fRs with a trailing vertical bar (\fB|\fR), symbolic links
+with a trailing "at" sign (\fB@\fR), and \fBAF_UNIX\fR address family sockets
+with a trailing equals sign (\fB=\fR). Does not follow symlinks named as
+operands unless the \fB-H\fR or \fB-L\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB--file-type\fR\fR
+.ad
+.sp .6
+.RS 4n
+Marks entries as with \fB-F\fR with the exception of executable files.
+Executable files are not marked. Does not follow symlinks named as operands
+unless the \fB-H\fR or \fB-L\fR option is specified.
+.RE
+
+.sp
+.LP
+Specifying more than one of the options in the following mutually exclusive
+pairs is not considered an error: \fB-C\fR and \fB-l\fR (ell), m and
+\fB-l\fR(ell), \fB-x\fR and \fB-l\fR (ell), \fB-@\fR and \fB-l\fR (ell),
+\fB-C\fR and \fB-1\fR (one), \fB-H\fR and -\fB-L\fR, \fB-c\fR and \fB-u\fR,
+\fB-e\fR and \fB-E\fR, \fB-t\fR and \fB-S\fR and \fB-U\fR. The last option
+specifying a specific timestamp (\fB-c\fR, \fB-u\fR, \fB-% atime\fR , \fB-%
+crtime\fR, \fB-% ctime\fR, and \fB-% mtime\fR) determines the timestamps used
+for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
+\fB-U\fR option determines the sorting behavior.
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+A path name of a file to be written. If the file specified is not found, a
+diagnostic message is output on standard error.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBls\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRViewing File Permissions
+.sp
+.LP
+The following example shows how to display detailed information about a file.
+
+.sp
+.in +2
+.nf
+% ls -l file.1
+-rw-r--r--   1 gozer    staff     206663 Mar 14 10:15 file.1 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The permissions string above (\fB-rw-r--r--\fR) describes that the file owner
+has read and write permissions, the owning group has read permissions, and
+others have read permissions.
+
+.sp
+.LP
+The following example shows how to display detailed information about a
+directory.
+
+.sp
+.in +2
+.nf
+% ls -ld test.dir
+drwxr-xr-x   2 gozer    staff          2 Mar 14 10:17 test.dir    
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The permissions string above (\fBdrwxr-xr-x\fR) describes that the directory
+owner has read, write, and search permissions, the owning group has read and
+search permissions, and others have read and search permissions.
+
+.sp
+.LP
+Another example of listing file permissions is as follows:
+
+.sp
+.in +2
+.nf
+% ls -l file.2
+-rw-rwl---   1 gozer    staff     206663 Mar 14 10:47 file.2
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The permissions string above (\fB-rw-rwl---\fR) describes that the file owner
+has read and write permissions, the owning group has read and write
+permissions, and the file can be locked during access.
+
+.LP
+\fBExample 2 \fRDisplaying ACL Information on Files and Directories
+.sp
+.LP
+The following example shows how to display verbose ACL information on a ZFS
+file.
+
+.sp
+.in +2
+.nf
+% ls -v file.1
+-rw-r--r--   1 marks    staff     206663 Mar 14 10:15 file.1
+     0:owner@:execute:deny
+     1:owner@:read_data/write_data/append_data/write_xattr/write_attributes
+          /write_acl/write_owner:allow
+     2:group@:write_data/append_data/execute:deny
+     3:group@:read_data:allow
+     4:everyone@:write_data/append_data/write_xattr/execute/write_attributes
+          /write_acl/write_owner:deny
+     5:everyone@:read_data/read_xattr/read_attributes/read_acl/synchronize
+          :allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example shows how to display compact ACL information on a ZFS
+directory.
+
+.sp
+.in +2
+.nf
+% ls -dV test.dir
+drwxr-xr-x   2 marks    staff          2 Mar 14 10:17 test.dir
+            owner@:--------------:------:deny
+            owner@:rwxp---A-W-Co-:------:allow
+            group@:-w-p----------:------:deny
+            group@:r-x-----------:------:allow
+            everyone@:-w-p---A-W-Co-:------:deny
+            everyone@:r-x---a-R-c--s:------:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example illustrates the \fBls\fR \fB-v\fR behavior when listing
+ACL  information on a UFS file.
+
+.sp
+.in +2
+.nf
+$ ls -v file.3
+-rw-r--r--   1 root     root        2703 Mar 14 10:59 file.3
+     0:user::rw-
+     1:group::r--               #effective:r--
+     2:mask:r--
+     3:other:r--
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRPrinting the Names of All Files
+.sp
+.LP
+The following example prints the names of all files in the current directory,
+including those that begin with a dot (\fB\&.\fR), which normally do not print:
+
+.sp
+.in +2
+.nf
+example% \fBls -a\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRProviding File Information
+.sp
+.LP
+The following example provides file information:
+
+.sp
+.in +2
+.nf
+example% ls -aisn
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This command provides information on \fBa\fRll files, including those that
+begin with a dot (\fBa\fR), the \fBi\fR-number, the memory address of the
+i-node associated with the file\(emprinted in the left-hand column (\fBi\fR);
+the \fBs\fRize (in blocks) of the files, printed in the column to the right of
+the i-numbers (\fBs\fR); finally, the report is displayed in the \fBn\fRumeric
+version of the long list, printing the \fBUID\fR (instead of user name) and
+\fBGID\fR (instead of group name) numbers associated with the files.
+
+.sp
+.LP
+When the sizes of the files in a directory are listed, a total count of blocks,
+including indirect blocks, is printed.
+
+.LP
+\fBExample 5 \fRProviding Extended System Attributes Information
+.sp
+.in +2
+.nf
+example% ls -/ c file    (extended system attribute in compact mode)
+-rw-r--r--   1 root     root           0 May 10 14:17 file    
+                         {AHRSadim-u}
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example, \fBav_quarantined\fR is not set.
+.sp
+.in +2
+.nf
+example% ls -/ v file (extended system attribute in verbose mode)
+-rw-r--r--   1 root     root           0 May 10 14:17 file
+                {archive,hidden,readonly,system,appendonly\e
+                 nodump,immutable,av_modified,\e
+                 noav_quarantined,nounlink}
+
+example% ls -/ v file     (no extended system attribute)
+-rw-r--r--  1 root    staff        0 May 16 14:48 file
+               {}
+
+example% ls -/ c file        (extended system attribute 
+                              supported file system)
+
+-rw-r--r--  1 root staff        3 Jun  4 22:04 file
+               {A------m--}
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBarchive\fR and \fBav_modified\fR attributes are set by default on  an
+extended system attribute supported file.
+.sp
+.in +2
+.nf
+example% ls -/ c  -%crtime file
+
+-rw-r--r--    root     root          0 May 10 14:17 file
+               {AHRSadim-u}
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This example displays the timestamp as the creation time:
+.sp
+.in +2
+.nf
+example% ls -l -%all file
+-rw-r--r--   1 root     root           0 May 10 14:17    file
+                timestamp: atime    Jun 14 08:47:37 2007
+                timestamp: ctime    May 10 14:20:23 2007
+                timestamp: mtime    May 10 14:17:56 2007
+                timestamp: crtime   May 10 14:17:56 2007
+
+example% ls -%crtime -tl file*
+
+-rw-r--r--   1 foo      staff          3 Jun  4 22:04 file1
+-rw-r--r--   1 root     root           0 May 10 14:17 file
+-rw-r--r--   1 foo      staff          0 May  9 13:49 file.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In this example the files are sorted by creation time.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBls\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_TIME\fR, \fBLC_MESSAGES\fR,
+\fBNLSPATH\fR, and \fBTZ\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCOLUMNS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Determines the user's preferred column position width for writing multiple
+text-column output. If this variable contains a string representing a decimal
+integer, the \fBls\fR utility calculates how many path name text columns to
+write (see \fB-C\fR) based on the width provided. If \fBCOLUMNS\fR is not set
+or is invalid, 80 is used. The column width chosen to write the names of files
+in any given directory is constant. File names are not be truncated to fit into
+the multiple text-column output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLS_COLORS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Determines the coloring scheme used when displaying color output. If not set
+and color output is specified, a default scheme is used. If TERM is not set, no
+color output is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTERM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Determine the terminal type. If this variable is unset or NULL, no color output
+is generated regardless of the value of the --color option.
+.RE
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All information was written successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.sp .6
+.RS 4n
+group IDs for \fBls\fR \fB-l\fR and \fBls\fR \fB-g\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.sp .6
+.RS 4n
+user IDs for \fBls\fR \fB-l\fR and \fBls\fR \fB-o\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/terminfo/?/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+terminal information database
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/ls"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
+\fB-S\fR, U \fB-v\fR, \fB-V\fR, \fB-@\fR, \fB-/\fR, \fB-%\fR, \fB--all\fR,
+\fB--almost-all\fR, \fB--block-size\fR, \fB--classify\fR, \fB--color\fR,
+\fB--colour\fR, \fB--dereference\fR, \fB--dereference-command-line\fR,
+\fB--escape\fR, \fB--file-type\fR, \fB--full-time\fR, \fB--human-readable\fR,
+\fB--ignore-backups\fR, \fB--inode\fR, \fB--no-group\fR,
+\fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
+\fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
+.SS "/usr/xpg4/bin/ls"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
+\fB-S\fR, U \fB-v\fR, \fB-V\fR, \fB-@\fR, \fB-/\fR, \fB-%\fR, \fB--all\fR,
+\fB--almost-all\fR, \fB--block-size\fR, \fB--classify\fR, \fB--color\fR,
+\fB--colour\fR, \fB--dereference\fR, \fB--dereference-command-line\fR,
+\fB--escape\fR, \fB--file-type\fR, \fB--full-time\fR, \fB--human-readable\fR,
+\fB--ignore-backups\fR, \fB--inode\fR, \fB--no-group\fR,
+\fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
+\fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
+.SS "/usr/xpg6/bin/ls"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
+\fB-S\fR, U \fB-v\fR, \fB-V\fR, \fB-@\fR, \fB-/\fR, \fB-%\fR, \fB--all\fR,
+\fB--almost-all\fR, \fB--block-size\fR, \fB--classify\fR, \fB--color\fR,
+\fB--colour\fR, \fB--dereference\fR, \fB--dereference-command-line\fR,
+\fB--escape\fR, \fB--file-type\fR, \fB--full-time\fR, \fB--human-readable\fR,
+\fB--ignore-backups\fR, \fB--inode\fR, \fB--no-group\fR,
+\fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
+\fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBcp\fR(1), \fBsetfacl\fR(1), \fBfgetattr\fR(3C),
+\fBstrftime\fR(3C), \fBterminfo\fR(4), \fBacl\fR(5), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Unprintable characters in file names can confuse the columnar output options.
+.sp
+.LP
+The total block count is incorrect if there are hard links among the files.
+.sp
+.LP
+The sort order of \fBls\fR output is affected by the locale and can be
+overridden by the \fBLC_COLLATE\fR environment variable. For example, if
+\fBLC_COLLATE\fR equals \fBC\fR, dot files appear first, followed by names
+beginning with upper-case letters, then followed by names beginning with
+lower-case letters. But if \fBLC_COLLATE\fR equals \fBen_US.ISO8859-1\fR, then
+leading dots as well as case are ignored in determining the sort order.

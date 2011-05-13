@@ -1,0 +1,181 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_search 3LDAP "05 Dec 2003" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_search, ldap_search_s, ldap_search_ext, ldap_search_ext_s, ldap_search_st
+\- LDAP search operations
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR...]
+#include <sys/time.h> /* for struct timeval definition */
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_search\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*base\fR, \fBint\fR \fIscope\fR, \fBchar\fR \fI*filter\fR,
+     \fBchar\fR \fI*attrs\fR[], \fBint\fR \fIattrsonly\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_search_s\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*base\fR, \fBint\fR \fIscope\fR, \fBchar\fR \fI*filter\fR,
+     \fBchar\fR \fI*attrs\fR[],\fBint\fR \fIattrsonly\fR, \fBLDAPMessage\fR \fI**res\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_search_st\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*base\fR, \fBint\fR \fIscope\fR, \fBchar\fR \fI*filter\fR,
+     \fBchar\fR \fI*attrs\fR[], \fBint\fR \fIattrsonly\fR, \fBstruct timeval\fR \fI*timeout\fR,
+     \fBLDAPMessage\fR \fI**res\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_search_ext\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*base\fR, \fBint\fR \fIscope\fR, \fBchar\fR
+     \fI*filter\fR, \fBchar\fR \fI**attrs\fR,\ \fBint\fR \fIattrsonly\fR, \fBLDAPControl\fR \fI**serverctrls\fR,
+     \fBLDAPControl\fR \fI**clientctrls\fR, \fBstruct timeval\fR \fI*timeoutp\fR,
+     \fBint\fR \fIsizelimit\fR, \fBint\fR \fI*msgidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_search_ext_s\fR(\fBLDAP\fR \fI*ld\fR,char \fI*base\fR, \fBint\fR \fIscope\fR, \fBchar\fR \fI*filter\fR,
+     \fBchar\fR \fI**attrs\fR, \fBint\fR \fIattrsonly\fR, \fBLDAPControl\fR \fI**serverctrls\fR,
+     \fBLDAPControl\fR \fI**clientctrls\fR, \fBstruct timeval\fR \fI*timeoutp\fR,
+     \fBint\fR \fIsizelimit\fR, \fBLDAPMessage\fR \fI**res\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to perform LDAP search operations. The
+\fBldap_search_s()\fR function does the search synchronously (that is, not
+returning until the operation completes). The \fBldap_search_st()\fR function
+does the same, but allows a \fItimeout\fR to be specified. The
+\fBldap_search()\fR function is the asynchronous version, initiating the search
+and returning the message ID of the operation it initiated.
+.sp
+.LP
+The \fIbase\fR is the DN of the entry at which to start the search. The
+\fIscope\fR is the scope of the search and should be one of
+\fBLDAP_SCOPE_BASE\fR, to search the object itself, \fBLDAP_SCOPE_ONELEVEL\fR,
+to search the object's immediate children, or \fBLDAP_SCOPE_SUBTREE\fR, to
+search the object and all its descendents.
+.sp
+.LP
+The \fIfilter\fR is a string representation of the filter to apply in the
+search. Simple filters can be specified as \fIattributetype=attributevalue\fR.
+More complex filters are specified using a prefix notation according to the
+following BNF:
+.sp
+.in +2
+.nf
+        <filter> ::= '(' <filtercomp> ')'
+        <filtercomp> ::= <and> | <or> | <not> | <simple>
+        <and> ::= '&' <filterlist>
+        <or> ::= '|' <filterlist>
+        <not> ::= '!' <filter>
+        <filterlist> ::= <filter> | <filter> <filterlist>
+        <simple> ::= <attributetype> <filtertype> <attributevalue>
+        <filtertype> ::= '=' | '~=' | '<=' | '>='
+.fi
+.in -2
+
+.sp
+.LP
+The '~=' construct is used to specify approximate matching. The representation
+for <attributetype> and <attributevalue> are as described in RFC 1778. In
+addition, <attributevalue> can be a single * to achieve an attribute existence
+test, or can contain text and *'s interspersed to achieve substring matching.
+.sp
+.LP
+For example, the filter \fBmail=*\fR finds entries that have a mail attribute.
+The filter \fBmail=*@terminator.rs.itd.umich.edu\fR finds entries that have a
+mail attribute ending in the specified string. Use a backslash (\fB\\fR) to
+escape parentheses characters in a filter. See RFC 1588 for a more complete
+description of the filters that are allowed. See \fBldap_getfilter\fR(3LDAP)
+for functions to help construct search filters automatically.
+.sp
+.LP
+The \fIattrs\fR is a null-terminated array of attribute types to return from
+entries that match \fIfilter\fR. If \fBNULL\fR is specified, all attributes are
+returned. The \fIattrsonly\fR is set to \fB1\fR when attribute types only are
+wanted. The \fIattrsonly\fR is set to \fB0\fR when both attributes types and
+attribute values are wanted.
+.sp
+.LP
+The \fIsizelimit\fR argument returns the number of matched entries specified
+for a search operation. When \fIsizelimit\fR is set to 50, for example, no more
+than 50 entries are returned. When \fIsizelimit\fR is set to 0, all matched
+entries are returned. The LDAP server can be configured to send a maximum
+number of entries, different from the size limit specified. If 5000 entries are
+matched in the database of a server configured to send a maximum number of 500
+entries, no more than 500 entries are returned even when \fIsizelimit\fR is set
+to 0.
+.sp
+.LP
+The \fBldap_search_ext()\fR function initiates an asynchronous search operation
+and returns \fBLDAP_SUCCESS\fR when the request is successfully sent to the
+server. Otherwise, \fBldap_search_ext()\fR returns an LDAP error code. See
+\fBldap_error\fR(3LDAP). If successful, \fBldap_search_ext()\fR places the
+message ID of the request in \fI*msgidp\fR. A subsequent call to
+\fBldap_result\fR(3LDAP) can be used to obtain the result of the add request.
+.sp
+.LP
+The \fBldap_search_ext_s()\fR function initiates a synchronous search operation
+and returns the result of the operation itself.
+.SH ERRORS
+.sp
+.LP
+The \fBldap_search_s()\fR and \fBldap_search_st()\fR functions return the LDAP
+error code that results from a search operation. See \fBldap_error\fR(3LDAP)
+for details.
+.sp
+.LP
+The \fBldap_search()\fR function returns \fB\(mi1\fR when the operation
+terminates unsuccessfully.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_result\fR(3LDAP), \fBldap_getfilter\fR(3LDAP),
+\fBldap_error\fR(3LDAP) , \fBattributes\fR(5)
+.sp
+.LP
+Howes, T., Kille, S., Yeong, W., Robbins, C., Wenn, J. \fIRFC 1778, The String
+Representation of Standard Attribute Syntaxes\fR. Network Working Group. March
+1995.
+.sp
+.LP
+Postel, J., Anderson, C. \fIRFC 1588, White Pages Meeting Report\fR. Network
+Working Group. February 1994.
+.SH NOTES
+.sp
+.LP
+The read and list functionality are subsumed by \fBldap_search()\fR functions,
+when a filter such as \fBobjectclass=*\fR is used with the scope
+\fBLDAP_SCOPE_BASE\fR to emulate read or the scope \fBLDAP_SCOPE_ONELEVEL\fR to
+emulate list.
+.sp
+.LP
+The \fBldap_search()\fR functions may allocate memory which must be freed by
+the calling application. Return values are contained in <\fBldap.h\fR>.

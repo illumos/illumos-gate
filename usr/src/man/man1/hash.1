@@ -1,0 +1,199 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH hash 1 "17 Jul 2002" "SunOS 5.11" "User Commands"
+.SH NAME
+hash, rehash, unhash, hashstat \- evaluate the internal hash table of the
+contents of directories
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/hash\fR [\fIutility\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/hash\fR [\fB-r\fR]
+.fi
+
+.SS "sh"
+.LP
+.nf
+\fBhash\fR [\fB-r\fR] [\fIname\fR]...
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBrehash\fR 
+.fi
+
+.LP
+.nf
+\fBunhash\fR 
+.fi
+
+.LP
+.nf
+\fBhashstat\fR 
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBhash\fR [\fIname\fR]...
+.fi
+
+.LP
+.nf
+\fBhash\fR [\fB-r\fR]
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/hash"
+.sp
+.LP
+The \fB/usr/bin/hash\fR utility affects the way the current shell environment
+remembers the locations of utilities found.  Depending on the arguments
+specified, it adds utility locations to its list of remembered locations or it
+purges the contents of the list. When no arguments are specified, it reports on
+the contents of the list. The \fB-r\fR option causes the shell to forget all
+remembered locations.
+.sp
+.LP
+Utilities provided as built-ins to the shell are not reported by \fBhash\fR.
+.SS "sh"
+.sp
+.LP
+For each \fIname\fR, the location in the search path of the command specified
+by \fIname\fR is determined and remembered by the shell. The \fB-r\fR option to
+the \fBhash\fR built-in causes the shell to forget all remembered locations. If
+no arguments are given, \fBhash\fR provides information about remembered
+commands. The \fIHits\fR column of output is the number of times a command has
+been invoked by the shell process. The \fICost\fR column of output is a measure
+of the work required to locate a command in the search path. If a command is
+found in a "relative" directory in the search path, after changing to that
+directory, the stored location of that command is recalculated. Commands for
+which this will be done are indicated by an asterisk (\fB*\fR) adjacent to the
+\fIHits\fR information. \fICost\fR will be incremented when the recalculation
+is done.
+.SS "csh"
+.sp
+.LP
+\fBrehash\fR recomputes the internal hash table of the contents of directories
+listed in the \fBpath\fR environmental variable to account for new commands
+added.
+.sp
+.LP
+\fBunhash\fR disables the internal hash table.
+.sp
+.LP
+\fBhashstat\fR prints a statistics line indicating how effective the internal
+hash table has been at locating commands (and avoiding \fBexec\fRs). An
+\fBexec\fR is attempted for each component of the \fIpath\fR where the hash
+function indicates a possible hit and in each component that does not begin
+with a '\|/\|'.
+.SS "ksh"
+.sp
+.LP
+For each \fIname\fR, the location in the search path of the command specified
+by \fIname\fR is determined and remembered by the shell. The \fB-r\fR option to
+the \fBhash\fR built-in causes the shell to forget all remembered locations. If
+no arguments are given, \fBhash\fR provides information about remembered
+commands.
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported by \fBhash\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutility\fR \fR
+.ad
+.RS 12n
+.rt  
+The name of a utility to be searched for and added to the list of remembered
+locations.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+The standard output of \fBhash\fR is used when no arguments are specified. Its
+format is unspecified, but includes the pathname of each utility in the list of
+remembered locations for the current shell environment. This list consists of
+those utilities named in previous \fBhash\fR invocations that have been
+invoked, and may contain those invoked and found through the normal command
+search process.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBhash\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPATH\fR \fR
+.ad
+.RS 9n
+.rt  
+Determine the location of \fIutility\fR.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned by \fBhash\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR \fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBksh\fR(1), \fBsh\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBstandards\fR(5)

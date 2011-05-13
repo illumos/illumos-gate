@@ -1,0 +1,53 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_version 3LDAP "19 Oct 2001" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_version \- get version information about the LDAP SDK for C
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-flag \&.\|.\|.\fR  \fIfile\fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR] 
+#include <ldap.h>
+
+\fBint\fR \fBldap_version\fR(\fBLDAPVERSION\fR *\fIver\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+A call to this function returns the version information for the LDAP SDK for C.
+This is a deprecated function. Use \fBldap_get_option\fR(3LDAP) instead. The
+version information is returned in the \fBLDAPVersion\fR  structure pointed to
+by \fIver\fR. If \fINULL\fR is passed for \fIver\fR, then only the  SDK version
+will be returned.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldap_version()\fR function returns the version number of the LDAP SDK
+for C, multiplied by 100. For example, for version 1.0 of the LDAP SDK for C,
+the function returns \fB100\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap_get_option\fR(3LDAP), \fBattributes\fR(5)

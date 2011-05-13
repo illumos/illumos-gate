@@ -1,0 +1,114 @@
+'\" te
+.\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
+.TH shutdown 1B "11 Oct 1994" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+shutdown \- close down the system at a given time
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/shutdown\fR [\fB-fhknr\fR] \fItime\fR [\fIwarning-message\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBshutdown\fR provides an automated procedure to notify users when the system
+is to be shut down. \fBtime\fR specifies when \fBshutdown\fR will bring the
+system down; it may be the word \fBnow\fR (indicating an immediate shutdown),
+or it may specify a future time in one of two formats: \fB+\fR\fInumber\fR and
+\fIhour\fR\fB:\fR\fImin.\fR The first form brings the system down in
+\fInumber\fR minutes, and the second brings the system down at the time of day
+indicated in 24-hour notation.
+.sp
+.LP
+At intervals that get closer as the apocalypse approaches, warning messages are
+displayed at terminals of all logged-in users, and of users who have remote
+mounts on that machine.
+.sp
+.LP
+At shutdown time a message is written to the system log daemon,
+\fBsyslogd\fR(1M), containing the time of shutdown, the instigator of the
+shutdown, and the reason. Then a terminate signal is sent to \fBinit\fR, which
+brings the system down to single-user mode.
+.SH OPTIONS
+.sp
+.LP
+As an alternative to the above procedure, these options can be specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Arrange, in the manner of \fBfastboot\fR(1B), that when the system is rebooted,
+the file systems will not be checked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Execute \fBhalt\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 6n
+.rt  
+Simulate shutdown of the system. Do not actually shut down the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Prevent the normal \fBsync\fR(2) before stopping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Execute \fBreboot\fR(1M).
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/rmtab\fR\fR
+.ad
+.RS 14n
+.rt  
+remote mounted file system table
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfastboot\fR(1B), \fBlogin\fR(1), \fBhalt\fR(1M), \fBreboot\fR(1M),
+\fBsyslogd\fR(1M), \fBsync\fR(2), \fBrmtab\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Only allows you to bring the system down between \fBnow\fR and 23:59 if you use
+the absolute time for shutdown.

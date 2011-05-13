@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * System call to checkpoint and resume the currently running kernel
  */
@@ -341,10 +339,14 @@ cpr(int fcn, void *mdep)
 		return (ENOTSUP);
 	}
 
-	if (!i_cpr_is_supported(cpr_sleeptype) ||
-	    (cpr_sleeptype == CPR_TODISK &&
-	    !cpr_is_ufs(rootvfs)&& !cpr_is_zfs(rootvfs)))
+	if (!i_cpr_is_supported(cpr_sleeptype))
 		return (ENOTSUP);
+
+#if defined(__sparc)
+	if ((cpr_sleeptype == CPR_TODISK &&
+	    !cpr_is_ufs(rootvfs) && !cpr_is_zfs(rootvfs)))
+		return (ENOTSUP);
+#endif
 
 	if (fcn == AD_CHECK_SUSPEND_TO_RAM ||
 	    fcn == DEV_CHECK_SUSPEND_TO_RAM) {

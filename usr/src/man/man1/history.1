@@ -1,0 +1,1184 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH history 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+history, fc, hist \- process command history list
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/fc\fR [\fB-r\fR] [\fB-e\fR \fIeditor\fR] [\fIfirst\fR [\fIlast\fR]]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/fc\fR \fB-l\fR [\fB-nr\fR] [\fIfirst\fR [\fIlast\fR]]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/fc\fR \fB-s\fR [\fIold\fR=\fInew\fR] [\fIfirst\fR]
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBhistory\fR [\fB-hr\fR] [\fIn\fR]
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBfc\fR \fB-e\fR \fB-\fR [\fIold\fR=\fInew\fR] [\fIcommand\fR]
+.fi
+
+.LP
+.nf
+\fBfc\fR \fB-s\fR [\fIold\fR = \fInew\fR] [\fIcommand\fR]
+.fi
+
+.LP
+.nf
+\fBfc\fR [\fB-e\fR \fIename\fR] [\fB-nlr\fR] [\fIfirst\fR [\fIlast\fR]]
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBhist\fR [\fB-lnprs\fR] [\fB-e\fR \fIeditor\fR][\fB-N\fR \fInum\fR][\fIfirst\fR[\fIlast\fR]]
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/fc"
+.sp
+.LP
+The \fBfc\fR utility lists or edits and reexecutes, commands previously entered
+to an interactive \fBsh\fR.
+.sp
+.LP
+The command history list references commands by number. The first number in the
+list is selected arbitrarily. The relationship of a number to its command does
+not change except when the user logs in and no other process is accessing the
+list, at which time the system can reset the numbering to start the oldest
+retained command at another number (usually 1). When the number reaches the
+value in \fBHISTSIZE\fR or \fB32767\fR (whichever is greater), the shell can
+wrap the numbers, starting the next command with a lower number (usually 1).
+However, despite this optional wrapping of numbers, \fBfc\fR maintains the
+time-ordering sequence of the commands. For example, if four commands in
+sequence are given the numbers 32 766, 32 767, 1 (wrapped), and 2 as they are
+executed, command 32 767 is considered the command previous to 1, even though
+its number is higher.
+.sp
+.LP
+When commands are edited (when the \fB-l\fR option is not specified), the
+resulting lines is entered at the end of the history list and then reexecuted
+by \fBsh\fR. The \fBfc\fR command that caused the editing is not entered into
+the history list. If the editor returns a non-zero exit status, this suppresses
+the entry into the history list and the command reexecution. Any command-line
+variable assignments or redirection operators used with \fBfc\fR affects both
+the \fBfc\fR command itself as well as the command that results, for example:
+.sp
+.in +2
+.nf
+\fBfc -s -- -1 2>/dev/null\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+reinvokes the previous command, suppressing standard error for both \fBfc\fR
+and the previous command.
+.SS "csh"
+.sp
+.LP
+Display the history list. If \fIn\fR is given, display only the \fIn\fR most
+recent events.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Reverse the order of printout to be most recent first rather than oldest first.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Display the history list without leading numbers. This is used to produce files
+suitable for sourcing using the \fB-h\fR option to the \fBcsh\fR built-in
+command, \fBsource\fR(1).
+.RE
+
+.SS "History Substitution:"
+.sp
+.LP
+History substitution allows you to use words from previous command lines in the
+command line you are typing. This simplifies spelling corrections and the
+repetition of complicated commands or arguments. Command lines are saved in the
+history list, the size of which is controlled by the \fBhistory\fR variable.
+The \fBhistory\fR shell variable can be set to the maximum number of command
+lines that is saved in the history file, that is:
+.sp
+.in +2
+.nf
+set history = 200
+.fi
+.in -2
+
+.sp
+.LP
+allows the history list to keep track of the most recent 200 command lines. If
+not set, the C shell saves only the most recent command.
+.sp
+.LP
+A history substitution begins with a \fB!\fR (although you can change this with
+the \fBhistchars\fR variable) and can occur anywhere on the command line;
+history substitutions do not nest. The \fB!\fR can be escaped with \fB\e\fR to
+suppress its special meaning.
+.sp
+.LP
+Input lines containing history substitutions are echoed on the terminal after
+being expanded, but before any other substitutions take place or the command
+gets executed.
+.SS "Event Designators:"
+.sp
+.LP
+An event designator is a reference to a command line entry in the history list.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fR
+.ad
+.sp .6
+.RS 4n
+Start a history substitution, except when followed by a space character, tab,
+newline, \fB=\fR or \fB(\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!!\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the previous command. By itself, this substitution repeats the
+previous command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fIn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to command line \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the current command line minus \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fIstr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command starting with \fIstr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!?\fR\fIstr\fR\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command containing \fIstr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!?\fR\fIstr\fR\fB?\fR \fIadditional\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command containing \fIstr\fR and append
+\fIadditional\fR to that referenced command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!{\fR\fBcommand\fR\fB}\fR \fIadditional\fR\fR
+.ad
+.sp .6
+.RS 4n
+Refer to the most recent command beginning with \fBcommand\fR and append
+\fIadditional\fR to that referenced command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fIprevious_word\fR\fB^\fR\fIreplacement\fR\fB^\fR\fR
+.ad
+.sp .6
+.RS 4n
+Repeat the previous command line replacing the string \fIprevious_word\fR with
+the string \fIreplacement\fR. This is equivalent to the history substitution:
+.sp
+Repeat the previous command line replacing the string \fIprevious_word\fR with
+the string \fIreplacement\fR. This is equivalent to the history substitution:
+.sp
+.in +2
+.nf
+\fB!:s/\fR\fIprevious_word\fR\fB/\fR\fIreplacement\fR\fB/\fR.
+.fi
+.in -2
+
+To re-execute a specific previous command \fBand\fR make such a substitution,
+say, re-executing command #6:
+.sp
+.in +2
+.nf
+\fB!:6s/\fR\fIprevious_word\fR\fB/\fR\fIreplacement\fR\fB/\fR.
+.fi
+.in -2
+
+.RE
+
+.SS "Word Designators:"
+.sp
+.LP
+A `\fB:\fR' (colon) separates the event specification from the word designator.
+2It can be omitted if the word designator begins with a \fB^\fR, \fB$\fR,
+\fB*\fR, \fB\(mi\fR or \fB%\fR. If the word is to be selected from the previous
+command, the second \fB!\fR character can be omitted from the event
+specification. For instance, \fB!!:1\fR and \fB!:1\fR both refer to the first
+word of the previous command, while \fB!!$\fR and \fB!$\fR both refer to the
+last word in the previous command. Word designators include:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB#\fR\fR
+.ad
+.RS 10n
+.rt  
+The entire command line typed so far.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 10n
+.rt  
+The first input word (command).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIn\fR'th argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB^\fR\fR
+.ad
+.RS 10n
+.rt  
+The first argument, that is, \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR\fR
+.ad
+.RS 10n
+.rt  
+The last argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fR
+.ad
+.RS 10n
+.rt  
+The word matched by (the most recent) \fB?\fR\fIs\fR search.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\(mi\fR\fIy\fR\fR
+.ad
+.RS 10n
+.rt  
+A range of words; \fB\(mi\fR\fIy\fR abbreviates \fB0\(mi\fR\fIy\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 10n
+.rt  
+All the arguments, or a null value if there is just one word in the event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB*\fR\fR
+.ad
+.RS 10n
+.rt  
+Abbreviates \fIx\fR\fB\(mi$\fR\fI\&.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fB\(mi\fR\fR
+.ad
+.RS 10n
+.rt  
+Like \fIx\fR\fB*\fR but omitting word \fB$\fR.
+.RE
+
+.SS "Modifiers:"
+.sp
+.LP
+After the optional word designator, you can add a sequence of one or more of
+the following modifiers, each preceded by a \fB:\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh\fR\fR
+.ad
+.RS 28n
+.rt  
+Remove a trailing pathname component, leaving the head.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 28n
+.rt  
+Remove a trailing suffix of the form `\fB\&.\fR\fIxxx\fR', leaving the
+basename.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.RS 28n
+.rt  
+Remove all but the suffix, leaving the extension.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs/\fR\fIoldchars\fR\fB/\fR\fIreplacements\fR\fB/\fR\fR
+.ad
+.RS 28n
+.rt  
+Substitute \fIreplacements\fR for \fIoldchars\fR. \fIoldchars\fR is a string
+that can contain embedded blank spaces, whereas \fIprevious_word\fR in the
+event designator can not.
+.sp
+.in +2
+.nf
+\fB^\fR\fIoldchars\fR\fB^\fR\fIreplacements\fR\fB^\fR
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 28n
+.rt  
+Remove all leading pathname components, leaving the tail.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB&\fR\fR
+.ad
+.RS 28n
+.rt  
+Repeat the previous substitution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 28n
+.rt  
+Apply the change to the first occurrence of a match in each word, by prefixing
+the above (for example, \fBg&\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 28n
+.rt  
+Print the new command but do not execute it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fR\fR
+.ad
+.RS 28n
+.rt  
+Quote the substituted words, escaping further substitutions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.RS 28n
+.rt  
+Like \fBq\fR, but break into words at each space character, tab or newline.
+.RE
+
+.sp
+.LP
+Unless preceded by a \fBg\fR, the modification is applied only to the first
+string that matches \fIoldchars\fR. An error results if no string matches.
+.sp
+.LP
+The left-hand side of substitutions are not regular expressions, but character
+strings. Any character can be used as the delimiter in place of \fB/\fR. A
+backslash quotes the delimiter character. The character \fB&\fR, in the right
+hand side, is replaced by the text from the left-hand-side. The \fB&\fR can be
+quoted with a backslash. A null \fIoldchars\fR uses the previous string either
+from a \fIoldchars\fR or from a contextual scan string \fIs\fR from
+\fB!?\fR\fIs\fR. You can omit the rightmost delimiter if a newline immediately
+follows \fIreplacements\fR; the rightmost \fB?\fR in a context scan can
+similarly be omitted.
+.sp
+.LP
+Without an event specification, a history reference refers either to the
+previous command, or to a previous history reference on the command line (if
+any).
+.SS "ksh"
+.sp
+.LP
+Using \fBfc\fR, in the form of
+.sp
+.in +2
+.nf
+\fBfc -e \(mi [\fIold\fR=\fInew\fR] [\fIcommand\fR],\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+\fBfc -s [\fIold\fR=\fInew\fR] [\fIcommand\fR],\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+the \fIcommand\fR is re-executed after the substitution
+\fIold\fR\fB=\fR\fInew\fR is performed. If there is not a \fIcommand\fR
+argument, the most recent command typed at this terminal is executed.
+.sp
+.LP
+Using \fBfc\fR in the form of
+.sp
+.in +2
+.nf
+\fBfc [-e \fIename\fR] [-nlr ] [\fIfirst\fR [\fIlast\fR]],\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+a range of commands from \fIfirst\fR to \fIlast\fR is selected from the last
+\fBHISTSIZE\fR commands that were typed at the terminal. The arguments
+\fIfirst\fR and \fIlast\fR can be specified as a number or as a string. A
+string is used to locate the most recent command starting with the given
+string. A negative number is used as an offset to the current command number.
+If the \fB-l\fR flag is selected, the commands are listed on standard output.
+Otherwise, the editor program \fB-e\fR \fIname\fR is invoked on a file
+containing these keyboard commands. If \fIename\fR is not supplied, then the
+value of the variable \fBFCEDIT\fR (default \fB/bin/ed\fR) is used as the
+editor. When editing is complete, the edited command(s) is executed. If
+\fBlast\fR is not specified, it is set to \fIfirst\fR. If \fIfirst\fR is not
+specified, the default is the previous command for editing and \(mi16 for
+listing. The flag \fB-r\fR reverses the order of the commands and the flag
+\fB-n\fR suppresses command numbers when listing. (See \fBksh\fR(1) for more
+about command line editing.)
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHISTFILE\fR\fR
+.ad
+.RS 12n
+.rt  
+If this variable is set when the shell is invoked, then the value is the
+pathname of the file that is used to store the command history.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHISTSIZE\fR\fR
+.ad
+.RS 12n
+.rt  
+If this variable is set when the shell is invoked, then the number of
+previously entered commands that are accessible by this shell is greater than
+or equal to this number. The default is \fB128\fR.
+.RE
+
+.SS "Command Re-entry:"
+.sp
+.LP
+The text of the last \fBHISTSIZE\fR (default 128) commands entered from a
+terminal device is saved in a \fBhistory\fR file. The file
+\fB$HOME/.sh_history\fR is used if the \fBHISTFILE\fR variable is not set or if
+the file it names is not writable. A shell can access the commands of all
+\fIinteractive\fR shells which use the same named \fBHISTFILE\fR. The special
+command \fBfc\fR is used to list or edit a portion of this file. The portion of
+the file to be edited or listed can be selected by number or by giving the
+first character or characters of the command. A single command or range of
+commands can be specified. If you do not specify an editor program as an
+argument to \fBfc\fR then the value of the variable \fBFCEDIT\fR is used. If
+\fBFCEDIT\fR is not defined then \fB/bin/ed\fR is used. The edited command(s)
+is printed and re-executed upon leaving the editor. The editor name \fB\(mi\fR
+is used to skip the editing phase and to re-execute the command. In this case a
+substitution parameter of the form \fIold\fR\fB=\fR\fInew\fR can be used to
+modify the command before execution. For example, if \fBr\fR is aliased to
+\fBa\'fc\fR \fB-e\fR \fB\(mi a\'\fR then typing \fB`r\fR \fBbad=good\fR
+\fBc'\fR re-executes the most recent command which starts with the letter
+\fBc\fR, replacing the first occurrence of the string \fBbad\fR with the string
+\fBgood\fR.
+.sp
+.LP
+Using the \fBfc\fR built-in command within a compound command causes the whole
+command to disappear from the history file.
+.SS "ksh93"
+.sp
+.LP
+\fBhist\fR lists, edits, or re-executes commands previously entered into the
+current shell environment.
+.sp
+.LP
+The command history list references commands by number. The first number in the
+list is selected arbitrarily. The relationship of a number to its command does
+not change during a login session. When the number reaches \fB32767\fR the
+number wraps around to \fB1\fR but maintains the ordering.
+.sp
+.LP
+When the \fBl\fR option is not specified, and commands are edited, the
+resulting lines are entered at the end of the history list and then re-executed
+by the current shell. The \fBhist\fR command that caused the editing is not
+entered into the history list. If the editor returns a \fBnon-zero\fR exit
+status, this suppresses the entry into the history list and the command
+re-execution. Command line variable assignments and redirections affect both
+the \fBhist\fR command and the commands that are re-executed.
+.sp
+.LP
+\fIfirst\fR and \fIlast\fR define the range of commands. Specify \fIfirst\fR
+and \fIlast\fR as one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fInumber\fR\fR
+.ad
+.RS 11n
+.rt  
+A positive number representing a command number. A \fB+\fR sign can precede
+\fInumber\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\fR\fInumber\fR\fR
+.ad
+.RS 11n
+.rt  
+A negative number representing a command that was executed \fInumber\fR
+commands previously. For example, \fB-1\fR is the previous command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring\fR\fR
+.ad
+.RS 11n
+.rt  
+\fIstring\fR indicates the most recently entered command that begins with
+\fIstring\fR. \fIstring\fR should not contain an \fB=\fR.
+.RE
+
+.sp
+.LP
+If \fIfirst\fR is omitted, the previous command is used, unless \fB-l\fR is
+specified, in which case it defaults to \fB-16\fR and last defaults to
+\fB-1\fR.
+.sp
+.LP
+If \fIfirst\fR is specified and \fIlast\fR is omitted, then \fIlast\fR defaults
+to \fIfirst\fR unless \fB-l\fR is specified in which case it defaults to
+\fB-1\fR.
+.sp
+.LP
+If no editor is specified, then the editor specified by the \fBHISTEDIT\fR
+variable is used if set, or the \fBFCEDIT\fR variable is used if set,
+otherwise, \fBed\fR is used.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-e\fR \fIeditor\fR\fR
+.ad
+.RS 13n
+.rt  
+Uses the editor named by \fIeditor\fR to edit the commands. The \fIeditor\fR
+string is a utility name, subject to search via the \fBPATH\fR variable. The
+value in the \fBFCEDIT\fR variable is used as a default when \fB-e\fR is not
+specified. If \fBFCEDIT\fR is null or unset, \fBed\fR is used as the editor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 13n
+.rt  
+(The letter ell.) Lists the commands rather than invoking an editor on them.
+The commands is written in the sequence indicated by the \fIfirst\fR and
+\fIlast\fR operands, as affected by \fB-r\fR, with each command preceded by the
+command number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 13n
+.rt  
+Suppresses command numbers when listing with \fB-l\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 13n
+.rt  
+Reverses the order of the commands listed (with \fB-l\fR \fB)\fR or edited
+(with neither \fB-l\fR nor \fB-s\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+Re-executes the command without invoking an editor.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+\fBksh93\fR supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIeditor\fR\fR
+.ad
+.RS 13n
+.rt  
+Specify the editor to use to edit the history command. A value of \fB-\fR for
+\fIeditor\fR is equivalent to specifying the \fB-s\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 13n
+.rt  
+List the commands rather than editing and re-executing them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fInum\fR\fR
+.ad
+.RS 13n
+.rt  
+Start at \fInum\fR commands back.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 13n
+.rt  
+Suppress the command numbers when the commands are listed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 13n
+.rt  
+Write the result of history expansion for each operand to standard output. All
+other options are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 13n
+.rt  
+Reverse the order of the commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+Re-execute the command without invoking an editor. In this case an operand of
+the form \fIold=new\fR can be specified to change the first occurrence of the
+string \fIold\fR in the command to \fInew\fR before re-executing the command.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfirst\fR\fR
+.ad
+.br
+.na
+\fB\fIlast\fR\fR
+.ad
+.RS 9n
+.rt  
+Selects the commands to list or edit. The number of previous commands that can
+be accessed is determined by the value of the \fBHISTSIZE\fR variable. The
+value of \fIfirst\fR or \fIlast\fR or both is one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB[\fB+\fR]\fInumber\fR\fR
+.ad
+.RS 14n
+.rt  
+A positive number representing a command number. Command numbers can be
+displayed with the \fB-l\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fInumber\fR\fR
+.ad
+.RS 14n
+.rt  
+A negative decimal number representing the command that was executed
+\fInumber\fR of commands previously. For example, \fB\(mi1\fR is the
+immediately previous command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring\fR\fR
+.ad
+.RS 14n
+.rt  
+A string indicating the most recently entered command that begins with that
+string. If the \fIold=new\fR operand is not also specified with \fB-s\fR, the
+string form of the \fIfirst\fR operand cannot contain an embedded equal sign.
+.sp
+When the synopsis form with \fB-s\fR is used, if \fIfirst\fR is omitted, the
+previous command is used.
+.sp
+For the synopsis forms without \fB-s\fR \fB:\fR
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIlast\fR is omitted, \fIlast\fR defaults to the previous command when
+\fB-l\fR is specified; otherwise, it defaults to \fIfirst\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIfirst\fR and \fIlast\fR are both omitted, the previous 16 commands is
+listed or the previous single command is edited (based on the \fB-l\fR option).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIfirst\fR and \fIlast\fR are both present, all of the commands from
+\fIfirst\fR to \fIlast\fR is edited (without \fB-l\fR \fB)\fR or listed (with
+\fB-l\fR). Editing multiple commands is accomplished by presenting to the
+editor all of the commands at one time, each command starting on a new line. If
+\fIfirst\fR represents a newer command than \fIlast\fR, the commands is listed
+or edited in reverse sequence, equivalent to using \fB-r\fR. For example, the
+following commands on the first line are equivalent to the corresponding
+commands on the second:
+.sp
+.in +2
+.nf
+fc -r 10 20     fc    30 40 
+fc   20 10      fc -r 40 30
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When a range of commands is used, it is not be an error to specify \fIfirst\fR
+or \fIlast\fR values that are not in the history list. \fBfc\fR substitutes the
+value representing the oldest or newest command in the list, as appropriate.
+For example, if there are only ten commands in the history list, numbered 1 to
+10:
+.sp
+.in +2
+.nf
+fc -l 
+fc 1 99
+.fi
+.in -2
+
+lists and edits, respectively, all ten commands.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIold=new\fR\fR
+.ad
+.RS 14n
+.rt  
+Replace the first occurrence of string \fIold\fR in the commands to be
+reexecuted by the string \fInew\fR.
+.RE
+
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+When the \fB-l\fR option is used to list commands, the format of each command
+in the list is as follows:
+.sp
+.in +2
+.nf
+\fB"%d\et%s\en", <\fR\fIline number\fR\fB>, <\fR\fIcommand\fR\fB>\fR
+.fi
+.in -2
+
+.sp
+.LP
+If both the \fB-l\fR and \fB-n\fR options are specified, the format of each
+command is:
+.sp
+.in +2
+.nf
+\fB"\et%s\en", <\fR\fIcommand\fR\fB>\fR
+.fi
+.in -2
+
+.sp
+.LP
+If the \fIcommand\fR\fIcommand\fR consists of more than one line, the lines
+after the first are displayed as:
+.sp
+.in +2
+.nf
+\fB"\et%s\en", <\fR\fIcontinued-command\fR\fB>\fR
+.fi
+.in -2
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing history and fc
+.sp
+.in +2
+.nf
+             csh                                     ksh
+
+% history                               $ fc -l
+  1   cd /etc                             1   cd /etc
+  2   vi passwd                           2   vi passwd
+  3   date                                3   date
+  4   cd                                  4   cd
+  5   du .                                5   du .
+  6   ls -t                               6   ls -t
+  7   history                             7   fc -l
+
+% !d                                    $ fc -e - d
+  du .                                    du .
+  262   ./SCCS                            262   ./SCCS
+  336   .                                 336   .
+
+% !da                                   $ fc -e - da
+  Thu Jul 21 17:29:56 PDT 1994            Thu Jul 21 17:29:56 PDT 1994
+
+%                                       $ alias \e!='fc -e -'
+
+% !!                                    $ !
+  date                                    alias ='fc -e -'
+  Thu Jul 21 17:29:56 PDT 1994
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBfc\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
+\fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFCEDIT\fR\fR
+.ad
+.RS 12n
+.rt  
+This variable, when expanded by the shell, determines the default value for the
+\fB-e\fR \fIeditor\fR option's \fIeditor\fR option-argument. If \fBFCEDIT\fR is
+null or unset, \fBed\fR(1) is used as the editor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHISTFILE\fR\fR
+.ad
+.RS 12n
+.rt  
+Determine a pathname naming a command history file. If the \fBHISTFILE\fR
+variable is not set, the shell can attempt to access or create a file
+\fB\&.sh_history\fR in the user's home directory. If the shell cannot obtain
+both read and write access to, or create, the history file, it uses an
+unspecified mechanism that allows the history to operate properly. (References
+to history ``file'' in this section are understood to mean this unspecified
+mechanism in such cases.) \fBfc\fR can choose to access this variable only when
+initializing the history file; this initialization occurs when \fBfc\fR or
+\fBsh\fR first attempt to retrieve entries from, or add entries to, the file,
+as the result of commands issued by the user, the file named by the \fBENV\fR
+variable, or a system startup file such as \fB/etc/profile\fR. (The
+initialization process for the history file can be dependent on the system
+startup files, in that they can contain commands that effectively preempts the
+user's settings of \fBHISTFILE\fR and \fBHISTSIZE\fR. For example, function
+definition commands are recorded in the history file, unless the \fBset\fR
+\fB-o\fR \fBnolog\fR option is set. If the system administrator includes
+function definitions in some system startup file called before the \fBENV\fR
+file, the history file is initialized before the user gets a chance to
+influence its characteristics.) The variable \fBHISTFILE\fR is accessed
+initially when the shell is invoked. Any changes to \fBHISTFILE\fR does not
+take effect until another shell is invoked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHISTSIZE\fR\fR
+.ad
+.RS 12n
+.rt  
+Determine a decimal number representing the limit to the number of previous
+commands that are accessible. If this variable is unset, an unspecified default
+greater than or equal to 128 are used. The variable \fBHISTSIZE\fR is accessed
+initially when the shell is invoked. Any changes to \fBHISTSIZE\fR does not
+take effect until another shell is invoked.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion of the listing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.LP
+Otherwise, the exit status is that of the commands executed by \fBfc\fR or
+\fBhist\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBed\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBset\fR(1),
+\fBset\fR(1F), \fBsh\fR(1), \fBsource\fR(1), \fBattributes\fR(5),
+\fBenviron\fR(5)

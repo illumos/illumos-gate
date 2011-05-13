@@ -1,0 +1,170 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH hsearch 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+hsearch, hcreate, hdestroy \- manage hash search tables
+.SH SYNOPSIS
+.LP
+.nf
+#include <search.h>
+
+\fBENTRY *\fR\fBhsearch\fR(\fBENTRY\fR \fIitem\fR, \fBACTION\fR \fIaction\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBhcreate\fR(\fBsize_t\fR \fImekments\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBhdestroy\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBhsearch()\fR function is a hash-table search routine generalized from
+Knuth (6.4) Algorithm D. It returns a pointer into a hash table indicating the
+location at which an entry can be found. The comparison function used by
+\fBhsearch()\fR is \fBstrcmp()\fR (see \fBstring\fR(3C)). The \fIitem\fR
+argument is a structure of type \fBENTRY\fR (defined in the  \fB<search.h>\fR
+header) containing two pointers: \fBitem.key\fR points to the comparison key,
+and \fBitem.data\fR points to any other data to be associated with that key.
+(Pointers to types other than void should be cast to pointer-to-void.) The
+\fIaction\fR argument is a member of an enumeration type \fBACTION\fR (defined
+in \fB<search.h>\fR) indicating the disposition of the entry if it cannot be
+found in the table. \fBENTER\fR indicates that the item should be inserted in
+the table at an appropriate point. Given a duplicate of an existing item, the
+new item is not entered and \fBhsearch()\fR returns a pointer to the existing
+item. \fBFIND\fR indicates that no entry should be made. Unsuccessful
+resolution is indicated by the return of a null pointer.
+.sp
+.LP
+The \fBhcreate()\fR function allocates sufficient space for the table, and must
+be called before \fBhsearch()\fR is used.  The \fInel\fR argument is an
+estimate of the maximum number of entries that the table will contain. This
+number may be adjusted upward by the algorithm in order to obtain certain
+mathematically favorable circumstances.
+.sp
+.LP
+The \fBhdestroy()\fR function destroys the search table, and may be followed by
+another call to \fBhcreate()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBhsearch()\fR function returns a null pointer if either the action is
+\fBFIND\fR and the item could not be found or the action is \fBENTER\fR and the
+table is full.
+.sp
+.LP
+The \fBhcreate()\fR function returns \fB0\fR if it cannot allocate sufficient
+space for the table.
+.SH USAGE
+.sp
+.LP
+The \fBhsearch()\fR and  \fBhcreate()\fR functions use \fBmalloc\fR(3C) to
+allocate space.
+.sp
+.LP
+Only one hash search table may be active at any given time.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample to read in strings.
+.sp
+.LP
+The following example will read in strings followed by two numbers and store
+them in a hash table, discarding duplicates. It will then read in strings and
+find the matching entry in the hash table and print it.
+
+.sp
+.in +2
+.nf
+\fB#include <stdio.h>
+#include <search.h>
+#include <string.h>
+#include <stdlib.h>
+
+struct info {              /* this is the info stored in table */
+        int age, room;     /* other than the key */
+};
+#define NUM_EMPL    5000   /* # of elements in search table */
+main( )
+{
+                        /* space to store strings */
+        char string_space[NUM_EMPL*20];
+                        /* space to store employee info */
+        struct info info_space[NUM_EMPL];
+                        /* next avail space in string_space */
+        char *str_ptr = string_space;
+                        /* next avail space in info_space */
+        struct info *info_ptr = info_space;
+        ENTRY item, *found_item;
+                        /* name to look for in table */
+        char name_to_find[30];
+        int i = 0;
+
+                        /* create table */
+        (void) hcreate(NUM_EMPL);
+        while (scanf("%s%d%d", str_ptr, &info_ptr\(mi>age,
+               &info_ptr\(mi>room) != EOF && i++ < NUM_EMPL) {
+                   /* put info in structure, and structure in item */
+                item.key = str_ptr;
+                item.data = (void *)info_ptr;
+                str_ptr += strlen(str_ptr) + 1;
+                info_ptr++;
+                        /* put item into table */
+                (void) hsearch(item, ENTER);
+        }
+
+                        /* access table */
+        item.key = name_to_find;
+        while (scanf("%s", item.key) != EOF) {
+            if ((found_item = hsearch(item, FIND)) != NULL) {
+                        /* if item is in the table */
+                (void)printf("found %s, age = %d, room = %d\en",
+                        found_item\(mi>key,
+                        ((struct info *)found_item\(mi>data)\(mi>age,
+                        ((struct info *)found_item\(mi>data)\(mi>room);
+            } else {
+                (void)printf("no such employee %s\en",
+                        name_to_find)
+            }
+        }
+        return 0;
+}\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbsearch\fR(3C), \fBlsearch\fR(3C), \fBmalloc\fR(3C), \fBstring\fR(3C),
+\fBtsearch\fR(3C), \fBmalloc\fR(3MALLOC), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.sp
+.LP
+\fIThe Art of Computer Programming, Volume 3, Sorting and Searching by Donald
+E. Knuth, published by Addison-Wesley Publishing Company, 1973.\fR

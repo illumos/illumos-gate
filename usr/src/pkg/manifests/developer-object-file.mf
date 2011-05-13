@@ -43,6 +43,7 @@ dir path=usr/lib/elfedit/$(ARCH64)
 dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/ccs
+dir path=usr/share/man/man1
 file path=usr/bin/$(ARCH64)/ar mode=0555
 file path=usr/bin/$(ARCH64)/dump mode=0555
 file path=usr/bin/$(ARCH64)/elfdump mode=0555
@@ -98,6 +99,26 @@ file path=usr/share/lib/ccs/nceucform
 file path=usr/share/lib/ccs/ncform
 file path=usr/share/lib/ccs/nrform
 file path=usr/share/lib/ccs/yaccpar
+file path=usr/share/man/man1/ar.1
+file path=usr/share/man/man1/dis.1
+file path=usr/share/man/man1/dump.1
+file path=usr/share/man/man1/elfdump.1
+file path=usr/share/man/man1/elfedit.1
+file path=usr/share/man/man1/gprof.1
+file path=usr/share/man/man1/lari.1
+file path=usr/share/man/man1/lex.1
+file path=usr/share/man/man1/lorder.1
+file path=usr/share/man/man1/mcs.1
+file path=usr/share/man/man1/nm.1
+file path=usr/share/man/man1/prof.1
+file path=usr/share/man/man1/ranlib.1
+file path=usr/share/man/man1/rpcgen.1
+file path=usr/share/man/man1/size.1
+file path=usr/share/man/man1/strip.1
+file path=usr/share/man/man1/symorder.1
+file path=usr/share/man/man1/tsort.1
+file path=usr/share/man/man1/unifdef.1
+file path=usr/share/man/man1/yacc.1
 hardlink path=usr/bin/$(ARCH64)/strip target=../../bin/$(ARCH64)/mcs
 hardlink path=usr/bin/strip target=../bin/mcs
 legacy pkg=SUNWbtool \

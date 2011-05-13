@@ -1,0 +1,78 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" Portions of this manual page are derived from documentation obtained from linuxmanpages.com
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dirfd 3C "24 Oct 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+dirfd \- get directory stream file descriptor
+.SH SYNOPSIS
+.LP
+.nf
+#include <dirent.h>
+
+\fBint\fR \fBdirfd\fR(\fBDIR *\fR\fIdir\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdirfd()\fR function returns the file descriptor associated with the
+directory stream \fIdir\fR.
+.sp
+.LP
+This file descriptor is the one used internally by the directory stream
+operations. See \fBopendir\fR(3C), \fBclosedir\fR(3C), \fBreaddir\fR(3C),
+\fBrewinddir\fR(3C), \fBseekdir\fR(3C), \fBtelldir\fR(3C).  The file descriptor
+is automatically closed when \fBclosedir()\fR is called for the directory
+stream \fIdir\fR or when one of the \fBexec\fR functions is called.  See
+\fBexec\fR(2).
+.sp
+.LP
+The file descriptor can safely be used only by functions that do not depend on
+or alter the file position, such as \fBfstat\fR(2) and \fBfchdir\fR(2).
+Closing the file descriptor with \fBclose\fR(2) or modifying the file position
+by means other than the directory stream operations listed above causes
+undefined behavior to occur when one of the directory stream operations is
+subsequently called with the directory stream \fIdir\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBdirfd()\fR function returns an open file
+descriptor for the directory associated with the directory stream \fIdir\fR.
+.SH ERRORS
+.sp
+.LP
+There are no defined error returns.  Passing an invalid directory stream as an
+argument to the \fBdirfd()\fR function results in undefined behavior.
+.SH USAGE
+.sp
+.LP
+The \fBdirfd()\fR function is intended to be used to obtain a file descriptor
+for use with the \fBfchdir()\fR function.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBexec\fR(2), \fBfchdir\fR(2), \fBfstat\fR(2),
+\fBclosedir\fR(3C), \fBopendir\fR(3C), \fBreaddir\fR(3C), \fBrewinddir\fR(3C),
+\fBseekdir\fR(3C), \fBtelldir\fR(3C), \fBattributes\fR(5)

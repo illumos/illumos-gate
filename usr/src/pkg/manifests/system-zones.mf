@@ -53,6 +53,11 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man5
+dir path=usr/share/man/man7d
 driver name=zcons
 file path=etc/zones/SUNWblank.xml mode=0444
 file path=etc/zones/SUNWdefault.xml mode=0444
@@ -91,6 +96,13 @@ file path=usr/sbin/zonecfg mode=0555
 file path=usr/share/lib/xml/dtd/brand.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zone_platform.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zonecfg.dtd.1
+file path=usr/share/man/man1/zlogin.1
+file path=usr/share/man/man1m/zoneadm.1m
+file path=usr/share/man/man1m/zoneadmd.1m
+file path=usr/share/man/man1m/zonecfg.1m
+file path=usr/share/man/man5/brands.5
+file path=usr/share/man/man5/zones.5
+file path=usr/share/man/man7d/zcons.7d
 legacy pkg=SUNWzoner desc="Solaris Zones Configuration Files" \
     name="Solaris Zones (Root)"
 legacy pkg=SUNWzoneu desc="Solaris Zones Configuration and Administration" \

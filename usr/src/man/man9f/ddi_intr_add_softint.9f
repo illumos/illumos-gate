@@ -1,0 +1,575 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_intr_add_softint 9F "16 Oct 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_intr_add_softint, ddi_intr_remove_softint, ddi_intr_trigger_softint,
+ddi_intr_get_softint_pri, ddi_intr_set_softint_pri \- software interrupt
+handling routines
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_intr_add_softint\fR(\fBdev_info_t *\fR\fIdip\fR, 
+     \fBddi_softint_handle_t *\fR\fIh\fR, \fBint\fR \fIsoft_pri\fR, 
+     \fBddi_intr_handler_t\fR \fIhandler\fR, \fBvoid *\fR\fIarg1\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_trigger_softint\fR(\fBddi_softint_handle_t\fR \fIh\fR,
+      \fBvoid *\fR\fIarg2\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_remove_softint\fR(\fBddi_softint_handle_t\fR \fIh\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_get_softint_pri\fR(\fBddi_softint_handle_t\fR \fIh\fR,
+      \fBuint *\fR\fIsoft_prip\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_set_softint_pri\fR(\fBddi_softint_handle_t\fR \fIh\fR,
+      \fBuint\fR \fIsoft_pri\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+\fBddi_intr_add_softint()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to a \fBdev_info\fR structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the DDI soft interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsoft_pri\fR\fR
+.ad
+.RS 12n
+.rt  
+Priority to associate with a soft interrupt
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandler\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to soft interrupt handler
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg1\fR\fR
+.ad
+.RS 12n
+.rt  
+Argument for the soft interrupt handler
+.RE
+
+.sp
+.LP
+\fBddi_intr_trigger_softint()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 8n
+.rt  
+DDI soft interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg2\fR\fR
+.ad
+.RS 8n
+.rt  
+Additional argument for the soft interrupt handler
+.RE
+
+.sp
+.LP
+\fBddi_intr_remove_softint()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 5n
+.rt  
+DDI soft interrupt handle
+.RE
+
+.sp
+.LP
+\fBddi_intr_get_softint_pri()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 13n
+.rt  
+DDI soft interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsoft_prip\fR\fR
+.ad
+.RS 13n
+.rt  
+Soft interrupt priority of the handle
+.RE
+
+.sp
+.LP
+\fBddi_intr_set_softint_pri()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 13n
+.rt  
+DDI soft interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsoft_prip\fR\fR
+.ad
+.RS 13n
+.rt  
+Soft interrupt priority of the handle
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_intr_add_softint()\fR function adds the soft interrupt handler given
+by the \fIhandler\fR argument \fIarg1\fR. The \fIhandler\fR runs at the soft
+interrupt priority given by the \fIsoft_pri\fR argument.
+.sp
+.LP
+The value returned in the location pointed at by \fIh\fR is the soft interrupt
+handle. This value is used in later calls to \fBddi_intr_remove_softint()\fR,
+\fBddi_intr_trigger_softint()\fR and \fBddi_intr_set_softint_pri()\fR.
+.sp
+.LP
+The software priority argument \fIsoft_pri\fR is a relative priority value
+within the range of \fBDDI_INTR_SOFTPRI_MIN\fR and \fBDDI_INTR_SOFTPRI_MAX\fR.
+If the driver does not know what priority to use, the default \fIsoft_pri\fR
+value of \fBDDI_INTR_SOFTPRI_DEFAULT\fR could be specified. The default value
+is the lowest possible soft interrupt priority value.
+.sp
+.LP
+The \fIsoft_pri\fR argument contains the value needed to initialize the lock
+associated with a soft interrupt. See \fBmutex_init\fR(9F) and
+\fBrw_init\fR(9F). The handler cannot be triggered until the lock is
+initiatized.
+.sp
+.LP
+The \fBddi_intr_remove_softint()\fR function removes the handler for the soft
+interrupt identified by the interrupt handle \fIh\fR argument. Once removed,
+the soft interrupt can no longer be triggered, although any trigger calls in
+progress can still be delivered to the handler.
+.sp
+.LP
+Drivers must remove any soft interrupt handlers before allowing the system to
+unload the driver. Otherwise, kernel resource leaks might occur.
+.sp
+.LP
+The \fBddi_intr_trigger_softint()\fR function triggers the soft interrupt
+specified by the interrupt handler \fIh\fR argument. A driver may optionally
+specify an additional argument \fIarg2\fR that is passed to the soft interrupt
+handler. Subsequent \fBddi_intr_trigger_softint()\fR events, along with
+\fIarg2\fR, will be dropped until the one pending is serviced and returns the
+error code \fBDDI_EPENDING\fR.
+.sp
+.LP
+The routine \fIhandler\fR, with the \fIarg1\fR and \fIarg2\fR arguments, is
+called upon the receipt of a software interrupt. These were registered through
+a prior call to \fBddi_intr_add_softint()\fR. Software interrupt handlers must
+not assume that they have work to do when they run. Like hardware interrupt
+handlers, they may run because a soft interrupt has occurred for some other
+reason. For example, another driver may have triggered a soft interrupt at the
+same level. Before triggering the soft interrupt, the driver must indicate to
+the soft interrupt handler that it has work to do. This is usually done by
+setting a flag in the state structure. The routine \fIhandler\fR checks this
+flag, reached through \fIarg1\fR and \fIarg2\fR, to determine if it should
+claim the interrupt and do its work.
+.sp
+.LP
+The interrupt handler must return \fBDDI_INTR_CLAIMED\fR if the interrupt was
+claimed and \fBDDI_INTR_UNCLAIMED\fR otherwise.
+.sp
+.LP
+The \fBddi_intr_get_softint_pri()\fR function retrieves the soft interrupt
+priority, a small integer value, associated with the soft interrupt handle. The
+handle is defined by the \fIh\fR argument, and the priority returned is in the
+value of the integer pointed to by the \fIsoft_prip\fR argument.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_intr_add_softint()\fR, \fBddi_intr_remove_softint()\fR,
+\fBddi_intr_trigger_softint()\fR, \fBddi_intr_get_softint_pri()\fR,
+\fBddi_intr_set_softint_pri()\fR functions return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 16n
+.rt  
+On success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EAGAIN\fR\fR
+.ad
+.RS 16n
+.rt  
+On encountering internal error regarding currently unavailable resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+On encountering invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 16n
+.rt  
+On any implementation specific failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EPENDING\fR\fR
+.ad
+.RS 16n
+.rt  
+On encountering a previously triggered softint event that is pending.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_intr_add_softint()\fR, \fBddi_intr_remove_softint()\fR,
+\fBddi_intr_trigger_softint()\fR, \fBddi_intr_get_softint_pri()\fR,
+\fBddi_intr_set_softint_pri()\fR functions can be called from either user or
+kernel non-interrupt context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDevice using high-level interrupts
+.sp
+.LP
+In the following example, the device uses high-level interrupts. High-level
+interrupts are those that interrupt at the level of the scheduler and above.
+High-level interrupts must be handled without using system services that
+manipulate thread or process states, because these interrupts are not blocked
+by the scheduler. In addition, high-level interrupt handlers must take care to
+do a minimum of work because they are not preemptable. See
+\fBddi_intr_get_hilevel_pri\fR(9F).
+
+.sp
+.LP
+In the example, the high-level interrupt routine minimally services the device,
+and enqueues the data for later processing by the soft interrupt handler. If
+the soft interrupt handler is not currently running, the high-level interrupt
+routine triggers a soft interrupt so the soft interrupt handler can process the
+data. Once running, the soft interrupt handler processes all the enqueued data
+before returning.
+
+.sp
+.LP
+The state structure contains two mutexes. The high-level mutex is used to
+protect data shared between the high-level interrupt handler and the soft
+interrupt handler. The low-level mutex is used to protect the rest of the
+driver from the soft interrupt handler.
+
+.sp
+.in +2
+.nf
+struct xxstate {
+  ...
+  ddi_intr_handle_t       int_hdl;
+  int                     high_pri;
+  kmutex_t                high_mutex;
+  ddi_softint_handle_t    soft_hdl;
+  int                     low_soft_pri;
+  kmutex_t                low_mutex;
+  int                     softint_running;
+  ...
+};
+
+struct xxstate *xsp;
+static uint_t xxsoftint_handler(void *, void *);
+static uint_t xxhighintr(void *, void *);
+\&...
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRSample \fBattach()\fR routine
+.sp
+.LP
+The following code fragment would usually appear in the driver's
+\fBattach\fR(9E) routine. \fBddi_intr_add_handler\fR(9F) is used to add the
+high-level interrupt handler and \fBddi_intr_add_softint()\fR is used to add
+the low-level interrupt routine.
+
+.sp
+.in +2
+.nf
+static uint_t
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+   int             types;
+   int             *actual;
+   int             nintrs;
+   struct xxstate  *xsp;
+   ...
+
+   (void) ddi_intr_get_supported_types(dip, &types);
+   (void) ddi_intr_get_nintrs(dip< DDI_INTR_TYPE_FIXED, *nintrs);
+   (void) ddi_intr_alloc(dip, &xsp->int_hdl, DDI_INTR_TYPE_FIXED,
+       1, nintrs, *actual, 0);
+
+   /* initialize high-level mutex */
+   (void) ddi_intr_get_pri(xsp->int_hdl, &>high_pri);
+   mutex_init(&xsp->high_mutex, NULL, MUTEX_DRIVER,
+       DDI_INTR_PRI(xsp->high_pri));
+
+   /* Ensure that this is a hi-level interrupt */
+   if (ddi_intr_get_hilevel_pri(h) != DDI_SUCCESS) {
+           /* cleanup */
+           return (DDI_FAILURE); /* fail attach */
+   }
+
+   /* add high-level routine - xxhighintr() */
+   if (ddi_intr_add_handler(xsp->int_hdl, xxhighintr,
+       arg1, NULL) != DDI_SUCCESS) {
+           /* cleanup */
+           return (DDI_FAILURE); /* fail attach */
+   }
+
+   /* Enable high-level routine - xxhighintr() */
+   if (ddi_intr_enable(xsp->int_hdl) != DDI_SUCCESS) {
+           /* cleanup */
+           return (DDI_FAILURE); /* fail attach */
+   }
+
+   /* Enable soft interrupts */
+   xsp->low_soft_pri = DDI_INTR_SOFTPRI_MIN;
+   if (ddi_intr_add_softint(dip, &xsp>soft_hdl,
+       xsp->low_soft_pri, xxsoftint_handler, arg1) != DDI_SUCCESS) {
+           /* clean up */
+           return (DDI_FAILURE); /* fail attach */
+   }
+
+   /* initialize low-level mutex */
+   mutex_init(&xsp->low_mutex, NULL, MUTEX_DRIVER,
+       DDI_INTR_PRI(xsp->low_soft_pri));
+
+   ...
+}
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRHigh-level interrupt routine
+.sp
+.LP
+The next code fragment represents the high-level interrupt routine. The
+high-level interrupt routine minimally services the device and enqueues the
+data for later processing by the soft interrupt routine. If the soft interrupt
+routine is not already running, \fBddi_intr_trigger_softint()\fR is called to
+start the routine. The soft interrupt routine will run until there is no more
+data on the queue.
+
+.sp
+.in +2
+.nf
+static uint_t
+xxhighintr(void *arg1, void *arg2)
+{
+   struct xxstate *xsp = (struct xxstate *)arg1;
+   int need_softint;
+   ...
+   mutex_enter(&xsp->high_mutex);
+   /*
+   * Verify this device generated the interrupt
+   * and disable the device interrupt.
+   * Enqueue data for xxsoftint_handler() processing.
+   */
+
+   /* is xxsoftint_handler() already running ? */
+   need_softint = (xsp->softint_running) ? 0 : 1;
+   mutex_exit(&xsp->high_mutex);
+
+   /* read-only access to xsp->id, no mutex needed */
+   if (xsp->soft_hdl && need_softint)
+           ddi_intr_trigger_softint(xsp->soft_hdl, arg2);
+   ...
+   return (DDI_INTR_CLAIMED);
+}
+
+
+static uint_t
+xxsoftint_handler(void *arg1, void *arg2)
+{
+   struct xxstate *xsp = (struct xxstate *)arg1;
+   ...
+   mutex_enter(&xsp->low_mutex);
+   mutex_enter(&xsp->high_mutex);
+
+   /* verify there is work to do */
+   if (work queue empty || xsp->softint_running )  {
+           mutex_exit(&xsp->high_mutex);
+           mutex_exit(&xsp->low_mutex);
+           return (DDI_INTR_UNCLAIMED);
+   }
+
+   xsp->softint_running = 1;
+
+   while ( data on queue )  {
+           ASSERT(mutex_owned(&xsp->high_mutex));
+           /* de-queue data */
+           mutex_exit(&xsp->high_mutex);
+
+           /* Process data on queue */
+           mutex_enter(&xsp->high_mutex);
+   }
+
+   xsp->softint_running = 0;
+   mutex_exit(&xsp->high_mutex);
+   mutex_exit(&xsp->low_mutex);
+   return (DDI_INTR_CLAIMED);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBattach\fR(9E), \fBddi_intr_alloc\fR(9F),
+\fBddi_intr_free\fR(9F), \fBddi_intr_get_hilevel_pri\fR(9F),
+\fBmutex_init\fR(9F), \fBrw_init\fR(9F), \fBrwlock\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Consumers of these interfaces should verify that the return value is not equal
+to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
+inconsistent behavior among platforms.
+.sp
+.LP
+The \fBddi_intr_add_softint()\fR may not be used to add the same software
+interrupt handler more than once. This is true even if a different value is
+used for \fIarg1\fR in each of the calls to \fBddi_intr_add_softint()\fR.
+Instead, the argument passed to the interrupt handler should indicate what
+service(s) the interrupt handler should perform. For example, the argument
+could be a pointer to the soft state structure of the device that could contain
+a \fBwhich_service\fR field that the handler examines. The driver must set this
+field to the appropriate value before calling \fBddi_intr_trigger_softint()\fR.
+.sp
+.LP
+Every time a modifiable valid second argument, \fIarg2\fR, is provided when
+\fBddi_intr_trigger_softint()\fR is invoked, the DDI framework saves \fIarg2\fR
+internally and passes it to the interrupt handler \fIhandler\fR.
+.sp
+.LP
+A call to \fBddi_intr_set_softint_pri()\fR could fail if a previously scheduled
+soft interrupt trigger is still pending.

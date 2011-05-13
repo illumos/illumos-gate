@@ -2169,9 +2169,14 @@ out:
 	 * all of memory, shouldn't try to bind more than it can transfer, and
 	 * the buffer shouldn't require more cookies than the driver/device can
 	 * handle [sgllen]).
+	 *
+	 * Note that negative values of dma_attr_sgllen are supposed
+	 * to mean unlimited, but we just cast them to mean a
+	 * "ridiculous large limit".  This saves some extra checks on
+	 * hot paths.
 	 */
 	if ((sinfo->si_copybuf_req == 0) &&
-	    (sinfo->si_sgl_size <= attr->dma_attr_sgllen) &&
+	    (sinfo->si_sgl_size <= (unsigned)attr->dma_attr_sgllen) &&
 	    (dmao->dmao_size < dma->dp_maxxfer)) {
 fast:
 		/*
@@ -2699,7 +2704,7 @@ rootnex_valid_alloc_parms(ddi_dma_attr_t *attr, uint_t maxsegmentsize)
 
 	if ((attr->dma_attr_seg & MMU_PAGEOFFSET) != MMU_PAGEOFFSET ||
 	    MMU_PAGESIZE & (attr->dma_attr_granular - 1) ||
-	    attr->dma_attr_sgllen <= 0) {
+	    attr->dma_attr_sgllen == 0) {
 		return (DDI_DMA_BADATTR);
 	}
 
@@ -3292,7 +3297,7 @@ rootnex_bind_slowpath(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	 */
 	if ((dma->dp_copybuf_size < sinfo->si_copybuf_req) ||
 	    (dmao->dmao_size > dma->dp_maxxfer) ||
-	    (attr->dma_attr_sgllen < sinfo->si_sgl_size)) {
+	    ((unsigned)attr->dma_attr_sgllen < sinfo->si_sgl_size)) {
 		dma->dp_partial_required = B_TRUE;
 		if (attr->dma_attr_granular != 1) {
 			dma->dp_trim_required = B_TRUE;
@@ -3388,7 +3393,8 @@ rootnex_bind_slowpath(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 			    dma->dp_dip);
 
 		/* if the cookie cnt == max sgllen, move to the next window */
-		} else if (window->wd_cookie_cnt >= attr->dma_attr_sgllen) {
+		} else if (window->wd_cookie_cnt >=
+		    (unsigned)attr->dma_attr_sgllen) {
 			partial = B_TRUE;
 			ASSERT(window->wd_cookie_cnt == attr->dma_attr_sgllen);
 			e = rootnex_sgllen_window_boundary(hp, dma, &window,
@@ -3532,11 +3538,7 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	 */
 	lattr = *attr;
 	lattr.dma_attr_align = MMU_PAGESIZE;
-	/*
-	 * this should be < 0 to indicate no limit, but due to a bug in
-	 * the rootnex, we'll set it to the maximum positive int.
-	 */
-	lattr.dma_attr_sgllen = 0x7fffffff;
+	lattr.dma_attr_sgllen = -1;	/* no limit */
 	/*
 	 * if we're using the copy buffer because of seg, use that for our
 	 * upper address limit.
@@ -3625,7 +3627,7 @@ rootnex_setup_windows(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		 * be (cookie count / cookies count H/W supports minus 1[for
 		 * trim]) plus one for remainder.
 		 */
-		if (attr->dma_attr_sgllen < sinfo->si_sgl_size) {
+		if ((unsigned)attr->dma_attr_sgllen < sinfo->si_sgl_size) {
 			sglwin = (sinfo->si_sgl_size /
 			    (attr->dma_attr_sgllen - 1)) + 1;
 		} else {

@@ -1,0 +1,131 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_modrdn 3LDAP "22 Octo 2001" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_modrdn, ldap_modrdn_s, ldap_modrdn2, ldap_modrdn2_s, ldap_rename,
+ldap_rename_s \- modify LDAP entry RDN
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR...\fB-l\fR ldap [ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_modrdn\fR(\fBLDAP\fR \fI*ld\fR, \fBconst char\fR \fI*dn\fR, \fBconst char\fR \fI*newrdn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_modrdn_s\fR(\fBLDAP\fR \fI*ld\fR, \fBconst char\fR \fI*dn\fR, \fBconst char\fR \fI*newrdn\fR,
+     \fBint\fR \fIdeleteoldrdn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_modrdn2\fR(\fBLDAP\fR \fI*ld\fR, \fBconst char\fR \fI*dn\fR, \fBconst char\fR \fI*newrdn\fR,
+     \fBint\fR \fIdeleteoldrdn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_modrdn2_s\fR(\fBLDAP\fR \fI*ld\fR, \fBconst char\fR \fI*dn\fR,
+     \fBconst char\fR \fI*newrdn\fR, \fBint\fR \fIdeleteoldrdn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_rename\fR(\fBLDAP\fR \fI*ld\fR, \fBconst char\fR \fI*dn\fR, \fBconst char\fR \fI*newrdn\fR,
+     \fBconst char\fR \fI*newparent\fR, \fBint\fR \fIdeleteoldrdn\fR,
+     \fBLDAPControl\fR \fI**serverctrls\fR, \fBLDAPControl\fR \fI**clientctrls\fR,
+     \fBint\fR \fI*msgidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_rename_s\fR(\fBLDAP\fR \fI*ld\fR, \fBconst char\fR \fI*dn\fR, \fBconst char\fR \fI*newrdn\fR,
+     \fBconst char\fR \fI*newparent\fR,\ \fBconst int\fR \fIdeleteoldrdn\fR,
+     \fBLDAPControl\fR \fI**serverctrls\fR,\fBLDAPControl\fR \fI**clientctrls\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldap_modrdn()\fR and \fBldap_modrdn_s()\fR functions perform an LDAP
+modify RDN (Relative Distinguished Name) operation.  They both take \fIdn\fR,
+the DN (Distinguished Name) of the entry whose RDN is to be changed, and
+\fInewrdn\fR, the new RDN, to give the entry. The old RDN of the entry is never
+kept as an attribute of the entry. \fBldap_modrdn()\fR is asynchronous. It
+return the message id of the operation it initiates. \fBldap_modrdn_s()\fR is
+synchronous. It returns the LDAP error code that indicates the success or
+failure of the operation.
+.sp
+.LP
+The \fBldap_modrdn2()\fR and \fBldap_modrdn2_s()\fR functions also perform an
+LDAP modify RDN operation. They take the same parameters as above.  In
+addition, they both take the \fIdeleteoldrdn\fR parameter ,which is used as a
+boolean value to indicate whether or not the old RDN values should be deleted
+from the entry.
+.sp
+.LP
+The  \fBldap_rename()\fR, \fBldap_rename_s()\fR routines are used to change the
+name, that is, the RDN of an entry. These routines deprecate  the
+\fBldap_modrdn()\fR and  \fBldap_modrdn_s()\fR routines, as well as
+\fBldap_modrdn2()\fR and \fBldap_modrdn2_s()\fR.
+.sp
+.LP
+The  \fBldap_rename()\fR and  \fBldap_rename_s()\fR functions both support
+LDAPv3 server controls and client controls.
+.SH ERRORS
+.sp
+.LP
+The synchronous (\fB_s\fR) versions of these functions return an LDAP error
+code, either  \fBLDAP_SUCCESS\fR or an error. See \fBldap_error\fR(3LDAP).
+.sp
+.LP
+The asynchronous versions return  \fB\(mi1\fR in the event of an error, setting
+the \fBld_errno\fR field of \fIld\fR.  See \fBldap_error\fR(3LDAP) for more
+details. Use \fBldap_result\fR(3LDAP) to determine a particular unsuccessful
+result.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes of the
+\fBldap_modrdn()\fR, \fBldap_modrdn_s()\fR, \fBldap_modrdn2()\fR and
+\fBldap_modrdn2_s()\fR functions:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityObsolete
+.TE
+
+.sp
+.LP
+The \fBldap_rename()\fR and  \fBldap_rename_s()\fR functions have the following
+attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP) , \fBattributes\fR(5)

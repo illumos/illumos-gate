@@ -270,8 +270,6 @@ shift
 [[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
 [[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
-#MACH=$(uname -p)
-
 # must match the getopts in nightly.sh
 OPTIND=1
 NIGHTLY_OPTIONS="-${NIGHTLY_OPTIONS#-}"
@@ -315,7 +313,7 @@ else
 	unset EXTRA_CFLAGS
 fi
 
-[[ "${flags.O}" ]] && export MULTI_PROTO="yes"
+[[ "${flags.O}" == "true" ]] && export MULTI_PROTO="yes"
 
 # update build-type variables
 PKGARCHIVE="${PKGARCHIVE}${SUFFIX}"
@@ -340,16 +338,6 @@ if "${flags.s.o}" ; then
         VERSION+=":OPEN_ONLY"
 	SRC="${OPEN_SRCDIR}/usr/src"
 fi
- 
-#
-# Keep track of this now, before we manipulate $PATH
-#
-WHICH_SCM="$(dirname -- "$(whence "$0")")/which_scm"
-if [[ ! -x $WHICH_SCM ]]; then
-	WHICH_SCM=which_scm
-fi
-$WHICH_SCM | read SCM_TYPE junk
-
 
 # 	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
@@ -459,8 +447,7 @@ export \
 	ENVCPPFLAGS4 \
         MAKEFLAGS \
         PARENT_ROOT \
-        PARENT_TOOLS_ROOT \
-	SCM_TYPE
+        PARENT_TOOLS_ROOT
 
 printf 'RELEASE      is %s\n'   "$RELEASE"
 printf 'VERSION      is %s\n'   "$VERSION"

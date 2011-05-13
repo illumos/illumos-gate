@@ -1,0 +1,274 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH usb_alloc_request 9F "25 July 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+usb_alloc_request, usb_alloc_ctrl_req, usb_free_ctrl_req, usb_alloc_bulk_req,
+usb_free_bulk_req, usb_alloc_intr_req, usb_free_intr_req, usb_alloc_isoc_req,
+usb_free_isoc_req \- Allocate and free USB transfer requests
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/usb/usba.h>
+
+\fBusb_ctrl_req_t *\fR\fBusb_alloc_ctrl_req\fR(\fBdev_info_t *\fR\fIdip\fR, \fBsize_t\fR \fIlen\fR, 
+     \fBusb_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBusb_free_ctrl_req\fR(\fBusb_ctrl_req_t *\fR\fIrequest\fR);
+.fi
+
+.LP
+.nf
+\fBusb_bulk_req_t *\fR\fBusb_alloc_bulk_req\fR(\fBdev_info_t\fR \fIdip\fR, \fBsize_t\fR \fIlen\fR, 
+     \fBusb_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBusb_free_bulk_req\fR(\fBusb_bulk_req_t *\fR\fIrequest\fR);
+.fi
+
+.LP
+.nf
+\fBusb_intr_req_t *\fR\fBusb_alloc_intr_req\fR(\fBdev_info_t *\fR\fIdip\fR, \fBsize_t\fR \fIlen\fR, 
+     \fBusb_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBusb_free_intr_req\fR(\fBusb_intr_req_t *\fR\fIrequest\fR);
+.fi
+
+.LP
+.nf
+\fBusb_isoc_req_t *\fR\fBusb_alloc_isoc_req\fR(\fBdev_info_t *\fR\fIdip\fR, 
+     \fBuint_t\fR \fIisoc_pkts_count\fR, \fBsize_t\fR \fIlen\fR, \fBusb_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBusb_free_isoc_req\fR(\fBusb_isoc_req_t *\fR\fIrequest\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.LP
+For \fBusb_alloc_ctrl_req()\fR, \fBusb_alloc_bulk_req()\fR and
+\fBusb_alloc_intr_req()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to the device's dev_info structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 9n
+.rt  
+Length of \fIdata\fR for this request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 9n
+.rt  
+Only USB_FLAGS_SLEEP is recognized. Wait for resources if not immediately
+available.
+.RE
+
+.sp
+.LP
+For \fBusb_alloc_isoc_req()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 19n
+.rt  
+Pointer to the device's dev_info structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIisoc_pkts_count\fR\fR
+.ad
+.RS 19n
+.rt  
+Number of isochronous packet descriptors to associate with this request. Must
+be greater than zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 19n
+.rt  
+Length of \fIdata\fR for this isochronous request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 19n
+.rt  
+Only USB_FLAGS_SLEEP is recognized. Wait for resources if not immediately
+available.
+.RE
+
+.sp
+.LP
+For \fBusb_free_ctrl_req()\fR, \fBusb_free_bulk_req()\fR,
+\fBusb_free_intr_req()\fR and \fBusb_free_isoc_req()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrequest\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to the request structure to be freed. Can be \fBNULL\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusb_alloc_ctrl_req()\fR, \fBusb_alloc_bulk_req()\fR,
+\fBusb_alloc_intr_req()\fR, and \fBusb_alloc_isoc_req()\fR functions allocate
+control, bulk, interrupt, or     isochronous requests. Optionally, these
+functions can also allocate an mblk of the specified length to pass data
+associated  with the request. (For guidelines on mblk data allocation, see the
+manpage for the relevant transfer function).
+.sp
+.LP
+The \fBusb_alloc_isoc_req()\fR function also allocates a number of isochronous
+packet descriptors (usb_isoc_pkt_descr_t) specified by isoc_pkts_count to the
+end of the request proper (usb_isoc_req_t).  See \fBusb_isoc_request\fR(9S) for
+more information on isochronous packet descriptors.
+.sp
+.LP
+These functions always succeed when the USB_FLAGS_SLEEP flag is set, provided
+that they are given valid args and are not called from interrupt context.
+.sp
+.LP
+The \fBusb_free_ctrl_req()\fR, \fBusb_free_bulk_req()\fR,
+\fBusb_free_intr_req()\fR, and \fBusb_free_isoc_req()\fR functions free their
+corresponding request. If the request's data block pointer is non-zero, the
+data block is also freed. For isoc requests, the array of packet descriptors is
+freed.
+.SH RETURN VALUES
+.sp
+.LP
+For \fBusb_alloc_ctrl_req()\fR, \fBusb_alloc_bulk_req()\fR,
+\fBusb_alloc_intr_req()\fR and \fBusb_alloc_isoc_req()\fR:
+.sp
+.LP
+On success: returns a pointer to the appropriate usb_xxx_request_t.
+.sp
+.LP
+On failure: returns \fBNULL\fR. Fails because the dip argument is invalid,
+USB_FLAGS_SLEEP is not set and memory is not available or because
+USB_FLAGS_SLEEP is set but the call was made in interrupt context.
+.sp
+.LP
+For \fBusb_free_ctrl_req()\fR, \fBusb_free_bulk_req()\fR,
+\fBusb_free_intr_req()\fR and \fBusb_free_isoc_req()\fR: None.
+.SH CONTEXT
+.sp
+.LP
+The allocation routines can always be called from kernel and user context. They
+may be called from interrupt context only if USB_FLAGS_SLEEP is not specified.
+.sp
+.LP
+The free routines may be called from kernel, user, and interrupt context.
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+    /* This allocates and initializes an asynchronous control 
+     * request which will pass no data.  Asynchronous requests 
+     * are used when they cannot block the calling thread.
+     */
+
+    usb_ctrl_req_t *ctrl_req;
+ 
+    if ((ctrl_req = usb_alloc_ctrl_req(dip, 0, 0)) == NULL) {
+            return (FAILURE);
+    }
+
+    /* Now initialize. */
+    ctrl_req->ctrl_bmRequestType = USB_DEV_REQ_DEV_TO_HOST |
+        USB_DEV_REQ_STANDARD | USB_DEV_REQ_RCPT_DEV;
+
+    ctrl_req->ctrl_bRequest      = (uint8_t)USB_REQ_GET_STATUS;
+    ...
+    ...
+    ctrl_req->ctrl_callback     = normal_callback;
+    ctrl_req->ctrl_exc_callback = exception_callback;
+    ...
+    ...
+            
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI-based systems
+_
+Interface stabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBusb_get_current_frame_number\fR(9F),
+\fBusb_get_max_pkts_per_isoc_request\fR(9F),
+\fBusb_pipe_get_max_bulk_transfer_size\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
+\fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
+\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_bulk_request\fR(9S),
+\fBusb_ctrl_request\fR(9S), \fBusb_intr_request\fR(9S),
+\fBusb_isoc_request\fR(9S)

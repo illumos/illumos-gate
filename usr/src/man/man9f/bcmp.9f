@@ -1,0 +1,84 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bcmp 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+bcmp \- compare two byte arrays
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+
+
+
+\fBint\fR \fBbcmp\fR(\fBconst void *\fR\fIs1\fR, \fBconst void *\fR\fIs2\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs1\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the first character string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs2\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the second character string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 7n
+.rt  
+Number of bytes to be compared.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbcmp()\fR function compares two byte arrays of length \fIlen\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBbcmp()\fR function returns \fB0\fR if the arrays are identical, or
+\fB1\fR if they are not.
+.SH CONTEXT
+.sp
+.LP
+The \fBbcmp()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBstrcmp\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Unlike \fBstrcmp\fR(9F), \fBbcmp()\fR does not terminate when it encounters a
+null byte.

@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getustack 2 "2 Nov 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+getustack, setustack \- retrieve or change the address of per-LWP stack
+boundary information
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucontext.h>
+
+\fBint\fR \fBgetustack\fR(\fBstack_t **\fR\fIspp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetustack\fR(\fBstack_t *\fR\fIsp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetustack()\fR function retrieves the address of per-LWP stack boundary
+information.  The address is stored at the location pointed to by \fIspp\fR. If
+this address has not been defined using a previous call to \fBsetustack()\fR,
+\fINULL\fR is stored at the location pointed to by \fIspp\fR.
+.sp
+.LP
+The \fBsetustack()\fR function changes the address of the current thread's
+stack boundary information to the value of \fIsp\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, \(mi1 is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIspp\fR or \fIsp\fR argument does not refer to a valid address.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Only implementors of custom threading libraries should use these functions to
+get and set the address of the stack bound to an internal per-thread data
+structure. Other users should use \fBstack_getbounds\fR(3C) and
+\fBstack_setbounds\fR(3C).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(5.5i) |cw(0i) 
+lw(5.5i) |lw(0i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fB_stack_grow\fR(3C), \fBstack_getbounds\fR(3C), \fBstack_inbounds\fR(3C),
+\fBstack_setbounds\fR(3C), \fBstack_violation\fR(3C), \fBattributes\fR(5)

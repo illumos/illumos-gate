@@ -1,0 +1,273 @@
+'\" te
+.\"  Copyright (c) 1992-1996 Competitive Automation, Inc. 
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dhcpinfo 1 "15 May 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+dhcpinfo \- display values of parameters received through DHCP
+.SH SYNOPSIS
+.LP
+.nf
+\fBdhcpinfo\fR [\fB-c\fR] [\fB-i\fR \fIinterface\fR] [\fB-n\fR \fIlimit\fR] [\fB-v 4|6\fR] \fIcode\fR
+.fi
+
+.LP
+.nf
+\fBdhcpinfo\fR [\fB-c\fR] [\fB-i\fR \fIinterface\fR] [\fB-n\fR \fIlimit\fR] [\fB-v 4|6\fR] \fIidentifier\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdhcpinfo\fR utility prints the \fBDHCP\fR-supplied value(s) of the
+parameter requested on the command line. The parameter can be identified either
+by its numeric code in the \fBDHCP\fR specification, or by its mnemonic
+identifier, as listed in \fBdhcp_inittab\fR(4). This command is intended to be
+used in command substitutions in the shell scripts invoked by \fBinit\fR(1M) at
+system boot. It first contacts the \fBDHCP\fR client daemon at system boot or
+in event scripts as described in \fBdhcpagent\fR(1M). It first contacts the
+DHCP client daemon \fBdhcpagent\fR(1M) to verify that \fBDHCP\fR has
+successfully completed on the requested interface. If \fBDHCP\fR has
+successfully completed on the requested interface, \fBdhcpinfo\fR retrieves the
+values for the requested parameter. Parameter values echoed by \fBdhcpinfo\fR
+should not be used without checking its exit status. See \fBexit\fR(1).
+.sp
+.LP
+See \fBdhcp_inittab\fR(4) for the list of mnemonic identifier codes for all
+\fBDHCP\fR parameters. See \fIRFC 2132, DHCP Options and BOOTP Vendor
+Extensions\fR for more details on DHCPv4 parameters, and RFC 3315, Dynamic Host
+Configuration Protocol for IPv6 (DHCPv6), for more details on DHCPv6
+parameters.
+.SS "Output Format"
+.sp
+.LP
+The output from \fBdhcpinfo\fR consists of one or more lines of \fBASCII\fR
+text; the format of the output depends upon the requested parameter. The number
+of values returned per line and the total number of lines output for a given
+parameter are determined by the parameter's \fBgranularity\fR and \fBmaximum\fR
+values, respectively, as defined by \fBdhcp_inittab\fR(4).
+.sp
+.LP
+The format of each individual value is determined by the data type of the
+option, as determined by \fBdhcp_inittab\fR(4). The possible data types and
+their formats are listed below:
+.sp
+
+.sp
+.TS
+tab();
+cw(1.4i) cw(2.1i) cw(2i) 
+lw(1.4i) lw(2.1i) lw(2i) 
+.
+Data TypeFormat\fBdhcp_inittab\fR(4) type
+Unsigned NumberOne or more decimal digitsT{
+\fBUNUMBER8\fR, \fBUNUMBER16\fR, \fBUNUMBER32\fR, \fBUNUMBER64\fR
+T}
+Signed NumberT{
+One or more decimal digits, optionally preceded by a minus sign
+T}T{
+\fBSNUMBER8\fR, \fBSNUMBER16\fR, \fBSNUMBER32\fR, \fBSNUMBER64\fR
+T}
+\fBIP\fR AddressDotted-decimal notation\fBIP\fR
+IPv6 AddressColon-separated notation\fBIPv6\fR
+OctetT{
+The string \fB0x\fR followed by a two-digit hexadecimal value
+T}\fBOCTET\fR
+StringZero or more \fBASCII\fR characters\fBASCII\fR
+DUIDDHCP Unique Identifier text\fBDUID\fR
+Domain NameT{
+Standard dot-separated domain name, RFC 1035 format
+T}\fBDOMAIN\fR
+.TE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 16n
+.rt  
+Displays the output in a canonical format. This format is identical to the
+\fBOCTET\fR format with a granularity of \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIinterface\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the interface to retrieve values for \fBDHCP\fR parameters from. If
+this option is not specified, the primary interface is used.
+.sp
+If a primary interface has not been selected for the system by
+\fBifconfig\fR(1M) or for this command by \fB-i\fR, the system automatically
+selects an interface to consider as primary for the current command invocation.
+The selection chooses the interface whose name sorts lexically first, and that
+has DHCP parameters attached.  This selection does not affect system state. Use
+\fBifconfig\fR(1M) to set a primary interface.
+.sp
+The recommended practice in the \fBdhcpagent\fR(1M) \fBeventhook\fR scripts is
+to specify the desired interface with \fB-i\fR, rather than relying on primary
+selection.
+.sp
+For DHCPv6, the interface name used should be the name of the physical
+interface, not one of the logical interfaces created by \fBdhcpagent\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fIlimit\fR\fR
+.ad
+.RS 16n
+.rt  
+Limits the list of values displayed to \fIlimit\fR lines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fB4 | 6\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the DHCP version to query. Use \fB-v4\fRfor DHCPv4 and \fB-v6\fR for
+DHCPv6.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcode\fR\fR
+.ad
+.RS 14n
+.rt  
+Numeric code for the requested \fBDHCP\fR parameter, as defined by the
+\fBDHCP\fR specification. Vendor options are specified by adding \fB256\fR to
+the actual vendor code for DHCPv4, and \fB65536\fR for DHCPv6.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIidentifier\fR\fR
+.ad
+.RS 14n
+.rt  
+Mnemonic symbol for the requested \fBDHCP\fR parameter, as listed in
+\fBdhcp_inittab\fR(4).
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+The operation was not successful. The \fBDHCP\fR client daemon might not be
+running, the interface might have failed to configure, or no satisfactory
+\fBDHCP\fR responses were received.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+Bad arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+.rt  
+The operation timed out.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB6\fR\fR
+.ad
+.RS 5n
+.rt  
+System error (should never occur).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdhcpagent\fR(1M), \fBifconfig\fR(1M), \fBinit\fR(1M), \fBdhcp_inittab\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+Alexander, S., and R. Droms, \fIRFC 2132, DHCP Options and BOOTP Vendor
+Extensions\fR, Silicon Graphics, Inc., Bucknell University, March 1997.
+.sp
+.LP
+Droms, R. , \fIRFC 3315, Dynamic Host Configuration Protocol for IPv6
+(DHCPv6)\fR, Cisco Systems, July 2003.
+.sp
+.LP
+Mockapetris, P.V. , \fIRFC 1035, Domain names - implementation and
+specification\fR, ISI, November 1987.

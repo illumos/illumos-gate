@@ -1,0 +1,495 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 1992, X/Open Company Limited All Rights Reserved Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH xargs 1 "17 Jul 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+xargs \- construct argument lists and invoke utility
+.SH SYNOPSIS
+.LP
+.nf
+\fBxargs\fR [\fB-t\fR] [\fB-p\fR] [\fB-e\fR[\fIeofstr\fR]] [\fB-E\fR \fIeofstr\fR] 
+     [\fB-I\fR \fIreplstr\fR] [\fB-i\fR[\fIreplstr\fR]] [\fB-L\fR \fInumber\fR] [\fB-l\fR[\fInumber\fR]] 
+     [\fB-n\fR \fInumber\fR [\fB-x\fR]] [\fB-s\fR \fIsize\fR] [\fIutility\fR [\fIargument\fR...]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBxargs\fR utility constructs a command line consisting of the
+\fIutility\fR and \fIargument\fR operands specified followed by as many
+arguments read in sequence from standard input as fit in length and number
+constraints specified by the options. The \fBxargs\fR utility then invokes the
+constructed command line and waits for its completion. This sequence is
+repeated until an end-of-file condition is detected on standard input or an
+invocation of a constructed command line returns an exit status of \fB255\fR.
+.sp
+.LP
+Arguments in the standard input must be separated by unquoted blank characters,
+or unescaped blank characters or newline characters. A string of zero or more
+non-double-quote (\fB"\fR) and non-newline characters can be quoted by
+enclosing them in double-quotes. A string of zero or more non-apostrophe
+(\fB\&'\fR) and non-newline characters can be quoted by enclosing them in
+apostrophes. Any unquoted character can be escaped by preceding it with a
+backslash (\fB\e\fR). The \fIutility\fR are executed one or more times until
+the end-of-file is reached. The results are unspecified if the utility named by
+\fIutility\fR attempts to read from its standard input.
+.sp
+.LP
+The generated command line length is the sum of the size in bytes of the
+utility name and each argument treated as strings, including a null byte
+terminator for each of these strings. The \fBxargs\fR utility limits the
+command line length such that when the command line is invoked, the combined
+argument and environment lists can not exceed \fB{ARG_MAX}\(mi2048\fR bytes.
+Within this constraint, if neither the \fB-n\fR nor the \fB-s\fR option is
+specified, the default command line length is at least \fB{LINE_MAX}\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-e\fR\fB[\fR\fIeofstr\fR\fB]\fR\fR
+.ad
+.RS 15n
+.rt  
+Uses \fIeofstr\fR as the logical end-of-file string. Underscore (\fB_\fR) is
+assumed for the logical \fBEOF\fR string if neither \fB-e\fR nor \fB-E\fR is
+used. When the \fIeofstr\fR option-argument is omitted, the logical \fBEOF\fR
+string capability is disabled and underscores are taken literally. The
+\fBxargs\fR utility reads standard input until either end-of-file or the
+logical \fBEOF\fR string is encountered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR \fIeofstr\fR\fR
+.ad
+.RS 15n
+.rt  
+Specifies a logical end-of-file string to replace the default underscore.
+\fBxargs\fR reads standard input until either end-of-file or the logical EOF
+string is encountered. When \fIeofstr\fR is a null string, the logical
+end-of-file string capability is disabled and underscore characters are taken
+literally.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR \fIreplstr\fR\fR
+.ad
+.RS 15n
+.rt  
+Insert mode. \fIutility\fR is executed for each line from standard input,
+taking the entire line as a single argument, inserting it in \fIargument\fR
+\fIs\fR for each occurrence of \fIreplstr\fR. A maximum of five arguments in
+\fIargument\fRs can each contain one or more instances of \fIreplstr\fR. Any
+blank characters at the beginning of each line are ignored. Constructed
+arguments cannot grow larger than 255 bytes. Option \fB-x\fR is forced on. The
+\fB-I\fR and \fB-i\fR options are mutually exclusive; the last one specified
+takes effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-i\fR\fB[\fR\fIreplstr\fR\fB]\fR\fR
+.ad
+.RS 15n
+.rt  
+This option is equivalent to \fB-I\fR \fIreplstr\fR. The string \fB{\|}\fR is
+assumed for \fIreplstr\fR if the option-argument is omitted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR \fInumber\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fIutility\fR is executed for each non-empty \fInumber\fR lines of
+arguments from standard input. The last invocation of \fIutility\fR is with
+fewer lines of arguments if fewer than \fInumber\fR remain. A line is
+considered to end with the first newline character unless the last character of
+the line is a blank character; a trailing blank character signals continuation
+to the next non-empty line, inclusive. The \fB-L\fR, \fB-l\fR, and \fB-n\fR
+options are mutually exclusive; the last one specified takes effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l[\fR\fInumber\fR\fB]\fR\fR
+.ad
+.RS 15n
+.rt  
+(The letter ell.) This option is equivalent to \fB-L\fR \fInumber\fR. If
+\fInumber\fR is omitted, \fB1\fR is assumed. Option \fB-x\fR is forced on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fInumber\fR\fR
+.ad
+.RS 15n
+.rt  
+Invokes \fIutility\fR using as many standard input arguments as possible, up to
+\fInumber\fR (a positive decimal integer) arguments maximum. Fewer arguments
+are used if:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The command line length accumulated exceeds the size specified by the \fB-s\fR
+option (or \fB{LINE_MAX}\fR if there is no \fB-s\fR option), or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The last iteration has fewer than \fInumber\fR, but not zero, operands
+remaining.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 15n
+.rt  
+Prompt mode. The user is asked whether to execute \fIutility\fR at each
+invocation. Trace mode (\fB-t\fR) is turned on to write the command instance to
+be executed, followed by a prompt to standard error. An affirmative response
+(specific to the user's locale) read from \fB/dev/tty\fR executes the command;
+otherwise, that particular invocation of \fIutility\fR is skipped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIsize\fR\fR
+.ad
+.RS 15n
+.rt  
+Invokes \fIutility\fR using as many standard input arguments as possible
+yielding a command line length less than \fIsize\fR (a positive decimal
+integer) bytes. Fewer arguments are used if:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The total number of arguments exceeds that specified by the \fB-n\fR option, or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The total number of lines exceeds that specified by the \fB-L\fR option, or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+End of file is encountered on standard input before \fIsize\fR bytes are
+accumulated.
+.RE
+Values of \fIsize\fR up to at least \fB{LINE_MAX}\fR bytes are supported,
+provided that the constraints specified in DESCRIPTION are met. It is not
+considered an error if a value larger than that supported by the implementation
+or exceeding the constraints specified in DESCRIPTION is specified. \fBxargs\fR
+uses the largest value it supports within the constraints.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Enables trace mode. Each generated command line is written to standard error
+just prior to invocation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+Terminates if a command line containing \fInumber\fR arguments (see the
+\fB-n\fR option above) or \fInumber\fR lines (see the \fB-L\fR option above)
+does not fit in the implied or specified size (see the \fB-s\fR option above).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIutility\fR\fR
+.ad
+.RS 12n
+.rt  
+The name of the utility to be invoked, found by search path using the
+\fBPATH\fR environment variable. (ee \fBenviron\fR(5).) If \fIutility\fR is
+omitted, the default is the \fBecho\fR(1) utility. If the \fIutility\fR operand
+names any of the special built-in utilities in \fBshell_builtins\fR(1), the
+results are undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIargument\fR\fR
+.ad
+.RS 12n
+.rt  
+An initial option or operand for the invocation of \fIutility\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fB255\fR exit status allows a utility being used by \fBxargs\fR to tell
+\fBxargs\fR to terminate if it knows no further invocations using the current
+data stream succeeds. Thus, \fIutility\fR should explicitly \fBexit\fR with an
+appropriate value to avoid accidentally returning with \fB255\fR.
+.sp
+.LP
+Notice that input is parsed as lines. Blank characters separate arguments. If
+\fBxargs\fR is used to bundle output of commands like \fBfind\fR \fIdir\fR
+\fB-print\fR or \fBls\fR into commands to be executed, unexpected results are
+likely if any filenames contain any blank characters or newline characters.
+This can be fixed by using \fBfind\fR to call a script that converts each file
+found into a quoted string that is then piped to \fBxargs\fR. Notice that the
+quoting rules used by \fBxargs\fR are not the same as in the shell. They were
+not made consistent here because existing applications depend on the current
+rules and the shell syntax is not fully compatible with it. An easy rule that
+can be used to transform any string into a quoted form that \fBxargs\fR
+interprets correctly is to precede each character in the string with a
+backslash (\fB\e\fR).
+.sp
+.LP
+On implementations with a large value for \fB{ARG_MAX}\fR, \fBxargs\fR can
+produce command lines longer than \fB{LINE_MAX}\fR. For invocation of
+utilities, this is not a problem. If \fBxargs\fR is being used to create a text
+file, users should explicitly set the maximum command line length with the
+\fB-s\fR option.
+.sp
+.LP
+The \fBxargs\fR utility returns exit status \fB127\fR if an error occurs so
+that applications can distinguish "failure to find a utility" from "invoked
+utility exited with an error indication." The value \fB127\fR was chosen
+because it is not commonly used for other meanings; most utilities use small
+values for "normal error conditions" and the values above \fB128\fR can be
+confused with termination due to receipt of a signal. The value \fB126\fR was
+chosen in a similar manner to indicate that the utility could be found, but not
+invoked.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the xargs command
+.sp
+.LP
+The following example moves all files from directory \fB$1\fR to directory
+\fB$2\fR, and echo each move command just before doing it:
+
+.sp
+.in +2
+.nf
+example% \fBls $1 | xargs -I {} -t mv $1/{} $2/{}\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command combines the output of the parenthesised commands onto
+one line, which is then written to the end of file \fBlog\fR:
+
+.sp
+.in +2
+.nf
+example% \fB(logname; date; printf "%s\en" "$0 $*") | xargs >>log\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command invokes \fBdiff\fR with successive pairs of arguments
+originally typed as command line arguments (assuming there are no embedded
+blank characters in the elements of the original argument list):
+
+.sp
+.in +2
+.nf
+example% \fBprintf "%s\en" "$*" | xargs -n 2 -x diff\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The user is asked which files in the current directory are to be archived. The
+files are archived into \fBarch\fR \fB;\fR a, one at a time, or b, many at a
+time:
+
+.sp
+.in +2
+.nf
+example% \fBls | xargs -p -L 1 ar -r arch
+ls | xargs -p -L 1 | xargs ar -r arch\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following executes with successive pairs of arguments originally typed as
+command line arguments:
+
+.sp
+.in +2
+.nf
+example% \fBecho $* | xargs -n 2 diff\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBxargs\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPATH\fR\fR
+.ad
+.RS 8n
+.rt  
+Determine the location of \fIutility\fR.
+.RE
+
+.sp
+.LP
+Affirmative responses are processed using the extended regular expression
+defined for the \fByesexpr\fR keyword in the \fBLC_MESSAGES\fR category of the
+user's locale. The locale specified in the \fBLC_COLLATE\fR category defines
+the behavior of ranges, equivalence classes, and multi-character collating
+elements used in the expression defined for \fByesexpr\fR. The locale specified
+in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
+bytes of text data a characters, the behavior of character classes used in the
+expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+All invocations of \fIutility\fR returned exit status \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\(mi125\fR\fR
+.ad
+.RS 12n
+.rt  
+A command line meeting the specified requirements could not be assembled, one
+or more of the invocations of \fIutility\fR returned a non-zero exit status, or
+some other error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB126\fR\fR
+.ad
+.RS 12n
+.rt  
+The utility specified by \fIutility\fR was found but could not be invoked.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB127\fR\fR
+.ad
+.RS 12n
+.rt  
+The utility specified by \fIutility\fR could not be found.
+.RE
+
+.sp
+.LP
+If a command line meeting the specified requirements cannot be assembled, the
+utility cannot be invoked, an invocation of the utility is terminated by a
+signal, or an invocation of the utility exits with exit status \fB255\fR, the
+\fBxargs\fR utility writes a diagnostic message and exit without processing any
+remaining input.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBecho\fR(1), \fBshell_builtins\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBstandards\fR(5)

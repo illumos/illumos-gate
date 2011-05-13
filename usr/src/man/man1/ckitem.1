@@ -1,0 +1,381 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1992, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ckitem 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+ckitem, erritem, helpitem \- build a menu; prompt for and return a menu item
+.SH SYNOPSIS
+.LP
+.nf
+\fBckitem\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-uno\fR] [\fB-f\fR \fIfilename\fR] [\fB-l\fR \fIlabel\fR] 
+     [ [\fB-i\fR \fIinvis\fR] [,]...] [\fB-m\fR \fImax\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] 
+     [\fB-e\fR \fI error\fR] [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]] 
+     [\fIchoice\fR [...]]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/erritem\fR [\fB-W\fR \fIwidth\fR] [\fB-e\fR \fIerror\fR] [\fIchoice\fR [..]]
+.fi
+
+.LP
+.nf
+\fB/usr/sadm/bin/helpitem\fR [\fB-W\fR \fIwidth\fR] [\fB-h\fR \fIhelp\fR] [\fIchoice\fR [..]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBckitem\fR utility builds a menu and prompts the user to choose one item
+from a menu of items. It then  verifies the response. Options for this command
+define, among other things, a prompt message whose response will be a menu
+item, text for help and error messages, and a default value (which will be
+returned if the user responds with a carriage return).
+.sp
+.LP
+By default, the menu is formatted so that each item is prepended by a number
+and is printed in columns across the terminal. Column length is determined by
+the longest choice. Items are alphabetized.
+.sp
+.LP
+All messages are limited in length to 70 characters and are formatted
+automatically. Any white space used in the definition (including newline) is
+stripped. The \fB-W\fR option cancels the automatic formatting. When a tilde is
+placed at the beginning or end of a message definition, the default text will
+be inserted at that point, allowing both custom text and the default text to be
+displayed.
+.sp
+.LP
+If the prompt, help or error message is not defined, the default message (as
+defined under \fBNOTES\fR) will be displayed.
+.sp
+.LP
+Two visual tool modules are linked to the \fBckitem\fR command. They are
+\fBerritem\fR (which formats and displays an error message) and \fBhelpitem\fR
+(which formats and displays a help message). These modules should be used in
+conjunction with \fBFML\fR objects. In this instance, the \fBFML\fR object
+defines the prompt. When \fIchoice\fR is defined in these modules, the messages
+will describe the available menu choice (or choices).
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fI default\fR\fR
+.ad
+.RS 15n
+.rt  
+Define the default value as \fIdefault\fR. The default is not validated and so
+does not have to meet any criteria.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fI error\fR\fR
+.ad
+.RS 15n
+.rt  
+Define the error message as \fI error\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fI filename\fR\fR
+.ad
+.RS 15n
+.rt  
+Define a file, \fIfilename\fR, which contains a list of menu items to be
+displayed. (The format of this file is: \fBtoken<tab>description\fR. Lines
+beginning with a pound sign (#) are designated as comments and ignored.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fI help\fR\fR
+.ad
+.RS 15n
+.rt  
+Define the help messages as \fI help\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fI invis\fR\fR
+.ad
+.RS 15n
+.rt  
+Define invisible menu choices (those which will not be printed in the menu).
+(For example, ``all'' used as an invisible choice would mean it is a legal
+option but does not appear in the menu. Any number of invisible choices may be
+defined.) Invisible choices should be made known to a user either in the prompt
+or in a help message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fI pid\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that the process \fBID\fR \fIpid\fR is to be sent a signal if the user
+chooses to abort.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fI label\fR\fR
+.ad
+.RS 15n
+.rt  
+Define a label, \fIlabel\fR, to print above the menu.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI max\fR\fR
+.ad
+.RS 15n
+.rt  
+Define the maximum number of menu choices that the user can choose. The default
+is 1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that menu items should not be displayed in alphabetical order.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that only one menu token will be returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI prompt\fR\fR
+.ad
+.RS 15n
+.rt  
+Define the prompt message as \fIprompt\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Q\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that quit will not be allowed as a valid response.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fI signal\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that process \fBID\fR \fIpid\fR defined with the \fB-k\fR option is to
+be sent signal \fI signal\fR when quit is chosen. If no signal is specified,
+\fBSIGTERM\fR is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that menu items should be displayed as an unnumbered list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-W\fR\fI width\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify that prompt, help and error messages will be formatted to a line length
+of \fIwidth\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIchoice\fR\fR
+.ad
+.RS 10n
+.rt  
+Define menu items. Items should be separated by white space or newline.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+\fBEOF\fR on input, or negative width on \fB-W\fR option, or inability to open
+file on \fB-f\fR option, or usage error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+User termination (quit).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+.rt  
+No choices from which to choose.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The user may input the number of the menu item if choices are numbered or as
+much of the string required for a unique identification of the item. Long menus
+are paged with 10 items per page.
+.sp
+.LP
+When menu entries are defined both in a file (by using the \fB-f\fR option) and
+also on the command line, they are usually combined alphabetically. However, if
+the \fB-n\fR option is used to suppress  alphabetical ordering, then the
+entries defined in the file are shown first, followed by the options defined on
+the command line.
+.sp
+.LP
+The default prompt for \fBckitem\fR is:
+.sp
+.in +2
+.nf
+Enter selection [?,??,q]:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+One question mark will give a help message and then redisplay the prompt. Two
+question marks will give a help message and then redisplay the menu label, the
+menu and the prompt.
+.sp
+.LP
+The default error message if you typed a number is:
+.sp
+.in +2
+.nf
+ERROR: Bad numeric choice specification
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default error message if you typed a string is:
+.sp
+.in +2
+.nf
+ERROR: Entry does not match available menu selection. Enter the number
+of the menu item you wish to select, the token which is associated
+with the menu item, or a partial string which uniquely identifies the
+token for the menu item. Enter ?? to reprint the menu.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The default help message is:
+.sp
+.in +2
+.nf
+Enter the number of the menu item you wish to select, the token
+which is associated with the menu item, or a partial string which
+uniquely identifies the token for the menu item. Enter ? to
+reprint the menu.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When the quit option is chosen (and allowed), \fBq\fR is returned along with
+the return code \fB3\fR.

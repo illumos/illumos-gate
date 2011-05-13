@@ -1,0 +1,303 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pmadvise 1 "25 Sep 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+pmadvise \- applies advice about memory to a process
+.SH SYNOPSIS
+.LP
+.nf
+\fBpmadvise\fR \fB-o\fR \fIoption\fR[,\fIoption\fR] [\fB-F\fR] [\fB-l\fR] [\fB-v\fR] \fIpid\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpmadvise\fR applies advice about how memory is used in the specified process
+using \fBmadvise\fR(3C).
+.sp
+.LP
+\fBpmadvise\fR allows users to apply advice to a specific sub-range at a
+specific instant in time. \fBpmadvise\fR differs from \fBmadv.so.1\fR(1) in
+that \fBmadv.so.1\fR(1) applies the advice throughout execution of the target
+program to all segments of a specified type.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+.rt  
+Force by grabbing the target process even if another process has control.
+.sp
+You should exercise caution when using the \fB-F\fR option. See \fBproc\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Show unresolved dynamic linker map names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 6n
+.rt  
+Specify advice to apply in the following form:
+.sp
+.in +2
+.nf
+private=\fBadvice\fR
+shared=\fBadvice\fR
+heap=\fBadvice\fR
+stack=\fBadvice\fR
+\fBaddress\fR[:\fBlength\fR]=\fBadvice\fR
+.fi
+.in -2
+.sp
+
+where the \fBadvice\fR can be one of the following:
+.sp
+.in +2
+.nf
+normal
+random
+sequential
+willneed
+dontneed
+free
+access_lwp
+access_many
+access_default
+.fi
+.in -2
+.sp
+
+An \fBaddress\fR and \fBlength\fR can be given to specify a subrange to apply
+the advice.The \fBaddress\fR should be hexadecimal and the \fBlength\fR should
+be in bytes by default.
+.sp
+If \fBlength\fR is not specified and the starting address refers to the start
+of a segment, the advice is applied to that segment. \fBlength\fR can be
+qualified by \fBK\fR, \fBM\fR, \fBG\fR, \fBT\fR, \fBP\fR, or \fBE\fR to specify
+kilobytes, megabytes, gigabytes, terabytes, or exabytes respectively as the
+unit of measure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+Print verbose output. Display output as \fBpmap\fR(1) does, showing what advice
+is being applied where. This can be useful when the advice is being applied to
+a named region (for example, private, shared, and so forth) to get feedback on
+exactly where the advice is being applied.
+.RE
+
+.sp
+.LP
+\fBpmadvise\fR tries to process all legal options. If an illegal address range
+is specified, an error message is printed and the offending option is skipped.
+\fBpmadvise\fR quits without processing any options and prints a usage message
+when there is a syntax error.
+.sp
+.LP
+If conflicting advice is given on a region, the order of precedence is from
+most specific advice to least, that is, most general. In other words, advice
+specified for a particuliar address range takes precedence over advice for heap
+and stack which in turn takes precedence over advice for private and shared
+memory.
+.sp
+.LP
+Moreover, the advice in each of the following groups are mutually exclusive
+from the other advice within the same group:
+.sp
+.in +2
+.nf
+MADV_NORMAL, MADV_RANDOM, MADV_SEQUENTIAL
+MADV_WILLNEED, MADV_DONTNEED, MADV_FREE
+MADV_ACCESS_DEFAULT, MADV_ACCESS_LWP, MADV_ACCESS_MANY
+.fi
+.in -2
+.sp
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 7n
+.rt  
+Process ID.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRApplying Advice to a Segment at Specified Address
+.sp
+.LP
+The following example applies advice to a segment at a specified address:
+
+.sp
+.in +2
+.nf
+% pmap $$
+100666: tcsh
+00010000     312K r-x--  /usr/bin/tcsh
+0006C000      48K rwx--  /usr/bin/tcsh
+00078000     536K rwx--    [ heap ]
+FF100000     856K r-x--  /lib/libc.so.1
+FF1E6000      32K rwx--  /lib/libc.so.1
+FF1EE000       8K rwx--  /lib/libc.so.1
+FF230000     168K r-x--  /lib/libcurses.so.1
+FF26A000      32K rwx--  /lib/libcurses.so.1
+FF272000       8K rwx--  /lib/libcurses.so.1
+FF280000     576K r-x--  /lib/libnsl.so.1
+FF310000      40K rwx--  /lib/libnsl.so.1
+FF31A000      24K rwx--  /lib/libnsl.so.1
+FF364000       8K rwxs-    [ anon ]
+FF370000      48K r-x--  /lib/libsocket.so.1
+FF38C000       8K rwx--  /lib/libsocket.so.1
+FF3A0000       8K r-x--  /platform/sun4u-us3/lib/libc_psr.so.1
+FF3B0000     176K r-x--  /lib/ld.so.1
+FF3EC000       8K rwx--  /lib/ld.so.1
+FF3EE000       8K rwx--  /lib/ld.so.1
+FFBE6000     104K rw---    [ stack ]
+%
+% pmadvise -o 78000=access_lwp $$
+
+%
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUsing the \fB-v\fR Option
+.sp
+.LP
+The following example displays verbose output from \fBpmadvise\fR:
+
+.sp
+.in +2
+.nf
+ 
+% pmadvise -o heap=access_lwp,stack=access_default -v $$
+1720:   -sh
+00010000      88K r-x--  /sbin/sh
+00036000       8K rwx--  /sbin/sh
+00038000      16K rwx--    [ heap ]           <= access_lwp
+FF250000      24K r-x--  /lib/libgen.so.1
+FF266000       8K rwx--  /lib/libgen.so.1
+FF272000       8K rwxs-    [ anon ]
+FF280000     840K r-x--  /lib/libc.so.1
+FF362000      32K rwx--  /lib/libc.so.1
+FF36A000      16K rwx--  /lib/libc.so.1
+FF380000       8K r-x--  /platform/sun4u-us3/lib/libc_psr.so.1
+FF390000      64K rwx--    [ anon ]
+FF3B0000     168K r-x--  /lib/ld.so.1
+FF3EA000       8K rwx--  /lib/ld.so.1
+FF3EC000       8K rwx--  /lib/ld.so.1
+FFBFE000       8K rw---    [ stack ]          <= access_default
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/*\fR\fR
+.ad
+.RS 19n
+.rt  
+Process files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/prob/lib/*\fR\fR
+.ad
+.RS 19n
+.rt  
+\fBproc\fR tools support files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The command syntax is Evolving. The output formats are Unstable.
+.SH SEE ALSO
+.sp
+.LP
+\fBmadv.so.1\fR(1), \fBpmap\fR(1), \fBproc\fR(1), \fBmadvise\fR(3C),
+\fBattributes\fR(5)

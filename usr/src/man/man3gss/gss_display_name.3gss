@@ -1,0 +1,152 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_display_name 3GSS "14 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_display_name \- convert internal-form name to text
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR] 
+#include <gssapi/gssapi.h>
+
+\fBOM_uint32\fR \fBgss_display_name\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
+     \fBconst gss_name_t\fR \fIinput_name\fR,\ \fBgss_buffer_t\fR \fIoutput_name_buffer\fR,
+     \fBgss_OID *\fR\fIoutput_name_type\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_display_name()\fR function allows an application to obtain a textual
+representation of an opaque internal-form  name for display purposes.
+.sp
+.LP
+If \fIinput_name\fR denotes an anonymous principal, the \fBGSS-API\fR returns
+the \fBgss_OID\fR value \fBGSS_C_NT_ANONYMOUS\fR as the \fIoutput_name_type\fR,
+and a textual name that is syntactically distinct from all valid supported
+printable names in \fIoutput_name_buffer\fR.
+.sp
+.LP
+If \fIinput_name\fR was created by a call to \fBgss_import_name\fR(3GSS),
+specifying \fBGSS_C_NO_OID\fR as the name-type, the GSS-API returns
+\fBGSS_C_NO_OID\fR by means of the \fIoutput_name_type\fR parameter.
+.SH PARAMETERS
+.sp
+.LP
+The parameter descriptions for \fBgss_display_name()\fR follow:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.RS 22n
+.rt  
+Mechanism-specific status code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput_name\fR\fR
+.ad
+.RS 22n
+.rt  
+Name in internal form.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutput_name_buffer\fR\fR
+.ad
+.RS 22n
+.rt  
+Buffer to receive textual name string. The application must free storage
+associated with this name after use with a call to
+\fBgss_release_buffer\fR(3GSS).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutput_name_type\fR\fR
+.ad
+.RS 22n
+.rt  
+The type of the returned name.  The returned \fBgss_OID\fR will be a pointer
+into static storage and should be treated as read-only by the caller. In
+particular, the application should not attempt to free it. Specify \fINULL\fR
+if this parameter is not required.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The \fBgss_display_name()\fR function may return the following status codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.RS 18n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_NAME\fR\fR
+.ad
+.RS 18n
+.rt  
+The \fIinput_name\fR was ill-formed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.RS 18n
+.rt  
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined.  The mechanism-specific status code reported by means
+of the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_import_name\fR(3GSS), \fBgss_release_buffer\fR(3GSS),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

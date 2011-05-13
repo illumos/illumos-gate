@@ -1,0 +1,3866 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curses 3CURSES "23 Oct 2001" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curses \- CRT screen handling and optimization package
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR.. .-lcurses [ \fIlibrary\fR... ]
+#include <curses.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcurses\fR library routines give the user a terminal-independent method
+of updating character screens with reasonable optimization.
+.sp
+.LP
+The \fBcurses\fR package allows:  overall screen, window and pad manipulation;
+output to windows and pads; reading terminal input; control over terminal and
+\fBcurses\fR input and output options; environment query routines; color
+manipulation; use of soft label keys; terminfo access; and access to low-level
+\fBcurses\fR routines.
+.sp
+.LP
+To initialize the routines, the routine \fBinitscr()\fR or \fBnewterm()\fR must
+be called before any of the other routines that deal with windows and screens
+are used. The routine \fBendwin()\fR must be called before exiting. To get
+character-at-a-time input without echoing (most interactive, screen oriented
+programs want this), the following sequence should be used:
+.sp
+.LP
+\fBinitscr,cbreak,noecho;\fR
+.sp
+.LP
+Most programs would additionally use the sequence:
+.sp
+.LP
+\fBnonl,intrflush(stdscr,FALSE),keypad(stdscr,TRUE);\fR
+.sp
+.LP
+Before a \fBcurses\fR program is run, the tab stops of the terminal should be
+set and its initialization strings, if defined, must be output. This can be
+done by executing the \fBtput init\fR command after the shell environment
+variable \fBTERM\fR has been exported. (See \fBterminfo\fR(4) for further
+details.)
+.sp
+.LP
+The \fBcurses\fR library permits manipulation of data structures, called
+\fIwindows\fR, which can be thought of as two-dimensional arrays of characters
+representing all or part of a \fBCRT\fR screen. A default window called
+\fBstdscr\fR, which is the size of the terminal screen, is supplied. Others may
+be created with \fBnewwin\fR(3CURSES).
+.sp
+.LP
+Windows are referred to by variables declared as \fBWINDOW *\fR. These data
+structures are manipulated with routines described on 3CURSES pages (whose
+names begin "curs_"). Among which the most basic routines are
+\fBmove\fR(3CURSES) and \fBaddch\fR(3CURSES). More general versions of these
+routines are included with names beginning with \fBw\fR, allowing the user to
+specify a window. The routines not beginning with \fBw\fR affect \fBstdscr\fR.
+.sp
+.LP
+After using routines to manipulate a window, \fBrefresh\fR(3CURSES) is called,
+telling \fBcurses\fR to make the user's \fBCRT\fR screen look like
+\fBstdscr\fR. The characters in a window are actually of type \fBchtype\fR,
+(character and attribute data) so that other information about the character
+may also be stored with each character.
+.sp
+.LP
+Special windows called \fIpads\fR may also be manipulated. These are windows
+which are not constrained to the size of the screen and whose contents need not
+be completely displayed. See \fBcurs_pad\fR(3CURSES) for more information.
+.sp
+.LP
+In addition to drawing characters on the screen, video attributes and colors
+may be included, causing the characters to show up in such modes as underlined,
+in reverse video, or in color on terminals that support such display
+enhancements. Line drawing characters may be specified to be output. On input,
+\fBcurses\fR is also able to translate arrow and function keys that transmit
+escape sequences into single values. The video attributes, line drawing
+characters, and input values use names, defined in <\fBcurses.h\fR>,  such as
+\fBA_REVERSE\fR, \fBACS_HLINE\fR, and \fBKEY_LEFT\fR.
+.sp
+.LP
+If the environment variables \fBLINES\fR and \fBCOLUMNS\fR are set, or if the
+program is executing in a window environment, line and column information in
+the environment will override information read by \fIterminfo\fR. This would
+effect a program running in an AT&T 630 layer, for example, where the size of a
+screen is changeable.
+.sp
+.LP
+If the environment variable \fBTERMINFO\fR is defined, any program using
+\fBcurses\fR checks for a local terminal definition before checking in the
+standard place. For example, if \fBTERM\fR is set to \fBatt4424\fR, then the
+compiled terminal definition is found in
+.sp
+.LP
+\fB/usr/share/lib/terminfo/a/att4424\fR.
+.sp
+.LP
+(The `\fBa\fR' is copied from the first letter of \fBatt4424\fR to avoid
+creation of huge directories.) However, if \fBTERMINFO\fR is set to
+\fB$HOME/myterms\fR, \fBcurses\fR first checks
+.sp
+.LP
+\fB$HOME/myterms/a/att4424\fR,
+.sp
+.LP
+and if that fails, it then checks
+.sp
+.LP
+\fB/usr/share/lib/terminfo/a/att4424\fR.
+.sp
+.LP
+This is useful for developing experimental definitions or when write permission
+in \fB/usr/share/lib/terminfo\fR is not available.
+.sp
+.LP
+The integer variables \fBLINES\fR and \fBCOLS\fR are defined in
+\fB<curses.h>\fR and will be filled in by \fBinitscr\fR with the size of the
+screen. The constants \fBTRUE\fR and \fBFALSE\fR have the values \fB1\fR and
+\fB0\fR, respectively.
+.sp
+.LP
+The \fBcurses\fR routines also define the \fBWINDOW *\fR variable \fBcurscr\fR
+which is used for certain low-level operations like clearing and redrawing a
+screen containing garbage. The \fBcurscr\fR can be used in only a few routines.
+.SS "International Functions"
+.sp
+.LP
+The number of bytes and the number of columns to hold a character from the
+supplementary character set is locale-specific (locale category \fBLC_CTYPE\fR)
+and can be specified in the character class table.
+.sp
+.LP
+For editing, operating at the character level is entirely appropriate. For
+screen formatting, arbitrary movement of characters on screen is not desirable.
+.sp
+.LP
+Overwriting characters (\fBaddch\fR, for example) operates on a screen level.
+Overwriting a character by a character that requires a different number of
+columns may produce \fIorphaned columns\fR. These orphaned columns are filled
+with background characters.
+.sp
+.LP
+Inserting characters (\fBinsch\fR, for example) operates on a character level
+(that is, at the character boundaries). The specified character is inserted
+right before the character, regardless of which column of a character the
+cursor points to. Before insertion, the cursor position is adjusted to the
+first column of the character.
+.sp
+.LP
+As with inserting characters, deleting characters (\fBdelch\fR, for example)
+operates on a character level (that is, at the character boundaries). The
+character at the cursor is deleted whichever column of the character the cursor
+points to. Before deletion, the cursor position is adjusted to the first column
+of the character.
+.sp
+.LP
+A \fImulti-column\fR character cannot be put on the last column of a line. When
+such attempts are made, the last column is set to the background character. In
+addition, when such an operation creates orphaned columns, the orphaned columns
+are filled with background characters.
+.sp
+.LP
+Overlapping and overwriting a window follows the operation of overwriting
+characters around its edge. The orphaned columns, if any, are handled as in the
+character operations.
+.sp
+.LP
+The cursor is allowed to be placed anywhere in a window. If the insertion or
+deletion is made when the cursor points to the second or later column position
+of a character that holds multiple columns, the cursor is adjusted to the first
+column of the character before the insertion or deletion.
+.SS "Routine and Argument Names"
+.sp
+.LP
+Many \fBcurses\fR routines have two or more versions. The routines prefixed
+with \fBw\fR require a window argument. The routines prefixed with \fBp\fR
+require a pad argument. Those without a prefix generally use \fBstdscr\fR.
+.sp
+.LP
+The routines prefixed with \fBmv\fR require an \fIx\fR and \fIy\fR coordinate
+to move to before performing the appropriate action. The \fBmv\fR routines
+imply a call to \fBmove\fR(3CURSES) before the call to the other routine. The
+coordinate \fIy\fR always refers to the row (of the window), and \fIx\fR always
+refers to the column. The upper left-hand corner is always (0,0), not (1,1).
+.sp
+.LP
+The routines prefixed with \fBmvw\fR take both a window argument and \fIx\fR
+and \fIy\fR coordinates. The window argument is always specified before the
+coordinates.
+.sp
+.LP
+In each case, \fIwin\fR is the window affected, and \fIpad\fR is the pad
+affected; \fIwin\fR and \fIpad\fR are always pointers to type \fBWINDOW\fR
+.sp
+.LP
+Option setting routines require a Boolean flag \fIbf\fR with the value
+\fBTRUE\fR or \fBFALSE\fR; \fIbf\fR is always of type \fBbool\fR. The variables
+\fIch\fR and \fIattrs\fR below are always of type \fBchtype\fR. The types
+\fBWINDOW\fR, \fBSCREEN\fR, \fBbool\fR, and \fBchtype\fR are defined in
+\fB<curses.h>\fR\&. The type \fBTERMINAL\fR is defined in \fB<term.h>\fR\&. All
+other arguments are integers.
+.SS "Routine Name Index"
+.sp
+.LP
+The following table lists each \fBcurses\fR routine and the name of the manual
+page on which it is described.
+.sp
+.ne 2
+.mk
+.na
+\fBcurses Routine Name\fR
+.ad
+.RS 23n
+.rt  
+Manual Page Name
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBaddwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBadjcurspos\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_alecompat\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBattroff\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBattron\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBattrset\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbaudrate\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbeep\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_beep\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbkgd\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_bkgd\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbkgdset\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_bkgd\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBborder\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_border\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbox\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_border\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBcan_change_color\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBcbreak\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBclear\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBclearok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBclrtobot\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBclrtoeol\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBcolor_content\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBcopywin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_overlay\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBcurs_set\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdef_prog_mode\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdef_shell_mode\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdel_curterm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelay_output\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_delch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdeleteln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_deleteln\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelscreen\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_initscr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBderwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdoupdate\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_refresh\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdupwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBecho\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBechochar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBechowchar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBendwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_initscr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBerase\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBerasechar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBfilter\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBflash\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_beep\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBflushinp\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetbegyx\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getyx\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetmaxyx\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getyx\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetparyx\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getyx\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetsyx\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBgetyx\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getyx\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBhalfdelay\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBhas_colors\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBhas_ic\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBhas_il\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBidcok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBidlok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBimmedok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinit_color\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinit_pair\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinitscr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_initscr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinsch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinsdelln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_deleteln\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinsertln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_deleteln\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinsnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinsnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinsstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinswch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinswstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBintrflush\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBis_linetouched\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_touch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBis_wintouched\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_touch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBisendwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_initscr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBkeyname\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBkeypad\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBkillchar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBleaveok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlongname\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmeta\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmove\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_move\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmovenextch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_alecompat\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmoveprevch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_alecompat\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvaddwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvcur\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvdelch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_delch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvderwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvgetch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvgetnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvgetstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvgetwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvgetwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinsch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinsnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinsnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinsstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinswch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinswstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvinwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvprintw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_printw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvscanw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scanw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwaddwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwdelch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_delch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwgetch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwgetnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwgetstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwgetwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwgetwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinsch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinsnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinsstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinswch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinswstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwinwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwprintw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_printw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmvwscanw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scanw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnapms\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnewpad\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_pad\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnewterm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_initscr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnewwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnl\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnocbreak\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnodelay\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnoecho\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnonl\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnoqiflush\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnoraw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnotimeout\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBoverlay\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_overlay\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBoverwrite\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_overlay\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpair_content\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpechochar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_pad\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpechowchar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_pad\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpnoutrefresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_pad\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBprefresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_pad\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBprintw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_printw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBputp\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBputwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBqiflush\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBraw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBredrawwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_refresh\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBrefresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_refresh\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBreset_prog_mode\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBreset_shell_mode\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBresetty\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBrestartterm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBripoffline\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsavetty\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscanw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scanw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscr_dump\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scr_dump\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscr_init\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scr_dump\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscr_restore\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scr_dump\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscr_set\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scr_dump\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscroll\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scroll\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBscrollok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBset_curterm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBset_term\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_initscr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsetscrreg\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsetsyx\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_kernel\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsetterm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsetupterm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_attroff\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_attron\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_attrset\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_clear\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_init\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_label\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_noutrefresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_refresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_restore\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_set\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslk_touch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_slk\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsrcl\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scroll\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBstandend\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBstandout\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBstart_color\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_color\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsubpad\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_pad\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsubwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsyncok\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtermattrs\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtermname\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termattrs\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtgetent\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termcap\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtgetflag\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termcap\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtgetnum\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termcap\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtgetstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termcap\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtgoto\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_termcap\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtigetflag\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtigetnum\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtigetstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtimeout\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtouchline\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_touch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtouchwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_touch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtparm\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtputs\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBtypeahead\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBunctrl\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBungetch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBungetwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBuntouchwin\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_touch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBuse_env\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_util\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvidattr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvidputs\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_terminfo\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvwprintw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_printw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvwscanw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scanw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwaddwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwadjcurspos\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_alecompat\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwattroff\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwattron\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwattrset\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwbkgd\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_bkgd\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwbkgdset\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_bkgd\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwborder\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_border\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwclear\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwclrtobot\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwclrtoeol\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwcursyncup\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwdelch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_delch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwdeleteln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_deleteln\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwechochar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwechowchar\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_addwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwerase\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_clear\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwgetch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwgetnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwgetnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwgetstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwgetwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwgetwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_getwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwhline\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_border\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinsch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinsdelln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_deleteln\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinsertln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_deleteln\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinsnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinsnwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinsstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_insstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_instr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinswch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinswstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inswstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinwch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinwchnstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinwchstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwchstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwinwstr\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inwstr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwmove\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_move\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwmovenextch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_alecompat\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwmoveprevch\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_alecompat\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwnoutrefresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_refresh\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwprintw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_printw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwredrawln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_refresh\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwrefresh\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_refresh\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwscanw\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scanw\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwscrl\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_scroll\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwsetscrreg\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_outopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwstandend\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwstandout\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_attr\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwsyncdown\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwsyncup\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_window\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwtimeout\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_inopts\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwtouchln\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_touch\fR(3CURSES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBwvline\fR
+.ad
+.RS 23n
+.rt  
+\fBcurs_border\fR(3CURSES)
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return an integer return \fBERR\fR upon failure and an integer
+value other than \fBERR\fR upon successful completion, unless otherwise noted
+in the routine descriptions.
+.sp
+.LP
+All macros return the value of the \fBw\fR version, except \fBsetscrreg()\fR,
+\fBwsetscrreg()\fR, \fBgetyx()\fR, \fBgetbegyx()\fR, and \fBgetmaxyx()\fR. The
+return values of \fBsetscrreg()\fR, \fBwsetscrreg()\fR, \fBgetyx()\fR,
+\fBgetbegyx()\fR, and \fBgetmaxyx()\fR are undefined (that is, these should not
+be used as the right-hand side of assignment statements).
+.sp
+.LP
+Routines that return pointers return \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3XCURSES), \fBlibcurses\fR(3LIB), \fBlibcurses\fR(3XCURSES),
+\fBterminfo\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.

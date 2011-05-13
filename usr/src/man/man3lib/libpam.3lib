@@ -1,0 +1,138 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libpam 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libpam \- PAM (Pluggable Authentication Module) library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpam\fR [ \fIlibrary\fR... ]
+#include <\fBsecurity/pam_appl.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in this library provide routines for the Pluggable Authentication
+Module (PAM).
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibpam.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpam_acct_mgmt\fR\fBpam_authenticate\fR
+\fBpam_chauthtok\fR\fBpam_close_session\fR
+\fBpam_end\fR\fBpam_get_data\fR
+\fBpam_get_item\fR\fBpam_get_user\fR
+\fBpam_getenv\fR\fBpam_getenvlist\fR
+\fBpam_open_session\fR\fBpam_putenv\fR
+\fBpam_set_data\fR\fBpam_set_item\fR
+\fBpam_setcred\fR\fBpam_start\fR
+\fBpam_strerror\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/libpam.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/pam.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+configuration file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/security/pam_dial_auth.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+authentication management  \fBPAM\fR module for dialups
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/security/pam_rhosts_auth.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+authentication management  \fBPAM\fR modules that use \fBruserok()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/security/pam_sample.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+sample \fBPAM\fR module
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpvs\fR(1),  \fBIntro\fR(3),  \fBpam\fR(3PAM), \fBpam.conf\fR(4),
+\fBattributes\fR(5), \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
+\fBpam_authtok_store\fR(5), \fBpam_dial_auth\fR(5), \fBpam_dhkeys\fR(5),
+\fBpam_passwd_auth\fR(5), \fBpam_rhosts_auth\fR(5), \fBpam_sample\fR(5),
+\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
+.SH NOTES
+.sp
+.LP
+The functions in \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.
+.sp
+.LP
+The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
+\fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
+\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), and
+\fBpam_unix_session\fR(5).

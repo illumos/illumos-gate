@@ -1,0 +1,439 @@
+'\" te
+.\" Copyright (c) 1980 Regents of the University
+.\" of California.  All rights reserved.  The Berkeley software License Agreement
+.\"  specifies the terms and conditions for redistribution.
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.TH vgrind 1 "3 Mar 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+vgrind \- grind nice program listings
+.SH SYNOPSIS
+.LP
+.nf
+\fBvgrind\fR [\fB-2fntwx\fR] [\fB-d\fR \fIdefs-file\fR] [\fB-h\fR \fIheader\fR] [\fB-l\fR \fIlanguage\fR] 
+     [\fB-s\fR \fIn\fR] [\fB-o\fR \fIpagelist\fR] [\fB-P\fR \fIprinter\fR] [\fB-T\fR \fIoutput-device\fR] \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvgrind\fR utility formats the program sources named by the
+\fIfilename\fR arguments in a nice style using \fBtroff\fR(1). Comments are
+placed in italics, keywords in bold face, and as each function is encountered
+its name is listed on the page margin.
+.sp
+.LP
+\fBvgrind\fR runs in two basic modes, filter mode or regular mode. In filter
+mode, \fBvgrind\fR acts as a filter in a manner similar to \fBtbl\fR(1). The
+standard input is passed directly to the standard output except for lines
+bracketed by the \fBtroff\fR-like macros:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\&.vS\fR\fR
+.ad
+.RS 9n
+.rt  
+starts processing
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\&.vE\fR\fR
+.ad
+.RS 9n
+.rt  
+ends processing
+.RE
+
+.sp
+.LP
+These lines are formatted as described above. The output from this filter can
+be passed to \fBtroff\fR for output. There need be no particular ordering with
+\fBeqn\fR(1) or \fBtbl\fR(1).
+.sp
+.LP
+In regular mode, \fBvgrind\fR accepts input \fIfilename\fRs, processes them,
+and passes them to \fBtroff\fR for output. Use a hyphen (`\fB\(mi\fR\&') to
+specify standard input; otherwise, \fBvgrind\fR will exit without attempting to
+read from the standard input. Filenames must be specified after all other
+option arguments.
+.sp
+.LP
+In regular mode, if the \fB-t\fR or \fB-P\fR option is specified, the output
+is:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+emitted (in \fBtroff\fR format) to stdout if the \fB-t\fR option is specified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+printed (as PostScript) to the named printer if the \fB-P\fR option is
+specified.
+.RE
+.sp
+.LP
+Otherwise, the output is:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+printed (as PostScript) on the system default printer, if one is defined, and
+the command's stdout is a tty.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+emitted (as PostScript) to stdout if it is not a tty (that is, if stdout is a
+pipe or a redirect to a file).
+.RE
+.sp
+.LP
+In both modes, \fBvgrind\fR passes any lines beginning with a decimal point
+without conversion.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-2\fR\fR
+.ad
+.RS 16n
+.rt  
+Produces two-column output. Specifying this option changes the default point
+size to 8 (as if the \fB-s8\fR option were supplied). It also arranges for
+output to appear in landscape mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 16n
+.rt  
+Forces filter mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 16n
+.rt  
+Does not make keywords boldface.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 16n
+.rt  
+Considers TAB characters to be spaced four columns apart instead of the usual
+eight.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 16n
+.rt  
+Outputs the index file in a "pretty" format. The index file itself is produced
+whenever \fBvgrind\fR is run with a file called \fBindex\fR that is present in
+the current directory. The index of function definitions can then be run off by
+giving \fBvgrind\fR the \fB-x\fR option and the file \fBindex\fR as argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdefs-file\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies an alternate language definitions file (default is
+\fB/usr/lib/vgrindefs\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fIheader\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies a header to appear in the center of every output page. Use quotes to
+specify headers with embedded spaces.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fIlanguage\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the language to use. Among the \fIlanguage\fRs currently known are:
+Bourne shell (\fB-lsh\fR), C (\fB-lc\fR, the default), C++ (\fB-lc++\fR), C
+shell (\fB-lcsh\fR), emacs MLisp (\fB-lml\fR), FORTRAN (\fB-lf\fR), Icon
+(\fB-lI\fR), ISP (\fB-i\fR), LDL (\fB-lLDL\fR), Model (\fB-lm\fR), Pascal
+(\fB-lp\fR), and RATFOR (\fB-lr\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR \fIprinter\fR\fR
+.ad
+.RS 16n
+.rt  
+Sends output to the named \fIprinter\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIn\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies a point size to use on output (exactly the same as the argument of a
+\fBtroff\fR \fB\&.ps\fR point size request).
+.RE
+
+.sp
+.LP
+\fBvgrind\fR passes the following options to the formatter specified by the
+\fBTROFF\fR environment variable. See ENVIRONMENT VARIABLES.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 20n
+.rt  
+Similar to the same option in \fBtroff\fR; that is, formatted text goes to the
+standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIpagelist\fR\fR
+.ad
+.RS 20n
+.rt  
+Prints only those pages whose page numbers appear in the comma-separated
+\fIpagelist\fR of numbers and ranges. A range \fIN\(miM\fR means pages \fIN\fR
+through \fIM\fR; an initial \fB-N\fR means from the beginning to page \fIN\fR;
+and a final \fIN\fR\(mi means from \fIN\fR to the end.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fIoutput-device\fR\fR
+.ad
+.RS 20n
+.rt  
+Formats output for the specified \fIoutput-device\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfilename\fR\fR
+.ad
+.RS 12n
+.rt  
+Name of the program source to be processed by \fBvgrind\fR. Use `\fB\(mi\fR\&'
+to specify the standard input.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+In regular mode, \fBvgrind\fR feeds its intermediate output to the text
+formatter given by the value of the \fBTROFF\fR environment variable, or to
+\fB/usr/bin/troff\fR if this variable is not defined in the environment. This
+mechanism allows for local variations in \fBtroff\fR's name.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBindex\fR\fR
+.ad
+.sp .6
+.RS 4n
+file where source for index is created
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/vgrindefs\fR\fR
+.ad
+.sp .6
+.RS 4n
+language descriptions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/vfontedpr\fR\fR
+.ad
+.sp .6
+.RS 4n
+preprocessor
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/tmac/tmac.vgrind\fR\fR
+.ad
+.sp .6
+.RS 4n
+macro package
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBctags\fR(1), \fBeqn\fR(1), \fBtbl\fR(1), \fBtroff\fR(1),
+\fBattributes\fR(5), \fBvgrindefs\fR(5)
+.SH BUGS
+.sp
+.LP
+\fBvgrind\fR assumes that a certain programming style is followed:
+.sp
+.ne 2
+.mk
+.na
+\fBC\fR
+.ad
+.RS 11n
+.rt  
+Function names can be preceded on a line only by SPACE, TAB, or an asterisk
+(\fB*\fR). The parenthesized arguments must also be on the same line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBFORTRAN\fR
+.ad
+.RS 11n
+.rt  
+Function names need to appear on the same line as the keywords \fBfunction\fR
+or \fBsubroutine\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBMLisp\fR
+.ad
+.RS 11n
+.rt  
+Function names should not appear on the same line as the preceding \fBdefun\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBModel\fR
+.ad
+.RS 11n
+.rt  
+Function names need to appear on the same line as the keywords \fBis
+beginproc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPascal\fR
+.ad
+.RS 11n
+.rt  
+Function names need to appear on the same line as the keywords \fBfunction\fR
+or \fBprocedure\fR.
+.RE
+
+.sp
+.LP
+If these conventions are not followed, the indexing and marginal function name
+comment mechanisms will fail.
+.sp
+.LP
+More generally, arbitrary formatting styles for programs usually give unsightly
+results. To prepare a program for \fBvgrind\fR output, use TAB rather than
+SPACE characters to align source code properly, since \fBvgrind\fR uses
+variable width fonts.
+.sp
+.LP
+The mechanism of \fBctags\fR(1) in recognizing functions should be used here.
+.sp
+.LP
+The \fB-w\fR option is annoying, but there is no other way to achieve the
+desired effect.
+.sp
+.LP
+The macros defined in \fBtmac.vgrind\fR do not coexist gracefully with those of
+other macro packages, making filter mode difficult to use effectively.
+.sp
+.LP
+\fBvgrind\fR does not process certain special characters in \fBcsh\fR(1)
+scripts correctly.
+.sp
+.LP
+The \fBtmac.vgrind\fR formatting macros wire in the page height and width used
+in two-column mode, effectively making two column output useless for paper
+sizes other than the standard American size of 8.5 inches by 11 inches. For
+other paper sizes, it is necessary to edit the size values given in
+\fBtmac.vgrind\fR. A better solution would be to create a \fBtroff\fR output
+device specification intended specifically for landscape output and record size
+information there.

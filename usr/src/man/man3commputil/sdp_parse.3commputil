@@ -1,0 +1,432 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" Portions Copyright (c) The Internet Society (2006) All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sdp_parse 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.SH NAME
+sdp_parse \- parse the SDP description
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR...] \fIfile\fR... -\fBlcommputil\fR [ \fIlibrary\fR...]
+#include <sdp.h>
+
+\fBint\fR \fBsdp_parse\fR(\fBconst char *\fR\fIsdp_info\fR, \fBint\fR \fIlen\fR, \fBint\fR \fIflags\fR,
+     \fBsdp_session_t **\fR\fIsession\fR, \fBuint_t *\fR\fIp_error\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsdp_parse()\fR function parses the SDP description present in
+\fIsdp_info\fR and populates the \fBsdp_session_t\fR structure. The \fIlen\fR
+argument specifies the length of the character buffer \fIsdp_info\fR. The
+\fIflags\fR argument is not used, but must be set to 0, otherwise the call
+fails with the error value of \fBEINVAL\fR and *\fIsession\fR set to
+\fINULL\fR. The function allocates the memory required for the
+\fBsdp_session_t\fR structure and hence the caller is responsible for freeing
+the parsed session structure (\fBsdp_session_t\fR) using
+\fBsdp_free_session()\fR, described on the \fBsdp_new_session\fR(3COMMPUTIL)
+manual page.
+.sp
+.LP
+The \fIp_error\fR argument identifies any field that had a parsing error. It
+cannot be \fINULL\fR and can take any of the following values:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBSDP_VERSION_ERROR\fR0x00000001
+\fBSDP_ORIGIN_ERROR\fR0x00000002
+\fBSDP_NAME_ERROR\fR0x00000004
+\fBSDP_INFO_ERROR\fR0x00000008
+\fBSDP_URI_ERROR\fR0x00000010
+\fBSDP_EMAIL_ERROR\fR0x00000020
+\fBSDP_PHONE_ERROR\fR0x00000040
+\fBSDP_CONNECTION_ERROR\fR0x00000080
+\fBSDP_BANDWIDTH_ERROR\fR0x00000100
+\fBSDP_TIME_ERROR\fR0x00000200
+\fBSDP_REPEAT_TIME_ERROR\fR0x00000400
+\fBSDP_ZONE_ERROR\fR0x00000800
+\fBSDP_KEY_ERROR\fR0x00001000
+\fBSDP_ATTRIBUTE_ERROR\fR0x00002000
+\fBSDP_MEDIA_ERROR\fR0x00004000
+\fBSDP_FIELDS_ORDER_ERROR\fR0x00008000
+\fBSDP_MISSING_FIELDS\fR0x00010000
+.TE
+
+.sp
+.LP
+RFC 4566 states that the fields in the SDP description need to be in a strict
+order. If the fields are not in the order specified in the RFC,
+\fBSDP_FIELDS_ORDER_ERROR\fR will be set.
+.sp
+.LP
+RFC 4566 mandates certain fields to be present in SDP description. If those
+fields are missing then \fBSDP_MISSING_FIELDS\fR will be set.
+.sp
+.LP
+Applications can check for presence of parsing error using the bit-wise
+operators.
+.sp
+.LP
+If there was an error on a particular field, that field information will not be
+in the \fBsdp_session_t\fR structure. Also, parsing continues even if there was
+a field with a parsing error.
+.sp
+.LP
+The \fBsdp_session_t\fR structure is defined in the header file \fB<sdp.h>\fR
+and contains the following members:
+.sp
+.in +2
+.nf
+typedef    struct sdp_session {
+    int              sdp_session_version;  /* SDP session verstion */
+    int              s_version;            /* SDP version field */
+    sdp_origin_t     *s_origin;            /* SDP origin field */
+    char             *s_name;              /* SDP name field */
+    char             *s_info;              /* SDP info field */
+    char             *s_uri;               /* SDP uri field */
+    sdp_list_t       *s_email;             /* SDP email field */
+    sdp_list_t       *s_phone;             /* SDP phone field */
+    sdp_conn_t       *s_conn;              /* SDP connection field */
+    sdp_bandwidth_t  *s_bw;                /* SDP bandwidth field */
+    sdp_time_t       *s_time;              /* SDP time field */
+    sdp_zone_t       *s_zone;              /* SDP zone field */
+    sdp_key_t        *s_key;               /* SDP key field */
+    sdp_attr_t       *s_attr;              /* SDP attribute field */
+    sdp_media_t      *s_media;             /* SDP media field */
+} sdp_session_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_session_version\fR member is used to track the version of the
+structure. Initially it is set to \fBSDP_SESSION_VERSION_1\fR (= 1).
+.sp
+.LP
+The \fBsdp_origin_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_origin {
+    char        *o_username;  /* username of the originating host */
+    uint64_t    o_id;         /* session id */
+    uint64_t    o_version;    /* version number of this session */
+                              /* description */
+    char        *o_nettype;   /* type of network */
+    char        *o_addrtype;  /* type of the address */
+    char        *o_address;   /* address of the machine from which */
+                              /* session was created */
+} sdp_origin_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_conn_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_conn {
+    char            *c_nettype;  /* type of network */
+    char            *c_addrtype; /* type of the address */
+    char            *c_address;  /* unicast-address or multicast */
+                                 /* address */
+    int             c_addrcount; /* number of addresses (case of */
+                                 /* multicast address with layered */
+                                 /* encodings */
+    struct sdp_conn *c_next;     /* pointer to next connection */
+                                 /* structure; there could be several */
+                                 /* connection fields in SDP description */
+    uint8_t         c_ttl;       /* TTL value for IPV4 multicast address */
+} sdp_conn_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_bandwidth_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_bandwidth {
+    char                  *b_type; /* info needed to interpret b_value */
+    uint64_t              b_value; /* bandwidth value */
+    struct sdp_bandwidth  *b_next; /* pointer to next bandwidth structure*/
+                                   /* (there could be several bandwidth */
+                                   /* fields in SDP description */
+} sdp_bandwidth_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_list_t\fR structure is a linked list of void pointers. This
+structure holds SDP fields like email and phone, in which case the void
+pointers point to character buffers.  It to hold information in cases where the
+number of elements is not predefined (for example, offset (in repeat field)
+where void pointer holds integer values or format (in media field) where void
+pointers point to character buffers). The \fBsdp_list_t\fR structure is defined
+as:
+.sp
+.in +2
+.nf
+typedef struct sdp_list {
+    void            *value; /* string values in case of email, phone and */
+                            /* format (in media field) or integer values */
+                            /* in case of offset (in repeat field) */
+    struct sdp_list *next;  /* pointer to the next node in the list */
+} sdp_list_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_repeat_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_repeat {
+    uint64_t          r_interval; /* repeat interval, e.g. 86400 seconds */
+                                  /* (1 day) */
+    uint64_t          r_duration; /* duration of session, e.g. 3600 */
+                                  /* seconds (1 hour) */
+    sdp_list_t        *r_offset;  /* linked list of offset values; each */
+                                  /* represents offset from start-time */
+                                  /* in SDP time field */
+    struct sdp_repeat *r_next;    /* pointer to next repeat structure; */
+                                  /* there could be several repeat */
+                                  /* fields in SDP description */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_repeat_t\fR structure will always be part of the time structure
+\fBsdp_time_t\fR, since the repeat field does not appear alone in SDP
+description and is always associated with the time field.
+.sp
+.LP
+The \fBsdp_time_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_time {
+    uint64_t         t_start;   /* start-time for a session */
+    uint64_t         t_stop;    /* end-time for a session */
+    sdp_repeat_t     *t_repeat; /* points to the SDP repeat field */
+    struct sdp_time  *t_next;   /* pointer to next time field; there */
+                                /* could there could be several time */
+                                /* fields in SDP description */
+} sdp_time_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_zone_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_zone {
+    uint64_t        z_time;    /* base time */
+    char            *z_offset; /* offset added to z_time to determine */
+                               /* session time; mainly used for daylight */
+                               /* saving time conversions */
+    struct sdp_zone *z_next;   /* pointer to next zone field; there */
+                               /* could be several <adjustment-time> */
+                               /* <offset> pairs within a zone field */
+} sdp_zone_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_key_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_key {
+    char   *k_method;   /* key type */
+    char   *k_enckey;   /* encryption key */
+} sdp_key_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_attr_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_attr {
+    char            *a_name;  /* name of the attribute */
+    char            *a_value; /* value of the attribute */
+    struct sdp_attr *a_next;  /* pointer to the next attribute */
+                              /* structure; there could be several */
+                              /* attribute fields within SDP description */
+} sdp_attr_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsdp_media_t\fR structure contains the following members:
+.sp
+.in +2
+.nf
+typedef struct sdp_media {
+    char              *m_name;     /* name of the media such as "audio", */
+                                   /* "video", "message" */
+    uint_t            m_port;      /* transport layer port information */
+    int               m_portcount; /* number of ports in case of */
+                                   /* hierarchically encoded streams */
+    char              *m_proto;    /* transport protocol */
+    sdp_list_t        *m_format;   /* media format description */
+    char              *m_info;     /* media info field */
+    sdp_conn_t        *m_conn;     /* media connection field */
+    sdp_bandwidth_t   *m_bw;       /* media bandwidth field */
+    sdp_key_t         *m_key;      /* media key field */
+    sdp_attr_t        *m_attr;     /* media attribute field */
+    struct sdp_media  *m_next;     /* pointer to next media structure; */
+                                   /* there could be several media */
+                                   /* sections in SDP description */
+    sdp_session_t     *m_session;  /* pointer to the session structure */
+} sdp_media_t;
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsdp_parse()\fR function returns 0 on success and the appropriate error
+value on failure. The value of \fBerrno\fR is not changed by these calls in the
+event of an error.
+.SH ERRORS
+.sp
+.LP
+The \fBsdp_parse()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Arguments to the function were invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Memory allocation failed while parsing \fIsdp_info\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBsdp_parse()\fR example
+.sp
+.LP
+If the SDP description was
+
+.sp
+.in +2
+.nf
+v=0\er\en
+o=jdoe 23423423 234234234 IN IP4 192.168.1.1\er\en
+s=SDP seminar\er\en
+i=A seminar on the session description protocol\er\en
+e=test@host.com
+c=IN IP4 156.78.90.1\er\en
+t=2873397496 2873404696\er\en
+.fi
+.in -2
+
+.sp
+.LP
+then after call to \fBsdp_parse()\fR function the \fBsdp_session_t\fR structure
+would be
+
+.sp
+.in +2
+.nf
+session {
+        sdp_session_version = 1
+        s_version = 0
+        s_origin {
+                o_username = "jdoe"
+                o_id = 23423423ULL
+                o_version = 234234234ULL
+                o_nettype = "IN"
+                o_addrtype = "IP4"
+                o_address = "192.168.1.1"
+        }
+        s_name = "SDP seminar"
+        s_info = "A seminar on the session description protocol"
+        s_uri =  (nil)
+        s_email {
+                value = "test@host.com"
+                next = (nil)
+        }
+        s_phone = (nil)
+        s_conn {
+                c_nettype = "IN"
+                c_addrtype = "IP4"
+                c_address = "156.78.90.1"
+                c_addrcount = 0
+                c_ttl = 0
+                c_next = (nil)
+        }
+        s_bw = (nil)
+        s_time {
+                t_start = 2873397496ULL
+                t_stop = 2873404696ULL
+                t_repeat = (nil)
+                t_next = (nil)
+        }
+        s_zone = (nil)
+        s_key = (nil)
+        s_attr = (nil)
+        s_media = (nil)
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcommputil\fR(3LIB), \fBsdp_new_session\fR(3COMMPUTIL),
+\fBattributes\fR(5)

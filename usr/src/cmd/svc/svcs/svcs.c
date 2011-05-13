@@ -78,6 +78,7 @@
 #include <strings.h>
 #include <time.h>
 #include <libzonecfg.h>
+#include <zone.h>
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -213,12 +214,31 @@ struct ht_elem {
 	struct ht_elem	*next;
 };
 
-static struct ht_elem	**ht_buckets;
-static uint_t		ht_buckets_num;
+static struct ht_elem	**ht_buckets = NULL;
+static uint_t		ht_buckets_num = 0;
 static uint_t		ht_num;
 
 static void
-ht_init()
+ht_free(void)
+{
+	struct ht_elem *elem, *next;
+	int i;
+
+	for (i = 0; i < ht_buckets_num; i++) {
+		for (elem = ht_buckets[i]; elem != NULL; elem = next) {
+			next = elem->next;
+			free((char *)elem->fmri);
+			free(elem);
+		}
+	}
+
+	free(ht_buckets);
+	ht_buckets_num = 0;
+	ht_buckets = NULL;
+}
+
+static void
+ht_init(void)
 {
 	if (ht_buckets != NULL) {
 		/*
@@ -3584,6 +3604,9 @@ main(int argc, char **argv)
 			break;
 
 		case 'z':
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcs -z may only be used from "
+				    "the global zone\n"));
 			if (show_zones)
 				argserr(progname);
 
@@ -3591,6 +3614,9 @@ main(int argc, char **argv)
 			break;
 
 		case 'Z':
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcs -Z may only be used from "
+				    "the global zone\n"));
 			if (opt_zone != NULL)
 				argserr(progname);
 
@@ -3746,7 +3772,7 @@ again:
 
 	if (opt_mode == 'L') {
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_log, NULL, errarg, errfunc)) != 0) {
+		    print_log, NULL, &exit_status, uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3832,6 +3858,14 @@ again:
 
 	switch (opt_mode) {
 	case 0:
+		/*
+		 * If we already have a hash table (e.g., because we are
+		 * processing multiple zones), destroy it before creating
+		 * a new one.
+		 */
+		if (ht_buckets != NULL)
+			ht_free();
+
 		ht_init();
 
 		/* Always show all FMRIs when given arguments or restarters */

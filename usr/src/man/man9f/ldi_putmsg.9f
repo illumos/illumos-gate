@@ -1,0 +1,128 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_putmsg 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_putmsg, ldi_getmsg \- Read/write message blocks from/to a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_putmsg\fR(\fBldi_handle_t\fR\fI lh\fR, \fBmblk_t *\fR\fIsmp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB ldi_getmsg\fR(\fBldi_handle_t\fR \fIlh\fR, \fBmblk_t **\fR\fIrmp\fR, \fBtimestruc_t *\fR\fItimeo\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlh\fR \fR
+.ad
+.RS 10n
+.rt  
+Layered handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsmp\fR \fR
+.ad
+.RS 10n
+.rt  
+Message block to send.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrmp\fR \fR
+.ad
+.RS 10n
+.rt  
+Message block to receive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItimeo\fR \fR
+.ad
+.RS 10n
+.rt  
+Optional timeout for data reception.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_putmsg\fR function allows a caller to send a message block to a
+streams device specified by the layered handle \fIlh\fR. Once the message (smp)
+has been passed to \fBldi_putmsg()\fR, the caller must not free the message
+even if an error occurs.
+.sp
+.LP
+The \fBldi_getmsg()\fR function allows a caller to receive a message block from
+a streams device specified by the layered handle \fIlh\fR. Callers must free
+the message received with \fBfreemsg\fR(9F).
+.sp
+.LP
+If a NULL timeout value is specified when the caller receives a message, the
+caller sleeps until a message is received.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldi_putmsg()\fR and \fBldi_getmsg()\fR functions return \fB0\fR upon
+success. If a failure occurs before the request is passed to the device, the
+possible return values are shown below. Otherwise any other error number may be
+returned by the device.
+.sp
+.ne 2
+.mk
+.na
+\fBEINVAL\fR
+.ad
+.RS 11n
+.rt  
+Invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBENOTSUP\fR
+.ad
+.RS 11n
+.rt  
+Operation is not supported for this device.
+.sp
+The \fBldi_getmsg()\fR function may also return:
+.sp
+.ne 2
+.mk
+.na
+\fBETIME\fR
+.ad
+.RS 9n
+.rt  
+Returned if the timeout \fBtimeo\fR expires with no messages received.
+.RE
+
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user or kernel context.

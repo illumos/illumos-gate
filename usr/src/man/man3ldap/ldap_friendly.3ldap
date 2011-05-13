@@ -1,0 +1,91 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_friendly 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_friendly, ldap_friendly_name, ldap_free_friendlymap \- LDAP attribute
+remapping functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBchar *\fR\fBldap_friendly_name\fR(\fBchar\fR \fI*filename\fR, \fBchar\fR \fI*name\fR,
+     \fBFriendlyMap\fR \fI**map\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_free_friendlymap\fR(\fBFriendlyMap\fR \fI**map\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is used to map one set of strings to another.  Typically, this is
+done for country names, to map from the two-letter country codes to longer more
+readable names.  The mechanism is general enough to be used with other things,
+though.
+.sp
+.LP
+\fIfilename\fR is the name of a file containing the unfriendly to friendly
+mapping, \fIname\fR is the unfriendly name to map to a friendly name, and
+\fImap\fR is a result-parameter that should be set to NULL on the first call.
+It is then used to hold the mapping in core so that the file need not be read
+on subsequent calls.
+.sp
+.LP
+For example:
+.sp
+.in +2
+.nf
+        FriendlyMap *map = NULL;
+        printf( "unfriendly %s => friendly %s\en", name,
+            ldap_friendly_name( "ETCDIR/ldapfriendly", name, &map ) );
+.fi
+.in -2
+
+.sp
+.LP
+The mapping file should contain lines like this: unfriendlyname\etfriendlyname.
+Lines that begin with a '#' character are comments and are ignored.
+.sp
+.LP
+The \fBldap_free_friendlymap()\fR call is used to free structures allocated by
+\fBldap_friendly_name()\fR when no more calls to \fBldap_friendly_name()\fR are
+to be made.
+.SH ERRORS
+.sp
+.LP
+\fINULL\fR is returned by \fBldap_friendly_name()\fR if there is an error
+opening \fIfilename\fR, or if the file has a bad format, or if the \fImap\fR
+parameter is \fINULL\fR.
+.SH FILES
+.sp
+.LP
+\fBETCDIR/ldapfriendly.conf\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBattributes\fR(5)

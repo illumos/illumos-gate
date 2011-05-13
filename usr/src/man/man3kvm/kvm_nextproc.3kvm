@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kvm_nextproc 3KVM "2 May 2002" "SunOS 5.11" "Kernel VM Library Functions"
+.SH NAME
+kvm_nextproc, kvm_getproc, kvm_setproc \- read system process structures
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkvm\fR [ \fIlibrary\fR\&.\|.\|.]
+#include <kvm.h>
+#include <sys/param.h>
+#include <sys/time.h>
+#include <sys/proc.h>
+
+\fBstruct proc *\fR\fBkvm_nextproc\fR(\fBkvm_t *\fR\fIkd\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkvm_setproc\fR(\fBkvm_t *\fR\fIkd\fR);
+.fi
+
+.LP
+.nf
+\fBstruct proc *\fR\fBkvm_getproc\fR(\fBkvm_t *\fR\fIkd\fR, \fBpid_t\fR \fIpid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkvm_nextproc()\fR function reads sequentially all of the system process
+structures from the kernel identified by \fIkd\fR (see \fBkvm_open\fR(3KVM)).
+Each call to \fBkvm_nextproc()\fR returns a pointer to the static memory area
+that contains a copy of the next valid process table entry. There is no
+guarantee that the data will remain valid across calls to \fBkvm_nextproc()\fR,
+\fBkvm_setproc()\fR, or \fBkvm_getproc()\fR. If the process structure must be
+saved, it should be copied to non-volatile storage.
+.sp
+.LP
+For performance reasons, many implementations will cache a set of system
+process structures. Since the system state is liable to change between calls to
+\fBkvm_nextproc()\fR, and since the cache may contain obsolete information,
+there is no guarantee that every process structure returned refers to an active
+process, nor is it certain that all processes will be reported.
+.sp
+.LP
+The \fBkvm_setproc()\fR function rewinds the process list, enabling
+\fBkvm_nextproc()\fR to rescan from the beginning of the system process table.
+This function will always flush the process structure cache, allowing an
+application to re-scan the process table of a running system.
+.sp
+.LP
+The \fBkvm_getproc()\fR function locates the \fBproc\fR structure of the
+process specified by \fIpid\fR and returns a pointer to it.  Although this
+function does not interact with the process table pointer manipulated by
+\fBkvm_nextproc()\fR, the restrictions regarding the validity of the data still
+apply.
+.SH RETURN VALUES
+.sp
+.LP
+On success, \fBkvm_nextproc()\fR returns a pointer to a copy of the next valid
+process table entry. On failure, it returns \fINULL\fR.
+.sp
+.LP
+On success, \fBkvm_getproc()\fR returns a pointer to the \fIproc\fR structure
+of the process specified by \fIpid\fR. On failure, it returns \fINULL\fR.
+.sp
+.LP
+The \fBkvm_setproc()\fR function returns 0 on success and \(mi1 on failure.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkvm_getu\fR(3KVM), \fBkvm_open\fR(3KVM), \fBkvm_kread\fR(3KVM),
+\fBattributes\fR(5)

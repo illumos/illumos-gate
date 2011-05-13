@@ -1,0 +1,273 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setflabel 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+setflabel \- move file to zone with corresponding sensitivity label
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBint\fR \fBsetflabel\fR(\fBconst char *\fR\fIpath\fR, \fBconst m_label_t *\fR\fIlabel_p\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The file that is named by \fIpath\fR is relabeled by moving it to a new
+pathname relative to the root directory of the zone corresponding to
+\fIlabel_p\fR. If the source and destination file systems are loopback mounted
+from the same underlying file system, the file is renamed. Otherwise, the file
+is copied and removed from the source directory.
+.sp
+.LP
+The \fBsetflabel()\fR function enforces the following policy checks:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the sensitivity label of \fIlabel_p\fR equals the existing sensitivity
+label, then the file is not moved.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the corresponding directory does not exist in the destination zone, or if
+the directory exists, but has a different label than \fIlabel_p\fR, the file is
+not moved. Also, if the file already exists in the destination directory, the
+file is not moved.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the sensitivity label of the existing file is not equal to the calling
+process label and the caller is not in the global zone, then the file is not
+moved. If the caller is in the global zone, the existing file label must be in
+a labeled zone (not \fBADMIN_LOW\fR or \fBADMIN_HIGH\fR).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the calling process does not have write access to both the source and
+destination directories, then the calling process must have
+\fBPRIV_FILE_DAC_WRITE\fR in its set of effective privileges.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the sensitivity label of \fIlabel_p\fR provides read only access to the
+existing sensitivity label (an upgrade), then the user must have the
+\fBsolaris.label.file.upgrade\fR authorization. In addition, if the current
+zone is a labeled zone, then it must have been assigned the privilege
+\fBPRIV_FILE_UPGRADE_SL\fR when the zone was configured.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the sensitivity label of \fIlabel_p\fR does not provide access to the
+existing sensitivity label (a downgrade), then the calling user must have the
+\fBsolaris.label.file.downgrade\fR authorization. In addition, if the current
+zone is a labeled zone, then it must have been assigned the privilege
+\fBPRIV_FILE_DOWNGRADE_SL\fR when the zone was configured.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the calling process is not in the global zone, and the user does not have
+the \fBsolaris.label.range\fR authorization, then \fIlabel_p\fR must be within
+the user's label range and within the system accreditation range.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the existing file is in use (not tranquil) it is not moved. This tranquility
+check does not cover race conditions nor remote file access.
+.RE
+.sp
+.LP
+Additional policy constraints can be implemented by customizing the shell
+script \fB/etc/security/tsol/relabel\fR. See the comments in this file.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsetflabel()\fR returns 0. Otherwise it returns
+-1 and sets \fIerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsetflabel()\fR function fails and the file is unchanged if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied for a component of the path prefix of \fIpath\fR.
+.sp
+The calling process does not have mandatory write access to the final component
+of path because the sensitivity label of the final component of path does not
+dominate the sensitivity label of the calling  process and the calling process
+does not have \fBPRIV_FILE_MAC_WRITE\fR in its set of effective privileges.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 16n
+.rt  
+There is an open file descriptor reference to the final component of
+\fIpath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECONNREFUSED\fR\fR
+.ad
+.RS 16n
+.rt  
+A connection to the label daemon could not be established.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEEXIST\fR\fR
+.ad
+.RS 16n
+.rt  
+A file with the same name exists in the destination directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+Improper parameters were received by the label daemon.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEISDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+The existing file is a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in translating \fIpath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The existing file is hardlinked to another file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the path argument exceeds \fIPATH_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+The file referred to by \fIpath\fR does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+The file system is read-only or its label is \fBADMIN_LOW\fR or
+\fBADMIN_HIGH\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.16i) |cw(3.34i) 
+lw(2.16i) |lw(3.34i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibtsol\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+\fISetting a File Sensitivity Label\fR in \fISolaris Trusted Extensions
+Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

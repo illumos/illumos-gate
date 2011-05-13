@@ -1,0 +1,598 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Intro 1 "18 Nov 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+Intro, intro \- introduction to commands and application programs
+.SH DESCRIPTION
+.sp
+.LP
+This section describes, in alphabetical order, commands available with this
+operating system.
+.sp
+.LP
+Pages of special interest are categorized as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB1B\fR
+.ad
+.RS 6n
+.rt  
+Commands found only in the \fISunOS/BSD Compatibility Package\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB1C\fR
+.ad
+.RS 6n
+.rt  
+Commands for communicating with other systems.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB1F\fR
+.ad
+.RS 6n
+.rt  
+Commands associated with \fIForm and Menu Language Interpreter\fR (FMLI).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB1S\fR
+.ad
+.RS 6n
+.rt  
+Commands specific to SunOS.
+.RE
+
+.SS "OTHER SECTIONS"
+.sp
+.LP
+See the following sections of the SunOS Reference Manual for more information.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Section 1M for system maintenance commands.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Section 4 for information on file formats.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Section 5 for descriptions of publicly available files and miscellaneous
+information pages.
+.RE
+.sp
+.LP
+For tutorial information about these commands and procedures, see \fISolaris
+Advanced User\&'s Guide\fR.
+.SS "Manual Page Command Syntax"
+.sp
+.LP
+Unless otherwise noted, commands described in the SYNOPSIS section of a manual
+page accept options and other arguments according to the following syntax and
+should be interpreted as explained below.
+.sp
+.LP
+\fIname\fR [\fB-\fR\fIoption\fR...] [\fIcmdarg\fR...] where:
+.sp
+.ne 2
+.mk
+.na
+\fB[ ]\fR
+.ad
+.RS 15n
+.rt  
+Surround an \fIoption\fR or \fIcmdarg\fR that is not required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fI\&...\fR\fR
+.ad
+.RS 15n
+.rt  
+Indicates multiple occurrences of the \fIoption\fR or \fIcmdarg\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 15n
+.rt  
+The name of an executable file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB{ }\fR
+.ad
+.RS 15n
+.rt  
+The options and/or arguments enclosed within braces are interdependent, such
+that everything enclosed must be treated as a unit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoption\fR\fR
+.ad
+.RS 15n
+.rt  
+(Always preceded by a "\(mi".) \fInoargletter\fR... or, \fIargletter\fR
+\fIoptarg\fR[\fB,\fR...]
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInoargletter\fR\fR
+.ad
+.RS 15n
+.rt  
+A single letter representing an option without an option-argument. Notice that
+more than one \fInoargletter\fR option can be grouped after one "\(mi"
+(Guideline 5, below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIargletter\fR\fR
+.ad
+.RS 15n
+.rt  
+A single letter representing an option requiring an option-argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoptarg\fR\fR
+.ad
+.RS 15n
+.rt  
+An option-argument (character string) satisfying a preceding \fIargletter\fR.
+Notice that groups of \fIoptargs\fR following an \fIargletter\fR must be
+separated by commas, or separated by a tab or space character and quoted
+(Guideline 8, below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmdarg\fR\fR
+.ad
+.RS 15n
+.rt  
+Path name (or other command argument) \fInot\fR beginning with "\(mi", or
+"\(mi" by itself indicating the standard input.
+.RE
+
+.sp
+.LP
+Unless otherwise specified, whenever an operand or option-argument is, or
+contains, a numeric value:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The number is interpreted as a decimal integer.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Numerals in the range 0 to 2147483647 are syntactically recognized as numeric
+values.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When the utility description states that it accepts negative numbers as
+operands or option-arguments, numerals in the range -2147483647 to 2147483647
+are syntactically recognized as numeric values.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Ranges greater than those listed here are allowed.
+.RE
+.SS "Command Syntax Standard: Guidelines"
+.sp
+.LP
+These command syntax guidelines are not followed by all current commands, but
+new commands are likely to obey them. \fBgetopts\fR(1) should be used by all
+shell procedures to parse positional parameters and to check for legal options.
+It supports Guidelines 3-10 below. The enforcement of the other guidelines must
+be done by the command itself.
+.RS +4
+.TP
+1.
+Command names (\fIname\fR above) should be between two and nine characters
+long.
+.RE
+.RS +4
+.TP
+2.
+Command names should include only lower-case letters and digits.
+.RE
+.RS +4
+.TP
+3.
+Option names (\fIoption\fR above) must be one character long.
+.RE
+.RS +4
+.TP
+4.
+All options must be preceded by "\(mi".
+.RE
+.RS +4
+.TP
+5.
+Options with no arguments can be grouped after a single "\(mi".
+.RE
+.RS +4
+.TP
+6.
+The first option-argument (\fIoptarg\fR above) following an option must be
+preceded by a tab or space character.
+.RE
+.RS +4
+.TP
+7.
+Option-arguments cannot be optional.
+.RE
+.RS +4
+.TP
+8.
+Groups of option-arguments following an option must either be separated by
+commas or separated by tab or space character and quoted (\fB-o\fR xxx,z,yy or
+\fB-o\fR"xxx z yy").
+.RE
+.RS +4
+.TP
+9.
+All options must precede operands (\fIcmdarg\fR above) on the command line.
+.RE
+.RS +4
+.TP
+10.
+"\(mi\|\(mi" can be used to indicate the end of the options.
+.RE
+.RS +4
+.TP
+11.
+The order of the options relative to one another should not matter.
+.RE
+.RS +4
+.TP
+12.
+The relative order of the operands (\fIcmdarg\fR above) can affect their
+significance in ways determined by the command with which they appear.
+.RE
+.RS +4
+.TP
+13.
+"\(mi" preceded and followed by a white space character should only be used
+to mean standard input.
+.RE
+.sp
+.LP
+An expanded set of guidelines referred to as CLIP for Command Line Interface
+Paradigm has been developed for Solaris and other Sun products. Its intent is
+to provide a command line syntax more closely aligned with the GNU command line
+syntax popular on Linux systems.There is no intent to retrofit existing
+utilities or even to apply this to all new utilities. It is only intended to be
+applied to sets of utilities being developed when appropriate.
+.sp
+.LP
+CLIP is a full superset of the guidelines discussed above which are closely
+aligned with IEEE Std. 1003.1-2001 (SUSv3). It does not include all the GNU
+syntax. The GNU syntax allows constructs that either conflict with the IEEE
+rules or are ambiguous. These constructs are not allowed.
+.sp
+.LP
+The expanded CLIP command line syntax is:
+.sp
+.in +2
+.nf
+utility_name -a --longopt1 -c option_argument \e
+   -f option_argument --longopt2=option_argument \e
+   --longopt3 option_argument operand
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The utility in the example is named \fButility_name\fR. It is followed by
+options, option-arguments, and operands, collectively referred to as arguments.
+The arguments that consist of a hyphen followed a single letter or digit, such
+as \fB-a\fR, are known as short-options \&. The arguments that consist of two
+hyphens followed by a series of letters, digits and hyphens, such as
+\fB--longopt1\fR, are known as long-options . Collectively, short-options and
+long-options are referred to as options (or historically, flags ). Certain
+options are followed by an option-argument, as shown with \fB-c\fR
+option_argument . The arguments following the last options and option-arguments
+are named operands. Once the first operand is encountered, all subsequent
+arguments are interpreted to be operands.
+.sp
+.LP
+Option-arguments are sometimes shown separated from their short-options by
+BLANKSs, sometimes directly adjacent. This reflects the situation that in some
+cases an option-argument is included within the same argument string as the
+option; in most cases it is the next argument. This specification requires that
+the option be a separate argument from its option-argument, but there are some
+exceptions to ensure continued operation of historical applications:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fBSYNOPSIS\fR of a utility shows a SPACE between a short-option and
+option-argument (as with \fB-c\fR option_argument in the example), the
+application uses separate arguments for that option and its option-argument.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If a SPACE is not shown (as with \fB-f\fR option_argument in the example), the
+application expects an option and its option-argument directly adjacent in the
+same argument string, without intervening BLANKs.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Notwithstanding the preceding requirements, an application should accept
+short-options and option-arguments as a single argument or as separate
+arguments whether or not a SPACE is shown on the synopsis line.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Long-options with option-arguments are always documented as using an equals
+sign as the separator between the option name and the option-argument. If the
+\fBOPTIONS\fR section of a utility shows an equals sign (\fB=\fR) between a
+long-option and its option-argument (as with \fB--longopt2= option_argument\fR
+in the example), a application shall also permit the use of separate arguments
+for that option and its option-argument (as with \fB--longopt1
+option_argument\fR in the example).
+.RE
+.sp
+.LP
+CLIP expands the guidelines discussed with the following additional guidelines:
+.sp
+.ne 2
+.mk
+.na
+\fB14.\fR
+.ad
+.RS 7n
+.rt  
+The form \fBcommand subcommand [options] [operands]\fR is appropriate for
+grouping similar operations. Subcommand names should follow the same
+conventions as command names as specified in guidelines 1 and 2.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB15.\fR
+.ad
+.RS 7n
+.rt  
+Long-options should be preceded by \fB--\fR and should include only
+alphanumeric characters and hyphens from the portable character set. Option
+names are typically one to three words long, with hyphens to separate words.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB16.\fR
+.ad
+.RS 7n
+.rt  
+\fB--name=argument\fR should be used to specify an option-argument for a
+long-option. The form \fB--name argument\fR is also accepted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB17.\fR
+.ad
+.RS 7n
+.rt  
+All utilities should support two standard long-options: \fB--version\fR (with
+the short-option synonym \fB-V\fR ) and \fB--help\fR (with the short-option
+synonym \fB-?\fR ). The short option synonyms for \fB--\fRversion can vary if
+the preferred synonym is already in use (but a  synonym shall be provided).
+Both of these options stop further argument processing when encountered and
+after displaying the appropriate output, the utility successfully exits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB18.\fR
+.ad
+.RS 7n
+.rt  
+Every short-option should have exactly one corresponding long-option and every
+long-option should have exactly one corresponding short-option. Synonymous
+options can be allowed in the interest of compatibility with historical
+practice or community versions of equivalent utilities.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB19.\fR
+.ad
+.RS 7n
+.rt  
+The short-option name should get its name from the long-option name according
+to these rules:
+.RS +4
+.TP
+1.
+Use the first letter of the long-option name for the short-option name.
+.RE
+.RS +4
+.TP
+2.
+If the first letter conflicts with other short-option names, choose a
+prominent consonant.
+.RE
+.RS +4
+.TP
+3.
+If the first letter and the prominent consonant conflict with other
+shortoption names, choose a prominent vowel.
+.RE
+.RS +4
+.TP
+4.
+If none of the letters of the long-option name are usable, select an
+arbitrary character.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB20.\fR
+.ad
+.RS 7n
+.rt  
+If a long-option name consists of a single character, it must use the same
+character as the short-option name. Single character long-options should be
+avoided. They are only allowed for the exceptionally rare case that a single
+character is the most  descriptive name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB21.\fR
+.ad
+.RS 7n
+.rt  
+The subcommand in the form described in guideline 1 of the additional CLIP
+guidelines is generally required. In the case where it is omitted, the command
+shall take no operands and only options which are defined to stop further
+argument processing when encountered are allowed. Invoking a command of this
+form without a subcommand and no arguments is an error. This guideline is
+provided to allow the common forms command \fB--help\fR, command \fB-?\fR,
+command \fB--version\fR, and command \fB-V\fR to be accepted in the
+command-subcommand construct.
+.RE
+
+.sp
+.LP
+Several of these guidelines are only of interest to the authors of utilities.
+They are provided here for the use of anyone wanting to author utilities
+following this syntax.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a discussion of the attributes listed in this
+section.
+.SH ACKNOWLEDGMENTS
+.sp
+.LP
+Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
+reproduce portions of its copyrighted documentation. Original documentation
+from The Open Group can be obtained online at
+http://www.opengroup.org/bookstore/\&.
+.sp
+.LP
+The Institute of Electrical and Electronics Engineers and The Open Group, have
+given us permission to reprint portions of their documentation.
+.sp
+.LP
+In the following statement, the phrase ``this text'' refers to portions of the
+system documentation.
+.sp
+.LP
+Portions of this text are reprinted and reproduced in electronic form in the
+SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
+Information Technology -- Portable Operating System Interface (POSIX), The Open
+Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of
+Electrical and Electronics Engineers, Inc and The Open Group.  In the event of
+any discrepancy between these versions and the original IEEE and The Open Group
+Standard, the original IEEE and The Open Group Standard is the referee
+document.  The original Standard can be obtained online at
+http://www.opengroup.org/unix/online.html\&.
+.sp
+.LP
+This notice shall appear on any product containing this material.
+.SH SEE ALSO
+.sp
+.LP
+\fBgetopts\fR(1), \fBwait\fR(1), \fBexit\fR(2), \fBgetopt\fR(3C),
+\fBwait\fR(3UCB), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+Upon termination, each command returns two bytes of status, one supplied by the
+system and giving the cause for termination, and (in the case of "normal"
+termination) one supplied by the program [see \fBwait\fR(3UCB) and
+\fBexit\fR(2)]. The former byte is \fB0\fR for normal termination. The latter
+byte is customarily \fB0\fR for successful execution and non-zero to indicate
+troubles such as erroneous parameters, or bad or inaccessible data. It is
+called variously "exit code", "exit status", or "return code", and is described
+only where special conventions are involved.
+.SH WARNINGS
+.sp
+.LP
+Some commands produce unexpected results when processing files containing null
+characters. These commands often treat text input lines as strings and
+therefore become confused upon encountering a null character (the string
+terminator) within a line.

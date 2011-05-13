@@ -1,0 +1,479 @@
+'\" te
+.\" Copyright (c) 2007 by Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH proc_service 3PROC "12 Oct 2007" "SunOS 5.11" "Process Control Library Functions"
+.SH NAME
+proc_service \- process service interfaces
+.SH SYNOPSIS
+.LP
+.nf
+#include <proc_service.h> 
+
+\fBps_err_e\fR \fBps_pdmodel\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBint *\fR\fIdata_model\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pglobal_lookup\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBconst char *\fR\fIobject_name\fR, \fBconst char *\fR\fIsym_name\fR,
+     \fBpsaddr_t *\fR\fIsym_addr\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pglobal_sym\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBconst char *\fR\fIobject_name\fR, \fBconst char *\fR\fIsym_name\fR,
+     \fBps_sym_t *\fR\fIsym\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pread\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pwrite\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pdread\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pdwrite\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_ptread\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_ptwrite\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBpsaddr_t\fR \fIaddr\fR,
+     \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pstop\fR(\fBstruct ps_prochandle *\fR\fIph\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pcontinue\fR(\fBstruct ps_prochandle *\fR\fIph\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lstop\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lcontinue\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lgetregs\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR,
+     \fBprgregset_t\fR \fIgregset\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lsetregs\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR,
+     \fBconst prgregset_t\fR \fIgregset\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lgetfpregs\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR,
+     \fBprfpregset_t *\fR\fIfpregset\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lsetfpregs\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR,
+     \fBconst prfpregset_t *\fR\fIfpregset\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pauxv\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBconst auxv_t **\fR\fIauxp\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_kill\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBint\fR \fIsig\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lrolltoaddr\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBlwpid_t\fR \fIlwpid\fR, \fBpsaddr_t\fR \fIgo_addr\fR, \fBpsaddr_t\fR \fIstop_addr\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBps_plog\fR(\fBconst char *\fR\fIfmt\fR);
+.fi
+
+.SS "SPARC"
+.LP
+.nf
+\fBps_err_e\fR \fBps_lgetxregsize\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBlwpid_t\fR \fIlwpid\fR, \fBint *\fR\fIxregsize\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lgetxregs\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBlwpid_t\fR \fIlwpid\fR, \fBcaddr_t\fR \fIxregset\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lsetxregs\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBlwpid_t\fR \fIlwpid\fR, \fBcaddr_t\fR \fIxregset\fR);
+.fi
+
+.SS "x86"
+.LP
+.nf
+\fBps_err_e\fR \fBps_lgetLDT\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR,
+     \fBstruct ssd *\fR\fIldt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Every program that links \fBlibthread_db\fR or \fBlibrtld_db\fR must provide a
+set of process control primitives that allow \fBlibthread_db\fR and
+\fBlibrtld_db\fR to access memory and registers in the target process, to start
+and to stop the target process, and to look up symbols in the target process.
+See \fBlibc_db\fR(3LIB). For information on \fBlibrtld_db\fR, refer to the
+\fILinker and Libraries Guide\fR.
+.sp
+.LP
+Refer to the individual reference manual pages that describe these routines for
+a functional specification that clients of \fBlibthread_db\fR and
+\fBlibrtld_db\fR can use to implement this required interface. The
+<\fBproc_service.h\fR> header lists the C declarations of these routines.
+.SH FUNCTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pdmodel()\fR\fR
+.ad
+.RS 23n
+.rt  
+Returns the data model of the target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pglobal_lookup()\fR\fR
+.ad
+.RS 23n
+.rt  
+Looks up the symbol in the symbol table of the load object in the target
+process and returns its address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pglobal_sym()\fR\fR
+.ad
+.RS 23n
+.rt  
+Looks up the symbol in the symbol table of the load object in the target
+process and returns its symbol table entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pread()\fR\fR
+.ad
+.RS 23n
+.rt  
+Copies \fIsize\fR bytes from the target process to the controlling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pwrite()\fR\fR
+.ad
+.RS 23n
+.rt  
+Copies \fIsize\fR bytes from the controlling process to the target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pdread()\fR\fR
+.ad
+.RS 23n
+.rt  
+Identical to \fBps_pread()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pdwrite()\fR\fR
+.ad
+.RS 23n
+.rt  
+Identical to \fBps_pwrite()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_ptread()\fR\fR
+.ad
+.RS 23n
+.rt  
+Identical to \fBps_pread()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_ptwrite()\fR\fR
+.ad
+.RS 23n
+.rt  
+Identical to \fBps_pwrite()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pstop()\fR\fR
+.ad
+.RS 23n
+.rt  
+Stops the target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pcontinue()\fR\fR
+.ad
+.RS 23n
+.rt  
+Resumes target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lstop()\fR\fR
+.ad
+.RS 23n
+.rt  
+Stops a single lightweight process ( \fBLWP\fR ) within the target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lcontinue()\fR\fR
+.ad
+.RS 23n
+.rt  
+Resumes a single \fBLWP\fR within the target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lgetregs()\fR\fR
+.ad
+.RS 23n
+.rt  
+Gets the general registers of the \fBLWP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lsetregs()\fR\fR
+.ad
+.RS 23n
+.rt  
+Sets the general registers of the \fBLWP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lgetfpregs()\fR\fR
+.ad
+.RS 23n
+.rt  
+Gets the \fBLWP`s\fR floating point register set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lsetfpregs()\fR\fR
+.ad
+.RS 23n
+.rt  
+Sets the \fBLWP`s\fR floating point register set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_pauxv()\fR\fR
+.ad
+.RS 23n
+.rt  
+Returns a pointer to a read-only copy of the target process's auxiliary vector.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_kill()\fR\fR
+.ad
+.RS 23n
+.rt  
+Sends signal to target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lrolltoaddr()\fR\fR
+.ad
+.RS 23n
+.rt  
+Rolls the \fBLWP\fR out of a critical section when the process is stopped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_plog()\fR\fR
+.ad
+.RS 23n
+.rt  
+Logs a message.
+.RE
+
+.SS "SPARC"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lgetxregsize()\fR\fR
+.ad
+.RS 21n
+.rt  
+Returns the size of the architecture-dependent extra state registers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lgetxregs()\fR\fR
+.ad
+.RS 21n
+.rt  
+Gets the extra state registers of the \fBLWP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lsetxregs()\fR\fR
+.ad
+.RS 21n
+.rt  
+Sets the extra state registers of the \fBLWP\fR.
+.RE
+
+.SS "x86"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBps_lgetLDT()\fR\fR
+.ad
+.RS 16n
+.rt  
+Reads the local descriptor table of the \fBLWP\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBlibrtld_db\fR(3LIB), \fBps_pread\fR(3PROC),
+\fBrtld_db\fR(3EXT), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

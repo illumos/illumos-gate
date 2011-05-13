@@ -1,0 +1,100 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH inet.h 3HEAD "30 Aug 2002" "SunOS 5.11" "Headers"
+.SH NAME
+inet.h, inet \- definitions for internet operations
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <arpa/inet.h>\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBarpa/inet.h\fR> header defines the type \fBin_port_t\fR, the type
+\fBin_addr_t\fR, and the \fBin_addr\fR structure, as described in
+\fBin.h\fR(3HEAD).
+.sp
+.LP
+Inclusion of the <\fBarpa/inet.h\fR> header may also make visible all symbols
+from \fBin.h\fR(3HEAD).
+.sp
+.LP
+The following are declared as functions, and may also be defined as macros:
+.sp
+.in +2
+.nf
+in_addr_t       inet_addr(const char *);
+in_addr_t       inet_lnaof(struct in_addr);
+struct in_addr  inet_makeaddr(in_addr_t, in_addr_t);
+in_addr_t       inet_netof(struct in_addr);
+in_addr_t       inet_network(const char *);
+char            *inet_ntoa(struct in_addr); 
+.fi
+.in -2
+
+.SS "Default"
+.sp
+.LP
+For applications that do not require standard-conforming behavior (those that
+use the socket interfaces described in section 3N of the reference manual; see
+\fBIntro\fR(3) and \fBstandards\fR(5)), the following may be declared as
+functions, or defined as macros, or both:
+.sp
+.in +2
+.nf
+uint32_t    htonl(uint32_t);
+uint16_t    htons(uint16_t);
+uint32_t    ntohl(uint32_t);
+uint16_t    ntohs(uint16_t);
+.fi
+.in -2
+
+.SS "Standard conforming"
+.sp
+.LP
+For applications that require standard-conforming behavior (those that use the
+socket interfaces described in section 3XN of the reference manual; see
+\fBIntro\fR(3) and \fBstandards\fR(5)), the following may be declared as
+functions, or defined as macros, or both:
+.sp
+.in +2
+.nf
+in_addr_t    htonl(in_addr_t);
+in_port_t    htons(in_port_t);
+in_addr_t    ntohl(in_addr_t);
+in_port_t    ntohs(in_port_t);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fBhtonl\fR(3SOCKET), \fBhtonl\fR(3XNET),
+\fBinet_addr\fR(3SOCKET), \fBinet_addr\fR(3XNET), \fBin.h\fR(3HEAD),
+\fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,126 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH flushq 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+flushq \- remove messages from a queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBvoid\fR \fBflushq\fR(\fBqueue_t *\fR\fIq\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to the queue to be flushed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 8n
+.rt  
+Valid \fIflag\fR values are:
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFLUSHDATA\fR\fR
+.ad
+.RS 13n
+.rt  
+Flush only data messages (types \fBM_DATA\fR \fBM_DELAY\fR \fBM_PROTO\fR and
+\fBM_PCPROTO\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFLUSHALL\fR\fR
+.ad
+.RS 13n
+.rt  
+Flush all messages.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBflushq()\fR function frees messages and their associated data structures
+by calling \fBfreemsg\fR(9F). If the queue's count falls below the low water
+mark and the queue was blocking an upstream service procedure, the nearest
+upstream service procedure is enabled.
+.SH CONTEXT
+.sp
+.LP
+The \fBflushq()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBflushq()\fR
+.sp
+.LP
+This example depicts the canonical flushing code for STREAMS modules. The
+module has a write service procedure and potentially has messages on the queue.
+If it receives an \fBM_FLUSH\fR message, and if the \fBFLUSHR\fR bit is on in
+the first byte of the message (line 10), then the read queue is flushed (line
+11). If the \fBFLUSHW\fR bit is on (line 12), then the write queue is flushed
+(line 13). Then the message is passed along to the next entity in the stream
+(line 14). See the example for \fBqreply\fR(9F) for the canonical flushing code
+for drivers.
+
+.sp
+.in +2
+.nf
+      1  /*
+      2   * Module write-side put procedure.
+      3   */
+      4  xxxwput(q, mp)
+      5      queue_t *q;
+      6      mblk_t *mp;
+      7  {
+      8   switch(mp->b_datap->db_type) {
+      9      case M_FLUSH:
+     10        if (*mp->b_rptr & FLUSHR)
+     11             flushq(RD(q), FLUSHALL);
+     12        if (*mp->b_rptr & FLUSHW)
+     13             flushq(q, FLUSHALL);
+     14        putnext(q, mp);
+     15        break;
+               . . .
+     16   }
+     17  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBflushband\fR(9F), \fBfreemsg\fR(9F), \fBputq\fR(9F), \fBqreply\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR \fISTREAMS Programming Guide\fR

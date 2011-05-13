@@ -1,0 +1,169 @@
+'\" te
+.\"  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volmgt_symname 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+volmgt_symname, volmgt_symdev \- convert between Volume Management symbolic
+names, and the devices that correspond to them
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lvolmgt\fR [ \fIlibrary\fR... ]
+#include <volmgt.h>
+
+\fBchar *\fR\fBvolmgt_symname\fR(\fBchar *\fR\fIpathname\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBvolmgt_symdev\fR(\fBchar *\fR\fIsymname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+These two routines compliment each other, translating between Volume
+Management's symbolic name for a device, called a \fIsymname\fR, and the
+\fB/dev\fR \fIpathname\fR for that same device.
+.sp
+.LP
+\fBvolmgt_symname\fR(\|) converts a supplied \fB/dev\fR \fIpathname\fR to a
+\fBsymname\fR, Volume Management's idea of that device's symbolic name.
+.sp
+.LP
+\fBvolmgt_symdev\fR(\|) does the opposite conversion, converting between a
+\fIsymname\fR, Volume Management's idea of a device's symbolic name for a
+volume, to the \fB/dev\fR \fIpathname\fR for that device.
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH ERRORS
+.sp
+.LP
+\fBvolmgt_symname\fR(\|) can fail, returning a null string pointer, if a
+\fBstat\fR(2) of the supplied \fBpathname\fR fails, or if an \fBopen\fR(2) of
+\fB/dev/volctl\fR fails, or if any of the following is true:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+.rt  
+Volume Management is not running.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+An interrupt signal was detected while trying to convert the supplied
+\fIpathname\fR to a \fIsymname\fR.
+.RE
+
+.sp
+.LP
+\fBvolmgt_symdev\fR(\|) can fail if an \fBopen\fR(2) of \fB/dev/volctl\fR
+fails, or if any of the following is true:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+.rt  
+Volume Management is not running.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+An interrupt signal was detected while trying to convert the supplied
+\fIsymname\fR to a \fB/dev\fR \fIpathname\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTesting Floppies
+.sp
+.LP
+The following tests how many floppies Volume Management currently sees in
+floppy drives (up to 10):
+
+.sp
+.in +2
+.nf
+for (i=0; i < 10; i++) {
+        (void) sprintf(path, "floppy%d", i);
+        if (volmgt_symdev(path) != NULL) {
+                (void) printf("volume %s is in drive %d\en",
+                    path, i);
+        }
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRFinding The Symbolic Name
+.sp
+.LP
+This code finds out what symbolic name (if any) Volume Management has for
+\fB/dev/rdsk/c0t6d0s2\fR:
+
+.sp
+.in +2
+.nf
+if ((nm = volmgt_symname("/dev/rdsk/c0t6d0s2")) == NULL) {
+        (void) printf("path not managed\en");
+} else {
+        (void) printf("path managed as %s\en", nm);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBopen\fR(2), \fBstat\fR(2), \fBfree\fR(3C), \fBmalloc\fR(3C),
+\fBvolmgt_check\fR(3VOLMGT), \fBvolmgt_inuse\fR(3VOLMGT),
+\fBvolmgt_running\fR(3VOLMGT), \fBattributes\fR(5), \fBhal\fR(5)

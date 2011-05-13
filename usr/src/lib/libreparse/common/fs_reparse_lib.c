@@ -64,22 +64,22 @@ static int rp_plugin_inited = 0;
  * return 0 if ok else return error code.
  */
 int
-reparse_create(const char *path, const char *string)
+reparse_create(const char *path, const char *data)
 {
 	int err;
 	struct stat sbuf;
 
-	if (path == NULL || string == NULL)
+	if (path == NULL || data == NULL)
 		return (EINVAL);
 
-	if ((err = reparse_validate(string)) != 0)
+	if ((err = reparse_validate(data)) != 0)
 		return (err);
 
 	/* check if object exists */
 	if (lstat(path, &sbuf) == 0)
 		return (EEXIST);
 
-	return (symlink(string, path) ? errno : 0);
+	return (symlink(data, path) ? errno : 0);
 }
 
 /*

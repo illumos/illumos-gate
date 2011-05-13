@@ -1,0 +1,131 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ev_get_cookie 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ev_get_cookie \- get an LDI event cookie for a specified event
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_ev_get_cookie\fR(\fIldi_handle_t lh\fR, \fIchar *evname\fR, 
+     \fIldi_ev_cookie_t *cookiep\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_handle_t lh\fR\fR
+.ad
+.sp .6
+.RS 4n
+A layered handle representing the device for which the event notification was
+requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIchar *evname\fR\fR
+.ad
+.sp .6
+.RS 4n
+The string name of the event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_cookie_t *cookiep\fR\fR
+.ad
+.sp .6
+.RS 4n
+A pointer to type \fBldi_ev_cookie_t\fR. Contains a pointer to the event cookie
+on return.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ev_get_cookie()\fR function accepts the string name of a state
+change event affecting the device represented by the layered driver handle
+"\fBlh\fR" and returns an opaque cookie on success. The call is successful if
+the framework supports event notification for the event named by
+"\fBevname\fR". If successful, the function returns an opaque cookie through
+the "\fBcookiep\fR" parameter. The cookie is required in subsequent calls for
+registering callbacks on events.
+.sp
+.LP
+The following two LDI events are currently defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_OFFLINE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device is moving to the offline state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_DEGRADE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device is moving to the degraded state.
+.RE
+
+.sp
+.LP
+\fBldi_ev_get_cookie()\fR also accepts the string name of any events defined
+for NDI event services. For such events, \fBldi_ev_get_cookie()\fR replaces
+\fBldi_get_eventcookie\fR(9F) (which is now obsolete).
+.SH RETURN VALUES
+.sp
+.LP
+The return values for this function are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The event cookie was created successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDI_EV_FAILURE\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred and the cookie was not created.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user and kernel contexts only.
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_ev_register_callbacks\fR(9F), \fBldi_ev_remove_callbacks\fR(9F)

@@ -1,0 +1,88 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_open 3CPC "30 Jan 2004" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_open, cpc_close \- initialize the CPU Performance Counter library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libcpc.h>
+
+\fBcpc_t *\fR\fBcpc_open\fR(\fBint\fR \fIvers\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_close\fR(\fBcpc_t *\fR\fIcpc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpc_open()\fR function initializes \fBlibcpc\fR(3LIB) and returns an
+identifier that must be used as the \fIcpc\fR argument in subsequent
+\fBlibcpc\fR function calls. The \fBcpc_open()\fR function takes an interface
+version as an argument and returns \fINULL\fR if that version of the interface
+is incompatible with the \fBlibcpc\fR implementation present on the system.
+Usually, the argument has the value of \fBCPC_VER_CURRENT\fR bound to the
+application when it was compiled.
+.sp
+.LP
+The \fBcpc_close()\fR function releases all resources associated with the
+\fIcpc\fR argument. Any bound counters utilized by the process are unbound. All
+entities of type \fBcpc_set_t\fR and \fBcpc_buf_t\fR are invalidated and
+destroyed.
+.SH RETURN VALUES
+.sp
+.LP
+If the version requested is supported by the implementation, \fBcpc_open()\fR
+returns a \fBcpc_t\fR handle for use in all subsequent \fBlibcpc\fR operations.
+If the implementation cannot support the version needed by the application,
+\fBcpc_open()\fR returns \fINULL\fR, indicating that the application at least
+needs to be recompiled to operate correctly on the new platform and might
+require further changes.
+.sp
+.LP
+The \fBcpc_close()\fR function always returns 0.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The version requested by the client is incompatible with the implementation.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcpc\fR(3LIB), \fBattributes\fR(5)

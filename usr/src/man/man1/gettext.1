@@ -1,0 +1,185 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gettext 1 "17 Sep 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+gettext \- retrieve text string from message database
+.SH SYNOPSIS
+.LP
+.nf
+\fBgettext\fR [\fB-d\fR \fItextdomain\fR | \fB-\(midomain\fR=\fItextdomain\fR] 
+     [\fItextdomain\fR] \fImsgid\fR
+.fi
+
+.LP
+.nf
+\fBgettext\fR \fB-s\fR [\fB-e\fR] [\fB-n\fR] 
+     [\fB-d\fR \fItextdomain\fR | \fB-\(midomain\fR=\fItextdomain\fR] \fImsgid\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgettext\fR utility retrieves a translated text string corresponding to
+string \fImsgid\fR from a message object generated with \fBmsgfmt\fR(1). The
+message object name is derived from the optional argument \fItextdomain\fR if
+present, otherwise from the \fBTEXTDOMAIN\fR environment. If no domain is
+specified, or if a corresponding string cannot be found, \fBgettext\fR prints
+\fImsgid\fR.
+.sp
+.LP
+Ordinarily, \fBgettext\fR looks for its message object in
+\fB/usr/lib/locale/\fIlang\fR/LC_MESSAGES\fR where \fIlang\fR is the locale
+name. If present, the \fBTEXTDOMAINDIR\fR environment variable replaces the
+pathname component up to \fIlang\fR.
+.sp
+.LP
+This command interprets C escape sequences such as \fB\et\fR for tab. Use
+\fB\e\e\fR to print a backslash. To produce a message on a line of its own,
+either enter \fB\en\fR at the end of \fImsgid\fR, or use this command in
+conjunction with \fBprintf\fR(1).
+.sp
+.LP
+When used with the \fB-s\fR option, \fBgettext\fR behaves like \fBecho\fR(1).
+But it does not simply copy its arguments to standard output. Instead, those
+messages found in the selected catalog are translated.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fItextdomain\fR\fR
+.ad
+.br
+.na
+\fB\fB-\(midomain\fR=\fItextdomain\fR\fR
+.ad
+.RS 26n
+.rt  
+Retrieves translated messages from the domain \fItextdomain\fR, if
+\fItextdomain\fR is not specified as an operand.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 26n
+.rt  
+Enables expansion of some escape sequences if used with the \fB-s\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 26n
+.rt  
+Suppresses trailing newline if used with the \fB-s\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 26n
+.rt  
+Behaves like \fBecho\fR(1) (see DESCRIPTION above). If the \fB-s\fR option is
+specified, no expansion of C escape sequences is performed and a newline
+character is appended to the output, by default.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fItextdomain\fR\fR
+.ad
+.RS 14n
+.rt  
+A domain name used to retrieve the messages. This overrides the specification
+by the \fB-d\fR or \fB-\(midomain\fR options, if present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgid\fR\fR
+.ad
+.RS 14n
+.rt  
+A key to retrieve the localized message.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLANG\fR\fR
+.ad
+.RS 17n
+.rt  
+Specifies locale name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_MESSAGES\fR\fR
+.ad
+.RS 17n
+.rt  
+Specifies messaging locale, and if present overrides \fBLANG\fR for messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTEXTDOMAIN\fR\fR
+.ad
+.RS 17n
+.rt  
+Specifies the text domain name, which is identical to the message object
+filename without \fB\&.mo\fR suffix.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTEXTDOMAINDIR\fR\fR
+.ad
+.RS 17n
+.rt  
+Specifies the pathname to the message database. If present, replaces
+\fB/usr/lib/locale\fR.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBecho\fR(1), \fBmsgfmt\fR(1), \fBprintf\fR(1), \fBgettext\fR(3C),
+\fBsetlocale\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+This is the shell equivalent of the library routine \fBgettext\fR(3C).

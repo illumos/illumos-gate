@@ -1,0 +1,1045 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T 
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH jobs 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+jobs, fg, bg, stop, notify \- control process execution
+.SH SYNOPSIS
+.SS "sh"
+.LP
+.nf
+\fBjobs\fR [\fB-p\fR | \fB-l\fR] [% \fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBjobs\fR \fB-x\fR \fIcommand\fR [\fIarguments\fR]
+.fi
+
+.LP
+.nf
+\fBfg\fR [% \fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBbg\fR [% \fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBstop\fR % \fIjob_id\fR...
+.fi
+
+.LP
+.nf
+\fBstop\fR \fIpid\fR...
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBjobs\fR [\fB-l\fR]
+.fi
+
+.LP
+.nf
+\fBfg\fR [% \fIjob_id\fR]
+.fi
+
+.LP
+.nf
+\fBbg\fR [% \fIjob_id\fR]...
+.fi
+
+.LP
+.nf
+\fBnotify\fR [% \fIjob_id\fR]...
+.fi
+
+.LP
+.nf
+\fBstop\fR % \fIjob_id\fR...
+.fi
+
+.LP
+.nf
+\fBstop\fR \fIpid\fR...
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBjobs\fR [\fB-lnp\fR] [% \fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBfg\fR [% \fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBbg\fR [% \fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBstop\fR % \fIjob_id\fR...
+.fi
+
+.LP
+.nf
+\fBstop\fR \fIpid\fR...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBjobs\fR [\fB-lnp\fR] [\fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBfg\fR [\fIjob_id\fR...]
+.fi
+
+.LP
+.nf
+\fBbg\fR [\fIjob_id\fR...]
+.fi
+
+.SH DESCRIPTION
+.SS "sh"
+.sp
+.LP
+When Job Control is enabled, the Bourne shell built-in \fBjobs\fR reports all
+jobs that are stopped or executing in the background. If \fB%\fR\fIjob_id\fR is
+omitted, all jobs that are stopped or running in the background is reported.
+The following options modify or enhance the output of \fBjobs\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Reports the process group \fBID\fR and working directory of the jobs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Reports only the process group \fBID\fR of the jobs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+Replaces any \fIjob_id\fR found in \fIcommand\fR or \fIarguments\fR with the
+corresponding process group \fBID\fR, and then executes \fIcommand\fR passing
+it \fIarguments\fR.
+.RE
+
+.sp
+.LP
+When the shell is invoked as \fBjsh\fR, Job Control is enabled in addition to
+all of the functionality described previously for \fBsh\fR. Typically Job
+Control is enabled for the interactive shell only. Non-interactive shells
+typically do not benefit from the added functionality of Job Control.
+.sp
+.LP
+With Job Control enabled every command or pipeline the user enters at the
+terminal is called a \fIjob_id\fR. All jobs exist in one of the following
+states: foreground, background or stopped. These terms are defined as follows:
+.RS +4
+.TP
+1.
+A job in the \fBforeground\fR has read and write access to the controlling
+terminal.
+.RE
+.RS +4
+.TP
+2.
+A job in the \fBbackground\fR is denied read access and has conditional
+write access to the controlling terminal (see \fBstty\fR(1))
+.RE
+.RS +4
+.TP
+3.
+A \fBstopped\fR job is a job that has been placed in a suspended state,
+usually as a result of a \fBSIGTSTP\fR signal (see \fBsignal.h\fR(3HEAD)).
+.RE
+.sp
+.LP
+Every job that the shell starts is assigned a positive integer, called a
+\fIjob_id number\fR which is tracked by the shell and are used as an identifier
+to indicate a specific job. Additionally, the shell keeps track of the
+\fBcurrent\fR and \fBprevious\fR jobs. The \fBcurrent job\fR is the most recent
+job to be started or restarted. The \fBprevious job\fR is the first non-current
+job.
+.sp
+.LP
+The acceptable syntax for a Job Identifier is of the form:
+.sp
+.LP
+\fB%\fR\fIjob_id\fR
+.sp
+.LP
+where \fIjob_id\fR can be specified in any of the following formats:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR or \fB+\fR\fR
+.ad
+.RS 13n
+.rt  
+for the current job
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 13n
+.rt  
+for the previous job
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fI<string>\fR\fR
+.ad
+.RS 13n
+.rt  
+specify the job for which the command line uniquely contains \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 13n
+.rt  
+for job number \fIn\fR, where \fIn\fR is a job number
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpref\fR\fR
+.ad
+.RS 13n
+.rt  
+where \fIpref\fR is a unique prefix of the command name (for example, if the
+command \fBls \(mil name\fR were running in the background, it could be
+referred to as \fB%ls\fR); \fIpref\fR cannot contain blanks unless it is
+quoted.
+.RE
+
+.sp
+.LP
+When Job Control is enabled, \fBfg\fR resumes the execution of a stopped job in
+the foreground, also moves an executing background job into the foreground. If
+\fB%\fR\fIjob_id\fR is omitted the current job is assumed.
+.sp
+.LP
+When Job Control is enabled, \fBbg\fR resumes the execution of a stopped job in
+the background. If \fB%\fR\fIjob_id\fR is omitted the current job is assumed.
+.sp
+.LP
+\fBstop\fR stops the execution of a background job(s) by using its
+\fIjob_id\fR, or of any process by using its \fIpid\fR; see \fBps\fR(1).
+.SS "csh"
+.sp
+.LP
+The C shell built-in, \fBjobs\fR, without an argument, lists the active jobs
+under job control.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+List process \fBID\fRs, in addition to the normal information.
+.RE
+
+.sp
+.LP
+The shell associates a numbered \fIjob_id\fR with each command sequence to keep
+track of those commands that are running in the background or have been stopped
+with \fBTSTP\fR signals (typically Control-Z). When a command or command
+sequence (semicolon-separated list) is started in the background using the
+\fB&\fR metacharacter, the shell displays a line with the job number in
+brackets and a list of associated process numbers:
+.sp
+.LP
+\fB[1] 1234\fR
+.sp
+.LP
+To see the current list of jobs, use the \fBjobs\fR built-in command. The job
+most recently stopped (or put into the background if none are stopped) is
+referred to as the \fBcurrent\fR job and is indicated with a `\fB+\fR'. The
+previous job is indicated with a `\fB\(mi\fR\&'; when the current job is
+terminated or moved to the foreground, this job takes its place (becomes the
+new current job).
+.sp
+.LP
+To manipulate jobs, refer to the \fBbg\fR, \fBfg\fR, \fBkill\fR, \fBstop\fR,
+and \fB%\fR built-in commands.
+.sp
+.LP
+A reference to a job begins with a `\fB%\fR'. By itself, the percent sign
+refers to the current job.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR \fB%+\fR \fB%%\fR\fR
+.ad
+.RS 12n
+.rt  
+The current job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\(mi\fR\fR
+.ad
+.RS 12n
+.rt  
+The previous job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fIj\fR\fR
+.ad
+.RS 12n
+.rt  
+Refer to job \fIj\fR as in: `\fBkill\fR \fB-9\fR \fB%\fR\fIj\fR'. \fIj\fR can
+be a job number, or a string that uniquely specifies the command line by which
+it was started; `\fBfg %vi\fR' might bring a stopped \fBvi\fR job to the
+foreground, for instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%?\fR\fIstring\fR\fR
+.ad
+.RS 12n
+.rt  
+Specify the job for which the command line uniquely contains \fIstring\fR.
+.RE
+
+.sp
+.LP
+A job running in the background stops when it attempts to read from the
+terminal. Background jobs can normally produce output, but this can be
+suppressed using the `\fBstty tostop\fR' command.
+.sp
+.LP
+\fBfg\fR brings the current or specified \fIjob_id\fR into the foreground.
+.sp
+.LP
+\fBbg\fR runs the current or specified jobs in the background.
+.sp
+.LP
+\fBstop\fR stops the execution of a background job(s) by using its
+\fIjob_id\fR, or of any process by using its \fIpid\fR; see \fBps\fR(1).
+.sp
+.LP
+\fBnotify\fR notifies the user asynchronously when the status of the current
+job or specified jobs changes.
+.SS "ksh"
+.sp
+.LP
+\fBjobs\fR displays the status of the jobs that were started in the current
+shell environment. When \fBjobs\fR reports the termination status of a job, the
+shell removes its process \fBID\fR from the list of those known in the current
+shell execution environment.
+.sp
+.LP
+\fIjob_id\fR specifies the jobs for which the status is to be displayed. If no
+\fIjob_id\fR is specified, the status information for all jobs are displayed.
+.sp
+.LP
+The following options modify or enhance the output of \fBjobs\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+(The letter ell.) Provides more information about each job listed. This
+information includes the job number, current job, process group \fBID\fR, state
+and the command that formed the job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays only jobs that have stopped or exited since last notified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays only the process \fBID\fRs for the process group leaders of the
+selected jobs.
+.RE
+
+.sp
+.LP
+By default, \fBjobs\fR displays the status of all the stopped jobs, running
+background jobs, and all jobs whose status has changed and have not been
+reported by the shell.
+.sp
+.LP
+If the \fBmonitor\fR option of the \fBset\fR command is turned on, an
+interactive shell associates a \fBjob\fR with each pipeline. It keeps a table
+of current jobs, printed by the \fBjobs\fR command, and assigns them small
+integer numbers. When a job is started asynchronously with \fB&\fR, the shell
+prints a line which looks like:
+.sp
+.LP
+\fB[1]\fR \fB1234\fR
+.sp
+.LP
+indicating that the job, which was started asynchronously, was job number
+\fB1\fR and had one (top-level) process, whose process id was \fB1234\fR.
+.sp
+.LP
+If you are running a job and wish to do something else you can hit the key ^Z
+(Control-Z) which sends a \fBSTOP\fR signal to the current job. The shell then
+normally indicates that the job has been "\fBStopped\fR" (see \fBOUTPUT\fR
+below), and print another prompt. You can then manipulate the state of this
+job, putting it in the background with the \fBbg\fR command, or run some other
+commands and then eventually bring the job back into the foreground with the
+foreground command \fBfg\fR. A ^Z takes effect immediately and is like an
+interrupt, in that pending output and unread input are discarded when it is
+typed.
+.sp
+.LP
+There are several ways to refer to jobs in the shell. A job can be referred to
+by the process id of any process of the job or by one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fInumber\fR\fR
+.ad
+.RS 12n
+.rt  
+The job with the specified number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fIstring\fR\fR
+.ad
+.RS 12n
+.rt  
+Any job whose command line begins with \fIstring\fR; works only in the
+interactive mode when the history file is active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%?\fR\fIstring\fR\fR
+.ad
+.RS 12n
+.rt  
+Any job whose command line contains \fIstring\fR; works only in the interactive
+mode when the history file is active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 12n
+.rt  
+Current job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%+\fR\fR
+.ad
+.RS 12n
+.rt  
+Equivalent to \fB%%\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\(mi\fR\fR
+.ad
+.RS 12n
+.rt  
+Previous job.
+.RE
+
+.sp
+.LP
+The shell learns immediately whenever a process changes state. It normally
+informs you whenever a job becomes blocked so that no further progress is
+possible, but only just before it prints a prompt. This is done so that it does
+not otherwise disturb your work. When the monitor mode is on, each background
+job that completes triggers any trap set for \fBCHLD\fR. When you try to leave
+the shell while jobs are running or stopped, you are warned that `You have
+stopped (running) jobs.' You can use the \fBjobs\fR command to see what they
+are. If you do this or immediately try to exit again, the shell does not warn
+you a second time, and the stopped jobs are terminated.
+.sp
+.LP
+\fBfg\fR moves a background job from the current environment into the
+foreground. Using \fBfg\fR to place a job in the foreground removes its process
+\fBID\fR from the list of those known in the current shell execution
+environment. The \fBfg\fR command is available only on systems that support job
+control. If \fIjob_id\fR is not specified, the current job is brought into the
+foreground.
+.sp
+.LP
+\fBbg\fR resumes suspended jobs from the current environment by running them as
+background jobs. If the job specified by \fIjob_id\fR is already a running
+background job, \fBbg\fR has no effect and exits successfully. Using \fBbg\fR
+to place a job into the background causes its process \fBID\fR to become `known
+in the current shell execution environment, as if it had been started as an
+asynchronous list. The \fBbg\fR command is available only on systems that
+support job control. If \fIjob_id\fR is not specified, the current job is
+placed in the background.
+.sp
+.LP
+\fBstop\fR stops the execution of a background job(s) by using its
+\fIjob_id\fR, or of any process by using its \fIpid\fR. See \fBps\fR(1).
+.SS "ksh93"
+.sp
+.LP
+\fBjobs\fR displays information about specified jobs that were started by the
+current shell environment on standard output. The information contains the job
+number enclosed in \fB[...]\fR, the status, and the command line that started
+the job.
+.sp
+.LP
+If \fIjob_id\fR is omitted, \fBjobs\fR displays the status of all stopped jobs,
+background jobs, and all jobs whose status has changed since last reported by
+the shell.
+.sp
+.LP
+When \fBjobs\fR reports the termination status of a job, the shell removes the
+job from the list of known jobs in the current shell environment.
+.sp
+.LP
+The following options modify or enhances the output of \fBjobs\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays process IDs after the job number in addition to the usual information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays only the jobs whose status has changed since the last prompt was
+displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays the process group leader IDs for the specified jobs.
+.RE
+
+.sp
+.LP
+\fIjob_id\fR can be specified to \fBjobs\fR, \fBfg\fR, and \fBbg\fR as one of
+the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fInumber\fR\fR
+.ad
+.RS 12n
+.rt  
+The process id of \fBjob\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-\fR\fInumber\fR\fR
+.ad
+.RS 12n
+.rt  
+The process group id of \fBjob\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fInumber\fR\fR
+.ad
+.RS 12n
+.rt  
+The job number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fIstring\fR\fR
+.ad
+.RS 12n
+.rt  
+The job whose name begins with \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%?\fR\fIstring\fR\fR
+.ad
+.RS 12n
+.rt  
+The job whose name contains \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%+\fR\fR
+.ad
+.br
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 12n
+.rt  
+The current job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%-\fR\fR
+.ad
+.RS 12n
+.rt  
+The previous job.
+.RE
+
+.sp
+.LP
+\fBfg\fR places the specified jobs into the foreground in sequence and sends a
+\fBCONT\fR signal to start each running. If \fIjob_id\fR is omitted, the most
+recently started or stopped background job is moved to the foreground.
+.sp
+.LP
+\fBbg\fR places the specified jobs into the background and sends a \fBCONT\fR
+signal to start them running. If \fIjob_id\fR is omitted, the most recently
+started or stopped background job is resumed or continued in the background.
+.SH OUTPUT
+.sp
+.LP
+If the \fB-p\fR option is specified, the output consists of one line for each
+process \fBID\fR:
+.sp
+.LP
+\fB"%d\en",\fR \fI"process ID"\fR
+.sp
+.LP
+Otherwise, if the \fB-l\fR option is not specified, the output is a series of
+lines of the form:
+.sp
+.LP
+\fB"[%d] %c %s %s\en"\fR, \fIjob-number\fR, \fIcurrent\fR, \fIstate\fR,
+\fIcommand\fR
+.sp
+.LP
+where the fields are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcurrent\fR\fR
+.ad
+.RS 14n
+.rt  
+The character \fB+\fR identifies the job that would be used as a default for
+the \fBfg\fR or \fBbg\fR commands. This job can also be specified using the
+\fIjob_id\fR \fB%+\fR or \fB%%\fR \fB\&.\fR The character \fB\(mi\fR identifies
+the job that would become the default if the current default job were to exit;
+this job can also be specified using the \fIjob_id\fR \fB%\(mi\fR \fB\&.\fR For
+other jobs, this field is a space character. At most, one job can be identified
+with \fB+\fR and at most one job can be identified with \fB\(mi\fR\&. If there
+is any suspended job, then the current job is a suspended job. If there are at
+least two suspended jobs, then the previous job is also a suspended job.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIjob-number\fR\fR
+.ad
+.RS 14n
+.rt  
+A number that can be used to identify the process group to the \fBwait\fR,
+\fBfg\fR, \fBbg,\fR and \fBkill\fR utilities. Using these utilities, the job
+can be identified by prefixing the job number with \fB%\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstate\fR\fR
+.ad
+.RS 14n
+.rt  
+One of the following strings in the POSIX Locale:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRunning\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job has not been suspended by a signal and has not exited.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDone\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job completed and returned exit status zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDone\fR(\fIcode\fR)\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job completed normally and that it exited with the specified
+\fBnon-zero\fR exit status, \fIcode\fR, expressed as a decimal number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBStopped\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job was stopped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBStopped(SIGTSTP)\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job was suspended by the \fBSIGTSTP\fR signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBStopped(SIGSTOP)\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job was suspended by the \fBSIGSTOP\fR signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBStopped(SIGTTIN)\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job was suspended by the \fBSIGTTIN\fR signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBStopped(SIGTTOU)\fR\fR
+.ad
+.RS 20n
+.rt  
+Indicates that the job was suspended by the \fBSIGTTOU\fR signal.
+.RE
+
+The implementation can substitute the string \fBSuspended\fR in place of
+\fBStopped\fR. If the job was terminated by a signal, the format of \fBstate\fR
+is unspecified, but it is visibly distinct from all of the other \fBstate\fR
+formats shown here and indicates the name or description of the signal causing
+the termination.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcommand\fR\fR
+.ad
+.RS 14n
+.rt  
+The associated command that was specified to the shell.
+.RE
+
+.sp
+.LP
+If the \fB-l\fR option is specified, a field containing the process group
+\fBID\fR is inserted before the \fBstate\fR field. Also, more processes in a
+process group can be output on separate lines, using only the process \fBID\fR
+and \fBcommand\fR fields.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBjobs\fR, \fBfg\fR, and \fBbg\fR: \fBLANG\fR,
+\fBLC_ALL\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.SS "sh, csh, ksh"
+.sp
+.LP
+The following exit values are returned for \fBjobs\fR, \fBfg\fR, and \fBbg\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following exit values are returned for \fBjobs\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+The information for each job is written to standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+One or more jobs does not exist.
+.RE
+
+.sp
+.LP
+The following exit values are returned for \fBfg\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexit status of last job\fR\fR
+.ad
+.RS 27n
+.rt  
+One or more jobs has been brought into the foreground.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 27n
+.rt  
+One or more jobs does not exist or has completed.
+.RE
+
+.sp
+.LP
+The following exit values are returned for \fBbg\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All background jobs are started.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+One more jobs does not exist or there are no background jobs.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "csh, sh, ksh"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBkill\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBps\fR(1),
+\fBsh\fR(1), \fBstop\fR(1), \fBshell_builtins\fR(1), \fBstty\fR(1),
+\fBwait\fR(1), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBstandards\fR(5)

@@ -2100,7 +2100,8 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 		for (dld = dt_list_next(&dtp->dt_lib_dep); dld != NULL;
 		    dld = dt_list_next(dld)) {
 			end = strrchr(dld->dtld_library, '/');
-			assert(end != NULL); /* dt_lib_depend_add ensures this */
+			/* dt_lib_depend_add ensures this */
+			assert(end != NULL);
 			if (strcmp(end + 1, dp->d_name) == 0)
 				break;
 		}

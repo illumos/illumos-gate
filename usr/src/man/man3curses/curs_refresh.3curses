@@ -1,0 +1,119 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_refresh 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_refresh, refresh, wrefresh, wnoutrefresh, doupdate, redrawwin, wredrawln
+\- refresh curses windows and lines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBrefresh\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwrefresh\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwnoutrefresh\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdoupdate\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBredrawwin\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwredrawln\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIbeg_line\fR, \fBint\fR \fInum_lines\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrefresh()\fR and \fBwrefresh()\fR routines (or \fBwnoutrefresh()\fR and
+\fBdoupdate()\fR) must be called to get any output on the terminal, as other
+routines merely manipulate data structures. The routine \fBwrefresh()\fR copies
+the named window to the physical terminal screen, taking into account what is
+already there in order to do optimizations. The \fBrefresh()\fR routine is the
+same, using \fBstdscr\fR as the default window. Unless \fBleaveok()\fR has been
+enabled, the physical cursor of the terminal is left at the location of the
+cursor for that window.
+.sp
+.LP
+The \fBwnoutrefresh()\fR and \fBdoupdate()\fR routines allow multiple updates
+with more efficiency than \fBwrefresh()\fR alone. In addition to all the window
+structures, \fBcurses\fR keeps two data structures representing the terminal
+screen: a physical screen, describing what is actually on the screen, and a
+virtual screen, describing what the programmer wants to have on the screen.
+.sp
+.LP
+The routine \fBwrefresh()\fR works by first calling \fBwnoutrefresh()\fR, which
+copies the named window to the virtual screen, and then calling
+\fBdoupdate()\fR, which compares the virtual screen to the physical screen and
+does the actual update. If the programmer wishes to output several windows at
+once, a series of calls to \fBwrefresh()\fR results in alternating calls to
+\fBwnoutrefresh()\fR and \fBdoupdate()\fR, causing several bursts of output to
+the screen. By first calling \fBwnoutrefresh()\fR for each window, it is then
+possible to call \fBdoupdate()\fR once, resulting in only one burst of output,
+with fewer total characters transmitted and less CPU time used. If the \fI
+win\fR argument to \fBwrefresh()\fR is the global variable \fBcurscr\fR, the
+screen is immediately cleared and repainted from scratch.
+.sp
+.LP
+The \fBredrawwin()\fR routine indicates to \fBcurses\fR that some screen lines
+are corrupted and should be thrown away before anything is written over them.
+These routines could be used for programs such as editors, which want a command
+to redraw some part of the screen or the entire screen. The routine
+\fBredrawln()\fR is preferred over \fBredrawwin()\fR where a noisy
+communication line exists and redrawing the entire window could be subject to
+even more communication noise. Just redrawing  several lines offers the
+possibility that they would show up unblemished.
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_outopts\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBrefresh()\fR and \fBredrawwin()\fR may be macros.

@@ -1,0 +1,241 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getnameinfo 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+getnameinfo \- get name information
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
+#include <sys/socket.h>
+#include <netdb.h>
+
+\fBint\fR \fBgetnameinfo\fR(\fBconst struct sockaddr *restrict\fR \fIsa\fR, \fBsocklen_t\fR \fIsalen\fR,
+     \fBchar *restrict\fR \fInode\fR, \fBsocklen_t\fR \fInodelen\fR, \fBchar *restrict\fR \fIservice\fR,
+     \fBsocklen_t\fR \fIservicelen\fR, \fBunsigned\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetnameinfo()\fR function translates a socket address to a node name and
+service location, all of which are defined as in \fBgetaddrinfo\fR(3XNET).
+.sp
+.LP
+The \fIsa\fR argument points to a socket address structure to be translated. If
+the socket address structure contains an IPv4-mapped IPv6 address or an
+IPv4-compatible IPv6 address, the implementation extracts the embedded IPv4
+address and lookup the node name for that IPv4 address.
+.sp
+.LP
+If the \fInode\fR argument is non-\fINULL\fR and the nodelen argument is
+non-zero, then the \fInode\fR argument points to a buffer able to contain up to
+\fInodelen\fR characters that receives the node name as a null-terminated
+string. If the \fInode\fR argument is \fINULL\fR or the \fInodelen\fR argument
+is zero, the node name is not returned. If the node's name cannot be located,
+the numeric form of the node's address is returned instead of its name.
+.sp
+.LP
+If the \fIservice\fR argument is non-\fINULL\fR and the \fIservicelen\fR
+argument is non-zero, then the \fIservice\fR argument points to a buffer able
+to contain up to \fIservicelen\fR bytes that receives the service name as a
+null-terminated string. If the \fIservice\fR argument is \fINULL\fR or the
+\fIservicelen\fR argument is zero, the service name is not returned. If the
+service's name cannot be located, the numeric form of the service address (for
+example, its port number) is returned instead of its name.
+.sp
+.LP
+The \fIflags\fR argument is a flag that changes the default actions of the
+function. By default the fully-qualified domain name (FQDN) for the host is
+returned, but:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the flag bit \fBNI_NOFQDN\fR is set, only the node name portion of the FQDN
+is returned for local hosts.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the flag bit \fBNI_NUMERICHOST\fR is set, the numeric form of the host's
+address is returned instead of its name, under all circumstances.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the flag bit \fBNI_NAMEREQD\fR is set, an error is returned if the host's
+name cannot be located.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the flag bit \fBNI_NUMERICSERV\fR is set, the numeric form of the service
+address is returned (for example, its port number) instead of its name, under
+all circumstances.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the flag bit \fBNI_DGRAM\fR is set, this indicates that the service is a
+datagram service (\fBSOCK_DGRAM\fR). The default behavior assumes that the
+service is a stream service (\fBSOCK_STREAM\fR).
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+A 0 return value for \fBgetnameinfo()\fR indicates successful completion; a
+non-zero return value indicates failure. The possible values for the failures
+are listed in the ERRORS section.
+.sp
+.LP
+Upon successful completion, \fBgetnameinfo()\fR returns the node and service
+names, if requested, in the buffers provided. The returned names are always
+null-terminated strings.
+.SH ERRORS
+.sp
+.LP
+The \fBgetnameinfo()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_AGAIN\fR\fR
+.ad
+.RS 16n
+.rt  
+The name could not be resolved at this time. Future attempts might succeed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_BADFLAGS\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIflags\fR argument had an invalid value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_FAIL\fR\fR
+.ad
+.RS 16n
+.rt  
+A non-recoverable error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_FAMILY\fR\fR
+.ad
+.RS 16n
+.rt  
+The address family was not recognized or the address length was invalid for the
+specified family.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_MEMORY\fR\fR
+.ad
+.RS 16n
+.rt  
+There was a memory allocation failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_NONAME\fR\fR
+.ad
+.RS 16n
+.rt  
+The name does not resolve for the supplied parameters.       \fBNI_NAMEREQD\fR
+is set and the host's name cannot be located, or both \fInodename\fR and
+\fIservname\fR were \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAI_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+A system error occurred. The error code can be found in \fBerrno\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If the returned values are to be used as part of any further name resolution
+(for example, passed to \fBgetaddrinfo()\fR), applications should provide
+buffers large enough to store any result possible on the system.
+.sp
+.LP
+Given the IPv4-mapped IPv6 address "::ffff:1.2.3.4", the implementation
+performs a lookup as if the socket address structure contains the IPv4 address
+"1.2.3.4".
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgai_strerror\fR(3XNET), \fBgetaddrinfo\fR(3XNET),
+\fBgetservbyname\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The IPv6 unspecified address ("::") and the IPv6 loopback address ("::1") are
+not IPv4-compatible addresses. If the address is the IPv6 unspecified address
+("::"), a lookup is not performed, and the \fBEAI_NONAME\fR error is returned.
+.sp
+.LP
+The two \fBNI_NUMERIC\fR\fIxxx\fR flags are required to support the \fB-n\fR
+flag that many commands provide.
+.sp
+.LP
+The \fBNI_DGRAM\fR flag is required for the few \fBAF_INET\fR and
+\fBAF_INET6\fR port numbers (for example, [512,514]) that represent different
+services for UDP and TCP.

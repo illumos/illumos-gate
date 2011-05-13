@@ -1,0 +1,127 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bcopy 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+bcopy \- copy data between address locations in the kernel
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/sunddi.h>
+
+
+
+
+\fBvoid\fR \fBbcopy\fR(\fBconst void *\fR\fIfrom\fR, \fBvoid *\fR\fIto\fR, \fBsize_t\fR \fIbcount\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfrom\fR\fR
+.ad
+.RS 10n
+.rt  
+Source address from which the copy is made.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIto\fR\fR
+.ad
+.RS 10n
+.rt  
+Destination address to which copy is made.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbcount\fR\fR
+.ad
+.RS 10n
+.rt  
+The number of bytes moved.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbcopy()\fR function copies \fIbcount\fR bytes from one kernel address to
+another. If the input and output addresses overlap, the command executes, but
+the results may not be as expected.
+.sp
+.LP
+Note that \fBbcopy()\fR should never be used to move data in or out of a user
+buffer, because it has no provision for handling page faults. The user address
+space can be swapped out at any time, and \fBbcopy()\fR always assumes that
+there will be no paging faults. If \fBbcopy()\fR attempts to access the user
+buffer when it is swapped out, the system will panic. It is safe to use
+\fBbcopy()\fR to move data within kernel space, since kernel space is never
+swapped out.
+.SH CONTEXT
+.sp
+.LP
+The \fBbcopy()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCopying data between address locations in the kernel:
+.sp
+.LP
+An \fBI/O\fR request is made for data stored in a \fBRAM\fR disk. If the \fBI/O
+\fRoperation is a read request, the data is copied from the \fBRAM\fR disk to a
+buffer (line 8).  If it is a write request, the data is copied from a buffer to
+the \fBRAM\fR disk (line 15). \fBbcopy()\fR is used since both the \fBRAM\fR
+disk and the buffer are part of the kernel address space.
+
+.sp
+.in +2
+.nf
+ 1 #define RAMDNBLK 1000                /* blocks in the RAM disk */
+ 2 #define RAMDBSIZ 512                 /* bytes per block */
+ 3 char ramdblks[RAMDNBLK][RAMDBSIZ];   /* blocks forming RAM 
+                                        /* disk 
+        ...
+ 4
+ 5 if   (bp->b_flags & B_READ)      /* if read request, copy data */
+ 6                                  /* from RAM disk data block */
+ 7                                  /* to system buffer */
+ 8           bcopy(&ramdblks[bp->b_blkno][0], bp->b_un.b_addr,
+ 9               bp->b_bcount);
+10
+11 else                             /* else write request, */
+12                                  /* copy data from a */
+13                                  /* system buffer to RAM disk */
+14                                  /* data block */
+15           bcopy(bp->b_un.b_addr, &ramdblks[bp->b_blkno][0],
+16               bp->b_bcount);
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcopyin\fR(9F), \fBcopyout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+The \fIfrom\fR and \fIto\fR addresses must be within the kernel space. No range
+checking is done. If an address outside of the kernel space is selected, the
+driver may corrupt the system in an unpredictable way.

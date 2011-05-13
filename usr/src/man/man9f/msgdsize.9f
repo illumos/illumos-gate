@@ -1,0 +1,64 @@
+'\" te
+.\"  Copyright 1989 AT&T 
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH msgdsize 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+msgdsize \- return the number of bytes in a message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBsize_t\fR \fBmsgdsize\fR(\fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 6n
+.rt  
+Message to be evaluated.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmsgdsize()\fR function counts the number of bytes in a data message.
+Only bytes included in the data blocks of type \fBM_DATA\fR are included in the
+count.
+.SH RETURN VALUES
+.sp
+.LP
+The number of data bytes in a message, expressed as an integer.
+.SH CONTEXT
+.sp
+.LP
+The \fBmsgdsize()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+See \fBbufcall\fR(9F) for an example that uses \fBmsgdsize()\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBbufcall\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -1,0 +1,114 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrp_latency 3LGRP "26 Jan 2005" "SunOS 5.11" "Locality Group Library Functions"
+.SH NAME
+lgrp_latency, lgrp_latency_cookie \- get latency between two lgroups
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-llgrp\fR [ \fIlibrary\fR... ] 
+#include <sys/lgrp_user.h>
+
+\fBint\fR \fBlgrp_latency_cookie\fR(\fBlgrp_cookie_t\fR \fIcookie\fR, \fBlgrp_id_t\fR \fIfrom\fR,
+     \fBlgrp_id_t\fR \fIto\fR, \fBlgrp_lat_between_t\fR \fIbetween\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBlgrp_latency\fR(\fBlgrp_id_t\fR \fIfrom\fR, \fBlgrp_id_t\fR \fIto\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlgrp_latency_cookie()\fR function takes a cookie representing a snapshot
+of the lgroup hierarchy obtained from \fBlgrp_init\fR(3LGRP) and returns the
+latency value between a hardware resource in the \fIfrom\fR lgroup to a
+hardware resource in the \fIto\fR lgroup. If \fIfrom\fR is the same lgroup as
+\fIto\fR, the latency value within that lgroup is returned.
+.sp
+.LP
+The \fIbetween\fR argument should be set to the following value to specify
+between which hardware resources the latency should be measured:
+.sp
+.in +2
+.nf
+LGRP_LAT_CPU_TO_MEM     /* latency from CPU to memory */
+.fi
+.in -2
+
+.sp
+.LP
+The latency value is defined by the operating system and is platform-specific.
+It can be used only for relative comparison of lgroups on the running system.
+It does not necessarily represent the actual latency between hardware devices,
+and it might not be applicable across platforms.
+.sp
+.LP
+The \fBlgrp_latency()\fR function is similiar to the
+\fBlgrp_latency_cookie()\fR function, but returns the latency between the given
+lgroups at the given instant in time. Since lgroups can be freed and
+reallocated, this function might not be able to provide a consistent answer
+across calls. For that reason, the \fBlgrp_latency_cookie()\fR function should
+be used in its place.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the latency value is returned. Otherwise \(mi1 is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBlgrp_latency_cookie()\fR and \fBlgrp_latency()\fR functions will fail
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified cookie, lgroup ID, or value given for the \fIbetween\fR argument
+is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified lgroup ID was not found, the \fIfrom\fR lgroup does not contain
+any CPUs, or the \fIto\fR lgroup does not have any memory.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlgrp_init\fR(3LGRP), \fBlgrp_parents\fR(3LGRP), \fBlgrp_children\fR(3LGRP),
+\fBliblgrp\fR(3LIB), \fBattributes\fR(5)

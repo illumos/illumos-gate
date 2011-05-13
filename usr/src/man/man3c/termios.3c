@@ -1,0 +1,100 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH termios 3C "5 Apr 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+termios \- general terminal interface
+.SH SYNOPSIS
+.LP
+.nf
+#include <termios.h>
+
+\fBint\fR \fBtcgetattr\fR(\fBint\fR \fIfildes\fR, \fBstruct termios *\fR\fItermios_p\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtcsetattr\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIoptional_actions\fR,
+     \fBconst struct termios *\fR\fItermios_p\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtcsendbreak\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIduration\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtcdrain\fR(\fBint\fR \fIfildes\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtcflush\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIqueue_selector\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtcflow\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIaction\fR);
+.fi
+
+.LP
+.nf
+\fBspeed_t\fR \fBcfgetospeed\fR(\fBconst struct termios *\fR\fItermios_p\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcfsetospeed\fR(\fBstruct termios *\fR\fItermios_p\fR, \fBspeed_t\fR \fIspeed\fR);
+.fi
+
+.LP
+.nf
+\fBspeed_t\fR \fBcfgetispeed\fR(\fBconst struct termios *\fR\fItermios_p\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcfsetispeed\fR(\fBstruct termios *\fR\fItermios_p\fR, \fBspeed_t\fR \fIspeed\fR);
+.fi
+
+.LP
+.nf
+#include <sys/types.h>
+#include <termios.h>
+
+\fBpid_t\fR \fBtcgetpgrp\fR(\fBint\fR \fIfildes\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtcsetpgrp\fR(\fBint\fR \fIfildes\fR, \fBpid_t\fR \fIpgid\fR);
+.fi
+
+.LP
+.nf
+\fBpid_t\fR \fBtcgetsid\fR(\fBint\fR \fIfildes\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions describe a general terminal interface for controlling
+asynchronous communications ports. A more detailed overview of the terminal
+interface can be found in \fBtermio\fR(7I), which also describes an
+\fBioctl\fR(2) interface that provides the same functionality. However, the
+function interface described by these functions is the preferred user
+interface.
+.sp
+.LP
+Each of these functions is now described on a separate manual page.
+.SH SEE ALSO
+.sp
+.LP
+\fBioctl\fR(2), \fBcfgetispeed\fR(3C), \fBcfgetospeed\fR(3C),
+\fBcfsetispeed\fR(3C), \fBcfsetospeed\fR(3C), \fBtcdrain\fR(3C),
+\fBtcflow\fR(3C), \fBtcflush\fR(3C), \fBtcgetattr\fR(3C), \fBtcgetpgrp\fR(3C),
+\fBtcgetsid\fR(3C), \fBtcsendbreak\fR(3C), \fBtcsetattr\fR(3C),
+\fBtcgetpgrp\fR(3C), \fBtcsendbreak\fR(3C), \fBtermio\fR(7I)

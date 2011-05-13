@@ -1,0 +1,97 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bdiff 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+bdiff \- big diff
+.SH SYNOPSIS
+.LP
+.nf
+\fBbdiff\fR \fIfilename1\fR \fIfilename2\fR [\fIn\fR] [\fB-s\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBbdiff\fR is used in a manner analogous to \fBdiff\fR to find which lines in
+\fIfilename1\fR and \fIfilename2\fR must be changed to bring the files into
+agreement. Its purpose is to allow processing of files too large for
+\fBdiff\fR. If \fIfilename1 (filename2)\fR is \fB\(mi\fR, the standard input is
+read.
+.sp
+.LP
+\fBbdiff\fR ignores lines common to the beginning of both files, splits the
+remainder of each file into \fIn\fR-line segments, and invokes \fBdiff\fR on
+corresponding segments. If both optional arguments are specified, they must
+appear in the order indicated above.
+.sp
+.LP
+The output of \fBbdiff\fR is exactly that of \fBdiff\fR, with line numbers
+adjusted to account for the segmenting of the files (that is, to make it look
+as if the files had been processed whole). Note:  Because of the segmenting of
+the files, \fBbdiff\fR does not necessarily find a smallest sufficient set of
+file differences.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR \fR
+.ad
+.RS 7n
+.rt  
+The number of line segments. The value of \fIn\fR is 3500 by default. If the
+optional third argument is given and it is numeric, it is used as the value for
+\fIn\fR. This is useful in those cases in which 3500-line segments are too
+large for \fBdiff\fR, causing it to fail.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fR
+.ad
+.RS 7n
+.rt  
+Specifies that no diagnostics are to be printed by \fBbdiff\fR (silent option).
+Note:  However, this does not suppress possible diagnostic messages from
+\fBdiff\fR, which \fBbdiff\fR calls.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBbdiff\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH FILES
+.sp
+.LP
+\fB/tmp/bd\fI?????\fR\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIenabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdiff\fR(1), \fBattributes\fR(5), \fBlargefile\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+Use \fBhelp\fR for explanations.

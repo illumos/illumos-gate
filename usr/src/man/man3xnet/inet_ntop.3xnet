@@ -1,0 +1,161 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH inet_ntop 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+inet_ntop, inet_pton \- convert IPv4 and IPv6 addresses between binary and text
+form
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
+#include <arpa/inet.h>
+
+\fBconst char *\fR\fBinet_ntop\fR(\fBint\fR \fIaf\fR, \fBconst void *restrict\fR \fIsrc\fR,
+     \fBchar *restrict\fR \fIdst\fR, \fBsocklen_t\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinet_pton\fR(\fBint\fR \fIaf\fR, \fBconst char *restrict\fR \fIsrc\fR, \fIdst\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinet_ntop()\fR function converts a numeric address into a text string
+suitable for presentation. The \fIaf\fR argument specifies the family of the
+address. This can be \fBAF_INET\fR or \fBAF_INET6\fR. The \fIsrc\fR argument
+points to a buffer holding an IPv4 address if the \fIaf\fR argument is
+\fBAF_INET\fR,  or an IPv6 address if the \fIaf\fR argument is \fBAF_INET6\fR.
+The \fIdst\fR argument points to a buffer where the function stores the
+resulting text string; it cannot be \fINULL\fR. The \fIsize\fR argument
+specifies the size of this buffer, which must be large enough to hold the text
+string (\fBINET_ADDRSTRLEN\fR characters for IPv4, \fBINET6_ADDRSTRLEN\fR
+characters for IPv6).
+.sp
+.LP
+The \fBinet_pton()\fR function converts an address in its standard text
+presentation form into its numeric binary form. The \fIaf\fR argument specifies
+the family of the address. The \fBAF_INET\fR and \fBAF_INET6\fR address
+families are supported. The \fIsrc\fR argument points to the string being
+passed in. The \fIdst\fR argument points to a buffer into which the function
+stores the numeric address; this must be large enough to hold the numeric
+address (32 bits for \fBAF_INET\fR, 128 bits for \fBAF_INET6\fR).
+.sp
+.LP
+If the \fIaf\fR argument of \fBinet_pton()\fR is \fBAF_INET\fR, the \fIsrc\fR
+string is in the standard IPv4 dotted-decimal form:
+.sp
+.in +2
+.nf
+ddd.ddd.ddd.ddd
+.fi
+.in -2
+
+.sp
+.LP
+where "\fBddd\fR"is a one to three digit decimal number between 0 and 255 (see
+\fBinet_addr\fR(3XNET)). The \fBinet_pton()\fR function does not accept other
+formats (such as the octal numbers, hexadecimal numbers, and fewer than four
+numbers that \fBinet_addr()\fR accepts).
+.sp
+.LP
+If the \fIaf\fR argument of \fBinet_pton()\fR is \fBAF_INET6\fR, the \fIsrc\fR
+string is in one of the following standard IPv6 text forms:
+.RS +4
+.TP
+1.
+The preferred form is "\fBx:x:x:x:x:x:x:x\fR", where the '\fBx\fR's are the
+hexadecimal values of the eight 16-bit pieces of the address. Leading zeros in
+individual fields can be omitted, but there must be at least one numeral in
+every field.
+.RE
+.RS +4
+.TP
+2.
+A string of contiguous zero fields in the preferred form can be shown as
+"\fB::\fR". The "\fB::\fR" can only appear once in an address. Unspecified
+addresses ("\fB0:0:0:0:0:0:0:0\fR") can be represented simply as "\fB::\fR".
+.RE
+.RS +4
+.TP
+3.
+A third form that is sometimes more convenient when dealing with a mixed
+environment of IPv4 and IPv6 nodes is "\fBx:x:x:x:x:x:d.d.d.d\fR", where
+the '\fBx\fR's are the hexadecimal values of the six high-order 16-bit pieces of
+the address, and the '\fBd\fR's are the decimal values of the four low-order
+8-bit pieces of the address (standard IPv4 representation).
+.RE
+.sp
+.LP
+A more extensive description of the standard representations of IPv6 addresses
+can be found in RFC 2373.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBinet_ntop()\fR function returns a pointer to the buffer containing the
+text string if the conversion succeeds. Otherwise it returns \fINULL\fR  and
+sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+The \fBinet_pton()\fR function returns 1 if the conversion succeeds, with the
+address pointed to by \fIdst\fR in network byte order. It returns 0 if the
+input is not a valid IPv4 dotted-decimal string or a valid IPv6 address string.
+It returns \(mi1 and sets \fBerrno\fR to \fBEAFNOSUPPORT\fR if the \fIaf\fR
+argument is unknown.
+.SH ERRORS
+.sp
+.LP
+The \fBinet_ntop()\fR and \fBinet_pton()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAFNOSUPPORT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIaf\fR argument is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 16n
+.rt  
+The size of the \fBinet_ntop()\fR result buffer is inadequate.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBinet_addr\fR(3XNET), \fBattributes\fR(5)

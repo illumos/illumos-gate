@@ -1,0 +1,194 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH col 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.SH NAME
+col \- reverse line-feeds filter
+.SH SYNOPSIS
+.LP
+.nf
+\fBcol\fR [\fB-bfpx\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcol\fR utility reads from the standard input and writes to the standard
+output. It performs the line overlays implied by reverse line-feeds, and by
+forward and reverse half-line-feeds. Unless \fB-x\fR is used, all blank
+characters in the input will be converted to tab characters wherever possible.
+\fBcol\fR is particularly useful for filtering multi-column output made with
+the \fB\&.rt\fR command of \fBnroff\fR(1) and output resulting from use of the
+\fBtbl\fR(1) preprocessor.
+.sp
+.LP
+The \fBASCII\fR control characters \fBSO\fR and \fBSI\fR are assumed by
+\fBcol\fR to start and end text in an alternative character set. The character
+set to which each input character belongs is remembered, and on output \fBSI\fR
+and \fBSO\fR characters are generated as appropriate to ensure that each
+character is written in the correct character set.
+.sp
+.LP
+On input, the only control characters accepted are space, backspace, tab,
+carriage-return and newline characters, \fBSI,\fR \fBSO,\fR \fBVT,\fR reverse
+line-feed, forward half-line-feed and reverse half-line-feed. The \fBVT\fR
+character is an alternative form of full reverse line-feed, included for
+compatibility with some earlier programs of this type. The only other
+characters to be copied to the output are those that are printable.
+.sp
+.LP
+The \fBASCII\fR codes for the control functions and line-motion sequences
+mentioned above are as given in the table below. \fBESC\fR stands for the
+\fBASCII\fR escape character, with the octal code 033; \fBESC\fR\fB\(mi\fR
+means a sequence of two characters, \fBESC\fR followed by the character
+\fBx\fR.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+reverse line-feedESC\(mi7
+reverse half-line-feedESC\(mi8
+forward half-line-feedESC\(mi9
+vertical-tab (VT)013
+start-of-text (SO)016
+end-of-text (SI)017
+.TE
+
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 7n
+.rt  
+Assume that the output device in use is not capable of backspacing. In this
+case, if two or more characters are to appear in the same place, only the last
+one read will be output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fR
+.ad
+.RS 7n
+.rt  
+Although \fBcol\fR accepts half-line motions in its input, it normally does not
+emit them on output. Instead, text that would appear between lines is moved to
+the next lower full-line boundary. This treatment can be suppressed by the
+\fB-f\fR (fine) option; in this case, the output from \fBcol\fR may contain
+forward half-line-feeds (ESC-9), but will still never contain either kind of
+reverse line motion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fR
+.ad
+.RS 7n
+.rt  
+Normally, \fBcol\fR will ignore any escape sequences unknown to it that are
+found in its input; the \fB-p\fR option may be used to cause \fBcol\fR to
+output these sequences as regular characters, subject to overprinting from
+reverse line motions. The use of this option is highly discouraged unless the
+user is fully aware of the textual position of the escape sequences.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR \fR
+.ad
+.RS 7n
+.rt  
+Prevent \fBcol\fR from converting blank characters to tab characters on output
+wherever possible. Tab stops are considered to be at each column position
+\fIn\fR such that \fIn\fR modulo 8 equals 1.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBcol\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
+\fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following error values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR \fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+CSIenabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnroff\fR(1), \fBtbl\fR(1), \fBascii\fR(5), \fBattributes\fR(5),
+\fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+The input format accepted by \fBcol\fR matches the output produced by
+\fBnroff\fR with either the \fB-T37\fR or \fB-Tlp\fR options. Use \fB-T37\fR
+(and the \fB-f\fR option of \fBcol\fR) if the ultimate disposition of the
+output of \fBcol\fR will be a device that can interpret half-line motions, and
+\fB-Tlp\fR otherwise.
+.sp
+.LP
+\fBcol\fR cannot back up more than 128 lines or handle more than 800 characters
+per line.
+.sp
+.LP
+Local vertical motions that would result in backing up over the first line of
+the document are ignored. As a result, the first line must not have any
+superscripts.

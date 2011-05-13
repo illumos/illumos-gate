@@ -1,0 +1,715 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH od 1 "20 May 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+od \- octal dump
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-\fR] [\fIfile\fR] [\fIoffset_string\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-A\fR \fIaddress_base\fR] [\fB-j\fR \fIskip\fR] 
+     [\fB-N\fR \fIcount\fR] [\fB-t\fR \fItype_string\fR]... [\fB-\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fIfile\fR] [\fIoffset_string\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-A\fR \fIaddress_base\fR] 
+     [\fB-j\fR \fIskip\fR] [\fB-N\fR \fIcount\fR] [\fB-t\fR \fItype_string\fR]... [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBod\fR command copies sequentially each input file to standard output and
+transforms the input data according to the output types specified by the
+\fB-t\fR or \fB-bcCDdFfOoSsvXx\fR options. If no output type is specified, the
+default output is as if \fB-t\fR \fBo2\fR had been specified.  Multiple types
+can be specified by using multiple \fB-bcCDdFfOoSstvXx\fR options. Output lines
+are written for each type specified in the order in which the types are
+specified.  If no \fIfile\fR is specified, the standard input is used.  The
+[\fIoffset_string\fR] operand is mutually exclusive from the \fB-A\fR,
+\fB-j\fR, \fB-N\fR, and \fB-t\fR options. For the purposes of this description,
+the following terms are used:
+.sp
+.ne 2
+.mk
+.na
+\fBword\fR
+.ad
+.RS 20n
+.rt  
+Refers to a 16-bit unit, independent of the word size of the machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlong word\fR
+.ad
+.RS 20n
+.rt  
+Refers to a 32-bit unit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdouble long word\fR
+.ad
+.RS 20n
+.rt  
+Refers to a 64-bit unit.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR \fIaddress_base\fR \fR
+.ad
+.RS 20n
+.rt  
+Specifies the input offset base. The \fIaddress_base\fR option-argument must be
+a character.  The characters \fBd\fR, \fBo\fR and \fBx\fR specify that the
+offset base will be written in decimal, octal or hexadecimal, respectively. The
+character \fBn\fR specifies that the offset will not be written. Unless
+\fB-A\fR \fBn\fR is specified, the output line will be preceded by the input
+offset, cumulative across input files, of the next byte to be written. In
+addition, the offset of the byte following the last byte written will be
+displayed after all the input data has been processed. Without the \fB-A\fR
+\fIaddress_base\fR option and the [\fIoffset_string\fR] operand, the input
+offset base is displayed in octal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fR
+.ad
+.RS 20n
+.rt  
+Interprets bytes in octal.  This is equivalent to \fB-t\fR \fBo1\fR.
+.RE
+
+.SS "/usr/bin/od"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fR
+.ad
+.RS 7n
+.rt  
+Displays single-byte characters. Certain non-graphic characters appear as
+C-language escapes:
+.sp
+.in +2
+.nf
+null	        \fB\e0\fR
+backspace	   \fB\eb\fR
+form-feed	   \fB\ef\fR
+new-line	   \fB\en\fR
+return	   \fB\er\fR
+tab	        \fB\et\fR
+.fi
+.in -2
+.sp
+
+Others appear as 3-digit octal numbers. For example:
+.sp
+.in +2
+.nf
+\fBecho "hello world" | od \(mic\fR
+0000000   h   e   l   l   o       w   o   r   l   d  \en
+0000014
+.fi
+.in -2
+.sp
+
+.RE
+
+.SS "/usr/xpg4/bin/od"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets bytes as single-byte or multibyte characters according to the
+current setting of the \fBLC_CTYPE\fR locale category. Printable multibyte
+characters are written in the area corresponding to the first byte of the
+character. The two-character sequence \fB**\fR is written in the area
+corresponding to each remaining byte in the character, as an indication that
+the character is continued. Non-graphic characters appear the same as they
+would using the \fB-C\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets bytes as single-byte or multibyte characters according to the
+current setting of the \fBLC_CTYPE\fR locale category. Printable multibyte
+characters are written in the area corresponding to the first byte of the
+character. The two-character sequence ** is written in the area corresponding
+to each remaining byte in the character, as an indication that the character is
+continued. Certain non-graphic characters appear as C escapes:
+.sp
+.in +2
+.nf
+null	        \fB\e0\fR
+backspace	   \fB\eb\fR
+form-feed	   \fB\ef\fR
+new-line	   \fB\en\fR
+return	   \fB\er\fR
+tab	        \fB\et\fR
+.fi
+.in -2
+.sp
+
+Other non-printable characters appear as one three-digit octal number for each
+byte in the character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets words in unsigned decimal.  This is equivalent to \fB-t\fR \fBu2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets long words in unsigned decimal. This is equivalent to \fB-t\fR
+\fBu4\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets long words in floating point.  This is equivalent to \fB-t\fR
+\fBf4\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets double long words in extended precision. This is equivalent to
+\fB-t\fR \fBf8\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-j\fR \fIskip\fR \fR
+.ad
+.RS 19n
+.rt  
+Jumps over \fIskip\fR bytes from the beginning of the input. The \fBod\fR
+command will read or seek past the first \fIskip\fR bytes in the concatenated
+input files.  If the combined input is not at least \fIskip\fR bytes long, the
+\fBod\fR command will write a diagnostic message to standard error and exit
+with a non-zero exit status.
+.sp
+By default, the \fIskip\fR option-argument is interpreted as a decimal number.
+With a leading \fB0x\fR or \fB0X\fR, the offset is interpreted as a hexadecimal
+number; otherwise, with a leading \fB0\fR, the offset will be interpreted as an
+octal number.  Appending the character \fBb\fR, \fBk\fR, or \fBm\fR to offset
+will cause it to be interpreted as a multiple of \fB512\fR, \fB1024\fR or
+\fB1\|048\|576\fR bytes, respectively. If the \fIskip\fR number is hexadecimal,
+any appended \fBb\fR is considered to be the final hexadecimal digit. The
+address is displayed starting at \fB0000000\fR, and its base is not implied by
+the base of the \fIskip\fR option-argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-N\fR \fIcount\fR \fR
+.ad
+.RS 19n
+.rt  
+Formats no more than \fIcount\fR bytes of input. By default, \fIcount\fR is
+interpreted as a decimal number.  With a leading \fB0x\fR or \fB0X\fR,
+\fIcount\fR is interpreted as a hexadecimal number; otherwise, with a leading
+\fB0\fR, it is interpreted as an octal number. If \fIcount\fR bytes of input
+(after successfully skipping, if \fB-j\fR\fIskip\fR is specified) are not
+available, it will not be considered an error. The \fBod\fR command will format
+the input that is available.  The base of the address displayed is not implied
+by the base of the \fIcount\fR option-argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets words in octal. This is equivalent to \fB-t\fR \fBo2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-O\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets long words in unsigned octal.  This is equivalent to \fB-t\fR
+\fBo4\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets words in signed decimal. This is equivalent to \fB-t\fR \fBd2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets long words in signed decimal. This is equivalent to \fB-t\fR
+\fBd4\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItype_string\fR \fR
+.ad
+.RS 19n
+.rt  
+Specifies one or more output types. The \fItype_string\fR option-argument must
+be a string specifying the types to be used when writing the input data. The
+string must consist of the type specification characters:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR \fR
+.ad
+.RS 6n
+.rt  
+\fINamed character\fR. Interprets bytes as named characters. Only the least
+significant seven bits of each byte will be used for this type specification.
+Bytes with the values listed in the following table will be written using the
+corresponding names for those characters.
+.sp
+The following are named characters in \fBod\fR:
+.sp
+.in +2
+.nf
+Value   Name  
+    
+\000    nul
+\001    soh
+\002    stx
+\003    etx
+\004    eot
+\005    enq
+\006    ack
+\007    bel
+\010    bs
+\011    ht
+\012    lf
+\013    vt
+\014    ff
+\015    cr
+\016    so
+\017    si
+\020    dle
+\021    dc1
+\022    dc2
+\023    dc3
+\024    dc4
+\025    nak
+\026    syn
+\027    etb
+\030    can
+\031    em
+\032    sub
+\033    esc
+\034    fs
+\035    gs
+\036    rs
+\037    us
+\040    sp
+\177    del
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR \fR
+.ad
+.RS 6n
+.rt  
+\fICharacter\fR. Interprets bytes as single-byte or multibyte characters
+specified by the current setting of the \fBLC_CTYPE\fR locale category.
+Printable multibyte characters are written in the area corresponding to the
+first byte of the character. The two-character sequence \fB**\fR is written in
+the area corresponding to each remaining byte in the character, as an
+indication that the character is continued. Certain non-graphic characters
+appear as C escapes: \fB\e0\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR,
+\fB\er\fR, \fB\et\fR, \fB\ev\fR\&. Other non-printable characters appear as one
+three-digit octal number for each byte in the character.
+.RE
+
+The type specification characters \fBd\fR, \fBf\fR, \fBo\fR, \fBu\fR, and
+\fBx\fR can be followed by an optional unsigned decimal integer that specifies
+the number of bytes to be transformed by each instance of the output type.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBf\fR \fR
+.ad
+.RS 18n
+.rt  
+\fIFloating point\fR. Can be followed by an optional \fBF\fR, \fBD\fR, or
+\fBL\fR indicating that the conversion should be applied to an item of type
+\fBfloat\fR, \fBdouble\fR, or \fBlong double\fR, respectively.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd\fR, \fBo\fR, \fBu\fR, and \fBx\fR\fR
+.ad
+.RS 18n
+.rt  
+\fISigned decimal\fR, \fIoctal\fR, \fIunsigned decimal\fR, and
+\fIhexadecimal\fR, respectively. Can be followed by an optional \fBC\fR,
+\fBS\fR, \fBI\fR, or \fBL\fR indicating that the conversion should be applied
+to an item of type \fBchar\fR, \fBshort\fR, \fBint\fR, or \fBlong\fR,
+respectively.
+.RE
+
+Multiple types can be concatenated within the same \fItype_string\fR and
+multiple \fB-t\fR options can be specified. Output lines are written for each
+type specified in the order in which the type specification characters are
+specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR \fR
+.ad
+.RS 19n
+.rt  
+Shows all input data (verbose). Without the \fB-v\fR option, all groups of
+output lines that would be identical to the immediately preceding output line
+(except for byte offsets), will be replaced with a line containing only an
+asterisk (*).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets words in hex. This is equivalent to \fB-t\fR \fBx2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-X\fR \fR
+.ad
+.RS 19n
+.rt  
+Interprets long words in hex. This is equivalent to \fB-t\fR \fBx4\fR.
+.RE
+
+.SH OPERANDS
+.SS "/usr/bin/od"
+.sp
+.LP
+The following operands are supported for \fB/usr/bin/od\fR only:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR \fR
+.ad
+.RS 26n
+.rt  
+Uses the standard input in addition to any files specified.  When this operand
+is not given, the standard input is used only if no \fIfile\fR operands are
+specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR \fR
+.ad
+.RS 26n
+.rt  
+A path name of a file to be read. If no \fIfile\fR operands are specified, the
+standard input will be used. If there are no more than two operands, none of
+the \fB-A\fR, \fB-j\fR, \fB-N\fR, or \fB-t\fR options is specified, and
+\fIany\fR of the following are true:
+.RS +4
+.TP
+1.
+the first character of the last operand is a plus sign (+)
+.RE
+.RS +4
+.TP
+2.
+the first character of the second operand is numeric
+.RE
+.RS +4
+.TP
+3.
+the first character of the second operand is \fBx\fR and the second
+character of the second operand is a lower-case hexadecimal character or digit
+.RE
+.RS +4
+.TP
+4.
+the second operand is named "\fBx\fR"
+.RE
+.RS +4
+.TP
+5.
+the second operand is named "\fB\&.\fR"
+.RE
+then the corresponding operand is assumed to be an offset operand rather than a
+file operand.
+.sp
+Without the \fB-N\fR count option, the display continues until an end-of-file
+is reached.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[+][0]\fR \fIoffset\fR \fB[.][b|B]\fR\fR
+.ad
+.br
+.na
+\fB\fB[+][0][\fR\fIoffset\fR] \fB[.]\fR\fR
+.ad
+.br
+.na
+\fB\fB[+][0x|x]\fR[\fIoffset\fR]\fR
+.ad
+.br
+.na
+\fB\fB[+][0x|x]\fR \fIoffset\fR\fB[B]\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fIoffset_string\fR operand specifies the byte offset in the file where
+dumping is to commence.  The offset is interpreted in octal bytes by default.
+If \fIoffset\fR begins with "\fB0\fR", it is interpreted in octal. If
+\fIoffset\fR begins with "\fBx\fR" or "\fB0x\fR", it is interpreted in
+hexadecimal and any appended "\fBb\fR" is considered to be the final
+hexadecimal digit. If "." is appended, the offset is interpreted in decimal. If
+"\fBb\fR" or "\fBB\fR" is appended, the offset is interpreted in units of
+\fB512\fR bytes. If the \fBfile\fR argument is omitted, the \fIoffset\fR
+argument must be preceded by a plus sign (\fB+\fR).  The address is displayed
+starting at the given offset.  The radix of the address will be the same as the
+radix of the offset, if specified, otherwise it will be octal.  Decimal
+overrides octal, and it is an error to specify both hexadecimal and decimal
+conversions in the same offset operand.
+.RE
+
+.SS "/usr/xpg4/bin/od"
+.sp
+.LP
+The following operands are supported for \fB/usr/xpg4/bin/od\fR only:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR \fR
+.ad
+.RS 29n
+.rt  
+Same as \fB/usr/bin/od\fR, except only one of the first two conditions must be
+true.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[+] [0] \fR\fIoffset\fR \fB[.]\|[b|B]\fR\fR
+.ad
+.br
+.na
+\fB\fB+ [\fR\fIoffset\fR] \fB[.]\fR\fR
+.ad
+.br
+.na
+\fB\fB[+][0x]\fR[\fIoffset\fR]\fR
+.ad
+.br
+.na
+\fB\fB[+][0x]\fR \fIoffset\fR\fB\|[B]\fR\fR
+.ad
+.br
+.na
+\fB\fB+x [\fR\fIoffset\fR\fB]\fR\fR
+.ad
+.br
+.na
+\fB\fB+x\fR\fIoffset \fR\fB[B]\fR\fR
+.ad
+.RS 29n
+.rt  
+Description of \fIoffset_string\fR is the same as for \fB/usr/bin/od\fR.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBod\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_NUMERIC\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR \fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/od"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIenabled
+.TE
+
+.SS "/usr/xpg4/bin/od"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIenabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsed\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

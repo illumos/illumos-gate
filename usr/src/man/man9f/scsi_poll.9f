@@ -1,0 +1,88 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_poll 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_poll \- run a polled SCSI command on behalf of a target driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR \fBscsi_poll\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_poll()\fR function requests the host adapter driver to run a polled
+command. Unlike \fBscsi_transport\fR(9F) which runs commands asynchronously,
+\fBscsi_poll()\fR runs commands to completion before returning. If the
+\fBpkt_time\fR member of \fIpkt\fR is \fB0\fR, the value of  \fBpkt_time\fR is
+defaulted to \fBSCSI_POLL_TIMEOUT\fR to prevent an indefinite hang of the
+system.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_poll()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+command completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.RS 6n
+.rt  
+command failed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_poll()\fR function can be called from user, interrupt, or kernel
+context. This function should not be called when the caller is executing
+\fBtimeout\fR(9F) in the context of a thread.
+.SH SEE ALSO
+.sp
+.LP
+\fBmakecom\fR(9F), \fBscsi_transport\fR(9F), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+Since \fBscsi_poll()\fR runs commands to completion before returning, it may
+require more time than is desirable when called from interrupt context.
+Therefore, calling \fBscsi_poll\fR from interrupt context is not recommended.

@@ -1,0 +1,136 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_pad 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_pad, newpad, subpad, prefresh, pnoutrefresh, pechochar, pechowchar \-
+create and display curses pads
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR .. ]
+#include <curses.h>
+
+\fBWINDOW *\fR\fBnewpad\fR(\fBint\fR \fInlines\fR, \fBint\fR \fIncols\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBsubpad\fR(\fBWINDOW *\fR\fIorig\fR, \fBint\fR \fInlines\fR, \fBint\fR \fIncols\fR, \fBint\fR \fIbegin_y\fR,
+     \fBint\fR \fIbegin_x\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefresh\fR(\fBWINDOW *\fR\fIpad\fR, \fBint\fR \fIpminrow\fR, \fBint\fR \fIpmincol\fR, \fBint\fR \fIsminrow\fR,
+     \fBint\fR \fIsmincol\fR, \fBint\fR \fIsmaxrow\fR, \fBint\fR \fIsmaxcol\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpnoutrefresh\fR(\fBWINDOW *\fR\fIpad\fR, \fBint\fR \fIpminrow\fR, \fBint\fR \fIpmincol\fR, \fBint\fR \fIsminrow\fR,
+     \fBint\fR \fIsmincol\fR, \fBint\fR \fIsmaxrow\fR, \fBint\fR \fIsmaxcol\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpechochar\fR(\fBWINDOW *\fR\fIpad\fR, \fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpechowchar\fR(\fBWINDOW *\fR\fIpad\fR, \fBchtype\fR \fIwch\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnewpad()\fR routine creates and returns a pointer to a new pad data
+structure with the given number of lines, \fInlines\fR, and columns,
+\fIncols\fR. A pad is like a window, except that it is not restricted by the
+screen size, and is not necessarily associated with a particular part of the
+screen. Pads can be used when a large window is needed, and only a part of the
+window will be on the screen at one time. Automatic refreshes of pads (for
+example, from scrolling or echoing of input) do not occur. It is not legal to
+call \fBwrefresh\fR(3CURSES) with a \fIpad\fR as an argument; the routines \fB
+prefresh()\fR or \fBpnoutrefresh()\fR should be called instead. Note that these
+routines require additional parameters to specify the part of the pad to be
+displayed and the location on the screen to be used for the display.
+.sp
+.LP
+The \fBsubpad()\fR routine creates and returns a pointer to a subwindow  within
+a pad with the given number of lines, \fInlines\fR, and columns, \fIncols\fR.
+Unlike \fBsubwin\fR(3CURSES), which uses screen coordinates, the window is at
+position (\fIbegin_x\fR\fB, \fR\fIbegin_y\fR) on the pad. The window is made in
+the middle of the window \fIorig\fR, so that changes made to one window affect
+both windows. During the use of this routine, it will often be necessary to
+call \fBtouchwin\fR(3CURSES) or \fBtouchline\fR(3CURSES) on \fIorig\fR before
+calling \fBprefresh()\fR.
+.sp
+.LP
+The \fBprefresh()\fR and \fBpnoutrefresh()\fR routines are analogous to
+\fBwrefresh\fR(3CURSES) and \fBwnoutrefresh\fR(3CURSES) except that they relate
+to pads instead of windows. The additional parameters are needed to indicate
+what part of the pad and screen are involved. \fIpminrow\fR and \fIpmincol\fR
+specify the upper left-hand corner of the rectangle to be displayed in the pad.
+\fIsminrow\fR, \fIsmincol\fR, \fIsmaxrow\fR, and \fIsmaxcol \fR specify the
+edges of the rectangle to be displayed on the screen. The lower right-hand
+corner of the rectangle to be displayed in the pad is calculated from the
+screen coordinates, since the rectangles must be the same size. Both rectangles
+must be entirely contained within their respective structures. Negative values
+of \fIpminrow\fR, \fIpmincol\fR, \fIsminrow\fR, or \fIsmincol\fR are treated as
+if they were zero.
+.sp
+.LP
+The \fBpechochar()\fR routine is functionally equivalent to a call to
+\fBaddch\fR(3CURSES) followed by a call to \fBrefresh\fR(3CURSES), a call to
+\fBwaddch\fR(3CURSES) followed by a call to \fBwrefresh\fR(3CURSES), or a call
+to \fBwaddch\fR(3CURSES) followed by a call to \fBprefresh()\fR. The knowledge
+that only a single character is being output is taken into consideration and,
+for non-control characters, a considerable performance gain might be seen by
+using these routines instead of their equivalents. In the case of
+\fBpechochar()\fR, the last location of the pad on the screen is reused for the
+arguments to \fBprefresh()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return an integer return \fBERR\fR upon failure and an integer
+value other than \fBERR\fR upon successful completion.
+.sp
+.LP
+Routines that return pointers return \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddch\fR(3CURSES), \fBcurses\fR(3CURSES), \fBrefresh\fR(3CURSES),
+\fBsubwin\fR(3CURSES), \fBtouchline\fR(3CURSES), \fBtouchwin\fR(3CURSES),
+\fBwaddch\fR(3CURSES), \fBwnoutrefresh\fR(3CURSES), \fBwrefresh\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header file <\fBcurses.h\fR> automatically includes the header files
+<\fBstdio.h\fR>, <\fBunctrl.h\fR> and <\fBwidec.h\fR>.
+.sp
+.LP
+Note that \fBpechochar()\fR may be a macro.

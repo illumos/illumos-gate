@@ -1,0 +1,185 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getnetgrent 3C "5 Apr 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getnetgrent, getnetgrent_r, setnetgrent, endnetgrent, innetgr \- get network
+group entry
+.SH SYNOPSIS
+.LP
+.nf
+#include <netdb.h>
+
+\fBint\fR \fBgetnetgrent\fR(\fBchar **\fR\fImachinep\fR, \fBchar **\fR\fIuserp\fR, \fBchar **\fR\fIdomainp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetnetgrent_r\fR(\fBchar **\fR\fImachinep\fR, \fBchar **\fR\fIuserp\fR, \fBchar **\fR\fIdomainp\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR\fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetnetgrent\fR(\fBconst char *\fR\fInetgroup\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBendnetgrent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinnetgr\fR(\fBconst char *\fR\fInetgroup\fR, \fBconst char *\fR\fImachine\fR,
+     \fBconst char *\fR\fIuser\fR, \fBconst char *\fR\fIdomain\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to test membership in and enumerate members of
+``netgroup'' network groups defined in a system database.  Netgroups are sets
+of (machine,user,domain) triples (see \fBnetgroup\fR(4)).
+.sp
+.LP
+These functions consult the source specified for \fBnetgroup\fR in the
+\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+.sp
+.LP
+The function \fBinnetgr()\fR returns  \fB1\fR if there is a netgroup
+\fInetgroup\fR that contains the specified \fImachine,\fR \fIuser,\fR
+\fIdomain\fR triple as a member; otherwise it returns  \fB0\fR. Any of the
+supplied pointers \fImachine\fR, \fIuser\fR, and \fIdomain\fR may be
+\fINULL,\fR signifying a "wild card" that matches all values in that position
+of the triple.
+.sp
+.LP
+The \fBinnetgr()\fR function is safe for use in single-threaded and
+multithreaded applications.
+.sp
+.LP
+The functions \fBsetnetgrent()\fR, \fBgetnetgrent()\fR, and \fBendnetgrent()\fR
+are used to enumerate the members of a given network group.
+.sp
+.LP
+The function \fBsetnetgrent()\fR establishes the network group specified in the
+parameter \fInetgroup\fR as the current group whose members are to be
+enumerated.
+.sp
+.LP
+Successive calls to the function \fBgetnetgrent()\fR will enumerate the members
+of the group established by calling \fBsetnetgrent()\fR; each call returns
+\fB1\fR if it succeeds in obtaining another member of the network group, or
+\fB0\fR if there are no further members of the group.
+.sp
+.LP
+When calling either \fBgetnetgrent()\fR or \fBgetnetgrent_r()\fR, addresses of
+the three character pointers are used as arguments, for example:
+.sp
+.in +2
+.nf
+char \fI*mp\fR, \fI*up\fR, \fI*dp\fR;
+getnetgrent(\fI&mp\fR, \fI&up\fR, \fI&dp\fR);
+.fi
+.in -2
+
+.sp
+.LP
+Upon successful return from  \fBgetnetgrent()\fR, the pointer \fImp\fR points
+to a string containing the name of the machine part of the member triple,
+\fIup\fR points to a string containing the user name and \fIdp\fR points to a
+string containing the domain name. If the pointer returned for \fImp\fR,
+\fIup\fR, or \fIdp\fR is \fINULL,\fR it signifies that the element of the
+netgroup contains wild card specifier in that position of the triple.
+.sp
+.LP
+The pointers returned by \fBgetnetgrent()\fR point into a buffer allocated by
+\fBsetnetgrent()\fR that is reused by each call. This space is released when an
+\fBendnetgrent()\fR call is made, and should not be released by the caller.
+This implementation is not safe for use in multi-threaded applications.
+.sp
+.LP
+The function \fBgetnetgrent_r()\fR is similar to \fBgetnetgrent()\fR function,
+but it uses a buffer supplied by the caller for the space needed to store the
+results.   The parameter \fIbuffer\fR should be a pointer to a buffer allocated
+by the caller and the length of this buffer should be specified by the
+parameter \fIbuflen\fR. The buffer must be large enough to hold the data
+associated with the triple. The \fBgetnetgrent_r()\fR function is safe for use
+both in single-threaded and multi-threaded applications.
+.sp
+.LP
+The function \fBendnetgrent()\fR frees the space allocated by the previous
+\fBsetnetgrent()\fR call.  The equivalent of an \fBendnetgrent()\fR implicitly
+performed whenever a  \fBsetnetgrent()\fR call is made to a new network group.
+.sp
+.LP
+Note that while \fBsetnetgrent()\fR and \fBendnetgrent()\fR are safe for use in
+multi-threaded applications, the effect of each is process-wide.  Calling
+\fBsetnetgrent()\fR resets the enumeration position for all threads. If
+multiple threads interleave calls to \fBgetnetgrent_r()\fR each will enumerate
+a disjoint subset of the netgroup. Thus the effective use of these functions in
+multi-threaded applications may require coordination by the caller.
+.SH ERRORS
+.sp
+.LP
+The function \fBgetnetgrent_r()\fR will return  \fB0\fR and set \fBerrno\fR to
+\fBERANGE\fR if the length of the buffer supplied by caller is not large enough
+to store the result.  See \fBIntro\fR(2) for the proper usage and
+interpretation of \fBerrno\fR in multi-threaded applications.
+.sp
+.LP
+The functions \fBsetnetgrent()\fR and \fBendnetgrent()\fR return \fB0\fR upon
+success.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nsswitch.conf\fR\fR
+.ad
+.RS 22n
+.rt  
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSee \fBDESCRIPTION\fR section.
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBIntro\fR(3), \fBnetgroup\fR(4), \fBnsswitch.conf\fR(4),
+\fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+The function \fBgetnetgrent_r()\fR is included in this release on an
+uncommitted basis only, and is subject to change or removal in future minor
+releases.
+.SH NOTES
+.sp
+.LP
+Only the Network Information Services, \fBNIS\fR and \fBNIS+,\fR are supported
+as sources for the \fBnetgroup\fR database.
+.sp
+.LP
+When compiling multi-threaded applications, see  \fBIntro\fR(3), \fINotes On
+Multithread Applications\fR, for information about the use of the
+\fB_REENTRANT\fR flag.

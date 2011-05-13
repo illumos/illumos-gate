@@ -1,0 +1,63 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_beep 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_beep, beep, flash \- curses bell and screen flash routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBbeep\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBflash\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbeep()\fR and \fBflash()\fR routines are used to signal the terminal
+user. The routine \fBbeep()\fR sounds the audible alarm on the terminal, if
+possible; if that is not possible, it flashes the screen (visible bell), if
+that is possible. The routine \fBflash()\fR flashes the screen, and if that is
+not possible, sounds the audible signal. If neither signal is possible, nothing
+happens. Nearly all terminals have an audible signal (bell or beep), but only
+some can flash the screen.
+.SH RETURN VALUES
+.sp
+.LP
+These routines always return \fBOK\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.

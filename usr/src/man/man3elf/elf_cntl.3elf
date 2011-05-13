@@ -1,0 +1,102 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_cntl 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_cntl \- control an elf file descriptor
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBint\fR \fBelf_cntl\fR(\fBElf *\fR\fIelf\fR, \fBElf_Cmd\fR \fIcmd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBelf_cntl()\fR instructs the library to modify its behavior with respect to
+an \fBELF\fR descriptor, \fIelf\fR. As \fBelf_begin\fR(3ELF) describes, an
+\fBELF\fR descriptor can have multiple activations, and multiple \fBELF\fR
+descriptors may share a single file descriptor. Generally, \fBelf_cntl()\fR
+commands apply to all activations of \fIelf\fR. Moreover, if the \fBELF\fR
+descriptor is associated with an archive file, descriptors for members within
+the archive will also be affected as described below. Unless stated otherwise,
+operations on archive members do not affect the descriptor for the containing
+archive.
+.sp
+.LP
+The \fIcmd\fR argument tells what actions to take and may have the following
+values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_FDDONE\fR\fR
+.ad
+.RS 16n
+.rt  
+This value tells the library not to use the file descriptor associated with
+\fIelf\fR. A program should use this command when it has requested all the
+information it cares to use and wishes to avoid the overhead of reading the
+rest of the file. The memory for all completed operations remains valid, but
+later file operations, such as the initial \fBelf_getdata()\fR for a section,
+will fail if the data are not in memory already.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_FDREAD\fR\fR
+.ad
+.RS 16n
+.rt  
+This command is similar to \fBELF_C_FDDONE\fR, except it forces the library to
+read the rest of the file. A program should use this command when it must close
+the file descriptor but has not yet read everything it needs from the file.
+After \fBelf_cntl()\fR completes the \fBELF_C_FDREAD\fR command, future
+operations, such as \fBelf_getdata()\fR, will use the memory version of the
+file without needing to use the file descriptor.
+.RE
+
+.sp
+.LP
+If \fBelf_cntl()\fR succeeds, it returns \fB0\fR. Otherwise \fIelf\fR was
+\fINULL\fR or an error occurred, and the function returns \fB\(mi1\fR\&.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf_begin\fR(3ELF), \fBelf_getdata\fR(3ELF),
+\fBelf_rawfile\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+If the program wishes to use the ``raw'' operations (see \fBelf_rawdata()\fR,
+which \fBelf_getdata\fR(3ELF) describes, and \fBelf_rawfile\fR(3ELF)) after
+disabling the file descriptor with \fBELF_C_FDDONE\fR or \fBELF_C_FDREAD\fR, it
+must execute the raw operations explicitly beforehand. Otherwise, the raw file
+operations will fail. Calling \fBelf_rawfile()\fR makes the entire image
+available, thus supporting subsequent \fBelf_rawdata()\fR calls.

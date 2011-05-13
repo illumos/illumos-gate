@@ -1,0 +1,111 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getnetpath 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+getnetpath, setnetpath, endnetpath \- get /etc/netconfig entry corresponding to
+NETPATH component
+.SH SYNOPSIS
+.LP
+.nf
+#include <netconfig.h>
+
+
+
+\fBstruct netconfig *\fR\fBgetnetpath\fR(\fBvoid *\fR\fIhandlep\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBsetnetpath\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBendnetpath\fR(\fBvoid *\fR\fIhandlep\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The routines described on this page are part of the Network Selection
+component. They provide the application access to the system network
+configuration database, \fB/etc/netconfig\fR, as it is "filtered" by the
+\fBNETPATH\fR environment variable. See \fBenviron\fR(5). See
+\fBgetnetconfig\fR(3NSL) for other routines that also access the network
+configuration database directly. The \fBNETPATH\fR variable is a list of
+colon-separated network identifiers.
+.sp
+.LP
+\fBgetnetpath()\fR returns a pointer to the  \fBnetconfig\fR database entry
+corresponding to the first  valid \fBNETPATH\fR component. The \fBnetconfig\fR
+entry is formatted as a \fBstruct netconfig\fR. On each subsequent call,
+\fBgetnetpath()\fR returns a pointer to the  \fBnetconfig\fR entry that
+corresponds to the next valid \fBNETPATH\fR component. \fBgetnetpath()\fR can
+thus be used to search the \fBnetconfig\fR database for all networks included
+in the \fBNETPATH\fR variable. When \fBNETPATH\fR has been exhausted,
+\fBgetnetpath()\fR returns NULL.
+.sp
+.LP
+A call to \fBsetnetpath()\fR "binds" to or "rewinds" \fBNETPATH\fR.
+\fBsetnetpath()\fR must be called before the first call to \fBgetnetpath()\fR
+and may be called at any other time. It returns a handle that is used by
+\fBgetnetpath()\fR.
+.sp
+.LP
+\fBgetnetpath()\fR silently ignores invalid  \fBNETPATH\fR components. A
+\fBNETPATH\fR component is invalid if there is no corresponding entry in the
+\fBnetconfig\fR database.
+.sp
+.LP
+If the \fBNETPATH\fR variable is \fBunset\fR, \fBgetnetpath()\fR behaves as if
+\fBNETPATH\fR were set to the sequence of "default" or "visible" networks in
+the \fBnetconfig\fR database, in the order in which they are listed.
+.sp
+.LP
+\fBendnetpath()\fR may be called to "unbind" from \fBNETPATH\fR when processing
+is complete, releasing resources for reuse. Programmers should be aware,
+however, that \fBendnetpath()\fR frees all memory allocated by
+\fBgetnetpath()\fR for the \fBstruct netconfig\fR data structure.
+\fBendnetpath()\fR returns \fB0\fR on success and \fB-1\fR on failure (for
+example, if \fBsetnetpath()\fR was not called previously).
+.SH RETURN VALUES
+.sp
+.LP
+\fBsetnetpath()\fR returns a handle that is used by \fBgetnetpath()\fR. In case
+of an error, \fBsetnetpath()\fR returns \fBNULL.\fR \fBnc_perror()\fR or
+\fBnc_sperror()\fR can be used to print out the reason for failure. See
+\fBgetnetconfig\fR(3NSL).
+.sp
+.LP
+When first called, \fBgetnetpath()\fR returns a pointer to the \fBnetconfig\fR
+database entry corresponding to the first valid \fBNETPATH\fR component. When
+\fBNETPATH\fR has been exhausted, \fBgetnetpath()\fR returns NULL.
+.sp
+.LP
+\fBendnetpath()\fR returns \fB0\fR on success and\fB -1 \fRon failure (for
+example, if \fBsetnetpath()\fR was not called previously).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetnetconfig\fR(3NSL), \fBnetconfig\fR(4), \fBattributes\fR(5),
+\fBenviron\fR(5)

@@ -48,6 +48,7 @@
 #include <procfs.h>
 #include <assert.h>
 #include <errno.h>
+#include <zone.h>
 
 #ifndef TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -2112,6 +2113,10 @@ main(int argc, char *argv[])
 		case 'z': {
 			scf_value_t *zone;
 
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcadm -z may only be used "
+				    "from the global zone\n"));
+
 			if ((zone = scf_value_create(h)) == NULL)
 				scfdie();
 
@@ -2131,7 +2136,8 @@ main(int argc, char *argv[])
 	}
 
 	if (scf_handle_bind(h) == -1)
-		uu_die(gettext("Couldn't bind to svc.configd.\n"));
+		uu_die(gettext("Couldn't bind to configuration repository: "
+		    "%s.\n"), scf_strerror(scf_error()));
 
 	if (optind >= argc)
 		usage();

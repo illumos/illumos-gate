@@ -1,0 +1,94 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cbreak 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+cbreak, nocbreak, noraw, raw \- set input mode controls
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBcbreak\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnocbreak\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnoraw\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBraw\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcbreak()\fR function enables the character input mode. This overrides
+any previous call to the \fBraw()\fR function and turns the \fBstty\fR flag
+\fBICANON\fR off.
+.sp
+.LP
+The \fBnocbreak()\fR function sets the line canonical mode and turns the
+\fBstty\fR flag \fBICANON\fR on without touching the \fBISIG\fR or \fBIXON\fR
+flags.
+.sp
+.LP
+The \fBnoraw()\fR function sets the line canonical mode and turns the
+\fBstty\fR flags \fBICANON\fR, \fBISIG\fR, and \fBIXON\fR all on.
+.sp
+.LP
+The \fBraw()\fR function sets the character input mode and turns the \fBstty\fR
+flags \fBICANON\fR, \fBISIG\fR, and \fBIXON\fR all off.  This mode provides
+maximum control over input.
+.sp
+.LP
+It is important to remember that the terminal may or may not be in  character
+mode operation initially.   Most interactive programs require \fBcbreak()\fR to
+be enabled.
+.SH RETURN VALUES
+.sp
+.LP
+On success, these functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetch\fR(3XCURSES), \fBhalfdelay\fR(3XCURSES), \fBnodelay\fR(3XCURSES),
+\fBtimeout\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5), \fBtermio\fR(7I)

@@ -1,0 +1,327 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fgetattr 3C "4 Aug 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fgetattr, fsetattr, getattrat, setattrat \- get and set system attributes
+.SH SYNOPSIS
+.LP
+.nf
+#include <fcntl.h>
+#include <sys/types.h>
+#include <attr.h>
+#include <sys/nvpair.h>
+
+\fBint\fR \fBfgetattr\fR(\fBint\fR fildes, \fBxattr_view_t\fR view,\fBnvlist_t **\fRresponse);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfsetattr\fR(\fBint\fR fildes, \fBxattr_view_t\fR view,\fBnvlist_t *\fRrequest)
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetattrat\fR(\fBint\fR fildes, \fBxattr_view_t\fR view, \fBconst char *\fRfilename,
+     \fBnvlist_t **\fRresponse);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetattrat\fR(\fBint\fR fildes, \fBxattr_view_t\fR view, \fBconst char *\fRfilename,
+     \fBnvlist_t *\fRrequest);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfgetattr()\fR function obtains an nvlist of system attribute information
+about an open file object specified by the file descriptor \fIfildes\fR,
+obtained from a successful \fBopen\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
+\fBfcntl\fR(2), or \fBpipe\fR(2) function.
+.sp
+.LP
+The \fBgetattrat()\fR function first opens the extended attribute file
+specified by \fIfilename\fR in the already opened file directory object
+specified by \fIfildes\fR. It then retrieves an nvlist of system attributes and
+their values from \fIfilename\fR.
+.sp
+.LP
+The \fIresponse\fR argument is allocated by either \fBfgetattr()\fR or
+\fBgetattrat()\fR. The application must call \fBnvlist_free\fR(3NVPAIR) to
+deallocate the memory.
+.sp
+.LP
+Upon successful completion, the nvlist will contain one nvpair for each of the
+system attributes associated with \fIview\fR.  The list of views and the
+attributes associated with each view are listed below.  Not all underlying file
+systems support all views and all attributes. The nvlist will not contain an
+nvpair for any attribute not supported by the underlying filesystem.
+.sp
+.LP
+The \fBfsetattr()\fR function uses the nvlist pointed to by \fIrequest\fR to
+update one or more of the system attribute's information about an open file
+object specified by the file descriptor \fIfildes\fR, obtained from a
+successful \fBopen()\fR, \fBcreat()\fR, \fBdup()\fR, \fBfcntl()\fR, or
+\fBpipe()\fR function. The \fBsetattrat()\fR function first opens the extended
+attribute file specified by \fIfilename\fR in the already opened file directory
+object specified by \fIfildes\fR. It then uses the nvlist pointed to by
+\fIrequest\fR to update one or more of the system attributes of filename.
+.sp
+.LP
+If completion is not successful then no system attribute information is
+updated.
+.sp
+.LP
+The following chart lists the supported views, attributes, and  data types for
+each view:
+.sp
+
+.sp
+.TS
+tab();
+cw(1.83i) cw(1.83i) cw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+ViewAttributeData type
+_
+\fBXATTR_VIEW_READONLY\fR\fBA_FSID\fR\fBuint64_value\fR
+\fBA_OPAQUE\fR\fBboolean_value\fR
+\fBA_AV_SCANSTAMP\fR\fBuint8_array[]\fR
+\fBXATTR_VIEW_READWRITE\fR\fBA_READONLY\fR\fBboolean_value\fR
+\fBA_HIDDEN\fR\fBboolean_value\fR
+\fBA_SYSTEM\fR\fBboolean_value\fR
+\fBA_ARCHIVE\fR\fBboolean_value\fR
+\fBA_CRTIME\fR\fBuint64_array\fR[2]
+\fBA_NOUNLINK\fR\fBboolean_value\fR
+\fBA_IMMUTABLE\fR\fBboolean_value\fR
+\fBA_APPENDONLY\fR\fBboolean_value\fR
+\fBA_NODUMP\fR\fBboolean_value\fR
+\fBA_AV_QUARANTINED\fR\fBboolean_value\fR
+\fBA_AV_MODIFIED\fR\fBboolean_value\fR
+\fBA_OWNERSID\fRT{
+nvlist composed of \fBuint32_value\fR and \fBstring\fR
+T}
+\fBA_GROUPSID\fRT{
+nvlist composed of \fBuint32_value\fR and \fBstring\fR
+T}
+.TE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, 0 is returned. Otherwise, -1  is returned and
+\fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBfgetattr()\fR, \fBgetattrat()\fR, \fBfsetattr()\fR, and
+\fBsetattrat()\fR, functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid open file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The underlying file system does not support extended file attributes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+An error occurred while reading from the file system.
+.RE
+
+.sp
+.LP
+The \fBgetattrat()\fR and \fBsetattrat()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+Search permission or write permission for \fIfilename\fR is denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfilename\fR argument does not name an existing file in the extended
+attribute directory represented by \fIfildes\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+There are insufficient privileges to manipulate attributes.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRObtain an nvlist of readonly system attributes for an open file
+object.
+.sp
+.LP
+Use \fBfgetattr()\fR to obtain an nvlist of the readonly system attributes for
+the open file object represented by file descriptor \fIfildes\fR.
+
+.sp
+.in +2
+.nf
+#include <fcntl.h>
+#include <sys/types.h>
+#include <attr.h>
+#include <sys/nvpair.h>
+
+nvlist_t *response;
+nvpair_t *pair = NULL;
+
+if (fgetattr(fildes, XATTR_VIEW_READONLY, &response)) {
+             exit(1);
+}
+while (pair = nvlist_next_nvpair(response, pair)) {
+    .
+    .
+    .
+}
+nvlist_free(response);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRSet the \fBA_READONLY\fR system attribute on an open file
+object.
+.sp
+.LP
+Use \fBfsetattr()\fR to set the \fBA_OPAQUE\fR system attribute on the open
+file object represented by file descriptor \fIfildes\fR.
+
+.sp
+.in +2
+.nf
+nvlist_t *request;
+nvpair_t *pair = NULL;
+
+if (nvlist_alloc(&request, NV_UNIQUE_NAME, 0) != 0) {
+            exit(1);
+}
+if (nvlist_add_boolean_value(request, A_READONLY, 1) != 0) {
+            exit(1);
+}
+if (fsetattr(fildes, XATTR_VIEW_READWRITE, request)) {
+            exit(1);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRObtain an nvlist of the read/write system attributes for a
+file.
+.sp
+.LP
+Use \fBgetattrat()\fR to obtain an nvlist of the read/write system attributes
+for the file named \fBxattrfile\fR in the extended attribute directory of the
+open file represented by file descriptor \fIfildes\fR.
+
+.sp
+.in +2
+.nf
+nvlist_t *response;
+nvpair_t *pair = NULL;
+
+if (getattrat(fildes, XATTR_VIEW_READWRITE, "file", &response)) {
+             exit(1);
+}
+while (pair = nvlist_next_nvpair(response, pair)) {
+    .
+    .
+    .
+}
+nvlist_free(response);
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRSet the \fBA_APPENDONLY\fR system attribute on a file.
+.sp
+.LP
+Use \fBsetattrat()\fR to set the \fBA_APPENDONLY\fR system attribute on the
+file named \fBfile\fR in the extended attribute directory of the open file
+represented by file descriptor \fIfildes\fR.
+
+.sp
+.in +2
+.nf
+nvlist_t *request;
+nvpair_t *pair = NULL;
+
+if (nvlist_alloc(&request, NV_UNIQUE_NAME, 0) != 0) {
+            exit(1);
+}
+if (nvlist_add_boolean_value(request, A_APPENDONLY, 1) != 0) {
+            exit(1);
+}
+if (setattrat(fildes, XATTR_VIEW_READWRITE, "file", request)) {
+            exit(1);
+     }
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2), \fBfstat\fR(2), \fBfstatat\fR(2),
+\fBopen\fR(2), \fBpipe\fR(2), \fBlibnvpair\fR(3LIB), \fBattributes\fR(5),
+\fBfsattr\fR(5)

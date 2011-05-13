@@ -1,0 +1,266 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Portions Copyright (c) 1995, Sun Microsystems,  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH asa 1 "18 Apr 1995" "SunOS 5.11" "User Commands"
+.SH NAME
+asa \- convert FORTRAN carriage-control output to printable form
+.SH SYNOPSIS
+.LP
+.nf
+\fBasa\fR [\fB-f\fR] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBasa\fR utility will write its input files to standard output, mapping
+carriage-control characters from the text files to line-printer control
+sequences.
+.sp
+.LP
+The first character of every line will be removed from the input, and the
+following actions will be performed.
+.sp
+.LP
+If the character removed is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSPACE\fR\fR
+.ad
+.RS 9n
+.rt  
+The rest of the line will be output without change.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 9n
+.rt  
+It is replaced by a newline control sequence followed by the rest  of the input
+line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 9n
+.rt  
+It is replaced by a newpage control sequence followed by the rest  of the input
+line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fR
+.ad
+.RS 9n
+.rt  
+It is replaced by a control sequence that causes printing to  return to the
+first column of the previous line, where the rest of  the input line is
+printed.
+.RE
+
+.sp
+.LP
+For any other character in the first column of an input line, \fBasa\fR skips
+the character and prints the rest of the line unchanged.
+.sp
+.LP
+If \fBasa\fR is called without providing a \fIfilename\fR, the standard input
+is used.
+.SH OPTIONS
+.sp
+.LP
+The following option is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Start each file on a new page.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A pathname of a text file used for input. If no \fBfile\fR operands are
+specified, or `\fB\|\(mi\|\fR\&' is specified, then the standard input will be
+used.
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBa.out | asa | lp\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+converts output from \fBa.out\fR to conform with conventional printers and
+directs it through a pipe to the printer.
+.sp
+.LP
+The command
+.sp
+.in +2
+.nf
+\fBasa \fI output\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+shows the contents of file \fIoutput\fR on a terminal as it would appear on a
+printer.
+.sp
+.LP
+The following program is used in the next two examples:
+.sp
+.in +2
+.nf
+write(*,'(" Blank")')
+write(*,'("0Zero ")')
+write(*,'("+        Plus ")')
+write(*,'("1One  ")')
+end
+.fi
+.in -2
+
+.sp
+.LP
+Both of the following examples produce two pages of output:
+.sp
+.LP
+Page 1:
+.sp
+.in +2
+.nf
+Blank
+
+ZeroPlus
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Page 2:
+.sp
+.in +2
+.nf
+One
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 1 \fRUsing actual files
+.sp
+.in +2
+.nf
+\fBa.out >  MyOutputFile
+asa < MyOutputFile | lp\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUsing only pipes
+.sp
+.in +2
+.nf
+\fBa.out |  asa | lp\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBasa\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All input files were output successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlp\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,58 @@
+'\" te
+.\"  All Rights Reserved  Copyright (c) 2006, Sun
+.\" Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_node_name 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_node_name \- return the devinfo node name
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBchar *\fR\fBddi_node_name\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+A pointer the device's \fBdev_info\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_node_name()\fR function returns the device node name contained in
+the \fBdev_info\fR node pointed to by \fIdip\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_node_name()\fR function returns the device node name contained in
+the \fBdev_info\fR structure.
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_node_name()\fR function can be called from user, interrupt, or
+kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_binding_name\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

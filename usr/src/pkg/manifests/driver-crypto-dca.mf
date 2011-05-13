@@ -40,6 +40,8 @@ dir path=usr/lib/fm/eft
 dir path=usr/lib/locale
 dir path=usr/lib/locale/C
 dir path=usr/lib/locale/C/LC_MESSAGES
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=dca \
     alias=pci108e,5454 \
     alias=pci108e,5455 \
@@ -59,6 +61,7 @@ file path=usr/lib/fm/eft/sca1000.eft mode=0444
 file path=usr/lib/fm/eft/sca500.eft mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.mo mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/SCA500.mo mode=0444
+file path=usr/share/man/man7d/dca.7d
 legacy pkg=SUNWdcaf desc="DCA Crypto Accelerator Supplemental Files (usr)" \
     name="DCA Crypto Accelerator (usr)"
 legacy pkg=SUNWdcar desc="DCA Crypto Accelerator driver" \

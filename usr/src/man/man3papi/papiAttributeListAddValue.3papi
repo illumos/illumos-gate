@@ -1,0 +1,732 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH papiAttributeListAddValue 3PAPI "17 Jan 2007" "SunOS 5.11" "PAPI Library Functions"
+.SH NAME
+papiAttributeListAddValue, papiAttributeListAddBoolean,
+papiAttributeListAddCollection, papiAttributeListAddDatetime,
+papiAttributeListAddInteger, papiAttributeListAddMetadata,
+papiAttributeListAddRange, papiAttributeListAddResolution,
+papiAttributeListAddString, papiAttributeListDelete, papiAttributeListGetValue,
+papiAttributeListGetNext, papiAttributeListFind, papiAttributeListGetBoolean,
+papiAttributeListGetCollection, papiAttributeListGetDatetime,
+papiAttributeListGetInteger, papiAttributeListGetMetadata,
+papiAttributeListGetRange, papiAttributeListGetResolution,
+papiAttributeListGetString, papiAttributeListFromString,
+papiAttributeListToString, papiAttributeListFree \- manage PAPI attribute lists
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <papi.h>
+
+\fBpapi_status_t\fR \fBpapiAttributeListAddValue\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBpapi_attribute_value_type_t\fR \fItype\fR,
+     \fBpapi_attribute_value_t *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddString\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBchar *\fR\fIstring\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddInteger\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBint\fR \fIinteger\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddBoolean\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBchar\fR \fIboolean\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddRange\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBint\fR \fIlower\fR, \fBint\fR \fIupper\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddResolution\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBint\fR \fIxres\fR, \fBint\fR \fIyres\fR,
+     \fBpapi_resolution_unit_t\fR \fIunits\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddDatetime\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBtime_t\fR \fIdatetime\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddCollection\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBpapi_attribute_t **\fR\fIcollection\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListAddMetadata\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIname\fR, \fBpapi_metadata_t\fR \fImetadata\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListDelete\fR(\fBpapi_attribute_t ***\fR\fIattributes\fR,
+     \fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetValue\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBpapi_attribute_value_type_t\fR \fItype\fR,
+     \fBpapi_attribute_value_t **\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetString\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBchar **\fR\fIvptr\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetInteger\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBint *\fR\fIvptr\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetBoolean\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBchar *\fR\fIvptr\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetRange\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBint *\fR\fImin\fR, \fBint *\fR\fImax\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetResolution\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBint *\fR\fIx\fR, \fBint *\fR\fIy\fR,
+     \fBpapi_resolution_unit_t *\fR\fIunits\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetDatetime\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBtime_t *\fR\fIdt\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetCollection\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBpapi_attribute_t ***\fR\fIcollection\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListGetMetadata\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR, \fBchar *\fR\fIname\fR, \fBpapi_metadata_t *\fR\fIvptr\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_attribute_t *\fR\fBpapiAttributeListFind\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_attribute_t *\fR\fBpapiAttributeListGetNext\fR(\fBpapi_attribute_t **\fR\fIlist\fR,
+     \fBvoid **\fR\fIiterator\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpapiAttributeListFree\fR(\fBpapi_attribute_t **\fR\fIattributes\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListFromString\fR(\fBpapi_attribute_t ***\fR\fIattrs\fR,
+     \fBint\fR \fIflags\fR, \fBchar *\fR\fIstring\fR);
+.fi
+
+.LP
+.nf
+\fBpapi_status_t\fR \fBpapiAttributeListToString\fR(\fBpapi_attribute_t **\fR\fIattrs\fR,
+     \fBchar *\fR\fIdelim\fR, \fBchar *\fR\fIbuffer\fR, \fBsize_t\fR \fIbuflen\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattrs\fR\fR
+.ad
+.RS 14n
+.rt  
+address of array of pointers to attributes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattributes\fR\fR
+.ad
+.RS 14n
+.rt  
+a list of attributes (of type \fBpapi_attribute_t **\fR) contained in a
+collection. Lists can be hierarchical.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIboolean\fR\fR
+.ad
+.RS 14n
+.rt  
+boolean value (\fBPAPI_TRUE\fR or \fBPAPI_FALSE)\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbuffer\fR\fR
+.ad
+.RS 14n
+.rt  
+buffer to fill
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbuflen\fR\fR
+.ad
+.RS 14n
+.rt  
+length of supplied buffer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcollection\fR\fR
+.ad
+.RS 14n
+.rt  
+list of attributes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdatetime\fR\fR
+.ad
+.RS 14n
+.rt  
+attribute time value specified in \fBtime_t\fR representation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdelim\fR\fR
+.ad
+.RS 14n
+.rt  
+delimiter used in construction of a string representation of an attribute list
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdt\fR\fR
+.ad
+.RS 14n
+.rt  
+date and time represented as a \fBtime_t\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 14n
+.rt  
+Specify bit fields defining how actions will be performed:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_ATTR_REPLACE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Free any existing value(s) and replace it with the supplied value(s).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_ATTR_APPEND\fR\fR
+.ad
+.sp .6
+.RS 4n
+Add the supplied value to the attribute.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_ATTR_EXCL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Add the supplied value to the attribute, if the attribute was not previously
+defined.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinteger\fR\fR
+.ad
+.RS 14n
+.rt  
+integer value
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIiterator\fR\fR
+.ad
+.RS 14n
+.rt  
+iterator for enumerating multiple values of multi-value attributes
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlist\fR\fR
+.ad
+.RS 14n
+.rt  
+array of pointers to attributes (attribute list)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlower\fR\fR
+.ad
+.RS 14n
+.rt  
+lower bound for a range of integer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImax\fR\fR
+.ad
+.RS 14n
+.rt  
+maximum value in a range
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImetadata\fR\fR
+.ad
+.RS 14n
+.rt  
+pseudo-values for specialized attributes \fBPAPI_UNSUPPORTED\fR,
+\fBPAPI_DEFAULT\fR, \fBPAPI_UNKNOWN\fR, \fBPAPI_NO_VALUE\fR,
+\fBPAPI_NOT_SETTABLE\fR, \fBPAPI_DELETE\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImin\fR\fR
+.ad
+.RS 14n
+.rt  
+minimum value in a range
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 14n
+.rt  
+attribute name
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstring\fR\fR
+.ad
+.RS 14n
+.rt  
+string value
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 14n
+.rt  
+attribute type (\fBPAPI_STRING\fR, \fBPAPI_INTEGER\fR, \fBPAPI_BOOLEAN\fR,
+\fBPAPI_RANGE\fR, \fBPAPI_RESOLUTION\fR, \fBPAPI_DATETIME\fR,
+\fBPAPI_COLLECTION\fR, \fBPAPI_METADATA\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIunits\fR\fR
+.ad
+.RS 14n
+.rt  
+resolution unit of measure (\fBPAPI_RES_PER_INCH\fR or \fBPAPI_RES_PER_CM\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIupper\fR\fR
+.ad
+.RS 14n
+.rt  
+upper bound for a range of integer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvalue\fR\fR
+.ad
+.RS 14n
+.rt  
+attribute value
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvptr\fR\fR
+.ad
+.RS 14n
+.rt  
+pointer to arbitrary data
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 14n
+.rt  
+horizontal (x) resolution
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIxres\fR\fR
+.ad
+.RS 14n
+.rt  
+horizontal (x) component of a resolution
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 14n
+.rt  
+vertical (y) resolution
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIyres\fR\fR
+.ad
+.RS 14n
+.rt  
+vertical (y) component of a resolution
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpapiAttributeListAdd*()\fR functions add new attributes and/or values to
+the attribute list passed in. If necessary, the attribute list passed in is
+expanded to contain a new attribute pointer for any new attributes added to the
+list. The list is null-terminated. Space for the new attributes and values is
+allocated and the name and value are copied into this allocated space.
+.sp
+.LP
+If \fBPAPI_ATTR_REPLACE\fR is specified in flags, any existing attribute values
+are freed and replaced with the supplied value.
+.sp
+.LP
+If \fBPAPI_ATTR_APPEND\fR is specified, the supplied value is appended to the
+attribute's list of values.
+.sp
+.LP
+If \fBPAPI_ATTR_EXCL\fR is specified, the operation succeeds only if the
+attribute was not previously defined.
+.sp
+.LP
+The \fBpapiAttributeListGet*()\fR functions retrieve an attribute value from an
+attribute list. If the attribute is a multi-valued attribute, the first call to
+retrieve a value should pass in an iterator and attribute name. Subsequent
+calls to retrieve additional values should pass in the iterator and a null
+value for the attribute name.  If a single-valued attribute is to be retrieved,
+\fINULL\fR can be used in place of the iterator.
+.sp
+.LP
+Upon successful completion of a get operation, the value passed in (string,
+integer, boolean, ...) is changed to the value from the attribute list.  If the
+operation fails for any reason (type mismatch, not found, ...), the value
+passed in remains untouched.
+.sp
+.LP
+The resulting value returned from a get operation is returned from the
+attribute list's allocated memory. It is not guaranteed to be available after
+the attribute list has been freed.
+.sp
+.LP
+The \fBpapiAttributeListDelete()\fR function removes an attribute from a
+supplied list.
+.sp
+.LP
+The \fBpapiAttributeListFind()\fR function allows an application to retrieve an
+entire attribute structure from the passed-in attribute list.
+.sp
+.LP
+The \fBpapiAttributeListGetNext()\fR function allows an application to walk
+through an attribute list returning subsequent attributes from the list.  With
+the first call, the iterator should be initialized to \fINULL\fR and subsequent
+calls should use \fINULL\fR for the list argument.
+.sp
+.LP
+The \fBpapiAttributeListFree()\fR function deallocates all memory associated
+with an attribute list, including values that might have been retrieved
+previously using \fBpapiAttributeListGet*()\fR calls.
+.sp
+.LP
+The \fBpapiAttributeListFromString()\fR function takes in a string
+representation of a set of attributes, parses the string and adds the
+attributes to the passed in attribute list using the flags to determine how to
+add them.  String values are specified with "key=value". Integer values are
+specified with "key=number". Boolean values are specified with either
+"key=(true|false)" or "[no]key". Multiple attributes can be specified in the
+string by separating them with a whitespace character.
+.sp
+.LP
+The \fBpapiAttributeListToString()\fR function converts an attribute list to a
+string representation that can be displayed to a user.  The delimiter value is
+placed between attributes in the string.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return \fBPAPI_OK\fR upon successful completion and one of the
+following on failure:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_BAD_ARGUMENT\fR\fR
+.ad
+.RS 24n
+.rt  
+The supplied arguments were not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_CONFLICT\fR\fR
+.ad
+.RS 24n
+.rt  
+There was an attribute type mismatch.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_NOT_FOUND\fR\fR
+.ad
+.RS 24n
+.rt  
+The requested attribute could not be found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_NOT_POSSIBLE\fR\fR
+.ad
+.RS 24n
+.rt  
+The requested operation could not be performed due to buffer overflow.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAPI_TEMPORARY_ERROR\fR\fR
+.ad
+.RS 24n
+.rt  
+Memory could not be allocated to add to the attribute list.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe following example manipulates a PAPI attribute list.
+.sp
+.in +2
+.nf
+/*
+ * program to manipulate a PAPI attribute list
+ */
+#include <stdio.h>
+#include <papi.h>
+
+/*ARGSUSED*/
+int
+main(int ac, char *av[])
+{
+    char buf[BUFSIZ];
+    papi_status_t status;
+    papi_attribute_t **list = NULL;
+    void *iter = NULL;
+    char *string = NULL;
+    int32_t integer = 0;
+
+    /* build an attribute list */
+    (void) papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
+                                "job-title", "example");
+    (void) papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
+                                "copies", 1);
+    (void) papiAttributeListFromString(&list, PAPI_ATTR_REPLACE, av[1]);
+    status = papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
+                                "document-format", "text/plain");
+    if (status != PAPI_OK)
+        printf("failed to set document-format to text/plain: %s\en",
+               papiStatusString(status));
+
+    /* dump the list */
+    status = papiAttributeListToString(list, "\en\et", buf, sizeof (buf));
+    if (status == PAPI_OK)
+        printf("Attributes: %s\en", buf);
+    else
+        printf("Attribute list to big to dump\en");
+
+
+    /* retreive various elements */
+    integer = 12;
+    (void) papiAttributeListGetInteger(list, NULL, "copies", &integer);
+    printf("copies: %d\en", integer);
+
+    string = NULL;
+    for (status = papiAttributeListGetString(list, &oter,
+                                            "job-files", &string);
+         status == PAPI_OK;
+         status = papiAttributeListGetString(list, &iter, NULL, &string))
+        printf("file: %s\en", string);
+
+    papiAttributeListFree(list);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpapi\fR(3LIB), \fBattributes\fR(5)

@@ -1,0 +1,355 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kiconvstr 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+kiconvstr \- string-based code conversion function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+
+
+
+\fBsize_t\fR \fBkiconvstr\fR(\fBconst char *\fR\fItocode\fR, \fBconst char *\fR\fIfromcode\fR, \fBchar *\fR\fIinarray\fR, 
+     \fBsize_t *\fR\fIinlen\fR, \fBchar *\fR\fIoutarray\fR, \fBsize_t *\fR\fIoutlen\fR, \fBint\fR \fIflag\fR, \fBint *\fR\fIerrno\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+The parameters for the \fBkiconvstr\fR function are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fItocode\fR\fR
+.ad
+.RS 12n
+.rt  
+Points to a target codeset name string. Supported names are specified at
+\fBkiconv_open()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfromcode\fR\fR
+.ad
+.RS 12n
+.rt  
+Points to a source codeset name string. Supported names are specified at
+\fBkiconv_open()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinarray\fR\fR
+.ad
+.RS 12n
+.rt  
+Points to a byte array containing a sequence of character bytes in
+\fIfromcode\fR codeset to be converted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinlen\fR\fR
+.ad
+.RS 12n
+.rt  
+As an input parameter, the number of bytes to be converted in \fIinarray\fR. As
+an output parameter, the number of bytes in \fIinarray\fR still not converted
+after the conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutarray\fR\fR
+.ad
+.RS 12n
+.rt  
+Points to a byte array where converted character bytes in \fItocode\fR codeset
+can be saved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutlen\fR\fR
+.ad
+.RS 12n
+.rt  
+As an input parameter, the number of available bytes at \fIoutarray\fR where
+converted character bytes can be saved. As an output parameter, the number of
+bytes still available at \fIoutarray\fR after the conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 12n
+.rt  
+Indicates possible conversion options constructed by a bitwise-inclusive-OR of
+the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKICONV_IGNORE_NULL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Normally, \fBkiconvstr()\fR stops the conversion if it encounters \fBNULL\fR
+byte even if the current \fIinlen\fR is pointing to a value larger than zero.
+.sp
+If this option is set, a \fBNULL\fR byte does not stop the conversion and the
+conversion continues until the number of \fIinarray\fR bytes pointed by
+\fIinlen\fR are all consumed for conversion or an error happened.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKICONV_REPLACE_INVALID\fR\fR
+.ad
+.sp .6
+.RS 4n
+Normally, \fBkiconvstr()\fR stops the conversion if it encounters illegal or
+incomplete characters with corresponding \fIerrno\fR values.
+.sp
+If this option is set, \fBkiconvstr()\fR does not stop the conversion and
+instead treats such characters as non-identical conversion  cases.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrno\fR\fR
+.ad
+.RS 12n
+.rt  
+Indicates the error when conversion is not completed or failed. The following
+are possible values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 13n
+.rt  
+The input conversion was stopped due to an input byte that does not belong to
+the input codeset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 13n
+.rt  
+The input conversion was stopped due to lack of space in the output array.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+The input conversion was stopped due to an incomplete character or shift
+sequence at the end of the input array.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 13n
+.rt  
+The requested conversion is not supported.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkiconvstr()\fR function converts the sequence of characters from one
+\fBcodeset\fR, in the array specified by \fIinarray\fR, into a sequence of
+corresponding characters in another \fBcodeset\fR, in the array specified by
+\fIoutarray\fR. The \fBcodesets\fR are those specified in \fIfromcode\fR and
+\fItocode\fR parameters. The \fIinarray\fR parameter points to a character byte
+array to the first character in the input array and \fIinlen\fR indicates the
+number of bytes to the end of the array to be converted. The \fIoutarray\fR
+parameter points to a character byte array to the first available byte in the
+output array and \fIoutlen\fR indicates the number of the available bytes to
+the end of the array. Unless \fBKICONV_IGNORE_NULL\fR is specified at flag,
+\fBkiconvstr()\fR function normally stops when it encounters \fBNULL\fR byte
+from the input array regardless of the current \fIinlen\fR value.
+.sp
+.LP
+If \fBKICONV_REPLACE_INVALID\fR is not specified at flag and if a sequence of
+input bytes does not form a valid character in the specified codeset,
+conversion stops after the previous successfully converted character. If
+\fBKICONV_REPLACE_INVALID\fR is not specified in \fIflag\fR and if the input
+array ends with an incomplete character or shift sequence, conversion stops
+after the previous successfully converted bytes. If the output array is not
+large enough to hold the entire converted input, conversion stops just prior to
+the input bytes that would cause the output array to overflow. The value
+pointed to by \fIinlen\fR is decremented to reflect the number of bytes still
+not converted in the input array. The value pointed to by \fIoutlen\fR is
+decremented to reflect the number of bytes still available in the output array.
+.sp
+.LP
+If \fBkiconvstr()\fR encounters a character in the input array that is legal,
+but for which an identical character does not exist in the target
+\fBcodeset\fR, \fBkiconvstr()\fR performs an implementation-defined conversion
+(that is, a non-identical conversion) on this character.
+.sp
+.LP
+If \fBKICONV_REPLACE_INVALID\fR is specified in \fIflag\fR and if
+\fBkiconvstr()\fR encounters illegal or incomplete characters in the input
+array, instead of stopping the conversion, \fBkiconvstr()\fR treats such
+characters  as if they are non-identical characters and does non-identical
+conversions on such character bytes.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBkiconvstr()\fR function updates the values pointed to by the \fIinlen\fR
+and \fIoutlen\fR parameters to reflect the extent of the conversion and returns
+the number of non-identical conversions performed. If the entire string in the
+input array is converted, the value pointed to by \fIinlen\fR is 0. If the
+input conversion is stopped due to any conditions mentioned above, the value
+pointed to by \fIinlen\fR is non-zero and \fIerrno\fR is set to indicate the
+condition. If an error occurs, \fBkiconvstr()\fR returns (\fBsize_t\fR)-1 and
+sets \fIerrno\fR to indicate the error.
+.SH CONTEXT
+.sp
+.LP
+\fBkiconvstr()\fR can be called from user or interrupt context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPerforming a Code Conversion
+.sp
+.LP
+The following example converts a \fBNULL\fR-terminated \fBISO8859-2\fR pathname
+string to a \fBUTF-8\fR string and treats illegal and incomplete characters as
+non-identical conversion cases. The conversion does not stop even if it
+encounters a \fBNULL\fR byte from the input array.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+
+        :
+
+size_t ret;
+char ib[MAXPATHLEN];
+char ob[MAXPATHLEN];
+size_t il, ol;
+int err;
+
+        :
+
+/*
+ * We got the pathname from somewhere.
+ *
+ * Calculate the length of input string including the terminating
+ * NULL byte and prepare other parameters for the conversion.
+ */
+(void) strlcpy(ib, pathname, MAXPATHLEN);
+il = strlen(ib) + 1;
+ol = MAXPATHLEN;
+
+/*
+ * Do the conversion. If the ret > 0, that's the number of
+ * non-identical character conversions happened during the conversion.
+ * Regardless of whether we have conversion failure or not,
+ * outarray could contain some converted characters.
+ */
+ret = kiconvstr("UTF-8", "ISO-8859-2", ib, &il, ob, &ol,
+                (KICONV_IGNORE_NULL|KICONV_REPLACE_INVALID), &err);
+if (ret == (size_t)-1) {
+        /* Code conversion not supported? */
+        if (err == EBADF)
+                return (-1);
+
+        /* Output array too small? */
+        if (err == E2BIG)
+                return (-2);
+
+        /* Unknown error which isn't possible BTW. */
+        return (-3);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBiconv\fR(3C), \fBiconv_close\fR(3C), \fBiconv_open\fR(3C),
+\fBu8_strcmp\fR(3C), \fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C),
+\fBuconv_u16tou32\fR(3C), \fBuconv_u16tou8\fR(3C), \fBuconv_u32tou16\fR(3C),
+\fBuconv_u32tou8\fR(3C), \fBuconv_u8tou16\fR(3C), \fBuconv_u8tou32\fR(3C),
+\fBattributes\fR(5), \fBkiconv\fR(9F), \fBkiconv_close\fR(9F),
+\fBkiconv_open\fR(9F), \fBu8_strcmp\fR(9F), \fBu8_textprep_str\fR(9F),
+\fBu8_validate\fR(9F), \fBuconv_u16tou32\fR(9F), \fBuconv_u16tou8\fR(9F),
+\fBuconv_u32tou16\fR(9F), \fBuconv_u32tou8\fR(9F), \fBuconv_u8tou16\fR(9F),
+\fBuconv_u8tou32\fR(9F)
+.sp
+.LP
+The Unicode Standard:
+.sp
+.LP
+http://www.unicode.org/standard/standard.html

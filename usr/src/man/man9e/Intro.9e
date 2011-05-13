@@ -1,0 +1,499 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Intro 9E "15 May 2001" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+Intro, intro \- overview of device driver interfaces and introduction to driver
+entry points
+.SH DESCRIPTION
+.sp
+.LP
+This page provides an overview of device driver interfaces and all of the
+Section 9 man pages (9E, 9F, 9P, and 9S). This overview is followed by an
+introduction to Section 9E, the driver entry-point routines.
+.SS "Overview of Device Driver Interfaces"
+.sp
+.LP
+Section 9 provides reference information needed to write device drivers for the
+Solaris operating environment. It describes the interfaces provided by the
+Device Driver Interface and the Driver-Kernel Interface (DDI/DKI).
+.SS "Porting"
+.sp
+.LP
+Software is usually considered portable if it can be adapted to run in a
+different environment more cheaply than it can be rewritten. The new
+environment may include a different processor, operating system, and even the
+language in which the program is written, if a language translator is
+available. Likewise the new environment might include multiple processors. More
+often, however, software is ported between environments that share an operating
+system, processor, and source language. The source code is modified to
+accommodate the differences in compilers or processors or releases of the
+operating system.
+.sp
+.LP
+In the past, device drivers did not port easily for one or more of the
+following reasons:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+To enhance functionality, members had been added to kernel data structures
+accessed by drivers, or the sizes of existing members had been redefined.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The calling or return syntax of kernel functions had changed.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Driver developers did not use existing kernel functions where available, or
+relied on undocumented side effects that were not maintained in the next
+release.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Architecture-specific code had been scattered throughout the driver when it
+could have been isolated.
+.RE
+.sp
+.LP
+Operating systems are periodically reissued to customers as a way to improve
+performance, fix bugs, and add new features. This is probably the most common
+threat to compatibility encountered by developers responsible for maintaining
+software. Another common problem is upgrading hardware. As new hardware is
+developed, customers occasionally decide to upgrade to faster, more capable
+computers of the same family. Although they may run the same operating system
+as those being replaced, architecture-specific code may prevent the software
+from porting.
+.SS "Scope of Interfaces"
+.sp
+.LP
+Although application programs have all of the porting problems mentioned,
+developers attempting to port device drivers have special challenges. Before
+describing the DDI/DKI, it is necessary to understand the position of device
+drivers in operating systems.
+.sp
+.LP
+Device drivers are kernel modules that control data transferred to and received
+from peripheral devices but are developed independently from the rest of the
+kernel. If the goal of achieving complete freedom in modifying the kernel is to
+be reconciled with the goal of binary compatibility with existing drivers, the
+interaction between drivers and the kernel must be rigorously regulated. This
+driver/kernel service interface is the most important of the three
+distinguishable interfaces for a driver, summarized as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Driver-Kernel. I/O System calls result in calls to driver entry point routines.
+These make up the kernel-to-driver part of the service interface, described in
+Section 9E. Drivers may call any of the functions described in Section 9F.
+These are the driver-to-kernel part of the interface.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Driver-Hardware. All drivers (except software drivers) must include code for
+interrupt handling, and may also perform direct memory access (DMA). These and
+other hardware-specific interactions make up the driver/hardware interface.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Driver-Boot/Configuration Software. The interaction between the driver and the
+boot and configuration software is the third interface affecting drivers.
+.RE
+.SS "Scope of the DDI/DKI"
+.sp
+.LP
+The primary goal of the DDI/DKI is to facilitate both source and binary
+portability across successive releases of the operating systems on a particular
+machine. In addition, it promotes source portability across implementations of
+UNIX on different machines, and applies only to implementations based on System
+V Release 4. The DDI/DKI consists of several sections:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+DDI/DKI Architecture Independent - These interfaces are supported on all
+implementations of System V Release 4.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+DKI-only - These interfaces are part of System V Release 4, and may not be
+supported in future releases of System V. There are only two interfaces in this
+class, \fBsegmap\fR(9E) and \fBhat_getkpfnum\fR(9F)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Solaris DDI - These interfaces specific to Solaris.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Solaris SPARC specific DDI - These interfaces are specific to the SPARC
+processor, and may not be available on other processors supported by Solaris.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Solaris x86 specific DDI - These interfaces are specific to the x86 processor,
+and may not be available on other processors supported by Solaris.
+.RE
+.sp
+.LP
+To achieve the goal of source and binary compatibility, the functions,
+routines, and structures specified in the DDI/DKI must be used according to
+these rules.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Drivers cannot access system state structures (for example, \fBu\fR and
+\fBsysinfo\fR) directly.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For structures external to the driver that may be accessed directly, only the
+utility functions provided in Section 9F should be used. More generally, these
+functions should be used wherever possible.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The headers \fB<sys/ddi.h>\fR and \fB<sys/sunddi.h>\fR must be the last header
+files included by the driver.
+.RE
+.SS "Audience"
+.sp
+.LP
+Section 9 is for software engineers responsible for creating, modifying, or
+maintaining drivers that run on this operating system and beyond. It assumes
+that the reader is familiar with system internals and the C programming
+language.
+.SS "PCMCIA Standard"
+.sp
+.LP
+The \fIPC\fR \fICard\fR \fI95\fR \fIStandard\fR is listed under the \fBSEE\fR
+\fBALSO\fR heading in some Section 9 reference pages. This refers to
+documentation published by the Personal Computer Memory Card International
+Association (PCMCIA) and the Japan Electronic Industry Development Association
+(JEIDA).
+.SS "How to Use Section 9"
+.sp
+.LP
+Section 9 is divided into the following subsections:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB9E\fR \fR
+.ad
+.RS 7n
+.rt  
+Driver Entry Points - contains reference pages for all driver entry point
+routines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB9F\fR \fR
+.ad
+.RS 7n
+.rt  
+Kernel Functions - contains reference pages for all driver support routines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB9P\fR \fR
+.ad
+.RS 7n
+.rt  
+Driver Properties - contains reference pages for driver properties.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB9S\fR \fR
+.ad
+.RS 7n
+.rt  
+Data Structures - contains reference pages for driver-related structures.
+.RE
+
+.SS "Compatibility Note"
+.sp
+.LP
+Sun Microsystem's implementation of the DDI/DKI was designed to provide binary
+compatibility for third-party device drivers across currently supported
+hardware platforms across minor releases of the operating system. However,
+unforeseen technical issues may force changes to the binary interface of the
+DDI/DKI. We cannot therefore promise or in any way assure that
+DDI/DKI-compliant device drivers will continue to operate correctly on future
+releases.
+.SS "Introduction to Section 9E"
+.sp
+.LP
+Section 9E describes the entry-point routines a developer can include in a
+device driver. These are called entry-point because they provide the calling
+and return syntax from the kernel into the driver. Entry-points are called, for
+instance, in response to system calls, when the driver is loaded, or in
+response to \fBSTREAMS\fR events.
+.sp
+.LP
+Kernel functions usable by the driver are described in section 9F.
+.sp
+.LP
+In this section, reference pages contain the following headings:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBNAME\fR describes the routine's purpose.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSYNOPSIS\fR summarizes the routine's calling and return syntax.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBINTERFACE LEVEL\fR describes any architecture dependencies. It also
+indicates whether the use of the entry point is required, optional, or
+discouraged.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBARGUMENTS\fR describes each of the routine's arguments.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDESCRIPTION\fR provides general information about the routine.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBRETURN VALUES\fR describes each of the routine's return values.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSEE ALSO\fR gives sources for further information.
+.RE
+.SS "Overview of Driver Entry-Point Routines and Naming Conventions"
+.sp
+.LP
+By convention, a prefix string is added to the driver routine names. For a
+driver with the prefix \fIprefix\fR, the driver code may contain routines named
+\fIprefix\fRopen, \fIprefix\fRclose, \fIprefix\fRread, \fIprefix\fRwrite, and
+so forth. All global variables associated with the driver should also use the
+same prefix.
+.sp
+.LP
+All routines and data should be declared as \fBstatic\fR.
+.sp
+.LP
+Every driver MUST include <\fBsys/ddi.h\fR> and <\fBsys/sunddi.h\fR>, in that
+order, and after all other include files.
+.sp
+.LP
+The following table summarizes the STREAMS driver entry points described in
+this section.
+.sp
+
+.sp
+.TS
+tab();
+cw(2.75i) cw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBRoutine\fR\fBType\fR
+_
+\fBput\fRDDI/DKI
+\fBsrv\fRDDI/DKI
+.TE
+
+.sp
+.LP
+The following table summarizes the driver entry points described in this
+section.
+.sp
+
+.sp
+.TS
+tab();
+cw(2.18i) cw(3.32i) 
+lw(2.18i) lw(3.32i) 
+.
+\fBRoutine\fR\fBType \fR
+_
+\fB_fini\fRSolaris DDI
+\fB_info\fRSolaris DDI
+\fB_init\fRSolaris DDI
+\fBaread\fRSolaris DDI
+\fBattach\fRSolaris DDI
+\fBawrite\fRSolaris DDI
+\fBchpoll\fRDDI/DKI
+\fBclose\fRDDI/DKI
+\fBdetach\fRSolaris DDI
+\fBdevmap\fRSolaris DDI
+\fBdevmap_access\fRSolaris DDI
+\fBdevmap_contextmgt\fRSolaris DDI
+\fBdevmap_dup\fRSolaris DDI
+\fBdevmap_map\fRSolaris DDI
+\fBdevmap_unmap\fRSolaris DDI
+\fBdump\fRSolaris DDI
+\fBgetinfo\fRSolaris DDI
+\fBidentify\fRSolaris DDI
+\fBioctl\fRDDI/DKI
+\fBks_update\fRSolaris DDI
+\fBmapdev_access\fRSolaris DDI
+\fBmapdev_dup\fRSolaris DDI
+\fBmapdev_free\fRSolaris DDI
+\fBmmap\fRDKI only
+\fBopen\fRDDI/DKI
+\fBpower\fRSolaris DDI
+\fBprint\fRDDI/DKI
+\fBprobe\fRSolaris DDI
+\fBprop_op\fRSolaris DDI
+\fBread\fRDDI/DKI
+\fBsegmap\fRDKI only
+\fBstrategy\fRDDI/DKI
+\fBtran_abort\fRSolaris DDI
+\fBtran_destroy_pkt\fRSolaris DDI
+\fBtran_dmafree\fRSolaris DDI
+\fBtran_getcap\fRSolaris DDI
+\fBtran_init_pkt\fRSolaris DDI
+\fBtran_reset\fRSolaris DDI
+\fBtran_reset_notify\fRSolaris DDI
+\fBtran_setcap\fRSolaris DDI
+\fBtran_start\fRSolaris DDI
+\fBtran_sync_pkt\fRSolaris DDI
+\fBtran_tgt_free\fRSolaris DDI
+\fBtran_tgt_init\fRSolaris DDI
+\fBtran_tgt_probe\fRSolaris DDI
+\fBwrite\fRDDI/DKI
+.TE
+
+.sp
+.LP
+The following table lists the error codes returned by a driver routine when it
+encounters an error. The error values are listed in alphabetic order and are
+defined in \fBsys/errno.h\fR. In the driver \fBopen\fR(9E), \fBclose\fR(9E),
+\fBioctl\fR(9E), \fBread\fR(9E), and \fBwrite\fR(9E) routines, errors are
+passed back to the user by calling \fBbioerror\fR(9F) to set \fBb_flags\fR to
+the proper error code. In the driver \fBstrategy\fR(9E) routine, errors are
+passed back to the user by setting the \fBb_error\fR member of the
+\fBbuf\fR(9S) structure to the error code. For \fBSTREAMS\fR \fBioctl\fR
+routines, errors should be sent upstream in an \fBM_IOCNAK\fR message. For
+\fBSTREAMS\fR \fBread()\fR and \fBwrite()\fR routines, errors should be sent
+upstream in an \fBM_ERROR\fR message. The driver \fBprint\fR routine should not
+return an error code because the function that it calls, \fBcmn_err\fR(9F), is
+declared as \fBvoid\fR (no error is returned).
+.sp
+
+.sp
+.TS
+tab();
+cw(1.69i) cw(3.81i) 
+lw(1.69i) lw(3.81i) 
+.
+Error ValueError Description
+_
+EAGAINT{
+Kernel resources, such as the buf structure or cache memory, are not available at this time (device may be busy, or the system resource is not available). This is used in open, ioctl, read, write, and strategy.
+T}
+_
+EFAULTT{
+An invalid address has been passed as an argument; memory addressing error. This is used in open, close, ioctl, read, write, and strategy.
+T}
+_
+EINTRT{
+Sleep interrupted by signal. This is used in open, close, ioctl, read, write, and strategy.
+T}
+_
+EINVALT{
+An invalid argument was passed to the routine. This is used in open, ioctl, read, write, and strategy.
+T}
+_
+EIOT{
+A device error occurred; an error condition was detected in a device status register (the I/O request was valid, but an error occurred on the device). This is used in open, close, ioctl, read, write, and strategy.
+T}
+_
+ENXIOT{
+An attempt was made to access a device or subdevice that does not exist (one that is not configured); an attempt was made to perform an invalid I/O operation; an incorrect minor number was specified. This is used in open, close, ioctl, read, write, and strategy.
+T}
+_
+EPERMT{
+A process attempting an operation did not have required permission. This is used in open, ioctl, read, write, and strategy.
+T}
+_
+EROFST{
+An attempt was made to open for writing a read-only device. This is used in open.
+T}
+.TE
+
+.sp
+.LP
+The table below cross references error values to the driver routines from which
+the error values can be returned.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.08i) |cw(1.11i) |cw(1.12i) |cw(2.18i) 
+lw(1.08i) |lw(1.11i) |lw(1.12i) |lw(2.18i) 
+.
+opencloseioctlread, write and strategy
+_
+EAGAINEFAULTEAGAINEAGAIN
+EFAULTEINTREFAULTEFAULT
+EINTREIOEINTREINTR
+EINVALENXIOEINVALEINVAL
+EIOEIOEIO
+ENXIOENXIOENXIO
+EPERMEPERM
+EROFS
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(9F), \fBIntro\fR(9S)

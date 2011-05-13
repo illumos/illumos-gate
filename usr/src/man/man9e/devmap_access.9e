@@ -1,0 +1,300 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap_access 9E "17 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+devmap_access \- device mapping access entry point
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBdevmap_access\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR, 
+     \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fItype\fR, \fBuint_t\fR \fIrw\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdhp\fR \fR
+.ad
+.RS 9n
+.rt  
+An opaque mapping handle that the system uses to describe the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvtp\fR \fR
+.ad
+.RS 9n
+.rt  
+Driver private mapping data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 9n
+.rt  
+User offset within the logical device memory at which the access begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 9n
+.rt  
+Length (in bytes) of the memory being accessed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR \fR
+.ad
+.RS 9n
+.rt  
+Type of access operation.  Possible values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEVMAP_ACCESS\fR \fR
+.ad
+.RS 18n
+.rt  
+Memory access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEVMAP_LOCK\fR \fR
+.ad
+.RS 18n
+.rt  
+Lock the memory being accessed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEVMAP_UNLOCK\fR \fR
+.ad
+.RS 18n
+.rt  
+Unlock the memory being accessed.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrw\fR \fR
+.ad
+.RS 9n
+.rt  
+Direction of access.  Possible values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEVMAP_READ\fR \fR
+.ad
+.RS 17n
+.rt  
+Read access attempted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEVMAP_WRITE\fR \fR
+.ad
+.RS 17n
+.rt  
+Write access attempted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDEVMAP_EXEC\fR \fR
+.ad
+.RS 17n
+.rt  
+Execution access attempted.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdevmap_access()\fR entry point is an optional routine.  It notifies
+drivers whenever an access is made to a mapping described by  \fIdhp\fR that
+has not been validated or does  not have sufficient protection for the access.
+The system expects \fBdevmap_access()\fR to call either
+\fBdevmap_do_ctxmgt\fR(9F) or \fBdevmap_default_access\fR(9F) to load the
+memory address translations before it returns. For mappings that support
+context switching,  device drivers should call \fBdevmap_do_ctxmgt\fR(9F). For
+mappings that do not support context switching, the drivers should call
+\fBdevmap_default_access\fR(9F).
+.sp
+.LP
+In  \fBdevmap_access()\fR, drivers perform memory access related operations
+such as context switching, checking the availability of the memory  object, and
+locking and unlocking the memory object being accessed. The
+\fBdevmap_access()\fR entry point is set to  \fINULL\fR if no operations need
+to be performed.
+.sp
+.LP
+\fIpvtp\fR is a pointer to the driver's private mapping data that was allocated
+and initialized in the \fBdevmap_map\fR(9E) entry point.
+.sp
+.LP
+\fIoff\fR and \fIlen\fR define the range to be affected by the operations in
+\fBdevmap_access()\fR. \fItype\fR defines the type of operation that device
+drivers should perform on the memory object.  If \fBtype\fR is either
+\fBDEVMAP_LOCK\fR or \fBDEVMAP_UNLOCK,\fR the length passed to either
+\fBdevmap_do_ctxmgt\fR(9F) or \fBdevmap_default_access\fR(9F) must be same as
+\fIlen\fR. \fIrw\fR specifies the direction of access on the memory object.
+.sp
+.LP
+A non-zero return value from  \fBdevmap_access()\fR may result in a
+\fBSIGSEGV\fR or \fBSIGBUS\fR signal being delivered to the process.
+.SH RETURN VALUES
+.sp
+.LP
+\fBdevmap_access()\fR returns the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.  The return value from  \fBdevmap_do_ctxmgt\fR(9F) or
+\fBdevmap_default_access\fR(9F) should be returned.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBdevmap_access()\fR entry point
+.sp
+.LP
+The following is an example of the \fBdevmap_access()\fR entry point.  If the
+mapping supports context switching, \fBdevmap_access()\fR calls
+\fBdevmap_do_ctxmgt\fR(9F). Otherwise, \fBdevmap_access()\fR calls
+\fBdevmap_default_access\fR(9F).
+
+.sp
+.in +2
+.nf
+\&.\|.\|.
+#define OFF_DO_CTXMGT  0x40000000
+#define OFF_NORMAL     0x40100000
+#define CTXMGT_SIZE    0x100000
+#define NORMAL_SIZE    0x100000
+
+/*
+ * Driver devmap_contextmgt(9E) callback function.
+ */
+static int
+xx_context_mgt(devmap_cookie_t dhp, void *pvtp, offset_t offset,
+   size_t length, uint_t type, uint_t rw)
+{
+   ......
+   /*
+    * see devmap_contextmgt(9E) for an example
+    */
+}
+
+/*
+ * Driver devmap_access(9E) entry point
+ */
+static int
+xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
+   size_t len, uint_t type, uint_t rw)
+{
+   offset_t diff;
+   int err;
+
+   /*
+    * check if \fIoff\fR is within the range that supports
+    * context management.
+    */
+   if ((diff = off - OFF_DO_CTXMG) >= 0 && diff < CTXMGT_SIZE) {
+       /*
+        * calculates the length for context switching
+        */
+       if ((len + off) > (OFF_DO_CTXMGT + CTXMGT_SIZE))
+           return (-1);
+       /*
+        * perform context switching
+        */
+       err = devmap_do_ctxmgt(dhp, pvtp, off, len, type,
+           rw, xx_context_mgt);
+    /*
+     * check if \fI off \fRis within the range that does normal
+     * memory mapping.
+     */
+    } else if ((diff = off - OFF_NORMAL) >= 0 && diff < NORMAL_SIZE) {
+       if ((len + off) > (OFF_NORMAL + NORMAL_SIZE))
+           return (-1);
+       err = devmap_default_access(dhp, pvtp, off, len, type, rw);
+    } else
+       return (-1);
+
+   return (err);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdevmap_map\fR(9E), \fBdevmap_default_access\fR(9F),
+\fBdevmap_do_ctxmgt\fR(9F), \fBdevmap_callback_ctl\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

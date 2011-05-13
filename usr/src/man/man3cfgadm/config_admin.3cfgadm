@@ -1,0 +1,713 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH config_admin 3CFGADM "1 Sep 2004" "SunOS 5.11" "Configuration Administration Library Functions"
+.SH NAME
+config_admin, config_change_state, config_private_func, config_test,
+config_stat, config_list, config_list_ext, config_ap_id_cmp,
+config_unload_libs, config_strerror \- configuration administration interface
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcfgadm\fR [ \fIlibrary\fR... ]
+#include <config_admin.h>
+#include <sys/param.h>
+
+\fBcfga_err_t\fR \fBconfig_change_state\fR(\fBcfga_cmd_t\fR \fIstate_change_cmd\fR,
+     \fBint\fR \fInum_ap_ids\fR, \fBchar * const *\fR\fIap_ids\fR, \fBconst char *\fR\fIoptions\fR,
+     \fBstruct cfga_confirm *\fR\fIconfp\fR, \fBstruct cfga_msg *\fR\fImsgp\fR,
+     \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBconfig_private_func\fR(\fBconst char *\fR\fIfunction\fR, \fBint\fR \fInum_ap_ids\fR,
+     \fBchar * const *\fR\fIap_ids\fR, \fBconst char *\fR\fIoptions\fR,
+     \fBstruct cfga_confirm *\fR\fIconfp\fR, \fImsgp\fR, \fBchar **\fR\fIerrstring\fR,
+     \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBconfig_test\fR(\fBint\fR \fInum_ap_ids\fR, \fBchar * const *\fR\fIap_ids\fR,
+     \fBconst char *\fR\fIoptions\fR, \fBstruct cfga_msg *\fR\fImsgp\fR,
+     \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBconfig_list_ext\fR(\fBint\fR \fInum_ap_ids\fR, \fBchar * const *\fR\fIap_ids\fR,
+     \fBstruct cfga_list_data **\fR\fIap_id_list\fR, \fBint *\fR\fInlist\fR,
+     \fBconst char *\fR\fIoptions\fR, \fBconst char *\fR\fIlistops\fR,
+     \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBconfig_ap_id_cmp\fR(\fBconst cfga_ap_id_t\fR \fIap_id1\fR,
+     \fBconst cfga_ap_id_t\fR \fIap_id2\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBconfig_unload_libs\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBconfig_strerror\fR(\fBcfga_err_t\fR \fIcfgerrnum\fR);
+.fi
+
+.SS "Deprecated Interfaces"
+.sp
+.LP
+The following interfaces have been deprecated and their use is strongly
+discouraged:
+.LP
+.nf
+\fBcfga_err_t\fR \fBconfig_stat\fR(\fBint\fR \fInum_ap_ids\fR, \fBchar * const *\fR\fIap_ids\fR,
+     \fBstruct cfga_stat_data *\fR\fIbuf\fR, \fBconst char *\fR\fIoptions\fR, \fBchar **\fR\fIerrstring\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBconfig_list\fR(\fBstruct cfga_stat_data **\fR\fIap_id_list\fR,
+      \fBint *\fR\fInlist\fR, \fBconst char *\fR\fIoptions\fR, \fBchar **\fR\fIerrstring\fR);
+.fi
+
+.SH HARDWARE DEPENDENT LIBRARY SYNOPSIS
+.sp
+.LP
+The \fBconfig_admin\fR library is a generic interface that is used for dynamic
+configuration, (DR). Each piece of hardware that supports \fBDR\fR must supply
+a hardware-specific \fIplugin\fR library that contains the entry points listed
+in this subsection. The generic library will locate and link to the appropriate
+library to effect \fBDR\fR operations. The interfaces specified in this
+subsection are really "hidden" from users of the generic libraries. It is,
+however, necessary that writers of the hardware-specific plug in libraries know
+what these interfaces are.
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_change_state\fR(\fBcfga_cmd_t\fR \fIstate_change_cmd\fR,
+     \fBconst char *\fR\fIap_id\fR, \fBconst char *\fR\fIoptions\fR, \fBstruct cfga_confirm *\fR\fIconfp\fR,
+     \fBstruct cfga_msg *\fR\fImsgp\fR, \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_private_func\fR(\fBconst char *\fR\fIfunction\fR,
+      \fBconst char *\fR\fIap_id\fR, \fBconst char *\fR\fIoptions\fR, \fBstruct cfga_confirm *\fR\fIconfp\fR,
+      \fBstruct cfga_msg *\fR\fImsgp\fR, \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_test\fR(\fBconst char *\fR\fIap_id\fR, \fBconst char *\fR\fIoptions\fR,
+      \fBstruct cfga_msg *\fR\fImsgp\fR, \fBchar **\fR\fI\fRerrstring, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_list_ext\fR(\fBconst char *\fR\fIap_id\fR,
+      \fBstruct cfga_list_data **\fR\fIap_id_list\fR, \fInlist\fR, \fBconst char *\fR\fIoptions\fR,
+      \fBconst char *\fR\fIlistopts\fR, \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_help\fR(\fBstruct cfga_msg *\fR\fImsgp\fR, \fBconst char *\fR\fIoptions\fR,
+      \fBcfga_flags_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcfga_ap_id_cmp\fR(\fBconst cfga_ap_id_t\fR \fIap_id1\fR, \fBconst cfga_ap_id_t\fR \fIap_id2\fR);
+.fi
+
+.SS "Deprecated Interfaces"
+.sp
+.LP
+The following interfaces have been deprecated and their use is strongly
+discouraged:
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_stat\fR(\fBconst char *\fR\fIap_id\fR, \fBstruct cfga_stat_data *\fR\fIbuf\fR,
+     \fBconst char *\fR\fIoptions\fR, \fBchar **\fR\fIerrstring\fR);
+.fi
+
+.LP
+.nf
+\fBcfga_err_t\fR \fBcfga_list\fR(\fBconst char *\fR\fIap_id\fR,
+     \fBstruct cfga_stat_data **\fR\fIap_id_list\fR, \fBint *\fR\fInlist\fR, \fBconst char *\fR\fIoptions\fR,
+     \fBchar **\fR\fIerrstring\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBconfig_*()\fR functions provide a hardware independent interface to
+hardware-specific system configuration administration functions.  The
+\fBcfga_*()\fR functions are provided by hardware-specific libraries that are
+dynamically loaded to handle configuration administration functions in a
+hardware-specific manner.
+.sp
+.LP
+The \fBlibcfgadm\fR library is used to provide the services of the
+\fBcfgadm\fR(1M) command. The hardware-specific libraries are located in
+\fB/usr/platform/${machine}/lib/cfgadm\fR,
+\fB/usr/platform/${arch}/lib/cfgadm\fR, and \fB/usr/lib/cfgadm\fR. The
+hardware-specific library names are derived from the driver name or from class
+names in device tree nodes that identify attachment points.
+.sp
+.LP
+The \fBconfig_change_state()\fR function performs operations that change the
+state of the system configuration. The \fIstate_change_cmd\fR argument can be
+one of the following: \fBCFGA_CMD_INSERT\fR, \fBCFGA_CMD_REMOVE\fR,
+\fBCFGA_CMD_DISCONNECT\fR, \fBCFGA_CMD_CONNECT\fR, \fBCFGA_CMD_CONFIGURE\fR, or
+\fBCFGA_CMD_UNCONFIGURE\fR. The \fIstate_change_cmd\fR \fBCFGA_CMD_INSERT\fR is
+used to prepare for manual insertion or to activate automatic hardware
+insertion of an occupant. The \fIstate_change_cmd\fR \fBCFGA_CMD_REMOVE\fR is
+used to prepare for manual removal or activate automatic hardware removal of an
+occupant. The \fIstate_change_cmd\fR \fBCFGA_CMD_DISCONNECT\fR is used to
+disable normal communication to or from an occupant in a receptacle. The
+\fIstate_change_cmd\fR \fBCFGA_CMD_CONNECT\fR is used to enable communication
+to or from an occupant in a receptacle. The \fIstate_change_cmd\fR
+\fBCFGA_CMD_CONFIGURE\fR is used to bring the hardware resources contained on,
+or attached to, an occupant into the realm of Solaris, allowing use of the
+occupant's hardware resources by the system. The \fIstate_change_cmd\fR
+\fBCFGA_CMD_UNCONFIGURE\fR is used to remove the hardware resources contained
+on, or attached to, an occupant from the realm of Solaris, disallowing further
+use of the occupant's hardware resources by the system.
+.sp
+.LP
+The \fIflags\fR argument may contain one or both of the defined flags,
+\fBCFGA_FLAG_FORCE\fR and \fBCFGA_FLAG_VERBOSE\fR. If the \fBCFGA_FLAG_FORCE\fR
+flag is asserted certain safety checks will be overridden. For example, this
+may not allow an occupant in the failed condition to be configured, but might
+allow an occupant in the failing condition to be configured.  Acceptance of a
+force is hardware dependent. If the \fBCFGA_FLAG_VERBOSE\fR flag is asserted
+hardware-specific details relating to the operation are output utilizing the
+\fBcfga_msg\fR mechanism.
+.sp
+.LP
+The \fBconfig_private_func()\fR function invokes private hardware-specific
+functions.
+.sp
+.LP
+The \fBconfig_test()\fR function is used to initiate testing of the specified
+attachment point.
+.sp
+.LP
+The \fInum_ap_ids\fR argument specifies the number of \fIap_id\fRs in the
+\fIap_ids\fR array. The \fIap_ids\fR argument points to an array of
+\fIap_id\fRs.
+.sp
+.LP
+The \fIap_id\fR argument points to a single \fIap_id\fR.
+.sp
+.LP
+The \fIfunction\fR and \fIoptions\fR strings conform to the \fBgetsubopt\fR(3C)
+syntax convention and are used to supply hardware-specific function or option
+information. No generic hardware-independent functions or options are defined.
+.sp
+.LP
+The \fBcfga_confirm\fR structure referenced by \fIconfp\fR provides a call-back
+interface to get permission to proceed should the requested operation require,
+for example, a noticeable service interruption. The \fBcfga_confirm\fR
+structure includes the following members:
+.sp
+.in +2
+.nf
+int  (*confirm)(void *appdata_ptr, const char *message);
+void *appdata_ptr;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBconfirm()\fR function is called with two arguments: the generic pointer
+\fIappdata_ptr\fR and the message detailing what requires confirmation. The
+generic pointer \fIappdata_ptr\fR is set to the value passed in in the
+\fBcfga_confirm\fR structure member \fBappdata_ptr\fR and can be used in a
+graphical user interface to relate the \fBconfirm\fR function call to the
+\fBconfig_*()\fR call.  The \fIconfirm\fR() function should return 1 to allow
+the operation to proceed and 0 otherwise.
+.sp
+.LP
+The \fBcfga_msg\fR structure referenced by \fImsgp\fR provides a call-back
+interface to output messages from a hardware-specific library. In the presence
+of the \fBCFGA_FLAG_VERBOSE\fR flag, these messages can be informational;
+otherwise they are restricted to error messages. The \fBcfga_msg\fR structure
+includes the following members:
+.sp
+.in +2
+.nf
+int (*message_routine)(void *appdata_ptr, const char *message);
+void *appdata_ptr;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBmessage_routine()\fR function is called with two arguments: the generic
+pointer \fIappdata_ptr\fR and the message. The generic pointer
+\fIappdata_ptr\fR is set to the value passed in in the \fBcfga_confirm\fR
+structure member \fBappdata_ptr\fR and can be used in a graphical user
+interface to relate the \fBmessage_routine()\fR function call to the
+\fBconfig_*()\fR call. The messages must be in the native language specified by
+the \fBLC_MESSAGES\fR locale category; see \fBsetlocale\fR(3C).
+.sp
+.LP
+For some generic errors a hardware-specific error message can be returned. The
+storage for the error message string, including the terminating null character,
+is allocated by the \fBconfig_\fR\fI*\fR functions using \fBmalloc\fR(3C) and a
+pointer to this storage returned through \fIerrstring\fR. If \fIerrstring\fR is
+\fINULL\fR no error message will be generated or returned. If \fIerrstring\fR
+is not \fINULL\fR and no error message is generated, the pointer referenced by
+\fIerrstring\fR will be set to \fINULL.\fR It is the responsibility of the
+function calling \fBconfig_*()\fR to deallocate the returned storage using
+\fBfree\fR(3C). The error messages must be in the native language specified by
+the \fBLC_MESSAGES\fR locale category; see \fBsetlocale\fR(3C).
+.sp
+.LP
+The \fBconfig_list_ext()\fR function provides the listing interface. When
+supplied with a list of \fIap_id\fRs through the first two arguments, it
+returns an array of \fBcfga_list_data_t\fR structures for each attachment point
+specified. If the first two arguments are 0 and \fINULL\fR respectively, then
+all attachment points in the device tree will be listed. Additionally, dynamic
+expansion of an attachment point to list dynamic attachment points may also be
+requested by passing the \fBCFGA_FLAG_LIST_ALL\fR flag through the \fIflags\fR
+argument. Storage for the returned array of \fBstat\fR structures is allocated
+by the \fBconfig_list_ext()\fR function using \fBmalloc\fR(3C). This storage
+must be freed by the caller of \fBconfig_list_ext()\fR by using \fBfree\fR(3C).
+.sp
+.LP
+The \fBcfga_list_data\fR structure includes the following members:
+.sp
+.in +2
+.nf
+cfga_log_ext_t     ap_log_id;        /* Attachment point logical id */
+cfga_phys_ext_t    ap_phys_id;       /* Attachment point physical id */
+cfga_class_t       ap_class;         /* Attachment point class */
+cfga_stat_t        ap_r_state;       /* Receptacle state */
+cfga_stat_t        ap_o_state;       /* Occupant state */
+cfga_cond_t        ap_cond;          /* Attachment point condition */
+cfga_busy_t        ap_busy;          /* Busy indicator */
+time_t             ap_status_time;   /* Attachment point last change*/
+cfga_info_t        ap_info;          /* Miscellaneous information */
+cfga_type_t        ap_type;          /* Occupant type */
+.fi
+.in -2
+
+.sp
+.LP
+The types are defined as follows:
+.sp
+.in +2
+.nf
+typedef char cfga_log_ext_t[CFGA_LOG_EXT_LEN];
+typedef char cfga_phys_ext_t[CFGA_PHYS_EXT_LEN];
+typedef char cfga_class_t[CFGA_CLASS_LEN];
+typedef char cfga_info_t[CFGA_INFO_LEN];
+typedef char cfga_type_t[CFGA_TYPE_LEN];
+typedef enum cfga_cond_t;
+typedef enum cfga_stat_t;
+typedef int  cfga_busy_t;
+typedef int cfga_flags_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fIlistopts\fR argument to \fBconfig_list_ext()\fR conforms to the
+\fBgetsubopt\fR(3C) syntax and is used to pass listing sub-options. Currently,
+only the sub-option \fIclass\fR=\fBclass_name\fR is supported. This list option
+restricts the listing  to attachment points of class \fBclass_name\fR.
+.sp
+.LP
+The \fIlistopts\fR argument to \fBcfga_list_ext()\fR is reserved for future
+use. Hardware-specific  libraries should ignore this argument if it is
+\fINULL\fR. If \fIlistopts\fR is not \fINULL\fR and is not supported by the
+hardware-specific library, an appropriate error code should be returned.
+.sp
+.LP
+The \fBap_log_id\fR and the \fBap_phys_id\fR members give the hardware-specific
+logical and physical names of the attachment point. The \fBap_busy\fR memberd
+indicates activity is present that may result in changes to state or condition.
+The \fBap_status_time\fR  member provides the time at which either the
+\fBap_r_state\fR, \fBap_o_state\fR, or \fBap_cond\fR field of the attachment
+point last changed. The \fBap_info\fR member is available for the
+hardware-specific code to provide additional information about the attachment
+point. The \fBap_class\fR member contains the attachment point class (if any)
+for an attachment point. The  \fBap_class\fR member is filled in by the generic
+library. If the \fBap_log_id\fR and \fBap_phys_id\fR members are not filled in
+by the hardware-specific library, the generic library will fill in these
+members using a generic format. The remaining members are the responsibility of
+the corresponding hardware-tospecific library.
+.sp
+.LP
+All string members in the \fBcfga_list_data\fR structure are null-terminated.
+.sp
+.LP
+The \fBconfig_stat()\fR, \fBconfig_list()\fR, \fBcfga_stat()\fR, and
+\fBcfga_list()\fR functions and the \fBcfga_stat_data\fR data structure are
+deprecated interfaces and are provided solely for backward  compatibility. Use
+of these interfaces is strongly discouraged.
+.sp
+.LP
+The \fBconfig_ap_id_cmp\fR function performs a hardware dependent comparison on
+two  \fIap_id\fRs, returning an equal to, less than or greater than indication
+in the manner of \fBstrcmp\fR(3C). Each argument is either a \fBcfga_ap_id_t\fR
+or can be a null-terminated string. This function can be used when sorting
+lists of \fIap_id\fRs, for example with \fBqsort\fR(3C), or when selecting
+entries from the result of a \fBconfig_list\fR function call.
+.sp
+.LP
+The \fBconfig_unload_libs\fR function unlinks all previously loaded
+hardware-specific libraries.
+.sp
+.LP
+The \fBconfig_strerror\fR function can be used to map an error return value to
+an error message string. See \fBRETURN VALUES\fR. The returned string should
+not be overwritten. \fBconfig_strerror\fR returns \fINULL\fR if \fIcfgerrnum\fR
+is out-of-range.
+.sp
+.LP
+The \fBcfga_help\fR function can be used request that a hardware-specific
+library output it's localized help message.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBconfig_*()\fR and \fBcfga_*()\fR functions return the following values.
+Additional error information may be returned through \fIerrstring\fR if the
+return code is not \fBCFGA_OK\fR. See  \fBDESCRIPTION\fR for details.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_BUSY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command was not completed due to an element of the system configuration
+administration system being busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_ATTR_INVAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+No attachment points with the specified attributes exists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred during the processing of the requested operation. This error
+code includes validation of the command arguments by the hardware-specific
+code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_INSUFFICIENT_CONDITION\fR\fR
+.ad
+.sp .6
+.RS 4n
+Operation failed due to attachment point condition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_INVAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+The system configuration administration operation requested is not supported on
+the specified attachment point.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_LIB_ERROR\fR\fR
+.ad
+.sp .6
+.RS 4n
+A procedural error occurred in the library, including failure to obtain process
+resources such as memory and file descriptors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_NACK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command was not completed due to a negative acknowledgement from the
+\fIconfp\fR\fB->confirm\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_NO_LIB\fR\fR
+.ad
+.sp .6
+.RS 4n
+A hardware-specific library could not be located using the supplied
+\fIap_id\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_NOTSUPP\fR\fR
+.ad
+.sp .6
+.RS 4n
+System configuration administration is not supported on the specified
+attachment point.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command completed as requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_OPNOTSUPP\fR\fR
+.ad
+.sp .6
+.RS 4n
+System configuration administration operation is not supported on this
+attachment point.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_PRIV\fR\fR
+.ad
+.sp .6
+.RS 4n
+The caller does not have the required process privileges. For example, if
+configuration administration is performed through a device driver, the
+permissions on the device node would be used to control access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCFGA_SYSTEM_BUSY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command required a service interruption and was not completed due to a part
+of the system that could not be quiesced.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+Many of the errors returned by the system configuration administration
+functions are hardware-specific. The strings returned in \fIerrstring\fR may
+include the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBattachment point\fR \fIap_id\fR \fBnot known\fR\fR
+.ad
+.sp .6
+.RS 4n
+The attachment point detailed in the error message does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunknown hardware option\fR \fIoption\fR \fBfor\fR\fIoperation\fR\fR
+.ad
+.sp .6
+.RS 4n
+An unknown option was encountered in the \fIoptions\fR string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhardware option\fR \fIoption\fR \fBrequires a value\fR\fR
+.ad
+.sp .6
+.RS 4n
+An option in the \fIoptions\fR string should have been of the form
+\fIoption\fR=\fIvalue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlisting option\fR \fIlist_option\fR \fBrequires a value\fR\fR
+.ad
+.sp .6
+.RS 4n
+An option in the listopts string should  have  been of the form
+\fIoption\fR=\fBvalue\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhardware option\fR \fIoption\fR \fBdoes not require a value\fR\fR
+.ad
+.sp .6
+.RS 4n
+An option in the \fIoptions\fR string should have been a simple option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBattachment point\fR \fIap_id\fR \fBis not configured\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fIconfig_change_state\fR command to  \fBCFGA_CMD_UNCONFIGURE\fR an occupant
+was made to an attachment point whose occupant was not in the
+\fBCFGA_STAT_CONFIGURED\fR state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBattachment point\fR \fIap_id\fR \fBis not unconfigured\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fIconfig_change_state\fR command requiring an unconfigured occupant was made
+to an attachment point whose occupant was not in the
+\fBCFGA_STAT_UNCONFIGURED\fR state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBattachment point\fR \fIap_id\fR \fBcondition not satisfactory\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fIconfig_change_state\fR command was made to  an attachment point whose
+condition prevented the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBattachment point\fR \fIap_id\fR \fBin condition\fR \fIcondition\fR
+\fBcannot be used\fR\fR
+.ad
+.sp .6
+.RS 4n
+A  \fIconfig_change_state\fR operation with force indicated was directed to an
+attachment point whose condition fails the hardware dependent test.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See  \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcfgadm\fR(1M), \fBdevinfo\fR(1M), \fBdlopen\fR(3C), \fBdlsym\fR(3C),
+\fBfree\fR(3C), \fBgetsubopt\fR(3C), \fBmalloc\fR(3C), \fBqsort\fR(3C),
+\fBsetlocale\fR(3C), \fBstrcmp\fR(3C), \fBlibcfgadm\fR(3LIB),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Applications using this library should be aware that the underlying
+implementation may use system services which alter the contents of the external
+variable \fBerrno\fR and may use file descriptor resources.
+.sp
+.LP
+The following code shows the intended error processing when \fBconfig_*()\fR
+returns a value other than \fBCFGA_OK\fR:
+.sp
+.in +2
+.nf
+void
+emit_error(cfga_err_t cfgerrnum, char *estrp)
+{
+    const char *ep;
+    ep = config_strerror(cfgerrnum);
+    if (ep == NULL)
+        ep = gettext("configuration administration unknown error");
+    if (estrp != NULL && *estrp != '\e0') {
+        (void) fprintf(stderr, "%s: %s\en", ep, estrp);
+    } else {
+        (void) fprintf(stderr, "%s\en", ep);
+    }
+    if (estrp != NULL)
+        free((void *)estrp);
+}
+.fi
+.in -2
+
+.sp
+.LP
+Reference should be made to the Hardware Specific Guide for details of System
+Configuration Administration support.

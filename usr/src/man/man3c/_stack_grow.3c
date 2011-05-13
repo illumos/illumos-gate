@@ -1,0 +1,86 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH _stack_grow 3C "18 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+_stack_grow \- express an intention to extend the stack
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucontext.h>
+
+\fBvoid *\fR\fB_stack_grow\fR(\fBvoid *\fR\fIaddr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB_stack_grow()\fR function indicates to the system that the stack is
+about to be extended to the address specified by \fIaddr\fR. If extending the
+stack to this address would violate the stack boundaries as retreived by
+\fBstack_getbounds\fR(3C), a \fBSIGSEGV\fR is raised.
+.sp
+.LP
+If the disposition of \fBSIGSEGV\fR is \fBSIG_DFL\fR, the process is terminated
+and a core dump is generated.  If the application has installed its own
+\fBSIGSEGV\fR handler to run on the alternate signal stack, the signal
+information passed to the handler will be such that a call to
+\fBstack_violation\fR(3C) with these parameters returns 1.
+.sp
+.LP
+The \fIaddr\fR argument is a biased stack pointer value. See the Solaris 64-bit
+Developer's Guide.
+.sp
+.LP
+This function has no effect if the specified address, \fIaddr\fR, is within the
+bounds of the current stack.
+.SH RETURN VALUES
+.sp
+.LP
+If the \fB_stack_grow()\fR function  succeeds and does not detect a stack
+violation, it returns \fIaddr\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+The \fB_stack_grow()\fR function does not actually adjust the stack pointer
+register. The caller is responsible for manipulating the stack pointer register
+once \fB_stack_grow()\fR returns.
+.sp
+.LP
+The \fB_stack_grow()\fR function is typically invoked by code created by the
+compilation environment prior to executing code that modifies the stack
+pointer. It can also be used by hand-written assembly routines to allocate
+stack-based storage safely.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstack_getbounds\fR(3C), \fBstack_inbounds\fR(3C), \fBstack_violation\fR(3C),
+\fBattributes\fR(5)
+.sp
+.LP
+Solaris 64-bit Developer's Guide

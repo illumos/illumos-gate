@@ -1,0 +1,167 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stdarg 3EXT "22 Mar 2006" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+stdarg \- handle variable argument list
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdarg.h>
+va_list \fIpvar\fR;
+
+\fBvoid\fR \fBva_start\fR(\fBva_list\fR \fIpvar\fR, \fBvoid\fR \fIname\fR);
+.fi
+
+.LP
+.nf
+\fB(type *)\fR \fBva_arg\fR(\fBva_list\fR \fIpvar\fR, \fB\fR\fItype\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBva_copy\fR(\fBva_list\fR \fIdest\fR, \fBva_list\fR \fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBva_end\fR(\fBva_list\fR \fIpvar\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This set of macros allows portable procedures that accept variable numbers of
+arguments of variable types to be written. Routines that have variable argument
+lists (such as \fBprintf\fR) but do not use \fIstdarg\fR are inherently
+non-portable, as different machines use different argument-passing conventions.
+.sp
+.LP
+\fBva_list\fR is a type defined for the variable used to traverse the list.
+.sp
+.LP
+The \fBva_start\fR macro is invoked before any access to the unnamed arguments
+and initializes \fIpvar\fR for subsequent use by \fBva_arg()\fR and
+\fBva_end()\fR. The parameter \fIname\fR is the identifier of the rightmost
+parameter in the variable parameter list in the function definition (the one
+just before the \fB, ...\fR). If this parameter is declared with the
+\fBregister\fR storage class or with a function or array type, or with a type
+that is not compatible with the type that results after application of the
+default argument promotions, the behavior is undefined.
+.sp
+.LP
+The parameter \fIname\fR is required under strict ANSI C compilation. In other
+compilation modes, \fIname\fR need not be supplied and the second parameter to
+the \fBva_start()\fR macro can be left empty (for example, \fBva_start(pvar,
+);\fR). This allows for routines that contain no parameters before the
+\fB\&...\fR in the variable parameter list.
+.sp
+.LP
+The \fBva_arg()\fR macro expands to an expression that has the type and value
+of the next argument in the call. The parameter \fBpvar\fR should have been
+previously initialized by \fBva_start()\fR. Each invocation of \fBva_arg()\fR
+modifies \fBpvar\fR so that the values of successive arguments are returned in
+turn. The parameter \fBtype\fR is the type name of the next argument to be
+returned. The type name must be specified in such a way so that the type of a
+pointer to an object that has the specified type can be obtained simply by
+postfixing a \fB*\fR to \fItype\fR. If there is no actual next argument, or if
+\fItype\fR is not compatible with the type of the actual next argument (as
+promoted according to the default argument promotions), the behavior is
+undefined.
+.sp
+.LP
+The \fBva_copy()\fR macro saves the state represented by the
+\fBva_list\fR\fIsrc\fR in the \fBva_list\fR \fIdest\fR. The \fBva_list\fR
+passed as \fIdest\fR should not be initialized by a previous call to
+\fBva_start()\fR, and must be passed to \fBva_end()\fR before being reused as a
+parameter to \fBva_start()\fR or as the \fIdest\fR parameter of a subsequent
+call to \fBva_copy()\fR. The behavior is undefined should any of these
+restrictions not be met.
+.sp
+.LP
+The \fBva_end()\fR macro is used to clean up.
+.sp
+.LP
+Multiple traversals, each bracketed by \fBva_start()\fR and \fBva_end()\fR, are
+possible.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample program.
+.sp
+.LP
+This example gathers into an array a list of arguments that are pointers to
+strings (but not more than \fBMAXARGS\fR arguments) with function \fBf1\fR,
+then passes the array as a single argument to function \fBf2\fR. The number of
+pointers is specified by the first argument to \fBf1\fR.
+
+.sp
+.in +2
+.nf
+#include <stdarg.h>
+#define MAXARGS	31
+void f1(int n_ptrs, ...)
+{
+     va_list ap;
+     char *array[MAXARGS];
+     int ptr_no = 0;
+
+     if (n_ptrs > MAXARGS)
+          n_ptrs = MAXARGS;
+     va_start(ap, n_ptrs);
+     while (ptr_no < n_ptrs)
+          array[ptr_no++] = va_arg(ap, char*);
+     va_end(ap);
+     f2(n_ptrs, array);
+}
+.fi
+.in -2
+
+.sp
+.LP
+Each call to \fBf1\fR shall have visible the definition of the function or a
+declaration such as
+
+.sp
+.in +2
+.nf
+\fBvoid f1(int, ...)\fR
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBvprintf\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+It is the responsibility of the calling routine to specify in some manner how
+many arguments there are, since it is not always possible to determine the
+number of arguments from the stack frame. For example, \fIexecl\fR is passed a
+zero pointer to signal the end of the list. The \fIprintf\fR function can
+determine the number of arguments by the format. It is non-portable to specify
+a second argument of \fBchar\fR, \fBshort\fR, or \fBfloat\fR to \fBva_arg()\fR,
+because arguments seen by the called function are not \fBchar\fR, \fBshort\fR,
+or \fBfloat\fR. C converts \fBchar\fR and \fBshort\fR arguments to \fBint\fR
+and converts \fBfloat\fR arguments to \fBdouble\fR before passing them to a
+function.

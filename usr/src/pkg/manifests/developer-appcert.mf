@@ -35,6 +35,8 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/abi
 dir path=usr/lib/abi/appcert
+dir path=usr/share/man
+dir path=usr/share/man/man1
 file path=usr/bin/appcert mode=0555
 file path=usr/lib/abi/appcert/AppcertUtil.pm mode=0555
 file path=usr/lib/abi/appcert/abi_index mode=0555
@@ -46,6 +48,7 @@ file path=usr/lib/abi/appcert/static_prof mode=0555
 file path=usr/lib/abi/appcert/symcheck mode=0555
 file path=usr/lib/abi/appcert/symprof mode=0555
 file path=usr/lib/abi/appcert/symreport mode=0555
+file path=usr/share/man/man1/appcert.1
 legacy pkg=SUNWapct \
     desc="Appcert utility for application ABI stability checking" \
     name="ABI Application Certification Tools"

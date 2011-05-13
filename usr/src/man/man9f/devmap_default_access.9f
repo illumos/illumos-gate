@@ -1,0 +1,211 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap_default_access 9F "14 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+devmap_default_access \- default driver memory access function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+ 
+
+\fBint\fR \fBdevmap_default_access\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR, 
+     \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fItype\fR, \fBuint_t\fR \fIrw\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdhp\fR \fR
+.ad
+.RS 9n
+.rt  
+An opaque mapping handle that the system uses to describe the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvtp\fR \fR
+.ad
+.RS 9n
+.rt  
+Driver private mapping data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 9n
+.rt  
+User offset within the logical device memory at which the access begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 9n
+.rt  
+Length (in bytes) of the memory being accessed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR \fR
+.ad
+.RS 9n
+.rt  
+Type of access operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrw\fR \fR
+.ad
+.RS 9n
+.rt  
+Type of access.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdevmap_default_access()\fR is a function providing the semantics of
+\fBdevmap_access\fR(9E). The drivers call \fBdevmap_default_access()\fR to
+handle the mappings that do not support context switching. The drivers should
+call \fBdevmap_do_ctxmgt\fR(9F) for the mappings that support context
+management.
+.sp
+.LP
+\fBdevmap_default_access()\fR can either be called from \fBdevmap_access\fR(9E)
+or be used as the \fBdevmap_access\fR(9E) entry point. The arguments \fIdhp\fR,
+\fIpvtp\fR,  \fIoff\fR,  \fIlen\fR, \fItype\fR,  and \fIrw\fR are provided by
+the \fBdevmap_access\fR(9E) entry point and must not be modified.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBdevmap_default_access()\fR must be called from the driver's
+\fBdevmap_access\fR(9E) entry point.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing devmap_default_access in devmap_access.
+.sp
+.LP
+The following shows an example of using \fBdevmap_default_access()\fR in the
+\fBdevmap_access\fR(9E) entry point.
+
+.sp
+.in +2
+.nf
+\&.\|.\|.
+#define OFF_DO_CTXMGT  0x40000000
+#define OFF_NORMAL     0x40100000
+#define CTXMGT_SIZE    0x100000
+#define NORMAL_SIZE    0x100000
+
+/*
+ * Driver devmap_contextmgt(9E) callback function.
+ */
+static int
+xx_context_mgt(devmap_cookie_t dhp, void *pvtp, offset_t offset,
+    size_t length, uint_t type, uint_t rw)
+{
+    ......
+    /*
+     * see devmap_contextmgt(9E) for an example
+     */
+}
+
+/*
+ * Driver devmap_access(9E) entry point
+ */
+static int
+xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
+    size_t len, uint_t type, uint_t rw)
+{
+    offset_t diff;
+    int err;
+
+    /*
+     * check if off is within the range that supports
+     * context management.
+     */
+    if ((diff = off - OFF_DO_CTXMG) >= 0 && diff < CTXMGT_SIZE) {
+        /*
+         * calculates the length for context switching
+         */
+        if ((len + off) > (OFF_DO_CTXMGT + CTXMGT_SIZE))
+            return (-1);
+        /*
+         * perform context switching
+         */
+        err = devmap_do_ctxmgt(dhp, pvtp, off, len, type,
+            rw,  xx_context_mgt);
+    /*
+     * check if off is within the range that does normal
+     * memory mapping.
+     */
+    } else if ((diff = off - OFF_NORMAL) >= 0 && diff < NORMAL_SIZE) {
+        if ((len + off) > (OFF_NORMAL + NORMAL_SIZE))
+            return (-1);
+        err = devmap_default_access(dhp, pvtp, off, len, type, rw);
+    } else
+        return (-1);
+
+    return (err);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdevmap_access\fR(9E), \fBdevmap_do_ctxmgt\fR(9F),
+\fBdevmap_callback_ctl\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

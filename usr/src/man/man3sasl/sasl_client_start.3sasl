@@ -1,0 +1,155 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems,
+.\" Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sasl_client_start 3SASL "26 Aug 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.SH NAME
+sasl_client_start \- perform a step in the authentication negotiation
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
+#include <sasl/sasl.h>
+
+\fBint\fR \fBsasl_client_start\fR(\fBsasl_conn_t *\fR\fIconn\fR, \fBconst char *\fR\fImechlist\fR,
+     \fBsasl_interact_t **\fR\fIprompt_need\fR, \fBconst char **\fR\fIclientout\fR,
+     \fBunsigned *\fR\fIclientoutlen\fR, \fBconst char **\fR\fImech\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Use the \fBsasl_client_start()\fR interface to select a mechanism for
+authentication and start the authentication session. The \fImechlist\fR
+parameter holds the list of mechanisms that the client might like to use. The
+mechanisms in the list are not necessarily supported by the client, nor are the
+mechanisms necessarily valid. SASL determines which of the mechanisms to use
+based upon the security preferences specified earlier. The list of mechanisms
+is typically a list of mechanisms that the server supports, acquired from a
+capability request.
+.sp
+.LP
+If \fBSASL_INTERACT\fR is returned, the library needs some values to be filled
+in before it can proceed. The \fIprompt_need\fR structure is filled in with
+requests. The application fullfills these requests and calls
+\fBsasl_client_start()\fR again with identical parameters. The
+\fIprompt_need\fR parameter is the same pointer as before, but it is filled in
+by the application.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconn\fR\fR
+.ad
+.RS 16n
+.rt  
+The SASL connection context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImechlist\fR\fR
+.ad
+.RS 16n
+.rt  
+A list of mechanism that the server has available. Punctuation is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprompt_need\fR\fR
+.ad
+.RS 16n
+.rt  
+A list of prompts that are needed to continue, if necessary.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIclientout\fR\fR
+.ad
+.br
+.na
+\fB\fIclientoutlen\fR\fR
+.ad
+.RS 16n
+.rt  
+\fIclientout\fR and \fIclientoutlen\fR are created. They contain the initial
+client response to send to the server. It is the job of the client to send them
+over the network to the server. Any protocol specific encodingthat is
+necessary, for example \fBbase64\fR encoding, must be done by the client.
+.sp
+If the protocol lacks client-send-first capability, then set \fIclientout\fR to
+\fINULL\fR. If there is no initial client-send, then *\fIclientout\fR will be
+set to \fINULL\fR on return.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImech\fR\fR
+.ad
+.RS 16n
+.rt  
+Contains the name of the chosen SASL mechanism, upon success.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBsasl_client_start()\fR returns an integer that corresponds to a SASL error
+code.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSASL_CONTINUE\fR\fR
+.ad
+.RS 17n
+.rt  
+The call to \fBsasl_client_start()\fR was successful, and more steps are needed
+in the authentication.
+.RE
+
+.sp
+.LP
+All other error codes indicate an error situation that must be handled, or the
+authentication session should be quit. See \fBsasl_errors\fR(3SASL) for
+information on SASL error codes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+AvailablitySUNWlibsasl
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsasl_errors\fR(3SASL), \fBattributes\fR(5)

@@ -1,0 +1,450 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_disptmpl 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_disptmpl, ldap_init_templates, ldap_init_templates_buf,
+ldap_free_templates, ldap_first_disptmpl, ldap_next_disptmpl, ldap_oc2template,
+ldap_name2template, ldap_tmplattrs, ldap_first_tmplrow, ldap_next_tmplrow,
+ldap_first_tmplcol, ldap_next_tmplcol \- LDAP display template functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_init_templates\fR(\fBchar\fR \fI*file\fR, \fBstruct ldap_disptmpl\fR \fI**tmpllistp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_init_templates_buf\fR(\fBchar\fR \fI*buf\fR, \fBunsigned long\fR \fIlen\fR,
+     \fBstruct ldap_disptmpl\fR \fI**tmpllistp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_free_templates\fR(\fBstruct ldap_disptmpl\fR \fI*tmpllist\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_disptmpl\fR \fB*ldap_first_disptmpl\fR
+     (\fBstruct ldap_disptmpl\fR \fI*tmpllist\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_disptmpl\fR \fB*ldap_next_disptmpl\fR
+     (\fBstruct ldap_disptmpl\fR \fI*tmpllist\fR,\fBstruct ldap_disptmpl\fR \fI*tmpl\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_disptmpl\fR \fB*ldap_oc2template\fR (\fBchar\fR \fI**oclist\fR,
+     \fBstruct ldap_disptmpl\fR \fI*tmpllist\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_disptmpl\fR \fB*ldap_name2template\fR (\fBchar\fR \fI*name\fR,
+     \fBstruct ldap_disptmpl\fR \fI*tmpllist\fR);
+.fi
+
+.LP
+.nf
+\fBchar\fR \fB**ldap_tmplattrs\fR(\fBstruct ldap_disptmpl\fR \fI*tmpl\fR, \fBchar\fR \fI**includeattrs\fR,
+     \fBint\fR \fIexclude;\fR, \fBunsigned long\fR \fIsyntaxmask\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_tmplitem\fR \fB*ldap_first_tmplrow\fR(\fBstruct ldap_disptmpl\fR \fI*tmpl\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_tmplitem\fR \fB*ldap_next_tmplrow\fR(\fBstruct ldap_disptmpl\fR \fI*tmpl\fR,
+     \fBstruct ldap_tmplitem\fR \fI*row\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_tmplitem\fR \fB*ldap_first_tmplcol\fR(\fBstruct ldap_disptmpl\fR \fI*tmpl\fR,
+     \fBstruct ldap_tmplitem\fR \fI*row\fR, \fBstruct ldap_tmplitem\fR \fI*col\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_tmplitem\fR \fB*ldap_next_tmplcol\fR(\fBstruct ldap_disptmpl\fR \fI*tmpl\fR,
+     \fBstruct ldap_tmplitem\fR \fI*row\fR, \fBstruct ldap_tmplitem\fR \fI*col\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide a standard way to access LDAP entry display templates.
+Entry display templates provide a standard way for LDAP applications to display
+directory entries.  The general idea is that it is possible to map the list of
+object class values present in an entry to an appropriate display template.
+Display templates are defined in a configuration file. See
+\fBldaptemplates.conf\fR(4). Each display template contains a pre-determined
+list of items, where each item generally corresponds to an attribute to be
+displayed.  The items contain information and flags that the caller can use to
+display the attribute and values in a reasonable fashion.  Each item has a
+syntaxid, which are described in the SYNTAX IDS section below.  The
+\fBldap_entry2text\fR(3LDAP) functions use the display template functions and
+produce text output.
+.sp
+.LP
+\fBldap_init_templates()\fR reads a sequence of templates from a valid LDAP
+template configuration file (see  \fBldaptemplates.conf\fR(4)). Upon success,
+\fB0\fR is returned, and \fItmpllistp\fR is set to point to a list of
+templates.  Each member of the list is an \fBldap_disptmpl\fR structure
+(defined below in the DISPTMPL Structure Elements section).
+.sp
+.LP
+\fBldap_init_templates_buf()\fR reads a sequence of templates from \fIbuf\fR
+(whose size is \fIbuflen).\fR \fIbuf\fR should point to the data in the format
+defined for an LDAP template configuration file (see
+\fBldaptemplates.conf\fR(4)). Upon success,  \fB0\fR is returned, and
+\fItmpllistp\fR is set to point to a list of templates.
+.sp
+.LP
+The \fBLDAP_SET_DISPTMPL_APPDATA()\fR macro is used to set the value of the
+\fBdt_appdata\fR field in an  \fBldap_disptmpl\fR structure.  This field is
+reserved for the calling application to use; it is not used internally.
+.sp
+.LP
+The \fBLDAP_GET_DISPTMPL_APPDATA()\fR macro is used to retrieve the value in
+the  \fBdt_appdata\fR field.
+.sp
+.LP
+The \fBLDAP_IS_DISPTMPL_OPTION_SET()\fR macro is used to test a
+\fBldap_disptmpl\fR structure for the existence of a template option.  The
+options currently defined are: \fBLDAP_DTMPL_OPT_ADDABLE\fR (it is appropriate
+to allow entries of this type to be added), \fBLDAP_DTMPL_OPT_ALLOWMODRDN\fR
+(it is appropriate to offer the "modify rdn"operation),
+\fBLDAP_DTMPL_OPT_ALTVIEW\fR (this template is merely an alternate view of
+another template, typically used for templates pointed to be an
+\fBLDAP_SYN_LINKACTION\fR item).
+.sp
+.LP
+\fBldap_free_templates()\fR disposes of the templates allocated by
+\fBldap_init_templates()\fR.
+.sp
+.LP
+\fBldap_first_disptmpl()\fR returns the first template in the list
+\fItmpllist.\fR The \fItmpllist\fR is typically obtained by calling
+\fBldap_init_templates()\fR \fB\&.\fR
+.sp
+.LP
+\fBldap_next_disptmpl()\fR returns the template after \fItmpl\fR in the
+template list \fItmpllist.\fR \fIA\fR \fINULL\fR pointer is returned if
+\fItmpl\fR is the last template in the list.
+.sp
+.LP
+\fBldap_oc2template()\fR searches \fItmpllist\fR for the best template to use
+to display an entry that has a specific set of  \fBobjectClass\fR values.
+\fIoclist\fR should be a null-terminated array of strings that contains the
+values of the  \fBobjectClass\fR attribute of the entry.  A pointer to the
+first template where all of the object classes listed in one of the template's
+\fBdt_oclist\fR elements are contained in \fIoclist\fR is returned.  A
+\fINULL\fR pointer is returned if no appropriate template is found.
+.sp
+.LP
+\fBldap_tmplattrs()\fR returns a null-terminated array that contains the names
+of attributes that need to be retrieved if the template \fItmpl\fR is to be
+used to display an entry.  The attribute list should be freed using
+\fBldap_value_free\fR(\|). The \fIincludeattrs\fR parameter contains a
+null-terminated array of attributes that should always be included (it may be
+\fINULL\fR if no extra attributes are required).  If \fIsyntaxmask\fR is
+non-zero, it is used to restrict the attribute set returned.  If \fIexclude\fR
+is zero, only attributes where the logical  \fBAND\fR of the template item
+syntax id and the \fIsyntaxmask\fR is non-zero are included.  If \fIexclude\fR
+is non-zero, attributes where the logical  \fBAND\fR of the template item
+syntax id and the \fIsyntaxmask\fR is non-zero are excluded.
+.sp
+.LP
+\fBldap_first_tmplrow()\fR returns a pointer to the first row of items in
+template \fItmpl.\fR
+.sp
+.LP
+\fBldap_next_tmplrow()\fR returns a pointer to the row that follows \fIrow\fR
+in template \fItmpl.\fR
+.sp
+.LP
+\fBldap_first_tmplcol()\fR returns a pointer to the first item (in the first
+column) of row \fIrow\fR within template \fItmpl\fR. A pointer to an
+\fBldap_tmplitem\fR structure (defined below in the TMPLITEM Structure Elements
+section) is returned.
+.sp
+.LP
+The \fBLDAP_SET_TMPLITEM_APPDATA()\fR macro is used to set the value of the
+\fBti_appdata\fR field in a  \fBldap_tmplitem\fR structure.  This field is
+reserved for the calling application to use; it is not used internally.
+.sp
+.LP
+The \fBLDAP_GET_TMPLITEM_APPDATA()\fR macro is used to retrieve the value of
+the  \fBti_appdata\fR field.
+.sp
+.LP
+The \fBLDAP_IS_TMPLITEM_OPTION_SET()\fR macro is used to test a
+\fBldap_tmplitem\fR structure for the existence of an item option.  The options
+currently defined are: \fBLDAP_DITEM_OPT_READONLY\fR (this attribute should not
+be modified), \fBLDAP_DITEM_OPT_SORTVALUES\fR (it makes sense to sort the
+values), \fBLDAP_DITEM_OPT_SINGLEVALUED\fR (this attribute can only hold a
+single value), \fBLDAP_DITEM_OPT_VALUEREQUIRED\fR (this attribute must contain
+at least one value), \fBLDAP_DITEM_OPT_HIDEIFEMPTY\fR (do not show this item if
+there are no values), and \fBLDAP_DITEM_OPT_HIDEIFFALSE\fR (for boolean
+attributes only:  hide this item if the value  is \fBFALSE\fR).
+.sp
+.LP
+\fBldap_next_tmplcol()\fR returns a pointer to the item (column) that follows
+column \fBcol\fR within row \fIrow\fR of template \fItmpl.\fR
+.SS "DISPTMPL Structure Elements"
+.sp
+.LP
+The  \fBldap_disptmpl\fR structure is defined as:
+.sp
+.in +2
+.nf
+struct ldap_disptmpl {
+	char                    	*dt_name;
+	char			*dt_pluralname;
+	char                    	*dt_iconname;
+	unsigned long           	dt_options;
+	char                    	*dt_authattrname;
+	char                    	*dt_defrdnattrname;
+	char                    	*dt_defaddlocation;
+	struct ldap_oclist	*dt_oclist;
+	struct ldap_adddeflist	*dt_adddeflist;
+	struct ldap_tmplitem	*dt_items;
+	void			*dt_appdata;
+	struct ldap_disptmpl	*dt_next;
+};
+\fI\fR
+.fi
+.in -2
+
+.sp
+.LP
+The  \fBdt_name\fR member is the singular name of the template.  The
+\fBdt_pluralname\fR is the plural name.  The  \fBdt_iconname\fR member will
+contain the name of an icon or other graphical element that can be used to
+depict entries that correspond to this display template.  The  \fBdt_options\fR
+contains options which may be tested using the
+\fBLDAP_IS_TMPLITEM_OPTION_SET()\fR macro.
+.sp
+.LP
+The  \fBdt_authattrname\fR contains the name of the DN-syntax attribute whose
+value(s) should be used to authenticate to make changes to an entry.  If
+\fBdt_authattrname\fR is \fINULL\fR, then authenticating as the entry itself is
+appropriate. The  \fBdt_defrdnattrname\fR is the name of the attribute that is
+normally used to name entries of this type, for example, "cn"for person
+entries.  The  \fBdt_defaddlocation\fR is the distinguished name of an entry
+below which new entries of this type are typically created (its value is
+site-dependent).
+.sp
+.LP
+\fBdt_oclist\fR is a pointer to a linked list of object class arrays, defined
+as:
+.sp
+.in +2
+.nf
+struct ldap_oclist {
+	char			**oc_objclasses;
+	struct ldap_oclist	*oc_next;
+};
+.fi
+.in -2
+
+.sp
+.LP
+These are used by the  \fBldap_oc2template()\fR function.
+.sp
+.LP
+\fBdt_adddeflist\fR is a pointer to a linked list of rules for defaulting the
+values of attributes when new entries are created.  The  \fBldap_adddeflist\fR
+structure is defined as:
+.sp
+.in +2
+.nf
+struct ldap_adddeflist {
+	int			ad_source;
+	char			*ad_attrname;
+	char			*ad_value;
+	struct ldap_adddeflist	*ad_next;
+};
+.fi
+.in -2
+
+.sp
+.LP
+The ad_attrname member contains the name of the attribute whose value this rule
+sets.  If  \fBad_source\fR is  \fBLDAP_ADSRC_CONSTANTVALUE\fR then the
+\fBad_value\fR member contains the (constant) value to use. If
+\fBad_source\fR is \fBLDAP_ADSRC_ADDERSDN\fR then ad_value is ignored and the
+distinguished name of the person who is adding the new entry is used as the
+default value for  \fBad_attrname\fR.
+.SS "TMPLITEM Structure Elements"
+.sp
+.LP
+The  \fBldap_tmplitem\fR structure is defined as:
+.sp
+.in +2
+.nf
+struct ldap_tmplitem {
+	unsigned long		ti_syntaxid;
+	unsigned long		ti_options;
+	char			*ti_attrname;
+	char			*ti_label;
+	char			**ti_args;
+	struct ldap_tmplitem	*ti_next_in_row;
+	struct ldap_tmplitem	*ti_next_in_col;
+	void			*ti_appdata;
+};
+.fi
+.in -2
+
+.SS "Syntax IDs"
+.sp
+.LP
+Syntax ids are found in the  \fBldap_tmplitem\fR structure element
+\fBti_syntaxid\fR, and they can be used to determine how to display the values
+for the attribute associated with an item.  The  \fBLDAP_GET_SYN_TYPE()\fR
+macro can be used to return a general type from a syntax id.  The five general
+types currently defined are: \fBLDAP_SYN_TYPE_TEXT\fR (for attributes that are
+most appropriately shown as text), \fBLDAP_SYN_TYPE_IMAGE\fR (for JPEG or FAX
+format images), \fBLDAP_SYN_TYPE_BOOLEAN\fR (for boolean attributes),
+\fBLDAP_SYN_TYPE_BUTTON\fR (for attributes whose values are to be retrieved and
+display only upon  request, for example, in response to the press of a button,
+a JPEG image is retrieved, decoded, and displayed), and
+\fBLDAP_SYN_TYPE_ACTION\fR (for special purpose actions such as "search for the
+entries where this entry is listed in the seeAlso attribute").
+.sp
+.LP
+The \fBLDAP_GET_SYN_OPTIONS\fR macro can be used to retrieve an unsigned long
+bitmap that defines options.  The only currently defined option is
+\fBLDAP_SYN_OPT_DEFER,\fR which (if set) implies that the values for the
+attribute should not be retrieved until requested.
+.sp
+.LP
+There are sixteen distinct syntax ids currently defined.  These generally
+correspond to one or more X.500 syntaxes.
+.sp
+.LP
+\fBLDAP_SYN_CASEIGNORESTR\fR is used for text attributes which are simple
+strings whose case is ignored for comparison purposes.
+.sp
+.LP
+\fBLDAP_SYN_MULTILINESTR\fR is used for text attributes which consist of
+multiple lines, for example,  \fBpostalAddress\fR, \fBhomePostalAddress\fR,
+\fBmultilineDescription\fR, or any attributes of syntax  \fBcaseIgnoreList\fR.
+.sp
+.LP
+\fBLDAP_SYN_RFC822ADDR\fR is used for case ignore string attributes that are
+RFC-822 conformant mail addresses, for example, mail.
+.sp
+.LP
+\fBLDAP_SYN_DN\fR is used for attributes with a Distinguished Name syntax, for
+example,  \fBseeAlso\fR.
+.sp
+.LP
+\fBLDAP_SYN_BOOLEAN\fR is used for attributes with a boolean syntax.
+.sp
+.LP
+\fBLDAP_SYN_JPEGIMAGE\fR is used for attributes with a jpeg syntax, for
+example, jpegPhoto.
+.sp
+.LP
+\fBLDAP_SYN_JPEGBUTTON\fR is used to provide a button (or equivalent interface
+element) that can be used to retrieve, decode, and display an attribute of jpeg
+syntax.
+.sp
+.LP
+\fBLDAP_SYN_FAXIMAGE\fR is used for attributes with a photo syntax, for
+example, Photo.  These are actually Group 3 Fax (T.4) format images.
+.sp
+.LP
+\fBLDAP_SYN_FAXBUTTON\fR is used to provide a button (or equivalent interface
+element) that can be used to retrieve, decode, and display an attribute of
+photo syntax.
+.sp
+.LP
+\fBLDAP_SYN_AUDIOBUTTON\fR is used to provide a button (or equivalent interface
+element) that can be used to retrieve and play an attribute of audio syntax.
+Audio values are in the "mu law" format, also known as "au" format.
+.sp
+.LP
+\fBLDAP_SYN_TIME\fR is used for attributes with the UTCTime syntax, for
+example,  \fBlastModifiedTime\fR. The value(s) should be displayed in complete
+date and time fashion.
+.sp
+.LP
+\fBLDAP_SYN_DATE\fR is used for attributes with the UTCTime syntax, for
+example,  \fBlastModifiedTime\fR. Only the date portion of the value(s) should
+be displayed.
+.sp
+.LP
+\fBLDAP_SYN_LABELEDURL\fR is used for  \fBlabeledURL\fR attributes.
+.sp
+.LP
+\fBLDAP_SYN_SEARCHACTION\fR is used to define a search that is used to retrieve
+related information. If  \fBti_attrname\fR is not \fINULL\fR, it is assumed to
+be a boolean attribute which will cause no search to be performed if its value
+is  \fBFALSE\fR.   The  \fBti_args\fR structure member will have four strings
+in it: \fBti_args[\fR \fB0\fR \fB]\fR should be the name of an attribute whose
+values are used to help construct a search filter or "-dn" is the distinguished
+name of the entry being displayed should be used,  \fBti_args[\fR \fB1\fR
+\fB]\fR should be a filter pattern where any occurrences of "%v" are replaced
+with the value derived from  \fBti_args[ 0 ]\fR,  \fBti_args[\fR \fB2\fR
+\fB]\fR should be the name of an additional attribute to retrieve when
+performing the search, and  \fBti_args[\fR \fB3\fR \fB]\fR should be a
+human-consumable name for that attribute.  The  \fBti_args[\fR \fB2\fR \fB]\fR
+attribute is typically displayed along with a list of distinguished names when
+multiple entries are returned by the search.
+.sp
+.LP
+\fBLDAP_SYN_LINKACTION\fR is used to define a link to another template by name.
+\fBti_args[\fR \fB0\fR \fB]\fR will contain the name of the display template to
+use.  The  \fBldap_name2template()\fR function can be used to obtain a pointer
+to the correct  \fBldap_disptmpl\fR structure.
+.sp
+.LP
+\fBLDAP_SYN_ADDDNACTION\fR and \fBLDAP_SYN_VERIFYDNACTION\fR are reserved as
+actions but currently undefined.
+.SH ERRORS
+.sp
+.LP
+The init template functions return \fBLDAP_TMPL_ERR_VERSION\fR if  \fIbuf\fR
+points to data that is newer than can be handled, \fBLDAP_TMPL_ERR_MEM\fR if
+there is a memory allocation problem, \fBLDAP_TMPL_ERR_SYNTAX\fR if there is a
+problem with the format of the templates buffer or file.
+\fBLDAP_TMPL_ERR_FILE\fR is returned by \fBldap_init_templates\fR if the file
+cannot be read.   Other functions generally return \fINULL\fR upon error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_entry2text\fR(3LDAP), \fBldaptemplates.conf\fR(4),
+\fBattributes\fR(5)

@@ -1,0 +1,536 @@
+'\" te
+.\" Copyright (C) 2002, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH eqn 1 "12 Jul 2002" "SunOS 5.11" "User Commands"
+.SH NAME
+eqn, neqn, checkeq \- typeset mathematics test
+.SH SYNOPSIS
+.LP
+.nf
+\fBeqn\fR [\fB-d\fR \fIxy\fR] [\fB -f\fR \fIn\fR] [\fB-p\fR \fIn\fR] [\fB -s\fR \fIn\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fBneqn\fR [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fBcheckeq\fR [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBeqn\fR and \fBneqn\fR are language processors to assist in describing
+equations. \fBeqn\fR is a preprocessor for \fBtroff\fR(1) and is intended for
+devices that can print  \fBtroff\fR's output. \fBneqn\fR is a preprocessor for
+\fBnroff\fR(1) and is intended for use with terminals.  Usage is almost always:
+.sp
+.in +2
+.nf
+example% \fBeqn file ... | troff\fR
+example% \fBneqn file ... | nroff\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If no \fIfile\fRs are specified, \fBeqn\fR and \fBneqn\fR read from the
+standard input. A line beginning with \fB\&.EQ\fR marks the start of an
+equation. The end of an equation is marked by a line beginning with
+\fB\&.EN\fR. Neither of these lines is altered, so they may be defined in macro
+packages to get centering, numbering, and so on.  It is also possible to set
+two characters as ``delimiters''; subsequent text between delimiters is also
+treated as \fBeqn\fR input.
+.sp
+.LP
+\fBcheckeq\fR reports missing or unbalanced delimiters and
+\fB\&.EQ\fR/\fB\&.EN\fR pairs.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fIxy\fR \fR
+.ad
+.RS 9n
+.rt  
+Sets equation delimiters set to characters \fIx\fR and \fIy\fR with the
+command-line argument. The more common way to do this is with \fBdelim\fR\fI
+xy\fR between \fB\&.EQ\fR and \fB\&.EN\fR. The left and right delimiters may be
+identical. Delimiters are turned off by \fBdelim\fR \fBoff\fR appearing in the
+text. All text that is neither between delimiters nor between \fB\&.EQ\fR and
+\fB\&.EN\fR is passed through untouched.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fIn\fR \fR
+.ad
+.RS 9n
+.rt  
+Changes font to \fIn\fR globally in the document. The font can also be changed
+globally in the body of the document by using the \fBgfont\fR\fI n\fR
+directive, where \fIn\fR is the font specification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fIn\fR \fR
+.ad
+.RS 9n
+.rt  
+Reduces subscripts and superscripts by \fIn\fR point sizes from the previous
+size.  In the absence of the \fB-p\fR option, subscripts and superscripts are
+reduced by 3 point sizes from the previous size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fIn\fR \fR
+.ad
+.RS 9n
+.rt  
+Changes point size to \fIn\fR globally in the document. The point size can also
+be changed globally in the body of the document by using the \fBgsize\fR\fI
+n\fR directive, where  \fIn\fR is the point size.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR \fR
+.ad
+.RS 9n
+.rt  
+The nroff or troff file processed by \fBeqn\fR or \fBneqn\fR.
+.RE
+
+.SH EQN LANGUAGE
+.sp
+.LP
+The nroff version of this description depicts the output of  \fBneqn\fR to the
+terminal screen exactly as  \fBneqn\fR is able to display it. To see an
+accurate depiction of the output, view the printed version of this page.
+.sp
+.LP
+Tokens within \fBeqn\fR are separated by braces, double quotes, tildes,
+circumflexes, SPACE, TAB, or NEWLINE characters. Braces {\|} are used for
+grouping. Generally speaking, anywhere a single character like \fIx\fR could
+appear, a complicated construction enclosed in braces may be used instead. A
+tilde (\fB~\fR) represents a full SPACE in the output; a circumflex (\fB^\fR)
+half as much.
+.sp
+.ne 2
+.mk
+.na
+\fBSubscripts and superscripts:\fR
+.ad
+.sp .6
+.RS 4n
+These are produced with the keywords \fBsub\fR and \fBsup\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx sub i\fR\fR
+.ad
+.RS 29n
+.rt  
+makes
+.EQ
+delim $$
+.EN
+$x sub i$
+.sp
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa sub i sup 2\fR  \fR
+.ad
+.RS 29n
+.rt  
+produces
+.EQ
+delim $$
+.EN
+$a sub i sup 2$
+.sp
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe sup {x sup 2 + y sup 2}\fR\fR
+.ad
+.RS 29n
+.rt  
+gives e^(x^2+y^2)
+.sp
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBFractions:\fR
+.ad
+.sp .6
+.RS 4n
+Fractions are made with \fBover\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa over b\fR \fR
+.ad
+.RS 13n
+.rt  
+yields
+.EQ
+delim $$
+.EN
+$a over b$
+.sp
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSquare Roots:\fR
+.ad
+.sp .6
+.RS 4n
+These are made with \fBsqrt\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1 over sqrt {ax sup 2 +bx+c}\fR  \fR
+.ad
+.sp .6
+.RS 4n
+results in
+.EQ
+delim $$
+.EN
+$1 over sqrt {ax sup 2 +bx+c}$
+.sp
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBLimits:\fR
+.ad
+.sp .6
+.RS 4n
+The keywords \fBfrom\fR and \fBto\fR introduce lower and upper limits on
+arbitrary things:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlim from {n\(-> inf } sum from 0 to n x sub i\fR\fR
+.ad
+.sp .6
+.RS 4n
+ makes
+.EQ
+delim $$
+.EN
+$lim from {n\(-> inf } sum from 0 to n x sub i$
+.sp
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBBrackets and Braces:\fR
+.ad
+.sp .6
+.RS 4n
+Left and right brackets, braces, and the like, of the right height are made
+with \fBleft\fR and \fBright\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBleft [ x sup 2 + y sup 2 over alpha right ] ~=~1\fR  \fR
+.ad
+.sp .6
+.RS 4n
+produces
+.EQ
+delim $$
+.EN
+$left [ x sup 2 + y sup 2 over alpha right ] ~=~1$
+.sp
+.sp
+The \fBright\fR clause is optional.  Legal characters after \fBleft\fR and
+\fBright\fR are braces, brackets, bars, \fBc\fR and \fBf\fR for ceiling and
+floor, and \fB""\fR for nothing at all (useful for a right-side-only bracket).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBVertical piles:\fR
+.ad
+.sp .6
+.RS 4n
+Vertical piles of things are made with  \fBpile\fR, \fBlpile\fR, \fBcpile\fR,
+and \fBrpile\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpile {a above b above c}\fR\fR
+.ad
+.RS 28n
+.rt  
+ produces
+.EQ
+delim $$
+.EN
+$pile {a above b above c}$
+.sp
+.sp
+There can be an arbitrary number of elements in a pile.  \fBlpile\fR
+left-justifies, \fBpile\fR and \fBcpile\fR center, with different vertical
+spacing, and \fBrpile\fR right justifies.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBMatrices:\fR
+.ad
+.sp .6
+.RS 4n
+Matrices are made with \fBmatrix\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmatrix { lcol { x sub i above y sub 2 } ccol { 1 above 2 } }\fR \fR
+.ad
+.sp .6
+.RS 4n
+produces
+.EQ
+delim $$
+.EN
+$matrix { lcol { x sub i above y sub 2 } ccol { 1 above 2 } }$
+.sp
+.sp
+In addition, there is \fBrcol\fR for a right-justified column.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDiacritical marks:\fR
+.ad
+.sp .6
+.RS 4n
+Diacritical marks are made with \fBdot\fR, \fBdotdot\fR, \fBhat\fR,
+\fBtilde\fR, \fBbar\fR, \fBvec\fR, \fBdyad\fR, and \fBunder\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx dot = f(t) bar\fR\fR
+.ad
+.RS 28n
+.rt  
+ is
+.EQ
+delim $$
+.EN
+$x dot = f(t) bar$
+.sp
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBy dotdot bar ~=~ n under\fR\fR
+.ad
+.RS 28n
+.rt  
+ is
+.EQ
+delim $$
+.EN
+$y dotdot bar ~=~ n under$
+.sp
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx vec ~=~ y dyad\fR \fR
+.ad
+.RS 28n
+.rt  
+is
+.EQ
+delim $$
+.EN
+$x vec ~=~ y dyad$
+.sp
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSizes and Fonts:\fR
+.ad
+.sp .6
+.RS 4n
+Sizes and font can be changed with \fBsize\fR \fIn\fR or \fBsize\fR
+\fB\(+-\fR\fIn,\fR \fBroman\fR, \fBitalic\fR, \fBbold\fR, and \fBfont\fR
+\fIn\fR. Size and fonts can be changed globally in a document by \fBgsize\fR
+\fIn\fR and \fBgfont\fR \fIn\fR, or by the command-line arguments
+\fB-s\fR\fIn\fR and \fB-f\fR\fIn.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSuccessive display arguments:\fR
+.ad
+.sp .6
+.RS 4n
+Successive display arguments can be lined up.  Place \fBmark\fR before the
+desired lineup point in the first equation; place \fBlineup\fR at the place
+that is to line up vertically in subsequent equations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBShorthands:\fR
+.ad
+.sp .6
+.RS 4n
+Shorthands may be defined or existing keywords redefined with
+\fBdefine\fR\fI:\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdefine\fR\fI thing \fR\fB%\fR\fI replacement \fR\fB%\fR \fR
+.ad
+.sp .6
+.RS 4n
+Defines a new token called \fIthing\fR which will be replaced by
+\fIreplacement\fR whenever it appears thereafter. The \fB%\fR may be any
+character that does not occur in \fIreplacement\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBKeywords and Shorthands:\fR
+.ad
+.sp .6
+.RS 4n
+Keywords like \fBsum\fR \fBint\fR \fBinf\fR and shorthands like \fB>=\fR
+\fB\(->\fR and \fB!=\fR are recognized.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBGreek letters:\fR
+.ad
+.sp .6
+.RS 4n
+Greek letters are spelled out in the desired case, as in \fBalpha\fR or
+\fBGAMMA\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBMathematical words:\fR
+.ad
+.sp .6
+.RS 4n
+Mathematical words like  \fBsin\fR,\fB cos\fR, and  \fBlog\fR are made Roman
+automatically.
+.RE
+
+.sp
+.LP
+\fBtroff\fR(1) four-character escapes like \(bu (\(bu) can be used anywhere.
+Strings enclosed in double quotes \fB"\fR.\|.\|.\fB"\fR are passed through
+untouched; this permits keywords to be entered as text, and can be used to
+communicate with \fBtroff\fR when all else fails.
+.SH SEE ALSO
+.sp
+.LP
+\fBnroff\fR(1), \fBtbl\fR(1), \fBtroff\fR(1), \fBattributes\fR(5), \fBms\fR(5)
+.SH BUGS
+.sp
+.LP
+To embolden characters such as digits and parentheses, it  is necessary to
+quote them, as in `\fBbold "12.3"\fR'.

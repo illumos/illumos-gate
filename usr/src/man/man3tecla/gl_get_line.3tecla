@@ -1,0 +1,2585 @@
+'\" te
+.\" Copyright (c) 2000, 2001, 2002, 2003, 2004 by Martin C. Shepherd.
+.\" All Rights Reserved.
+.\" Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
+.\" "Software"), to deal in the Software without restriction, including
+.\" without limitation the rights to use, copy, modify, merge, publish,
+.\" distribute, and/or sell copies of the Software, and to permit persons
+.\" to whom the Software is furnished to do so, provided that the above
+.\" copyright notice(s) and this permission notice appear in all copies of
+.\" the Software and that both the above copyright notice(s) and this
+.\" permission notice appear in supporting documentation.
+.\" 
+.\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+.\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+.\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+.\" OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+.\" HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+.\" INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+.\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+.\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+.\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\" 
+.\" Except as contained in this notice, the name of a copyright holder
+.\" shall not be used in advertising or otherwise to promote the sale, use
+.\" or other dealings in this Software without prior written authorization
+.\" of the copyright holder.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.TH gl_get_line 3TECLA "28 Nov 2007" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.SH NAME
+gl_get_line, new_GetLine, del_GetLine, gl_customize_completion,
+gl_change_terminal, gl_configure_getline, gl_load_history, gl_save_history,
+gl_group_history, gl_show_history, gl_watch_fd, gl_inactivity_timeout,
+gl_terminal_size, gl_set_term_size, gl_resize_history, gl_limit_history,
+gl_clear_history, gl_toggle_history, gl_lookup_history, gl_state_of_history,
+gl_range_of_history, gl_size_of_history, gl_echo_mode, gl_replace_prompt,
+gl_prompt_style, gl_ignore_signal, gl_trap_signal, gl_last_signal,
+gl_completion_action, gl_register_action, gl_display_text, gl_return_status,
+gl_error_message, gl_catch_blocked, gl_list_signals, gl_bind_keyseq,
+gl_erase_terminal, gl_automatic_history, gl_append_history, gl_query_char,
+gl_read_char \- allow the user to compose an input line
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <stdio.h>
+#include <libtecla.h>
+
+\fBGetLine *\fR\fBnew_GetLine\fR(\fBsize_t\fR \fIlinelen\fR, \fBsize_t\fR \fIhistlen\fR);
+.fi
+
+.LP
+.nf
+\fBGetLine *\fR\fBdel_GetLine\fR(\fBGetLine *\fR\fIgl\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBgl_get_line\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIprompt\fR,
+     \fBconst char *\fR\fIstart_line\fR, \fBint\fR \fIstart_pos\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_query_char\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIprompt\fR, \fBchar\fR \fIdefchar\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_read_char\fR(\fBGetLine *\fR\fIgl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_customize_completion\fR(\fBGetLine *\fR\fIgl\fR, \fBvoid *\fR\fIdata\fR,
+     \fBCplMatchFn *\fR\fImatch_fn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_change_terminal\fR(\fBGetLine *\fR\fIgl\fR, \fBFILE *\fR\fIinput_fp\fR,
+     \fBFILE *\fR\fIoutput_fp\fR, \fBconst char *\fR\fIterm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_configure_getline\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIapp_string\fR,
+     \fBconst char *\fR\fIapp_file\fR,\ \fBconst char *\fR\fIuser_file\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_bind_keyseq\fR(\fBGetLine *\fR\fIgl\fR, \fBGlKeyOrigin\fR \fIorigin\fR,
+     \fBconst char *\fR\fIkeyseq\fR, \fBconst char *\fR\fIaction\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_save_history\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIfilename\fR,
+     \fBconst char *\fR\fIcomment\fR, \fBint\fR \fImax_lines\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_load_history\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIfilename\fR,
+     \fBconst char *\fR\fIcomment\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_watch_fd\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIfd\fR, \fBGlFdEvent\fR \fIevent\fR,
+     \fBGlFdEventFn *\fR\fIcallback\fR, \fBvoid *\fR\fIdata\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_inactivity_timeout\fR(\fBGetLine *\fR\fIgl\fR, \fBGlTimeoutFn *\fR\fIcallback\fR,
+     \fBvoid *\fR\fIdata\fR, \fBunsigned long\fR \fIsec\fR, \fBunsigned long\fR \fInsec\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_group_history\fR(\fBGetLine *\fR\fIgl\fR, \fBunsigned\fR \fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_show_history\fR(\fBGetLine *\fR\fIgl\fR, \fBFILE *\fR\fIfp\fR, \fBconst char *\fR\fIfmt\fR,
+     \fBint\fR \fIall_groups\fR, \fBint\fR \fImax_lines\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_resize_history\fR(\fBGetLine *\fR\fIgl\fR, \fBsize_t\fR \fIbufsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_limit_history\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fImax_lines\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_clear_history\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIall_groups\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_toggle_history\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIenable\fR);
+.fi
+
+.LP
+.nf
+\fBGlTerminalSize\fR \fBgl_terminal_size\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIdef_ncolumn\fR,
+     \fBint\fR \fIdef_nline\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_set_term_size\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIncolumn\fR, \fBint\fR \fInline\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_lookup_history\fR(\fBGetLine *\fR\fIgl\fR, \fBunsigned long\fR \fIid\fR,
+     \fBGlHistoryLine *\fR\fIhline\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_state_of_history\fR(\fBGetLine *\fR\fIgl\fR, \fBGlHistoryState *\fR\fIstate\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_range_of_history\fR(\fBGetLine *\fR\fIgl\fR, \fBGlHistoryRange *\fR\fIrange\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_size_of_history\fR(\fBGetLine *\fR\fIgl\fR, \fBGlHistorySize *\fR\fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_echo_mode\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIenable\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_replace_prompt\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIprompt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_prompt_style\fR(\fBGetLine *\fR\fIgl\fR, \fBGlPromptStyle\fR \fIstyle\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_ignore_signal\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIsigno\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_trap_signal\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIsigno\fR, \fBunsigned\fR \fIflags\fR,
+     \fBGlAfterSignal\fR \fIafter\fR, \fBint\fR \fIerrno_value\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_last_signal\fR(\fBGetLine *\fR\fIgl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_completion_action\fR(\fBGetLine *\fR\fIgl\fR, \fBvoid *\fR\fIdata\fR,
+     \fBCplMatchFn *\fR\fImatch_fn\fR, \fBint\fR \fIlist_only\fR, \fBconst char *\fR\fIname\fR,
+     \fBconst char *\fR\fIkeyseq\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_register_action\fR(\fBGetLine *\fR\fIgl\fR, \fBvoid *\fR\fIdata\fR, \fBGlActionFn *\fR\fIfn\fR,
+     \fBconst char *\fR\fIname\fR, \fBconst char *\fR\fIkeyseq\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_display_text\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIindentation\fR,
+     \fBconst char *\fR\fIprefix\fR, \fBconst char *\fR\fIsuffix\fR, \fBint\fR \fIfill_char\fR,
+     \fBint\fR \fIdef_width\fR, \fBint\fR \fIstart\fR, \fBconst char *\fR\fIstring\fR);
+.fi
+
+.LP
+.nf
+\fBGlReturnStatus\fR \fBgl_return_status\fR(\fBGetLine *\fR\fIgl\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBgl_error_message\fR(\fBGetLine *\fR\fIgl\fR, \fBchar *\fR\fIbuff\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgl_catch_blocked\fR(\fBGetLine *\fR\fIgl\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_list_signals\fR(\fBGetLine *\fR\fIgl\fR, \fBsigset_t *\fR\fIset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_append_history\fR(\fBGetLine *\fR\fIgl\fR, \fBconst char *\fR\fIline\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_automatic_history\fR(\fBGetLine *\fR\fIgl\fR, \fBint\fR \fIenable\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgl_erase_terminal\fR(\fBGetLine *\fR\fIgl\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgl_get_line()\fR function is part of the \fBlibtecla\fR(3LIB) library.
+If the user is typing at a terminal, each call prompts them for an line of
+input, then provides interactive editing facilities, similar to those of the
+UNIX \fBtcsh\fR shell. In addition to simple command-line editing, it supports
+recall of previously entered command lines, TAB completion of file names, and
+in-line wild-card expansion of filenames. Documentation of both the user-level
+command-line editing features and all user configuration options can be found
+on the \fBtecla\fR(5) manual page.
+.SS "An Example"
+.sp
+.LP
+The following shows a complete example of how to use the \fBgl_get_line()\fR
+function to get input from the user:
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <locale.h>
+#include <libtecla.h>
+
+int main(int argc, char *argv[])
+{
+  char *line;    /* The line that the user typed */
+  GetLine *gl;   /* The gl_get_line() resource object */
+
+  setlocale(LC_CTYPE, ""); /* Adopt the user's choice */
+                           /* of character set. */
+
+  gl = new_GetLine(1024, 2048);
+  if(!gl)
+    return 1;
+  while((line=gl_get_line(gl, "$ ", NULL, -1)) != NULL &&
+         strcmp(line, "exit\en") != 0)
+    printf("You typed: %s\en", line);
+
+  gl = del_GetLine(gl);
+  return 0;
+}
+.fi
+.in -2
+
+.sp
+.LP
+In the example, first the resources needed by the \fBgl_get_line()\fR function
+are created by calling \fBnew_GetLine()\fR. This allocates the memory used in
+subsequent calls to the \fBgl_get_line()\fR function, including the history
+buffer for recording previously entered lines. Then one or more lines are read
+from the user, until either an error occurs, or the user types exit. Then
+finally the resources that were allocated by \fBnew_GetLine()\fR, are returned
+to the system by calling \fBdel_GetLine()\fR. Note the use of the \fINULL\fR
+return value of \fBdel_GetLine()\fR to make \fIgl\fR \fINULL\fR. This is a
+safety precaution. If the program subsequently attempts to pass \fIgl\fR to
+\fBgl_get_line()\fR, said function will complain, and return an error, instead
+of attempting to use the deleted resource object.
+.SS "The Functions Used In The Example"
+.sp
+.LP
+The \fBnew_GetLine()\fR function creates the resources used by the
+\fBgl_get_line()\fR function and returns an opaque pointer to the object that
+contains them. The maximum length of an input line is specified by the
+\fIlinelen\fR argument, and the number of bytes to allocate for storing history
+lines is set by the \fIhistlen\fR argument. History lines are stored
+back-to-back in a single buffer of this size. Note that this means that the
+number of history lines that can be stored at any given time, depends on the
+lengths of the individual lines. If you want to place an upper limit on the
+number of lines that can be stored, see the description of the
+\fBgl_limit_history()\fR function. If you do not want history at all, specify
+\fIhistlen\fR as zero, and no history buffer will be allocated.
+.sp
+.LP
+On error, a message is printed to \fBstderr\fR and \fINULL\fR is returned.
+.sp
+.LP
+The \fBdel_GetLine()\fR function deletes the resources that were returned by a
+previous call to \fBnew_GetLine()\fR. It always returns \fINULL\fR (for
+example, a deleted object). It does nothing if the \fIgl\fR argument is
+\fINULL\fR.
+.sp
+.LP
+The \fBgl_get_line()\fR function can be called any number of times to read
+input from the user. The gl argument must have been previously returned by a
+call to \fBnew_GetLine()\fR. The \fIprompt\fR argument should be a normal
+null-terminated string, specifying the prompt to present the user with. By
+default prompts are displayed literally, but if enabled with the
+\fBgl_prompt_style()\fR function, prompts can contain directives to do
+underlining, switch to and from bold fonts, or turn highlighting on and off.
+.sp
+.LP
+If you want to specify the initial contents of the line for the user to edit,
+pass the desired string with the \fIstart_line\fR argument. You can then
+specify which character of this line the cursor is initially positioned over by
+using the \fIstart_pos\fR argument. This should be -1 if you want the cursor to
+follow the last character of the start line. If you do not want to preload the
+line in this manner, send \fIstart_line\fR as \fINULL\fR, and set
+\fIstart_pos\fR to -1.
+.sp
+.LP
+The \fBgl_get_line()\fR function returns a pointer to the line entered by the
+user, or \fINULL\fR on error or at the end of the input. The returned pointer
+is part of the specified \fIgl\fR resource object, and thus should not be freed
+by the caller, or assumed to be unchanging from one call to the next. When
+reading from a user at a terminal, there will always be a newline character at
+the end of the returned line. When standard input is being taken from a pipe or
+a file, there will similarly be a newline unless the input line was too long to
+store in the internal buffer. In the latter case you should call
+\fBgl_get_line()\fR again to read the rest of the line. Note that this behavior
+makes \fBgl_get_line()\fR similar to \fBfgets\fR(3C). When \fBstdin\fR is not
+connected to a terminal, \fBgl_get_line()\fR simply calls \fBfgets()\fR.
+.SS "The Return Status Of \fBgl_get_line()\fR"
+.sp
+.LP
+The \fBgl_get_line()\fR function has two possible return values: a pointer to
+the completed input line, or \fINULL\fR. Additional information about what
+caused \fBgl_get_line()\fR to return is available both by inspecting
+\fBerrno\fR and by calling the \fBgl_return_status()\fR function.
+.sp
+.LP
+The following are the possible enumerated values returned by
+\fBgl_return_status()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_NEWLINE\fR\fR
+.ad
+.RS 15n
+.rt  
+The last call to \fBgl_get_line()\fR successfully returned a completed input
+line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_BLOCKED\fR\fR
+.ad
+.RS 15n
+.rt  
+The \fBgl_get_line()\fR function was in non-blocking server mode, and returned
+early to avoid blocking the process while waiting for terminal I/O. The
+\fBgl_pending_io()\fR function can be used to see what type of I/O
+\fBgl_get_line()\fR was waiting for. See the \fBgl_io_mode\fR(3TECLA).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_SIGNAL\fR\fR
+.ad
+.RS 15n
+.rt  
+A signal was caught by \fBgl_get_line()\fR that had an after-signal disposition
+of \fBGLS_ABORT\fR. See \fBgl_trap_signal()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_TIMEOUT\fR\fR
+.ad
+.RS 15n
+.rt  
+The inactivity timer expired while \fBgl_get_line()\fR was waiting for input,
+and the timeout callback function returned \fBGLTO_ABORT\fR. See
+\fBgl_inactivity_timeout()\fR for information about timeouts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_FDABORT\fR\fR
+.ad
+.RS 15n
+.rt  
+An application I/O callback returned \fBGLFD_ABORT\fR. Ssee
+\fBgl_watch_fd()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_EOF\fR\fR
+.ad
+.RS 15n
+.rt  
+End of file reached. This can happen when input is coming from a file or a
+pipe, instead of the terminal. It also occurs if the user invokes the
+list-or-eof or del-char-or-list-or-eof actions at the start of a new line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLR_ERROR\fR\fR
+.ad
+.RS 15n
+.rt  
+An unexpected error caused \fBgl_get_line()\fR to abort (consult \fBerrno\fR
+and/or \fBgl_error_message()\fR for details.
+.RE
+
+.sp
+.LP
+When \fBgl_return_status()\fR returns \fBGLR_ERROR\fR and the value of
+\fBerrno\fR is not sufficient to explain what happened, you can use the
+\fBgl_error_message()\fR function to request a description of the last error
+that occurred.
+.sp
+.LP
+The return value of \fBgl_error_message()\fR is a pointer to the message that
+occurred. If the \fIbuff\fR argument is \fINULL\fR, this will be a pointer to a
+buffer within \fIgl\fR whose value will probably change on the next call to any
+function associated with \fBgl_get_line()\fR. Otherwise, if a non-null
+\fIbuff\fR argument is provided, the error message, including a '\e0'
+terminator, will be written within the first \fIn\fR elements of this buffer,
+and the return value will be a pointer to the first element of this buffer. If
+the message will not fit in the provided buffer, it will be truncated to fit.
+.SS "Optional Prompt Formatting"
+.sp
+.LP
+Whereas by default the prompt string that you specify is displayed literally
+without any special interpretation of the characters within it, the
+\fBgl_prompt_style()\fR function can be used to enable optional formatting
+directives within the prompt.
+.sp
+.LP
+The \fIstyle\fR argument, which specifies the formatting style, can take any of
+the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGL_FORMAT_PROMPT\fR\fR
+.ad
+.RS 21n
+.rt  
+In this style, the formatting directives described below, when included in
+prompt strings, are interpreted as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%B\fR\fR
+.ad
+.RS 6n
+.rt  
+Display subsequent characters with a bold font.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%b\fR\fR
+.ad
+.RS 6n
+.rt  
+Stop displaying characters with the bold font.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%F\fR\fR
+.ad
+.RS 6n
+.rt  
+Make subsequent characters flash.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%f\fR\fR
+.ad
+.RS 6n
+.rt  
+Turn off flashing characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%U\fR\fR
+.ad
+.RS 6n
+.rt  
+Underline subsequent characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%u\fR\fR
+.ad
+.RS 6n
+.rt  
+Stop underlining characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%P\fR\fR
+.ad
+.RS 6n
+.rt  
+Switch to a pale (half brightness) font.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%p\fR\fR
+.ad
+.RS 6n
+.rt  
+Stop using the pale font.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%S\fR\fR
+.ad
+.RS 6n
+.rt  
+Highlight subsequent characters (also known as standout mode).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%s\fR\fR
+.ad
+.RS 6n
+.rt  
+Stop highlighting characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%V\fR\fR
+.ad
+.RS 6n
+.rt  
+Turn on reverse video.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%v\fR\fR
+.ad
+.RS 6n
+.rt  
+Turn off reverse video.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+Display a single % character.
+.RE
+
+For example, in this mode, a prompt string like "%UOK%u$" would display the
+prompt "OK$", but with the OK part underlined.
+.sp
+Note that although a pair of characters that starts with a % character, but
+does not match any of the above directives is displayed literally, if a new
+directive is subsequently introduced which does match, the displayed prompt
+will change, so it is better to always use %% to display a literal %.
+.sp
+Also note that not all terminals support all of these text attributes, and that
+some substitute a different attribute for missing ones.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGL_LITERAL_PROMPT\fR\fR
+.ad
+.RS 21n
+.rt  
+In this style, the prompt string is printed literally. This is the default
+style.
+.RE
+
+.SS "Alternate Configuration Sources"
+.sp
+.LP
+By default users have the option of configuring the behavior of
+\fBgl_get_line()\fR with a configuration file called \fB\&.teclarc\fR in their
+home directories. The fact that all applications share this same configuration
+file is both an advantage and a disadvantage. In most cases it is an advantage,
+since it encourages uniformity, and frees the user from having to configure
+each application separately. In some applications, however, this single means
+of configuration is a problem. This is particularly true of embedded software,
+where there's no filesystem to read a configuration file from, and also in
+applications where a radically different choice of keybindings is needed to
+emulate a legacy keyboard interface. To cater for such cases, the
+\fBgl_configure_getline()\fR function allows the application to control where
+configuration information is read from.
+.sp
+.LP
+The \fBgl_configure_getline()\fR function allows the configuration commands
+that would normally be read from a user's \fB~/.teclarc\fR file, to be read
+from any or none of, a string, an application specific configuration file,
+and/or a user-specific configuration file. If this function is called before
+the first call to \fBgl_get_line()\fR, the default behavior of reading
+\fB~/.teclarc\fR on the first call to \fBgl_get_line()\fR is disabled, so all
+configurations must be achieved using the configuration sources specified with
+this function.
+.sp
+.LP
+If \fIapp_string\fR != \fINULL\fR, then it is interpreted as a string
+containing one or more configuration commands, separated from each other in the
+string by embedded newline  characters. If \fIapp_file\fR != \fINULL\fR then it
+is interpreted as the full pathname of an application-specific configuration
+file. If user_file != \fINULL\fR then it is interpreted as the full path name
+of a user-specific configuration file, such as \fB~/.teclarc\fR. For example,
+in the call
+.sp
+.in +2
+.nf
+gl_configure_getline(gl, "edit-mode vi \n nobeep",
+                     "/usr/share/myapp/teclarc", "~/.teclarc");
+.fi
+.in -2
+
+.sp
+.LP
+The \fIapp_string\fR argument causes the calling application to start in
+\fBvi\fR(1) edit-mode, instead of the default \fBemacs\fR mode, and turns off
+the use of the terminal bell by the library. It then attempts to read
+system-wide configuration commands from an optional file called
+\fB/usr/share/myapp/teclarc\fR, then finally reads user-specific configuration
+commands from an optional \fB\&.teclarc\fR file in the user's home directory.
+Note that the arguments are listed in ascending order of priority, with the
+contents of \fIapp_string\fR being potentially over riden by commands in
+\fIapp_file\fR, and commands in \fIapp_file\fR potentially being overriden by
+commands in \fIuser_file\fR.
+.sp
+.LP
+You can call this function as many times as needed, the results being
+cumulative, but note that copies of any file names specified with the
+\fIapp_file\fR and \fIuser_file\fR arguments are recorded internally for
+subsequent use by the read-init-files key-binding function, so if you plan to
+call this function multiple times, be sure that the last call specifies the
+filenames that you want re-read when the user requests that the configuration
+files be re-read.
+.sp
+.LP
+Individual key sequences can also be bound and unbound using the
+\fBgl_bind_keyseq()\fR function. The \fIorigin\fR argument specifies the
+priority of the binding, according to whom it is being established for, and
+must be one of the following two values.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGL_USER_KEY\fR\fR
+.ad
+.RS 15n
+.rt  
+The user requested this key-binding.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGL_APP_KEY\fR\fR
+.ad
+.RS 15n
+.rt  
+This is a default binding set by the application.
+.RE
+
+.sp
+.LP
+When both user and application bindings for a given key sequence have been
+specified, the user binding takes precedence. The application's binding is
+subsequently reinstated if the user's binding is later unbound with either
+another call to this function, or a call to \fBgl_configure_getline()\fR.
+.sp
+.LP
+The \fIkeyseq\fR argument specifies the key sequence to be bound or unbound,
+and is expressed in the same way as in a \fB~/.teclarc\fR configuration file.
+The \fIaction\fR argument must either be a string containing the name of the
+action to bind the key sequence to, or it must be \fINULL\fR or \fB""\fR to
+unbind the key sequence.
+.SS "Customized Word Completion"
+.sp
+.LP
+If in your application you would like to have TAB completion complete other
+things in addition to or instead of filenames, you can arrange this by
+registering an alternate completion callback function with a call to the
+\fBgl_customize_completion()\fR function.
+.sp
+.LP
+The \fIdata\fR argument provides a way for your application to pass arbitrary,
+application-specific information to the callback function. This is passed to
+the callback every time that it is called. It might for example point to the
+symbol table from which possible completions are to be sought. The
+\fImatch_fn\fR argument specifies the callback function to be called. The
+\fICplMatchFn\fR function type is defined in <\fBlibtecla.h\fR>, as is a
+\fBCPL_MATCH_FN()\fR macro that you can use to declare and prototype callback
+functions. The declaration and responsibilities of callback functions are
+described in depth on the \fBcpl_complete_word\fR(3TECLA) manual page.
+.sp
+.LP
+The callback function is responsible for looking backwards in the input line
+from the point at which the user pressed TAB, to find the start of the word
+being completed. It then must lookup possible completions of this word, and
+record them one by one in the \fBWordCompletion\fR object that is passed to it
+as an argument, by calling the \fBcpl_add_completion()\fR function. If the
+callback function wants to provide filename completion in addition to its own
+specific completions, it has the option of itself calling the builtin filename
+completion callback. This also is documented on the
+\fBcpl_complete_word\fR(3TECLA) manual page.
+.sp
+.LP
+If you would like \fBgl_get_line()\fR to return the current input line when a
+successful completion is been made, you can arrange this when you call
+\fBcpl_add_completion()\fR by making the last character of the continuation
+suffix a newline character. The input line will be updated to display the
+completion, together with any contiuation suffix up to the newline character,
+and \fBgl_get_line()\fR will return this input line.
+.sp
+.LP
+If your callback function needs to write something to the terminal, it must
+call \fBgl_normal_io()\fR before doing so. This will start a new line after the
+input line that is currently being edited, reinstate normal terminal I/O, and
+notify \fBgl_get_line()\fR that the input line will need to be redrawn when the
+callback returns.
+.SS "Adding Completion Actions"
+.sp
+.LP
+In the previous section the ability to customize the behavior of the only
+default completion action, complete-word, was described. In this section the
+ability to install additional action functions, so that different types of word
+completion can be bound to different key sequences, is described. This is
+achieved by using the \fBgl_completion_action()\fR function.
+.sp
+.LP
+The \fIdata\fR and \fImatch_fn\fR arguments are as described on the
+\fBcpl_complete_word\fR(3TECLA) manual page, and specify the callback function
+that should be invoked to identify possible completions. The \fIlist_only\fR
+argument determines whether the action that is being defined should attempt to
+complete the word as far as possible in the input line before displaying any
+possible ambiguous completions, or whether it should simply display the list of
+possible completions without touching the input line. The former option is
+selected by specifying a value of 0, and the latter by specifying a value of 1.
+The \fIname\fR argument specifies the name by which configuration files and
+future invocations of this function should refer to the action. This must
+either be the name of an existing completion action to be changed, or be a new
+unused name for a new action. Finally, the \fIkeyseq\fR argument specifies the
+default key sequence to bind the action to. If this is \fINULL\fR, no new key
+sequence will be bound to the action.
+.sp
+.LP
+Beware that in order for the user to be able to change the key sequence that is
+bound to actions that are installed in this manner, you shouldcall
+\fBgl_completion_action()\fR to install a given action for the first time
+between calling \fBnew_GetLine()\fR and the first call to \fBgl_get_line()\fR.
+Otherwise, when the user's configuration file is read on the first call to
+\fBgl_get_line()\fR, the name of the your additional action will not be known,
+and any reference to it in the configuration file will generate an error.
+.sp
+.LP
+As discussed for \fBgl_customize_completion()\fR, if your callback function
+needs to write anything to the terminal, it must call \fBgl_normal_io()\fR
+before doing so.
+.SS "Defining Custom Actions"
+.sp
+.LP
+Although the built-in key-binding actions are sufficient for the needs of most
+applications, occasionally a specialized application may need to define one or
+more custom actions, bound to application-specific key sequences. For example,
+a sales application would benefit from having a key sequence that displayed the
+part name that corresponded to a part number preceding the cursor. Such a
+feature is clearly beyond the scope of the built-in action functions. So for
+such special cases, the \fBgl_register_action()\fR function is provided.
+.sp
+.LP
+The \fBgl_register_action()\fR function lets the application register an
+external function, \fIfn\fR, that will thereafter be called whenever either the
+specified key sequence, \fIkeyseq\fR, is entered by the user, or the user
+enters any other key sequence that the user subsequently binds to the specified
+action name, \fIname\fR, in their configuration file. The \fIdata\fR argument
+can be a pointer to anything that the application wants to have passed to the
+action function, \fIfn\fR, whenever that function is invoked.
+.sp
+.LP
+The action function, \fIfn\fR, should be declared using the
+\fBGL_ACTION_FN()\fR macro, which is defined in <\fBlibtecla.h\fR>.
+.sp
+.in +2
+.nf
+#define GL_ACTION_FN(fn) GlAfterAction (fn)(GetLine *gl, \e
+                       void *data, int count, size_t curpos, \e
+                       const char *line)
+.fi
+.in -2
+
+.sp
+.LP
+The \fIgl\fR and \fIdata\fR arguments are those that were previously passed to
+\fBgl_register_action()\fR when the action function was registered. The
+\fIcount\fR argument is a numeric argument which the user has the option of
+entering using the digit-argument action, before invoking the action. If the
+user does not enter a number, then the \fIcount\fR argument is set to 1.
+Nominally this argument is interpreted as a repeat count, meaning that the
+action should be repeated that many times. In practice however, for some
+actions a repeat count makes little sense. In such cases, actions can either
+simply ignore the \fIcount\fR argument, or use its value for a different
+purpose.
+.sp
+.LP
+A copy of the current input line is passed in the read-only \fIline\fR
+argument. The current cursor position within this string is given by the index
+contained in the \fIcurpos\fR argument. Note that direct manipulation of the
+input line and the cursor position is not permitted because the rules dictated
+by various modes (such as \fBvi\fR mode versus \fBemacs\fR mode, no-echo mode,
+and insert mode versus overstrike mode) make it too complex for an application
+writer to write a conforming editing action, as well as constrain future
+changes to the internals of \fBgl_get_line()\fR. A potential solution to this
+dilemma would be to allow the action function to edit the line using the
+existing editing actions. This is currently under consideration.
+.sp
+.LP
+If the action function wishes to write text to the terminal without this
+getting mixed up with the displayed text of the input line, or read from the
+terminal without having to handle raw terminal I/O, then before doing either of
+these operations, it must temporarily suspend line editing by calling the
+\fBgl_normal_io()\fR function. This function flushes any pending output to the
+terminal, moves the cursor to the start of the line that follows the last
+terminal line of the input line, then restores the terminal to a state that is
+suitable for use with the C \fBstdio\fR facilities. The latter includes such
+things as restoring the normal mapping of \en to \er\en, and, when in server
+mode, restoring the normal blocking form of terminal I/O. Having called this
+function, the action function can read from and write to the terminal without
+the fear of creating a mess. It is not necessary for the action function to
+restore the original editing environment before it returns. This is done
+automatically by \fBgl_get_line()\fR after the action function returns. The
+following is a simple example of an action function which writes the sentence
+"Hello world" on a new terminal line after the line being edited. When this
+function returns, the input line is redrawn on the line that follows the "Hello
+world" line, and line editing resumes.
+.sp
+.in +2
+.nf
+static GL_ACTION_FN(say_hello_fn)
+{
+    if(gl_normal_io(gl))   /* Temporarily suspend editing */
+        return GLA_ABORT;
+    printf("Hello world\en");
+    return GLA_CONTINUE;
+}
+.fi
+.in -2
+
+.sp
+.LP
+Action functions must return one of the following values, to tell
+\fBgl_get_line()\fR how to proceed.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLA_ABORT\fR\fR
+.ad
+.RS 16n
+.rt  
+Cause \fBgl_get_line()\fR to return \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLA_RETURN\fR\fR
+.ad
+.RS 16n
+.rt  
+Cause \fBgl_get_line()\fR to return the completed input line
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLA_CONTINUE\fR\fR
+.ad
+.RS 16n
+.rt  
+Resume command-line editing.
+.RE
+
+.sp
+.LP
+Note that the \fIname\fR argument of \fBgl_register_action()\fR specifies the
+name by which a user can refer to the action in their configuration file. This
+allows them to re-bind the action to an alternate key-seqeunce. In order for
+this to work, it is necessary to call \fBgl_register_action()\fR between
+calling \fBnew_GetLine()\fR and the first call to \fBgl_get_line()\fR.
+.SS "History Files"
+.sp
+.LP
+To save the contents of the history buffer before quitting your application and
+subsequently restore them when you next start the application, the
+\fBgl_save_history()\fR and \fBgl_load_history()\fR functions are provided.
+.sp
+.LP
+The \fIfilename\fR argument specifies the name to give the history file when
+saving, or the name of an existing history file, when loading. This may contain
+home directory and environment variable expressions, such as
+\fB~/.myapp_history\fR or \fB$HOME/.myapp_history\fR.
+.sp
+.LP
+Along with each history line, additional information about it, such as its
+nesting level and when it was entered by the user, is recorded as a comment
+preceding the line in the history file. Writing this as a comment allows the
+history file to double as a command file, just in case you wish to replay a
+whole session using it. Since comment prefixes differ in different languages,
+the comment argument is provided for specifying the comment prefix. For
+example, if your application were a UNIX  shell, such as the Bourne shell, you
+would specify "#" here. Whatever you choose for the comment character, you must
+specify the same prefix to \fBgl_load_history()\fR that you used when you
+called \fBgl_save_history()\fR to write the history file.
+.sp
+.LP
+The \fImax_lines\fR argument must be either -1 to specify that all lines in the
+history list be saved, or a positive number specifying a ceiling on how many of
+the most recent lines should be saved.
+.sp
+.LP
+Both fuctions return non-zero on error, after writing an error message to
+\fBstderr\fR. Note that \fBgl_load_history()\fR does not consider the
+non-existence of a file to be an error.
+.SS "Multiple History Lists"
+.sp
+.LP
+If your application uses a single \fBGetLine\fR object for entering many
+different types of input lines, you might want \fBgl_get_line()\fR to
+distinguish the different types of lines in the history list, and only recall
+lines that match the current type of line. To support this requirement,
+\fBgl_get_line()\fR marks lines being recorded in the history list with an
+integer identifier chosen by the application. Initially this identifier is set
+to 0 by \fBnew_GetLine()\fR, but it can be changed subsequently by calling
+\fBgl_group_history()\fR.
+.sp
+.LP
+The integer identifier ID can be any number chosen by the application, but note
+that \fBgl_save_history()\fR and \fBgl_load_history()\fR preserve the
+association between identifiers and historical input lines between program
+invocations, so you should choose fixed identifiers for the different types of
+input line used by your application.
+.sp
+.LP
+Whenever \fBgl_get_line()\fR appends a new input line to the history list, the
+current history identifier is recorded with it, and when it is asked to recall
+a historical input line, it only recalls lines that are marked with the current
+identifier.
+.SS "Displaying History"
+.sp
+.LP
+The history list can be displayed by calling \fBgl_show_history()\fR. This
+function displays the current contents of the history list to the \fBstdio\fR
+output stream \fIfp\fR. If the \fImax_lines\fR argument is greater than or
+equal to zero, then no more than this number of  the most recent lines will be
+displayed. If the \fIall_groups\fR argument is non-zero, lines from all history
+groups are displayed. Otherwise only those of the currently selected history
+group are displayed. The format string argument, \fIfmt\fR, determines how the
+line is displayed. This can contain arbitrary characters which are written
+verbatim, interleaved with any of the following format directives:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%D\fR\fR
+.ad
+.RS 6n
+.rt  
+The date on which the line was originally entered, formatted like 2001-11-20.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%T\fR\fR
+.ad
+.RS 6n
+.rt  
+The time of day when the line was entered, formatted like 23:59:59.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%N\fR\fR
+.ad
+.RS 6n
+.rt  
+The sequential entry number of the line in the history buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%G\fR\fR
+.ad
+.RS 6n
+.rt  
+The number of the history group which the line belongs to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+A literal % character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%H\fR\fR
+.ad
+.RS 6n
+.rt  
+The history line itself.
+.RE
+
+.sp
+.LP
+Thus a format string like "%D %T %H0" would output something like:
+.sp
+.in +2
+.nf
+2001-11-20 10:23:34  Hello world
+.fi
+.in -2
+
+.sp
+.LP
+Note the inclusion of an explicit newline character in the format string.
+.SS "Looking Up History"
+.sp
+.LP
+The \fBgl_lookup_history()\fR function allows the calling application to look
+up lines in the history list.
+.sp
+.LP
+The \fIid\fR argument indicates which line to look up, where the first line
+that was entered in the history list after \fBnew_GetLine()\fR was called is
+denoted by 0, and subsequently entered lines are denoted with successively
+higher numbers. Note that the range of lines currently preserved in the history
+list can be queried by calling the \fBgl_range_of_history()\fR function. If the
+requested line is in the history list, the details of the line are recorded in
+the variable pointed to by the \fIhline\fR argument, and 1 is returned.
+Otherwise 0 is returned, and the variable pointed to by \fIhline\fR is left
+unchanged.
+.sp
+.LP
+Beware that the string returned in \fIhline\fR->\fIline\fR is part of the
+history buffer, so it must not be modified by the caller, and will be recycled
+on the next call to any function that takes \fIgl\fR as its argument. Therefore
+you should make a private copy of this string if you need to keep it.
+.SS "Manual History Archival"
+.sp
+.LP
+By default, whenever a line is entered by the user, it is automatically
+appended to the history list, just before \fBgl_get_line()\fR returns the line
+to the caller. This is convenient for the majority of applications, but there
+are also applications that need finer-grained control over what gets added to
+the history list. In such cases, the automatic addition of entered lines to the
+history list can be turned off by calling the \fBgl_automatic_history()\fR
+function.
+.sp
+.LP
+If this function is called with its \fIenable\fR argument set to 0,
+\fBgl_get_line()\fR will not automatically archive subsequently entered lines.
+Automatic archiving can be reenabled at a later time by calling this function
+again, with its \fIenable\fR argument set to 1. While automatic history
+archiving is disabled, the calling application can use the
+\fBgl_append_history()\fR to append lines to the history list as needed.
+.sp
+.LP
+The \fIline\fR argument specifies the line to be added to the history list.
+This must be a normal '\e0 ' terminated string. If this string contains any
+newline characters, the line that gets archived in the history list will be
+terminated by the first of these. Otherwise it will be terminated by the '\e0 '
+terminator. If the line is longer than the maximum input line length that was
+specified when \fBnew_GetLine()\fR was called, it will be truncated to the
+actual \fBgl_get_line()\fR line length when the line is recalled.
+.sp
+.LP
+If successful, \fBgl_append_history()\fR returns 0. Otherwise it returns
+non-zero and sets \fBerrno\fR to one of the following values.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+One of the arguments passed to \fBgl_append_history()\fR was \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified line was longer than the allocated size of the history buffer (as
+specified when \fBnew_GetLine()\fR was called), so it could not be archived.
+.RE
+
+.sp
+.LP
+A textual description of the error can optionally be obtained by calling
+\fBgl_error_message()\fR. Note that after such an error, the history list
+remains in a valid state to receive new history lines, so there is little harm
+in simply ignoring the return status of \fBgl_append_history()\fR.
+.SS "Miscellaneous History Configuration"
+.sp
+.LP
+If you wish to change the size of the history buffer that was originally
+specified in the call to \fBnew_GetLine()\fR, you can do so with the
+\fBgl_resize_history()\fR function.
+.sp
+.LP
+The \fIhistlen\fR argument specifies the new size in bytes, and if you specify
+this as 0, the buffer will be deleted.
+.sp
+.LP
+As mentioned in the discussion of \fBnew_GetLine()\fR, the number of lines that
+can be stored in the history buffer, depends on the lengths of the individual
+lines. For example, a 1000 byte buffer could equally store 10 lines of average
+length 100 bytes, or 20 lines of average length 50 bytes. Although the buffer
+is never expanded when new lines are added, a list of pointers into the buffer
+does get expanded when needed to accomodate the number of lines currently
+stored in the buffer. To place an upper limit on the number of lines in the
+buffer, and thus a ceiling on the amount of memory used in this list, you can
+call the \fBgl_limit_history()\fR function.
+.sp
+.LP
+The \fImax_lines\fR should either be a positive number >= 0, specifying an
+upper limit on the number of lines in the buffer, or be -1 to cancel any
+previously specified limit. When a limit is in effect, only the \fImax_lines\fR
+most recently appended lines are kept in the buffer. Older lines are discarded.
+.sp
+.LP
+To discard lines from the history buffer, use the \fBgl_clear_history()\fR
+function.
+.sp
+.LP
+The \fIall_groups\fR argument tells the function whether to delete just the
+lines associated with the current history group (see \fBgl_group_history()\fR)
+or all historical lines in the buffer.
+.sp
+.LP
+The \fBgl_toggle_history()\fR function allows you to toggle history on and off
+without losing the current contents of the history list.
+.sp
+.LP
+Setting the \fIenable\fR argument to 0 turns off the history mechanism, and
+setting it to 1 turns it back on. When history is turned off, no new lines will
+be added to the history list, and history lookup key-bindings will act as
+though there is nothing in the history buffer.
+.SS "Querying History Information"
+.sp
+.LP
+The configured state of the history list can be queried with the
+\fBgl_history_state()\fR function. On return, the status information is
+recorded in the variable pointed to by the \fIstate\fR argument.
+.sp
+.LP
+The \fBgl_range_of_history()\fR function returns the number and range of lines
+in the history list. The return values are recorded in the variable pointed to
+by the range argument. If the \fInlines\fR member of this structure is greater
+than zero, then the oldest and newest members report the range of lines in the
+list, and \fInewest\fR=\fIoldest\fR+\fInlines\fR-1. Otherwise they are both
+zero.
+.sp
+.LP
+The \fBgl_size_of_history()\fR function returns the total size of the history
+buffer and the amount of the buffer that is currently occupied.
+.sp
+.LP
+On return, the size information is recorded in the variable pointed to by the
+\fIsize\fR argument.
+.SS "Changing Terminals"
+.sp
+.LP
+The \fBnew_GetLine()\fR constructor function assumes that input is to be read
+from \fBstdin\fR and output written to \fBstdout\fR. The following function
+allows you to switch to different input and output streams.
+.sp
+.LP
+The \fIgl\fR argument is the object that was returned by \fBnew_GetLine()\fR.
+The \fIinput_fp\fR argument specifies the stream to read from, and
+\fIoutput_fp\fR specifies the stream to be written to. Only if both of these
+refer to a terminal, will interactive terminal input be enabled. Otherwise
+\fBgl_get_line()\fR will simply call \fBfgets()\fR to read command input. If
+both streams refer to a terminal, then they must refer to the same terminal,
+and the type of this terminal must be specified with the \fIterm\fR argument.
+The value of the \fIterm\fR argument is looked up in the terminal information
+database (\fBterminfo\fR or \fBtermcap\fR), in order to determine which special
+control sequences are needed to control various aspects of the terminal.
+\fBnew_GetLine()\fR for example, passes the return value of
+\fBgetenv\fR("TERM") in this argument. Note that if one or both of
+\fIinput_fp\fR and \fIoutput_fp\fR do not refer to a terminal, then it is legal
+to pass \fINULL\fR instead of a terminal type.
+.sp
+.LP
+Note that if you want to pass file descriptors to \fBgl_change_terminal()\fR,
+you can do this by creating \fBstdio\fR stream wrappers using the POSIX
+\fBfdopen\fR(3C) function.
+.SS "External Event Handling"
+.sp
+.LP
+By default, \fBgl_get_line()\fR does not return until either a complete input
+line has been entered by the user, or an error occurs. In programs that need to
+watch for I/O from other sources than the terminal, there are two options.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Use the functions described in the \fBgl_io_mode\fR(3TECLA) manual page to
+switch \fBgl_get_line()\fR into non-blocking server mode. In this mode,
+\fBgl_get_line()\fR becomes a non-blocking, incremental line-editing function
+that can safely be called from an external event loop. Although this is a very
+versatile method, it involves taking on some responsibilities that are normally
+performed behind the scenes by \fBgl_get_line()\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+While \fBgl_get_line()\fR is waiting for keyboard input from the user, you can
+ask it to also watch for activity on arbitrary file descriptors, such as
+network sockets or pipes, and have it call functions of your choosing when
+activity is seen. This works on any system that has the select system call,
+which is most, if not all flavors of UNIX.
+.RE
+.sp
+.LP
+Registering a file descriptor to be watched by \fBgl_get_line()\fR involves
+calling the \fBgl_watch_fd()\fR function. If this returns non-zero, then it
+means that either your arguments are invalid, or that this facility is not
+supported on the host system.
+.sp
+.LP
+The \fIfd\fR argument is the file descriptor to be watched. The event argument
+specifies what type of activity is of interest, chosen from the following
+enumerated values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLFD_READ\fR\fR
+.ad
+.RS 15n
+.rt  
+Watch for the arrival of data to be read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLFD_WRITE\fR\fR
+.ad
+.RS 15n
+.rt  
+Watch for the ability to write to the file descriptor without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLFD_URGENT\fR\fR
+.ad
+.RS 15n
+.rt  
+Watch for the arrival of urgent out-of-band data on the file descriptor.
+.RE
+
+.sp
+.LP
+The \fIcallback\fR argument is the function to call when the selected activity
+is seen. It should be defined with the following macro, which is defined in
+libtecla.h.
+.sp
+.in +2
+.nf
+#define GL_FD_EVENT_FN(fn) GlFdStatus (fn)(GetLine *gl, \
+                                   void *data, int fd, GlFdEvent event)
+.fi
+.in -2
+
+.sp
+.LP
+The data argument of the \fBgl_watch_fd()\fR function is passed to the callback
+function for its own use, and can point to anything you like, including
+\fINULL\fR. The file descriptor and the event argument are also passed to the
+callback function, and this potentially allows the same callback function to be
+registered to more than one type of event and/or more than one file descriptor.
+The return value of the callback function should be one of the following
+values.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLFD_ABORT\fR\fR
+.ad
+.RS 17n
+.rt  
+Tell \fBgl_get_line()\fR to abort. When this happens, \fBgl_get_line()\fR
+returns \fINULL\fR, and a following call to \fBgl_return_status()\fR will
+return \fBGLR_FDABORT\fR. Note that if the application needs \fBerrno\fR always
+to have a meaningful value when \fBgl_get_line()\fR returns \fINULL\fR, the
+callback function should set \fBerrno\fR appropriately.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLFD_REFRESH\fR\fR
+.ad
+.RS 17n
+.rt  
+Redraw the input line  then continue waiting for input. Return this if your
+callback wrote to the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLFD_CONTINUE\fR\fR
+.ad
+.RS 17n
+.rt  
+Continue to wait for input, without redrawing the line.
+.RE
+
+.sp
+.LP
+Note that before calling the callback, \fBgl_get_line()\fR blocks most signals
+and leaves its own signal handlers installed, so if you need to catch a
+particular signal you will need to both temporarily install your own signal
+handler, and unblock the signal. Be sure to re-block the signal (if it was
+originally blocked) and reinstate the original signal handler, if any, before
+returning.
+.sp
+.LP
+Your callback should not try to read from the terminal, which is left in raw
+mode as far as input is concerned. You can write to the terminal as usual,
+since features like conversion of newline to carriage-return/linefeed are
+re-enabled while the callback is running. If your callback function does write
+to the terminal, be sure to output a newline first, and when your callback
+returns, tell \fBgl_get_line()\fR that the input line needs to be redrawn, by
+returning the \fBGLFD_REFRESH\fR status code.
+.sp
+.LP
+To remove a callback function that you previously registered for a given file
+descriptor and event, simply call \fBgl_watch_fd()\fR with the same \fIfd\fR
+and \fIevent\fR arguments, but with a \fIcallback\fR argument of 0. The
+\fIdata\fR argument is ignored in this case.
+.SS "Setting An Inactivity Timeout"
+.sp
+.LP
+The \fBgl_inactivity_timeout()\fR function can be used to set or cancel an
+inactivity timeout. Inactivity in this case refers both to keyboard input, and
+to I/O on any file descriptors registered by prior and subsequent calls to
+\fBgl_watch_fd()\fR.
+.sp
+.LP
+The timeout is specified in the form of an integral number of seconds and an
+integral number of nanoseconds, specified by the \fIsec\fR and \fInsec\fR
+arguments, respectively. Subsequently, whenever no activity is seen for this
+time period, the function specified by the \fIcallback\fR argument is called.
+The \fIdata\fR argument of \fBgl_inactivity_timeout()\fR is passed to this
+callback function whenever it is invoked, and can thus be used to pass
+arbitrary application-specific information to the callback. The following macro
+is provided in <\fBlibtecla.h\fR> for applications to use to declare and
+prototype timeout callback functions.
+.sp
+.in +2
+.nf
+#define GL_TIMEOUT_FN(fn) GlAfterTimeout (fn)(GetLine *gl, void *data)
+.fi
+.in -2
+
+.sp
+.LP
+On returning, the application's callback is expected to return one of the
+following enumerators to tell \fBgl_get_line()\fR how to procede after the
+timeout has been handled by the callback.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLTO_ABORT\fR\fR
+.ad
+.RS 17n
+.rt  
+Tell \fBgl_get_line()\fR to abort. When this happens, \fBgl_get_line()\fR will
+return \fINULL\fR, and a following call to \fBgl_return_status()\fR will return
+\fBGLR_TIMEOUT\fR. Note that if the application needs \fBerrno\fR always to
+have a meaningful value when \fBgl_get_line()\fR returns \fINULL\fR, the
+callback function should set \fBerrno\fR appropriately.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLTO_REFRESH\fR\fR
+.ad
+.RS 17n
+.rt  
+Redraw the input line, then continue waiting for input. You should return this
+value if your callback wrote to the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLTO_CONTINUE\fR\fR
+.ad
+.RS 17n
+.rt  
+In normal blocking-I/O mode, continue to wait for input, without redrawing the
+user's input line. In non-blocking server I/O mode (see
+\fBgl_io_mode\fR(3TECLA)), \fBgl_get_line()\fR acts as though I/O blocked. This
+means that \fBgl_get_line()\fR will immediately return \fINULL\fR, and a
+following call to \fBgl_return_status()\fR will return \fBGLR_BLOCKED\fR.
+.RE
+
+.sp
+.LP
+Note that before calling the callback, \fBgl_get_line()\fR blocks most signals
+and leaves its own signal handlers installed, so if you need to catch a
+particular signal you will need to both temporarily install your own signal
+handler and unblock the signal. Be sure to re-block the signal (if it was
+originally blocked) and reinstate the original signal handler, if any, before
+returning.
+.sp
+.LP
+Your callback should not try to read from the terminal, which is left in raw
+mode as far as input is concerned. You can however write to the terminal as
+usual, since features like conversion of newline to carriage-return/linefeed
+are re-enabled while the callback is running. If your callback function does
+write to the terminal, be sure to output a newline first, and when your
+callback returns, tell \fBgl_get_line()\fR that the input line needs to be
+redrawn, by returning the \fBGLTO_REFRESH\fR status code.
+.sp
+.LP
+Finally, note that although the timeout arguments include a nanosecond
+component, few computer clocks presently have resolutions that are finer than a
+few milliseconds, so asking for less than a few milliseconds is equivalent to
+requesting zero seconds on many systems. If this would be a problem, you should
+base your timeout selection on the actual resolution of the host clock (for
+example, by calling \fBsysconf\fR(\fB_SC_CLK_TCK\fR)).
+.sp
+.LP
+To turn off timeouts, simply call \fBgl_inactivity_timeout()\fR with a
+\fIcallback\fR argument of 0. The \fIdata\fR argument is ignored in this case.
+.SS "Signal Handling Defaults"
+.sp
+.LP
+By default, the \fBgl_get_line()\fR function intercepts a number of signals.
+This is particularly important for signals that would by default terminate the
+process, since the terminal needs to be restored to a usable state before this
+happens. This section describes the signals that are trapped by default and how
+\fBgl_get_line()\fR responds to them. Changing these defaults is the topic of
+the following section.
+.sp
+.LP
+When the following subset of signals are caught, \fBgl_get_line()\fR first
+restores the terminal settings and signal handling to how they were before
+\fBgl_get_line()\fR was called, resends the signal to allow the calling
+application's signal handlers to handle it, then, if the process still exists,
+returns \fINULL\fR and sets \fBerrno\fR as specified below.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGINT\fR\fR
+.ad
+.RS 11n
+.rt  
+This signal is generated both by the keyboard interrupt key (usually \fB^C\fR),
+and the keyboard break key. The \fBerrno\fR value is \fBEINTR\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGHUP\fR\fR
+.ad
+.RS 11n
+.rt  
+This signal is generated when the controlling terminal exits. The \fBerrno\fR
+value is \fBENOTTY\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGPIPE\fR\fR
+.ad
+.RS 11n
+.rt  
+This signal is generated when a program attempts to write to a pipe whose
+remote end is not being read by any process. This can happen for example if you
+have called \fBgl_change_terminal()\fR to redirect output to a pipe hidden
+under a pseudo terminal. The \fBerrno\fR value is \fBEPIPE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGQUIT\fR\fR
+.ad
+.RS 11n
+.rt  
+This signal is generated by the keyboard quit key (usually \fB^\\fR). The
+\fBerrno\fR value is \fBEINTR\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGABRT\fR\fR
+.ad
+.RS 11n
+.rt  
+This signal is generated by the standard C, abort function. By default it both
+terminates the process and generates a core dump. The \fBerrno\fR value is
+\fBEINTR\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGTERM\fR\fR
+.ad
+.RS 11n
+.rt  
+This is the default signal that the UNIX kill command sends to processes. The
+\fBerrno\fR value is \fBEINTR\fR.
+.RE
+
+.sp
+.LP
+Note that in the case of all of the above signals, POSIX mandates that by
+default the process is terminated, with the addition of a core dump in the case
+of the \fBSIGQUIT\fR signal. In other words, if the calling application does
+not override the default handler by supplying its own signal handler, receipt
+of the corresponding signal will terminate the application before
+\fBgl_get_line()\fR returns.
+.sp
+.LP
+If \fBgl_get_line()\fR aborts with \fBerrno\fR set to \fBEINTR\fR, you can find
+out what signal caused it to abort, by calling the \fBgl_last_signal()\fR
+function. This returns the numeric code (for example, \fBSIGINT\fR) of the last
+signal that was received during the most recent call to \fBgl_get_line()\fR, or
+-1 if no signals were received.
+.sp
+.LP
+On systems that support it, when a \fBSIGWINCH\fR (window change) signal is
+received, \fBgl_get_line()\fR queries the terminal to find out its new size,
+redraws the current input line to accomodate the new size, then returns to
+waiting for keyboard input from the user. Unlike other signals, this signal is
+not resent to the application.
+.sp
+.LP
+Finally, the following signals cause \fBgl_get_line()\fR to first restore the
+terminal and signal environment to that which prevailed before
+\fBgl_get_line()\fR was called, then resend the signal to the application. If
+the process still exists after the signal has been delivered, then
+\fBgl_get_line()\fR then re-establishes its own signal handlers, switches the
+terminal back to raw mode, redisplays the input line, and goes back to awaiting
+terminal input from the user.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGCONT\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated when a suspended process is resumed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGPOLL\fR\fR
+.ad
+.RS 13n
+.rt  
+On SVR4 systems, this signal notifies the process of an asynchronous I/O event.
+Note that under 4.3+BSD, \fBSIGIO\fR and \fBSIGPOLL\fR are the same. On other
+systems, \fBSIGIO\fR is ignored by default, so \fBgl_get_line()\fR does not
+trap it by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGPWR\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated when a power failure occurs (presumably when the
+system is on a UPS).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGALRM\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated when a timer expires.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGUSR1\fR\fR
+.ad
+.RS 13n
+.rt  
+An application specific signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGUSR2\fR\fR
+.ad
+.RS 13n
+.rt  
+Another application specific signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGVTALRM\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated when a virtual timer expires. See \fBsetitimer\fR(2).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGXCPU\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated when a process exceeds its soft CPU time limit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGXFSZ\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated when a process exceeds its soft file-size limit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGTSTP\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated by the terminal suspend key, which is usually
+\fB^Z\fR, or the delayed terminal suspend key, which is usually \fB^Y\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGTTIN\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated if the program attempts to read from the terminal
+while the program is running in the background.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGTTOU\fR\fR
+.ad
+.RS 13n
+.rt  
+This signal is generated if the program attempts to write to the terminal while
+the program is running in the background.
+.RE
+
+.sp
+.LP
+Obviously not all of the above signals are supported on all systems, so code to
+support them is conditionally compiled into the tecla library.
+.sp
+.LP
+Note that if \fBSIGKILL\fR or \fBSIGPOLL\fR, which by definition cannot be
+caught, or any of the hardware generated exception signals, such as
+\fBSIGSEGV\fR, \fBSIGBUS\fR, and \fBSIGFPE\fR, are received and unhandled while
+\fBgl_get_line()\fR has the terminal in raw mode, the program will be
+terminated without the terminal having been restored to a usable state. In
+practice, job-control shells usually reset the terminal settings when a process
+relinquishes the controlling terminal, so this is only a problem with older
+shells.
+.SS "Customized Signal Handling"
+.sp
+.LP
+The previous section listed the signals that \fBgl_get_line()\fR traps by
+default, and described how it responds to them. This section describes how to
+both add and remove signals from the list of trapped signals, and how to
+specify how \fBgl_get_line()\fR should respond to a given signal.
+.sp
+.LP
+If you do not need \fBgl_get_line()\fR to do anything in response to a signal
+that it normally traps, you can tell to \fBgl_get_line()\fR to ignore that
+signal by calling \fBgl_ignore_signal()\fR.
+.sp
+.LP
+The \fIsigno\fR argument is the number of the signal (for example,
+\fBSIGINT\fR) that you want to have ignored. If the specified signal is not
+currently one of those being trapped, this function does nothing.
+.sp
+.LP
+The \fBgl_trap_signal()\fR function allows you to either add a new signal to
+the list that \fBgl_get_line()\fR traps or modify how it responds to a signal
+that it already traps.
+.sp
+.LP
+The \fIsigno\fR argument is the number of the signal that you want to have
+trapped. The \fIflags\fR argument is a set of flags that determine the
+environment in which the application's signal handler is invoked. The
+\fIafter\fR argument tells \fBgl_get_line()\fR what to do after the
+application's signal handler returns. The \fIerrno_value\fR tells
+\fBgl_get_line()\fR what to set \fBerrno\fR to if told to abort.
+.sp
+.LP
+The \fIflags\fR argument is a bitwise OR of zero or more of the following
+enumerators:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_RESTORE_SIG\fR\fR
+.ad
+.RS 20n
+.rt  
+Restore the caller's signal environment while handling the signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_RESTORE_TTY\fR\fR
+.ad
+.RS 20n
+.rt  
+Restore the caller's terminal settings while handling the signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_RESTORE_LINE\fR\fR
+.ad
+.RS 20n
+.rt  
+Move the cursor to the start of the line following the input line before
+invoking the application's signal handler.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_REDRAW_LINE\fR\fR
+.ad
+.RS 20n
+.rt  
+Redraw the input line when the application's signal handler returns.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_UNBLOCK_SIG\fR\fR
+.ad
+.RS 20n
+.rt  
+Normally, if the calling program has a signal blocked (see
+\fBsigprocmask\fR(2)), \fBgl_get_line()\fR does not trap that signal. This flag
+tells \fBgl_get_line()\fR to trap the signal and unblock it for the duration of
+the call to \fBgl_get_line()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_DONT_FORWARD\fR\fR
+.ad
+.RS 20n
+.rt  
+If this flag is included, the signal will not be forwarded to the signal
+handler of the calling program.
+.RE
+
+.sp
+.LP
+Two commonly useful flag combinations are also enumerated as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_RESTORE_ENV\fR\fR
+.ad
+.RS 21n
+.rt  
+\fBGLS_RESTORE_SIG\fR | \fBGLS_RESTORE_TTY\fR |\fBGLS_REDRAW_LINE\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_SUSPEND_INPUT\fR\fR
+.ad
+.RS 21n
+.rt  
+\fBGLS_RESTORE_ENV\fR | \fBGLS_RESTORE_LINE\fR
+.RE
+
+.sp
+.LP
+If your signal handler, or the default system signal handler for this signal,
+if you have not overridden it, never either writes to the terminal, nor
+suspends or terminates the calling program, then you can safely set the
+\fIflags\fR argument to 0.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The cursor does not get left in the middle of the input line.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+So that the user can type in input and have it echoed.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+So that you do not need to end each output line with \er\en, instead of just
+\en.
+.RE
+.sp
+.LP
+The \fBGL_RESTORE_ENV\fR combination is the same as \fBGL_SUSPEND_INPUT\fR,
+except that it does not move the cursor. If your signal handler does not read
+or write anything to the terminal, the user will not see any visible indication
+that a signal was caught. This can be useful if you have a signal handler that
+only occasionally writes to the terminal, where using \fBGL_SUSPEND_LINE\fR
+would cause the input line to be unnecessarily duplicated when nothing had been
+written to the terminal. Such a signal handler, when it does write to the
+terminal, should be sure to start a new line at the start of its first write,
+by writing a new line before returning. If the signal arrives while the user is
+entering a line that only occupies a signal terminal line, or if the cursor is
+on the last terminal line of a longer input line, this will have the same
+effect as \fBGL_SUSPEND_INPUT\fR. Otherwise it will start writing on a line
+that already contains part of the displayed input line. This does not do any
+harm, but it looks a bit ugly, which is why the \fBGL_SUSPEND_INPUT\fR
+combination is better if you know that you are always going to be writting to
+the terminal.
+.sp
+.LP
+The \fIafter\fR argument, which determines what \fBgl_get_line()\fR does after
+the application's signal handler returns (if  it returns), can take any one of
+the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_RETURN\fR\fR
+.ad
+.RS 16n
+.rt  
+Return the completed input line, just as though the user had pressed the return
+key.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_ABORT\fR\fR
+.ad
+.RS 16n
+.rt  
+Cause \fBgl_get_line()\fR to abort. When this happens, \fBgl_get_line()\fR
+returns \fINULL\fR, and a following call to \fBgl_return_status()\fR will
+return \fBGLR_SIGNAL\fR. Note that if the application needs \fBerrno\fR always
+to have a meaningful value when \fBgl_get_line()\fR returns \fINULL\fR, the
+callback function should set \fBerrno\fR appropriately.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLS_CONTINUE\fR\fR
+.ad
+.RS 16n
+.rt  
+Resume command line editing.
+.RE
+
+.sp
+.LP
+The \fIerrno_value\fR argument is intended to be combined with the
+\fBGLS_ABORT\fR option, telling \fBgl_get_line()\fR what to set the standard
+\fBerrno\fR variable to before returning \fINULL\fR to the calling program. It
+can also, however, be used with the \fBGL_RETURN\fR option, in case you want to
+have a way to distinguish between an input line that was entered using the
+return key, and one that was entered by the receipt of a signal.
+.SS "Reliable Signal Handling"
+.sp
+.LP
+Signal handling is suprisingly hard to do reliably without race conditions. In
+\fBgl_get_line()\fR a lot of care has been taken to allow applications to
+perform reliable signal handling around \fBgl_get_line()\fR. This section
+explains how to make use of this.
+.sp
+.LP
+As an example of the problems that can arise if the application is not written
+correctly, imagine that one's application has a \fBSIGINT\fR signal handler
+that sets a global flag. Now suppose that the application tests this flag just
+before invoking \fBgl_get_line()\fR. If a \fBSIGINT\fR signal happens to be
+received in the small window of time between the statement that tests the value
+of this flag, and the statement that calls \fBgl_get_line()\fR, then
+\fBgl_get_line()\fR will not see the signal, and will not be interrupted. As a
+result, the application will not be able to respond to the signal until the
+user gets around to finishing entering the input line and \fBgl_get_line()\fR
+returns. Depending on the application, this might or might not be a disaster,
+but at the very least it would puzzle the user.
+.sp
+.LP
+The way to avoid such problems is to do the following.
+.RS +4
+.TP
+1.
+If needed, use the \fBgl_trap_signal()\fR function to configure
+\fBgl_get_line()\fR to abort when important signals are caught.
+.RE
+.RS +4
+.TP
+2.
+Configure \fBgl_get_line()\fR such that if any of the signals that it
+catches are blocked when \fBgl_get_line()\fR is called, they will be unblocked
+automatically during times when \fBgl_get_line()\fR is waiting for I/O. This
+can be done either on a per signal basis, by calling the \fBgl_trap_signal()\fR
+function, and specifying the \fBGLS_UNBLOCK\fR attribute of the signal, or
+globally by calling the \fBgl_catch_blocked()\fR function. This function simply
+adds the \fBGLS_UNBLOCK\fR attribute to all of the signals that it is currently
+configured to trap.
+.RE
+.RS +4
+.TP
+3.
+Just before calling \fBgl_get_line()\fR, block delivery of all of the
+signals that \fBgl_get_line()\fR is configured to trap. This can be done using
+the POSIX sigprocmask function in conjunction with the \fBgl_list_signals()\fR
+function. This function returns the set of signals that it is currently
+configured to catch in the set argument, which is in the form required by
+\fBsigprocmask\fR(2).
+.RE
+.RS +4
+.TP
+4.
+In the example, one would now test the global flag that the signal handler
+sets, knowing that there is now no danger of this flag being set again until
+\fBgl_get_line()\fR unblocks its signals while performing I/O.
+.RE
+.RS +4
+.TP
+5.
+Eventually \fBgl_get_line()\fR returns, either because a signal was caught,
+an error occurred, or the user finished entering their input line.
+.RE
+.RS +4
+.TP
+6.
+Now one would check the global signal flag again, and if it is set, respond
+to it, and zero the flag.
+.RE
+.RS +4
+.TP
+7.
+Use \fBsigprocmask()\fR to unblock the signals that were blocked in step 3.
+.RE
+.sp
+.LP
+The same technique can be used around certain POSIX signal-aware functions,
+such as \fBsigsetjmp\fR(3C) and \fBsigsuspend\fR(2), and in particular, the
+former of these two functions can be used in conjunction with
+\fBsiglongjmp\fR(3C) to implement race-condition free signal handling around
+other long-running system calls. The \fBgl_get_line()\fR function manages to
+reliably trap signals around calls to functions like \fBread\fR(2) and
+\fBselect\fR(3C) without race conditions.
+.sp
+.LP
+The \fBgl_get_line()\fR function first uses the POSIX \fBsigprocmask()\fR
+function to block the delivery of all of the signals that it is currently
+configured to catch. This is redundant if the application has already blocked
+them, but it does no harm. It undoes this step just before returning.
+.sp
+.LP
+Whenever \fBgl_get_line()\fR needs to call read or select to wait for input
+from the user, it first calls the POSIX \fBsigsetjmp()\fR function, being sure
+to specify a non-zero value for its \fIsavemask\fR argument.
+.sp
+.LP
+If \fBsigsetjmp()\fR returns zero, \fBgl_get_line()\fR then does the following.
+.RS +4
+.TP
+1.
+It uses the POSIX \fBsigaction\fR(2) function to register a temporary signal
+handler to all of the signals that it is configured to catch. This signal
+handler does two things.
+.RS +4
+.TP
+a.
+It records the number of the signal that was received in a file-scope
+variable.
+.RE
+.RS +4
+.TP
+b.
+It then calls the POSIX \fBsiglongjmp()\fR function using the buffer that
+was passed to \fBsigsetjmp()\fR for its first argument and a non-zero value for
+its second argument.
+.RE
+When this signal handler is registered, the \fIsa_mask\fR member of the
+\fBstruct sigaction\fR \fIact\fR argument of the call to \fBsigaction()\fR is
+configured to contain all of the signals that \fBgl_get_line()\fR is catching.
+This ensures that only one signal will be caught at once by our signal handler,
+which in turn ensures that multiple instances of our signal handler do not
+tread on each other's toes.
+.RE
+.RS +4
+.TP
+2.
+Now that the signal handler has been set up, \fBgl_get_line()\fR unblocks
+all of the signals that it is configured to catch.
+.RE
+.RS +4
+.TP
+3.
+It then calls the \fBread()\fR or \fBselect()\fR function to wait for
+keyboard input.
+.RE
+.RS +4
+.TP
+4.
+If this function returns (that is, no signal is received),
+\fBgl_get_line()\fR blocks delivery of the signals of interest again.
+.RE
+.RS +4
+.TP
+5.
+It then reinstates the signal handlers that were displaced by the one that
+was just installed.
+.RE
+.sp
+.LP
+Alternatively, if \fBsigsetjmp()\fR returns non-zero, this means that one of
+the signals being trapped was caught while the above steps were executing. When
+this happens, \fBgl_get_line()\fR does the following.
+.sp
+.LP
+First, note that when a call to \fBsiglongjmp()\fR causes \fBsigsetjmp()\fR to
+return, provided that the \fIsavemask\fR argument of \fBsigsetjmp()\fR was
+non-zero, the signal process mask is restored to how it was when
+\fBsigsetjmp()\fR was called. This is the important difference between
+\fBsigsetjmp()\fR and the older problematic \fBsetjmp\fR(3C), and is the
+essential ingredient that makes it possible to avoid signal handling race
+conditions. Because of this we are guaranteed that all of the signals that we
+blocked before calling \fBsigsetjmp()\fR are blocked again as soon as any
+signal is caught. The following statements, which are then executed, are thus
+guaranteed to be executed without any further signals being caught.
+.RS +4
+.TP
+1.
+If so instructed by the \fBgl_get_line()\fR configuration attributes of the
+signal that was caught, \fBgl_get_line()\fR restores the terminal attributes to
+the state that they had when \fBgl_get_line()\fR was called. This is
+particularly important for signals that suspend or terminate the process, since
+otherwise the terminal would be left in an unusable state.
+.RE
+.RS +4
+.TP
+2.
+It then reinstates the application's signal handlers.
+.RE
+.RS +4
+.TP
+3.
+Then it uses the C standard-library \fBraise\fR(3C) function to re-send the
+application the signal that was caught.
+.RE
+.RS +4
+.TP
+4.
+Next it unblocks delivery of the signal that we just sent. This results in
+the signal that was just sent by \fBraise()\fR being caught by the
+application's original signal handler, which can now handle it as it sees fit.
+.RE
+.RS +4
+.TP
+5.
+If the signal handler returns (that is, it does not terminate the process),
+\fBgl_get_line()\fR blocks delivery of the above signal again.
+.RE
+.RS +4
+.TP
+6.
+It then undoes any actions performed in the first of the above steps and
+redisplays the line, if the signal configuration calls for this.
+.RE
+.RS +4
+.TP
+7.
+\fBgl_get_line()\fR then either resumes trying to read a character, or
+aborts, depending on the configuration of the signal that was caught.
+.RE
+.sp
+.LP
+What the above steps do in essence is to take asynchronously delivered signals
+and handle them synchronously, one at a time, at a point in the code where
+\fBgl_get_line()\fR has complete control over its environment.
+.SS "The Terminal Size"
+.sp
+.LP
+On most systems the combination of the \fBTIOCGWINSZ\fR ioctl and the
+\fBSIGWINCH\fR signal is used to maintain an accurate idea of the terminal
+size. The terminal size is newly queried every time that \fBgl_get_line()\fR is
+called and whenever a \fBSIGWINCH\fR signal is received.
+.sp
+.LP
+On the few systems where this mechanism is not available, at startup
+\fBnew_GetLine()\fR first looks for the \fBLINES\fR and \fBCOLUMNS\fR
+environment variables. If these are not found, or they contain unusable values,
+then if a terminal information database like \fBterminfo\fR or \fBtermcap\fR is
+available, the default size of the terminal is looked up in this database. If
+this too fails to provide the terminal size, a default size of 80 columns by 24
+lines is used.
+.sp
+.LP
+Even on systems that do support ioctl(\fBTIOCGWINSZ\fR), if the terminal is on
+the other end of a serial line, the terminal driver generally has no way of
+detecting when a resize occurs or of querying what the current size is. In such
+cases no \fBSIGWINCH\fR is sent to the process, and the dimensions returned by
+ioctl(\fBTIOCGWINSZ\fR) are not correct. The only way to handle such instances
+is to provide a way for the user to enter a command that tells the remote
+system what the new size is. This command would then call the
+\fBgl_set_term_size()\fR function to tell \fBgl_get_line()\fR about the change
+in size.
+.sp
+.LP
+The \fIncolumn\fR and \fInline\fR arguments are used to specify the new
+dimensions of the terminal, and must not be less than 1. On systems that do
+support ioctl(\fBTIOCGWINSZ\fR), this function first calls
+ioctl(\fBTIOCSWINSZ\fR) to tell the terminal driver about the change in size.
+In non-blocking server-I/O mode, if a line is currently being input, the input
+line is then redrawn to accomodate the changed size. Finally the new values are
+recorded in \fIgl\fR for future use by \fBgl_get_line()\fR.
+.sp
+.LP
+The \fBgl_terminal_size()\fR function allows you to query the current size of
+the terminal, and install an alternate fallback size for cases where the size
+is not available. Beware that the terminal size will not be available if
+reading from a pipe or a file, so the default values can be important even on
+systems that do support ways of finding out the terminal size.
+.sp
+.LP
+This function first updates \fBgl_get_line()\fR's fallback terminal dimensions,
+then records its findings in the return value.
+.sp
+.LP
+The \fIdef_ncolumn\fR and \fIdef_nline\fR arguments specify the default number
+of terminal columns and lines to use if the terminal size cannot be determined
+by ioctl(\fBTIOCGWINSZ\fR) or environment variables.
+.SS "Hiding What You Type"
+.sp
+.LP
+When entering sensitive information, such as passwords, it is best not to have
+the text that you are entering echoed on the terminal. Furthermore, such text
+should not be recorded in the history list, since somebody finding your
+terminal unattended could then recall it, or somebody snooping through your
+directories could see it in your history file. With this in mind, the
+\fBgl_echo_mode()\fR function allows you to toggle on and off the display and
+archival of any text that is subsequently entered in calls to
+\fBgl_get_line()\fR.
+.sp
+.LP
+The \fIenable\fR argument specifies whether entered text should be visible or
+not. If it is 0, then subsequently entered lines will not be visible on the
+terminal, and will not be recorded in the history list. If it is 1, then
+subsequent input lines will be displayed as they are entered, and provided that
+history has not been turned off with a call to \fBgl_toggle_history()\fR, then
+they will also be archived in the history list. Finally, if the enable argument
+is -1, then the echoing mode is left unchanged, which allows you to
+non-destructively query the current setting through the return value. In all
+cases, the return value of the function is 0 if echoing was disabled before the
+function was called, and 1 if it was enabled.
+.sp
+.LP
+When echoing is turned off, note that although tab completion will invisibly
+complete your prefix as far as possible, ambiguous completions will not be
+displayed.
+.SS "Single Character Queries"
+.sp
+.LP
+Using \fBgl_get_line()\fR to query the user for a single character reply, is
+inconvenient for the user, since they must hit the enter or return key before
+the character that they typed is returned to the program. Thus the
+\fBgl_query_char()\fR function has been provided for single character queries
+like this.
+.sp
+.LP
+This function displays the specified prompt at the start of a new line, and
+waits for the user to type a character. When the user types a character,
+\fBgl_query_char()\fR displays it to the right of the prompt, starts a newline,
+then returns the character to the calling program. The return value of the
+function is the character that was typed. If the read had to be aborted for
+some reason, EOF is returned instead. In the latter case, the application can
+call the previously documented \fBgl_return_status()\fR, to find out what went
+wrong. This could, for example, have been the reception of a signal, or the
+optional inactivity timer going off.
+.sp
+.LP
+If the user simply hits enter, the value of the \fIdefchar\fR argument is
+substituted. This means that when the user hits either newline or return, the
+character specified in \fIdefchar\fR, is displayed after the prompt, as though
+the user had typed it, as well as being returned to the calling application. If
+such a replacement is not important, simply pass '\en' as the value of
+\fIdefchar\fR.
+.sp
+.LP
+If the entered character is an unprintable character, it is displayed
+symbolically. For example, control-A is displayed as \fB^A\fR, and characters
+beyond 127 are displayed in octal, preceded by a backslash.
+.sp
+.LP
+As with \fBgl_get_line()\fR, echoing of the entered character can be disabled
+using the \fBgl_echo_mode()\fR function.
+.sp
+.LP
+If the calling process is suspended while waiting for the user to type their
+response, the cursor is moved to the line following the prompt line, then when
+the process resumes, the prompt is redisplayed, and \fBgl_query_char()\fR
+resumes waiting for the user to type a character.
+.sp
+.LP
+Note that in non-blocking server mode, if an incomplete input line is in the
+process of being read when \fBgl_query_char()\fR is called, the partial input
+line is discarded, and erased from the terminal, before the new prompt is
+displayed. The next call to \fBgl_get_line()\fR will thus start editing a new
+line.
+.SS "Reading Raw Characters"
+.sp
+.LP
+Whereas the \fBgl_query_char()\fR function visibly prompts the user for a
+character, and displays what they typed, the \fBgl_read_char()\fR function
+reads a signal character from the user, without writing anything to the
+terminal, or perturbing any incompletely entered input line. This means that it
+can be called not only from between calls to \fBgl_get_line()\fR, but also from
+callback functions that the application has registered to be called by
+\fBgl_get_line()\fR.
+.sp
+.LP
+On success, the return value of \fBgl_read_char()\fR is the character that was
+read. On failure, EOF is returned, and the \fBgl_return_status()\fR function
+can be called to find out what went wrong. Possibilities include the optional
+inactivity timer going off, the receipt of a signal that is configured to abort
+\fBgl_get_line()\fR, or terminal I/O blocking, when in non-blocking server-I/O
+mode.
+.sp
+.LP
+Beware that certain keyboard keys, such as function keys, and cursor keys,
+usually generate at least three characters each, so a single call to
+\fBgl_read_char()\fR will not be enough to identify such keystrokes.
+.SS "Clearing The Terminal"
+.sp
+.LP
+The calling program can clear the terminal by calling
+\fBgl_erase_terminal()\fR. In non-blocking server-I/O mode, this function also
+arranges for the current input line to be redrawn from scratch when
+\fBgl_get_line()\fR is next called.
+.SS "Displaying Text Dynamically"
+.sp
+.LP
+Between calls to \fBgl_get_line()\fR, the \fBgl_display_text()\fR function
+provides a convenient way to display paragraphs of text, left-justified and
+split over one or more terminal lines according to the constraints of the
+current width of the terminal. Examples of the use of this function may be
+found in the demo programs, where it is used to display introductions. In those
+examples the advanced use  of optional prefixes, suffixes and filled lines to
+draw a box around the text is also illustrated.
+.sp
+.LP
+If \fIgl\fR is not currently connected to a terminal, for example if the output
+of a program that uses \fBgl_get_line()\fR is being piped to another program or
+redirected to a file, then the value of the \fIdef_width\fR parameter is used
+as the terminal width.
+.sp
+.LP
+The \fIindentation\fR argument specifies the number of characters to use to
+indent each line of ouput. The \fIfill_char\fR argument specifies the character
+that will be used to perform this indentation.
+.sp
+.LP
+The \fIprefix\fR argument can be either \fINULL\fR or a string to place at the
+beginning of each new line (after any indentation). Similarly, the \fIsuffix\fR
+argument can be either \fINULL\fR or a string to place at the end of each line.
+The suffix is placed flush against the right edge of the terminal, and any
+space between its first character and the last word on that line is filled with
+the character specified by the \fIfill_char\fR argument. Normally the
+fill-character is a space.
+.sp
+.LP
+The \fIstart\fR argument tells \fBgl_display_text()\fR how many characters have
+already been written to the current terminal line, and thus tells it the
+starting column index of the cursor. Since the return value of
+\fBgl_display_text()\fR is the ending column index of the cursor, by passing
+the return value of one call to the start argument of the next call, a
+paragraph that is broken between more than one string can be composed by
+calling \fBgl_display_text()\fR for each successive portion of the paragraph.
+Note that literal newline characters are necessary at the end of each paragraph
+to force a new line to be started.
+.sp
+.LP
+On error, \fBgl_display_text()\fR returns -1.
+.SS "Callback Function Facilities"
+.sp
+.LP
+Unless otherwise stated, callback functions such as tab completion callbacks
+and event callbacks should not call any functions in this module. The following
+functions, however, are designed specifically to be used by callback functions.
+.sp
+.LP
+Calling the \fBgl_replace_prompt()\fR function from a callback tells
+\fBgl_get_line()\fR to display a different prompt when the callback returns.
+Except in non-blocking server mode, it has no effect if used between calls to
+\fBgl_get_line()\fR. In non-blocking server mode, when used between two calls
+to \fBgl_get_line()\fR that are operating on the same input line, the current
+input line will be re-drawn with the new prompt on the following call to
+\fBgl_get_line()\fR.
+.SS "International Character Sets"
+.sp
+.LP
+Since \fBlibtecla\fR(3LIB) version 1.4.0, \fBgl_get_line()\fR has been 8-bit
+clean. This means that all 8-bit characters that are printable in the user's
+current locale are now displayed verbatim and included in the returned input
+line. Assuming that the calling program correctly contains a call like the
+following,
+.sp
+.in +2
+.nf
+setlocale(LC_CTYPE, "")
+.fi
+.in -2
+
+.sp
+.LP
+then the current locale is determined by the first of the environment variables
+\fBLC_CTYPE\fR, \fBLC_ALL\fR, and \fBLANG\fR that is found to contain a valid
+locale name. If none of these variables are defined, or the program neglects to
+call \fBsetlocale\fR(3C), then the default C locale is used, which is US 7-bit
+ASCII. On most UNIX-like platforms, you can get a list of valid locales by
+typing the command:
+.sp
+.in +2
+.nf
+locale -a
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+at the shell prompt. Further documentation on how the user can make use of this
+to enter international characters can be found in the \fBtecla\fR(5) man page.
+.SS "Thread Safety"
+.sp
+.LP
+Unfortunately neither \fBterminfo\fR nor \fBtermcap\fR were designed to be
+reentrant, so you cannot safely use the functions of the getline module in
+multiple threads (you can use the separate file-expansion and word-completion
+modules in multiple threads, see the corresponding man pages for details).
+However due to the use of POSIX reentrant functions for looking up home
+directories, it is safe to use this module from a single thread of a
+multi-threaded program, provided that your other threads do not use any
+\fBtermcap\fR or \fBterminfo\fR functions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
+\fBgl_io_mode\fR(3TECLA), \fBlibtecla\fR(3LIB), \fBpca_lookup_file\fR(3TECLA),
+\fBattributes\fR(5), \fBtecla\fR(5)

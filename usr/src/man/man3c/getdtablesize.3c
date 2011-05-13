@@ -1,0 +1,48 @@
+'\" te
+.\"  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.TH getdtablesize 3C "1 Mar 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getdtablesize \- get the file descriptor table size
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBgetdtablesize\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetdtablesize()\fR function is equivalent to \fBgetrlimit\fR(2) with the
+\fBRLIMIT_NOFILE\fR option.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetdtablesize()\fR function returns the current soft limit as if
+obtained from a call to \fBgetrlimit()\fR with the \fBRLIMIT_NOFILE\fR option.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+There is no direct relationship between the value returned by
+\fBgetdtablesize()\fR and \fBOPEN_MAX\fR defined in <\fBlimits.h\fR>.
+.sp
+.LP
+Each process has a file descriptor table which is guaranteed to have at least
+20 slots.  The entries in the descriptor table are numbered with small integers
+starting at 0. The \fBgetdtablesize()\fR function returns the current maximum
+size of this table by calling the \fBgetrlimit()\fR function.
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBgetrlimit\fR(2), \fBopen\fR(2), \fBsetrlimit\fR(2),
+\fBselect\fR(3C)

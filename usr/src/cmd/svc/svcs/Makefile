@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
+#
 
 PROG =		svcs
 OBJS =		svcs.o explain.o

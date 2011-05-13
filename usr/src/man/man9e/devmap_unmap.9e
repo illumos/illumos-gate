@@ -1,0 +1,218 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH devmap_unmap 9E "21 Jan 1997" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+devmap_unmap \- device mapping unmap entry point
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBvoid prefix\fR\fBdevmap_unmap\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBvoid *\fR\fIpvtp\fR, 
+     \fBoffset_t\fR \fIoff\fR, \fBsize_t\fR\fIlen\fR, \fBdevmap_cookie_t\fR \fInew_dhp1\fR, 
+     \fBvoid **\fR\fInew_pvtp1\fR, \fBdevmap_cookie_t\fR\fInew_dhp2\fR, \fBvoid **\fR\fInew_pvtp2\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdhp\fR \fR
+.ad
+.RS 14n
+.rt  
+An opaque mapping handle that the system uses to describe the mapping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvtp\fR \fR
+.ad
+.RS 14n
+.rt  
+Driver private mapping data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR \fR
+.ad
+.RS 14n
+.rt  
+User offset within the logical device memory at which the unmapping begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 14n
+.rt  
+Length (in bytes) of the memory being unmapped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInew_dhp1\fR \fR
+.ad
+.RS 14n
+.rt  
+The opaque mapping handle that the system uses to describe the new region that
+ends at (\fIoff\fR - 1) . \fInew_dhp1\fR may be  \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInew_pvtp1\fR \fR
+.ad
+.RS 14n
+.rt  
+A pointer to be filled in by the driver with the driver  private mapping data
+for the new region that ends at (\fIoff\fR - 1); ignored if \fInew_dhp1\fR is
+\fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInew_dhp2\fR \fR
+.ad
+.RS 14n
+.rt  
+The opaque mapping handle that the system uses to describe the new region that
+begins at (\fIoff \fR + \fIlen\fR); \fInew_dhp2\fR may be  \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInew_pvtp2\fR \fR
+.ad
+.RS 14n
+.rt  
+A pointer to be filled in by the driver with the driver private mapping data
+for the new region that begins at (\fIoff\fR + \fIlen\fR);  ignored if
+\fInew_dhp2\fR is  \fINULL\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdevmap_unmap()\fR is called when the system removes the mapping in the range
+[ \fIoff\fR, \fIoff\fR + \fIlen\fR ], such as in the  \fBmunmap\fR(2) or
+\fBexit\fR(2) system calls. Device drivers use \fBdevmap_unmap()\fR to free up
+the resources allocated in \fBdevmap_map\fR(9E).
+.sp
+.LP
+\fIdhp\fR is the mapping handle that uniquely identifies the mapping.   The
+driver stores the mapping attributes in the driver's private data, \fIpvtp\fR,
+when the mapping is created.  See \fBdevmap_map\fR(9E) for details.
+.sp
+.LP
+\fIoff\fR and \fIlen\fR define the range to be affected by
+\fBdevmap_unmap()\fR. This range is within the boundary of the mapping
+described by \fIdhp\fR.
+.sp
+.LP
+If the range [ \fIoff\fR, \fIoff\fR + \fIlen\fR ] covers the entire mapping,
+the system passes  \fINULL\fR to  \fInew_dhp1\fR, \fInew_pvtp1\fR,
+\fInew_dhp2\fR, and \fInew_pvtp2\fR. The system expects device drivers to free
+all resources allocated for this  mapping.
+.sp
+.LP
+If \fIoff\fR is at the beginning of the mapping and  \fIlen\fR does not cover
+the entire mapping, the system sets  \fINULL\fR to \fInew_dhp1\fR and to
+\fInew_pvtp1\fR. The system expects the drivers to allocate new driver private
+data for the region that starts at \fIoff\fR + \fIlen\fR and to set
+\fI*new_pvtp2\fR to point to it. \fInew_dhp2\fR is the mapping handle of the
+newly mapped object.
+.sp
+.LP
+If \fIoff\fR is not at the beginning of the mapping, but \fIoff\fR + \fIlen\fR
+is at the end of the mapping the system passes  \fINULL\fR to \fInew_dhp2\fR
+and \fInew_pvtp2\fR. The system then expects the drivers to allocate new driver
+private data for the region that begins at the beginning of the mapping (for
+example, stored in \fIpvtp\fR) and to set \fI*new_pvtp1\fR to point to it.
+\fInew_dhp1\fR is the mapping handle of the newly mapped object.
+.sp
+.LP
+The drivers should free up the driver private data, \fIpvtp\fR, previously
+allocated in \fBdevmap_map\fR(9E) before returning to the system.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBdevmap_unmap()\fR implementation
+.sp
+.in +2
+.nf
+static void
+xxdevmap_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off,
+    size_t len, devmap_cookie_t new_dhp1, void **new_pvtp1,
+    devmap_cookie_t new_dhp2, void **new_pvtp2)
+{
+    struct xxpvtdata *ptmp;
+    struct xxpvtdata *p = (struct xxpvtdata *)pvtp;
+    struct xx_softc  *softc = p->softc;
+    mutex_enter(&softc->mutex);
+    /*
+     * If new_dhp1 is not NULL, create a new driver private data
+     * for the region from the beginning of old mapping to off.
+     */
+    if (new_dhp1 != NULL) {
+        ptmp = kmem_zalloc(sizeof (struct xxpvtdata), KM_SLEEP);
+        ptmp->dhp = new_dhp1;
+        ptmp->off = pvtp->off;
+        ptmp->len = off - pvtp->off;
+        *new_pvtp1 = ptmp;
+    }
+
+    /*
+     * If new_dhp2 is not NULL, create a new driver private data
+     * for the region from off+len to the end of the old mapping.
+     */
+    if (new_dhp2 != NULL) {
+        ptmp = kmem_zalloc(sizeof (struct xxpvtdata), KM_SLEEP);
+        ptmp->off = off + len;
+        ptmp->len = pvpt->len - (off + len - pvtp->off);
+        ptmp->dhp = new_dhp2;
+        *new_pvtp2 = ptmp;
+    }
+
+    /* Destroy the driver private data - Device dependent */
+    ...
+    kmem_free(pvtp, sizeof (struct xxpvtdata));
+    mutex_exit(&softc->mutex);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBmunmap\fR(2), \fBdevmap_map\fR(9E),
+\fBdevmap_callback_ctl\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

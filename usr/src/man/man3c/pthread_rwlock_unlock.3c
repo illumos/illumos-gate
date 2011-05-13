@@ -1,0 +1,89 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1997, The Open Group.  All Rights Reserved.
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_rwlock_unlock 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_rwlock_unlock \- unlock read-write lock object
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_rwlock_unlock\fR(\fBpthread_rwlock_t\fR \fI*rwlock\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_rwlock_unlock()\fR function is called to release a lock held on
+the read-write lock object referenced by \fIrwlock\fR. Results are undefined if
+the read-write lock \fIrwlock\fR is not held by the calling thread.
+.sp
+.LP
+If this function is called to release a read lock from the read-write lock
+object and there are other read locks currently held on this read-write lock
+object, the read-write lock object remains in the read locked state. If this
+function releases the calling thread's last read lock on this read-write lock
+object, then the calling thread is no longer one of the owners of the object.
+If this function releases the last read lock for this read-write lock object,
+the read-write lock object will be put in the unlocked state with no owners.
+.sp
+.LP
+If this function is called to release a write lock for this read-write lock
+object, the read-write lock object will be put in the unlocked state with no
+owners.
+.sp
+.LP
+If the call to the \fBpthread_rwlock_unlock()\fR function results in the
+read-write lock object becoming unlocked and there are multiple threads waiting
+to acquire the read-write lock object for writing, the scheduling policy is
+used to determine which thread acquires the read-write lock object for writing.
+If there are multiple threads waiting to acquire the read-write lock object for
+reading, the scheduling policy is used to determine the order in which the
+waiting threads acquire the read-write lock object for reading.  If there are
+multiple threads blocked on \fIrwlock\fR for both read locks and write locks,
+it is unspecified whether the readers acquire the lock first or whether a
+writer acquires the lock first.
+.sp
+.LP
+Results are undefined if any of these functions are called with an
+uninitialized read-write lock.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_rwlock_unlock()\fR function returns \fB0\fR.
+Otherwise, an error number is returned to indicate the error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_rwlock_init\fR(3C), \fBpthread_rwlock_rdlock\fR(3C),
+\fBpthread_rwlock_wrlock\fR(3C), \fBpthread_rwlockattr_init\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,82 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH picl_initialize 3PICL "28 Mar 2000" "SunOS 5.11" "PICL Library Functions"
+.SH NAME
+picl_initialize \- initiate a session with the PICL daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicl\fR [ \fIlibrary\fR... ] 
+#include <picl.h>
+
+\fBint\fR \fBpicl_initialize\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpicl_initialize()\fR function opens the daemon door file and initiates a
+session with the PICL daemon running on the system.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, this function
+returns a non-negative integer, \fBPICL_FAILURE\fR.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTSUPPORTED\fR\fR
+.ad
+.RS 21n
+.rt  
+Version not supported
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 21n
+.rt  
+General system failure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NORESPONSE\fR\fR
+.ad
+.RS 21n
+.rt  
+Daemon not responding
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpicl_shutdown\fR(3PICL), \fBattributes\fR(5)

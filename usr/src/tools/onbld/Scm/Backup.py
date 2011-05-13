@@ -74,7 +74,8 @@ dirstate, are optional.
 import grp, os, pwd, shutil, tarfile, time, traceback
 from cStringIO import StringIO
 
-from mercurial import changegroup, error, node, patch, util
+from mercurial import changegroup, cmdutil, error, node, patch, util
+from onbld.Scm import Version
 
 
 class CdmNodeMissing(util.Abort):
@@ -437,7 +438,10 @@ class CdmUncommittedBackup(object):
                 raise util.Abort("couldn't apply working copy diff: %s\n"
                                  "   %s" % (diff, e))
         finally:
-            patch.updatedir(self.ws.ui, self.ws.repo, files)
+            if Version.at_least("1.7"):
+                cmdutil.updatedir(self.ws.ui, self.ws.repo, files)
+            else:
+                patch.updatedir(self.ws.ui, self.ws.repo, files)
 
         if not self.bu.exists('renames'):
             return

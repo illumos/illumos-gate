@@ -1,0 +1,133 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pathfind 3GEN "10 Mar 1999" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+pathfind \- search for named file in named directories
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
+#include <libgen.h>
+
+\fBchar *\fR\fBpathfind\fR(\fBconst char *\fR\fIpath\fR, \fBconst char *\fR\fIname\fR, \fBconst char *\fR\fImode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpathfind()\fR function searches the directories named in \fIpath\fR for
+the file \fIname\fR. The directories named in \fIpath\fR are separated by
+colons (:). The \fImode\fR argument is a string of option letters chosen from
+the set \fB[rwxfbcdpugks]:\fR
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+LetterMeaning
+_
+\fBr\fRreadable
+_
+\fBw\fRwritable
+_
+\fBx\fRexecutable
+_
+\fBf\fRnormal file
+_
+\fBb\fRblock special
+_
+\fBc\fRcharacter special
+_
+\fBd\fRdirectory
+_
+\fBp\fRFIFO (pipe)
+_
+\fBu\fRset user ID bit
+_
+\fBg\fRset group ID bit
+_
+\fBk\fRsticky bit
+_
+\fBs\fRsize non-zero
+.TE
+
+.sp
+.LP
+Options read, write, and execute are checked relative to the real (not the
+effective) user \fBID\fR and group \fBID\fR of the current process.
+.sp
+.LP
+If \fIname\fR begins with a slash, it is treated as an absolute path name, and
+\fIpath\fR is ignored.
+.sp
+.LP
+An empty \fIpath\fR member is treated as the current directory. A slash
+(\fB/\fR) character is not prepended at the occurrence of the first match;
+rather, the unadorned \fIname\fR is returned.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of finding the \fBls\fR command using the PATH
+environment variable.
+.sp
+.LP
+To find the \fBls\fR command using the \fBPATH\fR environment variable:
+
+.sp
+.LP
+pathfind (getenv ("PATH"), "ls", "rx")
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpathfind()\fR function returns a \fB(char *)\fR value containing static,
+thread-specific data that will be overwritten upon the next call from the same
+thread.
+.sp
+.LP
+If the file \fIname\fR with all characteristics specified by \fImode\fR is
+found in any of the directories specified by \fIpath\fR, then \fBpathfind()\fR
+returns a pointer to a string containing the member of \fIpath\fR, followed by
+a slash character (\fB/\fR), followed by \fIname\fR.
+.sp
+.LP
+If no match is found, \fBpathname()\fR returns a null pointer, \fB((char *)
+0)\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsh\fR(1), \fBtest\fR(1), \fBaccess\fR(2), \fBmknod\fR(2), \fBstat\fR(2),
+\fBgetenv\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The string pointed to by the returned pointer is stored in an area that is
+reused on subsequent calls to \fBpathfind()\fR. The string should not be
+deallocated by the caller.
+.sp
+.LP
+When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in
+multithreadedapplications.

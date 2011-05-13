@@ -1,0 +1,249 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getoptcvt 1 "7 Jan 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+getoptcvt \- convert to getopts to parse command options
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/getoptcvt\fR [\fB-b\fR] \fIfilename\fR
+.fi
+
+.LP
+.nf
+\fB/usr/lib/getoptcvt\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fB/usr/lib/getoptcvt\fR reads the shell script in \fIfilename\fR, converts it
+to use \fBgetopts\fR instead of \fBgetopt\fR, and writes the results on the
+standard output.
+.sp
+.LP
+\fBgetopts\fR is a built-in Bourne shell command used to parse positional
+parameters and to check for valid options. See \fBsh\fR(1). It supports all
+applicable rules of the command syntax standard (see Rules 3-10,
+\fBIntro\fR(1)). It should be used in place of the \fBgetopt\fR command. (See
+the NOTES section below.) The syntax for the shell's built-in \fBgetopts\fR
+command is:
+.sp
+.LP
+\fBgetopts\fR \fIoptstring\fR \fIname\fR [ \fIargument\fR\|.\|.\|.\|]
+.sp
+.LP
+\fIoptstring\fR must contain the option letters the command using \fBgetopts\fR
+will recognize; if a letter is followed by a colon (\fB:\fR), the option is
+expected to have an argument, or group of arguments, which must be separated
+from it by white space.
+.sp
+.LP
+Each time it is invoked, \fBgetopts\fR places the next option in the shell
+variable \fIname\fR and the index of the next argument to be processed in the
+shell variable \fBOPTIND\fR. Whenever the shell or a shell script is invoked,
+\fBOPTIND\fR is initialized to \fB1\fR.
+.sp
+.LP
+When an option requires an option-argument, \fBgetopts\fR places it in the
+shell variable \fBOPTARG\fR.
+.sp
+.LP
+If an illegal option is encountered, \fB?\fR will be placed in \fIname\fR.
+.sp
+.LP
+When the end of options is encountered, \fBgetopts\fR exits with a non-zero
+exit status. The special option \fB \(mi\(mi\fR may be used to delimit the end
+of the options.
+.sp
+.LP
+By default, \fBgetopts\fR parses the positional parameters. If extra arguments
+(\fIargument\fR .\|.\|.) are given on the \fBgetopts\fR command line,
+\fBgetopts\fR parses them instead.
+.sp
+.LP
+So that all new commands will adhere to the command syntax standard described
+in \fBIntro\fR(1), they should use \fBgetopts\fR or \fBgetopt\fR to parse
+positional parameters and check for options that are valid for that command
+(see the NOTES section below).
+.SH OPTIONS
+.sp
+.LP
+The following option is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 6n
+.rt  
+Makes the converted script portable to earlier releases of the UNIX system.
+\fB/usr/lib/getoptcvt\fR modifies the shell script in \fIfilename\fR so that
+when the resulting shell script is executed, it determines at run time whether
+to invoke \fBgetopts\fR or \fBgetopt\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRProcessing the arguments for a command
+.sp
+.LP
+The following fragment of a shell program shows how one might process the
+arguments for a command that can take the options \fB-a\fR or \fB-b\fR, as well
+as the option \fB-o\fR, which requires an option-argument:
+
+.sp
+.in +2
+.nf
+while getopts abo: c
+do
+      case $c in
+      a | b)     FLAG=$c;;
+      o)         OARG=$OPTARG;;
+      \e?)        echo $USAGE
+                 exit 2;;
+      esac
+done
+shift `expr $OPTIND \(mi 1`
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fREquivalent code expressions
+.sp
+.LP
+This code accepts any of the following as equivalent:
+
+.sp
+.in +2
+.nf
+\fBcmd -a -b -o "xxx z yy" filename
+cmd -a -b -o "xxx z yy" -filename
+cmd -ab -o xxx,z,yy filename
+cmd -ab -o "xxx z yy" filename
+cmd -o xxx,z,yy b a filename\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBgetopts\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOPTIND\fR \fR
+.ad
+.RS 11n
+.rt  
+This variable is used by \fBgetoptcvt\fR as the index of the next argument to
+be processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOPTARG\fR \fR
+.ad
+.RS 11n
+.rt  
+This variable is used by \fBgetoptcvt\fR to store the argument if an option is
+using arguments.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 7n
+.rt  
+An option, specified or unspecified by \fIoptstring\fR, was found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR \fR
+.ad
+.RS 7n
+.rt  
+The end of options was encountered or an error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+CSIenabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(1), \fBgetopts\fR(1), \fBsh\fR(1), \fBshell_builtins\fR(1),
+\fBgetopt\fR(3C), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBgetopts\fR prints an error message on the standard error when it encounters
+an option letter not included in \fIoptstring\fR.
+.SH NOTES
+.sp
+.LP
+Although the following command syntax rule (see \fBIntro\fR(1)) relaxations are
+permitted under the current implementation, they should not be used because
+they may not be supported in future releases of the system. As in the EXAMPLES
+section above, \fB-a\fR and \fB-b\fR are options, and the option \fB-o\fR
+requires an option-argument. The following example violates Rule 5:  options
+with option-arguments must not be grouped with other options:
+.sp
+.in +2
+.nf
+example% \fBcmd -aboxxx filename\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following example violates Rule 6: there must be white space after an
+option that takes an option-argument:
+.sp
+.in +2
+.nf
+example% \fBcmd -ab oxxx filename\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Changing the value of the shell variable \fBOPTIND\fR or parsing different sets
+of arguments may lead to unexpected results.

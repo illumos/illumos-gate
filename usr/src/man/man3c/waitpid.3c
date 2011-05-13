@@ -1,0 +1,227 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH waitpid 3C "7 Dec 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+waitpid \- wait for child process to change state
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/wait.h>
+
+\fBpid_t\fR \fBwaitpid\fR(\fBpid_t\fR \fIpid\fR, \fBint *\fR\fIstat_loc\fR, \fBint\fR \fIoptions\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwaitpid()\fR function will suspend execution of the calling thread until
+status information for one of its terminated child processes is available, or
+until delivery of a signal whose action is either to execute a signal-catching
+function or to terminate the process. If more than one thread is suspended in
+\fBwaitpid()\fR, \fBwait\fR(3C), or \fBwaitid\fR(2) awaiting termination of the
+same process, exactly one thread will return the process status at the time of
+the target process termination. If status information is available prior to the
+call to \fBwaitpid()\fR, return will be immediate.
+.sp
+.LP
+The \fIpid\fR argument specifies a set of child processes for which status is
+requested, as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIpid\fR is less than \fB(pid_t)\(mi1\fR, status is requested for any child
+process whose process group  \fBID\fR is equal to the absolute value of
+\fIpid\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIpid\fR is equal to \fB(pid_t)\(mi1\fR, status is requested for any child
+process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If  \fIpid\fR is equal to \fB(pid_t)0\fR status is requested for any child
+process whose process group  \fBID\fR is equal to that of the calling process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If  \fIpid\fR is greater than \fB(pid_t)0\fR, it specifies the process \fBID\fR
+of the child process for which status is requested.
+.RE
+.sp
+.LP
+One instance of a \fBSIGCHLD\fR signal is queued for each child process whose
+status has changed. If \fBwaitpid()\fR returns because the status of a child
+process is available, and \fBWNOWAIT\fR was not specified in \fIoptions\fR, any
+pending \fBSIGCHLD\fR signal associated with the process ID of that child
+process is discarded. Any other pending \fBSIGCHLD\fR signals remain pending.
+.sp
+.LP
+If the calling process has \fBSA_NOCLDWAIT\fR set or has \fBSIGCHLD\fR set to
+\fBSIG_IGN\fR and the process has no unwaited children that were transformed
+into zombie processes, it will block until all of its children terminate, and
+\fBwaitpid()\fR will fail and set \fBerrno\fR to \fBECHILD\fR.
+.sp
+.LP
+If \fBwaitpid()\fR returns because the status of a child process is available,
+then that  status may be evaluated with the macros defined by
+\fBwait.h\fR(3HEAD) If the calling process had specified a non-zero value of
+\fIstat_loc\fR, the status of the child process will be stored in the location
+pointed to by \fIstat_loc\fR.
+.sp
+.LP
+The \fIoptions\fR argument is constructed from the bitwise-inclusive OR of zero
+or more of the following flags, defined in the header  <\fBsys/wait.h\fR>:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWCONTINUED\fR\fR
+.ad
+.RS 14n
+.rt  
+The status of any continued child process specified by \fIpid\fR, whose status
+has not been reported since it continued, is also reported to the calling
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWNOHANG\fR\fR
+.ad
+.RS 14n
+.rt  
+The \fBwaitpid()\fR function will not suspend execution of the calling process
+if status is not immediately available for one of the child processes specified
+by \fIpid\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWNOWAIT\fR\fR
+.ad
+.RS 14n
+.rt  
+Keep the process whose status is returned in \fIstat_loc\fR in a waitable
+state. The process may be waited for again with identical results.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWUNTRACED\fR\fR
+.ad
+.RS 14n
+.rt  
+The status of any child processes specified by \fIpid\fR that are stopped, and
+whose status has not yet been reported since they stopped, is also reported to
+the calling process. \fBWSTOPPED\fR is a synonym for \fBWUNTRACED\fR.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+If \fBwaitpid()\fR returns because the status of a child process is available,
+it returns a value equal to the process \fBID\fR of the child process for which
+status is reported.  If \fBwaitpid()\fR returns due to the delivery of a signal
+to the calling process, \fB\(mi1\fR is returned and \fBerrno\fR is set to
+\fBEINTR\fR.  If \fBwaitpid()\fR was invoked with \fBWNOHANG\fR set in
+\fIoptions\fR, it has at  least one child process specified by \fIpid\fR for
+which status is not available, and status is not available for any process
+specified by \fIpid\fR, then \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBwaitpid()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECHILD\fR\fR
+.ad
+.RS 10n
+.rt  
+The process or process group specified by \fIpid\fR does not exist or is not a
+child of the calling process or can never be in the states specified by
+\fIoptions\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBwaitpid()\fR function was interrupted due to the receipt of a signal
+sent by the calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An invalid value was specified for \fIoptions.\fR
+.RE
+
+.SH USAGE
+.sp
+.LP
+With \fIoptions\fR equal to \fB0\fR and  \fIpid\fR equal to \fB(pid_t)\(mi1\fR,
+\fBwaitpid()\fR is identical to \fBwait\fR(3C). The \fBwaitpid()\fR function is
+implemented as a call to the more general \fBwaitid\fR(2) function.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBpause\fR(2),
+\fBsigaction\fR(2), \fBptrace\fR(3C), \fBsignal\fR(3C), \fBsiginfo.h\fR(3HEAD),
+\fBwait\fR(3C), \fBwait.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,124 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_transport 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_transport \- request by a SCSI target driver to start a command
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+
+
+\fBint\fR \fBscsi_transport\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Target drivers use \fBscsi_transport()\fR to request the host adapter driver to
+transport a command to the \fBSCSI \fRtarget device specified by \fIpkt\fR. The
+target driver must obtain resources for the packet using
+\fBscsi_init_pkt\fR(9F) prior to calling this function. The packet may be
+initialized using one of the \fBmakecom\fR(9F) functions.
+\fBscsi_transport()\fR does not wait for the \fBSCSI\fR command to complete.
+See \fBscsi_poll\fR(9F) for a description of polled \fBSCSI\fR commands. Upon
+completion of the \fBSCSI\fR command the host adapter calls the completion
+routine provided by the target driver in the \fBpkt_comp\fR member of the
+\fBscsi_pkt\fR pointed to by \fIpkt\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_transport()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRAN_ACCEPT\fR\fR
+.ad
+.RS 20n
+.rt  
+The packet was accepted by the transport layer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRAN_BUSY\fR\fR
+.ad
+.RS 20n
+.rt  
+The packet could not be accepted because there was already a packet in progress
+for this target/lun, the host adapter queue was full, or the target device
+queue was full.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRAN_BADPKT\fR\fR
+.ad
+.RS 20n
+.rt  
+The \fBDMA\fR count in the packet exceeded the \fBDMA\fR engine's maximum
+\fBDMA\fR size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRAN_FATAL_ERROR\fR\fR
+.ad
+.RS 20n
+.rt  
+A fatal error has occurred in the transport layer.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_transport()\fR function can be called from user, interrupt, or
+kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBscsi_transport()\fR
+.sp
+.in +2
+.nf
+if ((status = scsi_transport(rqpkt)) != TRAN_ACCEPT) {
+      scsi_log(devp, sd_label, CE_WARN,
+          "transport of request sense pkt fails (0x%x)\en", status);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_start\fR(9E), \fBmakecom\fR(9F), \fBscsi_init_pkt\fR(9F),
+\fBscsi_pktalloc\fR(9F), \fBscsi_poll\fR(9F), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,0 +1,163 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH crypt 3EXT "3 Mar 2008" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+crypt, setkey, encrypt, des_crypt, des_setkey, des_encrypt, run_setkey,
+run_crypt, crypt_close \- password and file encryption functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcrypt\fR [ \fIlibrary\fR ... ]
+#include <crypt.h>
+
+\fBchar *\fR\fBcrypt\fR(\fBconst char *\fR\fIkey\fR, \fBconst char *\fR\fIsalt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsetkey\fR(\fBconst char *\fR\fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBencrypt\fR(\fBchar *\fR\fIblock\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBdes_crypt\fR(\fBconst char *\fR\fIkey\fR, \fBconst char *\fR\fIsalt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdes_setkey\fR(\fBconst char *\fR\fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdes_encrypt\fR(\fBchar *\fR\fIblock\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrun_setkey\fR(\fBint *\fR\fIp\fR, \fBconst char *\fR\fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrun_crypt\fR(\fBlong\fR \fIoffset\fR, \fBchar *\fR\fIbuffer\fR, \fBunsigned int\fR \fIcount\fR,
+     \fBint *\fR\fIp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcrypt_close\fR(\fBint *\fR\fIp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdes_crypt()\fR is the password encryption function. It is based on a one-way
+hashing encryption algorithm with variations intended (among other things) to
+frustrate use of hardware implementations of a key search.
+.sp
+.LP
+\fIkey\fR is a user's typed password. \fIsalt\fR is a two-character string
+chosen from the set [\fBa-zA-Z0-9./\fR]; this string is used to perturb the
+hashing algorithm in one of 4096 different ways, after which the password is
+used as the key to encrypt repeatedly a constant string. The returned value
+points to the encrypted password. The first two characters are the salt itself.
+.sp
+.LP
+The \fBdes_setkey()\fR and \fBdes_encrypt()\fR entries provide (rather
+primitive) access to the actual hashing algorithm. The argument of
+\fBdes_setkey()\fR is a character array of length 64 containing only the
+characters with numerical value 0 and 1. If this string is divided into groups
+of 8, the low-order bit in each group is ignored, thereby creating a 56-bit key
+that is set into the machine. This key is the key that will be used with the
+hashing algorithm to encrypt the string \fIblock\fR with the function
+\fBdes_encrypt()\fR.
+.sp
+.LP
+The argument to the \fBdes_encrypt()\fR entry is a character array of length 64
+containing only the characters with numerical value 0 and 1. The argument array
+is modified in place to a similar array representing the bits of the argument
+after having been subjected to the hashing algorithm using the key set by
+\fBdes_setkey()\fR. If  \fIflag\fR is zero, the argument is encrypted; if
+non-zero, it is decrypted.
+.sp
+.LP
+Note that decryption is not provided in the international version of
+\fBcrypt()\fR. The international version is part of the C Development Set, and
+the domestic version is part of the Security Administration Utilities.  If
+decryption is attempted with the international version of \fBdes_encrypt()\fR,
+an error message is printed.
+.sp
+.LP
+\fBcrypt()\fR, \fBsetkey()\fR, and \fBencrypt()\fR are front-end routines that
+invoke \fBdes_crypt()\fR, \fBdes_setkey()\fR, and \fBdes_encrypt()\fR
+respectively.
+.sp
+.LP
+The routines \fBrun_setkey()\fR and \fBrun_crypt()\fR are designed for use by
+applications that need cryptographic capabilities, such as \fBed\fR(1) and
+\fBvi\fR(1). \fBrun_setkey()\fR establishes a two-way pipe connection with the
+\fBcrypt\fR utility, using \fIkey\fR as the password argument.
+\fBrun_crypt()\fR takes a block of characters and transforms the cleartext or
+ciphertext into their ciphertext or cleartext using the \fBcrypt\fR utility.
+\fIoffset\fR is the relative byte position from the beginning of the file that
+the block of text provided in \fIblock\fR is coming from. \fIcount\fR is the
+number of characters in \fIblock\fR, and \fIconnection\fR  is an array
+containing indices to a table of input and output file streams.   When
+encryption is finished, \fBcrypt_close()\fR is used to terminate the connection
+with the \fBcrypt\fR utility.
+.sp
+.LP
+\fBrun_setkey()\fR returns  \fB\(mi1\fR if a connection with the \fBcrypt\fR
+utility cannot be established. This result will occur in international versions
+of the UNIX system in which the \fBcrypt\fR utility is not available.  If a
+null key is passed to \fBrun_setkey()\fR, \fB0\fR is returned.  Otherwise,
+\fB1\fR is returned. \fBrun_crypt()\fR returns  \fB\(mi1\fR if it cannot write
+output or read input from the pipe attached to \fBcrypt()\fR. Otherwise it
+returns  \fB0\fR.
+.sp
+.LP
+The program must be linked with the object file access routine library
+\fBlibcrypt.a\fR.
+.SH RETURN VALUES
+.sp
+.LP
+In the international version of \fBcrypt()\fR, a flag argument of  \fB1\fR to
+\fBencrypt()\fR or \fBdes_encrypt()\fR is not accepted, and \fBerrno\fR is set
+to \fBENOSYS\fR to indicate that the functionality is not available.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBlogin\fR(1), \fBpasswd\fR(1), \fBvi\fR(1), \fBgetpass\fR(3C),
+\fBpasswd\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The return value in \fBcrypt()\fR points to static data that are overwritten by
+each call.

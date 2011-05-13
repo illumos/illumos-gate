@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH probe 9E "18 Nov 1992" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+probe \- determine if a non-self-identifying device is present
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBstatic intprefix\fR\fBprobe\fR(\fBdev_info_t *\fR\fIdip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). This entry point is required for
+non-self-identifying devices.  You must write it for such devices. For
+self-identifying devices,  \fBnulldev\fR(9F) should be specified in the
+\fBdev_ops\fR(9S) structure if a probe routine is not necessary.
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to the device's  \fBdev_info\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBprobe()\fR determines whether the device corresponding to \fIdip\fR actually
+exists and is a valid device for this driver. \fBprobe()\fR is called after
+\fBidentify\fR(9E) and before \fBattach\fR(9E) for a given \fIdip\fR. For
+example, the \fBprobe()\fR routine can map the device registers using
+\fBddi_map_regs\fR(9F) then attempt to access the hardware using
+\fBddi_peek\fR(9F) or \fBddi_poke\fR(9F) and determine if the device exists.
+Then the device registers should be unmapped using \fBddi_unmap_regs\fR(9F).
+.sp
+.LP
+To probe a device that was left powered off after the last \fBdetach()\fR, it
+might be necessary to power it up. If so, the driver must power up the device
+by accessing device registers directly. \fBpm_raise_power\fR(9F) will be not be
+available until \fBattach\fR(9E). The framework ensures that the ancestors of
+the node being probed and all relevant platform-specific power management
+hardware is at full power at the time that \fBprobe()\fR is called.
+.sp
+.LP
+\fBprobe()\fR should only probe the device. It should not change any software
+state and should not create any software state. Device initialization should be
+done in \fBattach\fR(9E).
+.sp
+.LP
+For a self-identifying device, this entry point is not necessary. However, if a
+device exists in both self-identifying and non-self-identifying forms, a
+\fBprobe()\fR routine can be provided to simplify the driver.
+\fBddi_dev_is_sid\fR(9F) can then be used to determine whether  \fBprobe()\fR
+needs to do any work. See \fBddi_dev_is_sid\fR(9F) for an example.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROBE_SUCCESS\fR \fR
+.ad
+.RS 23n
+.rt  
+If the probe was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROBE_FAILURE\fR \fR
+.ad
+.RS 23n
+.rt  
+If the probe failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROBE_DONTCARE\fR \fR
+.ad
+.RS 23n
+.rt  
+If the probe was unsuccessful, yet \fBattach\fR(9E) should still be called.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_PROBE_PARTIAL\fR \fR
+.ad
+.RS 23n
+.rt  
+If the instance is not present now, but may be present in the future.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBidentify\fR(9E), \fBddi_dev_is_sid\fR(9F),
+\fBddi_map_regs\fR(9F), \fBddi_peek\fR(9F), \fBddi_poke\fR(9F),
+\fBnulldev\fR(9F), \fBdev_ops\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

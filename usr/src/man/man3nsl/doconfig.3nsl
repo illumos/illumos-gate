@@ -1,0 +1,181 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH doconfig 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+doconfig \- execute a configuration script
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lnsl\fR [ \fIlibrary\fR ... ]
+# include <sac.h>
+
+
+
+\fBint\fR \fBdoconfig\fR(\fBint\fR \fIfildes\fR, \fBchar *\fR\fIscript\fR, \fBlong\fR \fIrflag\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdoconfig()\fR is a Service Access Facility library function that interprets
+the configuration scripts contained in the files
+\fB</etc/saf/\fR\fIpmtag\fR\fB/_config>\fR, \fB</etc/saf/_sysconfig>\fR, and
+\fB</etc/saf/\fR\fIpmtag\fR/\fIsvctag>\fR, where  \fIpmtag\fR specifies the tag
+associated with the port monitor, and \fIsvctag\fR specifies the service tag
+associated with a given service.   See \fBpmadm\fR(1M) and \fBsacadm\fR(1M).
+.sp
+.LP
+\fBscript\fR is the name of the configuration script; \fIfildes\fR is a file
+descriptor that designates the stream to which stream manipulation operations
+are to be applied; \fIrflag\fR is a bitmask that indicates the mode in which
+\fBscript\fR is to be interpreted. If \fIrflag\fR is zero, all commands in the
+configuration script are eligible to be interpreted. If \fIrflag\fR has the
+\fBNOASSIGN\fR bit set, the \fBassign\fR command is considered illegal and will
+generate an error return. If \fIrflag\fR has the \fBNORUN\fR bit set, the
+\fBrun\fR and \fBrunwait\fR commands are considered illegal and will generate
+error returns.
+.sp
+.LP
+The configuration language in which \fBscript\fR is written consists of a
+sequence of commands, each of which is interpreted separately. The following
+reserved keywords are defined:  \fBassign\fR, \fBpush\fR, \fBpop\fR,
+\fBrunwait\fR, and \fBrun\fR. The comment character is \fB#\fR; when a \fB#\fR
+occurs on a line, everything from that point to the end of the line is ignored.
+Blank lines are not significant. No line in a command script may exceed 1024
+characters.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBassign\fR \fIvariable\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used to define environment variables. \fIvariable\fR is the name of the
+environment variable and \fIvalue\fR is the value to be assigned to it. The
+value assigned must be a string constant; no form of parameter substitution is
+available. \fIvalue\fR may be quoted. The quoting rules are those used by the
+shell for defining environment variables. \fBassign\fR will fail if space
+cannot be allocated for the new variable or if any part of the specification is
+invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpush\fR \fImodule1\fR[, \fImodule2\fR, \fImodule3\fR, . . .]\fR
+.ad
+.sp .6
+.RS 4n
+Used to push STREAMS modules onto the stream designated by \fIfildes\fR.
+\fImodule1\fR is the name of the first module to be pushed, \fImodule2\fR is
+the name of the second module to be pushed, etc. The command will fail if any
+of the named modules cannot be pushed. If a module cannot be pushed, the
+subsequent modules on the same command line will be ignored and modules that
+have already been pushed will be popped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpop\fR [\fImodule\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Used to pop STREAMS modules off the designated stream. If \fBpop\fR is invoked
+with no arguments, the top module on the  stream is popped. If an argument is
+given, modules will be popped one at a time until the named module is at the
+top of the stream. If the named module is not on the designated stream, the
+stream is left as it was and the command fails. If \fImodule\fR is the special
+keyword ALL, then all modules on the stream will be popped. Note that only
+modules above the topmost driver are affected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrunwait\fR \fBcommand\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBrunwait\fR command runs a command and waits for it to complete.
+\fBcommand\fR is the pathname of the command to be run. The command is run with
+\fB/usr/bin/sh \fR\fB-c \fR prepended to it; shell scripts may thus be executed
+from configuration scripts. The \fBrunwait\fR command will fail if
+\fBcommand\fR cannot be found or cannot be executed, or if \fBcommand\fR exits
+with a non-zero status.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrun\fR \fBcommand\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBrun\fR command is identical to \fBrunwait\fR except that it does not
+wait for \fBcommand\fR to complete. \fBcommand\fR is the pathname of the
+command to be run. \fBrun\fR will not fail unless it is unable to create a
+child process to execute the command.
+.RE
+
+.sp
+.LP
+Although they are syntactically indistinguishable, some of the commands
+available to \fBrun\fR and \fBrunwait\fR are interpreter built-in commands.
+Interpreter built-ins are used when it is necessary to alter the state of a
+process within the context of that process. The \fBdoconfig()\fR interpreter
+built-in commands are similar to the shell special commands and, like these,
+they do not spawn another process for execution. See \fBsh\fR(1). The built-in
+commands are:
+.sp
+.in +2
+.nf
+\fBcd
+ulimit
+umask\fR
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBdoconfig()\fR returns \fB0\fR if the script was interpreted successfully. If
+a command in the script fails, the interpretation of the script ceases at that
+point and a positive number is returned; this number indicates which line in
+the script failed. If a system error occurs, a value of \fB\(mi1\fR is
+returned. When a script fails, the process whose environment was being
+established should \fInot\fR be started.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsh\fR(1), \fBpmadm\fR(1M), \fBsacadm\fR(1M), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+This interface is unsafe in multithreaded applications.  Unsafe interfaces
+should be called only from the main thread.

@@ -1,0 +1,112 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_cond_signal 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_cond_signal, pthread_cond_broadcast \- signal or broadcast a condition
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_cond_signal\fR(\fBpthread_cond_t *\fR\fIcond\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_cond_broadcast\fR(\fBpthread_cond_t *\fR\fIcond\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These two functions are used to unblock threads blocked on a condition
+variable.
+.sp
+.LP
+The \fBpthread_cond_signal()\fR call unblocks at least one of the threads that
+are blocked on the specified condition variable \fIcond\fR (if any threads are
+blocked on \fIcond\fR).
+.sp
+.LP
+The \fBpthread_cond_broadcast()\fR call unblocks all threads currently blocked
+on the specified condition variable \fIcond\fR.
+.sp
+.LP
+If more than one thread is blocked on a condition variable, the scheduling
+policy determines the order in which threads are unblocked. When each thread
+unblocked as a result of a \fBpthread_cond_signal()\fR or
+\fBpthread_cond_broadcast()\fR returns from its call to
+\fBpthread_cond_wait()\fR or \fBpthread_cond_timedwait()\fR, the thread owns
+the mutex with which it called \fBpthread_cond_wait()\fR or
+\fBpthread_cond_timedwait()\fR. The thread(s) that are unblocked contend for
+the mutex according to the scheduling policy (if applicable), and as if each
+had called \fBpthread_mutex_lock()\fR.
+.sp
+.LP
+The \fBpthread_cond_signal()\fR or \fBpthread_cond_broadcast()\fR functions may
+be called by a thread whether or not it currently owns the mutex that threads
+calling \fBpthread_cond_wait()\fR or \fBpthread_cond_timedwait()\fR have
+associated with the condition variable during their waits; however, if
+predictable scheduling behavior is required, then that mutex is locked by the
+thread calling \fBpthread_cond_signal()\fR or \fBpthread_cond_broadcast()\fR.
+.sp
+.LP
+The \fBpthread_cond_signal()\fR and \fBpthread_cond_broadcast()\fR functions
+have no effect if there are no threads currently blocked on \fIcond\fR.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_cond_signal()\fR and
+\fBpthread_cond_broadcast()\fR functions return  \fB0\fR. Otherwise, an error
+number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_cond_signal()\fR and \fBpthread_cond_broadcast()\fR function
+may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value \fIcond\fR does not refer to an initialized condition variable.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_cond_init\fR(3C), \fBpthread_cond_wait\fR(3C),
+\fBpthread_cond_timedwait\fR(3C), \fBattributes\fR(5), \fBcondition\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,649 @@
+'\" te
+.\" Copyright (c) 1985 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.TH rdist 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+rdist \- remote file distribution program
+.SH SYNOPSIS
+.LP
+.nf
+\fBrdist\fR [\fB-b\fR] [\fB-D\fR] [\fB-h\fR] [\fB-i\fR] [\fB-n\fR] [\fB-q\fR] [\fB-R\fR] [\fB-a\fR] [\fB-K\fR] [\fB-x\fR] 
+     [\fB-PN\fR | \fB-PO\fR] [\fB-k\fR \fIrealm\fR] [\fB-v\fR] [\fB-w\fR] [\fB-y\fR] 
+     [\fB-d\fR \fImacro\fR \fI=\fR \fIvalue\fR] [\fB-f\fR \fIdistfile\fR] [\fB-m\fR \fIhost\fR]...
+.fi
+
+.LP
+.nf
+\fBrdist\fR [\fB-b\fR] [\fB-D\fR] [\fB-h\fR] [\fB-i\fR] [\fB-n\fR] [\fB-q\fR] [\fB-R\fR] [\fB-a\fR] [\fB-K\fR] [\fB-x\fR] 
+     [\fB-PN\fR | \fB-PO\fR] [\fB-k\fR \fIrealm\fR] [\fB-v\fR] [\fB-w\fR] [\fB-y\fR] \fB-c\fR \fIpathname\fR... 
+     [\fIlogin\fR @] \fIhostname\fR [: \fIdestpath\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrdist\fR utility maintains copies of files on multiple hosts. It
+preserves the owner, group, mode, and modification time of the master copies,
+and can update programs that are executing. (\fBrdist\fR does not propagate
+ownership or mode changes when the file contents have not changed.) Normally, a
+copy on a remote host is updated if its size or modification time differs from
+the original on the local host. With the \fB-y\fR option (younger mode), only
+the modification times are checked, not the size. See \fBOPTIONS\fR below.
+.sp
+.LP
+There are two forms of the \fBrdist\fR command. In the first form shown in the
+\fBSYNOPSIS\fR section above, \fBrdist\fR reads the indicated \fIdistfile\fR
+for instructions on updating files and/or directories. If \fIdistfile\fR is
+`\fB\(mi\fR\&', the standard input is used. If no \fB-f\fR option is present,
+\fBrdist\fR first looks in its working directory for \fBdistfile\fR, and then
+for \fBDistfile\fR, for instructions.
+.sp
+.LP
+The second form shown in \fBSYNOPSIS\fR uses the \fB-c\fR option and specifies
+paths as command line options.
+.sp
+.LP
+The user can opt for a secure session of \fBrdist\fR which uses Kerberos V5 for
+authentication. Encryption of the data being transferred is also possible. The
+\fBrdist\fR session can be kerberized using any of the following Kerberos
+specific options : \fB-a\fR, \fB-PN\fR or \fB-PO\fR, \fB-x\fR, and \fB-k\fR
+\fIrealm\fR. Some of these options (\fB-a\fR, \fB-x\fR, \fB-PN\fR or \fB-PO\fR,
+and \fB-f\fR or \fB-F\fR) can also be specified in the \fB[appdefaults]\fR
+section of \fBkrb5.conf\fR(4). The usage of these options and the expected
+behavior is discussed in the OPTIONS section below. If Kerberos authentication
+is used, authorization to the account is controlled by rules in
+\fBkrb5_auth_rules\fR(5). If this authorization fails, fallback to normal
+\fBrdist\fR using rhosts occurs only if the \fB-PO\fR option is used explicitly
+on the command line or is specified in \fBkrb5.conf\fR(4). Also notice that the
+\fB-PN\fR or \fB-PO\fR, \fB-x\fR, and \fB-k\fR \fIrealm\fR options are just
+supersets of the \fB-a\fR option. In order to use the non-secure version of
+\fBrdist\fR across machines, each host machine must have a
+\fB/etc/host.equiv\fR file, or the user must have an entry in the
+\fB\&.rhosts\fR file in the home directory. See \fBhosts.equiv\fR(4) for more
+information.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option explicitly enables Kerberos authentication and trusts the
+\fB\&.k5login\fR file for access-control. If the authorization check by
+\fBin.rshd\fR(1M) on the server-side succeeds and if the \fB\&.k5login\fR file
+permits access, the user is allowed to carry out the \fBrdist\fR transfer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.sp .6
+.RS 4n
+Binary comparison. Performs a binary comparison and updates files if they
+differ, rather than merely comparing dates and sizes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR
+\fIpathname\fR .\|.\|.[\fIlogin\|\fR\fB@\fR]\fIhostname\fR[\fB:\fR\fIdestpath\|\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Copies each \fIpathname\fR to the named host; if \fIdestpath\fR is specified,
+it does not update any \fIpathname\fR on the named host. (Relative filenames
+are taken as relative to your home directory.) If the `\fIlogin\fR\fB\|@\fR\&'
+prefix is given, the update is performed with the user \fBID\fR of \fIlogin\fR.
+If the `\fB:\fR\fIdestpath\fR' is given, the remote file is installed as that
+pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fImacro\fR\fB=\fR\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Defines \fImacro\fR to have \fIvalue\fR. This option is used to define or
+override macro definitions in the distfile. \fIvalue\fR can be the empty
+string, one name, or a list of names surrounded by parentheses and separated by
+white space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables debugging.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIdistfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Uses the description file \fIdistfile\fR. A `\fB\(mi\fR\&' as the
+\fIdistfile\fR argument denotes the standard input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.sp .6
+.RS 4n
+Follows symbolic links. Copies the file that the link points to rather than the
+link itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ignores unresolved links. \fBrdist\fR normally tries to maintain the link
+structure of files being transferred and warn the user if all the links cannot
+be found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIrealm\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes \fBrdist\fR to obtain tickets for the remote host in \fIrealm\fR instead
+of the remote host's realm as determined by \fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-K\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option explicitly disables Kerberos authentication. It can be used to
+override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fIhost\fR\fR
+.ad
+.sp .6
+.RS 4n
+Limits which machines are to be updated. Multiple \fB-m\fR arguments can be
+given to limit updates to a subset of the hosts listed in the distfile.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints the commands without executing them. This option is useful for debugging
+a distfile.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-PO\fR\fR
+.ad
+.br
+.na
+\fB\fB-PN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Explicitly requests new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
+"\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalant
+in the old one and is regarded much more secure, but is not interoperable with
+older (MIT/SEAM) servers. The new protocol is used by default, unless
+explicitly specified using these options or through \fBkrb5.conf\fR(4). If
+Kerberos authorization fails when using the old "\fBrcmd\fR" protocol, there is
+fallback to regular, non-kerberized \fBrdist\fR. This is not the case when the
+new, more secure "\fBrcmd\fR" protocol is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.sp .6
+.RS 4n
+Quiet mode. Does not display the files being updated on the standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.sp .6
+.RS 4n
+Removes extraneous files. If a directory is being updated, removes files on the
+remote host that do not correspond to those in the master (local) directory.
+This is useful for maintaining truly identical copies of directories.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verifies that the files are up to date on all the hosts. Any files that are out
+of date are displayed, but no files are updated, nor is any mail sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.sp .6
+.RS 4n
+Whole mode. The whole file name is appended to the destination directory name.
+Normally, only the last component of a name is used when renaming files. This
+preserves the directory structure of the files being copied, instead of
+flattening the directory structure. For instance, renaming a list of files such
+as \fBdir1/dir2\fR to \fBdir3\fR would create files \fBdir3/dir1\fR and
+\fBdir3/dir2\fR instead of \fBdir3\fR and \fBdir3\fR. When the \fB-w\fR option
+is used with a filename that begins with \fB~\fR, everything except the home
+directory is appended to the destination name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the information transferred between hosts to be encrypted. Notice that
+the command is sent unencrypted to the remote system. All subsequent transfers
+are encrypted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-y\fR\fR
+.ad
+.sp .6
+.RS 4n
+Younger mode. Does not update remote copies that are younger than the master
+copy, but issues a warning message instead. Only modification times are
+checked. No comparison of size is made.
+.RE
+
+.SH USAGE
+.SS "White Space Characters"
+.sp
+.LP
+NEWLINE, TAB, and SPACE characters are all treated as white space; a mapping
+continues across input lines until the start of the next mapping: either a
+single \fIfilename\fR followed by a `\fB->\fR' or the opening parenthesis of a
+filename list.
+.SS "Comments"
+.sp
+.LP
+Comments begin with \fB#\fR and end with a NEWLINE.
+.SS "Distfiles"
+.sp
+.LP
+The distfile contains a sequence of entries that specify the files to be
+copied, the destination files to be copied, the destination hosts, and what
+operations to perform to do the updating. Each entry has one of the following
+formats:
+.sp
+.in +2
+.nf
+\fIvariable_name\fR '=' \fIname_list\fR 
+[ label: ] \fIsource_list\fR '\fB->\fR' \fIdestination_list\fR \fIcommand_list\fR 
+[ label: ] \fIsource_list\fR '\fB::\fR' \fItime_stamp_file\fR \fIcommand_list\fR
+.fi
+.in -2
+
+.sp
+.LP
+The first format is used for defining variables. The second format is used for
+distributing files to other hosts. The third format is used for making lists of
+files that have been changed since some given date. The source list specifies a
+list of files and/or directories on the local host that are to be used as the
+master copy for distribution. The destination list is the list of hosts to
+which these files are to be copied. Each file in the source list is added to a
+list of changes if the file is out of date on the host that is being updated
+(second format) or if the file is newer than the time stamp file (third
+format). Labels are optional. They are used to identify a command for partial
+updates. The colon (\fB:\fR) is used after an optional label, while the double
+colon (\fB::\fR) is used for making lists of files that have been changed since
+a certain date (specified by the date/time of the \fItime_stamp\fR file).
+Typically, only \fBnotify\fR is used with the '\fB::\fR' format of the command
+line.
+.SS "Macros"
+.sp
+.LP
+\fBrdist\fR has a limited macro facility. Macros are only expanded in filename
+or hostname lists, and in the argument lists of certain primitives. Macros
+cannot be used to stand for primitives or their options, or the `\fB->\fR' or
+`\fB::\fR' symbols.
+.sp
+.LP
+A macro definition is a line of the form:
+.sp
+.in +2
+.nf
+\fImacro\fR \fB=\fR \fIvalue\fR
+.fi
+.in -2
+
+.sp
+.LP
+A macro reference is a string of the form:
+.sp
+.in +2
+.nf
+\fB${\fR\fImacro\fR\fB}\fR
+.fi
+.in -2
+
+.sp
+.LP
+although (as with \fBmake\fR(1S)) the braces can be omitted if the macro name
+consists of just one character.
+.SS "Kerberos Access-Control file"
+.sp
+.LP
+For the kerberized \fBrdist\fR session, each user might have a private
+authorization list in a file \fB\&.k5login\fR in their home directory. Each
+line in this file should contain a Kerberos principal name of the form
+\fIprincipal\fR/\fIinstance\fR@\fIrealm\fR. If there is a \fB~/.k5login\fR
+file, then access is granted to the account if and only if the originater user
+is authenticated to one of the principals named in the \fB~/.k5login\fR file.
+Otherwise, the originating user is granted access to the account if and only if
+the authenticated principal name of the user can be mapped to the local account
+name using the \fIauthenticated-principal-name\fR \(-> \fIlocal-user-name\fR
+mapping rules. The \fB\&.k5login\fR file (for access control) comes into play
+only when Kerberos authentication is being done.
+.SS "Metacharacters"
+.sp
+.LP
+The shell meta-characters: \fB[\fR, \fB]\fR, \fB{\fR, \fB}\fR, \fB*\fR and
+\fB?\fR are recognized and expanded (on the local host only) just as they are
+with \fBcsh\fR(1). Metacharacters can be escaped by prepending a backslash.
+.sp
+.LP
+The \fB~\fR character is also expanded in the same way as with \fBcsh\fR;
+however, it is expanded separately on the local and destination hosts.
+.SS "Filenames"
+.sp
+.LP
+File names that do not begin with `\fB\|/\|\fR\&' or `\fB\|~\|\fR\&' are taken
+to be relative to user's home directory on each destination host; they are
+\fInot\fR relative to the current working directory. Multiple file names must
+be enclosed within parentheses.
+.SS "Primitives"
+.sp
+.LP
+The following primitives can be used to specify actions \fBrdist\fR is to take
+when updating remote copies of each file.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinstall\fR [\fB-b\fR] [\fB-h\fR] [\fB-i\fR] [\fB-R\fR] [\fB-v\fR]
+[\fB-w\fR] [\fB-y\fR] [\fInewname\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Copy out of date files and directories (recursively). If no \fInewname\fR
+operand is given, the name of the local file is given to the remote host's
+copy. If absent from the remote host, parent directories in a filename's path
+are created. To help prevent disasters, a non-empty directory on a target host
+is not replaced with a regular file or a symbolic link by \fBrdist\fR. However,
+when using the \fB-R\fR option, a non-empty directory is removed if the
+corresponding filename is completely absent on the master host.
+.sp
+The options for \fBinstall\fR have the same semantics as their command line
+counterparts, but are limited in scope to a particular map. The login name used
+on the destination host is the same as the local host unless the destination
+name is of the format \fIlogin@host\fR. In that case, the update is performed
+under the username \fIlogin\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnotify\fR \fIaddress.\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send mail to the indicated email \fIaddress\fR of the form:
+.sp
+\fIuser@host\fR
+.sp
+that lists the files updated and any errors that might have occurred. If an
+address does not contain a `\fB@\fR\fIhost\|\fR' suffix, \fBrdist\fR uses the
+name of the destination host to complete the address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexcept\fR \fIfilename .\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Omit from updates the files named as arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexcept_pat\fR \fIpattern .\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Omit from updates the filenames that match each regular-expression
+\fIpattern\fR (see \fBed\fR(1) for more information on regular expressions).
+Note that \fB`\e'\fR and \fB`$'\fR characters must be escaped in the distfile.
+Shell variables can also be used within a pattern, however shell filename
+expansion is not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBspecial\fR [\fIfilename\fR] .\|.\|. \fB"\fR\fIcommand-line\|\fR\fB"\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify a Bourne shell, \fBsh\fR(1) command line to execute on the remote host
+after each named file is updated. If no \fIfilename\fR argument is present, the
+\fIcommand-line\fR is performed for every updated file, with the shell variable
+\fBFILE\fR set to the file's name on the local host. The quotation marks allow
+\fIcommand-line\fR to span input lines in the distfile; multiple shell commands
+must be separated by semicolons (\fB;\fR).
+.sp
+The default working directory for the shell executing each \fIcommand-line\fR
+is the user's home directory on the remote host.
+.RE
+
+.SS "IPv6"
+.sp
+.LP
+The \fBrdist\fR command is IPv6-enabled. See \fBip6\fR(7P). \fBIPv6\fR is not
+currently supported with Kerberos V5 authentication.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA Sample distfile
+.sp
+.LP
+The following sample distfile instructs \fBrdist\fR to maintain identical
+copies of a shared library, a shared-library initialized data file, several
+include files, and a directory, on hosts named \fBhermes\fR and \fBmagus\fR. On
+\fBmagus\fR, commands are executed as super-user. \fBrdist\fR notifies
+\fBmerlin@druid\fR whenever it discovers that a local file has changed relative
+to a timestamp file. (Parentheses are used when the source or destination list
+contains zero or more names separated by white-space.)
+
+.sp
+.in +2
+.nf
+\fBHOSTS = ( hermes root@magus )
+
+FILES = ( /usr/local/lib/libcant.so.1.1
+             /usrlocal/lib/libcant.sa.1.1 /usr/local/include/{*.h}
+             /usr/local/bin )
+
+(${FILES}) -> (${HOSTS})
+      install \(miR ;
+${FILES} :: /usr/local/lib/timestamp
+            notify merlin@druid ;\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.rhosts\fR\fR
+.ad
+.RS 23n
+.rt  
+User's trusted hosts and users
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/host.equiv\fR\fR
+.ad
+.RS 23n
+.rt  
+system trusted hosts and users
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp/rdist*\fR\fR
+.ad
+.RS 23n
+.rt  
+Temporary file for update lists
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.k5login\fR\fR
+.ad
+.RS 23n
+.rt  
+File containing Kerberos principals that are allowed access
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/krb5/krb5.conf\fR\fR
+.ad
+.RS 23n
+.rt  
+Kerberos configuration file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBed\fR(1), \fBmake\fR(1S), \fBsh\fR(1), \fBin.rshd\fR(1M),
+\fBstat\fR(2), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4), \fBattributes\fR(5),
+\fBkrb5_auth_rules\fR(5), \fBip6\fR(7P)
+.SH DIAGNOSTICS
+.sp
+.LP
+A complaint about mismatch of \fBrdist\fR version numbers might really stem
+from some problem with starting your shell, for example, you are in too many
+groups.
+.SH WARNINGS
+.sp
+.LP
+The super-user does not have its accustomed access privileges on \fBNFS\fR
+mounted file systems. Using \fBrdist\fR to copy to such a file system might
+fail, or the copies might be owned by user "nobody".
+.SH BUGS
+.sp
+.LP
+Source files must reside or be mounted on the local host.
+.sp
+.LP
+There is no easy way to have a special command executed only once after all
+files in a directory have been updated.
+.sp
+.LP
+Variable expansion only works for name lists; there should be a general macro
+facility.
+.sp
+.LP
+\fBrdist\fR aborts on files that have a negative modification time (before Jan
+1, 1970).
+.sp
+.LP
+There should be a "force" option to allow replacement of non-empty directories
+by regular files or symlinks. A means of updating file modes and owners of
+otherwise identical files is also needed.

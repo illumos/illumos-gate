@@ -1,0 +1,655 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH auditon 2 "6 Apr 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+auditon \- manipulate auditing
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lbsm\fR \fB -lsocket \fR \fB -lnsl \fR [ \fIlibrary\fR... ]
+#include <sys/param.h>
+#include <bsm/libbsm.h>
+
+\fBint\fR \fBauditon\fR(\fBint\fR \fIcmd\fR, \fBcaddr_t\fR \fIdata\fR, \fBint\fR \fIlength\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBauditon()\fR function performs various audit subsystem control
+operations. The \fIcmd\fR argument designates the particular audit control
+command. The \fIdata\fR argument is a pointer to command-specific data. The
+\fIlength\fR argument is the length in bytes of the command-specific data.
+.sp
+.LP
+The following commands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETCOND\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the system audit on/off/disabled condition in the integer pointed to by
+\fIdata\fR. The following values can be returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUC_AUDITING\fR\fR
+.ad
+.RS 16n
+.rt  
+Auditing has been turned on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUC_DISABLED\fR\fR
+.ad
+.RS 16n
+.rt  
+Auditing system has not been enabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUC_NOAUDIT\fR\fR
+.ad
+.RS 16n
+.rt  
+Auditing has been turned off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUC_NOSPACE\fR\fR
+.ad
+.RS 16n
+.rt  
+Auditing has blocked due to lack of space in audit partition.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETCOND\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the system's audit on/off condition to the value in the integer pointed to
+by \fIdata\fR. The Solaris Audit subsystem must be enabled by \fBbsmconv\fR(1M)
+before auditing can be turned on. The following audit states can be set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUC_AUDITING\fR\fR
+.ad
+.RS 16n
+.rt  
+Turns on audit record generation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUC_NOAUDIT\fR\fR
+.ad
+.RS 16n
+.rt  
+Turns off audit record generation.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETCLASS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the event to class mapping for the designated audit event. The
+\fIdata\fR argument points to the \fBau_evclass_map\fR structure containing the
+event number. The preselection class mask is returned in the same structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETCLASS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the event class preselection mask for the designated audit event. The
+\fIdata\fR argument points to the \fBau_evclass_map\fR structure containing the
+event number and class mask.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETKMASK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the kernel preselection mask in the \fBau_mask\fR structure pointed to
+by \fIdata\fR. This is the mask used to preselect non-attributable audit
+events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETKMASK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the kernel preselection mask. The \fIdata\fR argument points to the
+\fBau_mask\fR structure containing the class mask. This is the mask used to
+preselect non-attributable audit events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETPINFO\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the audit ID, preselection mask, terminal ID and audit session ID of the
+specified process in the \fBauditpinfo\fR structure pointed to by \fIdata\fR.
+.sp
+Note that \fBA_GETPINFO\fR can fail if the termial ID contains a network
+address longer than 32 bits. In this case, the \fBA_GETPINFO_ADDR\fR command
+should be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETPINFO_ADDR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Returns the audit ID, preselection mask, terminal ID and audit session ID of
+the specified process in the \fBauditpinfo_addr\fR structure pointed to by
+\fIdata\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETPMASK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the preselection mask of the specified process. The \fIdata\fR argument
+points to the \fBauditpinfo\fR structure containing the process ID and the
+preselection mask. The other fields of the structure are ignored and should be
+set to \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETUMASK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the preselection mask for all processes with the specified audit ID. The
+\fIdata\fR argument points to the \fBauditinfo\fR structure containing the
+audit ID and the preselection mask. The other fields of the structure are
+ignored and should be set to \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETSMASK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the preselection mask for all processes with the specified audit session
+ID. The \fIdata\fR argument points to the \fBauditinfo\fR structure containing
+the audit session \fBID\fR and the preselection mask. The other fields of the
+structure are ignored and should be set to \fINULL.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETQCTRL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the kernel audit queue control parameters. These control the high and
+low water marks of the number of audit records allowed in the audit queue. The
+high water mark is the maximum allowed number of undelivered audit records. The
+low water mark determines when threads blocked on the queue are wakened.
+Another parameter controls the size of the data buffer used to write data to
+the audit trail. There is also a parameter that specifies a maximum delay
+before data is attempted to be written to the audit trail. The audit queue
+parameters are returned in the \fBau_qctrl\fR structure pointed to by
+\fIdata\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETQCTRL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the kernel audit queue control parameters as described above in the
+\fBA_GETQCTRL\fR command. The \fIdata\fR argument points to the \fBau_qctrl\fR
+structure containing the audit queue control parameters. The default and
+maximum values 'A/B' for the audit queue control parameters are:
+.sp
+.ne 2
+.mk
+.na
+\fBhigh water\fR
+.ad
+.RS 22n
+.rt  
+\fB100/10000\fR (audit records)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlow water\fR
+.ad
+.RS 22n
+.rt  
+\fB10/1024\fR (audit records)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBoutput buffer size\fR
+.ad
+.RS 22n
+.rt  
+\fB1024/1048576\fR (bytes)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBdelay\fR
+.ad
+.RS 22n
+.rt  
+\fB20/20000\fR (hundredths second)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETCWD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the current working directory as kept by the audit subsystem. This is a
+path anchored on the real root, rather than on the active root. The \fIdata\fR
+argument points to a buffer into which the path is copied. The \fIlength\fR
+argument is the length of the buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETCAR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the current active root as kept by the audit subsystem. This path can be
+used to anchor an absolute path for a path token generated by an application.
+The \fIdata\fR argument points to a buffer into which the path is copied. The
+\fIlength\fR argument is the length of the buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETSTAT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the system audit statistics in the \fBaudit_stat\fR structure pointed to
+by \fIdata\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETSTAT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reset system audit statistics values. The kernel statistics value is reset if
+the corresponding field in the statistics structure pointed to by the
+\fIdata\fR argument is \fBCLEAR_VAL\fR. Otherwise, the value is not changed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_GETPOLICY\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the audit policy flags in the integer pointed to by \fIdata\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA_SETPOLICY\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the audit policy flags to the values in the integer pointed to by
+\fIdata\fR. The following policy flags are recognized:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_CNT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not suspend processes when audit storage is full or inaccessible. The
+default action is to suspend processes until storage becomes available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_AHLT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Halt the machine when a non-attributable audit record can not be delivered. The
+default action is to count the number of events that could not be recorded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_ARGV\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include in the audit record the argument list for a member of the \fBexec\fR(2)
+family of functions. The default action is not to include this information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_ARGE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include the environment variables for the \fBexecv\fR(2) function in the audit
+record. The default action is not to include this information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_SEQ\fR\fR
+.ad
+.sp .6
+.RS 4n
+Add a \fIsequence\fR token to each audit record. The default action is not to
+include it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_TRAIL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Append a \fItrailer\fR token to each audit record. The default action is not to
+include it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_GROUP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include the supplementary groups list in audit records. The default action is
+not to include it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_PATH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include secondary paths in audit records. Examples of secondary paths are
+dynamically loaded shared library modules and the command shell path for
+executable scripts. The default action is to include only the primary path from
+the system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_WINDATA_DOWN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include in an audit record any downgraded data moved between windows. This
+policy is available only if the system is configured with Trusted Extensions.
+By default, this information is not included.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_WINDATA_UP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Include in an audit record any upgraded data moved between windows. This policy
+is available only if the system is configured with Trusted Extensions. By
+default, this information is not included.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_PERZONE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable auditing for each local zone. If not set, audit records from all zones
+are collected in a single log accessible in the global zone and certain
+\fBauditconfig\fR(1M) operations are disallowed. This policy can be set only
+from the global zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAUDIT_ZONENAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Generate a zone ID token with each audit record.
+.RE
+
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBauditon()\fR returns \fB0\fR. Otherwise, \(mi1
+is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBauditon()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIlength\fR field for the command was too small to hold the returned
+value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The copy of data to/from the kernel failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+One of the arguments was illegal, Solaris Audit has not been installed, or the
+operation is not valid from a local zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_SYS_AUDIT\fR} privilege is not asserted in the effective set of
+the calling process.
+.sp
+Neither the {\fBPRIV_PROC_AUDIT\fR} nor the {\fBPRIV_SYS_AUDIT\fR} privilege is
+asserted in the effective set of the calling process and the command is one of
+\fBA_GETCAR\fR, \fBA_GETCLASS\fR, \fBA_GETCOND\fR, \fBA_GETCWD\fR,
+\fBA_GETPINFO\fR, \fBA_GETPOLICY\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBauditon()\fR function can be invoked only by processes with appropriate
+privileges.
+.sp
+.LP
+The use of \fBauditon()\fR to change system audit state is permitted only in
+the global zone. From any other zone \fBauditon()\fR returns \(mi1 with
+\fBerrno\fR set to \fBEPERM\fR. The following \fBauditon()\fR commands are
+permitted only in the global zone: \fBA_SETCOND\fR, \fBA_SETCLASS\fR,
+\fBA_SETKMASK\fR, \fBA_SETQCTRL\fR, \fBA_SETSTAT\fR, \fBA_SETFSIZE\fR, and
+\fBA_SETPOLICY\fR. All other \fBauditon()\fR commands are valid from any zone.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBauditconfig\fR(1M), \fBauditd\fR(1M), \fBbsmconv\fR(1M), \fBaudit\fR(2),
+\fBexec\fR(2), \fBaudit.log\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described in this man page is available only if the Solaris
+Auditing has been enabled. See \fBbsmconv\fR(1M) for more information.
+.sp
+.LP
+The auditon options that modify or display process-based information are not
+affected by the "perzone" audit policy. Those that modify system audit data
+such as the terminal ID and audit queue parameters are valid only in the global
+zone unless the "perzone" policy is set. The "get" options for system audit
+data reflect the local zone if "perzone" is set; otherwise they reflects the
+settings of the global zone.

@@ -1,0 +1,325 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_modopen 9F "17 March 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_modopen, ddi_modsym, ddi_modclose \- dynamically-loaded kernel module
+functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/modctl.h>
+
+\fBddi_modhandle_t\fR \fBddi_modopen\fR(\fBconst char\fR\fI*modname\fR, \fBint\fR \fImode\fR,
+     \fBint\fR \fI*errnop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fB*ddi_modsym\fR(\fBddi_modhandle_t\fR \fIhandle\fR, \fBconst char\fR \fI*symname\fR,
+     \fBint\fR \fI*errnop\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_modclose\fR(\fBddi_modhandle_t\fR \fIhandle\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImodname\fR\fR
+.ad
+.RS 11n
+.rt  
+The name of the dynamically-loaded kernel module (file) to be opened. The
+\fImodname\fR string is of the form:
+.sp
+.in +2
+.nf
+"[\fInamespace\fR/[\fIdirspace\fR/]]\fImodulename\fR"
+.fi
+.in -2
+.sp
+
+Each "\fInamespace\fR/" directory along the standard kernel
+moddir/\fImodule-path\fR path (\fBsystem\fR(4)) is searched to locate the
+module. If "\fInamespace\fR/" is not specified, "misc/" is assumed. If
+"\fIdirspace\fR" is specified, then "\fInamespace\fR/" must be explicitly
+provided.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImode\fR\fR
+.ad
+.RS 11n
+.rt  
+Currently, \fBKRTLD_MODE_FIRST\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrnop\fR\fR
+.ad
+.RS 11n
+.rt  
+Pointer to \fBerrno\fR returned on error, if \fBNULL\fR then no additional
+error information is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 11n
+.rt  
+Opaque handle returned from \fBddi_modopen()\fR, invalidated by
+\fBddi_modclose()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsymname\fR\fR
+.ad
+.RS 11n
+.rt  
+Symbol's name as a character string.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The function prototypes for \fBddi_modopen()\fR, \fBddi_modsym()\fR, and
+\fBddi_modclose()\fR are modeled after the userland \fBlibdl\fR(3LIB),
+\fBdlopen\fR(3C), \fBdlsym\fR(3C) , and\fBdlclose\fR(3C) interfaces, however
+not all userland features are available and the kernel symbol resolution is
+different. The \fBdlerror\fR(3C) interface is not appropriate for the kernel
+environment, so the new \fIerrnop\fR return argument was added for
+\fBddi_modopen()\fR and \fBddi_modsym()\fR.
+.sp
+.LP
+The \fBddi_modopen()\fRfunction makes a dynamically-loaded kernel module named
+by "modname" available to a running kernel. \fBddi_modopen()\fR returns a
+handle that the caller can use on subsequent calls to \fBddi_modsym()\fR and
+\fBddi_modclose()\fR. The value of this handle should not be interpreted in any
+way by the caller.
+.sp
+.LP
+The \fBddi_modopen()\fR interface works best as a dynamic component/object
+plug-in mechanism when targeting kernel "misc" modules that contain a single
+"struct modlmisc" module linkage, however non-"misc" modules and modules with
+multiple linkage structures can also be targeted.
+.sp
+.LP
+There are two different symbol resolution search orders associated with the
+\fBddi_modopen()\fR function: one search order to resolve symbols during the
+load of the targeted module, another search order o resolve \fBddi_modsym()\fR
+calls against the handle returned by \fBddi_modopen()\fR. To resolve symbols
+during module load, the standard kernel module load search order is used; to
+resolve symbols during module "A" load, the order is as follows:
+.sp
+.in +2
+.nf
+A -> A's _depends_on -> unix -> unix's _depends_on
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A single-level, left-to-right search in \fB_depends_on\fR (or the "ld -N"
+alternative) modules occurs. For \fBUNIX\fR on \fBSparc\fR, \fB_depends_on\fR
+is similar to "genunix misc/platmod cpu/SUNW,UltraSPARC-III+  dtracestubs" for
+\fBIntel\fR, it is "genunix dtracestubs". The \fBddi_modsym()\fR search is
+limited to the module directly associated with the handle.
+.sp
+.LP
+The \fBddi_modopen()\fR function increments the reference count on the named
+kernel module. Upon the first load of a module, the\fB_init\fR(9E)
+initialization code in the module is called; \fBddi_modopen()\fR does not
+return until \fB_init\fR completes.
+.sp
+.LP
+The \fBddi_modsym()\fR function allows a caller to obtain the address of a
+symbol that is defined within a module. The \fIhandle\fR argument is a valid
+\fBddi_modhandle_t\fR as returned by \fBddi_modopen()\fR, the \fIsymname\fR
+argument is the symbol's name as a character string. The special handle values
+supported by ddi_modsym(3C) are not supported.
+.sp
+.LP
+The \fBddi_modclose()\fR function decrements the reference count of the kernel
+module associated with the specified handle. After the \fBddi_modclose()\fR
+function is called, all \fBddi_modsym()\fR resolutions obtained (either
+directly or indirectly) using the now closed \fIhandle\fR are invalid; further
+use of these resolutions can cause undefined behavior (that is, may lead to a
+panic). When the last \fBddi_modclose()\fR of a module occurs, and there are no
+further references to the module, the module \fB_fini\fR(9E)entry point may be
+called. If \fB_fini\fR returns success then the module may be unloaded.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_modopen()\fR function returns a handle to the dynamically-loaded
+kernel module. The \fBddi_modopen()\fR function returns \fBNULL\fR if the
+module cannot be found, the object cannot be relocated, or an error occurs
+during the process of resolving and relocating its symbolic references.
+.sp
+.LP
+The \fBddi_modsym()\fR function returns \fBNULL\fR if the \fIsymname\fR symbol
+cannot be found directly within the module associated with the \fIhandle\fR.
+.sp
+.LP
+If the \fIhandle\fR was not referenced, \fBddi_modclose()\fR returns 0. If the
+\fIhandle\fR is invalid, \fBddi_modclose()\fR may return a non-zero value.
+.sp
+.LP
+When either \fBddi_modopen()\fR or \fBddi_modsym()\fR return \fBNULL\fR,
+additional \fIerrno\fR information related to the failure is returned in
+\fI*errnop\fR if it is not \fBNULL\fR.
+.SH CONTEXT
+.sp
+.LP
+\fBddi_modopen()\fR can be called from user context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCoding a Dynamically Loaded Kernel Module
+.sp
+.LP
+The following example shows code to dynamically load and call a "\fBtest\fR"
+interface in a module called "\fBdltest\fR". The "\fBtest\fR" interface  then
+adds one to its integer argument.
+
+.sp
+.in +2
+.nf
+ddi_modhandle_t modh;
+int             (*test)(int);
+int             i = 0;
+int             errno;
+---%<---
+/* dynamically load "dltest" kernel 'misc' module */
+modh = ddi_modopen("dltest", KRTLD_MODE_FIRST, &errno);
+if (modh == NULL)
+         goto fail;      /* failed to open dltest module */
+
+test = (int (*)())ddi_modsym(modh, "test", &errno);
+if (test == NULL) {
+        (void) ddi_modclose(modh);
+        goto fail;      /* failed to find "test" interface */
+}
+
+/* invoke test interface and verify result */
+i = (*test)(0);
+ASSERT(i == 1);
+
+(void) ddi_modclose(modh);
+---%<---
+.fi
+.in -2
+
+.sp
+.LP
+The implementation of the "dltest" "misc" module is as follows:
+
+.sp
+.in +2
+.nf
+#include <sys/modctl.h>
+static dltest_add = 0;
+
+/* define the module linkage */
+static struct modlmisc          modlmisc = {&mod_miscops, "dltest"};
+static struct modlinkage        modlinkage = {
+        MODREV_1, (void *)&modmisc, NULL
+};
+int
+_init(void)
+{
+        int     i;
+
+        dltest_add = 1;                 /* initialization */
+        if ((i = mod_install(&modlinkage)) != 0)
+                dltest_add = -1;        /* un-initialization */
+        return (i);
+}
+int
+_fini()
+{
+        int     i;
+
+        if ((i = mod_remove(&modlinkage)) == 0)
+                        dltest_add = -1;        /* un-initialization */
+        return (i);
+}
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&modlinkage, modinfop));
+}
+
+/* "test" interface */
+int
+test(int i)
+{
+        return (i + dltest_add);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRDynamically Accessing a Kernel Module within a Drive
+.sp
+.LP
+The following example shows driver code to dynamically load into the kernel a
+module constructed via the \fBelfwrap\fR(1) utility and containing firmware
+intended for download to a device. The "\fBstart\fR" and "\fBend\fR" pointers
+provide the addresses of the beginning of the data and first byte beyond the
+data.
+
+.sp
+.in +2
+.nf
+ddi_modhandle_t modp;
+char *data_startp, *data_endp;
+size_t nbytes;
+int rv;
+
+modp = ddi_modopen("firmware-rev1.2a", KRTLD_MODE_FIRST, &rv);
+data_startp = (char *)ddi_modsym(modp, "fw-rev1.2a_start", &rv);
+data_endp = (char *)ddi_modsym(modp, "fw-rev1.2a_end", &rv);
+nbytes = data_endp - data_startp;
+rv = ddi_modclose(modp);
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlclose\fR(3C), \fBdlopen\fR(3C), \fBdlsym\fR(3C), \fBlibdl\fR(3LIB),
+\fBboot\fR(1M), \fBelfwrap\fR(1), \fBmodload\fR(1M), \fBsystem\fR(4),
+\fB_fini\fR(9E), \fB_info\fR(9E), \fB_init\fR(9E)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+A \fBsystem\fR(4)forceload must be established for modules targeted by
+\fBddi_modopen()\fR by code involved in the mount of root on "bootdev" during
+machine \fBboot\fR(1M).

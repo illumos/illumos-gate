@@ -1,0 +1,155 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ks_update 9E "27 May 1994" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+ks_update \- dynamically update kstats
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fB_ks_update\fR(\fBkstat_t *\fR\fIksp\fR, \fBint\fR \fIrw\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIksp\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a \fBkstat\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrw\fR \fR
+.ad
+.RS 8n
+.rt  
+Read/Write flag. Possible values are
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_READ\fR \fR
+.ad
+.RS 16n
+.rt  
+Update \fBkstat\fR structure statistics from the driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_WRITE\fR \fR
+.ad
+.RS 16n
+.rt  
+Update driver statistics from the kstat structure.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The kstat mechanism allows for an optional \fBks_update()\fR function to update
+kstat data.  This is useful for drivers where the underlying device keeps cheap
+hardware statistics, but extraction is expensive.  Instead of constantly
+keeping the kstat data section up to date, the driver can supply a
+\fBks_update()\fR function which updates the kstat's data section on demand. To
+take advantage of this feature, set the  \fBks_update\fR field before calling
+\fBkstat_install\fR(9F).
+.sp
+.LP
+The \fBks_update()\fR function must have the following structure:
+.sp
+.in +2
+.nf
+static int
+xx_kstat_update(kstat_t *ksp, int rw)
+{
+	if (rw == KSTAT_WRITE) {
+		/* update the native stats from ksp->ks_data */
+		/* return EACCES if you don't support this */
+	} else {
+		/* update ksp->ks_data from the native stats */
+	}
+	return (0);
+}
+.fi
+.in -2
+
+.sp
+.LP
+In general, the \fBks_update()\fR routine may need to refer to provider-private
+data; for example, it may need a pointer to the provider's raw statistics.  The
+\fBks_private\fR field is available for this purpose.   Its use is entirely at
+the provider's discretion.
+.sp
+.LP
+No \fBkstat\fR locking should be done inside the \fBks_update()\fR routine.
+The caller will already be holding the \fBkstat's\fR  \fBks_lock\fR (to ensure
+consistent data) and will prevent the \fBkstat\fR from being removed.
+.SH RETURN VALUES
+.sp
+.LP
+\fBks_update()\fR should return
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 11n
+.rt  
+For success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR \fR
+.ad
+.RS 11n
+.rt  
+If \fBKSTAT_WRITE\fR is not allowed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR \fR
+.ad
+.RS 11n
+.rt  
+For any other error.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

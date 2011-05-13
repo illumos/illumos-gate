@@ -1,0 +1,156 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_intr_signal_wait_pollfd 3RSM "1 Dec 2002" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_intr_signal_wait_pollfd \- wait for events on a list of file descriptors
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR\&.\|.\|. \fB-lrsm\fR [ \fIlibrary \&.\|.\|.\fR ] 
+#include <rsmapi.h>
+
+\fBint\fR \fBrsm_intr_signal_wait_pollfd\fR(\fBstruct pollfd\fR \fIfds\fR[],
+     \fBnfds_t\fR \fInfds\fR, \fBint\fR \fItimeout\fR, \fBint *\fR\fInumfdsp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrsm_intr_signal_wait_pollfd()\fR function is similar to
+\fBrsm_intr_signal_wait\fR(3RSM), except that it  allows an application to
+multiplex I/O over various types of file descriptors. Applications can use this
+function to wait for interrupt signals on RSMAPI segments as well as poll for
+I/O events on other non-RSMAPI file descriptors.
+.sp
+.LP
+The \fIfds\fR argument is an array of \fBpollfd\fR structures that correspond
+to both RSMAPI segments and other file descriptors. The
+\fBrsm_memseg_get_pollfd\fR(3RSM) is used to obtain a \fBpollfd\fR structure
+corresponding to an RSMAPI segment.
+.sp
+.LP
+The number of file descriptors that have events is returned in \fInumfdsp\fR.
+This parameter can be set to \fINULL\fR if the application is not interested in
+the number of file descriptors that have events. See \fBpoll\fR(2) for
+descriptions of the \fBpollfd\fR structure as well as the \fInfds\fR and
+\fItimeout\fR parameters.
+.sp
+.LP
+It is the application's responsibility to establish the validity of a
+\fBpollfd\fR structure corresponding to an RSMAPI segment by ensuring that
+\fBrsm_memseg_release_pollfd\fR(3RSM) has not been called on the segment or
+that the segment has not been destroyed.
+.sp
+.LP
+For file descriptors other than RSMAPI segments, the behavior of
+\fBrsm_intr_signal_wait_pollfd()\fR is similar to \fBpoll()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBrsm_intr_signal_wait_pollfd()\fR returns 0 and
+the \fBrevents\fR member of the \fBpollfd\fR struct corresponding to an RSMAPI
+segment is set to \fBPOLLRDNORM\fR, indicating that an interrupt signal for
+that segment was received. Otherwise, an error value is returned.
+.sp
+.LP
+For file descriptors other than RSMAPI segments, the \fBrevents\fR member of
+the \fBpollfd\fR struct is identical to that returned by \fBpoll\fR(2).
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_intr_signal_wait_pollfd()\fR function can return the following
+errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_TIMEOUT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Timeout has occured.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ARGS_ERRORS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Invalid arguments passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR\fR
+.ad
+.sp .6
+.RS 4n
+An argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INTERRUPTED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The call was interrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR\fR
+.ad
+.sp .6
+.RS 4n
+Insufficient resources.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpoll\fR(2), \fBrsm_intr_signal_wait\fR(3RSM),
+\fBrsm_memseg_get_pollfd\fR(3RSM), \fBrsm_memseg_release_pollfd\fR(3RSM),
+\fBattributes\fR(5)

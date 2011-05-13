@@ -1,0 +1,180 @@
+'\" te
+.\" Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_child_node 3DEVINFO "1 Dec 1998" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_child_node, di_parent_node, di_sibling_node, di_drv_first_node,
+di_drv_next_node \- libdevinfo node traversal functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
+#include <libdevinfo.h>
+
+\fBdi_node_t\fR \fBdi_child_node\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBdi_node_t\fR \fBdi_parent_node\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBdi_node_t\fR \fBdi_sibling_node\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.LP
+.nf
+\fBdi_node_t\fR \fBdi_drv_first_node\fR(\fBconst char *\fR\fIdrv_name\fR, \fBdi_node_t\fR \fIroot\fR);
+.fi
+
+.LP
+.nf
+\fBdi_node_t\fR \fBdi_drv_next_node\fR(\fBdi_node_t\fR \fInode\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdrv_name\fR\fR
+.ad
+.RS 12n
+.rt  
+The name of the driver of interest.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInode\fR\fR
+.ad
+.RS 12n
+.rt  
+A  handle to any node in the snapshot.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIroot\fR\fR
+.ad
+.RS 12n
+.rt  
+The handle of the root node for the snapshot returned by
+\fBdi_init\fR(3DEVINFO).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The kernel device configuration data may be viewed in two ways, either as a
+tree of device  configuration nodes or as a  list of nodes associated with each
+driver. In the tree view, each node may contain references to  its parent, the
+next sibling in a list of siblings, and the first child of a list of children.
+In the per-driver view, each node contains a reference to the next node
+associated with the same driver. Both views are captured in the snapshot, and
+the interfaces are provided for node  access.
+.sp
+.LP
+The \fBdi_child_node()\fR function obtains a handle to the first child of
+\fInode\fR. If no child node exists in the snapshot, \fBDI_NODE_NIL\fR is
+returned and \fIerrno\fR is set to \fBENXIO\fR or \fBENOTSUP\fR.
+.sp
+.LP
+The \fBdi_parent_node()\fR function obtains a handle to the parent node of
+\fInode\fR. If no parent node exists in the snapshot, \fBDI_NODE_NIL\fR is
+returned and \fIerrno\fR is set to \fBENXIO\fR or \fBENOTSUP\fR.
+.sp
+.LP
+The \fBdi_sibling_node()\fR function obtains a handle to the next sibling node
+of \fInode\fR. If no next sibling  node exists in the snapshot,
+\fBDI_NODE_NIL\fR is returned and \fIerrno\fR is set to \fBENXIO\fR or
+\fBENOTSUP\fR.
+.sp
+.LP
+The \fBdi_drv_first_node()\fR function obtains a handle to the first node
+associated with the driver specified by \fBdrv_name\fR. If there is no such
+driver, \fBDI_NODE_NIL\fR is returned with \fIerrno\fR is set to \fBEINVAL\fR.
+If the driver exists but there is no node associated with this driver,
+\fBDI_NODE_NIL\fR is  returned and \fIerrno\fR is set to \fBENXIO\fR or
+\fBENOTSUP\fR.
+.sp
+.LP
+The \fBdi_drv_next_node()\fR function returns a handle to the next node bound
+to the same driver. If no more nodes exist, \fBDI_NODE_NIL\fR is returned.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a handle is returned. Otherwise,  \fBDI_NODE_NIL\fR
+is returned and \fIerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The argument is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+The requested node does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The node was not found in the snapshot, but it may exist in the kernel. This
+error may occur if the snapshot contains a partial device tree.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_init\fR(3DEVINFO), \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

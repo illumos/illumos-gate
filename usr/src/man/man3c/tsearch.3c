@@ -1,0 +1,227 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tsearch 3C "6 Dec 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+tsearch, tfind, tdelete, twalk \- manage binary search trees
+.SH SYNOPSIS
+.LP
+.nf
+#include <search.h>
+
+\fBvoid *\fR\fBtsearch\fR(\fBconst void *\fR\fIkey\fR, \fBvoid **\fR\fIrootp\fR,
+     \fBint (*\fR\fIcompar\fR)(const void *, const void *));
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBtfind\fR(\fBconst void *\fR\fIkey\fR, \fBvoid * const *\fR\fIrootp\fR,
+     \fBint (*\fR\fIcompar\fR)(const void *, const void *));
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBtdelete\fR(\fBconst void *restrict\fR \fIkey\fR, \fBvoid **restrict\fR \fIrootp\fR,
+     \fBint (*\fR\fIcompar\fR)(const void *, const void *));
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtwalk\fR(\fBconst void *\fR\fIroot\fR, \fBvoid(*\fR\fIaction\fR) (void *, VISIT, int));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtsearch()\fR, \fBtfind()\fR, \fBtdelete()\fR, and \fBtwalk()\fR
+functions are routines for manipulating binary search trees. They are
+generalized from  \fIKnuth\fR \fI(6.2.2)\fR \fIAlgorithms\fR \fIT\fR \fIand\fR
+\fID.\fR All comparisons are done with a user-supplied routine. This routine is
+called with two arguments, the pointers to the elements being compared. It
+returns an integer less than, equal to, or greater than 0, according to whether
+the first argument is to be considered less than, equal to or greater than the
+second argument. The comparison function need not compare every byte, so
+arbitrary data may be contained in the elements in addition to the values being
+compared.
+.sp
+.LP
+The \fBtsearch()\fR function is used to build and access the tree.  The
+\fIkey\fR argument is a pointer to a datum to be accessed or stored. If there
+is a datum in the tree equal to \fI*key\fR (the value pointed to by \fIkey\fR),
+a pointer to this found datum is returned. Otherwise, \fI*key\fR is inserted,
+and a pointer to it returned. Only pointers are copied, so the calling routine
+must store the data. The \fIrootp\fR argument points to a variable that points
+to the root of the tree. A null value for the variable pointed to by
+\fIrootp\fR denotes an empty tree; in this case, the variable will be set to
+point to the datum which will be at the root of the new tree.
+.sp
+.LP
+Like \fBtsearch()\fR, \fBtfind()\fR will search for a datum in the tree,
+returning a pointer to it if found. However, if it is not found, \fBtfind()\fR
+will return a null pointer. The arguments for \fBtfind()\fR are the same as for
+\fBtsearch()\fR.
+.sp
+.LP
+The \fBtdelete()\fR function deletes a node from a binary search tree. The
+arguments are the same as for  \fBtsearch()\fR. The variable pointed to by
+\fIrootp\fR will be changed if the deleted node was the root of the tree.
+\fBtdelete()\fR returns a pointer to the parent of the deleted node, or a null
+pointer if the node is not found.
+.sp
+.LP
+The \fBtwalk()\fR function traverses a binary search tree. The \fIroot\fR
+argument is the root of the tree to be traversed. (Any node in a tree may be
+used as the root for a walk below that node.) \fIaction\fR is the name of a
+routine to be invoked at each node. This routine is, in turn, called with three
+arguments. The first argument is the address of the node being visited. The
+second argument is a value from an enumeration data type
+.sp
+.in +2
+.nf
+typedef enum { preorder, postorder, endorder, leaf } VISIT;
+.fi
+.in -2
+
+.sp
+.LP
+(defined in <\fBsearch.h\fR>), depending on whether this is the first, second
+or third time that the node has been visited (during a depth-first,
+left-to-right traversal of the tree), or whether the node is a leaf. The third
+argument is the level of the node in the tree, with the root being level zero.
+.sp
+.LP
+The pointers to the key and the root of the tree should be of type
+pointer-to-element, and cast to type pointer-to-character. Similarly, although
+declared as type pointer-to-character, the value returned should be cast into
+type pointer-to-element.
+.SH RETURN VALUES
+.sp
+.LP
+If the node is found, both \fBtsearch()\fR and \fBtfind()\fR return a pointer
+to it.  If not, \fBtfind()\fR returns a null pointer, and \fBtsearch()\fR
+returns a pointer to the inserted item.
+.sp
+.LP
+A null pointer is returned by \fBtsearch()\fR if there is not enough space
+available to create a new node.
+.sp
+.LP
+A null pointer is returned by \fBtsearch()\fR, \fBtfind()\fR and
+\fBtdelete()\fR if \fIrootp\fR is a null pointer on entry.
+.sp
+.LP
+The \fBtdelete()\fR function returns a pointer to the parent of the deleted
+node, or a null pointer if the node is not found.
+.sp
+.LP
+The \fBtwalk()\fR function returns no value.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+The \fIroot\fR argument to  \fBtwalk()\fR is one level of indirection less than
+the \fIrootp\fR arguments to \fBtsearch()\fR and \fBtdelete()\fR.
+.sp
+.LP
+There are two nomenclatures used to refer to the order in which tree nodes are
+visited. \fBtsearch()\fR uses preorder, postorder and endorder to refer
+respectively to visiting a node before any of its children, after its left
+child and before its right, and after both its children. The alternate
+nomenclature uses preorder, inorder and postorder to refer to the same visits,
+which could result in some confusion over the meaning of postorder.
+.sp
+.LP
+If the calling function alters the pointer to the root, the results are
+unpredictable.
+.sp
+.LP
+These functions safely allows concurrent access by multiple threads to disjoint
+data, such as overlapping subtrees or tables.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample program of using \fBtsearch()\fR function.
+.sp
+.LP
+The following code reads in strings and stores structures containing a pointer
+to each string and a count of its length. It then walks the tree, printing out
+the stored strings and their lengths in alphabetical order.
+
+.sp
+.in +2
+.nf
+#include <string.h>
+#include <stdio.h>
+#include <search.h>
+struct node {
+        char *string;
+        int length;
+};
+char string_space[10000];
+struct node nodes[500];
+void *root = NULL;
+
+int node_compare(const void *node1, const void *node2) {
+        return strcmp(((const struct node *) node1)->string,
+                      ((const struct node *) node2)->string);
+}
+
+void print_node(const void *node, VISIT order, int level) {
+        if (order == preorder || order == leaf) {
+                printf("length=%d, string=%20s\en",
+                (*(struct node **)node)->length,
+                (*(struct node **)node)->string);
+        }
+}
+
+main()
+{
+        char *strptr = string_space;
+        struct node *nodeptr = nodes;
+        int i = 0;
+
+        while (gets(strptr) != NULL && i++ < 500) {
+                nodeptr->string = strptr;
+                nodeptr->length = strlen(strptr);
+                (void) tsearch((void *)nodeptr,
+                        &root, node_compare);
+                strptr += nodeptr->length + 1;
+                nodeptr++;
+        }
+        twalk(root, print_node);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbsearch\fR(3C), \fBhsearch\fR(3C), \fBlsearch\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

@@ -31,12 +31,13 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/mail group=mail
-dir path=export group=sys
-dir path=home group=root mode=0555
-dir path=tmp group=sys mode=1777
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
+dir path=usr/share/man
+dir path=usr/share/man/man1b
+dir path=usr/share/man/man3libucb
+dir path=usr/share/man/man3ucb
 dir path=usr/ucb
 $(i386_ONLY)dir path=usr/ucb/$(ARCH32)
 dir path=usr/ucb/$(ARCH64)
@@ -44,6 +45,72 @@ dir path=usr/ucblib
 dir path=usr/ucblib/$(ARCH64)
 file path=etc/mail/Mail.rc original_name=SUNWscp:etc/mail/Mail.rc \
     preserve=true
+file path=usr/share/man/man1b/Mail.1b
+file path=usr/share/man/man1b/basename.1b
+file path=usr/share/man/man1b/biff.1b
+file path=usr/share/man/man1b/chown.1b
+file path=usr/share/man/man1b/df.1b
+file path=usr/share/man/man1b/du.1b
+file path=usr/share/man/man1b/echo.1b
+file path=usr/share/man/man1b/exportfs.1b
+file path=usr/share/man/man1b/expr.1b
+file path=usr/share/man/man1b/fastboot.1b
+file path=usr/share/man/man1b/fasthalt.1b
+file path=usr/share/man/man1b/file.1b
+file path=usr/share/man/man1b/from.1b
+file path=usr/share/man/man1b/groups.1b
+file path=usr/share/man/man1b/grpck.1b
+file path=usr/share/man/man1b/ln.1b
+file path=usr/share/man/man1b/logger.1b
+file path=usr/share/man/man1b/lpc.1b
+file path=usr/share/man/man1b/lpq.1b
+file path=usr/share/man/man1b/lpr.1b
+file path=usr/share/man/man1b/lprm.1b
+file path=usr/share/man/man1b/lptest.1b
+file path=usr/share/man/man1b/mail.1b
+file path=usr/share/man/man1b/mkstr.1b
+file path=usr/share/man/man1b/plot.1b
+file path=usr/share/man/man1b/printenv.1b
+file path=usr/share/man/man1b/ps.1b
+file path=usr/share/man/man1b/reset.1b
+file path=usr/share/man/man1b/rusage.1b
+file path=usr/share/man/man1b/shutdown.1b
+file path=usr/share/man/man1b/stty.1b
+file path=usr/share/man/man1b/sum.1b
+file path=usr/share/man/man1b/test.1b
+file path=usr/share/man/man1b/touch.1b
+file path=usr/share/man/man1b/tset.1b
+file path=usr/share/man/man1b/users.1b
+file path=usr/share/man/man1b/vipw.1b
+file path=usr/share/man/man1b/whereis.1b
+file path=usr/share/man/man1b/whoami.1b
+file path=usr/share/man/man3libucb/libcurses.3libucb
+file path=usr/share/man/man3libucb/libdbm.3libucb
+file path=usr/share/man/man3libucb/librpcsoc.3libucb
+file path=usr/share/man/man3libucb/libtermcap.3libucb
+file path=usr/share/man/man3libucb/libucb.3libucb
+file path=usr/share/man/man3ucb/dbm.3ucb
+file path=usr/share/man/man3ucb/flock.3ucb
+file path=usr/share/man/man3ucb/fopen.3ucb
+file path=usr/share/man/man3ucb/gettimeofday.3ucb
+file path=usr/share/man/man3ucb/mctl.3ucb
+file path=usr/share/man/man3ucb/nice.3ucb
+file path=usr/share/man/man3ucb/nlist.3ucb
+file path=usr/share/man/man3ucb/printf.3ucb
+file path=usr/share/man/man3ucb/psignal.3ucb
+file path=usr/share/man/man3ucb/rand.3ucb
+file path=usr/share/man/man3ucb/readdir.3ucb
+file path=usr/share/man/man3ucb/scandir.3ucb
+file path=usr/share/man/man3ucb/setjmp.3ucb
+file path=usr/share/man/man3ucb/sigblock.3ucb
+file path=usr/share/man/man3ucb/siginterrupt.3ucb
+file path=usr/share/man/man3ucb/signal.3ucb
+file path=usr/share/man/man3ucb/sigstack.3ucb
+file path=usr/share/man/man3ucb/sigvec.3ucb
+file path=usr/share/man/man3ucb/sleep.3ucb
+file path=usr/share/man/man3ucb/syscall.3ucb
+file path=usr/share/man/man3ucb/times.3ucb
+file path=usr/share/man/man3ucb/wait.3ucb
 file path=usr/ucb/basename mode=0755
 file path=usr/ucb/biff mode=0755
 file path=usr/ucb/chown mode=0755

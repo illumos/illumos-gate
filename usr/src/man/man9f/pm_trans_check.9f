@@ -1,0 +1,162 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pm_trans_check 9F "16 Jul 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+pm_trans_check \- Device power cycle advisory check
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunddi.h>
+
+\fBint\fR \fBpm_trans_check\fR(\fBstruct pm_trans_data *\fR\fIdatap,\fR time_t *\fIintervalp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdatap\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to a \fBpm_trans_data\fR structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIintervalp\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to time difference when next power cycle will be advised
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpm_trans_check()\fR function checks if a power-cycle is currently
+advised based on data in the \fBpm_trans_data\fR  structure. This function is
+provided to prevent damage to devices from excess power cycles; drivers for
+devices that are sensitive to the number of power cycles should call
+\fBpm_trans_check()\fR from their \fBpower\fR(9E) function before powering-off
+a device. If \fBpm_trans_check()\fR indicates that the device should not be
+power cycled, the driver should not attempt to power cycle the device and
+should fail the call to \fBpower\fR(9E) entry point.
+.sp
+.LP
+If \fBpm_trans_check()\fR returns that it is not advised to power cycle the
+device, it attempts to calculate when the  next power cycle is advised, based
+on the supplied parameters. In such case, \fIintervalp\fR returns the time
+difference (in seconds) from the current time to when the next power cycle is
+advised. If the time for the next power cycle cannot be determined,
+\fIintervalp\fR indicates \fB0\fR.
+.sp
+.LP
+To avoid excessive calls to the \fBpower\fR(9E) entry point during a period
+when power cycling is not advised, the driver should mark the corresponding
+device component busy for the  \fIintervalp\fR time period (if interval is not
+0). Conveniently, the driver can utilize the fact that calls to
+\fBpm_busy_component\fR(9F) are stacked. If power cycling is not advised, the
+driver can call \fBpm_busy_component\fR(9F)  and issue a \fBtimeout\fR(9F) for
+the \fIintervalp\fR time. The \fBtimeout()\fR handler can issue the
+corresponding \fBpm_idle_component\fR(9F) call.
+.sp
+.LP
+The format field of \fBpm_trans_data\fR accepts either \fBDC_SCSI_FORMAT\fR or
+\fBDC_SMART_FORMAT\fR. If the caller provides information from a SCSI Log Page,
+it should set the format field to \fBDC_SCSI_FORMAT\fR, and provide  valid data
+in \fIsvc_date\fR[], \fIlifemax\fR, \fIncycles\fR and \fIflag\fR in the
+\fBpm_scsi_cycles\fR structure. If the caller provides information from a SMART
+feature attribute, it should set the format field to \fBDC_SMART_FORMAT\fR and
+provide valid data in \fIallowed\fR, \fIusedup\fR and \fIflag\fR in the
+\fBpm_smart_count\fR structure, where \fIallowed\fR indicates the normalized
+cycle count before reaching the borderline threshold cycle count, and
+\fIusedup\fR indicates the normalized consumed cycle count.
+.sp
+.LP
+The \fIflag\fR field in both \fBpm_scsi_cycles\fR and \fBpm_smart_count\fR
+structures is reserved for future use and must be set to 0.
+.sp
+.in +2
+.nf
+struct pm_trans_data {
+       int format;            /* data format */
+       union {
+             struct pm_scsi_cycles scsi_cycles;
+             struct pm_smart_count smart_count;
+       } un;
+};
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+Power cycle is advised.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Power cycle is not advised.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.RS 6n
+.rt  
+Error due to invalid argument.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted 
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpower.conf\fR(4), \fBattributes\fR(5), \fBpower\fR(9E)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIUsing Power Management\fR

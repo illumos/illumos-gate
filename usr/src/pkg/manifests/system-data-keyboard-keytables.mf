@@ -38,6 +38,8 @@ dir path=usr/share/lib/keytables
 dir path=usr/share/lib/keytables/type_101
 $(sparc_ONLY)dir path=usr/share/lib/keytables/type_4
 dir path=usr/share/lib/keytables/type_6
+dir path=usr/share/man
+dir path=usr/share/man/man4
 file path=usr/lib/set_keyboard_layout mode=0555
 file path=usr/share/lib/keytables/type_101/canadian_french2
 file path=usr/share/lib/keytables/type_101/czech
@@ -172,6 +174,7 @@ file path=usr/share/lib/keytables/type_6/turkeyf
 file path=usr/share/lib/keytables/type_6/turkeyq
 file path=usr/share/lib/keytables/type_6/uk
 file path=usr/share/lib/keytables/type_6/us
+file path=usr/share/man/man4/keytables.4
 $(sparc_ONLY)hardlink path=usr/share/lib/keytables/belgium_france \
     target=../../../../usr/share/lib/keytables/type_4/belgium_france
 $(sparc_ONLY)hardlink path=usr/share/lib/keytables/canada \

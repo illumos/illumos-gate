@@ -1,0 +1,105 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceResolve 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceResolve \- resolve service instances with DNS
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceErrorType\fR \fIDNSServiceResolve\fR(\fBDNSServiceRef\fR *\fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR, \fBconst char\fR *\fIname\fR,
+     \fBconst char\fR *\fIregtype\fR, \fBconst char\fR *\fIdomain\fR,
+     \fBDNSServiceServiceResolveReply\fR \fIcallBack\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fIvoid\fR(*\fBDNSServiceResolveReply\fR)(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR,
+     \fBDNSServiceErrorType\fR \fIerrorCode\fR, \fBconst char\fR *\fIfullname\fR,
+     \fBconst char\fR *\fIhosttarget\fR, \fBuint16_t\fR \fIport\fR, \fBuint16_t\fR \fItxtLen\fR,
+     \fBconst char\fR *\fItxtRecord\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBDNSServiceResolve()\fR function is used to resolve a service name
+returned by \fBDNSServiceBrowse()\fR to host IP address, port number, and
+\fBTXT\fR record. The \fBDNSServiceResolve()\fR function returns results
+asynchronously. A \fBDNSServiceResolve()\fR call to resolve service name can be
+ended by calling \fBDNSServiceRefDeallocate()\fR. The \fIcallback\fR argument
+points to a function of type \fIDNSServiceResolveReply\fR as listed above. The
+callback function is invoked on finding a result or when the asynch resolve
+call fails. The \fIsdRef\fR argument to \fBDNSServiceResolve()\fR points to an
+uninitialized \fIDNSServiceRef\fR. If the call to \fBDNSServiceResolve()\fR
+succeeds, \fIsdRef\fR is initialized and \fBkDNSServiceErr_NoError\fR is
+returned.
+.sp
+.LP
+The \fIflags\fR argument to \fBDNSServiceResolve()\fR is currently unused and
+reserved for future use. The \fIinterfaceIndex\fR argument indicates the
+interface on which to resolve the service. If the \fBDNSServiceResolve()\fR
+call is the result of an earlier \fBDNSServiceBrowse()\fR operation, pass the
+\fIinterfaceIndex\fR to perform a resolve on all interfaces. See the section
+"Constants for specifying an interface index" in \fB<dns_sd.h>\fR for more
+details. The \fIname\fR parameter is the service instance name to be resolved,
+as returned from a \fBDNSServiceBrowse()\fR call. The \fIregtype\fR holds the
+service type and the \fIdomain\fR parameter indicates the domain in which the
+service instance was found. The \fIcontext\fR parameter points to a value that
+is passed to the callback function.
+.sp
+.LP
+The \fIsdRef\fR argument passed to the callback function is initialized by
+\fBDNSServiceResolve()\fR call. The \fIflags\fR parameter in the callback
+function is currently unused and reserved for future use. The \fIerrorCode\fR
+parameter is \fBkDNSServiceErr_NoError\fR on success. Otherwise, it will hold
+the error defined in \fB<dns_sd.h>\fR and other parameters are undefined when
+\fIerrorCode\fR is nonzero. The \fIfullname\fR parameter in the callback holds
+the full service domain name in the format
+<\fIservicename\fR>.<\fIprotocol\fR>.<\fIdomain\fR>. The full service domain
+name is escaped to follow standard \fBDNS\fR rules. The \fIhosttarget\fR
+parameter holds the target hostname of the machine providing the service. The
+\fIport\fR parameter indicates the port in network byte order on which the
+service accepts connections. The \fItxtLen\fR and \fItxtRecord\fR parameters
+hold the length and the \fBTXT\fR record of the service's primary \fBTXT\fR
+record. The \fIcontext\fR parameter points to the value that was passed as
+\fBcontext\fR to the \fBDNSServiceResolve()\fR call.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBDNSServiceResolve\fR function returns \fBkDNSServiceErr_NoError\fR on
+success. Otherwise, an error code defined in \fB<dns_sd.h>\fR is returned to
+indicate an error has occurred. When an error is returned by
+\fBDNSServiceResolve\fR, the callback function is not invoked and the
+\fIDNSServiceRef\fR argument is not initialized.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceBrowse\fR(3DNS_SD), \fBDNSServiceRefDeallocate\fR(3DNS_SD),
+\fBattributes\fR(5)

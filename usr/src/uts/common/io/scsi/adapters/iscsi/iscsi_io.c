@@ -21,6 +21,7 @@
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  *
  * iSCSI Pseudo HBA Driver
  */
@@ -1182,7 +1183,7 @@ iscsi_rx_process_rejected_tsk_mgt(idm_conn_t *ic, iscsi_hdr_t *old_ihp)
 {
 	iscsi_sess_t		*isp	= NULL;
 	iscsi_cmd_t		*icmdp	= NULL;
-	iscsi_conn_t		*icp 	= NULL;
+	iscsi_conn_t		*icp 	= ic->ic_handle;
 
 	isp = icp->conn_sess;
 	ASSERT(old_ihp != NULL);

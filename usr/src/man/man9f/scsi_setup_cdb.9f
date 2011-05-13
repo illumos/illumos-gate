@@ -1,0 +1,137 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_setup_cdb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_setup_cdb \- setup SCSI command descriptor block (CDB)
+.SH SYNOPSIS
+.LP
+.nf
+\fBint\fR \fBscsi_setup_cdb\fR(\fBunion scsi_cdb\fR \fI*cdbp\fR, \fBuchar_t\fR \fIcmd\fR, \fBuint_t\fR \fIaddr\fR, 
+     \fBuint_t\fR \fIcnt\fR, \fBuint_t\fR \fIothr_cdb_data\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcdbp\fR\fR
+.ad
+.RS 17n
+.rt  
+Pointer to command descriptor block.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd\fR\fR
+.ad
+.RS 17n
+.rt  
+The first byte of the \fBSCSI\fR group 0, 1, 2, 4, or 5 \fBCDB\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fR
+.ad
+.RS 17n
+.rt  
+Pointer to the location of the data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcnt\fR\fR
+.ad
+.RS 17n
+.rt  
+Data transfer length in units defined by the SCSI device type. For sequential
+devices \fIcnt\fR is the number of bytes. For block devices, \fIcnt\fR is the
+number of blocks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIothr_cdb_data\fR\fR
+.ad
+.RS 17n
+.rt  
+Additional \fBCDB\fR data.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_setup_cdb()\fR function initializes a group 0, 1, 2, 4, or 5 type
+of command descriptor block pointed to by  \fIcdbp\fR using \fIcmd\fR,
+\fIaddr\fR, \fIcnt\fR, \fIothr_cdb_data\fR.
+.sp
+.LP
+\fIaddr\fR should be set to 0 for commands having no addressing information
+(for example, group 0 READ command for sequential access devices).
+\fIothr_cdb_data\fR should be additional \fBCDB\fR data for Group 4 commands;
+otherwise, it should be set to 0.
+.sp
+.LP
+The \fBscsi_setup_cdb()\fR function does not set the \fBLUN\fR bits in
+\fBCDB\fR[1] as the  \fBmakecom\fR(9F) functions do.  Also, the fixed bit for
+sequential access device commands is not set.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_setup_cdb()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Upon success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Upon failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from a user, interrupt, or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBmakecom\fR(9F), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIAmerican National Standard Small Computer System Interface-2 (SCSI-2)\fR
+.sp
+.LP
+\fIAmerican National Standard SCSI-3 Primary Commands (SPC)\fR

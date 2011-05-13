@@ -1,0 +1,2100 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2011, Richard Lowe
+
+include ../../Makefile.master
+
+MANSECT = 	3c
+
+MANFILES = 	__fbufsize.3c					\
+	 	_longjmp.3c					\
+	 	_stack_grow.3c					\
+	 	a64l.3c						\
+	 	abort.3c					\
+	 	abs.3c						\
+	 	addsev.3c					\
+	 	addseverity.3c					\
+	 	aio_cancel.3c					\
+	 	aio_error.3c					\
+	 	aio_fsync.3c					\
+	 	aio_read.3c					\
+	 	aio_return.3c					\
+	 	aio_suspend.3c					\
+	 	aio_waitn.3c					\
+	 	aio_write.3c					\
+	 	aiocancel.3c					\
+	 	aioread.3c					\
+	 	aiowait.3c					\
+	 	assert.3c					\
+	 	atexit.3c					\
+	 	atomic_add.3c					\
+	 	atomic_and.3c					\
+	 	atomic_bits.3c					\
+	 	atomic_cas.3c					\
+	 	atomic_dec.3c					\
+	 	atomic_inc.3c					\
+	 	atomic_ops.3c					\
+	 	atomic_or.3c					\
+	 	atomic_swap.3c					\
+	 	attropen.3c					\
+	 	basename.3c					\
+	 	bsd_signal.3c					\
+	 	bsearch.3c					\
+	 	bstring.3c					\
+	 	btowc.3c					\
+	 	catgets.3c					\
+	 	catopen.3c					\
+	 	cfgetispeed.3c					\
+	 	cfsetispeed.3c					\
+	 	clock.3c					\
+	 	clock_nanosleep.3c				\
+	 	clock_settime.3c				\
+	 	closedir.3c					\
+	 	closefrom.3c					\
+	 	cond_init.3c					\
+	 	confstr.3c					\
+	 	crypt.3c					\
+	 	crypt_genhash_impl.3c				\
+	 	crypt_gensalt.3c				\
+	 	crypt_gensalt_impl.3c				\
+	 	cset.3c						\
+	 	ctermid.3c					\
+	 	ctime.3c					\
+	 	ctype.3c					\
+	 	cuserid.3c					\
+	 	daemon.3c					\
+	 	decimal_to_floating.3c				\
+	 	difftime.3c					\
+	 	directio.3c					\
+	 	dirfd.3c					\
+	 	dirname.3c					\
+	 	div.3c						\
+	 	dladdr.3c					\
+	 	dlclose.3c					\
+	 	dldump.3c					\
+	 	dlerror.3c					\
+	 	dlinfo.3c					\
+	 	dlopen.3c					\
+	 	dlsym.3c					\
+	 	door_bind.3c					\
+	 	door_call.3c					\
+	 	door_create.3c					\
+	 	door_cred.3c					\
+	 	door_getparam.3c				\
+	 	door_info.3c					\
+	 	door_return.3c					\
+	 	door_revoke.3c					\
+	 	door_server_create.3c				\
+	 	door_ucred.3c					\
+	 	drand48.3c					\
+	 	dup2.3c						\
+	 	econvert.3c					\
+	 	ecvt.3c						\
+	 	enable_extended_FILE_stdio.3c			\
+	 	encrypt.3c					\
+	 	end.3c						\
+	 	err.3c						\
+	 	euclen.3c					\
+	 	exit.3c						\
+	 	fattach.3c					\
+	 	fclose.3c					\
+	 	fdatasync.3c					\
+	 	fdetach.3c					\
+	 	fdopen.3c					\
+	 	ferror.3c					\
+	 	fflush.3c					\
+	 	ffs.3c						\
+	 	fgetattr.3c					\
+	 	fgetc.3c					\
+	 	fgetpos.3c					\
+	 	fgetwc.3c					\
+	 	floating_to_decimal.3c				\
+	 	flockfile.3c					\
+	 	fmtmsg.3c					\
+	 	fnmatch.3c					\
+	 	fopen.3c					\
+	 	fpgetround.3c					\
+	 	fputc.3c					\
+	 	fputwc.3c					\
+	 	fputws.3c					\
+	 	fread.3c					\
+	 	freopen.3c					\
+	 	fseek.3c					\
+	 	fsetpos.3c					\
+	 	fsync.3c					\
+	 	ftell.3c					\
+	 	ftime.3c					\
+	 	ftok.3c						\
+	 	ftw.3c						\
+	 	fwide.3c					\
+	 	fwprintf.3c					\
+	 	fwrite.3c					\
+	 	fwscanf.3c					\
+	 	getcpuid.3c					\
+	 	getcwd.3c					\
+	 	getdate.3c					\
+	 	getdtablesize.3c				\
+	 	getenv.3c					\
+	 	getexecname.3c					\
+	 	getgrnam.3c					\
+	 	gethostid.3c					\
+	 	gethostname.3c					\
+	 	gethrtime.3c					\
+	 	getloadavg.3c					\
+	 	getlogin.3c					\
+	 	getmntent.3c					\
+	 	getnetgrent.3c					\
+	 	getopt.3c					\
+	 	getpagesize.3c					\
+	 	getpagesizes.3c					\
+	 	getpass.3c					\
+	 	getpeerucred.3c					\
+	 	getpriority.3c					\
+	 	getpw.3c					\
+	 	getpwnam.3c					\
+	 	getrusage.3c					\
+	 	gets.3c						\
+	 	getspnam.3c					\
+	 	getsubopt.3c					\
+	 	gettext.3c					\
+	 	gettimeofday.3c					\
+	 	gettxt.3c					\
+	 	getusershell.3c					\
+	 	getutent.3c					\
+	 	getutxent.3c					\
+	 	getvfsent.3c					\
+	 	getwc.3c					\
+	 	getwchar.3c					\
+	 	getwd.3c					\
+	 	getwidth.3c					\
+	 	getws.3c					\
+	 	getzoneid.3c					\
+	 	glob.3c						\
+	 	grantpt.3c					\
+	 	hsearch.3c					\
+	 	iconv.3c					\
+	 	iconv_close.3c					\
+	 	iconv_open.3c					\
+	 	imaxabs.3c					\
+	 	imaxdiv.3c					\
+	 	index.3c					\
+	 	initgroups.3c					\
+	 	insque.3c					\
+	 	is_system_labeled.3c				\
+	 	isaexec.3c					\
+	 	isastream.3c					\
+	 	isatty.3c					\
+	 	isnand.3c					\
+	 	iswalpha.3c					\
+	 	iswctype.3c					\
+	 	killpg.3c					\
+	 	lckpwdf.3c					\
+	 	lfmt.3c						\
+	 	lio_listio.3c					\
+	 	localeconv.3c					\
+	 	lockf.3c					\
+	 	lsearch.3c					\
+	 	madvise.3c					\
+	 	makecontext.3c					\
+	 	makedev.3c					\
+	 	malloc.3c					\
+	 	mblen.3c					\
+	 	mbrlen.3c					\
+	 	mbrtowc.3c					\
+	 	mbsinit.3c					\
+	 	mbsrtowcs.3c					\
+	 	mbtowc.3c					\
+	 	membar_ops.3c					\
+	 	memory.3c					\
+	 	mkfifo.3c					\
+	 	mkstemp.3c					\
+	 	mktemp.3c					\
+	 	mktime.3c					\
+	 	mlock.3c					\
+	 	mlockall.3c					\
+	 	monitor.3c					\
+	 	mq_close.3c					\
+	 	mq_getattr.3c					\
+	 	mq_notify.3c					\
+	 	mq_open.3c					\
+	 	mq_receive.3c					\
+	 	mq_send.3c					\
+	 	mq_setattr.3c					\
+	 	mq_unlink.3c					\
+	 	msync.3c					\
+	 	mutex_init.3c					\
+	 	nanosleep.3c					\
+	 	ndbm.3c						\
+	 	nl_langinfo.3c					\
+	 	offsetof.3c					\
+	 	opendir.3c					\
+	 	perror.3c					\
+	 	pfmt.3c						\
+	 	plock.3c					\
+	 	popen.3c					\
+	 	port_alert.3c					\
+	 	port_associate.3c				\
+	 	port_create.3c					\
+	 	port_get.3c					\
+	 	port_send.3c					\
+	 	posix_fadvise.3c				\
+	 	posix_fallocate.3c				\
+	 	posix_madvise.3c				\
+	 	posix_memalign.3c				\
+	 	posix_openpt.3c					\
+	 	posix_spawn.3c					\
+	 	posix_spawn_file_actions_addclose.3c		\
+	 	posix_spawn_file_actions_addclosefrom_np.3c	\
+	 	posix_spawn_file_actions_adddup2.3c		\
+	 	posix_spawn_file_actions_destroy.3c		\
+	 	posix_spawnattr_destroy.3c			\
+	 	posix_spawnattr_getflags.3c			\
+	 	posix_spawnattr_getpgroup.3c			\
+	 	posix_spawnattr_getschedparam.3c		\
+	 	posix_spawnattr_getschedpolicy.3c		\
+	 	posix_spawnattr_getsigdefault.3c		\
+	 	posix_spawnattr_getsigignore_np.3c		\
+	 	posix_spawnattr_getsigmask.3c			\
+	 	printf.3c					\
+	 	priv_addset.3c					\
+	 	priv_set.3c					\
+	 	priv_str_to_set.3c				\
+	 	pset_getloadavg.3c				\
+	 	psignal.3c					\
+	 	pthread_atfork.3c				\
+	 	pthread_attr_getdetachstate.3c			\
+	 	pthread_attr_getguardsize.3c			\
+	 	pthread_attr_getinheritsched.3c			\
+	 	pthread_attr_getschedparam.3c			\
+	 	pthread_attr_getschedpolicy.3c			\
+	 	pthread_attr_getscope.3c			\
+	 	pthread_attr_getstack.3c			\
+	 	pthread_attr_getstackaddr.3c			\
+	 	pthread_attr_getstacksize.3c			\
+	 	pthread_attr_init.3c				\
+	 	pthread_barrier_destroy.3c			\
+	 	pthread_barrier_wait.3c				\
+	 	pthread_barrierattr_destroy.3c			\
+	 	pthread_barrierattr_getpshared.3c		\
+	 	pthread_cancel.3c				\
+	 	pthread_cleanup_pop.3c				\
+	 	pthread_cleanup_push.3c				\
+	 	pthread_cond_init.3c				\
+	 	pthread_cond_signal.3c				\
+	 	pthread_cond_wait.3c				\
+	 	pthread_condattr_getclock.3c			\
+	 	pthread_condattr_getpshared.3c			\
+	 	pthread_condattr_init.3c			\
+	 	pthread_create.3c				\
+	 	pthread_detach.3c				\
+	 	pthread_equal.3c				\
+	 	pthread_exit.3c					\
+	 	pthread_getconcurrency.3c			\
+	 	pthread_getschedparam.3c			\
+	 	pthread_getspecific.3c				\
+	 	pthread_join.3c					\
+	 	pthread_key_create.3c				\
+	 	pthread_key_delete.3c				\
+	 	pthread_kill.3c					\
+	 	pthread_mutex_getprioceiling.3c			\
+	 	pthread_mutex_init.3c				\
+	 	pthread_mutex_lock.3c				\
+	 	pthread_mutex_timedlock.3c			\
+	 	pthread_mutexattr_getprioceiling.3c		\
+	 	pthread_mutexattr_getprotocol.3c		\
+	 	pthread_mutexattr_getpshared.3c			\
+	 	pthread_mutexattr_gettype.3c			\
+	 	pthread_mutexattr_init.3c			\
+	 	pthread_once.3c					\
+	 	pthread_rwlock_init.3c				\
+	 	pthread_rwlock_rdlock.3c			\
+	 	pthread_rwlock_timedrdlock.3c			\
+	 	pthread_rwlock_timedwrlock.3c			\
+	 	pthread_rwlock_unlock.3c			\
+	 	pthread_rwlock_wrlock.3c			\
+	 	pthread_rwlockattr_getpshared.3c		\
+	 	pthread_rwlockattr_init.3c			\
+	 	pthread_self.3c					\
+	 	pthread_setcancelstate.3c			\
+	 	pthread_setcanceltype.3c			\
+	 	pthread_setschedprio.3c				\
+	 	pthread_sigmask.3c				\
+	 	pthread_spin_destroy.3c				\
+	 	pthread_spin_lock.3c				\
+	 	pthread_spin_unlock.3c				\
+	 	pthread_testcancel.3c				\
+	 	ptrace.3c					\
+	 	ptsname.3c					\
+	 	putenv.3c					\
+	 	putpwent.3c					\
+	 	puts.3c						\
+	 	putspent.3c					\
+	 	putws.3c					\
+	 	qsort.3c					\
+	 	raise.3c					\
+	 	rand.3c						\
+	 	random.3c					\
+	 	rctl_walk.3c					\
+	 	rctlblk_set_value.3c				\
+	 	re_comp.3c					\
+	 	readdir.3c					\
+	 	realpath.3c					\
+	 	reboot.3c					\
+	 	regcmp.3c					\
+	 	regcomp.3c					\
+	 	remove.3c					\
+	 	rewind.3c					\
+	 	rewinddir.3c					\
+	 	rwlock.3c					\
+	 	scandir.3c					\
+	 	scanf.3c					\
+	 	sched_get_priority_max.3c			\
+	 	sched_getparam.3c				\
+	 	sched_getscheduler.3c				\
+	 	sched_rr_get_interval.3c			\
+	 	sched_setparam.3c				\
+	 	sched_setscheduler.3c				\
+	 	sched_yield.3c					\
+	 	schedctl_init.3c				\
+	 	seekdir.3c					\
+	 	select.3c					\
+	 	sem_close.3c					\
+	 	sem_destroy.3c					\
+	 	sem_getvalue.3c					\
+	 	sem_init.3c					\
+	 	sem_open.3c					\
+	 	sem_post.3c					\
+	 	sem_timedwait.3c				\
+	 	sem_unlink.3c					\
+	 	sem_wait.3c					\
+	 	semaphore.3c					\
+	 	setbuf.3c					\
+	 	setbuffer.3c					\
+	 	setcat.3c					\
+	 	setenv.3c					\
+	 	setjmp.3c					\
+	 	setkey.3c					\
+	 	setlabel.3c					\
+	 	setlocale.3c					\
+	 	shm_open.3c					\
+	 	shm_unlink.3c					\
+	 	sigfpe.3c					\
+	 	siginterrupt.3c					\
+	 	signal.3c					\
+	 	sigqueue.3c					\
+	 	sigsetops.3c					\
+	 	sigstack.3c					\
+	 	sigwaitinfo.3c					\
+	 	sleep.3c					\
+	 	ssignal.3c					\
+	 	stack_getbounds.3c				\
+	 	stack_inbounds.3c				\
+	 	stack_setbounds.3c				\
+	 	stack_violation.3c				\
+	 	stdio.3c					\
+	 	str2sig.3c					\
+	 	strcoll.3c					\
+	 	strerror.3c					\
+	 	strftime.3c					\
+	 	string.3c					\
+	 	string_to_decimal.3c				\
+	 	strptime.3c					\
+	 	strsignal.3c					\
+	 	strtod.3c					\
+	 	strtoimax.3c					\
+	 	strtol.3c					\
+	 	strtoul.3c					\
+	 	strtows.3c					\
+	 	strxfrm.3c					\
+	 	swab.3c						\
+	 	sync_instruction_memory.3c			\
+	 	sysconf.3c					\
+	 	syslog.3c					\
+	 	system.3c					\
+	 	tcdrain.3c					\
+	 	tcflow.3c					\
+	 	tcflush.3c					\
+	 	tcgetattr.3c					\
+	 	tcgetpgrp.3c					\
+	 	tcgetsid.3c					\
+	 	tcsendbreak.3c					\
+	 	tcsetattr.3c					\
+	 	tcsetpgrp.3c					\
+	 	tell.3c						\
+	 	telldir.3c					\
+	 	termios.3c					\
+	 	thr_create.3c					\
+	 	thr_exit.3c					\
+	 	thr_getconcurrency.3c				\
+	 	thr_getprio.3c					\
+	 	thr_join.3c					\
+	 	thr_keycreate.3c				\
+	 	thr_kill.3c					\
+	 	thr_main.3c					\
+	 	thr_min_stack.3c				\
+	 	thr_self.3c					\
+	 	thr_sigsetmask.3c				\
+	 	thr_stksegment.3c				\
+	 	thr_suspend.3c					\
+	 	thr_yield.3c					\
+	 	timer_create.3c					\
+	 	timer_delete.3c					\
+	 	timer_settime.3c				\
+	 	timeradd.3c					\
+	 	tmpfile.3c					\
+	 	tmpnam.3c					\
+	 	toascii.3c					\
+	 	tolower.3c					\
+	 	toupper.3c					\
+	 	truncate.3c					\
+	 	tsearch.3c					\
+	 	ttyname.3c					\
+	 	ttyslot.3c					\
+	 	u8_strcmp.3c					\
+	 	u8_textprep_str.3c				\
+	 	u8_validate.3c					\
+	 	ualarm.3c					\
+	 	uconv_u16tou32.3c				\
+	 	ucred_get.3c					\
+	 	ungetc.3c					\
+	 	ungetwc.3c					\
+	 	unlockpt.3c					\
+	 	unsetenv.3c					\
+	 	usleep.3c					\
+	 	vfwprintf.3c					\
+	 	vlfmt.3c					\
+	 	vpfmt.3c					\
+	 	vprintf.3c					\
+	 	vsyslog.3c					\
+	 	wait.3c						\
+	 	wait3.3c					\
+	 	waitpid.3c					\
+	 	walkcontext.3c					\
+	 	wcrtomb.3c					\
+	 	wcscoll.3c					\
+	 	wcsftime.3c					\
+	 	wcsrtombs.3c					\
+	 	wcsstr.3c					\
+	 	wcstod.3c					\
+	 	wcstoimax.3c					\
+	 	wcstol.3c					\
+	 	wcstoul.3c					\
+	 	wcstring.3c					\
+	 	wcswidth.3c					\
+	 	wcsxfrm.3c					\
+	 	wctob.3c					\
+	 	wctomb.3c					\
+	 	wctype.3c					\
+	 	wcwidth.3c					\
+	 	wmemchr.3c					\
+	 	wmemcmp.3c					\
+	 	wmemcpy.3c					\
+	 	wmemmove.3c					\
+	 	wmemset.3c					\
+	 	wordexp.3c					\
+	 	wsprintf.3c					\
+	 	wsscanf.3c					\
+	 	wstring.3c					\
+
+MANSOFILES =	FD_CLR.3c				\
+	 	FD_ISSET.3c				\
+	 	FD_SET.3c				\
+	 	FD_ZERO.3c				\
+	 	__flbf.3c				\
+	 	__fpending.3c				\
+	 	__fpurge.3c				\
+	 	__freadable.3c				\
+	 	__freading.3c				\
+	 	__fsetlocking.3c			\
+	 	__fwritable.3c				\
+	 	__fwriting.3c				\
+	 	_edata.3c				\
+	 	_end.3c					\
+	 	_etext.3c				\
+	 	_exithandle.3c				\
+	 	_flushlbf.3c				\
+	 	_setjmp.3c				\
+	 	addrtosymstr.3c				\
+	 	aiowrite.3c				\
+	 	alloca.3c				\
+	 	alphasort.3c				\
+	 	ascftime.3c				\
+	 	asctime.3c				\
+	 	asctime_r.3c				\
+	 	asprintf.3c				\
+	 	atof.3c					\
+	 	atoi.3c					\
+	 	atol.3c					\
+	 	atoll.3c				\
+	 	atomic_add_16.3c			\
+	 	atomic_add_16_nv.3c			\
+	 	atomic_add_32.3c			\
+	 	atomic_add_32_nv.3c			\
+	 	atomic_add_64.3c			\
+	 	atomic_add_64_nv.3c			\
+	 	atomic_add_8.3c				\
+	 	atomic_add_8_nv.3c			\
+	 	atomic_add_char.3c			\
+	 	atomic_add_char_nv.3c			\
+	 	atomic_add_int.3c			\
+	 	atomic_add_int_nv.3c			\
+	 	atomic_add_long.3c			\
+	 	atomic_add_long_nv.3c			\
+	 	atomic_add_ptr.3c			\
+	 	atomic_add_ptr_nv.3c			\
+	 	atomic_add_short.3c			\
+	 	atomic_add_short_nv.3c			\
+	 	atomic_and_16.3c			\
+	 	atomic_and_16_nv.3c			\
+	 	atomic_and_32.3c			\
+	 	atomic_and_32_nv.3c			\
+	 	atomic_and_64.3c			\
+	 	atomic_and_64_nv.3c			\
+	 	atomic_and_8.3c				\
+	 	atomic_and_8_nv.3c			\
+	 	atomic_and_uchar.3c			\
+	 	atomic_and_uchar_nv.3c			\
+	 	atomic_and_uint.3c			\
+	 	atomic_and_uint_nv.3c			\
+	 	atomic_and_ulong.3c			\
+	 	atomic_and_ulong_nv.3c			\
+	 	atomic_and_ushort.3c			\
+	 	atomic_and_ushort_nv.3c			\
+	 	atomic_cas_16.3c			\
+	 	atomic_cas_32.3c			\
+	 	atomic_cas_64.3c			\
+	 	atomic_cas_8.3c				\
+	 	atomic_cas_ptr.3c			\
+	 	atomic_cas_uchar.3c			\
+	 	atomic_cas_uint.3c			\
+	 	atomic_cas_ulong.3c			\
+	 	atomic_cas_ushort.3c			\
+	 	atomic_clear_long_excl.3c		\
+	 	atomic_dec_16.3c			\
+	 	atomic_dec_16_nv.3c			\
+	 	atomic_dec_32.3c			\
+	 	atomic_dec_32_nv.3c			\
+	 	atomic_dec_64.3c			\
+	 	atomic_dec_64_nv.3c			\
+	 	atomic_dec_8.3c				\
+	 	atomic_dec_8_nv.3c			\
+	 	atomic_dec_ptr.3c			\
+	 	atomic_dec_ptr_nv.3c			\
+	 	atomic_dec_uchar.3c			\
+	 	atomic_dec_uchar_nv.3c			\
+	 	atomic_dec_uint.3c			\
+	 	atomic_dec_uint_nv.3c			\
+	 	atomic_dec_ulong.3c			\
+	 	atomic_dec_ulong_nv.3c			\
+	 	atomic_dec_ushort.3c			\
+	 	atomic_dec_ushort_nv.3c			\
+	 	atomic_inc_16.3c			\
+	 	atomic_inc_16_nv.3c			\
+	 	atomic_inc_32.3c			\
+	 	atomic_inc_32_nv.3c			\
+	 	atomic_inc_64.3c			\
+	 	atomic_inc_64_nv.3c			\
+	 	atomic_inc_8.3c				\
+	 	atomic_inc_8_nv.3c			\
+	 	atomic_inc_ptr.3c			\
+	 	atomic_inc_ptr_nv.3c			\
+	 	atomic_inc_uchar.3c			\
+	 	atomic_inc_uchar_nv.3c			\
+	 	atomic_inc_uint.3c			\
+	 	atomic_inc_uint_nv.3c			\
+	 	atomic_inc_ulong.3c			\
+	 	atomic_inc_ulong_nv.3c			\
+	 	atomic_inc_ushort.3c			\
+	 	atomic_inc_ushort_nv.3c			\
+	 	atomic_or_16.3c				\
+	 	atomic_or_16_nv.3c			\
+	 	atomic_or_32.3c				\
+	 	atomic_or_32_nv.3c			\
+	 	atomic_or_64.3c				\
+	 	atomic_or_64_nv.3c			\
+	 	atomic_or_8.3c				\
+	 	atomic_or_8_nv.3c			\
+	 	atomic_or_uchar.3c			\
+	 	atomic_or_uchar_nv.3c			\
+	 	atomic_or_uint.3c			\
+	 	atomic_or_uint_nv.3c			\
+	 	atomic_or_ulong.3c			\
+	 	atomic_or_ulong_nv.3c			\
+	 	atomic_or_ushort.3c			\
+	 	atomic_or_ushort_nv.3c			\
+	 	atomic_set_long_excl.3c			\
+	 	atomic_swap_16.3c			\
+	 	atomic_swap_32.3c			\
+	 	atomic_swap_64.3c			\
+	 	atomic_swap_8.3c			\
+	 	atomic_swap_ptr.3c			\
+	 	atomic_swap_uchar.3c			\
+	 	atomic_swap_uint.3c			\
+	 	atomic_swap_ulong.3c			\
+	 	atomic_swap_ushort.3c			\
+	 	backtrace.3c				\
+	 	backtrace_symbols.3c			\
+	 	backtrace_symbols_fd.3c			\
+	 	bcmp.3c					\
+	 	bcopy.3c				\
+	 	bind_textdomain_codeset.3c		\
+	 	bindtextdomain.3c			\
+	 	bzero.3c				\
+	 	calloc.3c				\
+	 	catclose.3c				\
+	 	cfgetospeed.3c				\
+	 	cfsetospeed.3c				\
+	 	cftime.3c				\
+	 	clearerr.3c				\
+	 	clock_getres.3c				\
+	 	clock_gettime.3c			\
+	 	closelog.3c				\
+	 	cond_broadcast.3c			\
+	 	cond_destroy.3c				\
+	 	cond_reltimedwait.3c			\
+	 	cond_signal.3c				\
+	 	cond_timedwait.3c			\
+	 	cond_wait.3c				\
+	 	csetcol.3c				\
+	 	csetlen.3c				\
+	 	csetno.3c				\
+	 	ctermid_r.3c				\
+	 	ctime_r.3c				\
+	 	dbm_clearerr.3c				\
+	 	dbm_close.3c				\
+	 	dbm_delete.3c				\
+	 	dbm_error.3c				\
+	 	dbm_fetch.3c				\
+	 	dbm_firstkey.3c				\
+	 	dbm_nextkey.3c				\
+	 	dbm_open.3c				\
+	 	dbm_store.3c				\
+	 	dcgettext.3c				\
+	 	dcngettext.3c				\
+	 	decimal_to_double.3c			\
+	 	decimal_to_extended.3c			\
+	 	decimal_to_quadruple.3c			\
+	 	decimal_to_single.3c			\
+	 	dgettext.3c				\
+	 	dladdr1.3c				\
+	 	dlmopen.3c				\
+	 	dngettext.3c				\
+	 	door_setparam.3c			\
+	 	door_unbind.3c				\
+	 	double_to_decimal.3c			\
+	 	edata.3c				\
+	 	endgrent.3c				\
+	 	endnetgrent.3c				\
+	 	endpwent.3c				\
+	 	endspent.3c				\
+	 	endusershell.3c				\
+	 	endutent.3c				\
+	 	endutxent.3c				\
+	 	erand48.3c				\
+	 	errno.3c				\
+	 	errx.3c					\
+	 	etext.3c				\
+	 	euccol.3c				\
+	 	eucscol.3c				\
+	 	extended_to_decimal.3c			\
+	 	fconvert.3c				\
+	 	fcvt.3c					\
+	 	fdopendir.3c				\
+	 	fdwalk.3c				\
+	 	feof.3c					\
+	 	fgetgrent.3c				\
+	 	fgetgrent_r.3c				\
+	 	fgetpwent.3c				\
+	 	fgetpwent_r.3c				\
+	 	fgets.3c				\
+	 	fgetspent.3c				\
+	 	fgetspent_r.3c				\
+	 	fgetws.3c				\
+	 	file_to_decimal.3c			\
+	 	fileno.3c				\
+	 	finite.3c				\
+	 	fpclass.3c				\
+	 	fpgetmask.3c				\
+	 	fpgetsticky.3c				\
+	 	fprintf.3c				\
+	 	fpsetmask.3c				\
+	 	fpsetround.3c				\
+	 	fpsetsticky.3c				\
+	 	fputs.3c				\
+	 	free.3c					\
+	 	fscanf.3c				\
+	 	fseeko.3c				\
+	 	fsetattr.3c				\
+	 	ftello.3c				\
+	 	ftruncate.3c				\
+	 	ftrylockfile.3c				\
+	 	func_to_decimal.3c			\
+	 	funlockfile.3c				\
+	 	gconvert.3c				\
+	 	gcvt.3c					\
+	 	getattrat.3c				\
+	 	getc.3c					\
+	 	getc_unlocked.3c			\
+	 	getchar.3c				\
+	 	getchar_unlocked.3c			\
+	 	getextmntent.3c				\
+	 	getgrent.3c				\
+	 	getgrent_r.3c				\
+	 	getgrgid.3c				\
+	 	getgrgid_r.3c				\
+	 	getgrnam_r.3c				\
+	 	gethomelgroup.3c			\
+	 	gethrvtime.3c				\
+	 	getlogin_r.3c				\
+	 	getmntany.3c				\
+	 	getnetgrent_r.3c			\
+	 	getpassphrase.3c			\
+	 	getpwent.3c				\
+	 	getpwent_r.3c				\
+	 	getpwnam_r.3c				\
+	 	getpwuid.3c				\
+	 	getpwuid_r.3c				\
+	 	getspent.3c				\
+	 	getspent_r.3c				\
+	 	getspnam_r.3c				\
+	 	getutid.3c				\
+	 	getutline.3c				\
+	 	getutmp.3c				\
+	 	getutmpx.3c				\
+	 	getutxid.3c				\
+	 	getutxline.3c				\
+	 	getvfsany.3c				\
+	 	getvfsfile.3c				\
+	 	getvfsspec.3c				\
+	 	getw.3c					\
+	 	getzoneidbyname.3c			\
+	 	getzonenamebyid.3c			\
+	 	globfree.3c				\
+	 	gmtime.3c				\
+	 	gmtime_r.3c				\
+	 	gsignal.3c				\
+	 	hasmntopt.3c				\
+	 	hcreate.3c				\
+	 	hdestroy.3c				\
+	 	initstate.3c				\
+	 	innetgr.3c				\
+	 	isalnum.3c				\
+	 	isalpha.3c				\
+	 	isascii.3c				\
+	 	isblank.3c				\
+	 	iscntrl.3c				\
+	 	isdigit.3c				\
+	 	isenglish.3c				\
+	 	isgraph.3c				\
+	 	isideogram.3c				\
+	 	islower.3c				\
+	 	isnanf.3c				\
+	 	isnumber.3c				\
+	 	isphonogram.3c				\
+	 	isprint.3c				\
+	 	ispunct.3c				\
+	 	isspace.3c				\
+	 	isspecial.3c				\
+	 	isupper.3c				\
+	 	iswalnum.3c				\
+	 	iswascii.3c				\
+	 	iswblank.3c				\
+	 	iswcntrl.3c				\
+	 	iswdigit.3c				\
+	 	iswgraph.3c				\
+	 	iswlower.3c				\
+	 	iswprint.3c				\
+	 	iswpunct.3c				\
+	 	iswspace.3c				\
+	 	iswupper.3c				\
+	 	iswxdigit.3c				\
+	 	isxdigit.3c				\
+	 	jrand48.3c				\
+	 	l64a.3c					\
+	 	labs.3c					\
+	 	lcong48.3c				\
+	 	ldiv.3c					\
+	 	lfind.3c				\
+	 	llabs.3c				\
+	 	lldiv.3c				\
+	 	lltostr.3c				\
+	 	localtime.3c				\
+	 	localtime_r.3c				\
+	 	longjmp.3c				\
+	 	lrand48.3c				\
+	 	major.3c				\
+	 	memalign.3c				\
+	 	membar_consumer.3c			\
+	 	membar_enter.3c				\
+	 	membar_exit.3c				\
+	 	membar_producer.3c			\
+	 	memccpy.3c				\
+	 	memchr.3c				\
+	 	memcmp.3c				\
+	 	memcpy.3c				\
+	 	memmove.3c				\
+	 	memset.3c				\
+	 	minor.3c				\
+	 	mkdtemp.3c				\
+	 	mkstemps.3c				\
+	 	mq_reltimedreceive_np.3c		\
+	 	mq_reltimedsend_np.3c			\
+	 	mq_timedreceive.3c			\
+	 	mq_timedsend.3c				\
+	 	mrand48.3c				\
+	 	munlock.3c				\
+	 	munlockall.3c				\
+	 	mutex_consistent.3c			\
+	 	mutex_destroy.3c			\
+	 	mutex_lock.3c				\
+	 	mutex_trylock.3c			\
+	 	mutex_unlock.3c				\
+	 	nftw.3c					\
+	 	ngettext.3c				\
+	 	nrand48.3c				\
+	 	openlog.3c				\
+	 	pclose.3c				\
+	 	port_dissociate.3c			\
+	 	port_getn.3c				\
+	 	port_sendn.3c				\
+	 	posix_spawn_file_actions_addopen.3c	\
+	 	posix_spawn_file_actions_init.3c	\
+	 	posix_spawnattr_init.3c			\
+	 	posix_spawnattr_setflags.3c		\
+	 	posix_spawnattr_setpgroup.3c		\
+	 	posix_spawnattr_setschedparam.3c	\
+	 	posix_spawnattr_setschedpolicy.3c	\
+	 	posix_spawnattr_setsigdefault.3c	\
+	 	posix_spawnattr_setsigignore_np.3c	\
+	 	posix_spawnattr_setsigmask.3c		\
+	 	posix_spawnp.3c				\
+	 	printstack.3c				\
+	 	priv_allocset.3c			\
+	 	priv_basicset.3c			\
+	 	priv_copyset.3c				\
+	 	priv_delset.3c				\
+	 	priv_emptyset.3c			\
+	 	priv_fillset.3c				\
+	 	priv_freeset.3c				\
+	 	priv_getbyname.3c			\
+	 	priv_getbynum.3c			\
+	 	priv_getsetbyname.3c			\
+	 	priv_getsetbynum.3c			\
+	 	priv_gettext.3c				\
+	 	priv_ineffect.3c			\
+	 	priv_intersect.3c			\
+	 	priv_inverse.3c				\
+	 	priv_isemptyset.3c			\
+	 	priv_isequalset.3c			\
+	 	priv_isfullset.3c			\
+	 	priv_ismember.3c			\
+	 	priv_issubset.3c			\
+	 	priv_set_to_str.3c			\
+	 	priv_union.3c				\
+	 	pselect.3c				\
+	 	psiginfo.3c				\
+	 	pthread_attr_destroy.3c			\
+	 	pthread_attr_setdetachstate.3c		\
+	 	pthread_attr_setguardsize.3c		\
+	 	pthread_attr_setinheritsched.3c		\
+	 	pthread_attr_setschedparam.3c		\
+	 	pthread_attr_setschedpolicy.3c		\
+	 	pthread_attr_setscope.3c		\
+	 	pthread_attr_setstack.3c		\
+	 	pthread_attr_setstackaddr.3c		\
+	 	pthread_attr_setstacksize.3c		\
+	 	pthread_barrier_init.3c			\
+	 	pthread_barrierattr_init.3c		\
+	 	pthread_barrierattr_setpshared.3c	\
+	 	pthread_cond_broadcast.3c		\
+	 	pthread_cond_destroy.3c			\
+	 	pthread_cond_reltimedwait_np.3c		\
+	 	pthread_cond_timedwait.3c		\
+	 	pthread_condattr_destroy.3c		\
+	 	pthread_condattr_setclock.3c		\
+	 	pthread_condattr_setpshared.3c		\
+	 	pthread_key_create_once_np.3c		\
+	 	pthread_mutex_destroy.3c		\
+	 	pthread_mutex_reltimedlock_np.3c	\
+	 	pthread_mutex_setprioceiling.3c		\
+	 	pthread_mutex_trylock.3c		\
+	 	pthread_mutex_unlock.3c			\
+	 	pthread_mutexattr_destroy.3c		\
+	 	pthread_mutexattr_setprioceiling.3c	\
+	 	pthread_mutexattr_setprotocol.3c	\
+	 	pthread_mutexattr_setpshared.3c		\
+	 	pthread_mutexattr_settype.3c		\
+	 	pthread_rwlock_destroy.3c		\
+	 	pthread_rwlock_reltimedrdlock_np.3c	\
+	 	pthread_rwlock_reltimedwrlock_np.3c	\
+	 	pthread_rwlock_tryrdlock.3c		\
+	 	pthread_rwlock_trywrlock.3c		\
+	 	pthread_rwlockattr_destroy.3c		\
+	 	pthread_rwlockattr_setpshared.3c	\
+	 	pthread_setconcurrency.3c		\
+	 	pthread_setschedparam.3c		\
+	 	pthread_setspecific.3c			\
+	 	pthread_spin_init.3c			\
+	 	pthread_spin_trylock.3c			\
+	 	putc.3c					\
+	 	putc_unlocked.3c			\
+	 	putchar.3c				\
+	 	putchar_unlocked.3c			\
+	 	putmntent.3c				\
+	 	pututline.3c				\
+	 	pututxline.3c				\
+	 	putw.3c					\
+	 	putwc.3c				\
+	 	putwchar.3c				\
+	 	qeconvert.3c				\
+	 	qfconvert.3c				\
+	 	qgconvert.3c				\
+	 	quadruple_to_decimal.3c			\
+	 	rand_r.3c				\
+	 	rctlblk_get_enforced_value.3c		\
+	 	rctlblk_get_firing_time.3c		\
+	 	rctlblk_get_global_action.3c		\
+	 	rctlblk_get_global_flags.3c		\
+	 	rctlblk_get_local_action.3c		\
+	 	rctlblk_get_local_flags.3c		\
+	 	rctlblk_get_privilege.3c		\
+	 	rctlblk_get_recipient_pid.3c		\
+	 	rctlblk_get_value.3c			\
+	 	rctlblk_set_local_action.3c		\
+	 	rctlblk_set_local_flags.3c		\
+	 	rctlblk_set_privilege.3c		\
+	 	rctlblk_set_recipient_pid.3c		\
+	 	rctlblk_size.3c				\
+	 	re_exec.3c				\
+	 	readdir_r.3c				\
+	 	realloc.3c				\
+	 	regerror.3c				\
+	 	regex.3c				\
+	 	regexec.3c				\
+	 	regfree.3c				\
+	 	remque.3c				\
+	 	resetmnttab.3c				\
+	 	rindex.3c				\
+	 	rw_rdlock.3c				\
+	 	rw_tryrdlock.3c				\
+	 	rw_trywrlock.3c				\
+	 	rw_unlock.3c				\
+	 	rw_wrlock.3c				\
+	 	rwlock_destroy.3c			\
+	 	rwlock_init.3c				\
+	 	sched_get_priority_min.3c		\
+	 	schedctl_exit.3c			\
+	 	schedctl_lookup.3c			\
+	 	schedctl_start.3c			\
+	 	schedctl_stop.3c			\
+	 	seconvert.3c				\
+	 	seed48.3c				\
+	 	sem_reltimedwait_np.3c			\
+	 	sem_trywait.3c				\
+	 	sema_destroy.3c				\
+	 	sema_init.3c				\
+	 	sema_post.3c				\
+	 	sema_trywait.3c				\
+	 	sema_wait.3c				\
+	 	setattrat.3c				\
+	 	setgrent.3c				\
+	 	sethostname.3c				\
+	 	setlinebuf.3c				\
+	 	setlogmask.3c				\
+	 	setnetgrent.3c				\
+	 	setpriority.3c				\
+	 	setpwent.3c				\
+	 	setspent.3c				\
+	 	setstate.3c				\
+	 	settimeofday.3c				\
+	 	setusershell.3c				\
+	 	setutent.3c				\
+	 	setutxent.3c				\
+	 	setvbuf.3c				\
+	 	sfconvert.3c				\
+	 	sgconvert.3c				\
+	 	sig2str.3c				\
+	 	sigaddset.3c				\
+	 	sigdelset.3c				\
+	 	sigemptyset.3c				\
+	 	sigfillset.3c				\
+	 	sighold.3c				\
+	 	sigignore.3c				\
+	 	sigismember.3c				\
+	 	siglongjmp.3c				\
+	 	sigpause.3c				\
+	 	sigrelse.3c				\
+	 	sigset.3c				\
+	 	sigsetjmp.3c				\
+	 	sigtimedwait.3c				\
+	 	single_to_decimal.3c			\
+	 	snprintf.3c				\
+	 	sprintf.3c				\
+	 	srand.3c				\
+	 	srand48.3c				\
+	 	srandom.3c				\
+	 	sscanf.3c				\
+	 	strcasecmp.3c				\
+	 	strcat.3c				\
+	 	strchr.3c				\
+	 	strcmp.3c				\
+	 	strcpy.3c				\
+	 	strcspn.3c				\
+	 	strdup.3c				\
+	 	strerror_r.3c				\
+	 	strlcat.3c				\
+	 	strlcpy.3c				\
+	 	strlen.3c				\
+	 	strncasecmp.3c				\
+	 	strncat.3c				\
+	 	strncmp.3c				\
+	 	strncpy.3c				\
+	 	strnlen.3c				\
+	 	strpbrk.3c				\
+	 	strrchr.3c				\
+	 	strsep.3c				\
+	 	strspn.3c				\
+	 	strstr.3c				\
+	 	strtof.3c				\
+	 	strtok.3c				\
+	 	strtok_r.3c				\
+	 	strtold.3c				\
+	 	strtoll.3c				\
+	 	strtoull.3c				\
+	 	strtoumax.3c				\
+	 	swapcontext.3c				\
+	 	swprintf.3c				\
+	 	swscanf.3c				\
+	 	tdelete.3c				\
+	 	tempnam.3c				\
+	 	textdomain.3c				\
+	 	tfind.3c				\
+	 	thr_continue.3c				\
+	 	thr_getspecific.3c			\
+	 	thr_keycreate_once.3c			\
+	 	thr_setconcurrency.3c			\
+	 	thr_setprio.3c				\
+	 	thr_setspecific.3c			\
+	 	timer_getoverrun.3c			\
+	 	timer_gettime.3c			\
+	 	timerclear.3c				\
+	 	timercmp.3c				\
+	 	timerisset.3c				\
+	 	timersub.3c				\
+	 	tmpnam_r.3c				\
+	 	ttyname_r.3c				\
+	 	twalk.3c				\
+	 	tzset.3c				\
+	 	uconv_u16tou8.3c			\
+	 	uconv_u32tou16.3c			\
+	 	uconv_u32tou8.3c			\
+	 	uconv_u8tou16.3c			\
+	 	uconv_u8tou32.3c			\
+	 	ucred_free.3c				\
+	 	ucred_getegid.3c			\
+	 	ucred_geteuid.3c			\
+	 	ucred_getgroups.3c			\
+	 	ucred_getlabel.3c			\
+	 	ucred_getpflags.3c			\
+	 	ucred_getpid.3c				\
+	 	ucred_getprivset.3c			\
+	 	ucred_getprojid.3c			\
+	 	ucred_getrgid.3c			\
+	 	ucred_getruid.3c			\
+	 	ucred_getsgid.3c			\
+	 	ucred_getsuid.3c			\
+	 	ucred_getzoneid.3c			\
+	 	ucred_size.3c				\
+	 	ulckpwdf.3c				\
+	 	ulltostr.3c				\
+	 	unordered.3c				\
+	 	updwtmp.3c				\
+	 	updwtmpx.3c				\
+	 	utmpname.3c				\
+	 	utmpxname.3c				\
+	 	valloc.3c				\
+	 	vasprintf.3c				\
+	 	verr.3c					\
+	 	verrx.3c				\
+	 	vfprintf.3c				\
+	 	vfscanf.3c				\
+	 	vfwscanf.3c				\
+	 	vscanf.3c				\
+	 	vsnprintf.3c				\
+	 	vsprintf.3c				\
+	 	vsscanf.3c				\
+	 	vswprintf.3c				\
+	 	vswscanf.3c				\
+	 	vwarn.3c				\
+	 	vwarnx.3c				\
+	 	vwprintf.3c				\
+	 	vwscanf.3c				\
+	 	wait4.3c				\
+	 	warn.3c					\
+	 	warnx.3c				\
+	 	watof.3c				\
+	 	watoi.3c				\
+	 	watol.3c				\
+	 	watoll.3c				\
+	 	wcscat.3c				\
+	 	wcschr.3c				\
+	 	wcscmp.3c				\
+	 	wcscpy.3c				\
+	 	wcscspn.3c				\
+	 	wcsetno.3c				\
+	 	wcslen.3c				\
+	 	wcsncat.3c				\
+	 	wcsncmp.3c				\
+	 	wcsncpy.3c				\
+	 	wcspbrk.3c				\
+	 	wcsrchr.3c				\
+	 	wcsspn.3c				\
+	 	wcstof.3c				\
+	 	wcstok.3c				\
+	 	wcstold.3c				\
+	 	wcstoll.3c				\
+	 	wcstoull.3c				\
+	 	wcstoumax.3c				\
+	 	wcswcs.3c				\
+	 	windex.3c				\
+	 	wordfree.3c				\
+	 	wprintf.3c				\
+	 	wrindex.3c				\
+	 	wscanf.3c				\
+	 	wscasecmp.3c				\
+	 	wscat.3c				\
+	 	wschr.3c				\
+	 	wscmp.3c				\
+	 	wscol.3c				\
+	 	wscoll.3c				\
+	 	wscpy.3c				\
+	 	wscspn.3c				\
+	 	wsdup.3c				\
+	 	wslen.3c				\
+	 	wsncasecmp.3c				\
+	 	wsncat.3c				\
+	 	wsncmp.3c				\
+	 	wsncpy.3c				\
+	 	wspbrk.3c				\
+	 	wsrchr.3c				\
+	 	wsspn.3c				\
+	 	wstod.3c				\
+	 	wstok.3c				\
+	 	wstol.3c				\
+	 	wstostr.3c				\
+	 	wsxfrm.3c
+
+MANFILES +=	$(MANSOFILES)
+
+__flbf.3c				:= SOSRC = man3c/__fbufsize.3c
+__fpending.3c				:= SOSRC = man3c/__fbufsize.3c
+__fpurge.3c				:= SOSRC = man3c/__fbufsize.3c
+__freadable.3c				:= SOSRC = man3c/__fbufsize.3c
+__freading.3c				:= SOSRC = man3c/__fbufsize.3c
+__fsetlocking.3c			:= SOSRC = man3c/__fbufsize.3c
+__fwritable.3c				:= SOSRC = man3c/__fbufsize.3c
+__fwriting.3c				:= SOSRC = man3c/__fbufsize.3c
+_flushlbf.3c				:= SOSRC = man3c/__fbufsize.3c
+
+_setjmp.3c				:= SOSRC = man3c/_longjmp.3c
+
+l64a.3c					:= SOSRC = man3c/a64l.3c
+
+labs.3c					:= SOSRC = man3c/abs.3c
+llabs.3c				:= SOSRC = man3c/abs.3c
+
+aiowrite.3c				:= SOSRC = man3c/aioread.3c
+
+atomic_add_16.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_16_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_32.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_32_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_64.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_64_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_8.3c				:= SOSRC = man3c/atomic_add.3c
+atomic_add_8_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_char.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_char_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_int.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_int_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_long.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_long_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_ptr.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_ptr_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_short.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_add_short_nv.3c			:= SOSRC = man3c/atomic_add.3c
+atomic_and_16.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_16_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_32.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_32_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_64.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_64_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_8.3c				:= SOSRC = man3c/atomic_and.3c
+atomic_and_8_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_uchar.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_uchar_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_uint.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_uint_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_ulong.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_ulong_nv.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_ushort.3c			:= SOSRC = man3c/atomic_and.3c
+atomic_and_ushort_nv.3c			:= SOSRC = man3c/atomic_and.3c
+
+atomic_clear_long_excl.3c		:= SOSRC = man3c/atomic_bits.3c
+atomic_set_long_excl.3c			:= SOSRC = man3c/atomic_bits.3c
+
+atomic_cas_16.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_32.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_64.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_8.3c				:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_ptr.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_uchar.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_uint.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_ulong.3c			:= SOSRC = man3c/atomic_cas.3c
+atomic_cas_ushort.3c			:= SOSRC = man3c/atomic_cas.3c
+
+atomic_dec_16.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_16_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_32.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_32_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_64.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_64_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_8.3c				:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_8_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_ptr.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_ptr_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_uchar.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_uchar_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_uint.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_uint_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_ulong.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_ulong_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_ushort.3c			:= SOSRC = man3c/atomic_dec.3c
+atomic_dec_ushort_nv.3c			:= SOSRC = man3c/atomic_dec.3c
+
+atomic_inc_16.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_16_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_32.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_32_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_64.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_64_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_8.3c				:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_8_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_ptr.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_ptr_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_uchar.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_uchar_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_uint.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_uint_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_ulong.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_ulong_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_ushort.3c			:= SOSRC = man3c/atomic_inc.3c
+atomic_inc_ushort_nv.3c			:= SOSRC = man3c/atomic_inc.3c
+
+atomic_or_16.3c				:= SOSRC = man3c/atomic_or.3c
+atomic_or_16_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_32.3c				:= SOSRC = man3c/atomic_or.3c
+atomic_or_32_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_64.3c				:= SOSRC = man3c/atomic_or.3c
+atomic_or_64_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_8.3c				:= SOSRC = man3c/atomic_or.3c
+atomic_or_8_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_uchar.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_uchar_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_uint.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_uint_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_ulong.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_ulong_nv.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_ushort.3c			:= SOSRC = man3c/atomic_or.3c
+atomic_or_ushort_nv.3c			:= SOSRC = man3c/atomic_or.3c
+
+atomic_swap_16.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_32.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_64.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_8.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_ptr.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_uchar.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_uint.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_ulong.3c			:= SOSRC = man3c/atomic_swap.3c
+atomic_swap_ushort.3c			:= SOSRC = man3c/atomic_swap.3c
+
+bcmp.3c					:= SOSRC = man3c/bstring.3c
+bcopy.3c				:= SOSRC = man3c/bstring.3c
+bzero.3c				:= SOSRC = man3c/bstring.3c
+
+catclose.3c				:= SOSRC = man3c/catopen.3c
+
+cfgetospeed.3c				:= SOSRC = man3c/cfgetispeed.3c
+
+cfsetospeed.3c				:= SOSRC = man3c/cfsetispeed.3c
+
+clock_getres.3c				:= SOSRC = man3c/clock_settime.3c
+clock_gettime.3c			:= SOSRC = man3c/clock_settime.3c
+
+fdwalk.3c				:= SOSRC = man3c/closefrom.3c
+
+cond_broadcast.3c			:= SOSRC = man3c/cond_init.3c
+cond_destroy.3c				:= SOSRC = man3c/cond_init.3c
+cond_reltimedwait.3c			:= SOSRC = man3c/cond_init.3c
+cond_signal.3c				:= SOSRC = man3c/cond_init.3c
+cond_timedwait.3c			:= SOSRC = man3c/cond_init.3c
+cond_wait.3c				:= SOSRC = man3c/cond_init.3c
+
+csetcol.3c				:= SOSRC = man3c/cset.3c
+csetlen.3c				:= SOSRC = man3c/cset.3c
+csetno.3c				:= SOSRC = man3c/cset.3c
+wcsetno.3c				:= SOSRC = man3c/cset.3c
+
+ctermid_r.3c				:= SOSRC = man3c/ctermid.3c
+
+asctime.3c				:= SOSRC = man3c/ctime.3c
+asctime_r.3c				:= SOSRC = man3c/ctime.3c
+ctime_r.3c				:= SOSRC = man3c/ctime.3c
+gmtime.3c				:= SOSRC = man3c/ctime.3c
+gmtime_r.3c				:= SOSRC = man3c/ctime.3c
+localtime.3c				:= SOSRC = man3c/ctime.3c
+localtime_r.3c				:= SOSRC = man3c/ctime.3c
+tzset.3c				:= SOSRC = man3c/ctime.3c
+
+isalnum.3c				:= SOSRC = man3c/ctype.3c
+isalpha.3c				:= SOSRC = man3c/ctype.3c
+isascii.3c				:= SOSRC = man3c/ctype.3c
+isblank.3c				:= SOSRC = man3c/ctype.3c
+iscntrl.3c				:= SOSRC = man3c/ctype.3c
+isdigit.3c				:= SOSRC = man3c/ctype.3c
+isgraph.3c				:= SOSRC = man3c/ctype.3c
+islower.3c				:= SOSRC = man3c/ctype.3c
+isprint.3c				:= SOSRC = man3c/ctype.3c
+ispunct.3c				:= SOSRC = man3c/ctype.3c
+isspace.3c				:= SOSRC = man3c/ctype.3c
+isupper.3c				:= SOSRC = man3c/ctype.3c
+isxdigit.3c				:= SOSRC = man3c/ctype.3c
+
+decimal_to_double.3c			:= SOSRC = man3c/decimal_to_floating.3c
+decimal_to_extended.3c			:= SOSRC = man3c/decimal_to_floating.3c
+decimal_to_quadruple.3c			:= SOSRC = man3c/decimal_to_floating.3c
+decimal_to_single.3c			:= SOSRC = man3c/decimal_to_floating.3c
+
+ldiv.3c					:= SOSRC = man3c/div.3c
+lldiv.3c				:= SOSRC = man3c/div.3c
+
+dladdr1.3c				:= SOSRC = man3c/dladdr.3c
+
+dlmopen.3c				:= SOSRC = man3c/dlopen.3c
+
+door_unbind.3c				:= SOSRC = man3c/door_bind.3c
+
+door_setparam.3c			:= SOSRC = man3c/door_getparam.3c
+
+erand48.3c				:= SOSRC = man3c/drand48.3c
+jrand48.3c				:= SOSRC = man3c/drand48.3c
+lcong48.3c				:= SOSRC = man3c/drand48.3c
+lrand48.3c				:= SOSRC = man3c/drand48.3c
+mrand48.3c				:= SOSRC = man3c/drand48.3c
+nrand48.3c				:= SOSRC = man3c/drand48.3c
+seed48.3c				:= SOSRC = man3c/drand48.3c
+srand48.3c				:= SOSRC = man3c/drand48.3c
+
+fconvert.3c				:= SOSRC = man3c/econvert.3c
+gconvert.3c				:= SOSRC = man3c/econvert.3c
+qeconvert.3c				:= SOSRC = man3c/econvert.3c
+qfconvert.3c				:= SOSRC = man3c/econvert.3c
+qgconvert.3c				:= SOSRC = man3c/econvert.3c
+seconvert.3c				:= SOSRC = man3c/econvert.3c
+sfconvert.3c				:= SOSRC = man3c/econvert.3c
+sgconvert.3c				:= SOSRC = man3c/econvert.3c
+
+fcvt.3c					:= SOSRC = man3c/ecvt.3c
+gcvt.3c					:= SOSRC = man3c/ecvt.3c
+
+_edata.3c				:= SOSRC = man3c/end.3c
+_end.3c					:= SOSRC = man3c/end.3c
+_etext.3c				:= SOSRC = man3c/end.3c
+edata.3c				:= SOSRC = man3c/end.3c
+etext.3c				:= SOSRC = man3c/end.3c
+
+errx.3c					:= SOSRC = man3c/err.3c
+verr.3c					:= SOSRC = man3c/err.3c
+verrx.3c				:= SOSRC = man3c/err.3c
+vwarn.3c				:= SOSRC = man3c/err.3c
+vwarnx.3c				:= SOSRC = man3c/err.3c
+warn.3c					:= SOSRC = man3c/err.3c
+warnx.3c				:= SOSRC = man3c/err.3c
+
+euccol.3c				:= SOSRC = man3c/euclen.3c
+eucscol.3c				:= SOSRC = man3c/euclen.3c
+
+_exithandle.3c				:= SOSRC = man3c/exit.3c
+
+clearerr.3c				:= SOSRC = man3c/ferror.3c
+feof.3c					:= SOSRC = man3c/ferror.3c
+fileno.3c				:= SOSRC = man3c/ferror.3c
+
+fsetattr.3c				:= SOSRC = man3c/fgetattr.3c
+getattrat.3c				:= SOSRC = man3c/fgetattr.3c
+setattrat.3c				:= SOSRC = man3c/fgetattr.3c
+
+getc.3c					:= SOSRC = man3c/fgetc.3c
+getc_unlocked.3c			:= SOSRC = man3c/fgetc.3c
+getchar.3c				:= SOSRC = man3c/fgetc.3c
+getchar_unlocked.3c			:= SOSRC = man3c/fgetc.3c
+getw.3c					:= SOSRC = man3c/fgetc.3c
+
+double_to_decimal.3c			:= SOSRC = man3c/floating_to_decimal.3c
+extended_to_decimal.3c			:= SOSRC = man3c/floating_to_decimal.3c
+quadruple_to_decimal.3c			:= SOSRC = man3c/floating_to_decimal.3c
+single_to_decimal.3c			:= SOSRC = man3c/floating_to_decimal.3c
+
+ftrylockfile.3c				:= SOSRC = man3c/flockfile.3c
+funlockfile.3c				:= SOSRC = man3c/flockfile.3c
+
+fpgetmask.3c				:= SOSRC = man3c/fpgetround.3c
+fpgetsticky.3c				:= SOSRC = man3c/fpgetround.3c
+fpsetmask.3c				:= SOSRC = man3c/fpgetround.3c
+fpsetround.3c				:= SOSRC = man3c/fpgetround.3c
+fpsetsticky.3c				:= SOSRC = man3c/fpgetround.3c
+
+putc.3c					:= SOSRC = man3c/fputc.3c
+putc_unlocked.3c			:= SOSRC = man3c/fputc.3c
+putchar.3c				:= SOSRC = man3c/fputc.3c
+putchar_unlocked.3c			:= SOSRC = man3c/fputc.3c
+putw.3c					:= SOSRC = man3c/fputc.3c
+
+putwc.3c				:= SOSRC = man3c/fputwc.3c
+putwchar.3c				:= SOSRC = man3c/fputwc.3c
+
+fseeko.3c				:= SOSRC = man3c/fseek.3c
+
+ftello.3c				:= SOSRC = man3c/ftell.3c
+
+nftw.3c					:= SOSRC = man3c/ftw.3c
+
+swprintf.3c				:= SOSRC = man3c/fwprintf.3c
+wprintf.3c				:= SOSRC = man3c/fwprintf.3c
+
+swscanf.3c				:= SOSRC = man3c/fwscanf.3c
+vfwscanf.3c				:= SOSRC = man3c/fwscanf.3c
+vswscanf.3c				:= SOSRC = man3c/fwscanf.3c
+vwscanf.3c				:= SOSRC = man3c/fwscanf.3c
+wscanf.3c				:= SOSRC = man3c/fwscanf.3c
+
+gethomelgroup.3c			:= SOSRC = man3c/getcpuid.3c
+
+endgrent.3c				:= SOSRC = man3c/getgrnam.3c
+fgetgrent.3c				:= SOSRC = man3c/getgrnam.3c
+fgetgrent_r.3c				:= SOSRC = man3c/getgrnam.3c
+getgrent.3c				:= SOSRC = man3c/getgrnam.3c
+getgrent_r.3c				:= SOSRC = man3c/getgrnam.3c
+getgrgid.3c				:= SOSRC = man3c/getgrnam.3c
+getgrgid_r.3c				:= SOSRC = man3c/getgrnam.3c
+getgrnam_r.3c				:= SOSRC = man3c/getgrnam.3c
+setgrent.3c				:= SOSRC = man3c/getgrnam.3c
+
+sethostname.3c				:= SOSRC = man3c/gethostname.3c
+
+gethrvtime.3c				:= SOSRC = man3c/gethrtime.3c
+
+getlogin_r.3c				:= SOSRC = man3c/getlogin.3c
+
+getextmntent.3c				:= SOSRC = man3c/getmntent.3c
+getmntany.3c				:= SOSRC = man3c/getmntent.3c
+hasmntopt.3c				:= SOSRC = man3c/getmntent.3c
+putmntent.3c				:= SOSRC = man3c/getmntent.3c
+resetmnttab.3c				:= SOSRC = man3c/getmntent.3c
+
+endnetgrent.3c				:= SOSRC = man3c/getnetgrent.3c
+getnetgrent_r.3c			:= SOSRC = man3c/getnetgrent.3c
+innetgr.3c				:= SOSRC = man3c/getnetgrent.3c
+setnetgrent.3c				:= SOSRC = man3c/getnetgrent.3c
+
+getpassphrase.3c			:= SOSRC = man3c/getpass.3c
+
+setpriority.3c				:= SOSRC = man3c/getpriority.3c
+
+endpwent.3c				:= SOSRC = man3c/getpwnam.3c
+fgetpwent.3c				:= SOSRC = man3c/getpwnam.3c
+fgetpwent_r.3c				:= SOSRC = man3c/getpwnam.3c
+getpwent.3c				:= SOSRC = man3c/getpwnam.3c
+getpwent_r.3c				:= SOSRC = man3c/getpwnam.3c
+getpwnam_r.3c				:= SOSRC = man3c/getpwnam.3c
+getpwuid.3c				:= SOSRC = man3c/getpwnam.3c
+getpwuid_r.3c				:= SOSRC = man3c/getpwnam.3c
+setpwent.3c				:= SOSRC = man3c/getpwnam.3c
+
+fgets.3c				:= SOSRC = man3c/gets.3c
+
+endspent.3c				:= SOSRC = man3c/getspnam.3c
+fgetspent.3c				:= SOSRC = man3c/getspnam.3c
+fgetspent_r.3c				:= SOSRC = man3c/getspnam.3c
+getspent.3c				:= SOSRC = man3c/getspnam.3c
+getspent_r.3c				:= SOSRC = man3c/getspnam.3c
+getspnam_r.3c				:= SOSRC = man3c/getspnam.3c
+setspent.3c				:= SOSRC = man3c/getspnam.3c
+
+bind_textdomain_codeset.3c		:= SOSRC = man3c/gettext.3c
+bindtextdomain.3c			:= SOSRC = man3c/gettext.3c
+dcgettext.3c				:= SOSRC = man3c/gettext.3c
+dcngettext.3c				:= SOSRC = man3c/gettext.3c
+dgettext.3c				:= SOSRC = man3c/gettext.3c
+dngettext.3c				:= SOSRC = man3c/gettext.3c
+ngettext.3c				:= SOSRC = man3c/gettext.3c
+textdomain.3c				:= SOSRC = man3c/gettext.3c
+
+settimeofday.3c				:= SOSRC = man3c/gettimeofday.3c
+
+endusershell.3c				:= SOSRC = man3c/getusershell.3c
+setusershell.3c				:= SOSRC = man3c/getusershell.3c
+
+endutent.3c				:= SOSRC = man3c/getutent.3c
+getutid.3c				:= SOSRC = man3c/getutent.3c
+getutline.3c				:= SOSRC = man3c/getutent.3c
+pututline.3c				:= SOSRC = man3c/getutent.3c
+setutent.3c				:= SOSRC = man3c/getutent.3c
+utmpname.3c				:= SOSRC = man3c/getutent.3c
+
+endutxent.3c				:= SOSRC = man3c/getutxent.3c
+getutmp.3c				:= SOSRC = man3c/getutxent.3c
+getutmpx.3c				:= SOSRC = man3c/getutxent.3c
+getutxid.3c				:= SOSRC = man3c/getutxent.3c
+getutxline.3c				:= SOSRC = man3c/getutxent.3c
+pututxline.3c				:= SOSRC = man3c/getutxent.3c
+setutxent.3c				:= SOSRC = man3c/getutxent.3c
+updwtmp.3c				:= SOSRC = man3c/getutxent.3c
+updwtmpx.3c				:= SOSRC = man3c/getutxent.3c
+utmpxname.3c				:= SOSRC = man3c/getutxent.3c
+
+getvfsany.3c				:= SOSRC = man3c/getvfsent.3c
+getvfsfile.3c				:= SOSRC = man3c/getvfsent.3c
+getvfsspec.3c				:= SOSRC = man3c/getvfsent.3c
+
+fgetws.3c				:= SOSRC = man3c/getws.3c
+
+getzoneidbyname.3c			:= SOSRC = man3c/getzoneid.3c
+getzonenamebyid.3c			:= SOSRC = man3c/getzoneid.3c
+
+globfree.3c				:= SOSRC = man3c/glob.3c
+
+hcreate.3c				:= SOSRC = man3c/hsearch.3c
+hdestroy.3c				:= SOSRC = man3c/hsearch.3c
+
+rindex.3c				:= SOSRC = man3c/index.3c
+
+remque.3c				:= SOSRC = man3c/insque.3c
+
+finite.3c				:= SOSRC = man3c/isnand.3c
+fpclass.3c				:= SOSRC = man3c/isnand.3c
+isnanf.3c				:= SOSRC = man3c/isnand.3c
+unordered.3c				:= SOSRC = man3c/isnand.3c
+
+isenglish.3c				:= SOSRC = man3c/iswalpha.3c
+isideogram.3c				:= SOSRC = man3c/iswalpha.3c
+isnumber.3c				:= SOSRC = man3c/iswalpha.3c
+isphonogram.3c				:= SOSRC = man3c/iswalpha.3c
+isspecial.3c				:= SOSRC = man3c/iswalpha.3c
+iswalnum.3c				:= SOSRC = man3c/iswalpha.3c
+iswascii.3c				:= SOSRC = man3c/iswalpha.3c
+iswblank.3c				:= SOSRC = man3c/iswalpha.3c
+iswcntrl.3c				:= SOSRC = man3c/iswalpha.3c
+iswdigit.3c				:= SOSRC = man3c/iswalpha.3c
+iswgraph.3c				:= SOSRC = man3c/iswalpha.3c
+iswlower.3c				:= SOSRC = man3c/iswalpha.3c
+iswprint.3c				:= SOSRC = man3c/iswalpha.3c
+iswpunct.3c				:= SOSRC = man3c/iswalpha.3c
+iswspace.3c				:= SOSRC = man3c/iswalpha.3c
+iswupper.3c				:= SOSRC = man3c/iswalpha.3c
+iswxdigit.3c				:= SOSRC = man3c/iswalpha.3c
+
+ulckpwdf.3c				:= SOSRC = man3c/lckpwdf.3c
+
+lfind.3c				:= SOSRC = man3c/lsearch.3c
+
+swapcontext.3c				:= SOSRC = man3c/makecontext.3c
+
+major.3c				:= SOSRC = man3c/makedev.3c
+minor.3c				:= SOSRC = man3c/makedev.3c
+
+alloca.3c				:= SOSRC = man3c/malloc.3c
+calloc.3c				:= SOSRC = man3c/malloc.3c
+free.3c					:= SOSRC = man3c/malloc.3c
+memalign.3c				:= SOSRC = man3c/malloc.3c
+realloc.3c				:= SOSRC = man3c/malloc.3c
+valloc.3c				:= SOSRC = man3c/malloc.3c
+
+membar_consumer.3c			:= SOSRC = man3c/membar_ops.3c
+membar_enter.3c				:= SOSRC = man3c/membar_ops.3c
+membar_exit.3c				:= SOSRC = man3c/membar_ops.3c
+membar_producer.3c			:= SOSRC = man3c/membar_ops.3c
+
+memccpy.3c				:= SOSRC = man3c/memory.3c
+memchr.3c				:= SOSRC = man3c/memory.3c
+memcmp.3c				:= SOSRC = man3c/memory.3c
+memcpy.3c				:= SOSRC = man3c/memory.3c
+memmove.3c				:= SOSRC = man3c/memory.3c
+memset.3c				:= SOSRC = man3c/memory.3c
+
+mkdtemp.3c				:= SOSRC = man3c/mkstemp.3c
+mkstemps.3c				:= SOSRC = man3c/mkstemp.3c
+
+munlock.3c				:= SOSRC = man3c/mlock.3c
+
+munlockall.3c				:= SOSRC = man3c/mlockall.3c
+
+mq_reltimedreceive_np.3c		:= SOSRC = man3c/mq_receive.3c
+mq_timedreceive.3c			:= SOSRC = man3c/mq_receive.3c
+
+mq_reltimedsend_np.3c			:= SOSRC = man3c/mq_send.3c
+mq_timedsend.3c				:= SOSRC = man3c/mq_send.3c
+
+mutex_consistent.3c			:= SOSRC = man3c/mutex_init.3c
+mutex_destroy.3c			:= SOSRC = man3c/mutex_init.3c
+mutex_lock.3c				:= SOSRC = man3c/mutex_init.3c
+mutex_trylock.3c			:= SOSRC = man3c/mutex_init.3c
+mutex_unlock.3c				:= SOSRC = man3c/mutex_init.3c
+
+dbm_clearerr.3c				:= SOSRC = man3c/ndbm.3c
+dbm_close.3c				:= SOSRC = man3c/ndbm.3c
+dbm_delete.3c				:= SOSRC = man3c/ndbm.3c
+dbm_error.3c				:= SOSRC = man3c/ndbm.3c
+dbm_fetch.3c				:= SOSRC = man3c/ndbm.3c
+dbm_firstkey.3c				:= SOSRC = man3c/ndbm.3c
+dbm_nextkey.3c				:= SOSRC = man3c/ndbm.3c
+dbm_open.3c				:= SOSRC = man3c/ndbm.3c
+dbm_store.3c				:= SOSRC = man3c/ndbm.3c
+
+fdopendir.3c				:= SOSRC = man3c/opendir.3c
+
+errno.3c				:= SOSRC = man3c/perror.3c
+
+pclose.3c				:= SOSRC = man3c/popen.3c
+
+port_dissociate.3c			:= SOSRC = man3c/port_associate.3c
+
+port_getn.3c				:= SOSRC = man3c/port_get.3c
+
+port_sendn.3c				:= SOSRC = man3c/port_send.3c
+
+posix_spawnp.3c				:= SOSRC = man3c/posix_spawn.3c
+
+posix_spawn_file_actions_addopen.3c	:= SOSRC = man3c/posix_spawn_file_actions_addclose.3c
+posix_spawn_file_actions_init.3c	:= SOSRC = man3c/posix_spawn_file_actions_destroy.3c
+
+posix_spawnattr_init.3c			:= SOSRC = man3c/posix_spawnattr_destroy.3c
+
+posix_spawnattr_setflags.3c		:= SOSRC = man3c/posix_spawnattr_getflags.3c
+
+posix_spawnattr_setpgroup.3c		:= SOSRC = man3c/posix_spawnattr_getpgroup.3c
+
+posix_spawnattr_setschedparam.3c	:= SOSRC = man3c/posix_spawnattr_getschedparam.3c
+
+posix_spawnattr_setschedpolicy.3c	:= SOSRC = man3c/posix_spawnattr_getschedpolicy.3c
+
+posix_spawnattr_setsigdefault.3c	:= SOSRC = man3c/posix_spawnattr_getsigdefault.3c
+
+posix_spawnattr_setsigignore_np.3c	:= SOSRC = man3c/posix_spawnattr_getsigignore_np.3c
+
+posix_spawnattr_setsigmask.3c		:= SOSRC = man3c/posix_spawnattr_getsigmask.3c
+
+asprintf.3c				:= SOSRC = man3c/printf.3c
+fprintf.3c				:= SOSRC = man3c/printf.3c
+snprintf.3c				:= SOSRC = man3c/printf.3c
+sprintf.3c				:= SOSRC = man3c/printf.3c
+
+priv_allocset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_basicset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_copyset.3c				:= SOSRC = man3c/priv_addset.3c
+priv_delset.3c				:= SOSRC = man3c/priv_addset.3c
+priv_emptyset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_fillset.3c				:= SOSRC = man3c/priv_addset.3c
+priv_freeset.3c				:= SOSRC = man3c/priv_addset.3c
+priv_intersect.3c			:= SOSRC = man3c/priv_addset.3c
+priv_inverse.3c				:= SOSRC = man3c/priv_addset.3c
+priv_isemptyset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_isequalset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_isfullset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_ismember.3c			:= SOSRC = man3c/priv_addset.3c
+priv_issubset.3c			:= SOSRC = man3c/priv_addset.3c
+priv_union.3c				:= SOSRC = man3c/priv_addset.3c
+
+priv_ineffect.3c			:= SOSRC = man3c/priv_set.3c
+
+priv_getbyname.3c			:= SOSRC = man3c/priv_str_to_set.3c
+priv_getbynum.3c			:= SOSRC = man3c/priv_str_to_set.3c
+priv_getsetbyname.3c			:= SOSRC = man3c/priv_str_to_set.3c
+priv_getsetbynum.3c			:= SOSRC = man3c/priv_str_to_set.3c
+priv_gettext.3c				:= SOSRC = man3c/priv_str_to_set.3c
+priv_set_to_str.3c			:= SOSRC = man3c/priv_str_to_set.3c
+
+psiginfo.3c				:= SOSRC = man3c/psignal.3c
+
+pthread_attr_setdetachstate.3c		:= SOSRC = man3c/pthread_attr_getdetachstate.3c
+
+pthread_attr_setguardsize.3c		:= SOSRC = man3c/pthread_attr_getguardsize.3c
+
+pthread_attr_setinheritsched.3c		:= SOSRC = man3c/pthread_attr_getinheritsched.3c
+
+pthread_attr_setschedparam.3c		:= SOSRC = man3c/pthread_attr_getschedparam.3c
+
+pthread_attr_setschedpolicy.3c		:= SOSRC = man3c/pthread_attr_getschedpolicy.3c
+
+pthread_attr_setscope.3c		:= SOSRC = man3c/pthread_attr_getscope.3c
+pthread_attr_setstack.3c		:= SOSRC = man3c/pthread_attr_getstack.3c
+
+pthread_attr_setstackaddr.3c		:= SOSRC = man3c/pthread_attr_getstackaddr.3c
+
+pthread_attr_setstacksize.3c		:= SOSRC = man3c/pthread_attr_getstacksize.3c
+
+pthread_attr_destroy.3c			:= SOSRC = man3c/pthread_attr_init.3c
+
+pthread_barrier_init.3c			:= SOSRC = man3c/pthread_barrier_destroy.3c
+
+pthread_barrierattr_init.3c		:= SOSRC = man3c/pthread_barrierattr_destroy.3c
+
+pthread_barrierattr_setpshared.3c	:= SOSRC = man3c/pthread_barrierattr_getpshared.3c
+
+pthread_cond_destroy.3c			:= SOSRC = man3c/pthread_cond_init.3c
+
+pthread_cond_broadcast.3c		:= SOSRC = man3c/pthread_cond_signal.3c
+
+pthread_cond_reltimedwait_np.3c		:= SOSRC = man3c/pthread_cond_wait.3c
+pthread_cond_timedwait.3c		:= SOSRC = man3c/pthread_cond_wait.3c
+
+pthread_condattr_setclock.3c		:= SOSRC = man3c/pthread_condattr_getclock.3c
+
+pthread_condattr_setpshared.3c		:= SOSRC = man3c/pthread_condattr_getpshared.3c
+
+pthread_condattr_destroy.3c		:= SOSRC = man3c/pthread_condattr_init.3c
+
+pthread_setconcurrency.3c		:= SOSRC = man3c/pthread_getconcurrency.3c
+
+pthread_setschedparam.3c		:= SOSRC = man3c/pthread_getschedparam.3c
+
+pthread_setspecific.3c			:= SOSRC = man3c/pthread_getspecific.3c
+
+pthread_key_create_once_np.3c		:= SOSRC = man3c/pthread_key_create.3c
+
+pthread_mutex_setprioceiling.3c		:= SOSRC = man3c/pthread_mutex_getprioceiling.3c
+
+pthread_mutex_destroy.3c		:= SOSRC = man3c/pthread_mutex_init.3c
+
+pthread_mutex_trylock.3c		:= SOSRC = man3c/pthread_mutex_lock.3c
+pthread_mutex_unlock.3c			:= SOSRC = man3c/pthread_mutex_lock.3c
+
+pthread_mutex_reltimedlock_np.3c	:= SOSRC = man3c/pthread_mutex_timedlock.3c
+
+pthread_mutexattr_setprioceiling.3c	:= SOSRC = man3c/pthread_mutexattr_getprioceiling.3c
+
+pthread_mutexattr_setprotocol.3c	:= SOSRC = man3c/pthread_mutexattr_getprotocol.3c
+
+pthread_mutexattr_setpshared.3c		:= SOSRC = man3c/pthread_mutexattr_getpshared.3c
+
+pthread_mutexattr_settype.3c		:= SOSRC = man3c/pthread_mutexattr_gettype.3c
+
+pthread_mutexattr_destroy.3c		:= SOSRC = man3c/pthread_mutexattr_init.3c
+
+pthread_rwlock_destroy.3c		:= SOSRC = man3c/pthread_rwlock_init.3c
+
+pthread_rwlock_tryrdlock.3c		:= SOSRC = man3c/pthread_rwlock_rdlock.3c
+
+pthread_rwlock_reltimedrdlock_np.3c	:= SOSRC = man3c/pthread_rwlock_timedrdlock.3c
+
+pthread_rwlock_reltimedwrlock_np.3c	:= SOSRC = man3c/pthread_rwlock_timedwrlock.3c
+
+pthread_rwlock_trywrlock.3c		:= SOSRC = man3c/pthread_rwlock_wrlock.3c
+
+pthread_rwlockattr_setpshared.3c	:= SOSRC = man3c/pthread_rwlockattr_getpshared.3c
+
+pthread_rwlockattr_destroy.3c		:= SOSRC = man3c/pthread_rwlockattr_init.3c
+
+pthread_spin_init.3c			:= SOSRC = man3c/pthread_spin_destroy.3c
+
+pthread_spin_trylock.3c			:= SOSRC = man3c/pthread_spin_lock.3c
+
+fputs.3c				:= SOSRC = man3c/puts.3c
+
+rand_r.3c				:= SOSRC = man3c/rand.3c
+srand.3c				:= SOSRC = man3c/rand.3c
+
+initstate.3c				:= SOSRC = man3c/random.3c
+setstate.3c				:= SOSRC = man3c/random.3c
+srandom.3c				:= SOSRC = man3c/random.3c
+
+rctlblk_get_enforced_value.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_firing_time.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_global_action.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_global_flags.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_local_action.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_local_flags.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_privilege.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_recipient_pid.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_get_value.3c			:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_set_local_action.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_set_local_flags.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_set_privilege.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_set_recipient_pid.3c		:= SOSRC = man3c/rctlblk_set_value.3c
+rctlblk_size.3c				:= SOSRC = man3c/rctlblk_set_value.3c
+
+re_exec.3c				:= SOSRC = man3c/re_comp.3c
+
+readdir_r.3c				:= SOSRC = man3c/readdir.3c
+
+regex.3c				:= SOSRC = man3c/regcmp.3c
+
+regerror.3c				:= SOSRC = man3c/regcomp.3c
+regexec.3c				:= SOSRC = man3c/regcomp.3c
+regfree.3c				:= SOSRC = man3c/regcomp.3c
+
+rw_rdlock.3c				:= SOSRC = man3c/rwlock.3c
+rw_tryrdlock.3c				:= SOSRC = man3c/rwlock.3c
+rw_trywrlock.3c				:= SOSRC = man3c/rwlock.3c
+rw_unlock.3c				:= SOSRC = man3c/rwlock.3c
+rw_wrlock.3c				:= SOSRC = man3c/rwlock.3c
+rwlock_destroy.3c			:= SOSRC = man3c/rwlock.3c
+rwlock_init.3c				:= SOSRC = man3c/rwlock.3c
+
+alphasort.3c				:= SOSRC = man3c/scandir.3c
+
+fscanf.3c				:= SOSRC = man3c/scanf.3c
+sscanf.3c				:= SOSRC = man3c/scanf.3c
+vfscanf.3c				:= SOSRC = man3c/scanf.3c
+vscanf.3c				:= SOSRC = man3c/scanf.3c
+vsscanf.3c				:= SOSRC = man3c/scanf.3c
+
+sched_get_priority_min.3c		:= SOSRC = man3c/sched_get_priority_max.3c
+
+schedctl_exit.3c			:= SOSRC = man3c/schedctl_init.3c
+schedctl_lookup.3c			:= SOSRC = man3c/schedctl_init.3c
+schedctl_start.3c			:= SOSRC = man3c/schedctl_init.3c
+schedctl_stop.3c			:= SOSRC = man3c/schedctl_init.3c
+
+FD_CLR.3c				:= SOSRC = man3c/select.3c
+FD_ISSET.3c				:= SOSRC = man3c/select.3c
+FD_SET.3c				:= SOSRC = man3c/select.3c
+FD_ZERO.3c				:= SOSRC = man3c/select.3c
+pselect.3c				:= SOSRC = man3c/select.3c
+
+sem_reltimedwait_np.3c			:= SOSRC = man3c/sem_timedwait.3c
+
+sem_trywait.3c				:= SOSRC = man3c/sem_wait.3c
+
+sema_destroy.3c				:= SOSRC = man3c/semaphore.3c
+sema_init.3c				:= SOSRC = man3c/semaphore.3c
+sema_post.3c				:= SOSRC = man3c/semaphore.3c
+sema_trywait.3c				:= SOSRC = man3c/semaphore.3c
+sema_wait.3c				:= SOSRC = man3c/semaphore.3c
+
+setvbuf.3c				:= SOSRC = man3c/setbuf.3c
+
+setlinebuf.3c				:= SOSRC = man3c/setbuffer.3c
+
+longjmp.3c				:= SOSRC = man3c/setjmp.3c
+siglongjmp.3c				:= SOSRC = man3c/setjmp.3c
+sigsetjmp.3c				:= SOSRC = man3c/setjmp.3c
+
+sighold.3c				:= SOSRC = man3c/signal.3c
+sigignore.3c				:= SOSRC = man3c/signal.3c
+sigpause.3c				:= SOSRC = man3c/signal.3c
+sigrelse.3c				:= SOSRC = man3c/signal.3c
+sigset.3c				:= SOSRC = man3c/signal.3c
+
+sigaddset.3c				:= SOSRC = man3c/sigsetops.3c
+sigdelset.3c				:= SOSRC = man3c/sigsetops.3c
+sigemptyset.3c				:= SOSRC = man3c/sigsetops.3c
+sigfillset.3c				:= SOSRC = man3c/sigsetops.3c
+sigismember.3c				:= SOSRC = man3c/sigsetops.3c
+
+sigtimedwait.3c				:= SOSRC = man3c/sigwaitinfo.3c
+
+gsignal.3c				:= SOSRC = man3c/ssignal.3c
+
+sig2str.3c				:= SOSRC = man3c/str2sig.3c
+
+strerror_r.3c				:= SOSRC = man3c/strerror.3c
+
+ascftime.3c				:= SOSRC = man3c/strftime.3c
+cftime.3c				:= SOSRC = man3c/strftime.3c
+
+strcasecmp.3c				:= SOSRC = man3c/string.3c
+strcat.3c				:= SOSRC = man3c/string.3c
+strchr.3c				:= SOSRC = man3c/string.3c
+strcmp.3c				:= SOSRC = man3c/string.3c
+strcpy.3c				:= SOSRC = man3c/string.3c
+strcspn.3c				:= SOSRC = man3c/string.3c
+strdup.3c				:= SOSRC = man3c/string.3c
+strlcat.3c				:= SOSRC = man3c/string.3c
+strlcpy.3c				:= SOSRC = man3c/string.3c
+strlen.3c				:= SOSRC = man3c/string.3c
+strncasecmp.3c				:= SOSRC = man3c/string.3c
+strncat.3c				:= SOSRC = man3c/string.3c
+strncmp.3c				:= SOSRC = man3c/string.3c
+strncpy.3c				:= SOSRC = man3c/string.3c
+strnlen.3c				:= SOSRC = man3c/string.3c
+strpbrk.3c				:= SOSRC = man3c/string.3c
+strrchr.3c				:= SOSRC = man3c/string.3c
+strsep.3c				:= SOSRC = man3c/string.3c
+strspn.3c				:= SOSRC = man3c/string.3c
+strstr.3c				:= SOSRC = man3c/string.3c
+strtok.3c				:= SOSRC = man3c/string.3c
+strtok_r.3c				:= SOSRC = man3c/string.3c
+
+file_to_decimal.3c			:= SOSRC = man3c/string_to_decimal.3c
+func_to_decimal.3c			:= SOSRC = man3c/string_to_decimal.3c
+
+atof.3c					:= SOSRC = man3c/strtod.3c
+strtof.3c				:= SOSRC = man3c/strtod.3c
+strtold.3c				:= SOSRC = man3c/strtod.3c
+
+strtoumax.3c				:= SOSRC = man3c/strtoimax.3c
+
+atoi.3c					:= SOSRC = man3c/strtol.3c
+atol.3c					:= SOSRC = man3c/strtol.3c
+atoll.3c				:= SOSRC = man3c/strtol.3c
+lltostr.3c				:= SOSRC = man3c/strtol.3c
+strtoll.3c				:= SOSRC = man3c/strtol.3c
+ulltostr.3c				:= SOSRC = man3c/strtol.3c
+
+strtoull.3c				:= SOSRC = man3c/strtoul.3c
+wstostr.3c				:= SOSRC = man3c/strtows.3c
+
+closelog.3c				:= SOSRC = man3c/syslog.3c
+openlog.3c				:= SOSRC = man3c/syslog.3c
+setlogmask.3c				:= SOSRC = man3c/syslog.3c
+
+thr_setconcurrency.3c			:= SOSRC = man3c/thr_getconcurrency.3c
+
+thr_setprio.3c				:= SOSRC = man3c/thr_getprio.3c
+
+thr_getspecific.3c			:= SOSRC = man3c/thr_keycreate.3c
+thr_keycreate_once.3c			:= SOSRC = man3c/thr_keycreate.3c
+thr_setspecific.3c			:= SOSRC = man3c/thr_keycreate.3c
+
+thr_continue.3c				:= SOSRC = man3c/thr_suspend.3c
+
+timer_getoverrun.3c			:= SOSRC = man3c/timer_settime.3c
+timer_gettime.3c			:= SOSRC = man3c/timer_settime.3c
+
+timerclear.3c				:= SOSRC = man3c/timeradd.3c
+timercmp.3c				:= SOSRC = man3c/timeradd.3c
+timerisset.3c				:= SOSRC = man3c/timeradd.3c
+timersub.3c				:= SOSRC = man3c/timeradd.3c
+
+tempnam.3c				:= SOSRC = man3c/tmpnam.3c
+tmpnam_r.3c				:= SOSRC = man3c/tmpnam.3c
+
+ftruncate.3c				:= SOSRC = man3c/truncate.3c
+
+tdelete.3c				:= SOSRC = man3c/tsearch.3c
+tfind.3c				:= SOSRC = man3c/tsearch.3c
+twalk.3c				:= SOSRC = man3c/tsearch.3c
+
+ttyname_r.3c				:= SOSRC = man3c/ttyname.3c
+
+uconv_u16tou8.3c			:= SOSRC = man3c/uconv_u16tou32.3c
+uconv_u32tou16.3c			:= SOSRC = man3c/uconv_u16tou32.3c
+uconv_u32tou8.3c			:= SOSRC = man3c/uconv_u16tou32.3c
+uconv_u8tou16.3c			:= SOSRC = man3c/uconv_u16tou32.3c
+uconv_u8tou32.3c			:= SOSRC = man3c/uconv_u16tou32.3c
+
+ucred_free.3c				:= SOSRC = man3c/ucred_get.3c
+ucred_getegid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_geteuid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getgroups.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getlabel.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getpflags.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getpid.3c				:= SOSRC = man3c/ucred_get.3c
+ucred_getprivset.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getprojid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getrgid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getruid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getsgid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getsuid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_getzoneid.3c			:= SOSRC = man3c/ucred_get.3c
+ucred_size.3c				:= SOSRC = man3c/ucred_get.3c
+
+vswprintf.3c				:= SOSRC = man3c/vfwprintf.3c
+vwprintf.3c				:= SOSRC = man3c/vfwprintf.3c
+
+vasprintf.3c				:= SOSRC = man3c/vprintf.3c
+vfprintf.3c				:= SOSRC = man3c/vprintf.3c
+vsnprintf.3c				:= SOSRC = man3c/vprintf.3c
+vsprintf.3c				:= SOSRC = man3c/vprintf.3c
+
+wait4.3c				:= SOSRC = man3c/wait3.3c
+
+addrtosymstr.3c				:= SOSRC = man3c/walkcontext.3c
+backtrace.3c				:= SOSRC = man3c/walkcontext.3c
+backtrace_symbols.3c			:= SOSRC = man3c/walkcontext.3c
+backtrace_symbols_fd.3c			:= SOSRC = man3c/walkcontext.3c
+printstack.3c				:= SOSRC = man3c/walkcontext.3c
+
+wscoll.3c				:= SOSRC = man3c/wcscoll.3c
+
+watof.3c				:= SOSRC = man3c/wcstod.3c
+wcstof.3c				:= SOSRC = man3c/wcstod.3c
+wcstold.3c				:= SOSRC = man3c/wcstod.3c
+wstod.3c				:= SOSRC = man3c/wcstod.3c
+
+wcstoumax.3c				:= SOSRC = man3c/wcstoimax.3c
+
+watoi.3c				:= SOSRC = man3c/wcstol.3c
+watol.3c				:= SOSRC = man3c/wcstol.3c
+watoll.3c				:= SOSRC = man3c/wcstol.3c
+wcstoll.3c				:= SOSRC = man3c/wcstol.3c
+wstol.3c				:= SOSRC = man3c/wcstol.3c
+
+wcstoull.3c				:= SOSRC = man3c/wcstoul.3c
+
+wcscat.3c				:= SOSRC = man3c/wcstring.3c
+wcschr.3c				:= SOSRC = man3c/wcstring.3c
+wcscmp.3c				:= SOSRC = man3c/wcstring.3c
+wcscpy.3c				:= SOSRC = man3c/wcstring.3c
+wcscspn.3c				:= SOSRC = man3c/wcstring.3c
+wcslen.3c				:= SOSRC = man3c/wcstring.3c
+wcsncat.3c				:= SOSRC = man3c/wcstring.3c
+wcsncmp.3c				:= SOSRC = man3c/wcstring.3c
+wcsncpy.3c				:= SOSRC = man3c/wcstring.3c
+wcspbrk.3c				:= SOSRC = man3c/wcstring.3c
+wcsrchr.3c				:= SOSRC = man3c/wcstring.3c
+wcsspn.3c				:= SOSRC = man3c/wcstring.3c
+wcstok.3c				:= SOSRC = man3c/wcstring.3c
+wcswcs.3c				:= SOSRC = man3c/wcstring.3c
+windex.3c				:= SOSRC = man3c/wcstring.3c
+wrindex.3c				:= SOSRC = man3c/wcstring.3c
+wscat.3c				:= SOSRC = man3c/wcstring.3c
+wschr.3c				:= SOSRC = man3c/wcstring.3c
+wscmp.3c				:= SOSRC = man3c/wcstring.3c
+wscpy.3c				:= SOSRC = man3c/wcstring.3c
+wscspn.3c				:= SOSRC = man3c/wcstring.3c
+wslen.3c				:= SOSRC = man3c/wcstring.3c
+wsncat.3c				:= SOSRC = man3c/wcstring.3c
+wsncmp.3c				:= SOSRC = man3c/wcstring.3c
+wsncpy.3c				:= SOSRC = man3c/wcstring.3c
+wspbrk.3c				:= SOSRC = man3c/wcstring.3c
+wsrchr.3c				:= SOSRC = man3c/wcstring.3c
+wsspn.3c				:= SOSRC = man3c/wcstring.3c
+wstok.3c				:= SOSRC = man3c/wcstring.3c
+
+wsxfrm.3c				:= SOSRC = man3c/wcsxfrm.3c
+
+wordfree.3c				:= SOSRC = man3c/wordexp.3c
+
+wscasecmp.3c				:= SOSRC = man3c/wstring.3c
+wscol.3c				:= SOSRC = man3c/wstring.3c
+wsdup.3c				:= SOSRC = man3c/wstring.3c
+wsncasecmp.3c				:= SOSRC = man3c/wstring.3c
+
+.KEEP_STATE:
+
+include ../Makefile.man
+
+install: $(ROOTMANFILES)
+
+

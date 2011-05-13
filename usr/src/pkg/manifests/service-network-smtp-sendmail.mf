@@ -56,6 +56,10 @@ dir path=usr/lib/help/auths
 dir path=usr/lib/help/auths/locale
 dir path=usr/lib/help/auths/locale/C
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 dir path=var group=sys
 dir path=var/adm group=sys mode=0775
 dir path=var/adm/sm.bin group=sys
@@ -183,6 +187,27 @@ file path=usr/sbin/check-permissions group=mail mode=0555
 file path=usr/sbin/editmap mode=0555
 file path=usr/sbin/etrn mode=0555
 file path=usr/sbin/makemap mode=0555
+file path=usr/share/man/man1/mailcompat.1
+file path=usr/share/man/man1/mailq.1
+file path=usr/share/man/man1/mailstats.1
+file path=usr/share/man/man1/mconnect.1
+file path=usr/share/man/man1/praliases.1
+file path=usr/share/man/man1/vacation.1
+file path=usr/share/man/man1m/check-hostname.1m
+file path=usr/share/man/man1m/check-permissions.1m
+file path=usr/share/man/man1m/editmap.1m
+file path=usr/share/man/man1m/etrn.1m
+file path=usr/share/man/man1m/makemap.1m
+file path=usr/share/man/man1m/newaliases.1m
+file path=usr/share/man/man1m/sendmail.1m
+file path=usr/share/man/man1m/smrsh.1m
+file path=usr/share/man/man4/addresses.4
+file path=usr/share/man/man4/alias.4
+file path=usr/share/man/man4/aliases.4
+file path=usr/share/man/man4/forward.4
+file path=usr/share/man/man4/sendmail.4
+file path=usr/share/man/man4/sendmail.cf.4
+file path=usr/share/man/man4/submit.cf.4
 legacy pkg=SUNWsndmr desc="Sendmail Configuration Files" \
     name="Sendmail (root)"
 legacy pkg=SUNWsndmu desc="Sendmail Utilities" name="Sendmail (/usr)"

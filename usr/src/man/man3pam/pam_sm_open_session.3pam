@@ -1,0 +1,117 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_sm_open_session 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_sm_open_session, pam_sm_close_session \- service provider implementation
+for pam_open_session and pam_close_session
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ]  \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+#include <security/pam_modules.h>
+
+
+
+\fBint\fR \fBpam_sm_open_session\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR,
+     \fBint\fR \fIargc\fR, \fBconst char **\fR\fIargv\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpam_sm_close_session\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIflags\fR,
+     \fBint\fR \fIargc\fR, \fBconst char **\fR\fIargv\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+In response to a call to \fBpam_open_session\fR(3PAM) and
+\fBpam_close_session\fR(3PAM), the  \fBPAM\fR framework calls
+\fBpam_sm_open_session()\fR and \fBpam_sm_close_session()\fR, respectively from
+the modules listed in the \fBpam.conf\fR(4) file.  The session management
+provider supplies the back-end functionality for this interface function.
+.sp
+.LP
+The \fBpam_sm_open_session()\fR function is called to initiate session
+management. The\fBpam_sm_close_session()\fR function is invoked when a session
+has terminated. The argument \fIpamh\fR is an authentication handle. The
+following flag may be set in the \fIflags\fR field:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 14n
+.rt  
+Session service should not generate any messages.
+.RE
+
+.sp
+.LP
+The \fIargc\fR argument represents the number of module options passed in from
+the configuration file \fBpam.conf\fR(4). \fIargv\fR specifies the module
+options, which are interpreted and processed by the session management service.
+If an unknown option is passed in, an error should be logged through
+\fBsyslog\fR(3C) and the option ignored.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fBPAM_SUCCESS\fR should be returned. The
+following values may also be returned upon error:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SESSION_ERR\fR\fR
+.ad
+.RS 19n
+.rt  
+Cannot make or remove an entry for the specified session.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 19n
+.rt  
+Ignore underlying session module regardless of whether the control  flag is
+\fIrequired\fR, \fIoptional\fR or \fIsufficient\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpam\fR(3PAM), \fBpam_open_session\fR(3PAM), \fBsyslog\fR(3C),
+\fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces in  \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own  \fBPAM\fR handle.

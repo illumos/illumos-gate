@@ -1,0 +1,252 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH srchtxt 1 "20 Dec 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+srchtxt \- display contents of, or search for a text string in, message data
+bases
+.SH SYNOPSIS
+.LP
+.nf
+\fBsrchtxt\fR [\fB-s\fR] [\fB-l\fR \fIlocale\fR] [\fB-m\fR \fImsgfile\fR ,...] [\fItext\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsrchtxt\fR utility is used to display all the text strings in message
+data bases, or to search for a text string in message data bases (see
+\fBmkmsgs\fR(1)). These data bases are files in the directory\fB
+/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR (see \fBsetlocale\fR(3C)), unless a
+file name given with the \fB-m\fR option contains a \fB/\fR. The directory
+\fBlocale\fR can be viewed as the name of the language in which the text
+strings are written. If the \fB-l\fR option is not specified, the files
+accessed will be determined by the value of the environment variable
+\fBLC_MESSAGES\fR. If \fBLC_MESSAGES\fR is not set, the files accessed will be
+determined by the value of the environment variable \fBLANG\fR. If \fBLANG\fR
+is not set, the files accessed will be in the directory
+\fB/usr/lib/locale//C/LC_MESSAGES \fR, which contains default strings.
+.sp
+.LP
+If no \fItext\fR argument is present, then all the text strings in the files
+accessed will be displayed.
+.sp
+.LP
+If the \fB-s\fR option is not specified, the displayed text is prefixed by
+message sequence numbers. The message sequence numbers are enclosed in angle
+brackets: \fB<\fR\fImsgfile\fR\fB:\fR\fImsgnum\fR\fB>.\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgfile\fR \fR
+.ad
+.RS 12n
+.rt  
+name of the file where the displayed text occurred
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsgnum\fR \fR
+.ad
+.RS 12n
+.rt  
+sequence number in \fImsgfile\fR where the displayed text occurred
+.RE
+
+.sp
+.LP
+This display is in the format used by \fBgettxt\fR(1) and \fBgettxt\fR(3C).
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 14n
+.rt  
+Suppress printing of the message sequence numbers of the messages being
+displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fI locale\fR \fR
+.ad
+.RS 14n
+.rt  
+Access files in the directory \fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR.
+If \fB-m\fR \fImsgfile\fR is also supplied, \fIlOCALE\fR is ignored for
+\fImsgfile\fRs containing a \fB/\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI msgfile\fR\fR
+.ad
+.RS 14n
+.rt  
+Access files specified by one or more \fImsgfile\fRs. If \fImsgfile\fR contains
+a \fB/\fR character, then \fImsgfile\fR \fIis\fR interpreted as a pathname;
+otherwise, it will be assumed to be in the directory determined as described
+above. To specify more than one \fImsgfile\fR, separate the file names using
+commas.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItext\fR \fR
+.ad
+.RS 14n
+.rt  
+Search for the text string specified by \fItext\fR and display each one that
+matches. \fItext\fR can take the form of a regular expression; see
+\fBregexp\fR(5).
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBsrchtxt\fR
+.sp
+.LP
+If message files have been installed in a locale named \fBfrench\fR by using
+\fBmkmsgs\fR(1), then you could display the entire set of text strings in the
+\fBfrench\fR locale (\fB/usr/lib/locale/french/LC_MESSAGES/* \fR) by typing:
+
+.sp
+.in +2
+.nf
+example% srchtxt \(mil french
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUsing \fBsrchtxt\fR
+.sp
+.LP
+If a set of error messages associated with the operating system have been
+installed in the file \fBUX\fR in the \fBfrench\fR locale
+(\fB/usr/lib/locale/french/LC_MESSAGE/UX \fR), then, using the value of the
+\fBLANG\fR environment variable to determine the locale to be searched, you
+could search that file in that locale for all error messages dealing with files
+by typing:
+
+.sp
+.in +2
+.nf
+example% setenv LANG=french; export  LANG
+example% srchtxt -m UX "[Ff]ichier"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If \fB/usr/lib/locale/french/LC_MESSAGES/UX \fR contained the following
+strings:
+
+.sp
+.in +2
+.nf
+Erreur E/S\en
+Liste d'arguments trop longue\en
+Fichier inexistant\en
+Argument invalide\en
+Trop de fichiers ouverts\en
+Fichier trop long\en
+Trop de liens\en
+Argument hors du domaine\en
+Identificateur supprim\en
+Etreinte fatale\en
+  .
+  .
+  .
+.fi
+.in -2
+
+.sp
+.LP
+then the following strings would be displayed:
+
+.sp
+.in +2
+.nf
+<UX:3>Fichier inexistant\en
+<UX:5>Trop de fichiers ouverts\en
+<UX:6>Fichier trop long\en
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing \fBsrchtxt\fR
+.sp
+.LP
+If a set of error messages associated with the operating system have been
+installed in the file \fBUX\fR and a set of error messages associated with the
+INGRESS data base product have been installed in the file \fBingress\fR, both
+in the \fBgerman\fR locale, then you could search for the pattern
+\fB[Dd]atei\fR in both the files \fBUX\fR and \fBingress\fR in the \fBgerman\fR
+locale by typing:
+
+.sp
+.in +2
+.nf
+example% srchtxt -l german -m UX,ingress "[Dd]atei"
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for a description of the \fBLC_CTYPE\fR environment
+variable that affects the execution of \fBsrchtxt\fR.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/C/LC_MESSAGES/* \fR\fR
+.ad
+.sp .6
+.RS 4n
+default files created by \fBmkmsgs\fR(1)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/locale/LC_MESSAGES/* \fR\fR
+.ad
+.sp .6
+.RS 4n
+message files created by \fBmkmsgs\fR(1)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexstr\fR(1), \fBgettxt\fR(1), \fBlocale\fR(1), \fBmkmsgs\fR(1),
+\fBgettxt\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlocale\fR(5), \fBregexp\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+The error messages produced by \fBsrchtxt\fR are intended to be
+self-explanatory. They indicate an error in the command line or errors
+encountered while searching for a particular locale and/or message file.

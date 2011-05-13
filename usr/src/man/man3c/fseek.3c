@@ -1,0 +1,304 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 20023, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fseek 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fseek, fseeko \- reposition a file-position indicator in a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBint\fR \fBfseek\fR(\fBFILE *\fR\fIstream\fR, \fBlong\fR \fIoffset\fR, \fBint\fR \fIwhence\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfseeko\fR(\fBFILE *\fR\fIstream\fR, \fBoff_t\fR \fIoffset\fR, \fBint\fR \fIwhence\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfseek()\fR function sets the file-position indicator for the stream
+pointed to by \fIstream\fR. The \fBfseeko()\fR function is identical to
+\fBfseek()\fR except for the type of \fIoffset\fR.
+.sp
+.LP
+The new position, measured in bytes from the beginning of the file, is obtained
+by adding \fIoffset\fR to the position specified by \fIwhence\fR, whose values
+are defined in <\fBstdio.h\fR> as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEEK_SET\fR\fR
+.ad
+.RS 12n
+.rt  
+Set position equal to \fIoffset\fR bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEEK_CUR\fR\fR
+.ad
+.RS 12n
+.rt  
+Set position to current location plus \fIoffset\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEEK_END\fR\fR
+.ad
+.RS 12n
+.rt  
+Set position to \fBEOF\fR plus \fIoffset\fR.
+.RE
+
+.sp
+.LP
+If the stream is to be used with wide character input/output functions,
+\fIoffset\fR must either be 0 or a value returned by an earlier call to
+\fBftell\fR(3C) on the same stream and \fIwhence\fR must be \fBSEEK_SET\fR.
+.sp
+.LP
+A successful call to \fBfseek()\fR clears the end-of-file indicator for the
+stream and undoes any effects of \fBungetc\fR(3C) and \fBungetwc\fR(3C) on the
+same stream.  After an \fBfseek()\fR call, the next operation on an update
+stream may be either input or output.
+.sp
+.LP
+If the most recent operation, other than \fBftell\fR(3C), on a given stream is
+\fBfflush\fR(3C), the file offset in the underlying open file description will
+be adjusted to reflect the location specified by \fBfseek()\fR.
+.sp
+.LP
+The \fBfseek()\fR function allows the file-position indicator to be set beyond
+the end of existing data in the file. If data is later written at this point,
+subsequent reads of data in the gap will return bytes with the value 0 until
+data is actually written into the gap.
+.sp
+.LP
+The value of the file offset returned by \fBfseek()\fR on devices which are
+incapable of seeking is undefined.
+.sp
+.LP
+If the stream is writable and buffered data had not been written to the
+underlying file, \fBfseek()\fR will cause the unwritten data to be written to
+the file and mark the \fBst_ctime\fR and \fBst_mtime\fR fields of the file for
+update.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBfseek()\fR and \fBfseeko()\fR functions return \fB0\fR on success;
+otherwise, they returned \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBfseek()\fR and \fBfseeko()\fR functions will fail if, either the
+\fIstream\fR is unbuffered or the \fIstream\fR's buffer needed to be flushed,
+and the call to \fBfseek()\fR or \fBfseeko()\fR causes an underlying
+\fBlseek\fR(2) or \fBwrite\fR(2) to be invoked:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBO_NONBLOCK\fR flag is set for the file descriptor and the process would
+be delayed in the write operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The file descriptor underlying the stream file is not open for writing or the
+stream's buffer needed to be flushed and the file is not open.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was made to write a file that exceeds the maximum file size or the
+process's file size limit, or the file is a regular file and an attempt was
+made to write at or beyond the offset maximum associated with the corresponding
+stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The write operation was terminated due to the receipt of a signal, and no data
+was transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIwhence\fR argument is invalid. The resulting file-position indicator
+would be set to a negative value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+A physical I/O error has occurred; or the process is a member of a background
+process group attempting to perform a \fBwrite\fR(2) operation to its
+controlling terminal, \fBTOSTOP\fR is set, the process is neither ignoring nor
+blocking \fBSIGTTOU\fR, and the process group of the process is orphaned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 10n
+.rt  
+There was no free space remaining on the device containing the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+.rt  
+A request was made of a non-existent device, or the request was outside the
+capabilities of the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+The file descriptor underlying \fIstream\fR is associated with a pipe or FIFO.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was made to write to a pipe or \fBFIFO\fR that is not open for
+reading by any process. A \fBSIGPIPE\fR signal will also be sent to the calling
+thread.
+.RE
+
+.sp
+.LP
+The \fBfseek()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The resulting file offset would be a value which cannot be represented
+correctly in an object of type \fBlong\fR.
+.RE
+
+.sp
+.LP
+The \fBfseeko()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The resulting file offset would be a value which cannot be represented
+correctly in an object of type \fBoff_t\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Although on the UNIX system an offset returned by \fBftell()\fR or
+\fBftello()\fR (see \fBftell\fR(3C)) is measured in bytes, and it is
+permissible to seek to positions relative to that offset, portability to
+non-UNIX systems requires that an offset be used by \fBfseek()\fR directly.
+Arithmetic may not meaningfully be performed on such an offset, which is not
+necessarily measured in bytes.
+.sp
+.LP
+The \fBfseeko()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetrlimit\fR(2), \fBulimit\fR(2), \fBfopen\fR(3UCB), \fBftell\fR(3C),
+\fBrewind\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C), \fBattributes\fR(5),
+\fBlf64\fR(5), \fBstandards\fR(5)

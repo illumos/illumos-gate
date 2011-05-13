@@ -1,0 +1,118 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2005,
+.\" Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH shutdown 3SOCKET "31 Jan 2005" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+shutdown \- shut down part of a full-duplex connection
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR... ]
+#include <sys/socket.h>
+
+\fBint\fR \fBshutdown\fR(\fBint\fR \fIs\fR, \fBint\fR \fIhow\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBshutdown()\fR call shuts down all or part of a full-duplex connection on
+the socket associated with \fIs\fR. If \fIhow\fR is \fBSHUT_RD\fR, further
+receives are disallowed. If \fIhow\fR is \fBSHUT_WR\fR, further sends are
+disallowed. If \fIhow\fR is \fBSHUT_RDWR\fR, further sends and receives are
+disallowed.
+.sp
+.LP
+The \fIhow\fR values should be defined constants.
+.SH RETURN VALUES
+.sp
+.LP
+\fB0\fR is returned if the call succeeds.
+.sp
+.LP
+\fB\(mi1\fR is returned if the call fails.
+.SH ERRORS
+.sp
+.LP
+The call succeeds unless one of the following conditions exists:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIs\fR value is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 12n
+.rt  
+Insufficient user memory is available for the operation to complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 12n
+.rt  
+Insufficient \fBSTREAMS\fR resources are available for the operation to
+complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTCONN\fR\fR
+.ad
+.RS 12n
+.rt  
+The specified socket is not connected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIs\fR value is not a socket.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBconnect\fR(3SOCKET), \fBsocket\fR(3SOCKET), \fBsocket.h\fR(3HEAD),
+\fBattributes\fR(5)

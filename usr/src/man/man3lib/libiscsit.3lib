@@ -1,0 +1,94 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libiscsit 3LIB "1 Oct 2008" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libiscsit \- iSCSI Management library
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-liscsit\fR [ \fIlibrary\fR... ]
+#include <libiscsit.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in this library provide management services for COMSTAR iSCSI target
+ports.
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibiscsit.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBit_config_commit\fR\fBit_config_free\fR
+\fBit_config_load\fR\fBit_config_setprop\fR
+\fBit_ini_create\fR\fBit_ini_delete\fR
+\fBit_ini_free\fR\fBit_ini_setprop\fR
+\fBit_portal_create\fR\fBit_portal_delete\fR
+\fBit_tgt_create\fR\fBit_tgt_delete\fR
+\fBit_tgt_free\fR\fBit_tgt_setprop\fR
+\fBit_tpg_create\fR\fBit_tpg_delete\fR
+\fBit_tpg_free\fR\fBit_tpgt_create\fR
+\fBit_tpgt_delete\fR\fBit_tpgt_free\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/libiscsit.so.1\fR\fR
+.ad
+.RS 26n
+.rt  
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/64/libiscsit.so.1\fR\fR
+.ad
+.RS 26n
+.rt  
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fBit_config_load\fR(3ISCSIT), \fBit_ini_create\fR(3ISCSIT),
+\fBit_portal_create\fR(3ISCSIT), \fBit_tgt_create\fR(3ISCSIT),
+\fBit_tpg_create\fR(3ISCSIT), \fBattributes\fR(5)

@@ -1,0 +1,100 @@
+'\" te
+.\" Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH atexit 3C "25 May 2001" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+atexit \- register a function to run at process termination or object unloading
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBint\fR \fBatexit\fR(\fBvoid (*\fR\fIfunc\fR)(void));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBatexit()\fR function registers the function pointed to by \fIfunc\fR to
+be called without arguments on normal termination of the program or when the
+object defining the function is unloaded.
+.sp
+.LP
+Normal termination occurs by either a call to the \fBexit\fR(3C) function or a
+return from \fBmain()\fR. Object unloading occurs when a call to
+\fBdlclose\fR(3C) results in the object becoming unreferenced.
+.sp
+.LP
+The number of functions that may be registered with \fBatexit()\fR is limited
+only by available memory (refer to the \fB_SC_ATEXIT_MAX\fR argument of
+\fBsysconf\fR(3C)).
+.sp
+.LP
+After a successful call to any of the \fBexec\fR(2) functions, any functions
+previously registered by \fBatexit()\fR are no longer registered.
+.sp
+.LP
+On process exit, functions are called in the reverse order of their
+registration. On object unloading, any functions belonging to an unloadable
+object are called in the reverse order of their registration.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBatexit()\fR function returns 0. Otherwise,
+it returns a non-zero value.
+.SH ERRORS
+.sp
+.LP
+The \fBatexit()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient storage space is available.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The functions registered by a call to \fBatexit()\fR must return to ensure that
+all registered functions are called.
+.sp
+.LP
+There is no way for an application to tell how many functions have already been
+registered with \fBatexit()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBdlclose\fR(3C), \fBexit\fR(3C), \fBsysconf\fR(3C),
+\fBattributes\fR(5)

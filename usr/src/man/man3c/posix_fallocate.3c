@@ -1,0 +1,172 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH posix_fallocate 3C "14 Jul 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+posix_fallocate \- file space control
+.SH SYNOPSIS
+.LP
+.nf
+#include <fcntl.h>
+
+\fBint\fR \fBposix_fallocate\fR(\fBint\fR \fIfd\fR, \fBoff_t\fR \fIoffset\fR, \fBoff_t\fR \fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBposix_fallocate()\fR function ensures that any required storage for
+regular file data starting at \fIoffset\fR and continuing for \fIlen\fR bytes
+is allocated on the file system storage media. If \fBposix_fallocate()\fR
+returns successfully, subsequent writes to the specified file data will not
+fail due to the lack of free space on the file system storage media.
+.sp
+.LP
+If the \fIoffset\fR+\fIlen\fR is beyond the current file size, then
+\fBposix_fallocate()\fR adjusts the file size to \fIoffset\fR+\fIlen\fR.
+Otherwise, the file size is not changed.
+.sp
+.LP
+Space allocated with \fBposix_fallocate()\fR is freed by a successful call to
+\fBcreat\fR(2) or \fBopen\fR(2) that truncates the size of the file. Space
+allocated with \fBposix_fallocate()\fR may be freed by a successful call to
+\fBftruncate\fR(3C) that reduces the file size to a size smaller than
+\fIoffset\fR+\fIlen\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBposix_fallocate()\fR returns zero. Otherwise, an
+error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBposix_fallocate()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfd\fR argument is not a valid file descriptor or references a file that
+was opened without write permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIoffset\fR+\fIlen\fR is greater than the maximum file size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+A signal was caught during execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIlen\fR argument is less than or equal to zero, or the \fIoffset\fR
+argument is less than zero, or the underlying file system does not support this
+operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+An I/O error occurred while reading from or writing to a file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENODEV\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfd\fR argument does not refer to a regular file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 10n
+.rt  
+There is insufficient free space remaining on the file system storage media.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfd\fR argument is associated with a pipe or FIFO.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBposix_fallocate()\fR function has a transitional interface for 64-bit
+file offsets. See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBopen\fR(2), \fBunlink\fR(2), \fBftruncate\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

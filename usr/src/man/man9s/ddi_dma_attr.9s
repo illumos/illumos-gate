@@ -1,0 +1,350 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_attr 9S "12 Feb 2009" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+ddi_dma_attr \- DMA attributes structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddidmareq.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+A \fBddi_dma_attr_t\fR structure describes device- and \fBDMA\fR
+engine-specific attributes necessary to allocate \fBDMA\fR resources for a
+device. The driver might have to extend the attributes with bus-specific
+information, depending on the bus to which the device is connected.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+uint_t      dma_attr_version;      /* version number */
+uint64_t    dma_attr_addr_lo;      /* low DMA address range */
+uint64_t    dma_attr_addr_hi;      /* high DMA address range */
+uint64_t    dma_attr_count_max;    /* DMA counter register */
+uint64_t    dma_attr_align;        /* DMA address alignment */
+uint_t      dma_attr_burstsizes;   /* DMA burstsizes */
+uint32_t    dma_attr_minxfer;      /* min effective DMA size */
+uint64_t    dma_attr_maxxfer;      /* max DMA xfer size */
+uint64_t    dma_attr_seg;          /* segment boundary */
+int         dma_attr_sgllen;       /* s/g list length */
+uint32_t    dma_attr_granular;     /* granularity of device */
+uint_t      dma_attr_flags;        /* DMA transfer flags */
+\fI\fR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBdma_attr_version\fR stores the version number of this \fBDMA\fR
+attribute structure. It should be set to \fBDMA_ATTR_V0\fR.
+.sp
+.LP
+The \fBdma_attr_addr_lo\fR and \fBdma_attr_addr_hi\fR fields specify the
+address range the device's \fBDMA\fR engine can access. The
+\fBdma_attr_addr_lo\fR field describes the inclusive lower 64-bit boundary. The
+\fBdma_attr_addr_hi\fR describes the inclusive upper 64-bit boundary. The
+system ensures that allocated \fBDMA\fR resources are within the range
+specified. See \fBddi_dma_cookie\fR(9S).
+.sp
+.LP
+The \fBdma_attr_count_max\fR describes an inclusive upper bound for the
+device's \fBDMA\fR counter register. For example, \fB0xFFFFFF\fR would describe
+a \fBDMA\fR engine with a 24-bit counter register. \fBDMA\fR resource
+allocation functions have to break up a \fBDMA\fR object into multiple
+\fBDMA\fR cookies if the size of the object exceeds the size of the \fBDMA\fR
+counter register.
+.sp
+.LP
+The \fBdma_attr_align\fR specifies alignment requirements for allocated
+\fBDMA\fR resources. This field can be used to force more restrictive alignment
+than imposed by \fBdma_attr_burstsizes\fR or \fBdma_attr_minxfer\fR, such as
+alignment at a page boundary. Most drivers set this field to 1, indicating byte
+alignment.
+.sp
+.LP
+The \fBdma_attr_align\fR only specifies alignment requirements for allocated
+\fBDMA\fR resources. The buffer passed to \fBddi_dma_addr_bind_handle\fR(9F) or
+\fBddi_dma_buf_bind_handle\fR(9F) must have an equally restrictive alignment
+(see \fBddi_dma_mem_alloc\fR(9F)).
+.sp
+.LP
+The \fBdma_attr_burstsizes\fR field describes the possible burst sizes the
+\fBDMA\fR engine of a device can accept. The format of the data sizes is
+binary, encoded in terms of powers of two. When \fBDMA\fR resources are
+allocated, the system can modify the \fBburstsizes\fR value to reflect the
+system limits. The driver must use the allowable \fBburstsizes\fR to program
+the \fBDMA\fR engine. See \fBddi_dma_burstsizes\fR(9F).
+.sp
+.LP
+The \fBdma_attr_minxfer\fR field describes the minimum effective \fBDMA\fR
+access size in units of bytes. \fBDMA\fR resources can be modified, depending
+on the presence and use of \fBI/O\fR caches and write buffers between the
+\fBDMA\fR engine and the memory object. This field is used to determine
+alignment and padding requirements for \fBddi_dma_mem_alloc\fR(9F).
+.sp
+.LP
+The \fBdma_attr_maxxfer\fR field describes the maximum effective \fBDMA\fR
+access size in units of bytes.
+.sp
+.LP
+The \fBdma_attr_seg\fR field specifies segment boundary restrictions for
+allocated \fBDMA\fR resources. The system allocates \fBDMA\fR resources for the
+device so that the object does not span the segment boundary specified by
+\fBdma_attr_seg\fR. For example, a value of \fB0xFFFF\fR means \fBDMA\fR
+resources must not cross a 64-Kbyte boundary. \fBDMA\fR resource allocation
+functions might have to break up a \fBDMA\fR object into multiple \fBDMA\fR
+cookies to enforce segment boundary restrictions. In this case, the transfer
+must be performed using scatter-gather \fBI/O\fR or multiple \fBDMA\fR windows.
+.sp
+.LP
+The \fBdma_attr_sgllen\fR field describes the length of the \fBDMA\fR
+scatter/gather list of a device. Possible values are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB< 0\fR\fR
+.ad
+.RS 7n
+.rt  
+Device \fBDMA\fR engine is not constrained by the size, for example,
+with\fBDMA\fR chaining.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB= 0\fR\fR
+.ad
+.RS 7n
+.rt  
+Reserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB= 1\fR\fR
+.ad
+.RS 7n
+.rt  
+Device \fBDMA\fR engine does not support scatter/gather such as third party
+\fBDMA\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB> 1\fR\fR
+.ad
+.RS 7n
+.rt  
+Device \fBDMA\fR engine uses scatter/gather. The \fBdma_attr_sgllen\fR value is
+the maximum number of entries in the list.
+.RE
+
+.sp
+.LP
+The \fBdma_attr_granular\fR field describes the granularity of the device
+transfer size in units of bytes. When the system allocates \fBDMA\fR resources,
+the size of a single segment is a multiple of the device granularity. If
+\fBdma_attr_sgllen\fR is larger than \fB1\fR within a window, the sum of the
+sizes for a subgroup of segments is a multiple of the device granularity.
+.sp
+.LP
+All driver requests for \fBDMA\fR resources must be a multiple of the
+granularity of the device transfer size.
+.sp
+.LP
+The \fBdma_attr_flags\fR field can be set to a combination of:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_FORCE_PHYSICAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Some platforms, such as SPARC systems, support what is called Direct Virtual
+Memory Access (\fBDVMA\fR). On these platforms, the device is provided with a
+virtual address by the system in order to perform the transfer. In this case,
+the underlying platform provides an \fIIOMMU\fR, which translates accesses to
+these virtual addresses into the proper physical addresses. Some of these
+platforms also support \fBDMA.\fR \fBDDI_DMA_FORCE_PHYSICAL\fR indicates that
+the system should return physical rather than virtual \fBI/O\fR addresses if
+the system supports both. If the system does not support physical \fBDMA\fR,
+the return value from \fBddi_dma_alloc_handle\fR(9F) is \fBDDI_DMA_BADATTR.\fR
+In this case, the driver has to clear \fBDDI_DMA_FORCE_PHYSICAL\fR and retry
+the operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_FLAGERR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Using this value indicates that the driver is hardened: able to cope with the
+incorrect results of \fBDMA\fR operations that might result from an \fBI/O\fR
+fault. The value also indicates that the driver will use
+\fBddi_fm_dma_err_get\fR(9F) to check \fBDMA\fR handles for faults on a regular
+basis.
+.sp
+If a \fBDMA\fR error is detected during a \fBDMA\fR access to an area mapped by
+such a handle, the system should not panic if possible, but should instead mark
+the \fBDMA\fR handle as having faulted.
+.sp
+This value is advisory: it tells the system that the driver can continue in the
+face of \fBI/O\fR faults. It does not guarantee that the system will not panic,
+as that depends on the nature of the fault and the capabilities of the system.
+It is quite legitimate for an implementation to ignore this flag and panic
+anyway.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_RELAXED_ORDERING\fR\fR
+.ad
+.sp .6
+.RS 4n
+This optional flag can be set if the \fBDMA\fR transactions associated with
+this handle are not required to observe strong \fBDMA\fR write ordering among
+themselves, nor with \fBDMA\fR write transactions of other handles.
+.sp
+The flag allows the host bridge to transfer data to and from memory more
+efficiently and might result in better \fBDMA\fR performance on some platforms.
+.sp
+Drivers for devices with hardware support, such as marking the bus transactions
+relaxed ordered, should not use this flag. Such drivers should use the hardware
+capability instead.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInitializing the \fBddi_dma_attr_t\fR Structure
+.sp
+.LP
+Assume a device has the following \fBDMA\fR characteristics:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Full 32-bit range addressable
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+24-bit DMA counter register
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Byte alignment
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+4- and 8-byte burst sizes support
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum effective transfer size of 1 bytes
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+64 Mbyte minus 1 (26-bit) maximum transfer size limit
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum segment size of 32 Kbyte
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+17 scatter/gather list elements
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+512-byte device transfer size granularity
+.RE
+.sp
+.LP
+The corresponding \fBddi_dma_attr_t\fR structure is initialized as follows:
+
+.sp
+.in +2
+.nf
+static ddi_dma_attr_t dma_attrs = {
+         DMA_ATTR_V0              /* version number */
+         (uint64_t)0x0,           /* low address */  
+         (uint64_t)0xffffffff,    /* high address */
+         (uint64_t)0xffffff,      /* DMA counter max */
+         (uint64_t)0x1            /* alignment */  
+         0x0c,                    /* burst sizes */
+         0x1,                     /* minimum transfer size */
+         (uint64_t)0x3ffffff,     /* maximum transfer size */
+         (uint64_t)0x7fff,        /* maximum segment size */
+         17,                      /* scatter/gather list lgth */
+         512                      /* granularity */  
+         0                        /* DMA flags */
+};
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_dma_addr_bind_handle\fR(9F),
+\fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
+\fBddi_dma_burstsizes\fR(9F), \fBddi_dma_mem_alloc\fR(9F),
+\fBddi_dma_nextcookie\fR(9F), \fBddi_fm_dma_err_get\fR(9F),
+\fBddi_dma_cookie\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

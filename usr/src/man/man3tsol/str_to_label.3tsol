@@ -1,0 +1,194 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH str_to_label 3TSOL "15 Jun 2009" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+str_to_label \- parse human readable strings to label
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBint\fR \fBstr_to_label\fR(\fBconst char *\fR\fIstring\fR, \fBm_label_t **\fR\fIlabel\fR, 
+    \fBconst m_label_type_t\fR \fIlabel_type\fR, \fBuint_t\fR \fIflags\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstr_to_label()\fR function is a simple function to parse human readable
+strings into labels of the requested type.
+.sp
+.LP
+The \fIstring\fR argument is the string to parse. If \fIstring\fR is the result
+of a \fBlabel_to_str()\fR conversion of type \fBM_INTERNAL\fR, \fIflags\fR are
+ignored, and any previously parsed label is replaced.
+.sp
+.LP
+If *\fIlabel\fR is \fINULL\fR, \fBstr_to_label()\fR allocates resources for
+\fIlabel\fR and initializes the label to the \fIlabel_type\fR that was
+requested before parsing \fIstring\fR.
+.sp
+.LP
+If *\fIlabel\fR is not \fINULL\fR, the label is a pointer to a mandatory label
+that is the result of a previously parsed label and \fIlabel_type\fR is
+ignored. The type that is used for parsing is derived from \fIlabel\fR for any
+type-sensitive operations.
+.sp
+.LP
+If \fIflags\fR is \fBL_MODIFY_EXISTING\fR, the parsed string can be used to
+modify this label.
+.sp
+.LP
+If \fIflags\fR is \fBL_NO_CORRECTION\fR, the previously parsed label is
+replaced and the parsing algorithm does not attempt to infer missing elements
+from string to compose a valid label.
+.sp
+.LP
+If \fIflags\fR is \fBL_DEFAULT\fR, the previously parsed label is replaced and
+the parsing algorithm makes a best effort to imply a valid label from the
+elements of \fIstring\fR.
+.sp
+.LP
+If \fIflags\fR contains \fBL_CHECK_AR\fR logically OR-ed with another value,
+the resulting label will be checked to ensure that it is within the
+"Accreditation Range" of the DIA encodings schema. This flag is interpreted
+only for \fBMAC_LABEL\fR label types.
+.sp
+.LP
+The caller is responsible for freeing the allocated resources by calling the
+\fBm_label_free()\fR function. \fIlabel_type\fR defines the type for a newly
+allocated label. The label type can be:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAC_LABEL\fR\fR
+.ad
+.RS 14n
+.rt  
+The string should be translated as a Mandatory Access Control (MAC) label.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSER_CLEAR\fR\fR
+.ad
+.RS 14n
+.rt  
+The string should be translated as a label that represents the least upper
+bound of the labels that the user is allowed to access.
+.RE
+
+.sp
+.LP
+If \fIerror\fR is \fINULL\fR, do not return additional error information for
+\fBEINVAL\fR. The calling process must have mandatory read access to
+\fIlabel\fR and human readable \fIstring\fR. Or the calling process must have
+the \fBsys_trans_label\fR privilege.
+.sp
+.LP
+The manifest constants \fBADMIN_HIGH\fR and \fBADMIN_LOW\fR are the human
+readable strings that correspond to the Trusted Extensions policy
+\fBadmin_high\fR and \fBadmin_low\fR label values. See \fBlabels\fR(5).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBstr_to_label()\fR function returns 0.
+Otherwise, \fB-1\fR is returned, \fIerrno\fR is set to indicate the error, and
+\fIerror\fR provides additional information for \fBEINVAL\fR. Otherwise,
+\fIerror\fR is a zero-based index to the string parse failure point.
+.SH ERRORS
+.sp
+.LP
+The \fBstr_to_label()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+Invalid parameter. \fBM_BAD_STRING\fR indicates that \fIstring\fR could not be
+parsed. \fBM_BAD_LABEL\fR indicates that the label passed in was in error.
+\fBM_OUTSIDE_AR\fR indicates that the resulting label is not within the
+"Accreditation Range" specified in the DIA encodings schema.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The system does not support label translations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+The physical limits of the system are exceeded by size bytes of memory which
+cannot be allocated.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+Parsing types that are relative to Defense Intelligence Agency (DIA) encodings
+schema are Standard. Standard is specified in \fBlabel_encodings\fR(4).
+.SH SEE ALSO
+.sp
+.LP
+\fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB), \fBm_label\fR(3TSOL),
+\fBlabel_encodings\fR(4), \fBattributes\fR(5), \fBlabels\fR(5)
+.sp
+.LP
+\fIValidating the Label Request Against the Printer\&'s Label Range\fR in
+\fISolaris Trusted Extensions Developer\&'s Guide\fR
+.SH WARNINGS
+.sp
+.LP
+A number of the parsing rules rely on the DIA label encodings schema. The rules
+might not be valid for other label schemata.
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

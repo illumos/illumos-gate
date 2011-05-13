@@ -38,6 +38,7 @@ dir path=lib/svc/manifest/network group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/inet
+dir path=usr/share/man/man1m
 file path=lib/svc/manifest/network/chargen.xml group=sys mode=0444
 file path=lib/svc/manifest/network/daytime.xml group=sys mode=0444
 file path=lib/svc/manifest/network/discard.xml group=sys mode=0444
@@ -48,6 +49,11 @@ file path=usr/lib/inet/in.daytimed mode=0555
 file path=usr/lib/inet/in.discardd mode=0555
 file path=usr/lib/inet/in.echod mode=0555
 file path=usr/lib/inet/in.timed mode=0555
+file path=usr/share/man/man1m/in.chargend.1m
+file path=usr/share/man/man1m/in.daytimed.1m
+file path=usr/share/man/man1m/in.discardd.1m
+file path=usr/share/man/man1m/in.echod.1m
+file path=usr/share/man/man1m/in.timed.1m
 legacy pkg=SUNWcnsr \
     desc="Common Network Services (Root): time, daytime, echo, discard, chargen" \
     name="Common Network Services (Root): time, daytime, echo, discard, chargen"

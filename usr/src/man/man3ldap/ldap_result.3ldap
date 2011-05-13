@@ -1,0 +1,121 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_result 3LDAP "31 Mar 2009" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_result, ldap_msgfree \- wait for and return LDAP operation result
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBldap_result\fR(\fBLDAP *\fR\fIld\fR, \fBint\fR \fImsgid\fR, \fBint\fR \fIall\fR,
+     \fBstruct timeval *\fR\fItimeout\fR, \fBLDAPMessage **\fR\fIresult\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_msgfree\fR(\fBLDAPMessage *\fR\fImsg\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldap_result()\fR function is used to wait for and return the result of
+an operation previously initiated by one of the LDAP asynchronous operation
+functions , for example, \fBldap_search\fR(3LDAP), and
+\fBldap_modify\fR(3LDAP). Those functions all return  \fB\(mi1\fR in case of
+error, and an invocation identifier upon successful initiation of the
+operation. The invocation identifier is picked by the library and is guaranteed
+to be unique across the LDAP session.  It can be used to request the result of
+a specific operation from \fBldap_result()\fR through the \fImsgid\fR
+parameter.
+.sp
+.LP
+The \fBldap_result()\fR function will block or not, depending upon the setting
+of the \fItimeout\fR parameter. If \fItimeout\fR is not a null pointer, it
+specifies a  maximum interval to wait for the selection to complete.  If
+\fItimeout\fR is a null pointer, the select blocks indefinitely. To effect a
+poll, the \fItimeout\fR argument should be a non-null pointer, pointing to a
+zero-valued \fBtimeval\fR structure.  See \fBselect\fR(3C) for further details.
+.sp
+.LP
+If the result of a specific operation is required, \fImsgid\fR should be set to
+the invocation identifier returned when the operation was initiated, otherwise
+\fBLDAP_RES_ANY\fR should be supplied.  The \fIall\fR parameter only has
+meaning for search responses and is used to select whether a single entry of
+the search response should be returned, or all results of the search should be
+returned.
+.sp
+.LP
+A search response is made up of zero or more search entries followed by a
+search result.  If \fIall\fR is set to 0, search entries will be returned one
+at a time as they come in, by means of separate calls to \fBldap_result()\fR.
+If it is set to a non-zero value, the search response will only be returned in
+its entirety, that is, after all entries and the final search result have been
+received.
+.sp
+.LP
+Upon success, the type of the result received is returned and the \fIresult\fR
+parameter will contain the result of the operation.  This result should be
+passed to the LDAP parsing functions, (see \fBldap_first_entry\fR(3LDAP)) for
+interpretation.
+.sp
+.LP
+The possible result types returned are:
+.sp
+.in +2
+.nf
+#define LDAP_RES_BIND          0x61L
+#define LDAP_RES_SEARCH_ENTRY  0x64L
+#define LDAP_RES_SEARCH_RESULT 0x65L
+#define LDAP_RES_MODIFY        0x67L
+#define LDAP_RES_ADD           0x69L
+#define LDAP_RES_DELETE        0x6bL
+#define LDAP_RES_MODRDN        0x6dL
+#define LDAP_RES_COMPARE       0x6fL
+.fi
+.in -2
+
+.sp
+.LP
+The \fBldap_msgfree()\fR function is used to free the memory allocated for a
+result by \fBldap_result()\fR or \fBldap_search_s\fR(3LDAP) functions.  It
+takes a pointer to the result to be freed and returns the type of the message
+it freed.
+.SH ERRORS
+.sp
+.LP
+The \fBldap_result()\fR function returns \fB\(mi1\fR on error and 0 if the
+specified timeout was exceeded.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBselect\fR(1), \fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP) ,
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBldap_result()\fR function allocates memory for results that it receives.
+The memory can be freed by calling \fBldap_msgfree\fR(3LDAP).

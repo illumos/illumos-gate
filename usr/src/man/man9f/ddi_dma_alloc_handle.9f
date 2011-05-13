@@ -1,0 +1,195 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_alloc_handle 9F "22 Sep 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_alloc_handle \- allocate DMA handle
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBddi_dma_alloc_handle\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_attr_t *\fR\fIattr\fR, 
+     \fBint  (*\fR\fIcallback\fR) (caddr_t), \fBcaddr_t\fR \fIarg\fR, \fBddi_dma_handle_t *\fR\fIhandlep\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the device's  \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattr\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to a  \fBDMA\fR attribute structure for this device (see
+\fBddi_dma_attr\fR(9S)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 12n
+.rt  
+The address of a function to call back later if resources aren't available now.
+The following special function addresses may also be used.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_SLEEP\fR\fR
+.ad
+.RS 20n
+.rt  
+Wait until resources are available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_DONTWAIT\fR\fR
+.ad
+.RS 20n
+.rt  
+Do not wait until resources are available and do not schedule a callback.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 12n
+.rt  
+Argument to be passed to a callback function, if such a function is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandlep\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the  \fBDMA\fR handle to be initialized.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_dma_alloc_handle()\fR allocates a new  \fBDMA\fR handle. A  \fBDMA\fR
+handle is an opaque object used as a reference to subsequently allocated
+\fBDMA\fR resources.   \fBddi_dma_alloc_handle()\fR accepts as parameters the
+device information referred to by  \fIdip\fR and the device's  \fBDMA\fR
+attributes described by a \fBddi_dma_attr\fR(9S) structure. A successful call
+to \fBddi_dma_alloc_handle()\fR fills in the value pointed to by
+\fIhandlep\fR. A  \fBDMA\fR handle must only be used by the device for which it
+was allocated and is only valid for one  I/O transaction at a time.
+.sp
+.LP
+The callback function, \fIcallback\fR, indicates how a caller wants to handle
+the possibility of resources not being available. If  \fIcallback\fR is set to
+\fBDDI_DMA_DONTWAIT\fR, then the caller does not care if the allocation fails,
+and can handle an allocation failure appropriately. If  \fIcallback\fR is set
+to  \fBDDI_DMA_SLEEP\fR, then the caller wishes to have the allocation routines
+wait for resources to become available. If any other value is set, and a
+\fBDMA\fR resource allocation fails, this value is assumed to be a function to
+call at a later time when resources may become available. When the specified
+function is called, it is passed \fIarg\fR as an argument. The specified
+callback function must return either \fBDDI_DMA_CALLBACK_RUNOUT\fR or
+\fBDDI_DMA_CALLBACK_DONE\fR. \fBDDI_DMA_CALLBACK_RUNOUT\fR indicates that the
+callback routine attempted to allocate \fBDMA\fR resources but failed to do so,
+in which case the callback function is put back on a list to be called again
+later.  \fBDDI_DMA_CALLBACK_DONE\fR indicates either success at allocating
+\fBDMA\fR resources or the driver no longer wishes to retry.
+.sp
+.LP
+The callback function is called in interrupt context. Therefore, only system
+functions that are accessible from interrupt context  is available. The
+callback function must take whatever steps necessary to protect its critical
+resources, data structures, queues, and so forth.
+.sp
+.LP
+When a  \fBDMA\fR handle is no longer needed, \fBddi_dma_free_handle\fR(9F)
+must be called to free the handle.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_dma_alloc_handle()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 23n
+.rt  
+Successfully allocated a new \fBDMA\fR handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_BADATTR\fR\fR
+.ad
+.RS 23n
+.rt  
+The attributes specified in the \fBddi_dma_attr\fR(9S) structure make it
+impossible for the system to allocate potential  \fBDMA\fR resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_NORESOURCES\fR\fR
+.ad
+.RS 23n
+.rt  
+No resources are available.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBddi_dma_alloc_handle()\fR can be called from user, kernel, or interrupt
+context, except when \fIcallback\fR is set to  \fBDDI_DMA_SLEEP\fR, in which
+case it can be called from user or kernel context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
+\fBddi_dma_burstsizes\fR(9F), \fBddi_dma_free_handle\fR(9F),
+\fBddi_dma_unbind_handle\fR(9F), \fBddi_dma_attr\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

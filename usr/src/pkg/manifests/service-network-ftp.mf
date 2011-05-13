@@ -37,6 +37,10 @@ dir path=lib/svc/manifest/network group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 file path=etc/ftpd/ftpaccess group=sys \
     original_name=SUNWftp:etc/ftpd/ftpaccess preserve=true
 file path=etc/ftpd/ftpconversions group=sys \
@@ -56,6 +60,22 @@ file path=usr/sbin/ftprestart mode=0555
 file path=usr/sbin/ftpshut mode=0555
 file path=usr/sbin/in.ftpd mode=0555
 file path=usr/sbin/privatepw mode=0555
+file path=usr/share/man/man1/ftpcount.1
+file path=usr/share/man/man1/ftpwho.1
+file path=usr/share/man/man1m/ftpaddhost.1m
+file path=usr/share/man/man1m/ftpconfig.1m
+file path=usr/share/man/man1m/ftpd.1m
+file path=usr/share/man/man1m/ftprestart.1m
+file path=usr/share/man/man1m/ftpshut.1m
+file path=usr/share/man/man1m/in.ftpd.1m
+file path=usr/share/man/man4/ftp.4
+file path=usr/share/man/man4/ftpaccess.4
+file path=usr/share/man/man4/ftpconversions.4
+file path=usr/share/man/man4/ftpgroups.4
+file path=usr/share/man/man4/ftphosts.4
+file path=usr/share/man/man4/ftpservers.4
+file path=usr/share/man/man4/ftpusers.4
+file path=usr/share/man/man4/xferlog.4
 hardlink path=usr/sbin/ftpwho target=../../usr/sbin/ftpcount
 legacy pkg=SUNWftpr desc="FTP Server Configuration Files" \
     name="FTP Server, (Root)"

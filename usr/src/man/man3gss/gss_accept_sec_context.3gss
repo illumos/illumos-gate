@@ -1,0 +1,596 @@
+'\" te
+.\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_accept_sec_context 3GSS "22 May 2006" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_accept_sec_context \- accept a security context initiated by a peer
+application
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lgss\fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <gssapi/gssapi.h>
+
+\fBOM_uint32\fR \fBgss_accept_sec_context\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
+     \fBgss_ctx_id_t *\fR\fIcontext_handle\fR,
+     \fBconst gss_cred_id_t\fR \fIacceptor_cred_handle\fR,
+     \fBconst gss_buffer_t\fR \fIinput_token\fR,
+     \fBconst gss_channel_bindings_t\fR \fIinput_chan_bindings\fR,
+     \fBconst gss_name_t *\fR \fIsrc_name\fR, \fBgss_OID *\fR \fImech_type\fR,
+     \fBgss_buffer_t\fR \fIoutput_token\fR, \fBOM_uint32 *\fR\fIret_flags\fR,
+     \fBOM_uint32 *\fR \fItime_rec\fR, \fBgss_cred_id_t *\fR\fIdelegated_cred_handle\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.LP
+The parameter descriptions for \fBgss_accept_sec_context()\fR follow:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.sp .6
+.RS 4n
+The status code returned by the underlying mechanism.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcontext_handle\fR\fR
+.ad
+.sp .6
+.RS 4n
+The context handle to return to the initiator. This should be set to
+\fBGSS_C_NO_CONTEXT\fR before the loop begins.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIacceptor_cred_handle\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle for the credentials acquired by the acceptor, typically through
+\fBgss_acquire_cred()\fR. It may be initialized to \fBGSS_C_NO_CREDENTIAL\fR to
+indicate a default credential to use. If no default credential is defined, the
+function returns \fBGSS_C_NO_CRED\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput_token_buffer\fR\fR
+.ad
+.sp .6
+.RS 4n
+Token received from the context initiative.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput_chan_bindings\fR\fR
+.ad
+.sp .6
+.RS 4n
+Optional application-specified bindings. Allows application to securely bind
+channel identification information to the security context. Set to
+\fBGSS_C_NO_CHANNEL_BINDINGS\fR if you do not want to use channel bindings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsrc_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+The authenticated name of the context initiator. After use, this name should be
+deallocated by passing it to \fBgss_release_name()\fR. See
+\fBgss_release_name\fR(3GSS). If not required, specify \fBNULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImech_type\fR\fR
+.ad
+.sp .6
+.RS 4n
+The security mechanism used. Set to \fBNULL\fR if it does not matter which
+mechanism is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutput_token\fR\fR
+.ad
+.sp .6
+.RS 4n
+The token to send to the acceptor. Initialize it to \fBGSS_C_NO_BUFFER\fR
+before the function is called (or its length field set to zero). If the length
+is zero, no token need be sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIret_flags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains various independent flags, each of which indicates that the context
+supports a specific service option. If not needed, specify \fBNULL\fR. Test the
+returned bit-mask \fIret_flags\fR value against its symbolic name to determine
+if the given option is supported by the context. \fIret_flags\fR may contain
+one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_DELEG_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, delegated credentials are available by means of the
+\fIdelegated_cred_handle\fR parameter. If false, no credentials were delegated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_MUTUAL_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, a remote peer asked for mutual authentication. If false, no remote
+peer asked for mutual authentication.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_REPLAY_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, replay of protected messages will be detected. If false, replayed
+messages will not be detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_SEQUENCE_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, out of sequence protected messages will be detected. If false, they
+will not be detected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_CONF_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, confidentiality service may be invoked by calling the \fBgss_wrap()\fR
+routine. If false, no confidentiality service is available by means of
+\fBgss_wrap()\fR. \fBgss_wrap()\fR will provide message encapsulation,
+data-origin authentication and integrity services only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_INTEG_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, integrity service may be invoked by calling either the
+\fBgss_get_mic\fR(3GSS) or the \fBgss_wrap\fR(3GSS) routine. If false,
+per-message integrity service is not available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_ANON_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, the initiator does not wish to be authenticated. The \fIsrc_name\fR
+parameter, if requested, contains an anonymous internal name. If false, the
+initiator has been authenticated normally.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_PROT_READY_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, the protection services specified by the states of
+\fBGSS_C_CONF_FLAG\fR and \fBGSS_C_INTEG_FLAG\fR are available if the
+accompanying major status return value is either \fBGSS_S_COMPLETE\fR or
+\fBGSS_S_CONTINUE_NEEDED\fR. If false, the protection services are available
+only if the accompanying major status return value is \fBGSS_S_COMPLETE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_C_TRANS_FLAG\fR\fR
+.ad
+.sp .6
+.RS 4n
+If true, the resultant security context may be transferred to other processes
+by means of a call to \fBgss_export_sec_context\fR(3GSS). If false, the
+security context cannot be transferred.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItime_rec\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of sections for which the context will remain value Specify
+\fBNULL\fR if not required.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdelegated_cred_handle\fR\fR
+.ad
+.sp .6
+.RS 4n
+The credential value for credentials received from the context's initiator. It
+is valid only if the initiator has requested that the acceptor act as a proxy:
+that is, if the \fIret_flag\fR argument resolves to \fBGSS_C_DELEG_FLAG\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_accept_sec_context()\fR function allows a remotely initiated
+security context between the application and a remote peer to be established.
+The routine may return an \fIoutput_token\fR, which should be transferred to
+the peer application, where the peer application will present it to
+\fBgss_init_sec_context()\fR. See \fBgss_init_sec_context\fR(3GSS). If no token
+need be sent, \fBgss_accept_sec_context()\fR will indicate this by setting the
+length field of the \fIoutput_token\fR argument to zero. To complete the
+context establishment, one or more reply tokens may be required from the peer
+application; if so, \fBgss_accept_sec_context()\fR will return a status flag of
+\fBGSS_S_CONTINUE_NEEDED\fR, in which case it should be called again when the
+reply token is received from the peer application, passing the token to
+\fBgss_accept_sec_context()\fR by means of the \fIinput_token\fR parameters.
+.sp
+.LP
+Portable applications should be constructed to use the token length and return
+status to determine whether to send or to wait for a token.
+.sp
+.LP
+Whenever \fBgss_accept_sec_context()\fR returns a major status that includes
+the value \fBGSS_S_CONTINUE_NEEDED\fR, the context is not fully established,
+and the following restrictions apply to the output parameters:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The value returned by means of the \fItime_rec\fR parameter is undefined.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Unless the accompanying \fIret_flags\fR parameter contains the bit
+\fBGSS_C_PROT_READY_FLAG\fR, which indicates that per-message services may be
+applied in advance of a successful completion status, the value returned by the
+\fImech_type\fR parameter may be undefined until \fBgss_accept_sec_context()\fR
+returns a major status value of \fBGSS_S_COMPLETE\fR.
+.RE
+.sp
+.LP
+The values of the \fBGSS_C_DELEG_FLAG\fR, \fBGSS_C_MUTUAL_FLAG\fR,
+\fBGSS_C_REPLAY_FLAG\fR, \fBGSS_C_SEQUENCE_FLAG\fR, \fBGSS_C_CONF_FLAG\fR,
+\fBGSS_C_INTEG_FLAG\fR and \fBGSS_C_ANON_FLAG\fR bits returned by means of the
+\fIret_flags\fR parameter are values that would be valid if context
+establishment were to succeed.
+.sp
+.LP
+The values of the \fBGSS_C_PROT_READY_FLAG\fR and \fBGSS_C_TRANS_FLAG\fR bits
+within \fIret_flags\fR indicate the actual state at the time
+\fBgss_accept_sec_context()\fR returns, whether or not the context is fully
+established. However, applications should not rely on this behavior, as
+\fBGSS_C_PROT_READY_FLAG\fR was not defined in Version 1 of the \fBGSS-API\fR.
+Instead, applications should be prepared to use per-message services after a
+successful context establishment, based upon the \fBGSS_C_INTEG_FLAG\fR and
+\fBGSS_C_CONF_FLAG\fR values.
+.sp
+.LP
+All other bits within the \fIret_flags\fR argument are set to zero.
+.sp
+.LP
+While \fBgss_accept_sec_context()\fR returns \fBGSS_S_CONTINUE_NEEDED\fR, the
+values returned by means of the the \fIret_flags\fR argument indicate the
+services available from the established context. If the initial call of
+\fBgss_accept_sec_context()\fR fails, no context object is created, and the
+value of the \fIcontext_handle\fR parameter is set to \fBGSS_C_NO_CONTEXT\fR.
+In the event of a failure on a subsequent call, the security context and the
+\fIcontext_handle\fR parameter are left untouched for the application to delete
+using \fBgss_delete_sec_context\fR(3GSS). During context establishment, the
+informational status bits \fBGSS_S_OLD_TOKEN\fR and \fBGSS_S_DUPLICATE_TOKEN\fR
+indicate fatal errors; \fBGSS-API\fR mechanisms always return them in
+association with a  routine error of \fBGSS_S_FAILURE\fR. This pairing
+requirement did not exist in version 1 of the \fBGSS-API\fR specification, so
+applications that wish to run over version 1 implementations must special-case
+these codes.
+.SH ERRORS
+.sp
+.LP
+\fBgss_accept_sec_context()\fR may return the following status codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.RS 30n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_CONTINUE_NEEDED\fR\fR
+.ad
+.RS 30n
+.rt  
+A token from the peer application is required to complete the context, and that
+\fBgss_accept_sec_context()\fR must be called again with that token.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_DEFECTIVE_TOKEN\fR\fR
+.ad
+.RS 30n
+.rt  
+Consistency checks performed on the \fIinput_token\fR failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_DEFECTIVE_CREDENTIAL\fR\fR
+.ad
+.RS 30n
+.rt  
+Consistency checks performed on the credential failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_NO_CRED\fR\fR
+.ad
+.RS 30n
+.rt  
+The supplied credentials were not valid for context acceptance, or the
+credential handle did not reference any credentials.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_CREDENTIALS_EXPIRED\fR\fR
+.ad
+.RS 30n
+.rt  
+The referenced credentials have expired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_BINDINGS\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIinput_token\fR contains different channel bindings than those specified
+by means of the \fIinput_chan_bindings\fR parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_NO_CONTEXT\fR\fR
+.ad
+.RS 30n
+.rt  
+The supplied context handle did not refer to a valid context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_SIG\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIinput_token\fR contains an invalid \fBMIC\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_OLD_TOKEN\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIinput_token\fR was too old. This is a fatal error while establishing
+context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_DUPLICATE_TOKEN\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIinput_token\fR is valid, but it is duplicate of a token already
+processed. This is a fatal error while establishing context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_MECH\fR\fR
+.ad
+.RS 30n
+.rt  
+The token received specified a mechanism that is not supported by the
+implementation or the provided credential.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.RS 30n
+.rt  
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined. The mechanism-specific status code reported by means of
+the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInvoking \fBgss_accept_sec_context()\fR Within a Loop
+.sp
+.LP
+A typical portable caller should always invoke \fBgss_accept_sec_context()\fR
+within a loop:
+
+.sp
+.in +2
+.nf
+gss_ctx_id_t context_hdl = GSS_C_NO_CONTEXT;
+
+do {
+   receive_token_from_peer(input_token);
+   maj_stat = gss_accept_sec_context(&min_stat,
+                                     &context_hdl,
+                                     cred_hdl,
+                                     input_token,
+                                     input_bindings,
+                                     &client_name,
+                                     &mech_type,
+                                     output_token,
+                                     &ret_flags,
+                                     &time_rec,
+                                     &deleg_cred);
+   if (GSS_ERROR(maj_stat)) {
+      report_error(maj_stat, min_stat);
+   };
+   if (output_token->length != 0) {
+      send_token_to_peer(output_token);
+      gss_release_buffer(&min_stat, output_token);
+   };
+   if (GSS_ERROR(maj_stat)) {
+      if (context_hdl != GSS_C_NO_CONTEXT)
+         gss_delete_sec_context(&min_stat,
+                                &context_hdl,
+                                GSS_C_NO_BUFFER);
+      break;
+   };
+} while (maj_stat & GSS_S_CONTINUE_NEEDED);
+
+/* Check client_name authorization */
+\&...
+
+(void) gss_release_name(&min_stat, &client_name);
+
+/* Use and/or store delegated credential */
+\&...
+
+(void) gss_release_cred(&min_stat, &deleg_cred);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_delete_sec_context\fR(3GSS), \fBgss_export_sec_context\fR(3GSS),
+\fBgss_get_mic\fR(3GSS), \fBgss_init_sec_context\fR(3GSS),
+\fBgss_release_cred\fR(3GSS), \fBgss_release_name\fR(3GSS),
+\fBgss_store_cred\fR(3GSS), \fBgss_wrap\fR(3GSS), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

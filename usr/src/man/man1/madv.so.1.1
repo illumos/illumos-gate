@@ -1,0 +1,332 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH madv.so.1 1 "15 Feb 2002" "SunOS 5.11" "User Commands"
+.SH NAME
+madv.so.1 \- madv library
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/madv.so.1\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmadv.so.1\fR shared object provides a means by which the VM advice can
+be selectively configured for a launched process (or processes) and its
+descendants. To enable \fBmadv.so.1\fR, the following string needs to be
+present in the environment (see \fBld.so.1\fR(1)) along with one or more
+\fBMADV\fR environment variables:
+.sp
+.in +2
+.nf
+\fBLD_PRELOAD=$LD_PRELOAD:madv.so.1\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+If the \fBmadv.so.1\fR shared object is specified in the \fBLD_PRELOAD\fR list,
+the following environment variables are read by the \fBmadv\fR shared object to
+determine to which created process(es) to apply the specified advice.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMADV\fR=\fIadvice\fR \fR
+.ad
+.RS 27n
+.rt  
+\fBMADV\fR specifies the VM advice to use for all heap, shared memory, and mmap
+regions in the process address                 space. This advice is applied to
+all created processes.
+.sp
+Values for \fIadvice\fR correspond to values in <sys/mman.h> used in
+\fBmadvise\fR(3C) to specify memory access patterns:
+.br
+.in +2
+normal
+.in -2
+.br
+.in +2
+random
+.in -2
+.br
+.in +2
+sequential
+.in -2
+.br
+.in +2
+access_lwp
+.in -2
+.br
+.in +2
+access_many
+.in -2
+.br
+.in +2
+access_default
+.in -2
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMADVCFGFILE\fR=\fIconfig-file\fR\fR
+.ad
+.RS 27n
+.rt  
+\fIconfig-file\fR is a text file which contains one or more \fBmadv\fR
+configuration entries of the form:
+.sp
+.in +2
+.nf
+\fIexec-name\fR \fIexec-args\fR:\fIadvice-opts\fR
+.fi
+.in -2
+.sp
+
+Advice specified in \fIconfig-file\fR takes precedence over that specified by
+the \fBMADV\fR environment variable. When \fBMADVCFGFILE\fR is not set, advice
+is taken from file \fB/etc/madv.conf\fR if it exists.
+.sp
+\fIexec-name\fR specifies the name of an application or executable. The
+corresponding advice is set for newly created processes (see
+\fBgetexecname\fR(3C)) that match the first \fIexec-name\fR found in the file.
+.sp
+\fIexec-name\fR can be a full pathname, a base name, or a pattern string. See
+\fBFile Name Generation\fR in \fBsh\fR(1) for a discussion of pattern matching.
+.sp
+\fIexec-args\fR is an optionally specified pattern string to match against
+arguments. Advice is set only if \fIexec-args\fR is not specified or occurs
+within the arguments to \fIexec-name\fR.
+.sp
+\fIadvice-opts\fR is a comma-separated list specifying the advice for various
+memory region(s):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmadv\fR=\fIadvice\fR\fR
+.ad
+.RS 21n
+.rt  
+Applies to all heap, shared memory, and mmap regions in the process address
+space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBheap\fR=\fIadvice\fR\fR
+.ad
+.RS 21n
+.rt  
+The heap is defined to be the brk area (see \fBbrk\fR(2)). Applies to the
+existing heap and for any additional heap memory allocated in the future.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBshm\fR=\fIadvice\fR\fR
+.ad
+.br
+.na
+\fB\fBism\fR=\fIadvice\fR\fR
+.ad
+.br
+.na
+\fB\fBdism\fR=\fIadvice\fR\fR
+.ad
+.RS 21n
+.rt  
+Shared memory segments (see \fBshmat\fR(2)) attached using any flags, flag
+\fBSHM_SHARE_MMU\fR, or flag \fBSHM_PAGEABLE\fR  respectively. Options
+\fBism\fR and \fBdism\fR take precedence over option \fBshm\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmap\fR=\fIadvice\fR\fR
+.ad
+.br
+.na
+\fB\fBmapshared\fR=\fIadvice\fR\fR
+.ad
+.br
+.na
+\fB\fBmapprivate\fR=\fIadvice\fR\fR
+.ad
+.br
+.na
+\fB\fBmapanon\fR=\fIadvice\fR\fR
+.ad
+.RS 21n
+.rt  
+Mappings established through \fBmmap\fR(2) using any flags, flag
+\fBMAP_SHARED\fR, flag \fBMAP_PRIVATE\fR, or flag \fBMAP_ANON\fR, respectively.
+Options \fBmapshared\fR, \fBmapprivate\fR, and \fBmapanon\fR take precedence
+over option \fBmap\fR. Option \fBmapanon\fR takes precedence over
+\fBmapshared\fR and \fBmapprivate\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMADVERRFILE\fR=\fIpathname\fR\fR
+.ad
+.RS 27n
+.rt  
+By default, error messages are logged via \fBsyslog\fR(3C) using level
+\fBLOG_ERR\fR and facility \fBLOG_USER\fR. If \fBMADVERRFILE\fR contains a
+valid \fIpathname\fR (such as \fB/dev/stderr\fR), error messages will be logged
+there instead.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRApplying advice to all ISM segments
+.sp
+.LP
+The following configuration applies advice to all ISM segments for application
+\fB/usr/bin/foo\fR:
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:madv.so.1\fR
+example$ \fBMADVCFGFILE=madvcfg\fR
+example$ \fBexport LD_PRELOAD MADVCFGFILE\fR
+example$ \fBcat $MADVCFGFILE\fR
+    /usr/bin/foo:ism=access_lwp
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting advice for all applications with exception
+.sp
+.LP
+The following configuration sets advice for all applications with the exception
+of \fBls\fR.
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:madv.so.1\fR
+example$ \fBMADV=access_many\fR
+example$ \fBMADVCFGFILE=madvcfg\fR
+example$ \fBexport LD_PRELOAD MADV MADVCFGFILE\fR
+example$ \fBcat $MADVCFGFILE\fR
+    ls:
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRPrecedence rules (continuation from Example 2)
+.sp
+.LP
+Because \fBMADVCFGFILE\fR takes precedence over \fBMADV\fR,
+specifying '\fB*\fR' (pattern match all) for the \fIexec-name\fR of the last \fBmadv\fR
+configuration entry would be equivalent to setting \fBMADV\fR. The following is
+equivalent to example 2:
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:madv.so.1\fR
+example$ \fBMADVCFGFILE=madvcfg\fR
+example$ \fBexport LD_PRELOAD MADVCFGFILE\fR
+example$ \fBcat $MADVCFGFILE\fR
+    ls:
+    *:madv=access_many
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRApplying advice for different regions
+.sp
+.LP
+The following configuration applies one type of advice for mmap regions and
+different advice for heap and shared memory regions for a select set of
+applications with exec names that begin with \fBfoo\fR:
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:madv.so.1\fR
+example$ \fBMADVCFGFILE=madvcfg\fR
+example$ \fBexport LD_PRELOAD MADVCFGFILE\fR
+example$ \fBcat $MADVCFGFILE\fR
+    foo*:madv=access_many,heap=sequential,shm=access_lwp
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRApplying advice selectively
+.sp
+.LP
+The following configuration applies advice for the heap of applications
+beginning with \fBora\fR that have \fBora1\fR as an argument:
+
+.sp
+.in +2
+.nf
+example$ \fBLD_PRELOAD=$LD_PRELOAD:madv.so.1\fR
+example$ \fBMADVCFGFILE=madvcfg\fR
+example$ \fBexport LD_PRELOAD MADVCFGFILE\fR
+example$ \fBcat $MADVCFGFILE\fR
+    ora* ora1:heap=access_many
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/madv.conf\fR \fR
+.ad
+.RS 19n
+.rt  
+Configuration file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcat\fR(1), \fBld.so.1\fR(1), \fBproc\fR(1), \fBsh\fR(1), \fBbrk\fR(2),
+\fBexec\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBmemcntl\fR(2), \fBshmat\fR(2),
+\fBgetexecname\fR(3C), \fBmadvise\fR(3C), \fBsyslog\fR(3C), \fBproc\fR(4),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The advice is inherited. A child process has the same advice         as its
+parent. On \fBexec()\fR (see \fBexec\fR(2)), the advice is set back to the
+default system advice unless different advice has been configured via the
+\fBmadv\fR shared object.
+.sp
+.LP
+Advice is only applied to \fBmmap\fR regions explicitly created by the user
+program. Those regions established by the run-time linker or by system
+libraries making direct system calls (for example, libthread allocations for
+thread stacks) are not affected.

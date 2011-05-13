@@ -1,0 +1,321 @@
+'\" te
+.\"  All Rights Reserved  Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH td_thr_get_info 3C_DB "20 Oct 1998" "SunOS 5.11" "Threads Debugging Library Functions"
+.SH NAME
+td_thr_get_info \- get thread information in libc_db library of interfaces
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
+#include <proc_service.h>
+#include <thread_db.h>
+
+\fBtd_err_e\fR \fBtd_thr_get_info\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBtd_thrinfo_t *\fR\fIti_p\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtd_thr_get_info()\fR function fills in the \fBtd_thrinfo_t\fR structure
+*\fIti_p\fR with values for the thread identified by  \fIth_p\fR.
+.sp
+.LP
+The \fBtd_thrinfo_t\fR structure contains the following fields:
+.sp
+.in +2
+.nf
+typedef struct td_thrinfo_t {
+  td_thragen_tx    *ti_ta_p           /* internal process handle */
+  unsigned         ti_user_flags;     /* value of flags parameter */
+  thread_t         ti_tid;            /* thread identifier */ 
+  char             *ti_tls;           /* pointer to thread-local storage*/
+  paddr            ti_startfunc;      /* address of function at which thread 
+                                         execution began*/
+  paddr            ti_stkbase;        /* base of thread's stack area*/
+  int              ti_stksize;        /* size in bytes of thread's allocated
+                                         stack region*/
+  paddr            ti_ro_area;        /* address of ulwp_t structure*/
+  int              ti_ro_size         /* size of the ulwp_t structure in 
+                                         bytes */
+  td_thr_state_e   ti_state           /* state of the thread */
+  uchar_t          ti_db_suspended    /* non-zero if thread suspended by 
+                                         td_thr_dbsuspend*/
+  td_thr_type_e    ti_type            /* type of the thread*/
+  int              ti_pc              /* value of thread's program counter*/
+  int              ti_sp              /* value of thread's stack counter*/
+  short            ti_flags           /* set of special flags used by 
+                                         libc*/
+  int              ti_pri             /* priority of thread returned by 
+                                         thr_getprio(3T)*/
+  lwpid_t          ti_lid             /* id of light weight process (LWP) 
+                                         executing this thread*/
+  sigset_t         ti_sigmask         /* thread's signal mask.  See 
+                                         thr_sigsetmask(3T)*/
+  u_char           ti_traceme         /* non-zero if event tracing is on*/
+  u_char_t         ti_preemptflag     /* non-zero if thread preempted when 
+                                         last active*/
+  u_char_t         ti_pirecflag      /* non-zero if thread runs priority 
+                                        beside regular */
+  sigset_t         ti_pending        /* set of signals pending for this 
+                                        thread*/
+  td_thr_events_t  ti_events         /* bitmap of events enabled for this 
+                                        thread*/
+} ;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBti_ta_p\fR member is the internal process handle identifying the process
+of which the thread is a member.
+.sp
+.LP
+The \fBti_user_flags\fR member is the value of the flags parameter passed to
+\fBthr_create\fR(3C) when the thread was created.
+.sp
+.LP
+The \fBti_tid\fR member is the thread identifier for the thread returned by
+\fBthr_create\fR(3C).
+.sp
+.LP
+The \fBti_tls\fR member is the thread's pointer to thread-local storage.
+.sp
+.LP
+The \fBti_startfunc\fR member is the address of the function at which thread
+execution began, as specified when the thread was created with
+\fBthr_create\fR(3C).
+.sp
+.LP
+The \fBti_stkbase\fR member is the base of the thread's stack area.
+.sp
+.LP
+The \fBti_stksize\fR member is the size in bytes of the thread's allocated
+stack region.
+.sp
+.LP
+The \fBti_ro_area\fR member is the address of the \fBulwp_t\fR structure for
+this thread.  Since accessing the \fBulwp_t\fR structure directly violates the
+encapsulation provided by \fBlibc_db\fR, this member should generally not be
+used.  However, it might be useful as a prototype for extensions.
+.sp
+.LP
+The \fBti_state\fR member is the state of the thread.  The \fBtd_thr_state_e\fR
+enumeration type can contain the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_ANY_STATE\fR \fR
+.ad
+.RS 26n
+.rt  
+This value is never returned by \fBtd_thr_get_info()\fR but is used as a
+wildcard to select threads in \fBtd_ta_thr_iter()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_UNKNOWN\fR \fR
+.ad
+.RS 26n
+.rt  
+The \fBlibc_db\fR library cannot determine the state of the thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_STOPPED\fR \fR
+.ad
+.RS 26n
+.rt  
+The thread has been stopped by a call to  \fBthr_suspend\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_RUN\fR \fR
+.ad
+.RS 26n
+.rt  
+The thread is runnable, but it is not currently assigned to an \fBLWP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_ACTIVE\fR \fR
+.ad
+.RS 26n
+.rt  
+The thread is currently executing on an  \fBLWP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_ZOMBIE\fR \fR
+.ad
+.RS 26n
+.rt  
+The thread has exited, but it has not yet been deallocated by a call to
+\fBthr_join\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_SLEEP\fR \fR
+.ad
+.RS 26n
+.rt  
+The thread is not currently runnable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_THR_STOPPED_ASLEEP\fR \fR
+.ad
+.RS 26n
+.rt  
+The thread is both blocked by  \fBTD_THR_SLEEP\fR and stopped by a call to
+\fBtd_thr_dbsuspend\fR(3C_DB).
+.RE
+
+.sp
+.LP
+The \fBti_db_suspended\fR member is non-zero if and only if this thread is
+currently suspended because the controlling process has called
+\fBtd_thr_dbsuspend\fR on it.
+.sp
+.LP
+The \fBti_type\fR member is a type of thread.  It is either \fBTD_THR_USER\fR
+for a user thread (one created by the application), or \fBTD_THR_SYSTEM\fR for
+one created by \fBlibc\fR.
+.sp
+.LP
+The \fBti_pc\fR member is the value of the thread's program counter, provided
+that the thread's \fBti_state\fR value is \fBTD_THR_SLEEP\fR,
+\fBTD_THR_STOPPED\fR, or \fBTD_THR_STOPPED_ASLEEP\fR. Otherwise, the value of
+this member is undefined.
+.sp
+.LP
+The \fBti_sp\fR member is the value of the thread's stack pointer, provided
+that the thread's \fBti_state\fR value is \fBTD_THR_SLEEP\fR,
+\fBTD_THR_STOPPED\fR, or \fBTD_THR_STOPPED_ASLEEP\fR. Otherwise, the value of
+this member is undefined.
+.sp
+.LP
+The \fBti_flags\fR member is a set of special flags used by \fBlibc\fR,
+currently of use only to those debugging \fBlibc\fR.
+.sp
+.LP
+The \fBti_pri\fR member is the thread's priority as it would be returned by
+\fBthr_getprio\fR(3C).
+.sp
+.LP
+The \fBti_lid\fR member is the ID of the \fBLWP\fR executing this thread, or
+the ID of the  \fBLWP\fR that last executed this thread, if this thread is not
+currently assigned to an\fBLWP\fR.
+.sp
+.LP
+The \fBti_sigmask\fR member is this thread's signal mask. See
+\fBthr_sigsetmask\fR(3C).
+.sp
+.LP
+The \fBti_traceme\fR member is non-zero if and only if event tracing for this
+thread is on.
+.sp
+.LP
+The \fBti_preemptflag\fR member is non-zero if and only if the thread was
+preempted the last time it was active.
+.sp
+.LP
+The \fBti_pirecflag\fR member is non-zero if and only if due to priority
+inheritance the thread is currently running at a priority other than its
+regular priority.
+.sp
+.LP
+The \fBti_events\fR member is the bitmap of events enabled for this thread.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_OK\fR\fR
+.ad
+.RS 12n
+.rt  
+The call completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_BADTH\fR\fR
+.ad
+.RS 12n
+.rt  
+An invalid thread handle was passed in.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_DBERR\fR\fR
+.ad
+.RS 12n
+.rt  
+A call to one of the imported interface routines failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_ERR\fR\fR
+.ad
+.RS 12n
+.rt  
+The call did not complete successfully.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBtd_ta_thr_iter\fR(3C_DB),
+\fBtd_thr_dbsuspend\fR(3C_DB), \fBthr_create\fR(3C), \fBthr_getprio\fR(3C),
+\fBthr_join\fR(3C), \fBthr_sigsetmask\fR(3C), \fBthr_suspend\fR(3C),
+\fBattributes\fR(5), \fBthreads\fR(5)

@@ -1,0 +1,207 @@
+'\" te
+.\" Copyright (c) 2004 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getlogin 3C "18 May 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getlogin, getlogin_r \- get login name
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBchar *\fR\fBgetlogin\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBgetlogin_r\fR(\fBchar *\fR\fIname\fR, \fBint\fR \fInamelen\fR);
+.fi
+
+.SS "Standard conforming"
+.LP
+.nf
+cc [ \fIflag \fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary \fR... ]
+
+\fBint\fR \fBgetlogin_r\fR(\fBchar *\fR\fIname\fR, \fBsize_t\fR \fInamesize\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetlogin()\fR function returns a pointer to the login name as found in
+\fB/var/adm/utmpx\fR. It can be used in conjunction with \fBgetpwnam\fR(3C) to
+locate the correct password file entry when the same user \fBID\fR is shared by
+several login names.
+.sp
+.LP
+If \fBgetlogin()\fR is called within a process that is not attached to a
+terminal, it returns a null pointer. The correct procedure for determining the
+login name is to call \fBcuserid\fR(3C), or to call \fBgetlogin()\fR and if it
+fails to call \fBgetpwuid\fR(3C).
+.sp
+.LP
+The \fBgetlogin_r()\fR function has the same functionality as \fBgetlogin()\fR
+except that the caller must supply a buffer \fIname\fR with length
+\fInamelen\fR to store the result.  The \fIname\fR buffer must be at least
+\fB_POSIX_LOGIN_NAME_MAX\fR bytes in size (defined in <\fBlimits.h\fR>). The
+POSIX version (see \fBstandards\fR(5)) of \fBgetlogin_r()\fR takes a
+\fInamesize\fR parameter of type \fBsize_t\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetlogin()\fR returns a pointer to the login
+name or a null pointer if the user's login name cannot be found.  Otherwise it
+returns a null pointer and sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+The standard-conforming \fBgetlogin_r()\fR returns \fB0\fR if successful, or
+the error number upon failure.
+.SH ERRORS
+.sp
+.LP
+The \fBgetlogin_r()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The size of the buffer is smaller than the result to be returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+And entry for the current user was not found in the \fB/var/adm/utmpx\fR file.
+.RE
+
+.sp
+.LP
+The \fBgetlogin()\fR and \fBgetlogin_r()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+The maximum allowable number of files is currently open in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+.rt  
+The calling process has no controlling terminal.
+.RE
+
+.sp
+.LP
+The \fBgetlogin_r()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The size of the buffer is smaller than the result to be returned.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The return value of \fBgetlogin()\fR points to thread-specific data whose
+content is overwritten on each call by the same thread.
+.sp
+.LP
+Three names associated with the current process can be determined:
+\fBgetpwuid(\fR\fBgeteuid()\fR\fB)\fR returns the name associated with the
+effective user ID of the process; \fBgetlogin()\fR returns the name associated
+with the current login activity; and \fBgetpwuid(\fR\fBgetuid()\fR\fB)\fR
+returns the name associated with the real user ID of the process.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/utmpx\fR\fR
+.ad
+.RS 18n
+.rt  
+user access and administration information
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSee below.
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgeteuid\fR(2), \fBgetuid\fR(2), \fBcuserid\fR(3C), \fBgetgrnam\fR(3C),
+\fBgetpwnam\fR(3C), \fBgetpwuid\fR(3C), \fButmpx\fR(4), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded programs, see \fBIntro\fR(3).
+.sp
+.LP
+The \fBgetlogin()\fR function is safe to use in multithreaded applications, but
+is discouraged. The \fBgetlogin_r()\fR function should be used instead.
+.sp
+.LP
+Solaris 2.4 and earlier releases provided a \fBgetlogin_r()\fR as specified in
+POSIX.1c Draft 6. The final POSIX.1c standard changed the interface as
+described above. Support for the Draft 6 interface is provided for
+compatibility only and may not be supported in future releases. New
+applications and libraries should use the standard-conforming interface.

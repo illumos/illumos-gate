@@ -1,0 +1,151 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_rwlock_timedwrlock 3C "30 Jan 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_rwlock_timedwrlock, pthread_rwlock_reltimedwrlock_np \- lock a
+read-write lock for writing
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <pthread.h>
+#include <time.h>
+
+\fBint\fR \fBpthread_rwlock_timedwrlock\fR(\fBpthread_rwlock_t *restrict\fR \fIrwlock\fR,
+     \fBconst struct timespec *restrict\fR \fIabs_timeout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_rwlock_reltimedwrlock_np\fR(\fBpthread_rwlock_t *restrict\fR \fIrwlock\fR,
+     \fBconst struct timespec *restrict\fR \fIrel_timeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_rwlock_timedwrlock()\fR function applies a write lock to the
+read-write lock referenced by \fIrwlock\fR as in the
+\fBpthread_rwlock_wrlock\fR(3C) function. If the lock cannot be acquired
+without waiting for other threads to unlock the lock, this wait will be
+terminated when the specified timeout expires. The timeout expires when the
+absolute time specified by \fIabs_timeout\fR passes, as measured by the
+\fBCLOCK_REALTIME\fR clock (that is, when the value of that clock equals or
+exceeds \fIabs_timeout\fR), or if the absolute time specified by
+\fIabs_timeout\fR has already been passed at the time of the call.
+.sp
+.LP
+The \fBpthread_rwlock_reltimedwrlock_np()\fR function is identical to the
+\fBpthread_rwlock_timedwrlock()\fR function, except that the timeout is
+specified as a relative time interval. The timeout expires when the time
+interval specified by \fIrel_timeout\fR passes, as measured by the
+\fBCLOCK_REALTIME\fR clock, or if the time interval specified by
+\fIrel_timeout\fR is negative at the time of the call.
+.sp
+.LP
+The resolution of the timeout is the resolution of the \fBCLOCK_REALTIME\fR
+clock. The \fBtimespec\fR data type is defined in the <\fBtime.h\fR> header.
+Under no circumstances does either function fail with a timeout if the lock can
+be acquired immediately. The validity of the a\fIbs_timeout\fR parameter need
+not be checked if the lock can be immediately acquired.
+.sp
+.LP
+If a signal that causes a signal handler to be executed is delivered to a
+thread blocked on a read- write lock with a call to
+\fBpthread_rwlock_timedwrlock()\fR or \fBpthread_rwlock_reltimedwrlock_np()\fR,
+upon return from the signal handler the thread resumes waiting for the lock as
+if it was not interrupted.
+.sp
+.LP
+The calling thread can deadlock if at the time the call is made it holds the
+read-write lock. The results are undefined if this function is called with an
+uninitialized read-write lock.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpthread_rwlock_timedwrlock()\fR and
+\fBpthread_rwlock_reltimedwrlock_np()\fR functions return 0 if the lock for
+writing on the read-write lock object referenced by \fIrwlock\fR is acquired.
+Otherwise, an error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_rwlock_timedwrlock()\fR and
+\fBpthread_rwlock_reltimedwrlock_np()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETIMEDOUT\fR\fR
+.ad
+.RS 13n
+.rt  
+The lock could not be acquired before the specified timeout expired.
+.RE
+
+.sp
+.LP
+The \fBpthread_rwlock_timedwrlock()\fR and
+\fBpthread_rwlock_reltimedwrlock_np()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDEADLK\fR\fR
+.ad
+.RS 11n
+.rt  
+The calling thread already holds the rwlock.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The value specified by \fIrwlock\fR does not refer to an initialized read-write
+lock object, or the timeout nanosecond value is less than zero or greater than
+or equal to 1,000 million.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelMT-Safe
+.TE
+
+.sp
+.LP
+The \fBpthread_rwlock_timedwrlock()\fR function is Standard. The
+\fBpthread_rwlock_reltimedwrlock_np()\fR function is Stable.
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_rwlock_destroy\fR(3C), \fBpthread_rwlock_rdlock\fR(3C),
+\fBpthread_rwlock_timedrdlock\fR(3C), \fBpthread_rwlock_trywrlock\fR(3C),
+\fBpthread_rwlock_unlock\fR(3C), \fBpthread_rwlock_wrlock\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

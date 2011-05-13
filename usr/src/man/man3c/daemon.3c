@@ -1,0 +1,118 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH daemon 3C "15 Sep 2009" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+daemon \- basic daemonization function
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBint\fR \fBdaemon\fR(\fBint\fR \fInochdir\fR, \fBint\fR \fInoclose\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdaemon()\fR function provides a means for applications to run in the
+background.
+.sp
+.LP
+This function ensures that the process calling this function:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+runs in the background
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+detaches from the controlling terminal
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+forms a new process group
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+is not a session group leader.
+.RE
+.sp
+.LP
+The arguments to this function are treated as boolean variables and are
+evaluated using negative logic.
+.sp
+.LP
+If the \fInochdir\fR argument is zero the working directory will be changed to
+the root directory (/); otherwise it will not be.
+.sp
+.LP
+If the \fInoclose\fR argument is zero the descriptors 0, 1, and 2 (normally
+corresponding to standard input, output and error output, depending on the
+application) will be redirected to \fB/dev/null\fR; otherwise they will not be.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBdaemon()\fR returns 0. Otherwise it returns -1
+and sets \fBerrno\fR to the values specified for \fBfork\fR(2),
+\fBsetsid\fR(2), \fBopen\fR(2), and \fBdup\fR(2).
+.sp
+.LP
+If \fBdaemon()\fR is called with \fInoclose\fR set to 0 and fails to redirect
+descriptors 0, 1, and 2 to \fB/dev/null\fR, those descriptors are not
+guaranteed to be the same as before the call.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing daemon to run a process in the background.
+.sp
+.LP
+The \fBmain()\fR function of a network server could look like this:
+
+.sp
+.in +2
+.nf
+int background;	/* background flag */
+
+/* Load and verify the configuration. */
+
+/* Go into background. */
+if (background && daemon(0, 0) < 0)
+        err(1, "daemon");
+
+/* Process requests here. */
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBdup\fR(2), \fBfork\fR(2), \fBopen\fR(2), \fBsetsid\fR(2),
+\fBattributes\fR(5)

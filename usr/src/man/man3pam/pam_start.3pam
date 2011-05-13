@@ -1,0 +1,218 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_start 3PAM "22 Feb 2005" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_start, pam_end \- PAM authentication transaction functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+\fBint\fR \fBpam_start\fR(\fBconst char *\fR\fIservice\fR, \fBconst char *\fR\fIuser\fR,
+     \fBconst struct pam_conv *\fR\fIpam_conv\fR, \fBpam_handle_t *\fR\fI*pamh\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpam_end\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBint\fR \fIstatus\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_start()\fR function is called to initiate an authentication
+transaction. It takes as arguments the name of the current service,
+\fIservice\fR, the name of the user to be authenticated, \fIuser\fR, the
+address of the conversation structure, \fIpam_conv\fR, and the address of a
+variable to be assigned the authentication handle \fIpamh\fR. Upon successful
+completion,  \fIpamh\fR refers to a \fBPAM\fR handle for use with subsequent
+calls to the authentication library.
+.sp
+.LP
+The  \fIpam_conv\fR structure contains the address of the conversation function
+provided by the application.  The underlying \fBPAM\fR service module invokes
+this function to output information to and retrieve input from the user. The
+\fBpam_conv\fR structure has the following entries:
+.sp
+.in +2
+.nf
+struct pam_conv {
+    int   (*conv)();     /* Conversation function */
+    void  *appdata_ptr;  /* Application data */
+};
+.fi
+.in -2
+
+.sp
+.in +2
+.nf
+int conv(int num_msg, const struct pam_message **msg, 
+         struct pam_response **resp, void *appdata_ptr);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBconv()\fR function is called by a service module to hold a \fBPAM\fR
+conversation with the application or user. For window applications, the
+application can create a new pop-up window to be used by the interaction.
+.sp
+.LP
+The \fInum_msg\fR  parameter is the number of messages associated with the
+call. The parameter \fImsg\fR is a pointer to an array of length \fInum_msg\fR
+of the \fIpam_message\fR structure.
+.sp
+.LP
+The \fBpam_message\fR structure is used to pass prompt, error message, or any
+text information from the authentication service to the application or user. It
+is the responsibility of the \fBPAM\fR service modules to localize the
+messages. The memory used by \fBpam_message\fR has to be allocated and freed by
+the  \fBPAM\fR modules.  The \fBpam_message\fR structure has the following
+entries:
+.sp
+.in +2
+.nf
+struct pam_message{
+    int     msg_style;
+    char    *msg;
+};
+.fi
+.in -2
+
+.sp
+.LP
+The message style, \fBmsg_style\fR, can be set to one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PROMPT_ECHO_OFF\fR\fR
+.ad
+.RS 23n
+.rt  
+Prompt user, disabling echoing of response.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PROMPT_ECHO_ON\fR\fR
+.ad
+.RS 23n
+.rt  
+Prompt user, enabling echoing of response.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_ERROR_MSG\fR\fR
+.ad
+.RS 23n
+.rt  
+Print error message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_TEXT_INFO\fR\fR
+.ad
+.RS 23n
+.rt  
+Print general text information.
+.RE
+
+.sp
+.LP
+The maximum size of the message and the response string is
+\fBPAM_MAX_MSG_SIZE\fR as defined in <\fBsecurity/pam.appl.h\fR>.
+.sp
+.LP
+The structure \fIpam_response\fR is used by the authentication service to get
+the user's response back from the application or user. The storage used by
+\fIpam_response\fR has to be allocated by the application and freed by the
+\fBPAM\fR modules. The \fIpam_response\fR structure has the following entries:
+.sp
+.in +2
+.nf
+struct pam_response{
+    char *resp;
+    int  resp_retcode;  /* currently not used, */
+                        /* should be set to 0 */
+ };
+.fi
+.in -2
+
+.sp
+.LP
+It is the responsibility of the conversation function to strip off
+\fBNEWLINE\fR characters for \fBPAM_PROMPT_ECHO_OFF\fR and
+\fBPAM_PROMPT_ECHO_ON\fR message styles, and to add \fBNEWLINE\fR characters
+(if appropriate) for \fBPAM_ERROR_MSG\fR and \fBPAM_TEXT_INFO\fR message
+styles.
+.sp
+.LP
+The \fIappdata_ptr\fR argument is an application data pointer which is passed
+by the application to the  \fBPAM\fR service modules. Since the  \fBPAM\fR
+modules pass it back through the conversation function, the applications can
+use this pointer to point to any application-specific data.
+.sp
+.LP
+The \fBpam_end()\fR function is called to terminate the authentication
+transaction identified by  \fIpamh\fR and to free any storage area allocated by
+the authentication module. The argument, \fIstatus\fR, is passed to the
+\fBcleanup(|)\fR function stored within the  \fBpam\fR handle, and is used to
+determine what module-specific state must be purged.  A cleanup function is
+attached to the handle by the underlying \fBPAM\fR modules through a call to
+\fBpam_set_data\fR(3PAM) to free module-specific data.
+.sp
+.LP
+Refer to \fISolaris Security for Developers Guide\fR for information about
+providing authentication, account management, session management, and password
+management through PAM modules.
+.SH RETURN VALUES
+.sp
+.LP
+Refer to the RETURN VALUES section on \fBpam\fR(3PAM).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpam\fR(3LIB), \fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM),
+\fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
+\fBpam_open_session\fR(3PAM), \fBpam_setcred\fR(3PAM),
+\fBpam_set_data\fR(3PAM), \fBpam_strerror\fR(3PAM), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR
+.SH NOTES
+.sp
+.LP
+The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

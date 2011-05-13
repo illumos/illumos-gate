@@ -1,0 +1,410 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH xdr_simple 3NSL "27 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+xdr_simple, xdr_bool, xdr_char, xdr_double, xdr_enum, xdr_float, xdr_free,
+xdr_hyper, xdr_int, xdr_long, xdr_longlong_t, xdr_quadruple, xdr_short,
+xdr_u_char, xdr_u_hyper, xdr_u_int, xdr_u_long, xdr_u_longlong_t, xdr_u_short,
+xdr_void \- library routines for external data representation
+.SH SYNOPSIS
+.LP
+.nf
+#include<rpc/xdr.h>
+
+
+
+\fBbool_t\fR \fBxdr_bool\fR(\fBXDR *\fR\fIxdrs\fR, \fBbool_t *\fR\fIbp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_char\fR(\fBXDR *\fR\fIxdrs\fR, \fBchar *\fR\fIcp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_double\fR(\fBXDR *\fR\fIxdrs\fR, \fBdouble *\fR\fIdp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_enum\fR(\fBXDR *\fR\fIxdrs\fR, \fBenum_t *\fR\fIep\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_float\fR(\fBXDR *\fR\fIxdrs\fR, \fBfloat *\fR\fIfp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBxdr_free\fR(\fBxdrproc_t\fR \fIproc\fR, \fBchar *\fR\fIobjp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_hyper\fR(\fBXDR *\fR\fIxdrs\fR, \fBlonglong_t *\fR\fIllp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_int\fR(\fBXDR *\fR\fIxdrs\fR, \fBint *\fR\fIip\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_long\fR(\fBXDR *\fR\fIxdrs\fR, \fBlongt *\fR\fIlp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_longlong_t\fR(\fBXDR *\fR\fIxdrs\fR, \fBlonglong_t *\fR\fIllp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_quadruple\fR(\fBXDR *\fR\fIxdrs\fR, \fBlong double *\fR\fIpq\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_short\fR(\fBXDR *\fR\fIxdrs\fR, \fBshort *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_u_char\fR(\fBXDR *\fR\fIxdrs\fR, \fBunsigned char *\fR\fIucp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_u_hyper\fR(\fBXDR *\fR\fIxdrs\fR, \fBu_longlong_t *\fR\fIullp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_u_int\fR(\fBXDR *\fR\fIxdrs\fR, \fBunsigned *\fR\fIup\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_u_long\fR(\fBXDR *\fR\fIxdrs\fR, \fBunsigned long *\fR\fIulp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_u_longlong_t\fR(\fBXDR *\fR\fIxdrs\fR, \fBu_longlong_t *\fR\fIullp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_u_short\fR(\fBXDR\fR \fIxdrs\fR, \fBunsigned short *\fR\fIusp\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBxdr_void\fR(void)
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBXDR\fR library routines allow C programmers to describe simple data
+structures in a machine-independent fashion. Protocols such as remote procedure
+calls (RPC) use these routines to describe the format of the data.
+.sp
+.LP
+These routines require the creation of \fBXDR\fR streams (see
+\fBxdr_create\fR(3NSL)).
+.SS "Routines"
+.sp
+.LP
+See \fBrpc\fR(3NSL) for the definition of the  \fBXDR\fR data structure. Note
+that any buffers passed to the \fBXDR\fR routines must be properly aligned. It
+is suggested that \fBmalloc\fR(3C) be used to allocate these buffers or that
+the programmer insure  that the buffer address is divisible evenly by four.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_bool()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_bool()\fR translates between booleans (C integers) and their external
+representations. When encoding data, this filter produces values of either
+\fB1\fR or \fB0\fR. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
+otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_char()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_char()\fR translates between C characters and their external
+representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
+otherwise. Note: encoded characters are not packed, and occupy 4 bytes each.
+For arrays of characters, it is worthwhile to consider \fBxdr_bytes()\fR,
+\fBxdr_opaque()\fR, or \fBxdr_string()\fR (see \fBxdr_complex\fR(3NSL)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_double()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_double()\fR translates between C \fBdouble\fR precision numbers and
+their external representations. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_enum()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_enum()\fR translates between C \fBenum\fRs (actually integers) and their
+external representations. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_float()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_float()\fR translates between C \fBfloat\fRs and their external
+representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
+otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_free()\fR\fR
+.ad
+.RS 22n
+.rt  
+Generic freeing routine. The first argument is the \fBXDR\fR routine for the
+object being freed. The second argument is a pointer to the object itself.
+Note: the pointer passed to this routine is not freed, but what it points to is
+freed (recursively, depending on the XDR routine).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_hyper()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_hyper()\fR translates between ANSI C  \fBlong\fR \fBlong\fR integers and
+their external representations. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_int()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_int()\fR translates between C integers and their external
+representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
+otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_long()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_long()\fR translates between C \fBlong\fR integers and their external
+representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
+otherwise.
+.sp
+In a 64-bit environment, this routine returns an error if the value of \fBlp\fR
+is outside the range \fB[INT32_MIN, INT32_MAX]\fR.  The \fBxdr_int()\fR routine
+is recommended in place of this routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_longlong_t()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_longlong_t()\fR translates between ANSI C  \fBlong\fR \fBlong\fR
+integers and their external representations. This routine returns \fBTRUE\fR if
+it succeeds, \fBFALSE\fR otherwise. This routine is identical to
+\fBxdr_hyper()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_quadruple()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_quadruple()\fR translates between IEEE quadruple precision floating
+point numbers and their external representations. This routine returns
+\fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_short()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_short()\fR translates between C \fBshort\fR integers and their external
+representations. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
+otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_u_char()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_u_char()\fR translates between \fBunsigned\fR C characters and their
+external representations. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_u_hyper()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_u_hyper()\fR translates between unsigned ANSI C  \fBlong\fR \fBlong\fR
+integers and their external representations. This routine returns \fBTRUE\fR if
+it succeeds, \fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_u_int()\fR\fR
+.ad
+.RS 22n
+.rt  
+A filter primitive that translates between a C \fBunsigned\fR integer and its
+external representation. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_u_long()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_u_long()\fR translates between C \fBunsigned long\fR integers and their
+external representations. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.sp
+In a 64-bit environment, this routine returns an error if the value of
+\fIulp\fR is outside the range \fB[0, UINT32_MAX]\fR.  The \fBxdr_u_int()\fR
+routine is recommended in place of this routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_u_longlong_t()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_u_longlong_t()\fR translates between unsigned ANSI C  \fBlong\fR
+\fBlong\fR integers and their external representations. This routine returns
+\fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise. This routine is identical to
+\fBxdr_u_hyper()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_u_short()\fR\fR
+.ad
+.RS 22n
+.rt  
+\fBxdr_u_short()\fR translates between C \fBunsigned short\fR integers and
+their external representations. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxdr_void()\fR\fR
+.ad
+.RS 22n
+.rt  
+This routine always returns \fBTRUE\fR. It may be passed to \fBRPC\fR routines
+that require a function parameter, where nothing is to be done.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) cw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmalloc\fR(3C), \fBrpc\fR(3NSL), \fBxdr_admin\fR(3NSL),
+\fBxdr_complex\fR(3NSL), \fBxdr_create\fR(3NSL), \fBattributes\fR(5)

@@ -1,0 +1,169 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLPFindSrvTypes 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.SH NAME
+SLPFindSrvTypes \- find service types
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lslp\fR [ \fIlibrary\fR... ]
+#include <slp.h>
+
+\fBSLPError\fR \fBSLPFindSrvTypes\fR(\fBSLPHandle\fR \fIhSLP\fR, \fBconst char *\fR\fIpcNamingAuthority\fR,
+     \fBconst char *\fR\fIpcScopeList\fR, \fBSLPSrvTypeCallback *\fR\fIcallback\fR, \fBvoid *\fR\fIpvCookie\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSLPFindSrvTypes()\fR function issues an \fBSLP\fR service type request
+for service types in the scopes  indicated by the \fBpcScopeList\fR. The
+results are returned through the \fIcallback\fR parameter. The service types
+are independent of language locale, but only for services registered in one of
+the scopes and for the indicated naming authority.
+.sp
+.LP
+If the naming authority is "\fB*\fR", then results are returned for all naming
+authorities. If the naming authority is the empty string, \fB""\fR, then the
+default naming authority, \fBIANA\fR, is used. \fBIANA\fR is not a valid naming
+authority name. The \fBSLP_PARAMETER_BAD\fR error code will be returned if you
+include it explicitly.
+.sp
+.LP
+The service type names are returned with the naming authority included in the
+following format:
+.sp
+.in +2
+.nf
+service-type "." naming-authority
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+unless the naming authority is the default, in which case, just the service
+type name is returned.
+.sp
+.LP
+If an error occurs in starting the operation, one  of  the \fBSLPError\fR codes
+is returned.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhSLP\fR\fR
+.ad
+.RS 21n
+.rt  
+The \fBSLPHandle\fR on which to  search for types. It cannot  be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcNamingAuthority\fR\fR
+.ad
+.RS 21n
+.rt  
+The naming authority to search. Use "\fB*\fR"to search all naming authorties;
+use the empty string \fB""\fR to search the default naming authority. It cannot
+be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcScopeList\fR\fR
+.ad
+.RS 21n
+.rt  
+A pointer to a \fBchar\fR containing a comma-separated  list  of scope names to
+search for service types. It cannot be \fINULL\fR or an empty string, \fB""\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 21n
+.rt  
+A callback through which the results of the operation are reported. It cannot
+be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvCookie\fR\fR
+.ad
+.RS 21n
+.rt  
+Memory passed to the callback code from the client. It can be \fINULL\fR.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+This function or its callback may return any \fBSLP\fR error code. See the
+ERRORS section in \fBslp_api\fR(3SLP).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBSLPFindSrvTypes()\fR
+.sp
+.LP
+The following example finds all service type names in the default scope and
+default naming authority:
+
+.sp
+.in +2
+.nf
+SLPError err;
+SLPHandle hSLP;
+SLPSrvTypeCallback findsrvtypes;
+
+err = SLPFindSrvTypes(hSLP, "", "default", findsrvtypes, NULL);
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLP_CONF_FILE\fR\fR
+.ad
+.RS 17n
+.rt  
+When set, use this file for configuration.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBslp.conf\fR(4), \fBslpd.reg\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Guttman, E.,  Perkins, C., Veizades, J., and Day, M. \fIRFC 2608, Service
+Location Protocol, Version 2\fR. The Internet Society. June 1999.
+.sp
+.LP
+Howes, T. \fIRFC 2254, The String Representation of LDAP Search Filters\fR. The
+Internet Society. 1997.
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

@@ -1,0 +1,1399 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ftp 1 "6 Jun 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+ftp \- file transfer program
+.SH SYNOPSIS
+.LP
+.nf
+\fBftp\fR [\fB-adfginpstvx\fR] [\fB-m\fR \fIGSS Mech\fR] [\fB-T\fR \fItimeout\fR] 
+     [\fIhostname\fR [\fIport\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBftp\fR command is the user interface to the \fBInternet\fR standard File
+Transfer Protocol (\fBFTP\fR). \fBftp\fR transfers files to and from a remote
+network site.
+.sp
+.LP
+The host and optional port with which \fBftp\fR is to communicate can be
+specified on the command line. If this is done, \fBftp\fR immediately attempts
+to establish a connection to an \fBFTP\fR server on that host. Otherwise,
+\fBftp\fR enters its command interpreter and awaits instructions from the user.
+When \fBftp\fR is awaiting commands from the user, it displays the prompt
+\fBftp>\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options can be specified at the command line, or to the command
+interpreter:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 14n
+.rt  
+Uses \fBGSSAPI\fR authentication \fBonly\fR. If the authentication fails, this
+option closes the connection.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 14n
+.rt  
+Enables debugging.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 14n
+.rt  
+Forwards local security credentials to the remote server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 14n
+.rt  
+Disables filename "globbing".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 14n
+.rt  
+Turns off interactive prompting during multiple file transfers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 14n
+.rt  
+Specifies the \fBGSS\fR-\fBAPI\fR mechanism to use. The default is to use the
+kerberos_v5 mechanism. Supported alternatives are defined in
+\fB/etc/gss/mech\fR (see \fBmech\fR(4)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 14n
+.rt  
+Does not attempt "auto-login" upon initial connection. If auto-login is not
+disabled, \fBftp\fR checks the \fB\&.netrc\fR file in the user's home directory
+for an entry describing an account on the remote machine. If no entry exists,
+\fBftp\fR prompts for the login name of the account on the remote machine (the
+default is the login name on the local machine), and, if necessary, prompts for
+a password and an account with which to login.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 14n
+.rt  
+Enables passive mode for data transfers. This command is useful when connecting
+to a remote host from behind a connection filtering firewall.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 14n
+.rt  
+Skips the \fBSYST\fR command that is sent by default to all remote servers upon
+connection. The system command is what enables the automatic use of binary mode
+rather than the protocol default ascii mode.
+.sp
+As some older servers cannot handle the \fBftp\fR command, this directive is
+provided to allow inter-operability with these servers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 14n
+.rt  
+Enables packet tracing (unimplemented).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fItimeout\fR\fR
+.ad
+.RS 14n
+.rt  
+Enables global connection timer, specified in seconds (decimal). There is a
+timer for the control connection that is reset when anything is sent to the
+server and disabled while the client is prompting for user input. Another
+independent timer is used to monitor incoming or outgoing data connections.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 14n
+.rt  
+Shows all responses from the remote server, as well as report on data transfer
+statistics. This is turned on by default if \fBftp\fR is running interactively
+with its input coming from the user's terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 14n
+.rt  
+Attempts to use \fBGSSAPI\fR for authentication and encryption. Data and
+Command channel protection is set to "\fBprivate\fR".
+.RE
+
+.sp
+.LP
+The following commands can be specified to the command interpreter:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fR
+.ad
+.sp .6
+.RS 4n
+[ \fIcommand\fR ] Runs \fIcommand\fR as a shell command on the local machine.
+If no \fIcommand\fR is given, invokes an interactive shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$\fR \fImacro-name\fR [ \fIargs\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Executes the macro \fImacro-name\fR that was defined with the \fBmacdef\fR
+command. Arguments are passed to the macro unglobbed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBaccount\fR [ \fIpasswd\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Supplies a supplemental password required by a remote system for access to
+resources once a login has been successfully completed. If no argument is
+included, the user is prompted for an account password in a non-echoing input
+mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBappend\fR \fIlocal-file\fR [ \fIremote-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Appends a local file to a file on the remote machine. If \fIremote-file\fR is
+not specified, the local file name is used, subject to alteration by any
+\fBntrans\fR or \fBnmap\fR settings. File transfer uses the current settings
+for "representation type", "file structure", and "transfer mode".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBascii\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the "representation type" to "network \fBASCII\fR". This is the default
+type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbell\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sounds a bell after each file transfer command is completed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbinary\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the "representation type" to "image".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbye\fR\fR
+.ad
+.sp .6
+.RS 4n
+Terminates the \fBFTP\fR session with the remote server and exit \fBftp\fR. An
+\fBEOF\fR also terminates the session and exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcase\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles remote computer file name case mapping during \fBmget\fR commands. When
+\fBcase\fR is on (default is off), remote computer file names with all letters
+in upper case are written in the local directory with the letters mapped to
+lower case.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcd\fR \fIremote-directory\fR\fR
+.ad
+.sp .6
+.RS 4n
+Changes the working directory on the remote machine to \fIremote-directory\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcdup\fR\fR
+.ad
+.sp .6
+.RS 4n
+Changes the remote machine working directory to the parent of the current
+remote machine working directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclear\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the protection level on data transfers to "\fBclear\fR". If no \fBADAT\fR
+command succeeded, then this is the default protection level.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclose\fR\fR
+.ad
+.sp .6
+.RS 4n
+Terminates the \fBFTP\fR session with the remote server, and return to the
+command interpreter. Any defined macros are erased.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcr\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles RETURN stripping during "network \fBASCII\fR" type file retrieval.
+Records are denoted by a RETURN/\fBLINEFEED\fR sequence during "network
+\fBASCII\fR" type file transfer. When \fBcr\fR is on (the default), RETURN
+characters are stripped from this sequence to conform with the UNIX system
+single \fBLINEFEED\fR record delimiter. Records on non-UNIX-system remote hosts
+can contain single \fBLINEFEED\fR characters; when an "network \fBASCII\fR"
+type transfer is made, these \fBLINEFEED\fR characters can be distinguished
+from a record delimiter only when \fBcr\fR is off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete\fR \fIremote-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the file \fIremote-file\fR on the remote machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdebug\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles debugging mode. When debugging is on, \fBftp\fR prints each command
+sent to the remote machine, preceded by the string \fB->\fR\&.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdir\fR [ \fIremote-directory\fR [ \fIlocal-file\fR ]]\fR
+.ad
+.sp .6
+.RS 4n
+Prints a listing of the directory contents in the directory,
+\fIremote-directory\fR, and, optionally, placing the output in
+\fIlocal-file\fR. If no directory is specified, the current working directory
+on the remote machine is used. If no local file is specified, or
+\fIlocal-file\fR is \fB\(mi\fR, output is sent to the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisconnect\fR\fR
+.ad
+.sp .6
+.RS 4n
+A synonym for \fBclose\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBform\fR [ \fIformat-name\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets the carriage control format subtype of the "representation type" to
+\fIformat-name\fR. The only valid \fIformat-name\fR is \fBnon-print\fR, which
+corresponds to the default "non-print" subtype.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBget\fR \fIremote-file\fR [ \fIlocal-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Retrieves the \fIremote-file\fR and store it on the local machine. If the local
+file name is not specified, it is given the same name it has on the remote
+machine, subject to alteration by the current \fBcase\fR, \fBntrans\fR, and
+\fBnmap\fR settings. The current settings for "representation type", "file
+structure", and "transfer mode" are used while transferring the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBglob\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles filename expansion, or "globbing", for \fBmdelete\fR, \fBmget\fR and
+\fBmput\fR. If globbing is turned off, filenames are taken literally.
+.sp
+Globbing for \fBmput\fR is done as in \fBsh\fR(1). For \fBmdelete\fR and
+\fBmget\fR, each remote file name is expanded separately on the remote machine,
+and the lists are not merged.
+.sp
+Expansion of a directory name is likely to be radically different from
+expansion of the name of an ordinary file: the exact result depends on the
+remote operating system and \fBFTP\fR server, and can be previewed with the
+command, \fBmls\fR \fIremote-files\fR \(mi.
+.sp
+\fBmget\fR and \fBmput\fR are not meant to transfer entire directory subtrees
+of files. You can do this by transferring a \fBtar\fR(1) archive of the subtree
+(using a "representation type" of "image" as set by the \fBbinary\fR command).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhash\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles hash-sign (\fB#\fR) printing for each data block transferred. The size
+of a data block is 8192 bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhelp\fR [ \fIcommand\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Prints an informative message about the meaning of \fIcommand\fR. If no
+argument is given, \fBftp\fR prints a list of the known commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlcd\fR [ \fIdirectory\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Changes the working directory on the local machine. If no \fIdirectory\fR is
+specified, the user's home directory is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBls\fR [ \fB-al\fR | \fIremote-directory\fR [ \fIlocal-file\fR ]]\fR
+.ad
+.sp .6
+.RS 4n
+By default, prints an abbreviated listing of the contents of a directory on the
+remote machine. This default behavior can be changed to make \fBls\fR a synonym
+of the \fBdir\fR command. This change can be achieved by setting
+\fBFTP_LS_SENDS_NLST\fR to '\fBno\fR' in \fB/etc/default/ftp\fR or in the
+environment. See \fBftp\fR(4) for details.
+.sp
+The \fB-a\fR option lists all entries, including those that begin with a dot
+(\fB\&.\fR), which are normally not listed. The \fB-l\fR option lists files in
+long format, giving mode, number of links, owner, group, size in bytes, and
+time of last modification for each file. If the file is a special file, the
+size field instead contains the major and minor device numbers rather than a
+size. If the file is a symbolic link, the filename is printed followed by
+"\fB\(->\fR" and the pathname of the referenced file.
+.sp
+If \fIremote-directory\fR is left unspecified, the current working directory is
+used.
+.sp
+If no local file is specified, or if \fIlocal-file\fR is \fB\(mi\fR, the output
+is sent to the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmacdef\fR \fImacro-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Defines a macro. Subsequent lines are stored as the macro \fImacro-name\fR. A
+null line (consecutive \fBNEWLINE\fR characters in a file or RETURN characters
+from the terminal) terminates macro input mode. There is a limit of 16 macros
+and 4096 total characters in all defined macros. Macros remain defined until a
+\fBclose\fR command is executed.
+.sp
+The macro processor interprets \fB$\fR and \fB\e\fR as special characters. A
+\fB$\fR followed by a number (or numbers) is replaced by the corresponding
+argument on the macro invocation command line. A \fB$\fR followed by an \fBi\fR
+signals that macro processor that the executing macro is to be looped. On the
+first pass, \fB$i\fR is replaced by the first argument on the macro invocation
+command line; on the second pass, it is replaced by the second argument, and so
+on. A \fB\e\fR followed by any character is replaced by that character. Use the
+\fB\e\fR to prevent special treatment of the \fB$\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmdelete\fR \fIremote-files\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the \fIremote-files\fR on the remote machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmdir\fR \fIremote-files local-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like \fBdir\fR, except multiple remote files can be specified. If interactive
+prompting is on, \fBftp\fR prompts the user to verify that the last argument is
+indeed the target local file for receiving \fBmdir\fR output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmget\fR \fIremote-files\fR\fR
+.ad
+.sp .6
+.RS 4n
+Expands the \fIremote-files\fR on the remote machine and do a \fBget\fR for
+each file name thus produced. See \fBglob\fR for details on the filename
+expansion. Resulting file names are processed according to \fBcase\fR,
+\fBntrans\fR, and \fBnmap\fR settings. Files are transferred into the local
+working directory, which can be changed with \fBlcd\fR \fIdirectory\fR. New
+local directories can be created with \fB! mkdir\fR \fIdirectory\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmkdir\fR \fIdirectory-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Makes a directory on the remote machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmls\fR \fIremote-files local-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Like \fBls\fR(1), except multiple remote files can be specified. If interactive
+prompting is on, \fBftp\fR prompts the user to verify that the last argument is
+indeed the target local file for receiving \fBmls\fR output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmode\fR [ \fImode-name\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets the "transfer mode" to \fImode-name\fR. The only valid \fImode-name\fR is
+\fBstream\fR, which corresponds to the default "stream" mode. This
+implementation only supports \fBstream\fR, and requires that it be specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmput\fR \fIlocal-files\fR\fR
+.ad
+.sp .6
+.RS 4n
+Expands wild cards in the list of local files given as arguments and do a
+\fBput\fR for each file in the resulting list. See \fBglob\fR for details of
+filename expansion. Resulting file names are processed according to
+\fBntrans\fR and \fBnmap\fR settings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnlist\fR [ \fB-al\fR | \fIremote-directory\fR [ \fIlocal-file\fR ]]\fR
+.ad
+.sp .6
+.RS 4n
+Prints an abbreviated listing of the contents of a directory on the remote
+machine, listing only those files that can be retrieved by the \fBget\fR
+command, unless the \fB-a\fR or \fB-l\fR option is used. If
+\fIremote-directory\fR is left unspecified, the current working directory is
+used.
+.sp
+The \fB-a\fR option lists all entries, including those that begin with a dot
+(\fB\&.\fR), which are normally not listed. The \fB-l\fR option lists files in
+long format the same way it does when used with the \fBls\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnmap\fR [ \fIinpattern outpattern\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets or unsets the filename mapping mechanism. If no arguments are specified,
+the filename mapping mechanism is unset. If arguments are specified, remote
+filenames are mapped during \fBmput\fR commands and \fBput\fR commands issued
+without a specified remote target filename. If arguments are specified, local
+filenames are mapped during \fBmget\fR commands and \fBget\fR commands issued
+without a specified local target filename.
+.sp
+This command is useful when connecting to a non-UNIX-system remote host with
+different file naming conventions or practices. The mapping follows the pattern
+set by \fIinpattern\fR and \fIoutpattern\fR. \fIinpattern\fR is a template for
+incoming filenames (which can have already been processed according to the
+\fBntrans\fR and \fBcase\fR settings). Variable templating is accomplished by
+including the sequences \fB$1\fR, \fB$2\fR, .\|.\|.\|, \fB$9\fR in
+\fIinpattern\fR. Use \fB\e\fR to prevent this special treatment of the \fB$\fR
+character. All other characters are treated literally, and are used to
+determine the \fBnmap\fR \fIinpattern\fR variable values.
+.sp
+For example, given \fIinpattern\fR \fB$1.$2\fR and the remote file name
+\fBmydata.data\fR, \fB$1\fR would have the value \fBmydata\fR, and \fB$2\fR
+would have the value \fBdata\fR.
+.sp
+The \fIoutpattern\fR determines the resulting mapped filename. The sequences
+\fB$1\fR, \fB$2\fR, .\|.\|.\|, \fB$9\fR are replaced by any value resulting
+from the \fIinpattern\fR template. The sequence \fB$0\fR is replaced by the
+original filename. Additionally, the sequence [\fI\|seq1\|\fR,\fI\|seq2\|\fR]
+is replaced by \fIseq1\fR if \fIseq1\fR is not a null string; otherwise it is
+replaced by \fIseq2\fR.
+.sp
+For example, the command \fBnmap $1.$2.$3 [$1,$2].[$2,file]\fR would yield the
+output filename \fBmyfile.data\fR for input filenames \fBmyfile.data\fR and
+\fBmyfile.data.old\fR, \fBmyfile.file\fR for the input filename \fBmyfile\fR,
+and \fBmyfile.myfile\fR for the input filename \fB\&.myfile\fR. \fBSPACE\fR
+characters can be included in \fIoutpattern\fR, as in the example \fBnmap $1 |
+sed "s/ *$//" > $1\fR. Use the \fB\e\fR character to prevent special treatment
+of the \fB$\fR, \fB[\fR, \fB]\fR, and \fB,\fR, characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBntrans\fR [ \fIinchars\fR [ \fIoutchars\fR ] ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets or unsets the filename character translation mechanism. If no arguments
+are specified, the filename character translation mechanism is unset. If
+arguments are specified, characters in remote filenames are translated during
+\fBmput\fR commands and \fBput\fR commands issued without a specified remote
+target filename, and characters in local filenames are translated during
+\fBmget\fR commands and \fBget\fR commands issued without a specified local
+target filename.
+.sp
+This command is useful when connecting to a non-UNIX-system remote host with
+different file naming conventions or practices. Characters in a filename
+matching a character in \fIinchars\fR are replaced with the corresponding
+character in \fIoutchars\fR. If the character's position in \fIinchars\fR is
+longer than the length of \fIoutchars\fR, the character is deleted from the
+file name.
+.sp
+Only 16 characters can be translated when using the \fBntrans\fR command under
+\fBftp\fR. Use \fBcase\fR (described above) if needing to convert the entire
+alphabet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBopen\fR \fIhost\fR [ \fIport\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Establishes a connection to the specified \fIhost\fR \fBFTP\fR server. An
+optional port number can be supplied, in which case, \fBftp\fR attempts to
+contact an \fBFTP\fR server at that port. If the \fIauto-login\fR option is on
+(default setting), \fBftp\fR also attempts to automatically log the user in to
+the \fBFTP\fR server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpassive\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles passive mode. When passive mode is turned on, the ftp client sends the
+\fBPASV\fR command requesting that the \fBFTP\fR server open a port for the
+data connection and return the address of that port. The remote server listens
+on that port and the client connects to it. When passive mode is turned off,
+the ftp client sends the \fBPORT\fR command to the server specifying an address
+for the remote server to connect back to. Passive mode is useful when the
+connections to the ftp client are controlled, for example, when behind a
+firewall. When connecting to an IPv6-enabled \fBFTP\fR server, \fBEPSV\fR can
+be used in place of \fBPASV\fR and \fBEPRT\fR in place of \fBPORT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprivate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the protection level on data transfers to "\fBprivate\fR". Data
+transmissions are confidentiality\(em and integrity\(emprotected by encryption.
+If no \fBADAT\fR command succeeded, then the only possible level is "clear".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprompt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles interactive prompting. Interactive prompting occurs during multiple
+file transfers to allow the user to selectively retrieve or store files. By
+default, prompting is turned on. If prompting is turned off, any \fBmget\fR or
+\fBmput\fR transfers all files, and any \fBmdelete\fR deletes all files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprotect\fR \fIprotection-level\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the protection level on data transfers to \fIprotection-level\fR. The
+valid protection levels are "\fBclear\fR" for unprotected data transmissions,
+"\fBsafe\fR" for data transmissions that are integrity-protected by
+cryptographic checksum, and "\fBprivate\fR" for data transmissions that are
+confidentiality\(em and integrity\(em protected by encryption. If no \fBADAT\fR
+command succeeded, then the only possible level is "\fBclear\fR". If no level
+is specified, the current level is printed. The default protection level is
+"\fBclear\fR".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBproxy\fR \fIftp-command\fR\fR
+.ad
+.sp .6
+.RS 4n
+Executes an \fBFTP\fR command on a secondary control connection. This command
+allows simultaneous connection to two remote \fBFTP\fR servers for transferring
+files between the two servers. The first \fBproxy\fR command should be an
+\fBopen\fR, to establish the secondary control connection. Enter the command
+\fBproxy\fR \fB?\fR to see other \fBFTP\fR commands executable on the secondary
+connection.
+.sp
+The following commands behave differently when prefaced by \fBproxy\fR:
+\fBopen\fR does not define new macros during the auto-login process,
+\fBclose\fR does not erase existing macro definitions, \fBget\fR and \fBmget\fR
+transfer files from the host on the primary control connection to the host on
+the secondary control connection, and \fBput\fR, \fBmputd\fR, and \fBappend\fR
+transfer files from the host on the secondary control connection to the host on
+the primary control connection.
+.sp
+Third party file transfers depend upon support of the \fBPASV\fR command by the
+server on the secondary control connection.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBput\fR \fIlocal-file\fR [ \fIremote-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Stores a local file on the remote machine. If \fIremote-file\fR is left
+unspecified, the local file name is used after processing according to any
+\fBntrans\fR or \fBnmap\fR settings in naming the remote file. File transfer
+uses the current settings for "representation type", "file structure", and
+"transfer mode".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpwd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints the name of the current working directory on the remote machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBquit\fR\fR
+.ad
+.sp .6
+.RS 4n
+A synonym for \fBbye\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBquote\fR \fIarg1 arg2\fR ...\fR
+.ad
+.sp .6
+.RS 4n
+Sends the arguments specified, verbatim, to the remote \fBFTP\fR server. A
+single \fBFTP\fR reply code is expected in return. (The \fBremotehelp\fR
+command displays a list of valid arguments.)
+.sp
+\fBquote\fR should be used only by experienced users who are familiar with the
+FTP protocol.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrecv\fR \fIremote-file\fR [ \fIlocal-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+ A synonym for \fBget\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreget\fR \fIremote-file\fR [ \fIlocal-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+The \fBreget\fR command acts like \fBget\fR, except that if \fIlocal-file\fR
+exists and is smaller than \fIremote-file\fR, \fIlocal-file\fR is presumed to
+be a partially transferred copy of \fIremote-file\fR and the transfer is
+continued from the apparent point of failure. This command is useful when
+transferring large files over networks that are prone to dropping connections.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBremotehelp\fR [ \fIcommand-name\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Requests help from the remote \fBFTP\fR server. If a \fIcommand-name\fR is
+specified it is supplied to the server as well.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrename\fR \fIfrom to\fR\fR
+.ad
+.sp .6
+.RS 4n
+Renames the file \fIfrom\fR on the remote machine to have the name \fIto\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreset\fR\fR
+.ad
+.sp .6
+.RS 4n
+Clears reply queue. This command re-synchronizes command/reply sequencing with
+the remote \fBFTP\fR server. Resynchronization can be necessary following a
+violation of the \fBFTP\fR protocol by the remote server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrestart\fR [ \fImarker\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Restarts the immediately following \fBget\fR or \fBput\fR at the indicated
+marker. On UNIX systems, \fImarker\fR is usually a byte offset into the file.
+When followed by an \fBmget\fR, the \fBrestart\fR applies to the first
+\fBget\fR performed. Specifying a \fImarker\fR of \fB0\fR clears the restart
+marker. If no argument is specified, the current restart status is displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrmdir\fR \fIdirectory-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes a directory on the remote machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrunique\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles storing of files on the local system with unique filenames. If a file
+already exists with a name equal to the target local filename for a \fBget\fR
+or \fBmget\fR command, a \fB\&.1\fR is appended to the name. If the resulting
+name matches another existing file, a \fB\&.2\fR is appended to the original
+name. If this process continues up to \fB\&.99\fR, an error message is printed,
+and the transfer does not take place. The generated unique filename is
+reported. \fBrunique\fR does not affect local files generated from a shell
+command. The default value is off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsafe\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the protection level on data transfers to "\fBsafe\fR". Data transmissions
+are integrity-protected by cryptographic checksum. If no \fBADAT\fR command
+succeeded, then the only possible level is "\fBclear\fR".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsend\fR \fIlocal-file\fR [ \fIremote-file\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+A synonym for \fBput\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsendport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles the use of \fBPORT\fR commands. By default, \fBftp\fR attempts to use a
+\fBPORT\fR command when establishing a connection for each data transfer. The
+use of \fBPORT\fR commands can prevent delays when performing multiple file
+transfers. If the \fBPORT\fR command fails, \fBftp\fR uses the default data
+port. When the use of \fBPORT\fR commands is disabled, no attempt is made to
+use \fBPORT\fR commands for each data transfer. This is useful when connected
+to certain \fBFTP\fR implementations that ignore \fBPORT\fR commands but
+incorrectly indicate they have been accepted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsite\fR \fIarg1\fR [ \fIarg2\fR ] ...\fR
+.ad
+.sp .6
+.RS 4n
+Sends the arguments specified, verbatim, to the remote \fBFTP\fR server as a
+\fBSITE\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus\fR\fR
+.ad
+.sp .6
+.RS 4n
+Show the current status of \fBftp\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstruct\fR [ \fIstruct-name\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets the file structure to \fIstruct-name\fR. The only valid \fIstruct-name\fR
+is \fBfile\fR, which corresponds to the default "file" structure. The
+implementation only supports \fBfile\fR, and requires that it be specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsunique\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles storing of files on remote machine under unique file names. The remote
+\fBFTP\fR server must support the \fBSTOU\fR command for successful completion.
+The remote server reports the unique name. Default value is off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtcpwindow\fR [ \fIsize\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets the \fBTCP\fR window size to be used for data connections. Specifying a
+size of \fB0\fR stops the explicit setting of the \fBTCP\fR window size on data
+connections. If no argument is specified, the current setting is displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtenex\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the "representation type" to that needed to talk to \fBTENEX\fR machines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtrace\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles packet tracing (unimplemented).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtype\fR [ \fItype-name\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Sets the "representation type" to \fItype-name\fR. The valid \fItype-name\fRs
+are \fBascii\fR for "network \fBASCII\fR", \fBbinary\fR or \fBimage\fR for
+"image", and \fBtenex\fR for "local byte size" with a byte size of 8 (used to
+talk to \fBTENEX\fR machines). If no type is specified, the current type is
+printed. The default type is "network \fBASCII\fR".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuser\fR \fIuser-name\fR [ \fIpassword\fR [ \fIaccount\fR ]]\fR
+.ad
+.sp .6
+.RS 4n
+Identify yourself to the remote \fBFTP\fR server. If the password is not
+specified and the server requires it, \fBftp\fR prompts the user for it (after
+disabling local echo). If an account field is not specified, and the \fBFTP\fR
+server requires it, the user is prompted for it. If an account field is
+specified, an account command is relayed to the remote server after the login
+sequence is completed if the remote server did not require it for logging in.
+Unless \fBftp\fR is invoked with "auto-login" disabled, this process is done
+automatically on initial connection to the \fBFTP\fR server.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverbose\fR\fR
+.ad
+.sp .6
+.RS 4n
+Toggles verbose mode. In verbose mode, all responses from the \fBFTP\fR server
+are displayed to the user. In addition, if verbose mode is on, when a file
+transfer completes, statistics regarding the efficiency of the transfer are
+reported. By default, verbose mode is on if \fBftp\fR's commands are coming
+from a terminal, and off otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR [ \fIcommand\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+A synonym for \fBhelp\fR.
+.RE
+
+.sp
+.LP
+Command arguments which have embedded spaces can be quoted with quote (\fB"\fR)
+marks.
+.sp
+.LP
+If any command argument which is not indicated as being optional is not
+specified, \fBftp\fR prompts for that argument.
+.SH ABORTING A FILE TRANSFER
+.sp
+.LP
+To abort a file transfer, use the terminal interrupt key. Sending transfers is
+immediately halted. Receiving transfers are halted by sending an \fBFTP\fR
+protocol \fBABOR\fR command to the remote server, and discarding any further
+data received. The speed at which this is accomplished depends upon the remote
+server's support for \fBABOR\fR processing. If the remote server does not
+support the \fBABOR\fR command, an \fBftp>\fR prompt does not appear until the
+remote server has completed sending the requested file.
+.sp
+.LP
+The terminal interrupt key sequence is ignored when \fBftp\fR has completed any
+local processing and is awaiting a reply from the remote server. A long delay
+in this mode can result from the \fBABOR\fR processing described above, or from
+unexpected behavior by the remote server, including violations of the ftp
+protocol. If the delay results from unexpected remote server behavior, the
+local \fBftp\fR program must be killed by hand.
+.SH FILE NAMING CONVENTIONS
+.sp
+.LP
+Local files specified as arguments to \fBftp\fR commands are processed
+according to the following rules.
+.sp
+.ne 2
+.mk
+.na
+\fB1)\fR
+.ad
+.RS 6n
+.rt  
+If the file name \fB\(mi\fR is specified, the standard input (for reading) or
+standard output (for writing) is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB2)\fR
+.ad
+.RS 6n
+.rt  
+If the first character of the file name is \fB|\fR, the remainder of the
+argument is interpreted as a shell command. \fBftp\fR then forks a shell, using
+\fBpopen\fR(3C) with the argument supplied, and reads (writes) from the
+standard output (standard input) of that shell. If the shell command includes
+SPACE characters, the argument must be quoted; for example \fB"| ls
+\fR\fB-lt\fR\fB"\fR. A particularly useful example of this mechanism is:
+\fB"dir | more"\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB3)\fR
+.ad
+.RS 6n
+.rt  
+Failing the above checks, if globbing is enabled, local file names are expanded
+according to the rules used in the \fBsh\fR(1); see the \fBglob\fR command. If
+the \fBftp\fR command expects a single local file (for example, \fBput\fR),
+only the first filename generated by the globbing operation is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB4)\fR
+.ad
+.RS 6n
+.rt  
+For \fBmget\fR commands and \fBget\fR commands with unspecified local file
+names, the local filename is the remote filename, which can be altered by a
+\fBcase\fR, \fBntrans\fR, or \fBnmap\fR setting. The resulting filename can
+then be altered if \fBrunique\fR is on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB5)\fR
+.ad
+.RS 6n
+.rt  
+For \fBmput\fR commands and \fBput\fR commands with unspecified remote file
+names, the remote filename is the local filename, which can be altered by a
+\fBntrans\fR or \fBnmap\fR setting. The resulting filename can then be altered
+by the remote server if \fBsunique\fR is on.
+.RE
+
+.SH FILE TRANSFER PARAMETERS
+.sp
+.LP
+The \fBFTP\fR specification specifies many parameters which can affect a file
+transfer.
+.sp
+.LP
+The "representation type" can be one of "network \fBASCII\fR", "\fBEBCDIC\fR",
+"image", or "local byte size" with a specified byte size (for PDP-10's and
+PDP-20's mostly). The "network \fBASCII\fR" and "\fBEBCDIC\fR" types have a
+further subtype which specifies whether vertical format control (\fBNEWLINE\fR
+characters, form feeds, and so on) are to be passed through ("non-print"),
+provided in \fBTELNET\fR format ("\fBTELNET\fR format controls"), or provided
+in \fBASA\fR (\fBFORTRAN\fR) ("carriage control (\fBASA\fR)") format. \fBftp\fR
+supports the "network \fBASCII\fR" (subtype "non-print" only) and "image"
+types, plus "local byte size" with a byte size of 8 for communicating with
+\fBTENEX\fR machines.
+.sp
+.LP
+The "file structure" can be one of \fBfile\fR (no record structure),
+\fBrecord\fR, or \fBpage\fR. \fBftp\fR supports only the default value, which
+is \fBfile\fR.
+.sp
+.LP
+The "transfer mode" can be one of \fBstream\fR, \fBblock\fR, or
+\fBcompressed\fR. \fBftp\fR supports only the default value, which is
+\fBstream\fR.
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBftp\fR when
+encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+.sp
+.LP
+The \fBftp\fR command is IPv6-enabled. See \fBip6\fR(7P).
+.SH FILES
+.sp
+.LP
+\fB~/.netrc\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIenabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBls\fR(1), \fBrcp\fR(1), \fBsh\fR(1), \fBtar\fR(1), \fBin.ftpd\fR(1M),
+\fBpopen\fR(3C), \fBftp\fR(4), \fBftpusers\fR(4), \fBmech\fR(4),
+\fBnetrc\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5), \fBip6\fR(7P)
+.sp
+.LP
+Allman, M., Ostermann, S., and Metz, C. \fIRFC 2428, FTP Extensions for IPv6
+and NATs\fR. The Internet Society. September 1998.
+.sp
+.LP
+Lunt, S. J. \fIRFC 2228, FTP Security Extensions\fR. Internet Draft. November
+1993.
+.sp
+.LP
+Postel, Jon, and Joyce Reynolds. \fIRFC 959, File Transfer Protocol (FTP )\fR.
+Network Information Center. October 1985.
+.sp
+.LP
+Piscitello, D. \fIRFC 1639, FTP Operation Over Big Address Records (FOOBAR)\fR.
+Network Working Group. June 1994.
+.SH NOTES
+.sp
+.LP
+Failure to log in can arise from an explicit denial by the remote \fBFTP\fR
+server because the account is listed in \fB/etc/ftpusers\fR. See
+\fBin.ftpd\fR(1M) and \fBftpusers\fR(4).
+.sp
+.LP
+Correct execution of many commands depends upon proper behavior by the remote
+server.
+.sp
+.LP
+An error in the treatment of carriage returns in the 4.2 \fBBSD\fR code
+handling transfers with a "representation type" of "network \fBASCII\fR" has
+been corrected. This correction can result in incorrect transfers of binary
+files to and from 4.2 \fBBSD\fR servers using a "representation type" of
+"network \fBASCII\fR". Avoid this problem by using the "image" type.

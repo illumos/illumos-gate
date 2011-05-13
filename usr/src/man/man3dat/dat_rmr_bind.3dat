@@ -1,0 +1,435 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_rmr_bind 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_rmr_bind \- bind the RMR to the specified memory region within an LMR
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_rmr_bind(
+    IN    DAT_RMR_HANDLE        rmr_handle,
+    IN    DAT_LMR_TRIPLET       *lmr_triplet,
+    IN    DAT_MEM_PRIV_FLAGS    mem_privileges,
+    IN    DAT_EP_HANDLE         ep_handle,
+    IN    DAT_RMR_COOKIE        user_cookie,
+    IN    DAT_COMPLETION_FLAGS  completion_flags,
+    OUT   DAT_RMR_CONTEXT       *rmr_context
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrmr_handle\fR\fR
+.ad
+.RS 20n
+.rt  
+Handle for an RMR instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlmr_triplet\fR\fR
+.ad
+.RS 20n
+.rt  
+A pointer to an \fIlmr_triplet\fR that defines the memory region of the LMR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImem_privileges\fR\fR
+.ad
+.RS 20n
+.rt  
+Consumer-requested memory access privileges for the registered remote memory
+region. The Default value is \fBDAT_MEM_PRIV_NONE_FLAG\fR. The constant value
+\fBDAT_MEM_PRIV_ALL_FLAG\fR = 0x33, which specifies both Read and Write
+privileges, is also defined. Memory privilege definitions are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBRemote Read\fR
+.ad
+.RS 16n
+.rt  
+\fBDAT_MEM_PRIV_REMOTE_READ_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x02\fR
+.ad
+.RS 8n
+.rt  
+Remote read access requested.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBRemote Write\fR
+.ad
+.RS 16n
+.rt  
+\fBDAT_MEM_PRIV_REMOTE_WRITE_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x20\fR
+.ad
+.RS 8n
+.rt  
+Remote write access requested.
+.RE
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIep_handle\fR\fR
+.ad
+.RS 20n
+.rt  
+Endpoint to which \fBdat_rmr_bind()\fR is posted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser_cookie\fR\fR
+.ad
+.RS 20n
+.rt  
+User-provided cookie that is returned to a Consumer at the completion of the
+\fBdat_rmr_bind()\fR. Can be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcompletion_flags\fR\fR
+.ad
+.RS 20n
+.rt  
+Flags for RMR Bind. The default \fBDAT_COMPLETION_DEFAULT_FLAG\fR is 0. Flag
+definitions are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCompletion Suppression\fR
+.ad
+.RS 30n
+.rt  
+\fBDAT_COMPLETION_SUPPRESS_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x01\fR
+.ad
+.RS 8n
+.rt  
+Suppress successful Completion.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNotification of Completion\fR
+.ad
+.RS 30n
+.rt  
+\fB\fR\fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x04\fR
+.ad
+.RS 8n
+.rt  
+Non-notification completion. Local Endpoint must be configured for Notification
+Suppression.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBBarrier Fence\fR
+.ad
+.RS 30n
+.rt  
+\fB\fR\fBDAT_COMPLETION_BARRIER_FENCE_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x08\fR
+.ad
+.RS 8n
+.rt  
+Request for Barrier Fence.
+.RE
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrmr_context\fR\fR
+.ad
+.RS 20n
+.rt  
+New \fIrmr_context\fR for the bound RMR suitable to be shared with a remote
+host.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_rmr_bind()\fR function binds the RMR to the specified memory region
+within an LMR and provides the new \fIrmr_context\fR value. The
+\fBdat_rmr_bind()\fR operation is a lightweight asynchronous operation that
+generates a new \fIrmr_context\fR. The Consumer is notified of the completion
+of this operation through a \fIrmr_bind\fR Completion event on the
+\fIrequest_evd_handle\fR of the specified Endpoint \fIep_handle\fR.
+.sp
+.LP
+The return value of \fIrmr_context\fR can be transferred by local Consumer to a
+Consumer on a remote host to be used for an RDMA DTO. The use of
+\fIrmr_context\fR by a remote host for an RDMA DTO prior to the completion of
+the \fBdat_rmr_bind()\fR can result in an error and a broken connection. The
+local Consumer can ensure that the remote Consumer does not have
+\fIrmr_context\fR before \fBdat_rmr_bind()\fR is completed. One way is to
+"wait" for the completion \fBdat_rmr_bind()\fR on the \fIrmr_bind\fR Event
+Dispatcher of the specified Endpoint \fIep_handle\fR. Another way is to send
+\fIrmr_context\fR in a Send DTO over the connection of the Endpoint
+\fIep_handle\fR. The barrier-fencing behavior of the \fBdat_rmr_bind()\fR with
+respect to Send and RDMA DTOs ensures that a Send DTO does not start until
+\fBdat_rmr_bind()\fR completed.
+.sp
+.LP
+The \fBdat_rmr_bind()\fR function automatically fences all Send, RDMA Read, and
+RDMA Write DTOs and \fBdat_rmr_bind()\fR operations submitted on the Endpoint
+\fIep_handle\fR after the \fBdat_rmr_bind()\fR. Therefore, none of these
+operations starts until \fBdat_rmr_bind()\fR is completed.
+.sp
+.LP
+If the RMR Bind fails after \fBdat_rmr_bind()\fR returns, connection of
+\fIep_handle\fR is broken. The Endpoint transitions into a
+\fBDAT_EP_STATE_DISCONNECTED\fR state and the \fBDAT_CONNECTION_EVENT_BROKEN\fR
+event is delivered to the \fIconnect_evd_handle\fR of the Endpoint.
+.sp
+.LP
+The \fBdat_rmr_bind()\fR function employs fencing to ensure that operations
+sending the RMR Context on the same Endpoint as the bind specified cannot
+result in an error from the peer side using the delivered RMR Context too soon.
+One method, used by InfiniBand, is to ensure that none of these operations
+start on the Endpoint until after the bind is completed. Other transports can
+employ different methods to achieve the same goal.
+.sp
+.LP
+Any RDMA DTO that uses the previous value of \fIrmr_context\fR after the
+\fBdat_rmr_bind()\fR is completed fail and report a protection violation.
+.sp
+.LP
+By default, \fBdat_rmr_bind()\fR generates notification completions.
+.sp
+.LP
+The \fImem_privileges\fR parameter allows Consumers to restrict the type of
+remote accesses to the registered RMR by RDMA DTOs. Providers whose underlying
+Transports require that privileges of the requested RMR and the associated LMR
+match, that is
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Set RMR's \fBDAT_MEM_PRIV_REMOTE_READ_FLAG\fR  requires that LMR's
+\fBDAT_MEM_PRIV_LOCAL_READ_FLAG\fR is also set,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Set RMR's \fBDAT_MEM_PRIV_REMOTE_WRITE_FLAG\fR requires that LMR's
+\fBDAT_MEM_PRIV_LOCAL_WRITE_FLAG\fR is also set,
+.RE
+.sp
+.LP
+or the operation fails and returns \fBDAT_PRIVILEGES_VIOLATION\fR.
+.sp
+.LP
+In the \fIlmr_triplet\fR, the value of \fIlength\fR of zero means that the
+Consumer does not want to associate an RMR with any memory region within the
+LMR and the return value of \fIrmr_context\fR for that case is undefined.
+.sp
+.LP
+The completion of the posted RMR Bind is reported to the Consumer
+asynchronously through a DTO Completion event based on the specified
+\fIcompletion_flags\fR value. The value of
+\fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR is only valid if the Endpoint Request
+Completion Flags \fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR. Otherwise,
+\fBDAT_INVALID_PARAMETER\fR is returned.
+.sp
+.LP
+The \fIuser_cookie\fR parameter allows Consumers to have unique identifiers for
+each \fBdat_rmr_bind()\fR. These identifiers are completely under user control
+and are opaque to the Provider. The Consumer is not required to ensure the
+uniqueness of the \fIuser_cookie\fR value. The \fIuser_cookie\fR is returned to
+the Consumer in the \fIrmr_bind\fR Completion event for this operation.
+.sp
+.LP
+The operation is valid for the Endpoint in the \fBDAT_EP_STATE_CONNECTED\fR and
+\fBDAT_EP_STATE_DISCONNECTED\fR states. If the operation returns successfully
+for the Endpoint in \fBDAT_EP_STATE_DISCONNECTED\fR state, the posted RMR Bind
+is immediately flushed to \fIrequest_evd_handle\fR.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation failed due to resource limitations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_PARAMETER\fR\fR
+.ad
+.RS 30n
+.rt  
+Invalid parameter. For example, the \fItarget_address\fR or
+\fIsegment_length\fR exceeded the limits of the existing LMR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 30n
+.rt  
+Invalid DAT handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_STATE\fR\fR
+.ad
+.RS 30n
+.rt  
+Parameter in an invalid state. Endpoint was not in the a
+\fBDAT_EP_STATE_CONNECTED\fR or \fBDAT_EP_STATE_DISCONNECTED\fR state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
+.ad
+.RS 30n
+.rt  
+The requested Model was not supported by the Provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_PRIVILEGES_VIOLATION\fR\fR
+.ad
+.RS 30n
+.rt  
+Privileges violation for local or remote memory access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_PROTECTION_VIOLATION\fR\fR
+.ad
+.RS 30n
+.rt  
+Protection violation for local or remote memory access.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.1, 1.2
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdat\fR(3LIB), \fBattributes\fR(5)

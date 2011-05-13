@@ -1,0 +1,196 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lastcomm 1 "10 Jan 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+lastcomm \- display the last commands executed, in reverse order
+.SH SYNOPSIS
+.LP
+.nf
+\fBlastcomm\fR [\fB-f\fR \fIfile\fR] [\fB-x\fR] [\fIcommand-name\fR] ... [\fIuser-name\fR] ... 
+     [\fIterminal-name\fR] ...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlastcomm\fR command gives information on previously executed commands.
+\fBlastcomm\fR with no arguments displays information about all the commands
+recorded during the current accounting file's lifetime. If called with
+arguments, \fBlastcomm\fR only displays accounting entries with a matching
+\fIcommand-name\fR, \fIuser-name\fR, or \fIterminal-name\fR. If extended
+process accounting is active (see \fBacctadm\fR(1M)) and is recording the
+appropriate data items, \fBlastcomm\fR attempts to take data from the current
+extended process accounting file. If standard process accounting is active,
+\fBlastcomm\fR takes data from the current standard accounting file (see
+\fBacct\fR(2)).
+.sp
+.LP
+If \fIterminal-name\fR is `\fB- -\fR', there was no controlling \fBTTY\fR for
+the process. The process was probably executed during boot time. If
+\fIterminal-name\fR is `\fB??\fR', the controlling \fBTTY\fR could not be
+decoded into a printable name.
+.sp
+.LP
+For each process entry, \fBlastcomm\fR displays the following items of
+information:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The command name under which the process was called.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+One or more flags indicating special information about the process. The flags
+have the following meanings:
+.RS
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF\fR\fR
+.ad
+.RS 5n
+.rt  
+The process performed a \fBfork\fR but not an \fBexec\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBS\fR\fR
+.ad
+.RS 5n
+.rt  
+The process ran as a set-user-id program.
+.RE
+
+.RE
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The name of the user who ran the process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The terminal which the user was logged in on at the time (if applicable).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The amount of \fBCPU\fR time used by the process (in seconds).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The date and time the process exited.
+.RE
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfile\fR\fR
+.ad
+.RS 11n
+.rt  
+Uses \fIfile\fR as the source of accounting data. \fIfile\fR may be either an
+extended process accounting file or a standard process accounting file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 11n
+.rt  
+Uses the currently active extended process accounting file. If extended
+processing accounting is inactive, no output will be produced.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRListing executions of named commands
+.sp
+.LP
+The command
+
+.sp
+.in +2
+.nf
+example% \fBlastcomm a.out root term/01\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces a listing of all the executions of commands named \fBa.out\fR by user
+\fBroot\fR while using the terminal \fBterm/01\fR.
+
+.LP
+\fBExample 2 \fRListing all user commands
+.sp
+.LP
+The command
+
+.sp
+.in +2
+.nf
+example% \fBlastcomm root\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+produces a listing of all the commands executed by user \fBroot\fR.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/pacct\fR\fR
+.ad
+.RS 24n
+.rt  
+standard accounting file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/exacct/proc\fR\fR
+.ad
+.RS 24n
+.rt  
+extended accounting file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlast\fR(1), \fBacctadm\fR(1M), \fBacct\fR(2), \fBacct.h\fR(3HEAD),
+\fBsigvec\fR(3UCB), \fBcore\fR(4), \fBattributes\fR(5)

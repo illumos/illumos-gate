@@ -1,0 +1,361 @@
+'\" te
+.\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_sndv 3NSL "23 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_sndv \- send data or expedited data, from one or more non-contiguous buffers,
+on a connection
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h> 
+
+
+
+\fBint\fR \fBt_sndv\fR(\fBint\fR \fIfd\fR, \fBconst struct t_iovec *\fR\fIiov\fR, \fBunsigned int\fR \fIiovcount\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is used to send either normal or expedited data.  The argument
+\fIfd\fR identifies the local transport endpoint over which data should be
+sent,  \fIiov\fR points to an array of buffer address/buffer length pairs.
+\fBt_sndv()\fR sends data contained in buffers  \fIiov\fR\fB0\fR\fI , \fR
+\fIiov\fR\fB1\fR\fI ,\fR through  \fIiov [iovcount-1]\fR\fB\&.\fR
+\fIiovcount\fR contains the number of non-contiguous data buffers which is
+limited to  \fBT_IOV_MAX\fR, an implementation-defined value of at least 16.
+If the limit is exceeded, the function fails with \fBTBADDATA\fR.
+.sp
+.in +2
+.nf
+\fIiov(0).iov_len + . . + iov(iovcount-1).iov_len\fR) 
+.fi
+.in -2
+
+.sp
+.LP
+Note that the limit on the total number of bytes available in all buffers
+passed:
+.sp
+.LP
+may be constrained by implementation limits. If no other constraint applies, it
+will be limited by \fBINT_MAX\fR. In practice, the availability of memory to an
+application is likely to impose a lower limit on the amount of data that can be
+sent or received using scatter/gather functions.
+.sp
+.LP
+The argument  \fIflags\fR specifies any optional flags described below:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_EXPEDITED\fR \fR
+.ad
+.RS 16n
+.rt  
+If set in \fIflags\fR, the data will be sent as expedited data and will be
+subject to the interpretations of the transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBT_MORE\fR \fR
+.ad
+.RS 16n
+.rt  
+If set in  \fIflags\fR, this indicates to the transport provider that the
+transport service data unit (TSDU) (or expedited transport service data unit -
+ETSDU) is being sent through multiple \fBt_sndv()\fR calls. Each
+\fBt_sndv()\fR with the  \fBT_MORE\fR flag set indicates that another
+\fBt_sndv()\fR or  \fBt_snd\fR(3NSL) will follow with more data for the current
+TSDU (or ETSDU).
+.RE
+
+.sp
+.LP
+The end of the TSDU (or ETSDU) is identified by a  \fBt_sndv()\fR call with the
+\fBT_MORE\fR flag not set.  Use of  \fBT_MORE\fR enables a user to break up
+large logical data units without losing the boundaries of those units at the
+other end of the connection.  The flag implies nothing about how the data is
+packaged for transfer below the transport interface.  If the transport provider
+does not support the concept of a TSDU as indicated in the  \fIinfo\fR argument
+on return from  \fBt_open\fR(3NSL) or \fBt_getinfo\fR(3NSL), the  \fBT_MORE\fR
+flag is not meaningful and will be ignored if set.
+.sp
+.LP
+The sending of a zero-length fragment of a TSDU or ETSDU is only permitted
+where this is used to indicate the end of a TSDU or ETSDU, that is, when the
+\fBT_MORE\fR flag is not set. Some transport providers also forbid zero-length
+TSDUs and ETSDUs.
+.sp
+.LP
+If set in \fIflags\fR, requests that the provider transmit all data that it has
+accumulated but not sent.  The request is a local action on the provider and
+does not affect any similarly named protocol flag (for example, the TCP PUSH
+flag). This effect of setting this flag is protocol\(hydependent, and it may be
+ignored entirely by transport providers which do not support the use of this
+feature.
+.sp
+.LP
+The communications provider is free to collect data in a send buffer until it
+accumulates a sufficient amount for transmission.
+.sp
+.LP
+By default,  \fBt_sndv()\fR operates in synchronous mode and may wait if flow
+control restrictions prevent the data from being accepted by the local
+transport provider at the time the call is made.  However, if  \fBO_NONBLOCK\fR
+is set by means of \fBt_open\fR(3NSL) or  \fBfcntl\fR(2), \fBt_sndv()\fR
+executes in asynchronous mode, and will fail immediately if there are flow
+control restrictions.  The process can arrange to be informed when the flow
+control restrictions are cleared via either \fBt_look\fR(3NSL) or the EM
+interface.
+.sp
+.LP
+On successful completion,  \fBt_sndv()\fR returns the number of bytes accepted
+by the transport provider.  Normally this will equal the total number of bytes
+to be sent, that is,
+.sp
+.in +2
+.nf
+\fI(iov\fR\fB0.iov_len + .. + iov[iovcount-1].iov_len)\fR
+.fi
+.in -2
+
+.sp
+.LP
+However, the interface is constrained to send at most  \fBINT_MAX\fR bytes in a
+single send.  When  \fBt_sndv()\fR has submitted  \fBINT_MAX\fR (or lower
+constrained value, see the note above) bytes to the provider for a single call,
+this value is returned to the user.   However, if \fBO_NONBLOCK\fR is set or
+the function is interrupted by a signal, it is possible that only part of the
+data has actually been accepted by the communications provider.  In this case,
+\fBt_sndv()\fR returns a value that is less than the value of nbytes.  If
+\fBt_sndv()\fR is interrupted by a signal before it could transfer data to the
+communications provider, it returns  -1 \fBwith\fR \fBt_errno\fR set to
+\fBTSYSERR\fR and  \fBerrno\fR set to \fBEINTR\fR.
+.sp
+.LP
+If the number of bytes of data in the  \fIiov\fR array is zero and sending of
+zero octets is not supported by the underlying transport service,
+\fBt_sndv()\fR returns  -1 \fBwith\fR \fBt_errno\fR set to \fBTBADDATA\fR.
+.sp
+.LP
+The size of each TSDU or ETSDU must not exceed the limits of the transport
+provider as specified by the current values in the TSDU or ETSDU fields in the
+\fIinfo\fR argument returned by \fBt_getinfo\fR(3NSL).
+.sp
+.LP
+The error \fBTLOOK\fR is returned for asynchronous events. It is required only
+for an incoming disconnect event but may be returned for other events.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion,  \fBt_sndv()\fR returns the number of bytes accepted
+by the transport provider.  Otherwise,  -1 is returned on failure and
+\fBt_errno\fR is set to indicate the error.
+.sp
+.LP
+Note that in synchronous mode, if more than  \fBINT_MAX\fR bytes of data are
+passed in the  \fIiov\fR array, only the first  \fBINT_MAX\fR bytes will be
+passed to the provider.
+.sp
+.LP
+If the number of bytes accepted by the communications provider is less than the
+number of bytes requested, this may either indicate that  \fBO_NONBLOCK\fR is
+set and the communications provider is blocked due to flow control, or that
+\fBO_NONBLOCK\fR is clear and the function was interrupted by a signal.
+.SH VALID STATES
+.sp
+.LP
+\fBT_DATAXFER\fR, \fBT_INREL\fR.
+.SH ERRORS
+.sp
+.LP
+On failure,  \fBt_errno\fR is set to one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADDATA\fR\fR
+.ad
+.RS 12n
+.rt  
+Illegal amount of data:
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified file descriptor does not refer to a transport endpoint.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A single send was attempted specifying a TSDU (ETSDU) or fragment TSDU (ETSDU)
+greater than that specified by the current values of the TSDU or ETSDU fields
+in the  \fIinfo\fR argument.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A send of a zero byte TSDU (ETSDU) or zero byte fragment of a TSDU (ETSDU) is
+not supported by the provider.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Multiple sends were attempted resulting in a TSDU (ETSDU) larger than that
+specified by the current value of the TSDU or ETSDU fields in the  \fIinfo\fR
+argument - the ability of an XTI implementation to detect such an error case is
+implementation-dependent. See \fBWARNINGS\fR, below.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIiovcount\fR is greater than  \fBT_IOV_MAX.\fR
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADFLAG\fR\fR
+.ad
+.RS 15n
+.rt  
+An invalid flag was specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTFLOW\fR\fR
+.ad
+.RS 15n
+.rt  
+\fBO_NONBLOCK\fR was set, but the flow control mechanism prevented the
+transport provider from accepting any data at this time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTLOOK\fR\fR
+.ad
+.RS 15n
+.rt  
+An asynchronous event has occurred on this transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTNOTSUPPORT\fR\fR
+.ad
+.RS 15n
+.rt  
+This function is not supported by the underlying transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTOUTSTATE\fR\fR
+.ad
+.RS 15n
+.rt  
+The communications endpoint referenced by \fIfd\fR is not in one of the states
+in which a call to this function is valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 15n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+\fB(t_errno)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 15n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+In the \fBTLI\fR interface definition, no counterpart of this routine was
+defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBt_getinfo\fR(3NSL), \fBt_open\fR(3NSL), \fBt_rcvv\fR(3NSL)
+\fBt_rcv\fR(3NSL), \fBt_snd\fR(3NSL), \fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+It is important to remember that the transport provider treats all users of a
+transport endpoint as a single user. Therefore if several processes issue
+concurrent  \fBt_sndv()\fR or  \fBt_snd\fR(3NSL) calls, then the different data
+may be intermixed.
+.sp
+.LP
+Multiple sends which exceed the maximum TSDU or ETSDU size may not be
+discovered by XTI.  In this case an implementation-dependent error will result
+(generated by the transport provider), perhaps on a subsequent XTI call.  This
+error may take the form of a connection abort, a \fBTSYSERR\fR, a
+\fBTBADDATA\fR or a \fBTPROTO\fR error.
+.sp
+.LP
+If multiple sends which exceed the maximum TSDU or ETSDU size are detected by
+XTI,  \fBt_sndv()\fR fails with \fBTBADDATA\fR.

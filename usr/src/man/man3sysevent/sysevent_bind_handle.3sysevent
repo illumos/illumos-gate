@@ -1,0 +1,184 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sysevent_bind_handle 3SYSEVENT "24 Jul 2009" "SunOS 5.11" "System Event Library Functions"
+.SH NAME
+sysevent_bind_handle, sysevent_unbind_handle \- bind or unbind subscriber
+handle
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR\&.\|.\|.]  \fIfile\fR \&.\|.\|. \fB-lsysevent\fR [\fIlibrary\fR \&.\|.\|.] 
+#include <libsysevent.h>
+
+\fBsysevent_handle_t *\fR\fBsysevent_bind_handle\fR(\fBvoid (*\fR\fIevent_handler\fR)
+     (sysevent_t *\fIev\fR));
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsysevent_unbind_handle\fR(\fBsysevent_handle_t *\fR\fIsysevent_hdl\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIev\fR\fR
+.ad
+.RS 17n
+.rt  
+pointer to \fBsysevent\fR buffer handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIevent_handler\fR\fR
+.ad
+.RS 17n
+.rt  
+pointer to an event handling function
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsysevent_hdl\fR\fR
+.ad
+.RS 17n
+.rt  
+pointer to a \fBsysevent\fR subscriber handle
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsysevent_bind_handle()\fR function allocates memory associated with a
+subscription handle and binds it to the caller's \fIevent_handler\fR.  The
+\fIevent_handler\fR is invoked during subsequent system event notifications
+once a subscription has been made with
+\fBsysevent_subscribe_event\fR(3SYSEVENT).
+.sp
+.LP
+The system event is represented by the argument \fIev\fR and is passed as an
+argument to the invoked event delivery function, \fIevent_handler\fR.
+.sp
+.LP
+Additional threads are created to service communication between
+\fBsyseventd\fR(1M) and the calling process and to run the event handler
+routine, \fIevent_handler\fR.
+.sp
+.LP
+The \fBsysevent_unbind_handle()\fR function deallocates memory and other
+resources associated with a subscription handle and deactivates all system
+event notifications for the calling process.  All event notifications are
+guaranteed to stop upon return from \fBsysevent_unbind_handle()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsysevent_bind_handle()\fR function returns a valid \fBsysevent\fR
+subscriber handle if the handle is successfully allocated.  Otherwise,
+\fINULL\fR is returned and \fBerrno\fR is set to indicate the error.
+.sp
+.LP
+The \fBsysevent_unbind_handle()\fR function returns no value.
+.SH ERRORS
+.sp
+.LP
+The \fBsysevent_bind_handle()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The calling process has an ID other than the privileged user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+There are no resources available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The pointer to the function \fIevent_handler\fR is \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+.rt  
+The process has too many open descriptors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There are insufficient resources to allocate the handle.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsyseventd\fR(1M), \fBsysevent_subscribe_event\fR(3SYSEVENT),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Event notifications are revoked by \fBsyseventd\fR when the bound process dies.
+Event notification is suspended if a signal is caught and handled by the
+\fIevent_handler\fR thread.  Event notification is also suspended when the
+calling process attempts to use \fBfork\fR(2) or \fBfork1\fR(2).  Event
+notifications might be lost during suspension periods.
+.sp
+.LP
+The \fBlibsysevent\fR interfaces do not work at all in non-global zones.

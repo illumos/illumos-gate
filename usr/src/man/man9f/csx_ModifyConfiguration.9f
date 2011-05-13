@@ -1,0 +1,286 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_ModifyConfiguration 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_ModifyConfiguration \- modify socket and PC Card Configuration Register
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_ModifyConfiguration\fR(\fBclient_handle_t\fR \fIch\fR, \fBmodify_config_t *\fR\fImc\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImc\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBmodify_config_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function allows a socket and \fBPC \fRCard configuration to be modified.
+This function can only modify a configuration requested via
+\fBcsx_RequestConfiguration\fR(9F).
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBmodify_config_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     Socket;        /* socket number */
+uint32_t     Attributes;    /* attributes to modify */
+uint32_t     Vpp1;          /* Vpp1 value */
+uint32_t     Vpp2;          /* Vpp2 value */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR \fR
+.ad
+.RS 15n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR \fR
+.ad
+.RS 15n
+.rt  
+This field is bit-mapped. The following bits are defined:
+.sp
+.ne 2
+.mk
+.na
+\fBCONF_ENABLE_IRQ_STEERING\fR
+.ad
+.RS 28n
+.rt  
+Enable IRQ steering. Set to connect the \fBPC \fRCard \fBIREQ \fRline to a
+previously selected system interrupt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCONF_IRQ_CHANGE_VALID\fR
+.ad
+.RS 28n
+.rt  
+IRQ change valid. Set to request the \fBIRQ \fRsteering enable to be changed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCONF_VPP1_CHANGE_VALID\fR
+.ad
+.RS 28n
+.rt  
+Vpp1 change valid. These bits are set to request a change to the corresponding
+voltage level for the \fBPC \fRCard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCONF_VPP2_CHANGE_VALID\fR
+.ad
+.RS 28n
+.rt  
+Vpp2 change valid. These bits are set to request a change to the corresponding
+voltage level for the \fBPC \fRCard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCONF_VSOVERRIDE\fR
+.ad
+.RS 28n
+.rt  
+Override VS pins. For Low Voltage keyed cards, must be set if a client desires
+to apply a voltage inappropriate for this card to any pin. After card insertion
+and prior to the first \fBcsx_RequestConfiguration\fR(9F) call for this client,
+the voltage levels applied to the card will be those specified by the Card
+Interface Specification. (See \fBWARNINGS\fR.)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBVpp1\fR, \fBVpp2\fR\fR
+.ad
+.RS 15n
+.rt  
+Represent voltages expressed in tenths of a volt. Values from \fB0\fR to
+\fB25.5\fR volts may be set. To be valid, the exact voltage must be available
+from the system. To be compliant with the \fIPC Card 95 Standard,
+PCMCIA/JEIDA\fR, systems must always support \fB5.0\fR volts for both \fBVcc\fR
+and \fBVpp\fR. (See \fBWARNINGS\fR.)
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid or \fBcsx_RequestConfiguration\fR(9F) not done.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SOCKET\fR \fR
+.ad
+.RS 28n
+.rt  
+Error getting/setting socket hardware parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_VPP\fR \fR
+.ad
+.RS 28n
+.rt  
+Requested \fBVpp\fR is not available on socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_RegisterClient\fR(9F), \fBcsx_ReleaseConfiguration\fR(9F),
+\fBcsx_ReleaseIO\fR(9F), \fBcsx_ReleaseIRQ\fR(9F),
+\fBcsx_RequestConfiguration\fR(9F), \fBcsx_RequestIO\fR(9F),
+\fBcsx_RequestIRQ\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR
+.SH WARNINGS
+.RS +4
+.TP
+1.
+\fBCONF_VSOVERRIDE\fR is provided for clients that have a need to override
+the information provided in the CIS. The client must exercise caution when
+setting this as it overrides any voltage level protection provided by Card
+Services.
+.RE
+.RS +4
+.TP
+2.
+Using \fBcsx_ModifyConfiguration()\fR to set \fBVpp\fR to \fB0\fR volts may
+result in the loss of a \fBPC \fRCard's state. Any client setting \fBVpp\fR to
+\fB0\fR volts is responsible for insuring that the \fBPC \fRCard's state is
+restored when power is re-applied to the card.
+.RE
+.SH NOTES
+.sp
+.LP
+Mapped \fBIO \fRaddresses can only be changed by first releasing the current
+configuration and \fBIO \fRresources with \fBcsx_ReleaseConfiguration\fR(9F)
+and \fBcsx_ReleaseIO\fR(9F), requesting new \fBIO \fRresources and a new
+configuration with \fBcsx_RequestIO\fR(9F), followed by
+\fBcsx_RequestConfiguration\fR(9F).
+.sp
+.LP
+\fBIRQ \fRpriority can only be changed by first releasing the current
+configuration and \fBIRQ \fRresources with \fBcsx_ReleaseConfiguration\fR(9F)
+and \fBcsx_ReleaseIRQ\fR(9F), requesting new \fBIRQ \fRresources and a new
+configuration with \fBcsx_RequestIRQ\fR(9F), followed by
+\fBcsx_RequestConfiguration\fR(9F).
+.sp
+.LP
+\fBVcc\fR can not be changed using \fBcsx_ModifyConfiguration()\fR. \fBVcc\fR
+may be changed by first invoking \fBcsx_ReleaseConfiguration\fR(9F), followed
+by \fBcsx_RequestConfiguration\fR(9F) with a new \fBVcc\fR value.

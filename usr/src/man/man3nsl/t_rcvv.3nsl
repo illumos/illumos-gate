@@ -1,0 +1,247 @@
+'\" te
+.\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_rcvv 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_rcvv \- receive data or expedited data sent over a connection and put the
+data into one or more non-contiguous buffers
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h> 
+
+
+
+
+\fBint\fR \fBt_rcvv\fR(\fBint\fR \fIfd\fR, \fBstruct t_iovec *\fR\fIiov\fR, \fBunsigned int\fR \fIiovcount\fR, \fBint *\fR\fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function receives either normal or expedited data.  The argument  \fIfd\fR
+identifies the local transport endpoint through which data will arrive,
+\fIiov\fR points to an array of buffer address/buffer size pairs
+(\fIiov_base\fR, \fIiov_len\fR). The  \fBt_rcvv()\fR function receives data
+into the buffers specified by  \fIiov\fR\fB0\fR\fI\&.iov_base\fR,
+\fIiov\fR\fB1\fR\fI\&.iov_base\fR, through  \fIiov
+[iovcount-1].iov_base\fR\fB,\fR always filling one buffer before proceeding to
+the next.
+.sp
+.LP
+Note that the limit on the total number of bytes available in all buffers
+passed:
+.sp
+.in +2
+.nf
+\fIiov(0).iov_len + . . + iov(iovcount-1).iov_len)\fR
+.fi
+.in -2
+
+.sp
+.LP
+may be constrained by implementation limits. If no other constraint applies, it
+will be limited by \fBINT_MAX\fR. In practice, the availability of memory to an
+application is likely to impose a lower limit on the amount of data that can be
+sent or received using scatter/gather functions.
+.sp
+.LP
+The argument iovcount contains the number of buffers which is limited to
+\fBT_IOV_MAX,\fR which is an implementation-defined value  of at least 16. If
+the limit is exceeded, the function will fail with \fBTBADDATA\fR.
+.sp
+.LP
+The argument flags may be set on return from  \fBt_rcvv()\fR and specifies
+optional flags as described below.
+.sp
+.LP
+By default,  \fBt_rcvv()\fR operates in synchronous mode and will wait for data
+to arrive if none is currently available. However, if  \fBO_NONBLOCK\fR is set
+by means of  \fBt_open\fR(3NSL) or  \fBfcntl\fR(2), \fBt_rcvv()\fR will execute
+in asynchronous mode and will fail if no data is available. See \fBTNODATA\fR
+below.
+.sp
+.LP
+On return from the call, if  \fBT_MORE\fR is set in flags, this indicates that
+there is more data, and the current transport service data unit (TSDU) or
+expedited transport service data unit (ETSDU) must be received in multiple
+\fBt_rcvv()\fR or \fBt_rcv\fR(3NSL) calls.  In the asynchronous mode,  or under
+unusual conditions (for example, the arrival of a signal or  \fBT_EXDATA\fR
+event), the  \fBT_MORE\fR flag may be set on return from the  \fBt_rcvv()\fR
+call even when the number of bytes received is less than the total size of all
+the receive buffers.  Each  \fBt_rcvv()\fR with the  \fBT_MORE\fR flag set
+indicates that another  \fBt_rcvv()\fR must follow to get more data for the
+current TSDU.  The end of the TSDU is identified by the return of a
+\fBt_rcvv()\fR call with the  \fBT_MORE\fR flag not set.  If the transport
+provider does not support the concept of a TSDU as indicated in the  \fIinfo\fR
+argument on return from  \fBt_open\fR(3NSL) or \fBt_getinfo\fR(3NSL), the
+\fBT_MORE\fR flag is not meaningful and should be ignored.  If the amount of
+buffer space passed in  \fIiov\fR is greater than zero on the call to
+\fBt_rcvv()\fR, then \fBt_rcvv()\fR will return  \fB0\fR only if the end of a
+TSDU is being returned to the user.
+.sp
+.LP
+On return, the data is expedited if  \fBT_EXPEDITED\fR is set in flags.  If
+\fBT_MORE\fR is also set, it indicates that the number of expedited bytes
+exceeded nbytes, a signal has interrupted the  call, or that an entire ETSDU
+was not available (only for transport protocols that support fragmentation of
+ETSDUs).  The rest of the ETSDU will be returned by subsequent calls to
+\fBt_rcvv()\fR which will return with  \fBT_EXPEDITED\fR set in flags. The end
+of the ETSDU is identified by the return of a  \fBt_rcvv()\fR call with
+\fBT_EXPEDITED\fR set and  \fBT_MORE\fR cleared.  If the entire ETSDU is not
+available it is possible for normal data fragments to be returned between the
+initial and final fragments of an ETSDU.
+.sp
+.LP
+If a signal arrives, \fBt_rcvv()\fR returns, giving the user any data currently
+available.  If no data is available,  \fBt_rcvv()\fR returns  -1, sets
+\fBt_errno\fR to \fBTSYSERR\fR and  \fBerrno\fR to \fBEINTR\fR. If some data is
+available,  \fBt_rcvv()\fR returns the number of bytes received and
+\fBT_MORE\fR is set in flags.
+.sp
+.LP
+In synchronous mode, the only way for the user to be notified of the arrival of
+normal or expedited data is to issue this function or check for the
+\fBT_DATA\fR \fBor\fR \fBT_EXDATA\fR events using the  \fBt_look\fR(3NSL)
+function.  Additionally, the process can arrange to be notified via the EM
+interface.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion,  \fBt_rcvv()\fR returns the number of bytes received.
+Otherwise, it returns  -1 on failure and \fBt_errno\fR is set to indicate the
+error.
+.SH VALID STATES
+.sp
+.LP
+\fBT_DATAXFER\fR, \fBT_OUTREL\fR.
+.SH ERRORS
+.sp
+.LP
+On failure,  \fBt_errno\fR is set to one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADDATA\fR\fR
+.ad
+.RS 15n
+.rt  
+\fIiovcount\fR is greater than  \fBT_IOV_MAX.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified file descriptor does not refer to a transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTLOOK\fR\fR
+.ad
+.RS 15n
+.rt  
+An asynchronous event has occurred on this transport endpoint and requires
+immediate attention.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTNODATA\fR\fR
+.ad
+.RS 15n
+.rt  
+\fBO_NONBLOCK\fR was set, but no data is currently available from the transport
+provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTNOTSUPPORT\fR\fR
+.ad
+.RS 15n
+.rt  
+This function is not supported by the underlying transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTOUTSTATE\fR\fR
+.ad
+.RS 15n
+.rt  
+The communications endpoint referenced by \fIfd\fR is not in one of the states
+in which a call to this function is valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 15n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+\fB(t_errno)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 15n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+In the \fBTLI\fR interface definition, no counterpart of this routine was
+defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfcntl\fR(2), \fBt_getinfo\fR(3NSL), \fBt_look\fR(3NSL), \fBt_open\fR(3NSL),
+\fBt_rcv\fR(3NSL), \fBt_snd\fR(3NSL), \fBt_sndv\fR(3NSL), \fBattributes\fR(5)

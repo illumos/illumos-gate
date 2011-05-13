@@ -1,0 +1,70 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH soelim 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+soelim \- resolve and eliminate .so requests from nroff or troff input
+.SH SYNOPSIS
+.LP
+.nf
+\fBsoelim\fR [\fIfilename\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBsoelim\fR reads the specified files or the standard input and performs the
+textual inclusion implied by the \fBnroff\fR(1) directives of the form:
+.sp
+.in +2
+.nf
+\fB\&.so\fR \fIsomefile\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+when they appear at the beginning of input lines.
+.sp
+.LP
+This is useful as programs such as \fBtbl\fR(1) do not normally do this. It
+allows the placement of individual tables in separate files to be run as a part
+of a large document.
+.sp
+.LP
+An argument consisting of \fB\(mi\fR is taken to be a file name corresponding
+to the standard input.
+.sp
+.LP
+Inclusion can be suppressed by using a single quote (\fB\&'\fR) instead of a
+dot (\fB\&.\fR) that is,
+.sp
+.in +2
+.nf
+ ' so /usr/share/lib/tmac/tmac.s
+.fi
+.in -2
+.sp
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBsoelim\fR Command
+.sp
+.LP
+The following is an example of the \fBsoelim\fR command:
+
+.sp
+.in +2
+.nf
+\fBexample% soelim exum?.n | tbl | nroff\fR \fB-ms\fR \fB| col | lpr\fR
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmore\fR(1), \fBnroff\fR(1), \fBtbl\fR(1), \fBattributes\fR(5)

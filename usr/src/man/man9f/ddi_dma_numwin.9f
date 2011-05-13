@@ -1,0 +1,91 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_numwin 9F "29 Sep 1994" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_numwin \- retrieve number of DMA windows
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_dma_numwin\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBuint_t *\fR\fInwinp\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 11n
+.rt  
+The  \fBDMA\fR handle previously allocated by a call to
+\fBddi_dma_alloc_handle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInwinp\fR \fR
+.ad
+.RS 11n
+.rt  
+Upon a successful return,  \fInwinp\fR will contain the number of  \fBDMA\fR
+windows for this object.
+.RE
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_dma_numwin()\fR returns the number of  \fBDMA\fR windows for a
+\fBDMA\fR object if partial resource allocation was permitted.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_dma_numwin()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR \fR
+.ad
+.RS 16n
+.rt  
+Successfully filled in the number of  \fBDMA\fR windows.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR \fR
+.ad
+.RS 16n
+.rt  
+\fBDMA\fR windows are not activated.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBddi_dma_numwin()\fR can be called from user, kernel, or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
+\fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_unbind_handle\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

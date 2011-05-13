@@ -1,0 +1,219 @@
+'\" te
+.\"  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH xgettext 1 "23 Mar 1999" "SunOS 5.11" "User Commands"
+.SH NAME
+xgettext \- extract gettext call strings from C programs
+.SH SYNOPSIS
+.LP
+.nf
+\fBxgettext\fR [\fB-ns\fR] [\fB-a\fR [\fB-x\fR \fIexclude-file\fR]] [\fB-c\fR \fIcomment-tag\fR] 
+     [\fB-d\fR \fIdefault-domain\fR] [\fB-j\fR] [\fB-m\fR \fIprefix\fR] [\fB-M\fR \fIsuffix\fR] 
+     [\fB-p\fR \fIpathname\fR] \fB-|\fR \fIfilename\fR...
+.fi
+
+.LP
+.nf
+\fBxgettext\fR \fB-h\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBxgettext\fR utility is used to automate the creation of portable message
+files (\fB\&.po\fR). A \fB\&.po\fR file contains copies of "C" strings that are
+found in  ANSI C source code in \fIfilename\fR or the standard input if
+`\fB\(mi\fR\&' is specified on the command line. The  \fB\&.po\fR file can be
+used as input to the  \fBmsgfmt\fR(1) utility, which produces a binary form of
+the message file that can be  used by application during run-time.
+.sp
+.LP
+\fBxgettext\fR writes \fImsgid\fR strings from \fBgettext\fR(3C) calls in
+\fIfilename\fR to the default output file \fBmessages.po\fR. The default output
+file name can be changed by  \fB-d\fR option. \fImsgid\fR strings in
+\fBdgettext()\fR calls are written to the output file
+\fBdomainname\fR\fB\&.po\fR where \fBdomainname\fR is the first parameter to
+the \fBdgettext()\fR call.
+.sp
+.LP
+By default, \fBxgettext\fR creates a  \fB\&.po\fR file in the current working
+directory, and each entry is in the same order that the strings are extracted
+from \fIfilenames\fR. When the \fB-p\fR option is specified, the  \fB\&.po\fR
+file is created in the  \fIpathname\fR directory. An existing \fB\&.po\fR file
+is overwritten.
+.sp
+.LP
+Duplicate  \fImsgid\fRs are written to the  \fB\&.po\fR file as comment lines.
+When the  \fB-s\fR option is specified, the  \fB\&.po\fR is sorted by the
+\fImsgid\fR string, and all duplicated \fImsgid\fRs are removed. All
+\fImsgstr\fR directives in the \fB\&.po\fR file are empty unless the \fB-m\fR
+option is used.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 21n
+.rt  
+Add comment lines to the output file indicating file name and line number in
+the source file where each extracted string is encountered. These lines appear
+before each \fImsgid\fR in the following format:
+.sp
+.in +2
+.nf
+# # File: \fIfilename\fR, line: \fIline-number\fR 
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 21n
+.rt  
+Generate output sorted by  \fImsgid\fRs with all duplicate  \fImsgid\fRs
+removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 21n
+.rt  
+Extract all strings, not just those found in \fBgettext\fR(3C), and
+\fBdgettext()\fR () calls. Only one  \fB\&.po\fR file is created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIcomment-tag\fR\fR
+.ad
+.RS 21n
+.rt  
+The comment block beginning with \fIcomment-tag\fR as the first token of the
+comment block is added to the output \fB\&.po\fR file as  \fI#\fR delimited
+comments. For multiple domains, \fBxgettext\fR directs comments and messages to
+the prevailing text domain.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdefault-domain\fR\fR
+.ad
+.RS 21n
+.rt  
+Rename default output file from \fBmessages.po\fR to \fIdefault-domain\fR
+\fB\&.po\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-j\fR\fR
+.ad
+.RS 21n
+.rt  
+Join messages with existing message files.  If a \fB\&.po\fR file does not
+exist, it is created.  If a \fB\&.po\fR file does exist, new messages are
+appended.  Any duplicate \fBmsgid\fRs are commented out in the resulting
+\fB\&.po\fR file.  Domain directives in the existing \fB\&.po\fR file are
+ignored. Results not guaranteed if the existing message file has been edited.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fIprefix\fR\fR
+.ad
+.RS 21n
+.rt  
+Fill in the \fImsgstr\fR with  \fIprefix\fR. This is useful for debugging
+purposes. To make \fImsgstr\fR identical to \fImsgid\fR, use an empty string
+(\fB""\fR) for \fIprefix\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR \fIsuffix\fR\fR
+.ad
+.RS 21n
+.rt  
+Fill in the \fImsgstr\fR with  \fIsuffix\fR. This is useful for debugging
+purposes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpathname\fR\fR
+.ad
+.RS 21n
+.rt  
+Specify the directory where the output files will be placed. This option
+overrides the current working directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR \fIexclude-file\fR\fR
+.ad
+.RS 21n
+.rt  
+Specify a  \fB\&.po\fR file that contains a list of \fImsgid\fRs that are not
+to be extracted from the input files. The format of \fIexclude-file\fR is
+identical to the \fB\&.po\fR file. However, only the \fImsgid\fR directive line
+in \fIexclude-file\fR is used. All other lines are simply ignored.  The
+\fB-x\fR option can only be used with the \fB-a\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 21n
+.rt  
+Print a help message on the standard output.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmsgfmt\fR(1), \fBgettext\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBxgettext\fR is not able to extract cast strings, for example ANSI C casts of
+literal strings to \fB(const char *)\fR. This is unnecessary anyway, since the
+prototypes in \fB<libintl.h>\fR already specify this type.
+.sp
+.LP
+In messages and translation notes, lines greater than 2048 characters are
+truncated to 2048 characters and a warning message is printed to stderr.

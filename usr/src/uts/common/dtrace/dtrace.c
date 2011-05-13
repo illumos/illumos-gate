@@ -10967,10 +10967,10 @@ dtrace_enabling_matchall(void)
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
 		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;
 		cred_t *cr = dcr->dcr_cred;
-		zoneid_t zone = cr != NULL ? crgetzonedid(cr) : 0;
+		zoneid_t zone = cr != NULL ? crgetzoneid(cr) : 0;
 
 		if ((dcr->dcr_visible & DTRACE_CRV_ALLZONE) || (cr != NULL &&
-		    (zone == GLOBAL_ZONEID || getzonedid() == zone)))
+		    (zone == GLOBAL_ZONEID || getzoneid() == zone)))
 			(void) dtrace_enabling_match(enab, NULL);
 	}
 

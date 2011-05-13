@@ -1,0 +1,194 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pci_report_pmcap 9F "13 August 1999" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+pci_report_pmcap \- Report Power Management capability of a PCI device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBpci_report_pmcap\fR(\fBdev_info_t *\fR\fIdip\fR,  int \fIcap,\fR void *\fIarg\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the device's \fBdev_info\fR structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcap\fR\fR
+.ad
+.RS 7n
+.rt  
+Power management capability
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 7n
+.rt  
+Argument for the capability
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Some PCI devices provide power management capabilities in addition to those
+provided by the PCI Power Management Specification. The
+\fBpci_report_pmcap()\fR function reports those Power Management capabilities
+of the PCI device to the framework. Framework supports dynamic changing of the
+capability by allowing \fBpci_report_pmcap()\fR to be called multiple times.
+Following are the supported capabilities as indicated by the \fBcap\fR:
+.sp
+.LP
+\fBPCI_PM_IDLESPEED\fR \(em The \fBPCI_PM_IDLESPEED\fR value indicates the
+lowest PCI clock speed that a device can tolerate when idle, and is  applicable
+only to 33 MHz PCI bus. \fBarg\fR represents the lowest possible idle speed in
+KHz (1 KHz is 1000 Hz). The integer value representing the speed should be cast
+to \fB(void *)\fRbefore passing as \fBarg\fR to \fBpci_report_pmcap()\fR.
+.sp
+.LP
+The special values of \fBarg\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPCI_PM_IDLESPEED_ANY\fR\fR
+.ad
+.RS 25n
+.rt  
+The device can tolerate any idle clock speed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPCI_PM_IDLESPEED_NONE\fR\fR
+.ad
+.RS 25n
+.rt  
+The device cannot tolerate slowing down of PCI clock even when idle.
+.RE
+
+.sp
+.LP
+If the driver doesn't make this call, \fBPCI_PM_IDLESPEED_NONE\fR is assumed.
+In this case, one offending device can keep the entire bus from being power
+managed.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpci_report_pmcap()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+Successful reporting of the capability
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+Failure to report capability because of invalid argument(s)
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBpci_report_pmcap()\fR function can be called from user, kernel and
+interrupt context.
+.SH EXAMPLES
+.sp
+.LP
+1. A device driver knows that the device it controls works with any clock
+between DC and 33 MHz as specified in \fISection 4.2.3.1: Clock Specification
+\fR of the \fIPCI Bus Specification Revision 2.1\fR. The device driver makes
+the following call from its \fBattach\fR(9E):
+.sp
+.in +2
+.nf
+if (pci_report_pmcap(dip, PCI_PM_IDLESPEED, PCI_PM_IDLESPEED_ANY) !=
+            DDI_SUCCESS) 
+                cmn_err(CE_WARN, "%s%d: pci_report_pmcap failed\fB\en\fR",
+                    ddi_driver_name(dip), ddi_get_instance(dip));
+.fi
+.in -2
+
+.sp
+.LP
+2. A device driver controls a 10/100 Mb Ethernet device which runs the device
+state machine on the chip from the PCI clock. For the device state machine to
+receive packets at 100 Mb, the PCI clock cannot drop below 4 MHz. The driver
+makes the following call whenever it negotiates a 100 Mb Ethernet connection:
+.sp
+.in +2
+.nf
+if (pci_report_pmcap(dip,  PCI_PM_IDLESPEED, (void *)4000) !=
+               DDI_SUCCESS) 
+                cmn_err(CE_WARN, "%s%d: pci_report_pmcap failed\fB\en\fR",
+                    ddi_driver_name(dip), ddi_get_instance(dip));
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIPCI Bus Power Management Interface Specification Version 1.1\fR
+.sp
+.LP
+\fIPCI Bus Specification Revision 2.1\fR

@@ -1,0 +1,87 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH unlinkb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+unlinkb \- remove a message block from the head of a message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBunlinkb\fR(\fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBunlinkb()\fR function removes the first message block from the message
+pointed to by \fImp\fR. A new message, minus the removed message block, is
+returned.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBunlinkb()\fR function returns a pointer to the message
+with the first message block removed. If there is only one message block in the
+message, \fINULL\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBunlinkb()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBunlinkb()\fR example
+.sp
+.LP
+The routine expects to get passed an \fBM_PROTO T_DATA_IND\fR message. It will
+remove and free the  \fBM_PROTO\fR header and return the remaining
+\fBM_DATA\fR portion of the message.
+
+.sp
+.in +2
+.nf
+1  mblk_t *
+2  makedata(mp)
+3      mblk_t *mp;
+4  {
+5	mblk_t *nmp;
+6
+7	nmp = unlinkb(mp);
+8	freeb(mp);
+9	return(nmp);
+10 }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlinkb\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

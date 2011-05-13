@@ -1,0 +1,109 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rtld_audit 3EXT "6 Oct 2004" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+rtld_audit, la_activity, la_i86_pltenter, la_objsearch, la_objopen,
+la_objfilter, la_pltexit, la_pltexit64, la_preinit, la_sparcv8_pltenter,
+la_sparcv9_pltenter, la_amd64_pltenter, la_symbind32, la_symbind64, la_version
+\- runtime linker auditing functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBvoid\fR \fBla_activity\fR(\fBuintptr_t *\fR\fIcookie\fR, \fBuint_t\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_i86_pltenter\fR(\fBElf32_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR, \fBuintptr_t *\fR\fIrefcook\fR,
+     \fBuintptr_t *\fR\fIdefcook\fR, \fBLa_i86_regs *\fR\fIregs\fR, \fBuint_t *\fR\fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBla_objsearch\fR(\fBconst char *\fR\fIname\fR, \fBuintptr_t *\fR\fIcookie\fR, \fBuint_t\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBla_objopen\fR(\fBLink_map  *\fR\fIlmp\fR, \fBLmid_t\fR \fIlmid\fR, \fBuintptr_t *\fR\fIcookie\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBla_objfilter\fR(\fBuintptr_t  *\fR\fIfltrcook\fR, \fBuintptr_t *\fR\fIfltecook\fR,
+     \fBuint_t *\fR\fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_pltexit\fR(\fBElf32_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR, \fBuintptr_t *\fR\fIrefcook\fR,
+     \fBuintptr_t *\fR\fIdefcook\fR, \fBuintptr_t\fR \fIretval\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_pltexit64\fR(\fBElf64_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR, \fBuintptr_t *\fR\fIrefcook\fR,
+     \fBuintptr_t *\fR\fIdefcook\fR, \fBuintptr_t\fR \fIretval\fR, \fBconst char *\fR\fIsym_name\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBla_preinit\fR(\fBuintptr_t *\fR\fIcookie\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_sparcv8_pltenter\fR(\fBElf32_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR,
+     \fBuintptr_t *\fR\fIrefcook\fR, \fBuintptr_t *\fR\fIdefcook\fR, \fBLa_amd64_regs *\fR\fIregs\fR,
+     \fBuint_t *\fR\fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_sparcv9_pltenter\fR(\fBElf64_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR,
+     \fBuintptr_t *\fR\fIrefcook\fR, \fBuintptr_t *\fR\fIdefcook\fR, \fBLa_sparcv8_regs *\fR\fIregs\fR,
+     \fBuint_t *\fR\fIflags\fR, \fBconst char *\fR\fIsym_name\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_amd64_pltenter\fR(\fBElf32_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR,
+     \fBuintptr_t *\fR\fIrefcook\fR, \fBuintptr_t *\fR\fIdefcook\fR, \fBLa_sparcv8_regs *\fR\fIregs\fR,
+     \fBuint_t *\fR\fIflags\fR, \fBconst char *\fR\fIsym_name\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_symbind32\fR(\fBElf32_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR, \fBuintptr_t *\fR\fIrefcook\fR,
+     \fBuintptr_t *\fR\fIdefcook\fR, \fBuint_t *\fR\fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBuintptr_t\fR \fBla_symbind64\fR(\fBElf64_Sym *\fR\fIsym\fR, \fBuint_t\fR \fIndx\fR,
+     \fBuintptr_t *\fR\fIrefcook\fR,\fBuintptr_t *\fR\fIdefcook\fR, \fBuint_t *\fR\fIflags\fR,
+     \fBconst char *\fR\fIsym_name\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBla_version\fR(\fBuint_t\fR \fIversion\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+A runtime linker auditing library is a user-created shared object offering one
+or more of these interfaces. The runtime linker \fBld.so.1\fR(1), calls these
+interfaces during process execution. See the \fILinker and Libraries Guide\fR
+for a full description of the link auditing mechanism.
+.SH SEE ALSO
+.sp
+.LP
+\fBld.so.1\fR(1)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

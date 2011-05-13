@@ -1,0 +1,196 @@
+'\" te
+.\"  Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH hook_pkt_event 9S "1 May 2008" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+hook_pkt_event \- packet event structure passed through to hooks
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/neti.h>
+#include <sys/hook.h>
+#include <sys/hook_event.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBhook_pkt_event\fR structure contains fields that relate to a packet in a
+network protocol handler. This structure is passed through to a callback for
+\fBNH_PRE_ROUTING\fR, \fBNH_POST_ROUTING\fR, \fBNH_FORWARDING\fR,
+\fBNH_LOOPBACK_IN\fR and \fBNH_LOOPBACK_OUT\fR events.
+.sp
+.LP
+A callback may only modify the \fBhpe_hdr\fR, \fBhpe_mp\fR and \fBhpe_mb\fR
+fields.
+.sp
+.LP
+The following table documents which fields can be safely used as a result of
+each event.
+.sp
+.in +2
+.nf
+Event            hpe_ifp     hpe_ofp     hpe_hdr     hpe_mp     hpe_mb
+-----            -------     -------     -------     ------     ------
+NH_PRE_ROUTING      yes                     yes         yes       yes
+NH_POST_ROUTING                 yes         yes         yes       yes
+NH_FORWARDING       yes         yes         yes         yes       yes
+NH_LOOPBACK_IN      yes                     yes         yes       yes
+NH_LOOPBACK_OUT                 yes         yes         yes       yes
+.fi
+.in -2
+.sp
+
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+net_data_t           hne_family;      
+phy_if_t             hpe_ifp;
+phy_if_t             hpe_ofp;
+void                 *hpe_hdr;
+mblk_t               *hpe_mp;
+mblk_t               *hpe_mb;
+uint32_t             hpe_flags;
+
+ 
+.fi
+.in -2
+
+.sp
+.LP
+The following fields are set for each event:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhne_family\fR\fR
+.ad
+.RS 14n
+.rt  
+The protocol family for this packet. This value matches the corresponding value
+returned from a call to \fBnet_protocol_lookup\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhpe_ifp\fR\fR
+.ad
+.RS 14n
+.rt  
+The inbound interface for a packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhpe_ofp\fR\fR
+.ad
+.RS 14n
+.rt  
+The outbound interface for a packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhpe_hdr\fR\fR
+.ad
+.RS 14n
+.rt  
+Pointer to the start of the network protocol header within an \fBmblk_t\fR
+structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhpe_mp\fR\fR
+.ad
+.RS 14n
+.rt  
+Pointer to the \fBmblk_t\fR pointer that points to the first \fBmblk_t\fR
+structure in this packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhpe_mb\fR\fR
+.ad
+.RS 14n
+.rt  
+Pointer to the \fBmblk_t\fR structure that contains \fBhpe_hdr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhpe_flags\fR\fR
+.ad
+.RS 13n
+.rt  
+This field is used to carry additional properties of packets. The current
+collection of defined bits available is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHPE_BROADCAST\fR\fR
+.ad
+.RS 17n
+.rt  
+This bit is set if the packet was recognized as a broadcast packet from the
+link layer. The bit cannot be set if \fBHPE_MULTICAST\fR is set, currently only
+possible with physical in packet events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHPE_MULTICAST\fR\fR
+.ad
+.RS 17n
+.rt  
+This set if the packet was recognized as a multicast packet from the link
+layer. This bit cannot be set if \fBHPE_BROADCAST\fR is set, currently only
+possible with physical in packet events.
+.RE
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnet_protocol_lookup\fR(9F), \fBnetinfo\fR(9F)

@@ -1,0 +1,111 @@
+'\" te
+.\"  Copyright (c) 1993, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_tgt_probe 9E "1 Nov 1993" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_tgt_probe \- request to probe SCSI bus for a particular target
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+
+
+\fBint prefix\fR\fBtran_tgt_probe\fR(\fBstruct scsi_device *\fR\fIsd\fR, \fBint (*\fR\fIwaitfunc\fR,
+     \fBvoid));\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsd\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a  \fBscsi_device\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwaitfunc\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to either  \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_tgt_probe()\fR vector in the \fBscsi_hba_tran\fR(9S) structure may
+be initialized during the \fBHBA \fRdriver's \fBattach\fR(9E) to point to a
+function to be called by \fBscsi_probe\fR(9F) when called by a target driver
+during \fBprobe\fR(9E) and \fBattach\fR(9E) to probe for a particular \fBSCSI
+\fRtarget on the bus. In the absence of an \fBHBA\fR-specific
+\fBtran_tgt_probe()\fR function, the default \fBscsi_probe\fR(9F) behavior is
+supplied by the function \fBscsi_hba_probe\fR(9F).
+.sp
+.LP
+The possible choices the \fBHBA \fRdriver may make are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Initialize the \fBtran_tgt_probe\fR vector to point to
+\fBscsi_hba_probe\fR(9F), which results in the same behavior.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Initialize the \fBtran_tgt_probe\fR vector to point to a private function in
+the \fBHBA\fR, which may call \fBscsi_hba_probe\fR(9F) before or after any
+necessary processing, as long as all the defined \fBscsi_probe\fR(9F) semantics
+are preserved.
+.RE
+.sp
+.LP
+\fIwaitfunc\fR indicates what \fBtran_tgt_probe()\fR should do when resources
+are not available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR \fR
+.ad
+.RS 15n
+.rt  
+Do not wait for resources.  See  \fBscsi_probe\fR(9F) for defined return values
+if no resources are available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR \fR
+.ad
+.RS 15n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBprobe\fR(9E), \fBtran_tgt_free\fR(9E),
+\fBtran_tgt_init\fR(9E), \fBscsi_hba_probe\fR(9F), \fBscsi_probe\fR(9F),
+\fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

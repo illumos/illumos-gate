@@ -1,0 +1,223 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setjmp 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+setjmp, sigsetjmp, longjmp, siglongjmp \- non-local goto
+.SH SYNOPSIS
+.LP
+.nf
+#include <setjmp.h>
+
+\fBint\fR \fBsetjmp\fR(\fBjmp_buf\fR \fIenv\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsigsetjmp\fR(\fBsigjmp_buf\fR \fIenv\fR, \fBint\fR \fIsavemask\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBlongjmp\fR(\fBjmp_buf\fR \fIenv\fR, \fBint\fR \fIval\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsiglongjmp\fR(\fBsigjmp_buf\fR \fIenv\fR, \fBint\fR \fIval\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are useful for dealing with errors  and interrupts encountered
+in a low-level subroutine of a program.
+.sp
+.LP
+The \fBsetjmp()\fR function saves its stack environment in \fIenv\fR for later
+use by \fBlongjmp()\fR.
+.sp
+.LP
+The \fBsigsetjmp()\fR function saves the calling process's registers and stack
+environment (see \fBsigaltstack\fR(2)) in  \fIenv\fR for later use by
+\fBsiglongjmp()\fR. If  \fIsavemask\fR is non-zero, the calling process's
+signal mask (see \fBsigprocmask\fR(2)) and scheduling parameters (see
+\fBpriocntl\fR(2)) are also saved.
+.sp
+.LP
+The \fBlongjmp()\fR function restores the environment saved by the last call of
+\fBsetjmp()\fR with the corresponding \fIenv\fR argument. After \fBlongjmp()\fR
+completes, program execution continues as if the corresponding call to
+\fBsetjmp()\fR had just returned the value \fIval\fR. The caller of
+\fBsetjmp()\fR must not have returned in the interim.  The \fBlongjmp()\fR
+function cannot cause \fBsetjmp()\fR to return the value 0.  If \fBlongjmp()\fR
+is invoked with a second argument of 0, \fBsetjmp()\fR will return 1. At the
+time of the second return from \fBsetjmp()\fR, all external and static
+variables have values as of the time \fBlongjmp()\fR is called (see
+\fBEXAMPLES\fR).
+.sp
+.LP
+The \fBsiglongjmp()\fR function restores the environment saved by the last call
+of \fBsigsetjmp()\fR with the corresponding \fIenv\fR argument. After
+\fBsiglongjmp()\fR completes, program execution continues as if the
+corresponding call to \fBsigsetjmp()\fR had just returned the value \fIval\fR.
+The \fBsiglongjmp()\fR function cannot cause \fBsigsetjmp()\fR to return the
+value 0.  If \fBsiglongjmp()\fR is invoked with a second argument of 0,
+\fBsigsetjmp()\fR will return 1. At the time of the second return from
+\fBsigsetjmp()\fR, all external and static variables have values as of the time
+\fBsiglongjmp()\fR was called.
+.sp
+.LP
+If a signal-catching function interrupts \fBsleep\fR(3C) and calls
+\fBsiglongjmp()\fR to restore an environment saved prior to the \fBsleep()\fR
+call, the action associated with \fBSIGALRM\fR and time it is scheduled to be
+generated are unspecified. It is also unspecified whether the \fBSIGALRM\fR
+signal is blocked, unless the process's signal mask is restored as part of the
+environment.
+.sp
+.LP
+The  \fBsiglongjmp()\fR function restores the saved signal mask if and only if
+the  \fIenv\fR argument was initialized by a call to the \fBsigsetjmp()\fR
+function with a non-zero  \fIsavemask\fR argument.
+.sp
+.LP
+The values of register and automatic variables are undefined. Register or
+automatic variables whose value must be relied upon must be declared as
+volatile.
+.SH RETURN VALUES
+.sp
+.LP
+If the return is from a direct invocation, \fBsetjmp()\fR and \fBsigsetjmp()\fR
+return \fB0\fR. If the return is from a call to \fBlongjmp()\fR, \fBsetjmp()\fR
+returns a non-zero value. If the return is from a call to \fBsiglongjmp()\fR,
+\fBsigsetjmp()\fR returns a non-zero value.
+.sp
+.LP
+After \fBlongjmp()\fR is completed, program execution continues as if the
+corresponding invocation of \fBsetjmp()\fR had just returned the value
+specified by \fIval\fR. The \fBlongjmp()\fR function cannot cause
+\fBsetjmp()\fR to return 0; if \fIval\fR is 0, \fBsetjmp()\fR returns 1.
+.sp
+.LP
+After \fBsiglongjmp()\fR is completed, program execution continues as if the
+corresponding invocation of \fBsigsetjmp()\fR had just returned the value
+specified by \fIval\fR. The \fBsiglongjmp()\fR function cannot cause
+\fBsigsetjmp()\fR to return 0; if \fIval\fR is 0, \fBsigsetjmp()\fR returns 1.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBsetjmp()\fR and \fBlongjmp()\fR functions.
+.sp
+.LP
+The following example uses both \fBsetjmp()\fR and \fBlongjmp()\fR to return
+the flow of control to the appropriate instruction block:
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <unistd.h>
+jmp_buf env; static void signal_handler();
+
+main(\|)  {
+        int returned_from_longjump, processing = 1;
+        unsigned int time_interval = 4;
+        if ((returned_from_longjump = setjmp(env)) != 0)
+            switch (returned_from_longjump)     {
+              case SIGINT:
+                printf("longjumped from interrupt %d\en",SIGINT);
+                break;
+              case SIGALRM:
+                printf("longjumped from alarm %d\en",SIGALRM);
+                break;
+            }
+        (void) signal(SIGINT, signal_handler);
+        (void) signal(SIGALRM, signal_handler);
+        alarm(time_interval);
+        while (processing)        {
+          printf(" waiting for you to INTERRUPT (cntrl-C) ...\en");
+          sleep(1);
+        }		 /* end while forever loop */
+}
+
+static void signal_handler(sig)
+int sig; {
+        switch (sig)     {
+          case SIGINT:	... 	  /* process for interrupt */
+                      	longjmp(env,sig);
+                             	  /* break never reached */
+          case SIGALRM:	... 	  /* process for alarm */
+                       	longjmp(env,sig);
+                               /* break never reached */
+          default:     	exit(sig);
+        }
+}
+.fi
+.in -2
+
+.sp
+.LP
+When this example is compiled and executed, and the user sends an interrupt
+signal, the output will be:
+
+.sp
+.in +2
+.nf
+longjumped from interrupt
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Additionally, every 4 seconds the alarm will expire, signalling this process,
+and the output will be:
+
+.sp
+.in +2
+.nf
+longjumped from alarm
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetcontext\fR(2), \fBpriocntl\fR(2), \fBsigaction\fR(2),
+\fBsigaltstack\fR(2), \fBsigprocmask\fR(2), \fBsignal\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH WARNINGS
+.sp
+.LP
+If \fBlongjmp()\fR or \fBsiglongjmp()\fR are called even though \fIenv\fR was
+never primed by a call to \fBsetjmp()\fR or \fBsigsetjmp()\fR, or when the last
+such call was in a function that has since returned, the results are undefined.

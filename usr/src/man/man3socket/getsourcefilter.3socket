@@ -1,0 +1,245 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getsourcefilter 3SOCKET "20 Aug 2007" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+getsourcefilter, setsourcefilter, getipv4sourcefilter, setipv4sourcefilter \-
+retrieve and set a socket's multicast filter
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR [ \fIlibrary\fR... ]
+#include <netinet/in.h>
+
+\fBint\fR \fBgetsourcefilter\fR(\fBint\fR \fIs\fR, \fBuint32_t\fR \fIinterface\fR,
+     \fBstruct sockaddr *\fR\fIgroup\fR, \fBsocklen_t\fR \fIgrouplen\fR, \fBuint32_t *\fR\fIfmode\fR,
+     \fBuint_t *\fR\fInumsrc\fR, \fBstruct sockaddr_storage *\fR\fIslist\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetsourcefilter\fR(\fBint\fR \fIs\fR, \fBuint32_t\fR \fIinterface\fR,
+     \fBstruct sockaddr *\fR\fIgroup\fR, \fBsocklen_t\fR \fIgrouplen\fR, \fBuint32_t\fR \fIfmode\fR,
+     \fBuint_t\fR \fInumsrc\fR, \fBstruct sockaddr_storage *\fR\fIslist\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBgetipv4sourcefilter\fR(\fBint\fR \fIs\fR, \fBstruct in_addr\fR \fIinterface\fR,
+     \fBstruct in_addr\fR \fIgroup\fR, \fBuint32_t *\fR\fIfmode\fR, \fBuint32_t *\fR\fInumsrc\fR,
+     \fBstruct in_addr *\fR\fIslist\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetipv4sourcefilter\fR(\fBint\fR \fIs\fR, \fBstruct in_addr\fR \fIinterface\fR,
+     \fBstruct in_addr\fR \fIgroup\fR,\fBuint32_t\fR \fIfmode\fR, \fBuint32_t\fR \fInumsrc\fR,
+     \fBstruct in_addr *\fR\fIslist\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions allow applications to retrieve and modify the multicast
+filtering state for a tuple consisting of socket, interface, and multicast
+group values.
+.sp
+.LP
+A multicast filter is described by a filter mode, which is \fBMODE_INCLUDE\fR
+or \fBMODE_EXCLUDE\fR, and a list of source addresses which are filtered. If a
+group is simply joined with no source address restrictions, the filter mode is
+\fBMODE_EXCLUDE\fR and the source list is empty.
+.sp
+.LP
+The \fBgetsourcefilter()\fR and \fBsetsourcefilter()\fR functions are
+protocol-independent. They can be used on either \fBPF_INET\fR or
+\fBPF_INET6\fR sockets. The \fBgetipv4sourcefilter()\fR and
+\fBsetipv4sourcefilter()\fR functions are IPv4-specific. They must be used only
+on \fBPF_INET\fR sockets.
+.sp
+.LP
+For the protocol-independent functions, the first four arguments identify the
+socket, interface, multicast group tuple values. The argument \fIs\fR is an
+open socket of type \fBSOCK_DGRAM\fR or \fBSOCK_RAW\fR. The \fIinterface\fR
+argument is the interface index. The interface name can be mapped to the index
+using \fBif_nametoindex\fR(3SOCKET). The \fIgroup\fR points to either a
+\fBsockaddr_in\fR containing an IPv4 multicast address if the socket is
+\fBPF_INET\fR or a \fBsockaddr_in6\fR containing an IPv6 multicast address if
+the socket is \fBPF_INET6\fR. The \fIgrouplen\fR is the size of the structure
+pointed to by \fIgroup\fR.
+.sp
+.LP
+For the IPv4-specific functions, the first three arguments identify the same
+socket, interface, multicast group tuple values. The argument \fIs\fR is an
+open socket of type \fBSOCK_DGRAM\fR or \fBSOCK_RAW\fR and protocol family
+\fBPF_INET\fR. The \fIinterface\fR argument is the IPv4 address assigned to the
+local interface. The \fIgroup\fR argument is the IPv4 multicast address.
+.sp
+.LP
+The \fBgetsourcefilter()\fR and \fBgetipv4sourcefilter()\fR functions retrieve
+the current filter for the given tuple consisting of socket, interface, and
+multicast group values. On successful return, \fIfmode\fR contains either
+\fBMODE_INCLUDE\fR or \fBMODE_EXCLUDE\fR, indicating the filter mode. On input,
+the \fInumsrc\fR argument holds the number of addresses that can fit in the
+\fIslist\fR array.  On return, \fIslist\fR contains as many addresses as fit,
+while \fInumsrc\fR contains the total number of source addresses in the filter.
+It is possible that \fInumsrc\fR can contain a number larger than the number of
+addresses in the \fIslist\fR array. An application might determine the required
+buffer size by calling \fBgetsourcefilter()\fR with \fInumsrc\fR containing
+\fB0\fR and \fIslist\fR a \fBNULL\fR pointer. On return, \fInumsrc\fR contains
+the number of elements that the \fIslist\fR buffer must be able to hold.
+Alternatively, the maximum number of source addresses allowed by this
+implementation is defined in \fB<netinet/in.h>\fR:
+.sp
+.in +2
+.nf
+#define MAX_SRC_FILTER_SIZE	64
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsetsourcefilter()\fR and \fBsetipv4sourcefilter\fR functions replace the
+current filter with the filter specified in the arguments \fIfmode\fR,
+\fInumsrc\fR, and \fIslist\fR. The \fIfmode\fR argument must be set to either
+\fBMODE_INCLUDE\fR or \fBMODE_EXCLUDE\fR. The \fInumsrc\fR argument is the
+number of addresses in the \fIslist\fR array. The \fIslist\fR argument points
+to the array of source addresses to be included or excluded, depending on the
+\fIfmode\fR value.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, all four functions return \fB0\fR. Otherwise, they return
+\fB\(mi1\fR and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIs\fR argument is not a valid descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAFNOSUPPORT\fR\fR
+.ad
+.RS 16n
+.rt  
+The address family of the passed-in \fIsockaddr\fR is not \fBAF_INET\fR or
+\fBAF_INET6\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOPROTOOPT\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket \fIs\fR is not of type \fBSOCK_DGRAM\fR or \fBSOCK_RAW\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOPROTOOPT\fR\fR
+.ad
+.RS 16n
+.rt  
+The address family of the group parameter does not match the protocol family of
+the socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 16n
+.rt  
+Insufficient \fBSTREAMS\fR resources available for the operation to complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIinterface\fR argument, either an index or an IPv4 address, does not
+identify a valid interface.
+.RE
+
+.sp
+.LP
+The \fBgetsourcefilter()\fR and \fBgetipv4sourcefilter()\fR functions will fail
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEADDRNOTAVAIL\fR\fR
+.ad
+.RS 17n
+.rt  
+The tuple consisting of socket, interface, and multicast group values does not
+exist; \fIgroup\fR is not being listened to on \fIinterface\fR by \fIsocket\fR.
+.RE
+
+.sp
+.LP
+The functions \fBsetsourcefilter()\fRand \fBsetipv4sourcefilter()\fR can fail
+in the following additional case:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOBUFS\fR\fR
+.ad
+.RS 11n
+.rt  
+The source filter list is larger than that allowed by the implementation.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBif_nametoindex\fR(3SOCKET), \fBsocket\fR(3SOCKET), \fBattributes\fR(5)
+.sp
+.LP
+RFC 3678

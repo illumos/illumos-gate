@@ -1,0 +1,110 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceQueryRecord 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceQueryRecord \- query records from DNS
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceErrorType\fR \fIDNSServiceQueryRecord\fR(\fBDNSServiceRef\fR *\fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR, \fBconst char\fR *\fIfullname\fR,
+     \fBuint16_t\fR \fIrrtype\fR, \fBuint16_t\fR \fIrrclass\fR,
+     \fBDNSServiceServiceQueryRecordReply\fR \fIcallBack\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fIvoid\fR(*\fBDNSServiceQueryRecordReply\fR)(\fBDNSServiceRef\fR \fIDNSServiceRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR,
+     \fBDNSServiceErrorType\fR \fIerrorCode\fR, \fBconst char\fR *\fIfullname\fR,
+     \fBuint16_t\fR \fIrrtype\fR, \fBuint16_t\fR \fIrrclass\fR, \fBuint16_t\fR \fIrdlen\fR,
+     \fBconst void\fR *\fIrdata\fR, \fBuint32_t\fR \fIttl\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBDNSServiceQueryRecord()\fR function is used to query the daemon for any
+\fBDNS\fR resource record type. The \fIcallback\fR argument to
+\fBDNSServiceQueryRecord()\fR points to a function of type
+\fBDNSServiceQueryRecordReply()\fR listed above. The \fIsdRef\fR parameter in
+\fBDNSServiceQueryRecord()\fR points to an uninitialized \fIDNSServiceRef\fR.
+The \fBDNSServiceQueryRecord()\fR function returns \fBkDNSServiceErr_NoError\fR
+and initializes \fIsdRef\fR on success. The query runs indefinitely until the
+client terminates by passing the initialized \fIsdRef\fR from the query call to
+\fBDNSServiceRefDeallocate()\fR.
+.sp
+.LP
+The flag \fBkDNSServiceFlagsLongLivedQuery\fR should be passed in the
+\fIflags\fR argument of \fBDNSServiceQueryRecord()\fR to create a "long-lived"
+unicast query in a non-local domain. This flag has no effect on link local
+multicast queries. Without this flag, unicast queries will be one-shot and only
+the results that are available at the time of the query will be returned. With
+long-lived queries, add or remove events that are available after the first
+call generate callbacks. The \fIinterfaceIndex\fR argument specifies the
+interface on which to issue the query. Most applications will pass a \fB0\fR as
+the \fIinterfaceIndex\fR to make the query on all interfaces. See the section
+"Constants for specifying an interface index" in \fB<dns_sd.h>\fR\&. The
+\fIfullname\fR argument indicates the full domain name of the resource record
+to be queried. The \fIrrtype\fR argument indicates the resource record type:
+\fBkDNSServiceType_PTR\fR, for example. The \fIrrclass\fR argument holds the
+class of the resource record to be queried (\fBkDNSServiceClass_IN\fR). The
+\fIcontext\fR argument can be \fINULL\fR and points to a value passed to the
+callback function.
+.sp
+.LP
+The \fIsdRef\fR argument passed to the callback function is initialized by the
+call to \fBDNSServiceQueryRecord()\fR. Possible values for the \fIflags\fR
+parameter to the callback function are \fBkDNSServiceFlagsMoreComing\fR and
+\fBkDNSServiceFlagsAdd\fR. The \fBkDNSServiceFlagsMoreComing\fR value is set to
+indicate that additional results are immediately available. The
+\fBkDNSServiceFlagsAdd\fR value indicates that the results returned to the
+callback function are for a valid \fBDNS\fR record. If
+\fBkDNSServiceFlagsAdd\fR is not set, the results returned are for a delete
+event. The \fIerrorCode\fR passed to the callback is
+\fBkDNSServiceErr_NoError\fR on success. Otherwise, failure is indicated and
+other parameter values are undefined. The \fIfullname\fR parameter indicates
+the full domain name of the resource record . The \fIrrtype\fR indicates the
+resource record type. The \fIrrclass\fR indicates the class of the \fBDNS\fR
+resource record. The \fIrdlen\fR parameter indicates the length of the resource
+record \fIrdata\fR in bytes. The \fIrdata\fR parameter points to raw rdata of
+the resource record. The \fIttl\fR parameter indicates the time to live of the
+resource record in seconds. The \fIcontext\fR parameter points to the value
+passed  by the application in the \fBcontext\fR argument to the
+\fBDNSServiceQueryRecord()\fR call.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBDNSServiceQueryRecord\fR function returns \fBkDNSServiceErr_NoError\fR
+on success. Otherwise, an error code defined in \fB<dns_sd.h>\fR is returned to
+indicate the specific failure that occurred.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceBrowse\fR(3DNS_SD), \fBDNSServiceRegister\fR(3DNS_SD),
+\fBDNSServiceResolve\fR(3DNS_SD), \fBattributes\fR(5)

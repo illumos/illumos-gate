@@ -1,0 +1,305 @@
+'\" te
+.\"  Copyright (c) 2001 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsm_memseg_export_publish 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.SH NAME
+rsm_memseg_export_publish, rsm_memseg_export_unpublish,
+rsm_memseg_export_republish \- allow or disallow a memory segment to be
+imported by other nodes
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
+#include <rsmapi.h> 
+
+\fBint\fR \fBrsm_memseg_export_publish\fR(
+     \fBrsm_memseg_export_handle_t\fR \fImemseg\fR,
+     \fBrsm_memseg_id_t *\fR\fIsegment_id\fR,
+     \fBrsmapi_access_entry_t\fR \fIaccess_list\fR[],
+     \fBuint_t\fR \fIaccess_list_length\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_export_unpublish\fR(
+     \fBrsm_memseg_export_handle_t\fR \fImemseg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrsm_memseg_export_republish\fR(
+     \fBrsm_memseg_export_handle_t\fR \fImemseg\fR,
+     \fBrsmapi_access_entry_t\fR \fIaccess_list\fR[],
+     \fBuint_t\fR \fIaccess_list_length\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrsm_memseg_export_publish()\fR, \fBrsm_memseg_export_unpublish()\fR, and
+\fBrsm_memseg_export_republish()\fR functions allow or disallow a memory
+segment to be imported by other nodes.
+.sp
+.LP
+The rsm_memseg_export_publish(3RSM) function allows the export segment
+specified by the \fImemseg\fR argument to be imported by other nodes. It also
+assigns a unique segment identifier to the segment and defines the access
+control list for the segment. The \fIsegment_id\fR argument is a pointer to an
+identifier which is unique on the publishing node. It is the responsibility of
+the application to manage the assignment of unique segment identifiers. The
+identifier can be optionally initialized to 0, in which case the system will
+return a unique segment identifier value.  The \fIaccess_list\fR argument is
+composed of pairs of nodeid and access permissions. For each nodeid specified
+in the list, the associated read/write permissions are provided by three octal
+digits for owner, group, and other, as for Solaris file permissions. In the
+access control each octal digit may have the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB2\fR
+.ad
+.RS 5n
+.rt  
+write access
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB4\fR
+.ad
+.RS 5n
+.rt  
+read only access
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB6\fR
+.ad
+.RS 5n
+.rt  
+read and write access
+.RE
+
+.sp
+.LP
+An access permissions value of 0624 specifies: (1) an importer with the same
+uid as the exporter has read and write access; (2) an importer with the same
+gid as the exporter has write access only; and (3) all other importers have
+read access only. When an access control list is provided, nodes not included
+in the list will be prevented from importing the segment.  However, if the
+access list is \fINULL\fR (this will require the length
+\fIaccess_list_length\fR to be specified as 0 as well), then no nodes will be
+excluded from importing and the access permissions on all nodes will equal the
+owner-group-other file creation permissions of the exporting process.
+Corresponding to the \fIaccess_list\fR argument, the \fIaccess_list_length\fR
+argument specifies the number of entries in the \fIaccess_list\fR array.
+.sp
+.LP
+The \fBrsm_memseg_export_unpublish()\fR function disallows the export segment
+specified by \fImemseg\fR from being imported. All the existing import
+connections are forcibly disconnected.
+.sp
+.LP
+The \fBrsm_memseg_export_republish()\fR function changes the access control
+list for the exported and published segment. Although the current import
+connections remain unaffected by this call, new connections are constrained by
+the new  access list.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, an error value
+is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBrsm_memseg_export_publish()\fR, \fBrsm_memseg_export_unpublish()\fR, and
+\fBrsm_memseg_export_republish()\fR functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
+.ad
+.RS 24n
+.rt  
+Invalid segment handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_NOT_CREATOR\fR \fR
+.ad
+.RS 24n
+.rt  
+Not creator of segment.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_publish()\fR and  \fBrsm_memseg_export_republish()\fR
+functions can return the following errors, with the exception that only
+\fBrsm_memseg_export_publish()\fR can return the errors related to the segment
+identifier:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_SEGID_IN_USE\fR \fR
+.ad
+.sp .6
+.RS 4n
+Segment identifier in use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_RESERVED_SEGID\fR \fR
+.ad
+.sp .6
+.RS 4n
+Segment identifier reserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_SEGID\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid segment identifier.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ACL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Invalid access control list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_SEG_ALREADY_PUBLISHED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Segment already published.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
+.ad
+.sp .6
+.RS 4n
+Insufficient resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_LOCKS_NOT_SUPPORTED\fR \fR
+.ad
+.sp .6
+.RS 4n
+Locks not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_BAD_ADDR\fR \fR
+.ad
+.sp .6
+.RS 4n
+Bad address.
+.RE
+
+.sp
+.LP
+The \fBrsm_memseg_export_republish()\fR and \fBrsm_memseg_export_unpublish()\fR
+functions can return the following errors:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_SEG_NOT_PUBLISHED\fR \fR
+.ad
+.RS 29n
+.rt  
+Segment not published.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRSMERR_INTERRUPTED\fR\fR
+.ad
+.RS 29n
+.rt  
+The operation was interrupted by a signal.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPE ATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsm_memseg_export_create\fR(3RSM), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+An attempt to publish a segment might block until sufficient resources become
+available.

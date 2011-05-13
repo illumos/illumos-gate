@@ -1,0 +1,230 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_cred 9F "6 Aug 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_cred, crgetuid, crgetruid, crgetsuid, crgetgid, crgetrgid, crgetsgid,
+crgetzoneid, crgetgroups, crgetngroups \- access and change parts of the cred_t
+structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/cred.h>
+
+
+
+\fBuid_t\fR \fBcrgetuid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBuid_t\fR \fBcrgetruid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBuid_t\fR \fBcrgetsuid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBgid_t\fR \fBcrgetgid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBgid_t\fR \fBcrgetrgid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBgid_t\fR \fBcrgetsgid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBzoneid_t\fR \fBcrgetzoneid\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBconst gid_t *\fR\fBcrgetgroups\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcrgetngroups\fR(\fBconst cred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcrsetresuid\fR(\fBcred_t *\fR\fIcr\fR, \fBuid_t\fR \fIruid\fR, \fBuid_t\fR \fIeuid\fR, \fBuid_t\fR \fIsuid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcrsetresgid\fR(\fBcred_t *\fR\fIcr\fR, \fBgid_t\fR \fIrgid\fR, \fBgid_t\fR \fIegid\fR, \fBgid_t\fR \fIsgid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcrsetugid\fR(\fBcred_t *\fR\fIcr\fR, \fBuid_t\fR \fIuid\fR, \fBgid_t\fR \fIgid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcrsetgroups\fR(\fBcred_t *\fR\fIcr\fR, \fBint\fR \fIngroups\fR, \fBgid_t\fR \fIgids\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcr\fR\fR
+.ad
+.RS 25n
+.rt  
+pointer to the user credential structure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuid\fR, \fIruid\fR, \fIeuid\fR, \fIsuid\fR\fR
+.ad
+.RS 25n
+.rt  
+new user id, real, effective and saved user id
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIgid\fR, \fIrgid\fR, \fIegid\fR, \fIsgid\fR\fR
+.ad
+.RS 25n
+.rt  
+new group id, real, effective and saved group id
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIngroups\fR\fR
+.ad
+.RS 25n
+.rt  
+number of groups in the group array
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIgids\fR\fR
+.ad
+.RS 25n
+.rt  
+pointer to array of new groups
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The user credential is a shared, read-only, ref-counted data structure. Its
+actual size and layout are subject to change. The functions described in this
+page allow the programmer to retrieve fields from the structure and to
+initialize newly allocated credential structures.
+.sp
+.LP
+\fBcrgetuid()\fR, \fBcrgetruid()\fR, and \fBcrgetsuid()\fR return,
+respectively, the effective, real, and saved user id from the user credential
+pointed to by \fIcr\fR.
+.sp
+.LP
+\fBcrgetgid()\fR, \fBcrgetrgid()\fR, and \fBcrgetsgid()\fR return,
+respectively, the effective, real, and saved group id from the user credential
+pointed to by \fIcr\fR.
+.sp
+.LP
+\fBcrgetzoneid()\fR returns the zone id from the user credential pointed to by
+\fIcr\fR.
+.sp
+.LP
+\fBcrgetgroups()\fR returns the group list of the user credential pointed to by
+\fIcr\fR.
+.sp
+.LP
+\fBcrgetngroups()\fR returns the number of groups in the user credential
+pointed to by \fIcr\fR.
+.sp
+.LP
+\fBcrsetresuid()\fR sets the real, effective and saved user id. All but one can
+be specified as -1, which causes the original value not to change.
+.sp
+.LP
+\fBcrsetresgid()\fR sets the real, effective and saved group id. All but one
+can be specified as -1, which causes the original value not to change.
+.sp
+.LP
+\fBcrsetugid()\fR initializes the real, effective and saved user id \fBall\fR
+to \fIuid\fR. It initializes the real, effective, and saved group id \fBall\fR
+to \fIgid\fR.
+.sp
+.LP
+\fBcrsetgroups()\fR sets the number of groups in the user credential to
+\fIngroups\fR and copies the groups from \fIgids\fR to the user credential. If
+\fIngroups\fR is 0, \fIgids\fR need not point to valid storage.
+.sp
+.LP
+It is an error to call this any of the \fBcrset*()\fR functions on a user
+credential structure that was newly allocated.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBcrget*()\fR functions return the requested information.
+.sp
+.LP
+The \fBcrset*id()\fR functions return 0 on success and -1 if any of the
+specified ids are invalid. The functions might cause a system panic if called
+on a user credential structure that is referenced by other parts of the system.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user and kernel contexts.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+ArchitectureAll
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBdrv_priv\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

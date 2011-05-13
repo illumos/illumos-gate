@@ -1,0 +1,188 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sem.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.SH NAME
+sem.h, sem \-  semaphore facility
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBsys/sem.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBsys/sem.h\fR> header defines the following constants and structures.
+.sp
+.LP
+Semaphore operation flags:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEM_UNDO\fR\fR
+.ad
+.RS 12n
+.rt  
+Set up adjust on exit entry.
+.RE
+
+.sp
+.LP
+Command definitions for the \fBsemctl()\fR function are provided as listed
+below. See \fBsemctl\fR(2).
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETNCNT\fR\fR
+.ad
+.RS 11n
+.rt  
+Get \fBsemncnt\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETPID\fR\fR
+.ad
+.RS 11n
+.rt  
+Get \fBsempid\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+Get \fBsemval\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETALL\fR\fR
+.ad
+.RS 11n
+.rt  
+Get all cases of \fBsemval\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGETZCNT\fR\fR
+.ad
+.RS 11n
+.rt  
+Get \fBsemzcnt\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSETVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+Set \fBsemval\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSETALL\fR\fR
+.ad
+.RS 11n
+.rt  
+Set all cases of \fBsemval\fR.
+.RE
+
+.sp
+.LP
+The \fBsemid_ds\fR structure contains the following members:
+.sp
+.in +2
+.nf
+struct ipc_perm sem_perm     /* operation permission structure */
+unsigned short  sem_nsems    /* number of semaphores in set */
+time_t          sem_otime    /* last \fBsemop()\fR time */
+time_t          sem_ctime    /* last time changed by \fBsemctl()\fR */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBpid_t\fR, \fBtime_t\fR, \fBkey_t\fR, and \fBsize_t\fR types are defined
+as described in <\fBsys/types.h\fR>. See \fBtypes.h\fR(3HEAD).
+.sp
+.LP
+A semaphore is represented by an anonymous structure containing the following
+members:
+.sp
+.in +2
+.nf
+unsigned short semval     /* semaphore value */
+pid_t          sempid     /* process ID of last operation */
+unsigned short semncnt    /* number of processes waiting for \fBsemval\fR
+                             to become greater than current value */
+unsigned short semzcnt    /* number of processes waiting for \fBsemval\fR
+                             to become 0 */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsembuf\fR structure contains the following members:
+.sp
+.in +2
+.nf
+unsigned short sem_num     /* semaphore number */
+short          sem_op      /* semaphore operation */
+short          sem_flg     /* operation flags */
+.fi
+.in -2
+
+.sp
+.LP
+All of the symbols from <\fBsys/ipc.h\fR> are defined when this header is
+included. See \fBipc.h\fR(3HEAD).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsemctl\fR(2), \fBsemget\fR(2), \fBsemop\fR(2), \fBipc.h\fR(3HEAD),
+\fBtypes.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

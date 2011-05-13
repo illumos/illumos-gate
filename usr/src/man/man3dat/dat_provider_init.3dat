@@ -1,0 +1,120 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_provider_init 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_provider_init \- locate the Provider in the Static Registry
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+void
+    dat_provider_init (
+    IN    const DAT_PROVIDER_INFO    *provider_info,
+    IN    const char *               instance_data
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprovider_info\fR\fR
+.ad
+.RS 17n
+.rt  
+The information that was provided by the Consumer to locate the Provider in the
+Static Registry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinstance_data\fR\fR
+.ad
+.RS 17n
+.rt  
+The instance data string obtained from the entry found in the Static Registry
+for the Provider.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+A constructor the Registry calls on a Provider before the first call to
+\fBdat_ia_open\fR(3DAT) for a given IA name when the Provider is auto-loaded.
+An application that explicitly loads a Provider on its own can choose to use
+\fBdat_provider_init()\fR just as the Registry would have done for an
+auto-loaded Provider.
+.sp
+.LP
+The Provider's implementation of this method must call
+\fBdat_registry_add_provider\fR(3DAT), using the IA name in the
+\fBprovider_info.ia_name\fR field, to register itself with the Dynamic
+Registry. The implementation must not register other IA names at this time.
+Otherwise, the Provider is free to perform any initialization it finds useful
+within this method.
+.sp
+.LP
+This method is called before the first call to \fBdat_ia_open()\fR for a given
+IA name after one of the following has occurred:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Provider library was loaded into memory.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Registry called \fBdat_provider_fini\fR(3DAT) for that IA name.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Provider called \fBdat_registry_remove_provider\fR(3DAT) for that IA name
+(but it is still the Provider indicated in the Static Registry).
+.RE
+.sp
+.LP
+If this method fails, it should ensure that it does not leave its entry in the
+Dynamic Registry.
+.SH RETURN VALUES
+.sp
+.LP
+No values are returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.1, 1.2
+_
+MT-Level
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdat_ia_open\fR(3DAT), \fBdat_provider_fini\fR(3DAT),
+\fBdat_registry_add_provider\fR(3DAT),
+\fBdat_registry_remove_provider\fR(3DAT), \fBlibdat\fR(3LIB),
+\fBattributes\fR(5)

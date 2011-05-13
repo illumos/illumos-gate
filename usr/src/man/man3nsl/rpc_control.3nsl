@@ -1,0 +1,138 @@
+'\" te
+.\"  Copyright 1989 AT&T 
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rpc_control 3NSL "24 Feb 1999" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+rpc_control \- library routine for manipulating global RPC attributes for
+client and server applications
+.SH SYNOPSIS
+.LP
+.nf
+\fBbool_t\fR \fBrpc_control\fR(\fBint\fR \fIop\fR, \fBvoid *\fR\fIinfo\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This \fBRPC\fR library routine allows applications to set and modify global
+\fBRPC\fR attributes that apply to clients as well as servers.  At present, it
+supports only server side operations. This function allows applications to set
+and modify global attributes that apply to client as well as server functions.
+\fIop\fR indicates the type of operation, and \fIinfo\fR is a pointer to the
+operation specific information. The supported values of \fIop\fR and their
+argument types, and what they do are:
+.sp
+.in +2
+.nf
+RPC_SVC_MTMODE_SET       int *	set multithread mode
+RPC_SVC_MTMODE_GET       int *	get multithread mode
+RPC_SVC_THRMAX_SET       int *	set maximum number of threads
+RPC_SVC_THRMAX_GET       int *	get maximum number of threads
+RPC_SVC_THRTOTAL_GET     int *	get number of active threads
+RPC_SVC_THRCREATES_GET   int *	get number of threads created
+RPC_SVC_THRERRORS_GET    int *	get number of thread create errors
+RPC_SVC_USE_POLLFD       int *	set number of file descriptors to unlimited
+RPC_SVC_CONNMAXREC_SET   int *  set non-blocking max rec size
+RPC_SVC_CONNMAXREC_GET   int *  get non-blocking max rec size
+.fi
+.in -2
+
+.sp
+.LP
+There are three multithread (MT) modes.  These are:
+.sp
+.in +2
+.nf
+RPC_SVC_MT_NONE	Single threaded mode	(default)
+RPC_SVC_MT_AUTO	Automatic MT mode
+RPC_SVC_MT_USER	User MT mode
+.fi
+.in -2
+
+.sp
+.LP
+Unless the application sets the Automatic or User MT modes, it will stay in the
+default (single threaded) mode.  See the \fINetwork Interfaces Programmer's
+Guide\fR for the meanings of these modes and programming examples.  Once a mode
+is set, it cannot be changed.
+.sp
+.LP
+By default, the maximum number of threads that the server will create at any
+time is 16.  This allows the service developer to put a bound on thread
+resources consumed by a server.  If a server needs to process more than 16
+client requests concurrently, the maximum number of threads must be set to the
+desired number.  This parameter may be set at any time by the server.
+.sp
+.LP
+Set and get operations will succeed even in modes where the operations don't
+apply.  For example, you can set the maximum number of threads in any mode,
+even though it makes sense only for the Automatic MT mode. All of the get
+operations except \fBRPC_SVC_MTMODE_GET\fR apply only to the Automatic MT mode,
+so values returned in other modes may be undefined.
+.sp
+.LP
+By default, \fBRPC\fR servers are limited to a maximum of 1024 file descriptors
+or connections due to limitations in the historical interfaces
+\fBsvc_fdset\fR(3NSL) and \fBsvc_getreqset\fR(3NSL). Applications written to
+use the preferred interfaces of \fBsvc_pollfd\fR(3NSL) and
+\fBsvc_getreq_poll\fR(3NSL) can use an unlimited number of file descriptors.
+Setting \fBinfo\fR to point to a non-zero integer and  \fIop\fR to
+\fBRPC_SVC_USE_POLLFD\fR removes the limitation.
+.sp
+.LP
+Connection oriented \fBRPC\fR transports read \fBRPC\fR requests in blocking
+mode by default. Thus, they may be adversely affected by network delays and
+broken clients. \fBRPC_SVC_CONNMAXREC_SET\fR enables non-blocking mode and
+establishes the maximum record size (in bytes) for \fBRPC\fR requests;
+\fBRPC\fR responses are not affected. Buffer space is allocated as needed up to
+the specified maximum, starting at the maximum or \fBRPC_MAXDATASIZE\fR,
+whichever is smaller.
+.sp
+.LP
+The value established by \fBRPC_SVC_CONNMAXREC_SET\fR is used when a connection
+is created, and it remains in effect for that connection until it is closed. To
+change the value for existing connections on a per-connection basis, see
+\fBsvc_control\fR(3NSL).
+.sp
+.LP
+\fBRPC_SVC_CONNMAXREC_GET\fR retrieves the current maximum record size. A zero
+value means that no maximum is in effect, and that the connections are in
+blocking mode.
+.sp
+.LP
+\fIinfo\fR is a pointer to an argument of type \fBint\fR. Non-connection RPC
+transports ignore \fBRPC_SVC_CONNMAXREC_SET\fR and
+\fBRPC_SVC_CONNMAXREC_GET\fR.
+.SH RETURN VALUES
+.sp
+.LP
+This routine returns \fBTRUE\fR if the operation was successful and
+returns\fBFALSE\fR otherwise.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBrpc_svc_calls\fR(3NSL),
+\fBattributes\fR(5)
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR

@@ -1,0 +1,273 @@
+'\" te
+.\" Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  
+.\" Portions Copyright 1989 AT&T  
+.\" Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH t_sndvudata 3NSL "23 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+t_sndvudata \- send a data unit from one or more noncontiguous buffers
+.SH SYNOPSIS
+.LP
+.nf
+#include <xti.h> 
+
+
+
+
+\fBint\fR \fBt_sndvudata\fR(\fBint\fR \fIfd\fR, \fBstruct t_unitdata *\fR\fIunitdata\fR, \fBstruct t_iovec  *\fR\fIiov\fR,
+     \fBunsigned int\fR \fIiovcount\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is used in connectionless mode to send a data unit to another
+transport user.  The argument  \fIfd\fR identifies the local transport endpoint
+through which data will be sent,  \fIiovcount\fR contains the number of
+non-contiguous  \fIudata\fR buffers and is limited to an implementation-defined
+value given by  \fBT_IOV_MAX\fR which is at least 16, and  \fIunitdata\fR
+points to a  \fBt_unitdata\fR structure containing the following members:
+.sp
+.in +2
+.nf
+struct netbuf addr;
+struct netbuf opt;
+struct netbuf udata;
+.fi
+.in -2
+
+.sp
+.LP
+If the limit on  \fIiovcount\fR is exceeded, the function fails with
+\fBTBADDATA\fR.
+.sp
+.LP
+In  \fBunitdata\fR, \fIaddr\fR specifies the protocol address of the
+destination user, and  \fIopt\fR identifies options that the user wants
+associated with this request. The  \fIudata\fR field is not used.  The user may
+choose not to specify what protocol options are associated with the transfer by
+setting the  \fIlen\fR field of  \fIopt\fR to zero.  In this case, the provider
+may use default options.
+.sp
+.LP
+The data to be sent is identified by  \fIiov\fR\fB[0]\fR\fI\fR through \fIiov
+[iovcount-1]\fR\fB\&.\fR
+.sp
+.LP
+Note that the limit on the total number of bytes available in all buffers
+passed:
+.sp
+.in +2
+.nf
+\fIiov(0).iov_len + . . + iov(iovcount-1).iov_len \fR 
+.fi
+.in -2
+
+.sp
+.LP
+may be constrained by implementation limits. If no other constraint applies, it
+will be limited by \fBINT_MAX\fR. In practice, the availability of memory to an
+application is likely to impose a lower limit on the amount of data that can be
+sent or received using scatter/gather functions.
+.sp
+.LP
+By default,  \fBt_sndvudata()\fR operates in synchronous mode and may wait if
+flow control restrictions prevent the data from being accepted by the local
+transport provider at the time the call is made.  However, if  \fBO_NONBLOCK\fR
+is set by means of  \fBt_open\fR(3NSL) or  \fBfcntl\fR(2), \fBt_sndvudata()\fR
+executes in asynchronous mode and will fail under such conditions.  The process
+can arrange to be notified of the clearance of a flow control restriction by
+means of either  \fBt_look\fR(3NSL) or the EM interface.
+.sp
+.LP
+If the amount of data specified in  \fIiov\fR\fB0\fR\fI\fR through \fIiov
+[iovcount-1]\fR exceeds the TSDU size as returned in the  \fItsdu\fR field of
+the  \fIinfo\fR argument of \fBt_open\fR(3NSL) or  \fBt_getinfo\fR(3NSL), or is
+zero and sending of zero octets is not supported by the underlying transport
+service, a \fBTBADDATA\fR error is generated.  If  \fBt_sndvudata()\fR is
+called before the destination user has activated its transport endpoint (see
+\fBt_bind\fR(3NSL)\|), the data unit may be discarded.
+.sp
+.LP
+If it is not possible for the transport provider to immediately detect the
+conditions that cause the errors \fBTBADDADDR\fR and \fBTBADOPT\fR, these
+errors will alternatively be returned by  \fBt_rcvuderr\fR(3NSL). An
+application must therefore be prepared to receive these errors in both of these
+ways.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, a value of  \fB0\fR is returned. Otherwise, a value
+of  -1 is returned and  \fBt_errno\fR is set to indicate an error.
+.SH VALID STATES
+.sp
+.LP
+\fBT_IDLE\fR.
+.SH ERRORS
+.sp
+.LP
+On failure,  \fBt_errno\fR is set to one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADADDR\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified protocol address was in an incorrect format or contained illegal
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADDATA\fR\fR
+.ad
+.RS 15n
+.rt  
+Illegal amount of data.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A single send was attempted specifying a TSDU greater than that specified in
+the \fIinfo\fR argument, or a send of a zero byte TSDU is not supported by the
+provider.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fIiovcount\fR is greater than  \fBT_IOV_MAX.\fR
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADF\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified file descriptor does not refer to a transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTBADOPT\fR\fR
+.ad
+.RS 15n
+.rt  
+The specified options were in an incorrect  format or contained illegal
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTFLOW\fR\fR
+.ad
+.RS 15n
+.rt  
+\fBO_NONBLOCK\fR \fBi\fR was set, but the flow control mechanism prevented the
+transport provider from accepting any data at this time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTLOOK\fR\fR
+.ad
+.RS 15n
+.rt  
+An asynchronous event has occurred on this transport endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTNOTSUPPORT\fR\fR
+.ad
+.RS 15n
+.rt  
+This function is not supported by the underlying transport provider.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTOUTSTATE\fR\fR
+.ad
+.RS 15n
+.rt  
+The communications endpoint referenced by \fIfd\fR is not in one of the states
+in which a call to this function is valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTPROTO\fR\fR
+.ad
+.RS 15n
+.rt  
+This error indicates that a communication problem has been detected between XTI
+and the transport provider for which there is no other suitable XTI error
+\fB(t_errno)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTSYSERR\fR\fR
+.ad
+.RS 15n
+.rt  
+A system error has occurred during execution of this function.
+.RE
+
+.SH TLI COMPATIBILITY
+.sp
+.LP
+In the \fBTLI\fR interface definition, no counterpart of this routine was
+defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfcntl\fR(2), \fBt_alloc\fR(3NSL), \fBt_open\fR(3NSL),
+\fBt_rcvudata\fR(3NSL), \fBt_rcvvudata\fR(3NSL) \fBt_rcvuderr\fR(3NSL),
+\fBt_sndudata\fR(3NSL), \fBattributes\fR(5)

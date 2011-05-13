@@ -1,0 +1,222 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tgmath.h 3HEAD "17 Dec 2003" "SunOS 5.11" "Headers"
+.SH NAME
+tgmath.h, tgmath \- type-generic macros
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBtgmath.h\fR>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBtgmath.h\fR> header includes the headers <\fBmath.h\fR> and
+<\fBcomplex.h\fR> and defines several type-generic macros.
+.sp
+.LP
+Of the functions contained within the <\fBmath.h\fR> and <\fBcomplex.h\fR>
+headers without an \fBf\fR (float) or \fBl\fR (\fBlong double\fR) suffix,
+several have one or more parameters whose corresponding real type is
+\fBdouble\fR. For each such function except \fBmodf\fR(3M), there is  a
+corresponding type-generic macro. The parameters whose corresponding real type
+is \fBdouble\fR in the function synopsis are generic parameters. Use of the
+macro invokes a function whose corresponding real type and type domain are
+determined by the arguments for the generic parameters.
+.sp
+.LP
+Use of the macro invokes a function whose generic parameters have the
+corresponding real type determined as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+First, if any argument for generic parameters has type \fBlong double\fR, the
+type determined is \fBlong double\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, if any argument for generic parameters has type \fBdouble\fR or is
+of integer type, the type determined is \fBdouble\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, the type determined is \fBfloat\fR.
+.RE
+.sp
+.LP
+For each unsuffixed function in the <\fBmath.h\fR> header for which there is a
+function in the <\fBcomplex.h\fR> header with the same name except for a
+\fBc\fR prefix, the corresponding type-generic macro (for both functions) has
+the same name as the function in the <\fBmath.h\fR> header. The corresponding
+type-generic macro for \fBfabs()\fR and \fBcabs()\fR is \fBfabs()\fR.
+.sp
+
+.sp
+.TS
+tab();
+cw(1.83i) cw(1.83i) cw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+<\fBmath.h\fR> Function<\fBcomplex.h\fR> FunctionType-Generic Macro
+_
+\fBacos()\fR\fBcacos()\fR\fBacos()\fR
+\fBasin()\fR\fBcasin()\fR\fBasin()\fR
+\fBatan()\fR\fBcatan()\fR\fBatan()\fR
+\fBacosh()\fR\fBcacosh()\fR\fBacosh()\fR
+\fBasinh()\fR\fBcasinh()\fR\fBasinh()\fR
+\fBatanh()\fR\fBcatanh()\fR\fBatanh()\fR
+\fBcos()\fR\fBccos()\fR\fBcos()\fR
+\fBsin()\fR\fBcsin()\fR\fBsin()\fR
+\fBtan()\fR\fBctan()\fR\fBtan()\fR
+\fBcosh()\fR\fBccosh()\fR\fBcosh()\fR
+\fBsinh()\fR\fBcsinh()\fR\fBsinh()\fR
+\fBtanh()\fR\fBctanh()\fR\fBtanh()\fR
+\fBexp()\fR\fBcexp()\fR\fBexp()\fR
+\fBlog()\fR\fBclog()\fR\fBlog()\fR
+\fBpow()\fR\fBcpow()\fR\fBpow()\fR
+\fBsqrt()\fR\fBcsqrt()\fR\fBsqrt()\fR
+\fBfabs()\fR\fBcfabs()\fR\fBfabs()\fR
+.TE
+
+.sp
+.LP
+If at least one argument for a generic parameter is complex, then use of the
+macro invokes a complex function; otherwise, use of the macro invokes a real
+function.
+.sp
+.LP
+For each unsuffixed function in the <\fBmath.h\fR> header without a
+\fBc\fR-prefixed counterpart in the <\fBcomplex.h\fR> header, the corresponding
+type-generic macro has the same name as the function. These type-generic macros
+are:
+.sp
+.in +2
+.nf
+atan2()       fma()     llround()       remainder()
+cbrt()        fmax()    log10()         remquo()
+ceil()        fmin()    log1p()         rint()
+copysign()    fmod()    log2()          round()
+erf()         frexp()   logb()          scalbn()
+erfc()        hypot()   lrint()         scalbln()
+exp2()        ilogb()   lround()        tgamma()
+expm1()       ldexp()   nearbyint()     trunc()
+fdim()        lgamma()  nextafter()
+floor()       llrint()  nexttoward()
+.fi
+.in -2
+
+.sp
+.LP
+If all arguments for generic parameters are real, then use of the macro invokes
+a real function; otherwise, use of the macro results in undefined behavior.
+.sp
+.LP
+For each unsuffixed function in the <\fBcomplex.h\fR> header that is not a
+\fBc\fR-prefixed counterpart to a function in the <\fBmath.h\fR> header, the
+corresponding type-generic macro has the same name as the function. These
+type-generic macros are:
+.sp
+.in +2
+.nf
+carg()
+cimag()
+conj()
+cproj()
+creal()
+.fi
+.in -2
+
+.sp
+.LP
+Use of the macro with any real or complex argument invokes a complex function.
+.SH USAGE
+.sp
+.LP
+Functions invoked by use of type-generic macros are invoked with the
+declarations listed below.
+.sp
+.in +2
+.nf
+#include <tgmath.h>
+int n;
+float f;
+double d;
+long double ld;
+float complex fc;
+double complex dc;
+long double complex ldc;
+.fi
+.in -2
+
+.sp
+.LP
+The following are the type-generic macros that invoke the functions that are
+invoked with the preceding declarations.
+.sp
+
+.sp
+.TS
+tab();
+cw(2.75i) cw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+MacroUse Invokes
+_
+exp(n)exp(n), the function
+acosh(f)acoshf(f)
+sin(d)sin(d), the function
+atan(ld)atanl(ld)
+log(fc)clogf(fc)
+sqrt(dc)csqrt(dc)
+pow(ldc,f)cpowl(ldc, f)
+remainder(n,n)remainder(n, n), the function
+nextafter(d,f)nextafter(d, f), the function
+nexttoward(f,ld)nexttowardf(f, ld)
+copysign(n,ld)copysignl(n, ld)
+ceil(fc)undefined behavior
+rint(dc)undefined behavior
+fmax(ldc,ld)undefined behavior
+carg(n)carg(n), the function
+cproj(f)cprojf(f)
+creal(d)creal(d), the function
+cimag(ld)cimagl(ld)
+cabs(fc)cabsf(fc)
+carg(dc)carg(dc), the function
+cproj(ldc)cprojl(ldc)
+.TE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmodf\fR(3M), \fBcomplex.h\fR(3HEAD), \fBmath.h\fR(3HEAD), \fBcabs\fR(3M),
+\fBfabs\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)

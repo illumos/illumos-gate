@@ -1,0 +1,167 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aio_fsync 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aio_fsync \- asynchronous file synchronization
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBaio_fsync\fR(\fBint\fR \fIop\fR, \fBstruct aiocb *\fR\fIaiocbp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaio_fsync()\fR function asynchronously forces all I/O operations
+associated with the file indicated by the file descriptor \fBaio_fildes\fR
+member of the \fBaiocb\fR structure referenced by the \fIaiocbp\fR argument and
+queued at the time of the call to \fBaio_fsync()\fR to the synchronized I/O
+completion state. The function call returns when the synchronization request
+has been initiated or queued to the file or device (even when the data cannot
+be synchronized immediately).
+.sp
+.LP
+If \fIop\fR is \fBO_DSYNC\fR, all currently queued I/O operations are completed
+as if by a call to \fBfdatasync\fR(3C); that is, as defined for synchronized
+I/O data integrity completion. If \fIop\fR is \fBO_SYNC\fR, all currently
+queued I/O operations are completed as if by a call to \fBfsync\fR(3C); that
+is, as defined for synchronized I/O file integrity completion. If the
+\fBaio_fsync()\fR function fails, or if the operation queued by
+\fBaio_fsync()\fR fails, then, as for \fBfsync\fR(3C) and \fBfdatasync\fR(3C),
+outstanding I/O operations are not guaranteed to have been completed.
+.sp
+.LP
+If \fBaio_fsync()\fR succeeds, then it is only the I/O that was queued at the
+time of the call to \fBaio_fsync()\fR that is guaranteed to be forced to the
+relevant completion state. The completion of subsequent I/O on the file
+descriptor is not guaranteed to be completed in a synchronized fashion.
+.sp
+.LP
+The \fIaiocbp\fR argument refers to an asynchronous I/O control block. The
+\fIaiocbp\fR value may be used as an argument to \fBaio_error\fR(3C) and
+\fBaio_return\fR(3C) in order to determine the error status and return status,
+respectively, of the asynchronous operation while it is proceeding. When the
+request is queued, the error status for the operation is \fBEINPROGRESS.\fR
+When all data has been successfully transferred, the error status will be reset
+to reflect the success or failure of the operation. If the operation does not
+complete successfully, the error status for the operation will be set to
+indicate the error. The \fIaio_sigevent\fR member determines the asynchronous
+notification to occur when all operations have achieved synchronized I/O
+completion (see \fBsignal.h\fR(3HEAD)). All other members of the structure
+referenced by \fIaiocbp\fR are ignored. If the control block referenced by
+\fIaiocbp\fR becomes an illegal address prior to asynchronous I/O completion,
+then the behavior is undefined.
+.sp
+.LP
+If the \fBaio_fsync()\fR function fails or the \fIaiocbp\fR indicates an error
+condition, data is not guaranteed to have been successfully transferred.
+.sp
+.LP
+If \fIaiocbp\fR is \fINULL\fR, then no status is returned in \fIaiocbp\fR, and
+no signal is generated upon completion of the operation.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBaio_fsync()\fR function returns \fB0\fR to the calling process if the
+I/O operation is successfully queued; otherwise, the function returns
+\fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBaio_fsync()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested asynchronous operation was not queued due to temporary resource
+limitations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBaio_fildes\fR member of the \fBaiocb\fR structure referenced by the
+\fIaiocbp\fR argument is not a valid file descriptor open for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The system does not support synchronized I/O for this file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+A value of \fIop\fR other than \fBO_DSYNC\fR or \fBO_SYNC\fR was specified.
+.RE
+
+.sp
+.LP
+In the event that any of the queued I/O operations fail, \fBaio_fsync()\fR
+returns the error condition defined for \fBread\fR(2) and \fBwrite\fR(2). The
+error will be returned in the error status for the asynchronous \fBfsync\fR(3C)
+operation, which can be retrieved using \fBaio_error\fR(3C).
+.SH USAGE
+.sp
+.LP
+The \fBaio_fsync()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfcntl\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
+\fBaio_error\fR(3C), \fBaio_return\fR(3C), \fBaio.h\fR(3HEAD),
+\fBfcntl.h\fR(3HEAD), \fBfdatasync\fR(3C), \fBfsync\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

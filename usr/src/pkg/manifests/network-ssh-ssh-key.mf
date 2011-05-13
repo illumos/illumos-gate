@@ -33,9 +33,14 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/ssh
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
 file path=usr/bin/ssh-keygen mode=0555
 file path=usr/bin/ssh-keyscan mode=0555
 file path=usr/lib/ssh/ssh-keysign mode=4555
+file path=usr/share/man/man1/ssh-keygen.1
+file path=usr/share/man/man1/ssh-keyscan.1
+file path=usr/share/man/man1m/ssh-keysign.1m
 legacy pkg=SUNWsshcu desc="Secure Shell protocol common Utilities" \
     name="SSH Common, (Usr)"
 license usr/src/cmd/ssh/THIRDPARTYLICENSE \

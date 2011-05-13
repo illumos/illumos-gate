@@ -1,0 +1,796 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sar 1 "24 Jul 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+sar \- system activity reporter
+.SH SYNOPSIS
+.LP
+.nf
+\fBsar\fR [\fB-aAbcdgkmpqruvwy\fR] [\fB-o\fR \fIfilename\fR] \fIt\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fBsar\fR [\fB-aAbcdgkmpqruvwy\fR] [\fB-e\fR \fItime\fR] [\fB-f\fR \fIfilename\fR] [\fB-i\fR \fIsec\fR] 
+     [\fB-s\fR \fItime\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+In the first instance, the \fBsar\fR utility samples cumulative activity
+counters in the operating system at \fIn\fR intervals of \fIt\fR seconds, where
+\fIt\fR should be \fB5\fR or greater. If \fIt\fR is specified with more than
+one option, all headers are printed together and the output can be difficult to
+read. (If the sampling interval is less than \fB5\fR, the activity of \fBsar\fR
+itself can affect the sample.) If the \fB-o\fR option is specified, it saves
+the samples in \fIfilename\fR in binary format. The default value of \fIn\fR is
+\fB1\fR.
+.sp
+.LP
+In the second instance, no sampling interval is specified. \fBsar\fR extracts
+data from a previously recorded \fIfilename\fR, either the one specified by the
+\fB-f\fR option or, by default, the standard system activity daily data file
+\fB/var/adm/sa/sa\fIdd\fR\fR for the current day \fIdd\fR. The starting and
+ending times of the report can be bounded using the \fB-e\fR and \fB-s\fR
+arguments with \fItime\fR specified in the form \fIhh\fR[:\fImm\fR[:\fIss\fR]].
+The \fB-i\fR option selects records at \fIsec\fR second intervals. Otherwise,
+all intervals found in the data file are reported.
+.SH OPTIONS
+.sp
+.LP
+The following options modify the subsets of information reported by \fBsar\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports use of file access system routines: iget/s, namei/s, dirblk/s
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports all data. Equivalent to \fB-abcdgkmpqruvwy\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports buffer activity:
+.sp
+.ne 2
+.mk
+.na
+\fBbread/s, bwrit/s\fR
+.ad
+.RS 20n
+.rt  
+transfers per second of data between system buffers and disk or other block
+devices.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlread/s, lwrit/s\fR
+.ad
+.RS 20n
+.rt  
+accesses of system buffers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB%rcache, %wcache\fR
+.ad
+.RS 20n
+.rt  
+cache hit ratios, that is, (1\(mibread/lread) as a percentage.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpread/s, pwrit/s\fR
+.ad
+.RS 20n
+.rt  
+transfers using raw (physical) device mechanism.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports system calls:
+.sp
+.ne 2
+.mk
+.na
+\fBscall/s\fR
+.ad
+.sp .6
+.RS 4n
+system calls of all types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsread/s, swrit/s, fork/s, exec/s\fR
+.ad
+.sp .6
+.RS 4n
+specific system calls.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBrchar/s, wchar/s\fR
+.ad
+.sp .6
+.RS 4n
+characters transferred by read and write system calls. No incoming or outgoing
+\fBexec\fR(2) and \fBfork\fR(2) calls are reported.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports activity for each block device (for example, disk or tape drive) with
+the exception of \fBXDC\fR disks and tape drives. When data is displayed, the
+device specification \fIdsk-\fR is generally used to represent a disk drive.
+The device specification used to represent a tape drive is machine dependent.
+The activity data reported is:
+.sp
+.ne 2
+.mk
+.na
+\fB%busy, avque\fR
+.ad
+.RS 27n
+.rt  
+portion of time device was busy servicing a transfer request, average number of
+requests outstanding during that time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBread/s, write/s, blks/s\fR
+.ad
+.RS 27n
+.rt  
+number of read/write transfers from or to device, number of bytes transferred
+in 512-byte units.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBavwait\fR
+.ad
+.RS 27n
+.rt  
+average wait time in milliseconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBavserv\fR
+.ad
+.RS 27n
+.rt  
+average service time in milliseconds.
+.RE
+
+For more general system statistics, use \fBiostat\fR(1M), \fBsar\fR(1M), or
+\fBvmstat\fR(1M).
+.sp
+See \fISystem Administration Guide: Advanced Administration\fR for naming
+conventions for disks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fItime\fR\fR
+.ad
+.RS 15n
+.rt  
+Selects data up to \fBtime\fR. Default is \fB18:00\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+Uses \fIfilename\fR as the data source for \fBsar\fR. Default is the current
+daily data file \fB/var/adm/sa/sa\fR\fIdd.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports paging activities:
+.sp
+.ne 2
+.mk
+.na
+\fBpgout/s\fR
+.ad
+.RS 12n
+.rt  
+page-out requests per second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBppgout/s\fR
+.ad
+.RS 12n
+.rt  
+pages paged-out per second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpgfree/s\fR
+.ad
+.RS 12n
+.rt  
+pages per second placed on the free list by the page stealing daemon.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpgscan/s\fR
+.ad
+.RS 12n
+.rt  
+pages per second scanned by the page stealing daemon.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB%ufs_ipf\fR
+.ad
+.RS 12n
+.rt  
+the percentage of \fBUFS\fR inodes taken off the freelist by iget which had
+reusable pages associated with them. These pages are flushed and cannot be
+reclaimed by processes. Thus, this is the percentage of igets with page
+flushes.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIsec\fR\fR
+.ad
+.RS 15n
+.rt  
+Selects data at intervals as close as possible to \fIsec\fR seconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports kernel memory allocation (KMA) activities:
+.sp
+.ne 2
+.mk
+.na
+\fBsml_mem, alloc, fail\fR
+.ad
+.RS 24n
+.rt  
+information about the memory pool reserving and allocating space for small
+requests: the amount of memory in bytes \fBKMA\fR has for the small pool, the
+number of bytes allocated to satisfy requests for small amounts of memory, and
+the number of requests for small amounts of memory that were not satisfied
+(failed).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBlg_mem, alloc, fail\fR
+.ad
+.RS 24n
+.rt  
+information for the large memory pool (analogous to the information for the
+small memory pool).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBovsz_alloc, fail\fR
+.ad
+.RS 24n
+.rt  
+the amount of memory allocated for oversize requests and the number of oversize
+requests which could not be satisfied (because oversized memory is allocated
+dynamically, there is not a pool).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports message and semaphore activities:
+.sp
+.ne 2
+.mk
+.na
+\fBmsg/s, sema/s\fR
+.ad
+.RS 17n
+.rt  
+primitives per second.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIfilename\fR\fR
+.ad
+.RS 15n
+.rt  
+Saves samples in file, \fIfilename\fR, in binary format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports paging activities:
+.sp
+.ne 2
+.mk
+.na
+\fBatch/s\fR
+.ad
+.RS 11n
+.rt  
+page faults per second that are satisfied by reclaiming a page currently in
+memory (attaches per second).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpgin/s\fR
+.ad
+.RS 11n
+.rt  
+page-in requests per second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBppgin/s\fR
+.ad
+.RS 11n
+.rt  
+pages paged-in per second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpflt/s\fR
+.ad
+.RS 11n
+.rt  
+page faults from protection errors per second (illegal access to page) or
+"copy-on-writes".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvflt/s\fR
+.ad
+.RS 11n
+.rt  
+address translation page faults per second (valid page not in memory).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBslock/s\fR
+.ad
+.RS 11n
+.rt  
+faults per second caused by software lock requests requiring physical
+\fBI/O\fR.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports average queue length while occupied, and percent of time occupied:
+.sp
+.ne 2
+.mk
+.na
+\fBrunq-sz, %runocc\fR
+.ad
+.RS 20n
+.rt  
+Run queue of kernel threads in memory and runnable
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBswpq-sz, %swpocc\fR
+.ad
+.RS 20n
+.rt  
+Swap queue of processes
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports unused memory pages and disk blocks:
+.sp
+.ne 2
+.mk
+.na
+\fBfreemem\fR
+.ad
+.RS 12n
+.rt  
+average pages available to user processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBfreeswap\fR
+.ad
+.RS 12n
+.rt  
+disk blocks available for page swapping.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fItime\fR\fR
+.ad
+.RS 15n
+.rt  
+Selects data later than \fBtime\fR in the form \fIhh\fR[:\fImm\fR]. Default is
+\fB08:00\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports \fBCPU\fR utilization (the default):
+.sp
+.ne 2
+.mk
+.na
+\fB%usr, %sys, %wio, %idle\fR
+.ad
+.RS 27n
+.rt  
+portion of time running in user mode, running in system mode, idle with some
+process waiting for block \fBI/O\fR, and otherwise idle.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports status of process, i-node, file tables:
+.sp
+.ne 2
+.mk
+.na
+\fBproc-sz, inod-sz, file-sz, lock-sz\fR
+.ad
+.sp .6
+.RS 4n
+entries/size for each table, evaluated once at sampling point.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBov\fR
+.ad
+.sp .6
+.RS 4n
+overflows that occur between sampling points for each table.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports system swapping and switching activity:
+.sp
+.ne 2
+.mk
+.na
+\fBswpin/s, swpot/s, bswin/s, bswot/s\fR
+.ad
+.sp .6
+.RS 4n
+number of transfers and number of 512-byte units transferred for swapins and
+swapouts (including initial loading of some programs).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBpswch/s\fR
+.ad
+.sp .6
+.RS 4n
+process switches.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-y\fR\fR
+.ad
+.RS 15n
+.rt  
+Reports TTY device activity:
+.sp
+.ne 2
+.mk
+.na
+\fBrawch/s, canch/s, outch/s\fR
+.ad
+.RS 29n
+.rt  
+input character rate, input character rate processed by canon, output character
+rate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBrcvin/s, xmtin/s, mdmin/s\fR
+.ad
+.RS 29n
+.rt  
+receive, transmit and modem interrupt rates.
+.RE
+
+If run in a non-global zone and the pools facility is active, these values
+reflect activity on the processors of the processor set of the pool to which
+the zone is bound.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRViewing System Activity
+.sp
+.LP
+The following example displays today's \fBCPU\fR activity so far:
+
+.sp
+.in +2
+.nf
+example% sar
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRWatching System Activity Evolve
+.sp
+.LP
+To watch \fBCPU\fR activity evolve for 10 minutes and save data:
+
+.sp
+.in +2
+.nf
+example% sar -o temp 60 10
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRReviewing Disk and Tape Activity
+.sp
+.LP
+To later review disk and tape activity from that period:
+
+.sp
+.in +2
+.nf
+example% sar -d -f temp
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/sa/sa\fIdd\fR\fR\fR
+.ad
+.RS 20n
+.rt  
+daily data file, where \fIdd\fR are digits representing the day of the month
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsag\fR(1), \fBiostat\fR(1M), \fBsar\fR(1M), \fBvmstat\fR(1M), \fBexec\fR(2),
+\fBfork\fR(2), \fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Advanced Administration\fR
+.SH NOTES
+.sp
+.LP
+The sum of CPU utilization might vary slightly from 100 because of rounding
+errors in the production of a percentage figure.

@@ -1,0 +1,150 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_oid_to_str 3GSS "15 Aug 2007" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_oid_to_str \- convert an OID to a string
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+#include <gssapi/gssapi.h>
+
+\fB\fR\fBgss_oid_to_str\fR(\fBOM_uint32 *\fR\fIminor_status\fR, \fBconst gss_OID\fR \fIoid\fR,
+     \fBgss_buffer_t\fR\fIoid_str\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.RS 16n
+.rt  
+Status code returned by underlying mechanism.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoid\fR\fR
+.ad
+.RS 16n
+.rt  
+\fBGSS-API\fR \fBOID\fR structure to convert.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoid_str\fR\fR
+.ad
+.RS 16n
+.rt  
+String to receive converted \fBOID\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_oid_to_str()\fR function converts a \fBGSS-API\fR \fBOID\fR
+structure to a string. You can use the function to convert the name of a
+mechanism from an \fBOID\fR to a simple string. This function is a convenience
+function, as is its complementary function, \fBgss_str_to_oid\fR(3GSS).
+.sp
+.LP
+If an \fBOID\fR must be created, use \fBgss_create_empty_oid_set\fR(3GSS) and
+\fBgss_add_oid_set_member\fR(3GSS) to create it.  \fBOID\fRs created in this
+way must be released with \fBgss_release_oid_set\fR(3GSS). However, it is
+strongly suggested that applications use the default \fBGSS-API\fR mechanism
+instead of creating an \fBOID\fR for a specific mechanism.
+.SH ERRORS
+.sp
+.LP
+The \fBgss_oid_to_str()\fR function returns one of the following status codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_CALL_INACCESSIBLE_READ\fR\fR
+.ad
+.sp .6
+.RS 4n
+A required input parameter could not be read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_CALL_INACCESSIBLE_WRITE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A required output parameter could not be written.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined.  The mechanism-specific status code reported by means
+of the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_add_oid_set_member\fR(3GSS), \fBgss_create_empty_oid_set\fR(3GSS),
+\fBgss_release_oid_set\fR(3GSS), \fBgss_str_to_oid\fR(3GSS),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR
+.SH WARNINGS
+.sp
+.LP
+This function is included for compatibility only with programs using earlier
+versions of the \fBGSS-API\fR and should not be used for new programs. Other
+implementations of the \fBGSS-API\fR might not support this function, so
+portable programs should not rely on it. Sun might not continue to support this
+function.

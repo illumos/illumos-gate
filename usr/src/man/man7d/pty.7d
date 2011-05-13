@@ -1,0 +1,270 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pty 7D "8 Aug 1994" "SunOS 5.11" "Devices"
+.SH NAME
+pty \- pseudo-terminal driver
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpty\fR driver provides support for a pair of devices collectively known
+as a \fIpseudo-terminal\fR. The two devices comprising a pseudo-terminal are
+known as a \fIcontroller\fR and a \fIslave\fR. The slave device distinguishes
+between the \fBB0\fR baud rate and other baud rates specified in the
+\fBc_cflag\fR word of the \fBtermios\fR structure, and the \fBCLOCAL\fR flag in
+that word. It does not support any of the other \fBtermio\fR(7I) device control
+functions specified by flags in the \fBc_cflag\fR word of the \fBtermios\fR
+structure and by the \fB\fR\fBIGNBRK\fR\fB, \fR \fB\fR\fBIGNPAR\fR\fB, \fR
+\fB\fR\fBPARMRK\fR\fB, \fR or \fBINPCK\fR flags in the \fBc_iflag\fR word of
+the \fBtermios\fR structure, as these functions apply only to asynchronous
+serial ports.  All other \fBtermio\fR(7I) functions must be performed by
+\fBSTREAMS\fR modules pushed atop the driver; when a slave device is opened,
+the \fBldterm\fR(7M) and \fBttcompat\fR(7M) \fBSTREAMS\fR modules are
+automatically pushed on top of the stream, providing the standard
+\fBtermio\fR(7I) interface.
+.sp
+.LP
+Instead of having a hardware interface and associated hardware that supports
+the terminal functions, the functions are implemented by another process
+manipulating the controller device of the pseudo-terminal.
+.sp
+.LP
+The controller and the slave devices of the pseudo-terminal are tightly
+connected. Any data written on the controller device is given to the slave
+device as input, as though it had been received from a hardware interface. Any
+data written on the slave terminal can be read from the controller device
+(rather than being transmitted from a \fBUAR\fR).
+.sp
+.LP
+By default, 48 pseudo-terminal pairs are configured as follows:
+.sp
+.in +2
+.nf
+/dev/pty[p-r][0-9a-f] controller devices
+/dev/tty[p-r][0-9a-f] slave devices
+.fi
+.in -2
+
+.SH IOCTLS
+.sp
+.LP
+The standard set of \fBtermio ioctl\fRs are supported by the slave device.
+None of the bits in the \fBc_cflag\fR word have any effect on the
+pseudo-terminal, except that if the baud rate is set to \fBB0\fR, it will
+appear to the process on the controller device as if the last process on the
+slave device had closed the line; thus, setting the baud rate to \fBB0\fR has
+the effect of ``hanging up'' the pseudo-terminal, just as it has the effect of
+``hanging up'' a real terminal.
+.sp
+.LP
+There is no notion of ``parity'' on a pseudo-terminal, so none of the flags in
+the \fBc_iflag\fR word that control the processing of parity errors have any
+effect. Similarly, there is no notion of a ``break'', so none of the flags that
+control the processing of breaks, and none of the \fBioctl\fRs that generate
+breaks, have any effect.
+.sp
+.LP
+Input flow control is automatically performed; a process that attempts to write
+to the controller device will be blocked if too much unconsumed data is
+buffered on the slave device.  The input flow control provided by the
+\fBIXOFF\fR flag in the \fBc_iflag\fR word is not supported.
+.sp
+.LP
+The delays specified in the \fBc_oflag\fR word are not supported.
+.sp
+.LP
+As there are no modems involved in a pseudo-terminal, the \fBioctl\fRs that
+return or alter the state of modem control lines are silently ignored.
+.sp
+.LP
+A few special \fBioctl\fRs are provided on the controller devices of
+pseudo-terminals to provide the functionality needed by applications programs
+to emulate real hardware interfaces:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCSTOP\fR\fR
+.ad
+.RS 14n
+.rt  
+The argument is ignored. Output to the pseudo-terminal is suspended, as if a
+\fBSTOP\fR character had been typed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCSTART\fR\fR
+.ad
+.RS 14n
+.rt  
+The argument is ignored. Output to the pseudo-terminal is restarted, as if a
+\fBSTART\fR character had been typed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT\fR\fR
+.ad
+.RS 14n
+.rt  
+The argument is a pointer to an \fBint\fR. If the value of the \fBint\fR is
+non-zero, \fIpacket\fR mode is enabled; if the value of the \fBint\fR is zero,
+packet mode is disabled. When a pseudo-terminal is in packet mode, each
+subsequent \fBread\fR(2) from the controller device will return data written on
+the slave device preceded by a zero byte (symbolically defined as
+\fB\fR\fBTIOCPKT_DATA\fR\fB), \fR or a single byte reflecting control status
+information.  In the latter case, the byte is an inclusive-or of zero or more
+of the bits:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT_FLUSHREAD\fR\fR
+.ad
+.RS 22n
+.rt  
+whenever the read queue for the terminal is flushed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT_FLUSHWRITE\fR\fR
+.ad
+.RS 22n
+.rt  
+whenever the write queue for the terminal is flushed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT_STOP\fR\fR
+.ad
+.RS 22n
+.rt  
+whenever output to the terminal is stopped using ^S.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT_START\fR\fR
+.ad
+.RS 22n
+.rt  
+whenever output to the terminal is restarted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT_DOSTOP\fR\fR
+.ad
+.RS 22n
+.rt  
+whenever \fBXON/XOFF\fR flow control is enabled after being disabled; it is
+considered ``enabled'' when the \fBIXON\fR flag in the \fBc_iflag\fR word is
+set, the \fBVSTOP\fR member of the \fBc_cc\fR array is ^S and the \fBVSTART\fR
+member of the \fBc_cc\fR array is ^Q.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCPKT_NOSTOP\fR\fR
+.ad
+.RS 22n
+.rt  
+whenever \fBXON/XOFF\fR flow control is disabled after being enabled.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIOCREMOTE\fR\fR
+.ad
+.RS 14n
+.rt  
+The argument is a pointer to an \fBint\fR. If the value of the \fBint\fR is
+non-zero, \fIremote\fR mode is enabled; if the value of the \fBint\fR is zero,
+remote mode is disabled. This mode can be enabled or disabled independently of
+packet mode. When a pseudo-terminal is in remote mode, input to the slave
+device of the pseudo-terminal is flow controlled and not input edited
+(regardless of the mode the slave side of the pseudo-terminal). Each write to
+the controller device produces a record boundary for the process reading the
+slave device.  In normal usage, a write of data is like the data typed as a
+line on the terminal; a write of 0 bytes is like typing an \fBEOF\fR character.
+Note: this means that a process writing to a pseudo-terminal controller in
+\fIremote\fR mode must keep track of line boundaries, and write only one line
+at a time to the controller.  If, for example, it were to buffer up several
+\fBNEWLINE\fR characters and write them to the controller with one
+\fBwrite()\fR, it would appear to a process reading from the slave as if a
+single line containing several \fBNEWLINE\fR characters had been typed (as if,
+for example, a user had typed the \fBLNEXT\fR character before typing all but
+the last of those \fBNEWLINE\fR characters). Remote mode can be used when doing
+remote line editing in a window manager, or whenever flow controlled input is
+required.
+.RE
+
+.SH EXAMPLES
+.sp
+.in +2
+.nf
+#include <fcntl.h>
+#include <sys/termios.h>
+
+int fdm fds;  
+fdm = open("/dev/ptyp0, O_RDWR);  /* open master */ 
+fds = open("/dev/ttyp0, O_RDWR);  /* open slave */
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/pty[p-z][0-9a-f]\fR\fR
+.ad
+.RS 25n
+.rt  
+pseudo-terminal controller devices
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/tty[p-z][0-9a-f]\fR\fR
+.ad
+.RS 25n
+.rt  
+pseudo-terminal slave devices
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrlogin\fR(1), \fBrlogind\fR(1M), \fBldterm\fR(7M), \fBtermio\fR(7I),
+\fBttcompat\fR(7M),
+.SH NOTES
+.sp
+.LP
+It is apparently not possible to send an \fBEOT\fR by writing zero bytes in
+\fBTIOCREMOTE\fR mode.

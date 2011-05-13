@@ -1,0 +1,83 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_device 9S "19 Feb 1993" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+scsi_device \- SCSI device structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_device\fR structure stores common information about each SCSI
+logical unit, including pointers to areas that contain both generic and device
+specific information. There is one \fBscsi_device\fR structure for each logical
+unit attached to the system. The host adapter driver initializes part of this
+structure prior to \fBprobe\fR(9E) and destroys this structure after a probe
+failure or successful \fBdetach\fR(9E).
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+struct scsi_address        sd_address; /* Routing info. */
+dev_info_t                 *sd_dev;    /* Cross-ref. to */
+                                       /* dev_info_t */
+kmutex_t                   sd_mutex;   /* Mutex for this dev. */
+struct scsi_inquiry        *sd_inq;    /* scsi_inquiry data struc. */
+struct scsi_extended_sense *sd_sense;  /* Optional request */
+                                       /* sense buffer ptr */
+caddr_t                    sd_private; /* Target drivers 
+                                          private data */
+.fi
+.in -2
+
+.sp
+.LP
+\fBsd_address\fR contains the routing information that the target driver
+normally copies into a \fBscsi_pkt\fR(9S) structure using the collection of
+\fBmakecom\fR(9F) functions. The \fBSCSA\fR library routines use this
+information to determine which host adapter, \fBSCSI\fR bus, and target/logical
+unit number (lun) a command is intended for. This structure is initialized by
+the host adapter driver.
+.sp
+.LP
+\fBsd_dev\fR is a pointer to the corresponding \fBdev_info\fR structure. This
+pointer is initialized by the host adapter driver.
+.sp
+.LP
+\fBsd_mutex\fR is a mutual exclusion lock for this device. It is used to
+serialize access to a device. The host adapter driver initializes this mutex.
+See \fBmutex\fR(9F).
+.sp
+.LP
+\fBsd_inq\fR is initially \fINULL\fR (zero). After executing
+\fBscsi_probe\fR(9F), this field contains the inquiry data associated with the
+particular device.
+.sp
+.LP
+\fBsd_sense\fR is initially \fINULL\fR (zero). If the target driver wants to
+use this field for storing \fBREQUEST SENSE\fR data, it should allocate an
+\fBscsi_extended_sense\fR(9S) buffer and set this field to the address of this
+buffer.
+.sp
+.LP
+\fBsd_private\fR is reserved for the use of target drivers and should generally
+be used to point to target specific data structures.
+.SH SEE ALSO
+.sp
+.LP
+\fBdetach\fR(9E), \fBprobe\fR(9E), \fBmakecom\fR(9F), \fBmutex\fR(9F),
+\fBscsi_probe\fR(9F), \fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

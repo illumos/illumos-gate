@@ -1,0 +1,97 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Portions Copyright (c) 1995 IEEE.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_cleanup_pop 3C "4 Oct 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_cleanup_pop \- pop a thread cancellation cleanup handler
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBvoid\fR \fBpthread_cleanup_pop\fR(\fBint\fR \fIexecute\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_cleanup_pop()\fR function removes the cleanup handler routine at
+the top of the cancellation cleanup stack of the calling thread and executes it
+if \fIexecute\fR is non-zero.
+.sp
+.LP
+When the thread calls \fBpthread_cleanup_pop()\fR with a non-zero \fIexecute\fR
+argument, the argument at the top of the stack is popped and executed. An
+argument of  \fB0\fR pops the handler without executing it.
+.sp
+.LP
+The \fBpthread_cleanup_push\fR(3C) and \fBpthread_cleanup_pop()\fR functions
+can be implemented as macros. The application must ensure that they appear as
+statements, and in pairs within the same lexical scope (that is, the
+\fBpthread_cleanup_push()\fR macro can be thought to expand to a token list
+whose first token is '{' with \fBpthread_cleanup_pop()\fR expanding to a token
+list whose last token is the corresponding '}').
+.sp
+.LP
+The effect of the use of \fBreturn\fR, \fBbreak\fR, \fBcontinue\fR, and
+\fBgoto\fR to prematurely leave a code block described by a pair of
+\fBpthread_cleanup_push()\fR and \fBpthread_cleanup_pop()\fR function calls is
+undefined.
+.sp
+.LP
+Using \fBlongjmp()\fR or \fBsiglongjmp()\fR to jump into or out of a push/pop
+pair can result in either the matching push or the matching pop statement not
+getting executed.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpthread_cleanup_pop()\fR function returns no value.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.sp
+.LP
+The \fBpthread_cleanup_pop()\fR function will not return an error code of
+\fBEINTR\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_cancel\fR(3C), \fBpthread_cleanup_push\fR(3C),
+\fBpthread_exit\fR(3C), \fBpthread_join\fR(3C),
+\fBpthread_setcancelstate\fR(3C), \fBpthread_setcanceltype\fR(3C),
+\fBpthread_testcancel\fR(3C), \fBsetjmp\fR(3C), \fBattributes\fR(5),
+\fBcancellation\fR(5), \fBcondition\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+See \fBcancellation\fR(5) for a discussion of cancellation concepts.

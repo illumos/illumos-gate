@@ -1,0 +1,81 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc. , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_arq_status 9S "30 Sep 1996" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+scsi_arq_status \- SCSI auto request sense structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+When auto request sense has been enabled using  \fBscsi_ifsetcap\fR(9F) and the
+"auto-rqsense" capability, the target driver must allocate a status area in the
+\fBSCSI\fR packet structure for the auto request sense structure (see
+\fBscsi_pkt\fR(9S)).  In the event of a \fBcheck\fR \fIcondition\fR, the
+transport layer automatically executes a request sense command.  This check
+ensures that the request sense information does not get lost. The auto request
+sense structure supplies the \fBSCSI\fR status of the original command, the
+transport information pertaining to the request sense command, and the request
+sense data.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+struct scsi_status       sts_status;          /* SCSI status */
+struct scsi_status       sts_rqpkt_status;    /* SCSI status of   
+                                                 request sense cmd */
+uchar_t                  sts_rqpkt_reason;    /* reason completion */
+uchar_t                  sts_rqpkt_resid;     /* residue */
+uint_t                   sts_rqpkt_state;     /* state of command */
+uint_t                   sts_rqpkt_statistics;/* statistics */
+struct scsi_extended_sense sts_sensedata;      /* actual sense data */
+.fi
+.in -2
+
+.sp
+.LP
+\fBsts_status\fR is the \fBSCSI\fR status of the original command. If the
+status indicates a \fBcheck\fR \fIcondition\fR, the transport layer might have
+performed an auto request sense command.
+.sp
+.LP
+\fBsts_rqpkt_status\fR is the \fBSCSI\fR status of the request sense command.
+\fBsts_rqpkt_reason\fR is the completion reason of the request sense command.
+If the reason is not \fBCMD_CMPLT\fR, then the request sense command did not
+complete normally.
+.sp
+.LP
+\fBsts_rqpkt_resid\fR is the residual count of the data transfer and indicates
+the number of data bytes that have not been transferred. The auto request sense
+command requests \fBSENSE_LENGTH\fR bytes.
+.sp
+.LP
+\fBsts_rqpkt_state\fR has bit positions representing the five most important
+statuses that a  \fBSCSI \fRcommand can go obtain.
+.sp
+.LP
+\fBsts_rqpkt_statistics\fR maintains transport-related statistics of the
+request sense command.
+.sp
+.LP
+\fBsts_sensedata\fR contains the actual sense data if the request sense command
+completed normally.
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F),
+\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

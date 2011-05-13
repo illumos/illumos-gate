@@ -1,0 +1,327 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mq_open 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mq_open \- open a message queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <mqueue.h>
+
+\fBmqd_t\fR \fBmq_open\fR(\fBconst char *\fR\fIname\fR, \fBint\fR \fIoflag\fR,
+     \fB/* unsigned long\fR \fImode\fR, \fBmq_attr\fR \fIattr\fR */  ...);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmq_open()\fR function establishes the connection between a process and a
+message queue with a message queue descriptor. It creates a open message queue
+description that refers to the message queue, and a message queue descriptor
+that refers to that open message queue description. The message queue
+descriptor is used by other functions to refer to that message queue.
+.sp
+.LP
+The \fIname\fR argument points to a string naming a message queue. The
+\fIname\fR argument must conform to the construction rules for a  path-name. If
+\fIname\fR is not the name of an existing message queue and its creation is not
+requested, \fBmq_open()\fR fails and returns an error. The first character of
+\fIname\fR must be a slash  (\fB/\fR) character and the remaining characters of
+\fIname\fR cannot include any slash characters.  For maximum portability,
+\fIname\fR should include no more than 14 characters, but this limit is not
+enforced.
+.sp
+.LP
+The \fIoflag\fR argument requests the desired receive and/or send access to the
+message queue. The requested access permission to receive messages or send
+messages is granted if the calling process would be granted read or write
+access, respectively, to a file with the equivalent permissions.
+.sp
+.LP
+The value of \fIoflag\fR is the bitwise inclusive \fBOR\fR of values from the
+following list. Applications must specify exactly one of the first three values
+(access modes) below in the value of \fIoflag\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_RDONLY\fR \fR
+.ad
+.RS 13n
+.rt  
+Open the message queue for receiving messages. The process can use the returned
+message queue descriptor with \fBmq_receive\fR(3C), but not \fBmq_send\fR(3C).
+A message queue may be open multiple times in the same or different processes
+for receiving messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_WRONLY\fR \fR
+.ad
+.RS 13n
+.rt  
+Open the queue for sending messages. The process can use the returned message
+queue descriptor with \fBmq_send\fR(3C) but not \fBmq_receive\fR(3C). A message
+queue may be open multiple times in the same or different processes for sending
+messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_RDWR\fR \fR
+.ad
+.RS 13n
+.rt  
+Open the queue for both receiving and sending messages. The process can use any
+of the functions allowed for \fBO_RDONLY\fR and \fBO_WRONLY\fR. A message queue
+may be open multiple times in the same or different processes for sending
+messages.
+.RE
+
+.sp
+.LP
+Any combination of the remaining flags may additionally be specified in the
+value of \fIoflag\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_CREAT\fR \fR
+.ad
+.RS 15n
+.rt  
+This option is used to create a message queue, and it requires two additional
+arguments: \fImode\fR, which is of type \fBmode_t\fR, and  \fIattr\fR, which is
+pointer to a \fBmq_attr\fR structure. If the pathname, \fIname\fR, has already
+been used to create a message queue that still exists, then this flag has no
+effect, except as noted under \fBO_EXCL\fR (see below). Otherwise, a message
+queue is created without any messages in it.
+.sp
+The user ID of the message queue is set to the effective user ID of process,
+and the group ID of the message queue is set to the effective group ID of the
+process. The file permission bits are set to the value of \fImode\fR, and
+modified by clearing all bits set in the file mode creation mask of the process
+(see \fBumask\fR(2)).
+.sp
+If \fIattr\fR is non-\fINULL\fR and the calling process has the appropriate
+privilege on \fIname\fR, the message queue \fImq_maxmsg\fR and \fImq_msgsize\fR
+attributes are set to the values of the corresponding members in the
+\fBmq_attr\fR structure referred to by \fIattr\fR. If \fIattr\fR is
+non-\fINULL\fR, but the calling process does not have the appropriate privilege
+on \fIname\fR, the \fBmq_open()\fR function fails and returns an error without
+creating the message queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_EXCL\fR \fR
+.ad
+.RS 15n
+.rt  
+If both \fBO_EXCL\fR and \fBO_CREAT\fR are set, \fBmq_open()\fR will fail if
+the message queue \fIname\fR exists. The check for the existence of the message
+queue and the creation of the message queue if it does not exist are atomic
+with respect to other processes executing \fBmq_open()\fR naming the same
+\fIname\fR with both \fBO_EXCL\fR and \fBO_CREAT\fR set.  If \fBO_EXCL\fR and
+\fBO_CREAT\fR are not set, the result is undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO_NONBLOCK\fR \fR
+.ad
+.RS 15n
+.rt  
+The setting of this flag is associated with the open message queue description
+and determines whether a \fBmq_send\fR(3C) or \fBmq_receive\fR(3C) waits for
+resources or messages that are not currently available, or fails with
+\fBerrno\fR set to \fBEAGAIN\fR. See \fBmq_send\fR(3C) and \fBmq_receive\fR(3C)
+for details.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBmq_open()\fR returns a message queue descriptor;
+otherwise the function returns \fB(mqd_t)\(mi1\fR and sets \fBerrno\fR to
+indicate the error condition.
+.SH ERRORS
+.sp
+.LP
+The  \fBmq_open()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR \fR
+.ad
+.RS 17n
+.rt  
+The message queue exists and the permissions specified by \fIoflag\fR are
+denied, or the message queue does not exist and permission to create the
+message queue is denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEEXIST\fR \fR
+.ad
+.RS 17n
+.rt  
+\fBO_CREAT\fR and \fBO_EXCL\fR are set and the named message queue already
+exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR \fR
+.ad
+.RS 17n
+.rt  
+The \fBmq_open()\fR operation was interrupted by a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 17n
+.rt  
+The \fBmq_open()\fR operation is not supported for the given name, or
+\fBO_CREAT\fR was specified in \fIoflag\fR, the value of \fIattr\fR is not
+\fINULL,\fR and either \fBmq_maxmsg\fR or \fBmq_msgsize\fR was less than or
+equal to zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR \fR
+.ad
+.RS 17n
+.rt  
+The number of open message queue descriptors in this process exceeds
+\fBMQ_OPEN_MAX,\fR of the number of open file descriptors in this process
+exceeds \fBOPEN_MAX.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR \fR
+.ad
+.RS 17n
+.rt  
+The length of the \fIname\fR string exceeds \fBPATH_MAX,\fR or a pathname
+component is longer than \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENFILE\fR \fR
+.ad
+.RS 17n
+.rt  
+Too many message queues are currently open in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR \fR
+.ad
+.RS 17n
+.rt  
+\fBO_CREAT\fR is not set and the named message queue does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR \fR
+.ad
+.RS 17n
+.rt  
+There is insufficient space for the creation of the new message queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR \fR
+.ad
+.RS 17n
+.rt  
+The \fBmq_open()\fR function is not supported by the system.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBexit\fR(2), \fBumask\fR(2), \fBsysconf\fR(3C),
+\fBmqueue.h\fR(3HEAD), \fBmq_close\fR(3C), \fBmq_receive\fR(3C),
+\fBmq_send\fR(3C), \fBmq_setattr\fR(3C), \fBmq_unlink\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Due to the manner in which message queues are implemented, they should not be
+considered secure and should not be used in security-sensitive applications.
+.sp
+.LP
+Solaris 2.6 was the first release to support the Asynchronous Input and Output
+option. Prior to this release, this function always returned \fB\(mi1\fR and
+set \fBerrno\fR to \fBENOSYS\fR.

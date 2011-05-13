@@ -1,0 +1,1064 @@
+'\" te
+.\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.TH tip 1 "28 Nov 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+tip \- connect to remote system
+.SH SYNOPSIS
+.LP
+.nf
+\fBtip\fR [\fB-v\fR] [\fB-speed-entry\fR] {\fIhostname\fR | \fIphone-number\fR | \fIdevice\fR}
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtip\fR utility establishes a full-duplex terminal connection to a remote
+host. Once the connection is established, a remote session using  \fBtip\fR
+behaves like an interactive session on a local terminal.
+.sp
+.LP
+The \fBremote\fR file contains entries describing remote systems and line
+speeds used by \fBtip\fR.
+.sp
+.LP
+Each host has a default baud rate for the connection, or you can specify a
+speed with the \fB-\fR\fIspeed-entry\fR command line argument.
+.sp
+.LP
+When \fIphone-number\fR is specified, \fBtip\fR looks for an entry in the
+\fBremote\fR file of the form:
+.sp
+.in +2
+.nf
+tip -\fIspeed-entry\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When \fBtip\fR finds such an entry, it sets the connection speed accordingly.
+If it finds no such entry, \fBtip\fR interprets \fB-\fR\fIspeed-entry\fR as if
+it were a system name, resulting in an error message.
+.sp
+.LP
+If you omit \fB-\fR\fIspeed-entry\fR, \fBtip\fR uses the \fBtip0\fR entry to
+set a speed for the connection.
+.sp
+.LP
+When \fIdevice\fR is specified, \fBtip\fR attempts to open that device, but
+will do so using the access privileges of the user, rather than \fBtip\fR's
+usual access privileges (\fBsetuid uucp\fR). The user must have read/write
+access to the device. The \fBtip\fR utility interprets any character string
+beginning with the slash character (\|\fB/\fR\|) as a device name.
+.sp
+.LP
+When establishing the connection, \fBtip\fR sends a connection message to the
+remote system. The default value for this message can be found in the
+\fBremote\fR file.
+.sp
+.LP
+When \fBtip\fR attempts to connect to a remote system, it opens the associated
+device with an exclusive-open \fBioctl\fR(2) call. Thus, only one user at a
+time may access a device. This is to prevent multiple processes from sampling
+the terminal line. In addition, \fBtip\fR honors the locking protocol used by
+\fBuucp\fR(1C).
+.sp
+.LP
+When \fBtip\fR starts up, it reads commands from the file \fB\&.tiprc\fR in
+your home directory.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+Display commands from the \fB\&.tiprc\fR file as they are executed.
+.RE
+
+.SH USAGE
+.sp
+.LP
+Typed characters are normally transmitted directly to the remote machine, which
+does the echoing as well.
+.sp
+.LP
+At any time that \fBtip\fR prompts for an argument (for example, during setup
+of a file transfer), the line typed may be edited with the standard erase and
+kill characters. A null line in response to a prompt, or an interrupt, aborts
+the dialogue and returns you to the remote machine.
+.SS "Commands"
+.sp
+.LP
+A tilde (\fB~\fR) appearing as the first character of a line is an escape
+signal which directs \fBtip\fR to perform some special action. \fBtip\fR
+recognizes the following escape sequences:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~^D\fR\fR
+.ad
+.br
+.na
+\fB\fB~.\fR\fR
+.ad
+.RS 18n
+.rt  
+Drop the connection and exit (you may still be logged in on the remote
+machine). \fBNote:\fR If you rlogin and then run \fBtip\fR on the remote host,
+you must type \fB~~.\fR (tilde tilde dot) to end the \fBtip\fR session. If you
+type \fB~.\fR (tilde dot), it terminates the rlogin.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~c\fR [\fIname\fR]\fR
+.ad
+.RS 18n
+.rt  
+Change directory to \fIname\fR. No argument implies change to your home
+directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~!\fR\fR
+.ad
+.RS 18n
+.rt  
+Escape to an interactive shell on the local machine. Exiting the shell returns
+you to \fBtip\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~>\fR\fR
+.ad
+.RS 18n
+.rt  
+Copy file from local to remote.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~<\fR\fR
+.ad
+.RS 18n
+.rt  
+Copy file from remote to local.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~p\fR\fI from\fR [\fI to \fR]\fR
+.ad
+.RS 18n
+.rt  
+Send a file to a remote host running the UNIX system. When you use the put
+command, the remote system runs the command string
+.sp
+.in +2
+.nf
+\fBcat > \fR\fIto\fR
+.fi
+.in -2
+.sp
+
+while \fBtip\fR sends it the \fIfrom\fR file. If the \fIto\fR file is not
+specified, the \fIfrom\fR file name is used. This command is actually a
+UNIX-system-specific version of the `\fB~>\fR' command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~t\fR\fI from\fR [\fI to \fR]\fR
+.ad
+.RS 18n
+.rt  
+Take a file from a remote host running the UNIX system. As in the put command
+the \fIto\fR file defaults to the \fIfrom\fR file name if it is not specified.
+The remote host executes the command string
+.sp
+.in +2
+.nf
+\fBcat \fR\fIfrom\fR\fB\|;  echo ^A\fR
+.fi
+.in -2
+.sp
+
+to send the file to \fBtip\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~|\fR\fR
+.ad
+.RS 18n
+.rt  
+Pipe the output from a remote command to a local process. The command string
+sent to the local system is processed by the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~C\fR\fR
+.ad
+.RS 18n
+.rt  
+Connect a program to the remote machine. The command string sent to the program
+is processed by the shell. The program inherits file descriptors 0 as remote
+line input, 1 as remote line output, and 2 as tty standard error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~$\fR\fR
+.ad
+.RS 18n
+.rt  
+Pipe the output from a local process to the remote host. The command string
+sent to the local system is processed by the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~#\fR\fR
+.ad
+.RS 18n
+.rt  
+Send a \fBBREAK\fR to the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~s\fR\fR
+.ad
+.RS 18n
+.rt  
+Set a variable (see the discussion below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~^Z\fR\fR
+.ad
+.RS 18n
+.rt  
+Stop \fBtip\fR. Only available when run under a shell that supports job
+control, such as the C shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~^Y\fR\fR
+.ad
+.RS 18n
+.rt  
+Stop only the "local side" of \fBtip\fR. Only available when run under a shell
+that supports job control, such as the C shell. The "remote side" of \fBtip\fR,
+that is, the side that displays output from the remote host, is left running.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~?\fR\fR
+.ad
+.RS 18n
+.rt  
+Get a summary of the tilde escapes.
+.RE
+
+.sp
+.LP
+Copying files requires some cooperation on the part of the remote host. When a
+\fB~>\fR or \fB~<\fR escape is used to send a file, \fBtip\fR prompts for a
+file name (to be transmitted or received) and a command to be sent to the
+remote system, in case the file is being transferred from the remote system.
+While \fBtip\fR is transferring a file, the number of lines transferred will be
+continuously displayed on the screen. A file transfer may be aborted with an
+interrupt.
+.SS "Auto-call Units"
+.sp
+.LP
+\fBtip\fR may be used to dial up remote systems using a number of auto-call
+unit's (\fBACU\fRs). When the remote system description contains the \fBdu\fR
+capability, \fBtip\fR uses the call-unit (\fBcu\fR), \fBACU\fR type (\fBat\fR),
+and phone numbers (\fBpn\fR) supplied. Normally, \fBtip\fR displays verbose
+messages as it dials.
+.sp
+.LP
+Depending on the type of auto-dialer being used to establish a connection, the
+remote host may have garbage characters sent to it upon connection. The user
+should never assume that the first characters typed to the foreign host are the
+first ones presented to it. The recommended practice is to immediately type a
+\fBkill\fR character upon establishing a connection (most UNIX systems either
+support \fB@\fR or Control-U as the initial kill character).
+.sp
+.LP
+\fBtip\fR currently supports the Ventel MD-212+ modem and DC Hayes-compatible
+modems.
+.sp
+.LP
+When \fBtip\fR initializes a Hayes-compatible modem for dialing, it sets up the
+modem to auto-answer. Normally, after the conversation is complete, \fBtip\fR
+drops \fBDTR\fR, which causes the modem to "hang up."
+.sp
+.LP
+Most modems can be configured so that when \fBDTR\fR drops, they re-initialize
+themselves to a preprogrammed state. This can be used to reset the modem and
+disable auto-answer, if desired.
+.sp
+.LP
+Additionally, it is possible to start the phone number with a Hayes \fBS\fR
+command so that you can configure the modem before dialing. For example, to
+disable auto-answer, set up all the phone numbers in \fB/etc/remote\fR using
+something like \fBpn=S0=0DT5551212\fR. The  \fBS0=0\fR disables auto-answer.
+.SS "Remote Host Description"
+.sp
+.LP
+Descriptions of remote hosts are normally located in the system-wide file
+\fB/etc/remote\fR. However, a user may maintain personal description files (and
+phone numbers) by defining and exporting the \fBREMOTE\fR shell variable. The
+\fBremote\fR file must be readable by \fBtip\fR, but a secondary file
+describing phone numbers may be maintained readable only by the user. This
+secondary phone number file is \fB/etc/phones\fR, unless the shell variable
+\fBPHONES\fR is defined and exported. The phone number file contains lines of
+the form:
+.sp
+.in +2
+.nf
+\fIsystem-name phone-number\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each phone number found for a system is tried until either a connection is
+established, or an end of file is reached.  Phone numbers are constructed from
+`\fB0123456789\(mi=*\fR', where the `\fB=\fR' and `\fB*\fR' are used to
+indicate a second dial tone should be waited for (\fBACU\fR dependent).
+.SS "tip Internal Variables"
+.sp
+.LP
+\fBtip\fR maintains a set of variables which are used in normal operation. Some
+of these variables are read-only to normal users (root is allowed to change
+anything of interest). Variables may be displayed and set through the \fB~s\fR
+escape.  The syntax for variables is patterned after \fBvi\fR(1) and
+\fBmail\fR(1). Supplying \fBall\fR as an argument to the \fB~s\fR escape
+displays all variables that the user can read.  Alternatively, the user may
+request display of a particular variable by attaching a \fB?\fR to the end. For
+example, `\fB~s escape?\fR' displays the current escape character.
+.sp
+.LP
+Variables are numeric (num), string (str), character (char), or Boolean (bool)
+values. Boolean variables are set merely by  specifying their name. They may be
+reset by prepending a \fB!\fR to the name. Other variable types are set by
+appending an \fB=\fR and the value. The entire assignment must not have any
+blanks in it. A single set command may be used to interrogate as well as set a
+number of variables.
+.sp
+.LP
+Variables may be initialized at run time by placing set commands (without the
+\fB~s\fR prefix) in a \fB\&.tiprc\fR file in one's home directory. The \fB-v\fR
+option makes \fBtip\fR display the sets as they are made. Comments preceded by
+a \fB#\fR sign can appear in the  \fB\&.tiprc\fR file.
+.sp
+.LP
+Finally, the variable names must either be completely specified or an
+abbreviation may be given.  The following list details those variables known to
+\fBtip\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbeautify\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Discard unprintable characters when a session is being scripted;
+abbreviated  \fBbe\fR. If the \fBnb\fR capability is present, \fBbeautify\fR is
+initially set to \fBoff\fR. Otherwise, \fBbeautify\fR is initially set to
+\fBon\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbaudrate\fR\fR
+.ad
+.RS 16n
+.rt  
+(num) The baud rate at which the connection was established; abbreviated
+\fBba\fR. If a baud rate was specified on the command line, \fBbaudrate\fR is
+initially set to the specified value. Or, if the \fBbr\fR capability is
+present, \fBbaudrate\fR is initially set to the value of that capability.
+Otherwise, \fBbaudrate\fR is set to 300 baud. Once \fBtip\fR has been started,
+\fBbaudrate\fR can only changed by the super-user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdialtimeout\fR\fR
+.ad
+.RS 16n
+.rt  
+(num) When dialing a phone number, the time (in seconds) to wait for a
+connection to be established; abbreviated \fBdial\fR. \fBdialtimeout\fR is
+initially set to 60 seconds, and can only changed by the super-user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisconnect\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The string to send to the remote host to disconnect from it; abbreviated
+\fBdi\fR. If the \fBdi\fR capability is present, \fBdisconnect\fR is initially
+set to the value of that capability. Otherwise, \fBdisconnect\fR is set to a
+null string (\fB""\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBechocheck\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Synchronize with the remote host during file transfer by waiting for the
+echo of the last character transmitted; abbreviated \fBec\fR. If the \fBec\fR
+capability is present, \fBechocheck\fR is initially set to \fBon\fR. Otherwise,
+\fBechocheck\fR is initially set to \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeofread\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The set of characters which signify an end-of-transmission during a
+\fB~<\fR file transfer command; abbreviated \fBeofr\fR. If the \fBie\fR
+capability is present, \fBeofread\fR is initially set to the value of that
+capability. Otherwise, \fBeofread\fR is set to a null string (\fB""\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeofwrite\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The string sent to indicate end-of-transmission during a \fB~>\fR file
+transfer command; abbreviated \fBeofw\fR. If the \fBoe\fR capability is
+present, \fBeofread\fR is initially set to the value of that capability.
+Otherwise, \fBeofread\fR is set to a null string (\fB""\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeol\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The set of characters which indicate an end-of-line. \fBtip\fR will
+recognize escape characters only after an end-of-line. If the \fBel\fR
+capability is present, \fBeol\fR is initially set to the value of that
+capability. Otherwise, \fBeol\fR is set to a null string (\fB""\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBescape\fR\fR
+.ad
+.RS 16n
+.rt  
+(char) The command prefix (escape) character; abbreviated \fBes\fR. If the
+\fBes\fR capability is present, \fBescape\fR is initially set to the value of
+that capability. Otherwise, \fBescape\fR is set to `\fB\|~\|\fR\&'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBetimeout\fR\fR
+.ad
+.RS 16n
+.rt  
+(num) The amount of time, in seconds, that \fBtip\fR should wait for the
+echo-check response when \fBechocheck\fR is set; abbreviated \fBet\fR. If the
+\fBet\fR capability is present, \fBetimeout\fR is initially set to the value of
+that capability. Otherwise, \fBetimeout\fR is set to 10 seconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexceptions\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The set of characters which should not be discarded due to the
+beautification switch; abbreviated \fBex\fR. If the \fBex\fR capability is
+present, \fBexceptions\fR is initially set to the value of that capability.
+Otherwise, \fBexceptions\fR is set to `\fB\et\en\ef\eb\fR\&'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBforce\fR\fR
+.ad
+.RS 16n
+.rt  
+(char) The character used to force literal data transmission; abbreviated
+\fBfo\fR. If the \fBfo\fR capability is present, \fBforce\fR is initially set
+to the value of that capability. Otherwise, \fBforce\fR is set to \fB\e377\fR
+(which disables it).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBframesize\fR\fR
+.ad
+.RS 16n
+.rt  
+(num) The amount of data (in bytes) to buffer between file system writes when
+receiving files; abbreviated \fBfr\fR. If the \fBfs\fR capability is present,
+\fBframesize\fR is initially set to the value of that capability. Otherwise,
+\fBframesize\fR is set to \fB1024\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhalfduplex\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Do local echoing because the host is half-duplex; abbreviated \fBhdx\fR.
+If the \fBhd\fR capability is present, \fBhalfduplex\fR is initially set to
+\fBon\fR. Otherwise, \fBhalfduplex\fR is initially set to \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhardwareflow\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Do hardware flow control; abbreviated \fBhf\fR. If the  \fBhf\fR
+capability is present, \fBhardwareflow\fR is initially set to \fBon\fR.
+Otherwise, \fBhardwareflowcontrol\fR is initially set to \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhost\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The name of the host to which you are connected; abbreviated \fBho\fR.
+\fBhost\fR is permanently set to the name given on the command line or in the
+\fBHOST\fR environment variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlocalecho\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) A synonym for \fBhalfduplex\fR; abbreviated \fBle\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlog\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The name of the file to which to log information about outgoing phone
+calls. \fBlog\fR is initially set to \fB/var/adm/aculog\fR, and can only be
+inspected or changed by the super-user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBparity\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The parity to be generated and checked when talking to the remote host;
+abbreviated \fBpar\fR. The possible values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnone\fR>\fR
+.ad
+.br
+.na
+\fB\fBzero\fR\fR
+.ad
+.RS 9n
+.rt  
+Parity is not checked on input, and the parity bit is set to zero on output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBone\fR\fR
+.ad
+.RS 9n
+.rt  
+Parity is not checked on input, and the parity bit is set to one on output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeven\fR\fR
+.ad
+.RS 9n
+.rt  
+Even parity is checked for on input and generated on output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBodd\fR\fR
+.ad
+.RS 9n
+.rt  
+Odd parity is checked for on input and generated on output.
+.RE
+
+If the \fBpa\fR capability is present, \fBparity\fR is initially set to the
+value of that capability; otherwise, \fBparity\fR is set to  \fBnone\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBphones\fR\fR
+.ad
+.RS 16n
+.rt  
+The file in which to find hidden phone numbers. If the environment variable
+\fBPHONES\fR is set, \fBphones\fR is set to the value of \fBPHONES\fR.
+Otherwise, \fBphones\fR is set to \fB/etc/phones\fR. The value of \fBphones\fR
+cannot be changed from within \fBtip\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprompt\fR\fR
+.ad
+.RS 16n
+.rt  
+(char) The character which indicates an end-of-line on the remote host;
+abbreviated \fBpr\fR. This value is used to synchronize during data transfers.
+The count of lines transferred during a file transfer command is based on
+receipt of this character. If the \fBpr\fR capability is present, \fBprompt\fR
+is initially set to the value of that capability. Otherwise, \fBprompt\fR is
+set to \fB\en\fR\&.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBraise\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Upper case mapping mode; abbreviated  \fBra\fR. When this mode is
+enabled, all lower case letters will be mapped to upper case by \fBtip\fR for
+transmission to the remote machine. If the \fBra\fR capability is present,
+\fBraise\fR is initially set to \fBon\fR. Otherwise, \fBraise\fR is initially
+set to \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBraisechar\fR\fR
+.ad
+.RS 16n
+.rt  
+(char) The input character used to toggle upper case mapping mode; abbreviated
+\fBrc\fR. If the \fBrc\fR capability is present, \fBraisechar\fR is initially
+set to the value of that capability. Otherwise, \fBraisechar\fR is set to
+\fB\e377\fR (which disables it).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrawftp\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Send all characters during file transfers; do not filter non-printable
+characters, and do not do translations like \fB\en\fR to \fB\er\fR\&.
+Abbreviated \fBraw\fR. If the \fBrw\fR capability is present, \fBrawftp\fR is
+initially set to \fBon\fR. Otherwise, \fBrawftp\fR is initially set to
+\fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrecord\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The name of the file in which a session script is recorded; abbreviated
+\fBrec\fR. If the \fBre\fR capability is present, \fBrecord\fR is initially set
+to the value of that capability. Otherwise, \fBrecord\fR is set to
+\fBtip.record\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBremote\fR\fR
+.ad
+.RS 16n
+.rt  
+The file in which to find descriptions of remote systems. If the environment
+variable \fBREMOTE\fR is set, \fBremote\fR is set to the value of \fBREMOTE\fR.
+Otherwise, \fBremote\fR is set to \fB/etc/remote\fR. The value of \fBremote\fR
+cannot be changed from within \fBtip\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBscript\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Session scripting mode; abbreviated \fBsc\fR. When \fBscript\fR is
+\fBon\fR, \fBtip\fR will record everything transmitted by the remote machine in
+the script record file specified in \fBrecord\fR. If the \fBbeautify\fR switch
+is on, only printable \fBASCII\fR characters will be included in the script
+file (those characters between 040 and 0177). The variable \fBexceptions\fR is
+used to indicate characters which are an exception to the normal beautification
+rules. If the \fBsc\fR capability is present, \fBscript\fR is initially set to
+\fBon\fR. Otherwise, \fB script\fR is initially set to \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtabexpand\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Expand \fBTAB\fR characters to \fBSPACE\fR characters during file
+transfers; abbreviated \fBtab\fR. When  \fBtabexpand\fR is \fBon\fR, each tab
+is expanded to eight SPACE characters. If the \fBtb\fR capability is present,
+\fBtabexpand\fR is initially set to \fBon\fR. Otherwise, \fBtabexpand\fR is
+initially set to \fBoff\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtandem\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Use \fBXON\fR/\fBXOFF\fR flow control to limit the rate that data is
+sent by the remote host; abbreviated \fBta\fR. If the  \fBnt\fR capability is
+present, \fBtandem\fR is initially set to \fBoff\fR. Otherwise, \fBtandem\fR is
+initially set to \fBon\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverbose\fR\fR
+.ad
+.RS 16n
+.rt  
+(bool) Verbose mode; abbreviated \fBverb\fR; When verbose mode is enabled,
+\fBtip\fR prints messages while dialing, shows the current number of lines
+transferred during a file transfer operations, and more. If the \fBnv\fR
+capability is present, \fBverbose\fR is initially set to \fBoff\fR. Otherwise,
+\fBverbose\fR is initially set to \fBon\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHELL\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The name of the shell to use for the \fB~!\fR command; default value is
+\fB/bin/sh\fR, or taken from the environment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOME\fR\fR
+.ad
+.RS 16n
+.rt  
+(str) The home directory to use for the \fB~c\fR command. Default value is
+taken from the environment.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the tip command
+.sp
+.LP
+An example of the dialog used to transfer files is given below.
+
+.sp
+.in +2
+.nf
+arpa% \fBtip monet\fR
+[connected]
+\&...(assume we are talking to a UNIX system)...
+ucbmonet login: sam
+Password:
+monet% cat  sylvester.c
+~> Filename: sylvester.c
+32 lines transferred in 1 minute 3 seconds
+monet%
+monet% ~< Filename: reply.c
+List command for remote host: cat reply.c
+65 lines transferred in 2 minutes
+monet%
+\&...(or, equivalently)...
+monet% ~p sylvester.c
+\&...(actually echoes as ~[put] sylvester.c)...
+32 lines transferred in 1 minute 3 seconds
+monet%
+monet% ~t reply.c
+\&...(actually echoes as ~[take] reply.c)...
+65 lines transferred in 2 minutes
+monet%
+\&...(to print a file locally)...
+monet% ~|Local command: pr h sylvester.c | lpr
+List command for remote host: cat sylvester.c
+monet% ~^D
+[EOT]
+\&...(back on the local system)... 
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+The following environment variables are read by \fBtip\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBREMOTE\fR\fR
+.ad
+.RS 10n
+.rt  
+The location of the \fBremote\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPHONES\fR\fR
+.ad
+.RS 10n
+.rt  
+The location of the file containing private phone numbers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOST\fR\fR
+.ad
+.RS 10n
+.rt  
+A default host to connect to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOME\fR\fR
+.ad
+.RS 10n
+.rt  
+One's log-in directory (for chdirs).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSHELL\fR\fR
+.ad
+.RS 10n
+.rt  
+The shell to fork on a `\fB~!\fR' escape.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/phones\fR\fR
+.ad
+.RS 29n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/remote\fR\fR
+.ad
+.RS 29n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/locks/LCK.\|.*\fR\fR
+.ad
+.RS 29n
+.rt  
+lock file to avoid conflicts with \fBUUCP\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/aculog\fR\fR
+.ad
+.RS 29n
+.rt  
+file in which outgoing calls are logged
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.tiprc\fR\fR
+.ad
+.RS 29n
+.rt  
+initialization file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcu\fR(1C), \fBmail\fR(1), \fBuucp\fR(1C), \fBvi\fR(1), \fBioctl\fR(2),
+\fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+There are two additional variables, \fBchardelay\fR and \fBlinedelay\fR, that
+are currently not implemented.

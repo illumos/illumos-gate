@@ -1,0 +1,291 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_vu_errmsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_vu_errmsg \- display a SCSI request sense message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBvoid\fR \fBscsi_vu_errmsg\fR(\fBstruct scsi_pkt\fR \fI*pktp\fR, \fBchar\fR \fI*drv_name\fR, \fBint severity,\fR
+     \fBint err_blkno,\fR \fBstruct scsi_key_strings\fR \fI*cmdlist\fR, 
+     \fBstruct scsi_extended_sense\fR \fI*sensep\fR,
+     \fBstruct scsi_asq_key_strings\fR \fI*asc_list\fR,
+     \fBchar **decode_fru struct scsi_device\fR\fI*\fR, char \fI*\fR, int, char);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+The following parameters are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevp\fR\fR
+.ad
+.RS 14n
+.rt  
+Pointer to the \fBscsi_device\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpktp\fR\fR
+.ad
+.RS 14n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdrv_name\fR\fR
+.ad
+.RS 14n
+.rt  
+String used by \fBscsi_log\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIseverity\fR\fR
+.ad
+.RS 14n
+.rt  
+Error severity level, maps to severity strings below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIblkno\fR\fR
+.ad
+.RS 14n
+.rt  
+Requested block number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerr_blkno\fR\fR
+.ad
+.RS 14n
+.rt  
+Error block number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmdlist\fR\fR
+.ad
+.RS 14n
+.rt  
+An array of SCSI command description strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsensep\fR\fR
+.ad
+.RS 14n
+.rt  
+A pointer to a \fBscsi_extended_sense\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIasc_list\fR\fR
+.ad
+.RS 14n
+.rt  
+A pointer to a array of asc and ascq message list.The list must be terminated
+with \fB-1\fR asc value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdecode_fru\fR\fR
+.ad
+.RS 14n
+.rt  
+This is a function pointer that will be called after the entire sense
+information has been decoded. The parameters will be the scsi_device structure
+to identify the device. Second argument will be a pointer to a buffer of length
+specified by third argument. The fourth argument will be the FRU byte.
+\fIdecode_fru\fR might be \fINULL\fR if no special decoding is required.
+\fIdecode_fru\fR is expected to return pointer to a char string if decoding
+possible and \fINULL\fR if no decoding is possible.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is very similar to \fBscsi_errmsg\fR(9F) but allows decoding of
+vendor-unique ASC/ASCQ and FRU information.
+.sp
+.LP
+The \fBscsi_vu_errmsg()\fR function interprets the request sense information in
+the \fIsensep\fR pointer and generates a standard message that is displayed
+using \fBscsi_log\fR(9F). It first searches the list array for a matching
+vendor unique code if supplied. If it does not find one in the list then the
+standard list is searched. The first line of the message is always a
+\fBCE_WARN\fR, with the continuation lines being \fBCE_CONT\fR. \fIsensep\fR
+may be \fINULL\fR, in which case no sense key or vendor information is
+displayed.
+.sp
+.LP
+The driver should make the determination as to when to call this function based
+on the severity of the failure and the severity level that the driver wants to
+report.
+.sp
+.LP
+The \fBscsi_device\fR(9S) structure denoted by \fIdevp\fR supplies the
+identification of the device that requested the display. \fIseverity\fR selects
+which string is used in the Error Level: reporting, according to the table
+below:
+.sp
+.in +2
+.nf
+     Severity Value:      String:  
+     SCSI_ERR_ALL         All
+     SCSI_ERR_UNKNOWN     Unknown
+     SCSI_ERR_INFO        Information
+     SCSI_ERR_RECOVERED   Recovered
+     SCSI_ERR_RETRYABLE   Retryable
+     SCSI_ERR_FATAL       Fatal
+.fi
+.in -2
+
+.sp
+.LP
+\fIblkno\fR is the block number of the original request that generated the
+error. \fIerr_blkno\fR is the block number where the error occurred.
+\fIcmdlist\fR is a mapping table for translating the SCSI command code in pktp
+to the actual command string.
+.sp
+.LP
+The \fIcmdlist\fR is described in the structure below:
+.sp
+.in +2
+.nf
+struct scsi_key_strings {
+    int key;
+    char *message;
+};
+.fi
+.in -2
+
+.sp
+.LP
+For a basic SCSI disk, the following list is appropriate:
+.sp
+.in +2
+.nf
+     static struct scsi_key_strings scsi_cmds[] = {            
+             0x00, "test unit ready",
+             0x01, "rezero/rewind",
+             0x03, "request sense",
+             0x04, "format",
+             0x07, "reassign",
+             0x08, "read",
+             0x0a, "write",
+             0x0b, "seek",
+             0x12, "inquiry",
+             0x15, "mode select",
+             0x16, "reserve",
+             0x17, "release",
+             0x18, "copy",
+             0x1a, "mode sense",
+             0x1b, "start/stop",
+             0x1e, "door lock",
+             0x28, "read(10)",
+             0x2a, "write(10)",
+             0x2f, "verify",
+             0x37, "read defect data",
+             0x3b, "write buffer",
+             -1, NULL
+     };
+.fi
+.in -2
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_vu_errmsg()\fR function may be called from user, interrupt, or
+kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBscsi_vu_errmsg()\fR
+.sp
+.in +2
+.nf
+     struct scsi_asq_key_strings cd_slist[] = {
+             0x81, 0, "Logical Unit is inaccessable",
+             -1, 0, NULL,
+     };
+
+        
+     scsi_vu_errmsg(devp, pkt, "sd",
+                    SCSI_ERR_INFO, bp->b_blkno, err_blkno,
+                    sd_cmds, rqsense, cd_list,
+                    my_decode_fru);
+.fi
+.in -2
+
+.sp
+.LP
+This generates the following console warning:
+
+.sp
+.in +2
+.nf
+WARNING: /sbus@1,f8000000/esp@0,800000/sd@1,0 (sd1):
+          Error for Command: read        Error Level: Informational
+          Requested Block: 23936         Error Block: 23936
+          Vendor: XYZ                Serial Number: 123456
+          Sense Key:  Unit Attention
+          ASC: 0x81 (Logical Unit is inaccessable), ASCQ: 0x0
+          FRU: 0x11 (replace LUN 1, located in slot 1)
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F), \fBscsi_log\fR(9F),
+\fBscsi_errmsg\fR(9F), \fBscsi_asc_key_strings\fR(9S), \fBscsi_device\fR(9S),
+\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

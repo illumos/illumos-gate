@@ -1,0 +1,304 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_handle_decode_fmri 3SCF "4 Jun 2009" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_handle_decode_fmri, scf_scope_to_fmri, scf_service_to_fmri,
+scf_instance_to_fmri, scf_pg_to_fmri, scf_property_to_fmri \- convert between
+objects and FMRIs in the Service Configuration Facility
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <libscf.h>
+
+\fBint\fR \fBscf_handle_decode_fmri\fR(\fBscf_handle_t *\fR\fIhandle\fR, \fBconst char *\fR\fIfmri\fR,
+     \fBscf_scope_t *\fR\fIscope\fR, \fBscf_service_t *\fR\fIservice\fR,
+     \fBscf_instance_t *\fR\fIinstance\fR, \fBscf_propertygroup_t *\fR\fIpg\fR,
+     \fBscf_property_t *\fR\fIproperty\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_scope_to_fmri\fR(\fBconst scf_scope_t *\fR\fIobject\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_service_to_fmri\fR(\fBconst scf_scope_t *\fR\fIobject\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_instance_to_fmri\fR(\fBconst scf_instance_t *\fR\fIinst\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_pg_to_fmri\fR(\fBconst scf_propertygroup_t *\fR\fIpg\fR, \fBchar *\fR\fIout\fR,
+     \fBsize_t\fR \fIsz\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_property_to_fmri\fR(\fBconst scf_scope_t *\fR\fIobject\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscf_handle_decode_fmri()\fR function decodes an FMRI string into a set
+of repository entries. Any number of the entity handles can be \fINULL\fR. The
+validation and decoding of the FMRI are determined by the \fIflags\fR argument
+and by those arguments that are \fINULL\fR.
+.sp
+.LP
+If \fIflags\fR == 0, any FMRI is accepted as long as it is well-formed and
+exists in the repository.
+.sp
+.LP
+If \fBSCF_DECODE_FMRI_EXACT\fR is set in \fIflags\fR, the last part of the FMRI
+must match the last non-null entity handle. For example, if property is
+\fINULL\fR and \fIpg\fR is non-null, the FMRI must be a property group FMRI.
+.sp
+.LP
+If \fBSCF_DECODE_FMRI_TRUNCATE\fR is set in \fIflags\fR, there is no check for
+the existence of any objects specified in the FMRI that follow the last
+non-null entity handle. For example, if property is \fINULL\fR, \fIpg\fR is
+non-null, and a property FMRI is passed in, \fBscf_handle_decode_fmri()\fR
+succeeds as long as the property group exists, even if the referenced property
+does not exist.
+.sp
+.LP
+If \fBSCF_DECODE_FMRI_REQUIRE_INSTANCE\fR (or
+\fBSCF_FMRI_REQUIRE_NO_INSTANCE\fR) is set in \fIflags\fR, then the FMRI must
+(or must not) specify an instance.
+.sp
+.LP
+If an error occurs, all of the entity handles that were passed to the function
+are reset.
+.sp
+.LP
+The \fBscf_scope_to_fmri()\fR, \fBscf_service_to_fmri()\fR,
+\fBscf_instance_to_fmri()\fR, \fBscf_pg_to_fmri()\fR, and
+\fBscf_property_to_fmri()\fR functions convert an entity handle to an FMRI.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_handle_decode_fmri()\fR returns 0.
+Otherwise, it returns -1.
+.sp
+.LP
+Upon successful completion, \fBscf_scope_to_fmri()\fR,
+\fBscf_service_to_fmri()\fR, \fBscf_instance_to_fmri()\fR,
+\fBscf_pg_to_fmri()\fR, and \fBscf_property_to_fmri()\fR return the length of
+the FMRI. The buffer will be null-terminated if \fIsz\fR > 0, similar to
+strlcpy(3C). Otherwise, they return -1 and the contents of buffer are
+undefined.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_handle_decode_fmri()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(1M))
+chose for the operation denied access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the repository was lost.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONSTRAINT_VIOLATED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The FMRI does not meet the restrictions requested in the flag argument.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_DELETED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The object argument refers to an object that has been deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
+.ad
+.sp .6
+.RS 4n
+One or more of the entity handles was not derived from handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INTERNAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+An internal error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIfmri\fR argument is not a valid FMRI.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
+.ad
+.sp .6
+.RS 4n
+The server does not have adequate resources to complete the request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle is not currently bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_FOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The FMRI is well-formed but there is no object in the repository matching it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.sp .6
+.RS 4n
+Cannot use unset value.
+.RE
+
+.sp
+.LP
+The \fBscf_scope_to_fmri()\fR, \fBscf_service_to_fmri()\fR,
+\fBscf_instance_to_fmri()\fR, \fBscf_pg_to_fmri()\fR, and
+\fBscf_property_to_fmri()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIobject\fR argument is not currently set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_DELETED\fR\fR
+.ad
+.sp .6
+.RS 4n
+The object argument refers to an object that has been deleted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle is not currently bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the repository was lost.
+.RE
+
+.sp
+.LP
+The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBattributes\fR(5)

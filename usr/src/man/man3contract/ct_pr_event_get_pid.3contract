@@ -1,0 +1,272 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ct_pr_event_get_pid 3CONTRACT "19 Jul 2004" "SunOS 5.11" "Contract Management Library Functions"
+.SH NAME
+ct_pr_event_get_pid, ct_pr_event_get_ppid, ct_pr_event_get_signal,
+ct_pr_event_get_sender, ct_pr_event_get_senderct, ct_pr_event_get_exitstatus,
+ct_pr_event_get_pcorefile, ct_pr_event_get_gcorefile, ct_pr_event_get_zcorefile
+\- process contract event functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -lcontract \fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <libcontract.h>
+#include <sys/contract/process.h>
+
+\fBint\fR \fBct_pr_event_get_pid\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBpid_t *\fR\fIpidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_ppid\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBpid_t *\fR\fIpidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_signal\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBint *\fR\fIsignalp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_sender\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBpid_t *\fR\fIpidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_senderct\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBctid_t *\fR\fIpidp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_exitstatus\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBint *\fR\fIstatusp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_pcorefile\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBchar **\fR\fInamep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_gcorefile\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBchar **\fR\fInamep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBct_pr_event_get_zcorefile\fR(\fBct_evthdl_t\fR \fIevthdl\fR, \fBchar **\fR\fInamep\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions read process contract event information from an event object
+returned by \fBct_event_read\fR(3CONTRACT) or
+\fBct_event_read_critical\fR(3CONTRACT).
+.sp
+.LP
+The \fBct_pr_event_get_pid()\fR function reads the process ID of the process
+generating the event.
+.sp
+.LP
+The \fBct_pr_event_get_ppid()\fR function reads the process ID of the process
+that forked the new process causing the \fBCT_PR_EV_FORK\fR event.
+.sp
+.LP
+The \fBct_pr_event_get_signal()\fR function reads the signal number of the
+signal that caused the \fBCT_PR_EV_SIGNAL\fR event.
+.sp
+.LP
+The \fBct_pr_event_get_sender()\fR function reads the process ID of the process
+that sent the signal that caused the \fBCT_PR_EV_SIGNAL\fR event. If the
+signal's sender was not in the same zone as the signal's recipient, this
+information is available only to event consumers in the global zone.
+.sp
+.LP
+The ct_pr_event_get_senderct function reads the contract ID of the process that
+sent the signal that caused the CT_PR_EV_SIGNAL event. If the signal's sender
+was not in the same zone as the signal's recipient, this information is
+available only
+.sp
+.LP
+The \fBct_pr_event_get_exitstatus()\fR function reads the exit status of the
+process generating a \fBCT_PR_EV_EXIT\fR event.
+.sp
+.LP
+The \fBct_pr_event_get_pcorefile()\fR function reads the name of the process
+core file if one was created when the \fBCT_PR_EV_CORE\fR event was generated.
+A pointer to a character array is stored in *\fInamep\fR and is freed when
+\fBct_event_free\fR(3CONTRACT) is called on the event handle.
+.sp
+.LP
+The \fBct_pr_event_get_gcorefile()\fR function reads the name of the zone's
+global core file if one was created when the \fBCT_PR_EV_CORE\fR event was
+generated. A pointer to a character array is stored in *\fInamep\fR and is
+freed when \fBct_event_free()\fR is called on the event handle.
+.sp
+.LP
+The \fBct_pr_event_get_zcorefile()\fR function reads the name of the
+system-wide core file in the global zone if one was created when the
+\fBCT_PR_EV_CORE\fR event was generated. This information is available only to
+event consumers in the global zone. A pointer to a character array is stored in
+*\fInamep\fR and is freed when \fBct_event_free()\fR is called on the event
+handle.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBct_pr_event_get_pid()\fR,
+\fBct_pr_event_get_ppid()\fR, \fBct_pr_event_get_signal()\fR,
+\fBct_pr_event_get_sender()\fR, \fBct_pr_event_get_senderct()\fR,
+\fBct_pr_event_get_exitstatus()\fR, \fBct_pr_event_get_pcorefile()\fR,
+\fBct_pr_event_get_gcorefile()\fR, and \fBct_pr_event_get_zcorefile()\fR return
+0. Otherwise, they return a non-zero error value.
+.SH ERRORS
+.sp
+.LP
+The \fBct_pr_event_get_pid()\fR, \fBct_pr_event_get_ppid()\fR,
+\fBct_pr_event_get_signal()\fR, \fBct_pr_event_get_sender()\fR,
+\fBct_pr_event_get_senderct()\fR, \fBct_pr_event_get_exitstatus()\fR,
+\fBct_pr_event_get_pcorefile()\fR, \fBct_pr_event_get_gcorefile()\fR, and
+\fBct_pr_event_get_zcorefile()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIevthdl\fR argument is not a process contract event object.
+.RE
+
+.sp
+.LP
+The \fBct_pr_event_get_ppid()\fR, \fBct_pr_event_get_signal()\fR,
+\fBct_pr_event_get_sender()\fR, \fBct_pr_event_get_senderct()\fR,
+\fBct_pr_event_get_exitstatus()\fR, \fBct_pr_event_get_pcorefile()\fR,
+\fBct_pr_event_get_gcorefile()\fR, and \fBct_pr_event_get_zcorefile()\fR
+functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested data do not match the event type.
+.RE
+
+.sp
+.LP
+The \fBct_pr_event_get_sender()\fRa functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The process ID of the sender was not available, or the event object was read by
+a process running in a non-global zone and the sender was in a different zone.
+.RE
+
+.sp
+.LP
+The \fBct_pr_event_get_pcorefile()\fR, \fBct_pr_event_get_gcorefile()\fR, and
+\fBct_pr_event_get_zcorefile()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The requested core file was not created.
+.RE
+
+.sp
+.LP
+The \fBct_pr_event_get_zcorefile()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The event object was read by a process running in a non-global zone.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPrint the instigator of all \fBCT_PR_EV_SIGNAL\fR events.
+.sp
+.LP
+Open the process contract bundle. Loop reading events. Fetch and display the
+signalled pid and signalling pid for each \fBCT_PR_EV_SIGNAL\fR event
+encountered.
+
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <libcontract.h>
+ 
+\&...
+int fd;
+ct_evthdl_t event;
+pid_t pid, sender;
+
+fd = open("/system/contract/process/bundle", O_RDONLY);
+for (;;) {
+        ct_event_read(fd, &event);
+        if (ct_event_get_type(event) != CT_PR_EV_SIGNAL) {
+                ct_event_free(event);
+                continue;
+        }
+        ct_pr_event_get_pid(event, &pid);
+        if (ct_pr_event_get_sender(event, &sender) == ENOENT)
+                printf("process %ld killed by unknown process\en",
+                    (long)pid);
+        else
+                printf("process %ld killed by process %ld\en",
+                    (long)pid, (long)sender);
+        ct_event_free(event);
+}
+        ...
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBct_event_free\fR(3CONTRACT), \fBct_event_read\fR(3CONTRACT),
+\fBct_event_read_critical\fR(3CONTRACT), \fBlibcontract\fR(3LIB),
+\fBcontract\fR(4), \fBprocess\fR(4), \fBattributes\fR(5), \fBlfcompile\fR(5)

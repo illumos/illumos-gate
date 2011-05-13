@@ -1,0 +1,119 @@
+'\" te
+.\"  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_bus_reset 9E "17 Mar 1999" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_bus_reset \- reset a SCSI bus
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> int \fIprefix\fR
+
+\fB\fR\fBtran_bus_reset\fR(\fBdev_info_t\fR \fI*hba_dip\fR, \fBint\fR \fIlevel\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhba_dip\fR\fR
+.ad
+.RS 11n
+.rt  
+The  \fBdev_info_t\fR pointer associated with the SCSI HBA.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlevel\fR\fR
+.ad
+.RS 11n
+.rt  
+The level of reset required.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBtran_bus_reset()\fR vector in the \fBscsi_hba_tran\fR(9S) structure
+should be initialized during the HBA driver's \fBattach\fR(9E). It is an HBA
+entry point to be called when a user initiates a bus reset through device
+control interfaces.
+.sp
+.LP
+\fBtran_bus_reset()\fR must reset the SCSI bus without resetting targets.
+.sp
+.LP
+\fIlevel\fR will be one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRESET_BUS\fR\fR
+.ad
+.RS 13n
+.rt  
+Reset the SCSI bus only, not the targets.
+.RE
+
+.sp
+.LP
+Implementation is hardware specific. If it is not possible to reset the SCSI
+bus without changing the state and operating mode of the targets, the HBA
+driver should not initialize this vector or return failure.
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_bus_reset()\fR should return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+on success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+on failure.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBtran_quiesce\fR(9E), \fBscsi_hba_tran\fR(9S)

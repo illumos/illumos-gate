@@ -1,0 +1,123 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH putnextctl 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+putnextctl \- send a control message to a queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBputnextctl\fR(\fBqueue_t *\fR\fIq\fR, \fBint\fR \fItype\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 8n
+.rt  
+Queue to which the message is to be sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 8n
+.rt  
+Message type (must be control, not data type).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBputnextctl()\fR function tests the \fItype\fR argument to make sure a
+data type has not been specified, and then attempts to allocate a message
+block. \fBputnextctl()\fR fails if \fItype\fR is \fBM_DATA\fR, \fBM_PROTO\fR,
+or \fBM_PCPROTO\fR, or if a message block cannot be allocated. If successful,
+\fBputnextctl()\fR calls the  \fBput\fR(9E) routine of the queue pointed to by
+\fIq\fR with the newly allocated and initialized messages.
+.sp
+.LP
+A call to \fBputnextctl(\fR\fIq\fR\fB,\fR\fItype\fR\fB)\fR is an atomic
+equivalent of \fBputctl(\fR\fIq\fR\fB->q_next\fR,\fItype\fR\fI).\fR The STREAMS
+framework provides whatever mutual exclusion is necessary to insure that
+dereferencing \fIq\fR through its \fBq_next\fR field and then invoking
+\fBputctl\fR(9F) proceeds without interference from other threads.
+.sp
+.LP
+The \fBputnextctl()\fR function should always be used in preference to
+\fBputctl\fR(9F)
+.SH RETURN VALUES
+.sp
+.LP
+On success, \fB1\fR is returned. If \fItype\fR is a data type, or if a message
+block cannot be allocated, \fB0\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBputnextctl()\fR function can be user, interrupt, or kernel context.
+.SH EXAMPLES
+.sp
+.LP
+The \fBsend_ctl\fR routine is used to pass control messages downstream.
+\fBM_BREAK\fR messages are handled with  \fBputnextctl\fR(\|) (line 8).
+\fBputnextctl1\fR(9F) (line 13) is used for \fBM_DELAY\fR messages,  so that
+\fIparm\fR can be used to specify the length of the delay. In either case, if a
+message block cannot be allocated  a  variable recording the number of
+allocation failures  is incremented (lines 9, 14). If an invalid message type
+is detected,  \fBcmn_err\fR(9F) panics the system (line 18).
+.sp
+.in +2
+.nf
+1 void
+ 2 send_ctl(queue_t *wrq, uchar_t type, uchar_t parm)
+ 3 {
+ 4	        extern int num_alloc_fail;
+ 5
+ 6	        switch (type) {
+ 7         case M_BREAK:
+ 8                if (!putnextctl(wrq, M_BREAK))
+ 9	                        num_alloc_fail++;
+10	               break;
+11
+12	        case M_DELAY:
+13                if (!putnextctl1(wrq, M_DELAY, parm))
+14	                        num_alloc_fail++;
+15                break;
+16
+17         default:
+18                cmn_err(CE_PANIC, "send_ctl: bad message type passed");
+19	               break;
+20	        }
+21  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBput\fR(9E), \fBcmn_err\fR(9F), \fBdatamsg\fR(9F), \fBputctl\fR(9F),
+\fBputnextctl1\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

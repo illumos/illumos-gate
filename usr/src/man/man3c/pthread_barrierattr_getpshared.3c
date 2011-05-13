@@ -1,0 +1,122 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_barrierattr_getpshared 3C "30 Jan 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_barrierattr_getpshared, pthread_barrierattr_setpshared \- get and set
+process-shared attribute of barrier attributes object
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_barrierattr_getpshared\fR(
+     \fBconst pthread_barrierattr_t *restrict\fR \fIattr\fR,
+     \fBint *restrict\fR \fIpshared\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_barrierattr_setpshared\fR(\fBpthread_barrierattr_t *\fR\fIattr\fR,
+     \fBint\fR \fIpshared\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_barrierattr_getpshared()\fR function obtains the value of the
+\fIprocess-shared\fR attribute from the attributes object referenced by
+\fIattr\fR. The \fBpthread_barrierattr_setpshared()\fR function sets the
+\fIprocess-shared\fR attribute in an initialized attributes object referenced
+by \fIattr\fR.
+.sp
+.LP
+The \fIprocess-shared\fR attribute is set to \fBPTHREAD_PROCESS_SHARED\fR to
+permit a barrier to be operated upon by any thread that has access to the
+memory where the barrier is allocated. If the \fIprocess-shared\fR attribute is
+\fBPTHREAD_PROCESS_PRIVATE\fR, the barrier will only be operated upon by
+threads created within the same process as the thread that initialized the
+barrier. If threads of different processes attempt to operate on such a
+barrier, the behavior is undefined.
+.sp
+.LP
+The default value of the attribute is \fBPTHREAD_PROCESS_PRIVATE\fR. Both
+constants \fBPTHREAD_PROCESS_SHARED\fR and \fBPTHREAD_PROCESS_PRIVATE\fR are
+defined in <\fBpthread.h\fR>.
+.sp
+.LP
+No barrier attributes other than the \fIprocess-shared\fR attribute are
+provided.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBpthread_barrierattr_getpshared()\fR function
+returns 0 and stores the value of the \fIprocess-shared\fR attribute of
+\fIattr\fR into the object referenced by the \fIpshared\fR parameter.
+Otherwise, an error number is returned to indicate the error.
+.sp
+.LP
+Upon successful completion, the \fBpthread_barrierattr_setpshared()\fR function
+returns 0. Otherwise, an error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR is invalid.
+.RE
+
+.sp
+.LP
+The \fBpthread_barrierattr_setpshared()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The new value specified for the \fIprocess-shared\fR attribute is not one of
+the legal values \fBPTHREAD_PROCESS_SHARED\fR or \fBPTHREAD_PROCESS_PRIVATE\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_barrier_init\fR(3C), \fBpthread_barrierattr_destroy\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

@@ -122,6 +122,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	nss_common.h	\
 	nss_dbdefs.h	\
 	nss_netdir.h	\
+	paths.h		\
 	pcsample.h	\
 	pfmt.h		\
 	pkgdev.h	\

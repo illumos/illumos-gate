@@ -1,0 +1,103 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_scr_dump 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_scr_dump, scr_dump, scr_restore, scr_init, scr_set \- read or write a
+curses screen from or to a file
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBscr_dump\fR(\fBchar *\fR\fIfilename\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscr_restore\fR(\fBchar *\fR\fIfilename\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscr_init\fR(\fBchar *\fR\fIfilename\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscr_set\fR(\fBchar *\fR\fIfilename\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+With the \fBscr_dump()\fR routine, the current contents of the virtual screen
+are written to the file \fIfilename\fR.
+.sp
+.LP
+With the \fBscr_restore()\fR routine, the virtual screen is set to the contents
+of \fIfilename\fR, which must have been written using \fBscr_dump()\fR. The
+next call to \fBdoupdate()\fR restores the screen to the way it looked in the
+dump file.
+.sp
+.LP
+With the \fBscr_init()\fR routine, the contents of \fIfilename\fR are read in
+and used to initialize the \fBcurses\fR data structures about what the terminal
+currently has on its screen. If the data is determined to be valid,
+\fBcurses\fR bases its next update of the screen on this information rather
+than clearing the screen and starting from scratch. \fBscr_init()\fR is used
+after \fBinitscr()\fR or a \fBsystem\fR(3C) call to share the screen with
+another process which has done a \fBscr_dump()\fR after its \fBendwin()\fR
+call. The data is declared invalid if the time-stamp of the tty is old or the
+terminfo capabilities \fBrmcup()\fR and \fBnrrmc()\fR exist.
+.sp
+.LP
+The \fBscr_set()\fR routine is a combination of \fBscr_restore()\fR and
+\fBscr_init()\fR. It tells the program that the information in \fIfilename\fR
+is what is currently on the screen, and also what the program wants on the
+screen. This can be thought of as a screen inheritance function.
+.sp
+.LP
+To read (write) a window from (to) a file, use the \fBgetwin()\fR and
+\fBputwin()\fR routines (see \fBcurs_util\fR(3CURSES)).
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and \fBOK\fR upon
+success.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_initscr\fR(3CURSES), \fBcurs_refresh\fR(3CURSES),
+\fBcurs_util\fR(3CURSES), \fBcurses\fR(3CURSES), \fBsystem\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBscr_init()\fR, \fBscr_set()\fR, and \fBscr_restore()\fR may be
+macros.

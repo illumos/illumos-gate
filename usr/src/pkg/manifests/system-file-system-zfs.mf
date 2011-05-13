@@ -73,6 +73,7 @@ dir path=usr/lib/zfs
 dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
+dir path=usr/share/man/man1m
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
 file \
     path=etc/sysevent/config/SUNW,EC_zfs,ESC_ZFS_bootfs_vdev_attach,sysevent.conf \
@@ -126,6 +127,10 @@ file path=usr/lib/zfs/pyzfs.pyc mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/zdb mode=0555
 file path=usr/sbin/$(ARCH64)/zdb mode=0555
 file path=usr/sbin/zstreamdump mode=0555
+file path=usr/share/man/man1m/zdb.1m
+file path=usr/share/man/man1m/zfs.1m
+file path=usr/share/man/man1m/zpool.1m
+file path=usr/share/man/man1m/zstreamdump.1m
 hardlink path=kernel/fs/$(ARCH64)/zfs target=../../../kernel/drv/$(ARCH64)/zfs
 $(i386_ONLY)hardlink path=kernel/fs/zfs target=../../kernel/drv/zfs
 hardlink path=usr/lib/fs/zfs/fstyp target=../../../sbin/fstyp

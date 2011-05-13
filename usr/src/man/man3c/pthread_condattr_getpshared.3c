@@ -1,0 +1,123 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_condattr_getpshared 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_condattr_getpshared, pthread_condattr_setpshared \- get or set
+process-shared condition variable attributes
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_condattr_getpshared\fR(
+     \fBconst pthread_condattr_t *restrict\fR \fIattr\fR,
+     \fBint *restrict\fR \fIpshared\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_condattr_setpshared\fR(\fBpthread_condattr_t *\fR\fIattr\fR,
+     \fBint\fR \fIpshared\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_condattr_getpshared()\fR function obtains the value of the
+\fIprocess-shared\fR attribute from the attributes object referenced by
+\fIattr\fR. The \fBpthread_condattr_setpshared()\fR function is used to set the
+\fIprocess-shared\fR attribute in an initialized attributes object referenced
+by \fIattr\fR.
+.sp
+.LP
+The \fIprocess-shared\fR attribute is set to  \fBPTHREAD_PROCESS_SHARED\fR to
+permit a condition variable to be operated upon by any thread that has access
+to the memory where the condition variable is allocated, even if the condition
+variable is allocated in memory that is shared by multiple processes. If the
+\fIprocess-shared\fR attribute is  \fBPTHREAD_PROCESS_PRIVATE,\fR the condition
+variable will only be operated upon by threads created within the same process
+as the thread that initialized the condition variable; if threads of differing
+processes attempt to operate on such a condition variable, the behavior is
+undefined.  The default value of the attribute is
+\fBPTHREAD_PROCESS_PRIVATE.\fR
+.sp
+.LP
+Additional attributes, their default values, and the names of the associated
+functions to get and set those attribute values are implementation-dependent.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_condattr_setpshared()\fR function returns
+\fB0\fR. Otherwise, an error number is returned to indicate the error.
+.sp
+.LP
+If successful, the \fBpthread_condattr_getpshared()\fR function returns
+\fB0\fR and stores the value of the \fIprocess-shared\fR attribute of
+\fIattr\fR into the object referenced by the \fIpshared\fR parameter.
+Otherwise, an error number is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_condattr_getpshared()\fR and \fBpthread_condattr_setpshared()\fR
+functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR is invalid.
+.RE
+
+.sp
+.LP
+The \fBpthread_condattr_setpshared()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The new value specified for the attribute is outside the range of legal values
+for that attribute.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_condattr_init\fR(3C), \fBpthread_create\fR(3C),
+\fBpthread_mutex_init\fR(3C), \fBpthread_cond_init\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

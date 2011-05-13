@@ -1,0 +1,259 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getspnam 3C "23 Jan 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getspnam, getspnam_r, getspent, getspent_r, setspent, endspent, fgetspent,
+fgetspent_r \- get password entry
+.SH SYNOPSIS
+.LP
+.nf
+#include <shadow.h>
+
+\fBstruct spwd *\fR\fBgetspnam\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct spwd *\fR\fBgetspnam_r\fR(\fBconst char *\fR\fIname\fR, \fBstruct spwd *\fR\fIresult\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBstruct spwd *\fR\fBgetspent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct spwd *\fR\fBgetspent_r\fR(\fBstruct spwd *\fR\fIresult\fR, \fBchar *\fR\fIbuffer\fR,
+     \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsetspent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBendspent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct spwd *\fR\fBfgetspent\fR(\fBFILE *\fR\fIfp\fR);
+.fi
+
+.LP
+.nf
+\fBstruct spwd *\fR\fBfgetspent_r\fR(\fBFILE *\fR\fIfp\fR, \fBstruct spwd *\fR\fIresult\fR,
+     \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to obtain shadow password entries.  An entry may come
+from any of the sources for \fBshadow\fR specified in the
+\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+.sp
+.LP
+The \fBgetspnam()\fR function searches for a shadow password entry with the
+login name specified by the character string argument \fIname\fR.
+.sp
+.LP
+The  \fBsetspent()\fR, \fBgetspent()\fR, and \fBendspent()\fR functions are
+used to enumerate shadow password entries from the database.
+.sp
+.LP
+The \fBsetspent()\fR function sets (or resets) the enumeration to the beginning
+of the set of shadow password entries.  This function should be called before
+the first call to \fBgetspent()\fR. Calls to \fBgetspnam()\fR leave the
+enumeration position in an indeterminate state.
+.sp
+.LP
+Successive calls to \fBgetspent()\fR return either successive entries or
+\fINULL\fR, indicating the end of the enumeration.
+.sp
+.LP
+The \fBendspent()\fR function may be called to indicate that the caller expects
+to do no further shadow password retrieval operations; the system may then
+close the shadow password file, deallocate resources it was using, and so
+forth.  It is still allowed, but possibly less efficient, for the process to
+call more shadow password functions after calling \fBendspent()\fR.
+.sp
+.LP
+The \fBfgetspent()\fR function, unlike the other functions above, does not use
+\fBnsswitch.conf\fR; it reads and parses the next line from the stream
+\fIfp\fR, which is assumed to have the format of the \fBshadow\fR file (see
+\fBshadow\fR(4)).
+.SS "Reentrant Interfaces"
+.sp
+.LP
+The  \fBgetspnam()\fR, \fBgetspent()\fR, and \fBfgetspent()\fR functions use
+thread-specific data storage that is reused in each call to one of these
+functions by the same thread, making them safe to use but not recommended for
+multithreaded applications.
+.sp
+.LP
+The  \fBgetspnam_r()\fR, \fBgetspent_r()\fR, and \fBfgetspent_r()\fR functions
+provide reentrant interfaces for these operations.
+.sp
+.LP
+Each reentrant interface performs the same operation as its non-reentrant
+counterpart, named by removing the  \fB_r\fR suffix.  The reentrant interfaces,
+however, use buffers supplied by the caller to store returned results, and  are
+safe for use in both single-threaded and multithreaded applications.
+.sp
+.LP
+Each reentrant interface takes the same argument as its non-reentrant
+counterpart, as well as the following additional arguments.  The \fIresult\fR
+argument must be a pointer to a \fBstruct spwd\fR structure allocated by the
+caller.  On successful completion, the function returns the shadow password
+entry in this structure. The  \fIbuffer\fR argument must be a pointer to a
+buffer supplied by the caller.  This buffer is used as storage space for the
+shadow password data.  All of the pointers within the returned \fBstruct
+spwd\fR \fIresult\fR point to data stored within this buffer (see \fBRETURN
+VALUES\fR). The buffer must be large enough to hold all of the data associated
+with the shadow password entry. The \fIbuflen\fR argument should give the size
+in bytes of the buffer indicated by \fIbuffer.\fR
+.sp
+.LP
+For enumeration in multithreaded applications, the position within the
+enumeration is a process-wide property shared by all threads. The
+\fBsetspent()\fR function may be used in a multithreaded application but resets
+the enumeration position for all threads.  If multiple threads interleave calls
+to \fBgetspent_r()\fR, the threads will enumerate disjoint subsets of the
+shadow password database.
+.sp
+.LP
+Like its non-reentrant counterpart, \fBgetspnam_r()\fR leaves the enumeration
+position in an indeterminate state.
+.SH RETURN VALUES
+.sp
+.LP
+Password entries are represented by the \fBstruct spwd\fR structure defined in
+\fB<shadow.h>\fR:
+.sp
+.in +2
+.nf
+\fBstruct spwd{
+    char           *sp_namp;     /* login name */
+    char           *sp_pwdp;     /* encrypted passwd */
+    int            sp_lstchg;    /* date of last change */
+    int            sp_min;       /* min days to passwd change */
+    int            sp_max;       /* max days to passwd change*/
+    int            sp_warn;      /* warning period */
+    int            sp_inact;     /* max days inactive */
+    int            sp_expire;    /* account expiry date */
+    unsigned int   sp_flag;      /* not used */
+};\fR
+.fi
+.in -2
+
+.sp
+.LP
+See \fBshadow\fR(4) for more information on the interpretation of this data.
+.sp
+.LP
+The  \fBgetspnam()\fRand \fBgetspnam_r()\fR functions each return a pointer to
+a \fBstruct spwd\fR if they successfully locate the requested entry; otherwise
+they return \fINULL\fR.
+.sp
+.LP
+The  \fBgetspent()\fR, \fBgetspent_r()\fR, \fBfgetspent()\fR, and
+\fBfgetspent()\fR functions each return a pointer to a \fBstruct spwd\fR if
+they successfully enumerate an entry; otherwise they return \fINULL\fR,
+indicating the end of the enumeration.
+.sp
+.LP
+The  \fBgetspnam()\fR, \fBgetspent()\fR, and \fBfgetspent()\fR functions use
+thread-specific data storage, so returned data must be copied before a
+subsequent call to any of these functions if the data is to be saved.
+.sp
+.LP
+When the pointer returned by the reentrant functions \fBgetspnam_r()\fR,
+\fBgetspent_r()\fR, and \fBfgetspent_r()\fR is non-null, it is always equal to
+the \fIresult\fR pointer that was supplied by the caller.
+.SH ERRORS
+.sp
+.LP
+The reentrant functions  \fBgetspnam_r()\fR, \fBgetspent_r()\fR, and
+\fBfgetspent_r()\fR will return \fBNULL\fR and set \fBerrno\fR to \fBERANGE\fR
+if the length of the buffer supplied by caller is not large enough to store the
+result.  See \fBIntro\fR(2) for the proper usage and interpretation of
+\fBerrno\fR in multithreaded applications.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelT{
+See "Reentrant Interfaces" in \fBDESCRIPTION\fR.
+T}
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnispasswd\fR(1), \fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(3),
+\fBgetlogin\fR(3C), \fBgetpwnam\fR(3C), \fBnsswitch.conf\fR(4),
+\fBpasswd\fR(4), \fBshadow\fR(4), \fBattributes\fR(5)
+.SH WARNINGS
+.sp
+.LP
+The reentrant interfaces \fBgetspnam_r()\fR, \fBgetspent_r()\fR, and
+\fBfgetspent_r()\fR are included in this release on an uncommitted basis only,
+and are subject to change or removal in future minor releases.
+.SH NOTES
+.sp
+.LP
+When compiling multithreaded applications, see \fBIntro\fR(3), \fINotes On
+Multithreaded Applications\fR, for information about the use of the
+\fB_REENTRANT\fR flag.
+.sp
+.LP
+Use of the enumeration interfaces \fBgetspent()\fR and \fBgetspent_r()\fR is
+not recommended; enumeration is supported for the shadow file, \fBNIS,\fR and
+\fBNIS+,\fR but in general is not efficient and may not be supported for all
+database sources.  The semantics of enumeration are discussed further in
+\fBnsswitch.conf\fR(4).
+.sp
+.LP
+Access to shadow password information may be restricted in a manner depending
+on the database source being used.  Access to the \fB/etc/shadow\fR file is
+generally restricted to processes running with the effective uid of the file
+owner or the {\fBPRIV_FILE_DAC_READ\fR} privilege.  Other database sources may
+impose stronger or less stringent restrictions.
+.sp
+.LP
+Empty fields in the database source return -1 values for all fields except
+\fBsp_pwdp\fR and \fBsp_flag\fR, where the value returned is 0.
+.sp
+.LP
+When \fBNIS\fR is used as the database source,  the information for the shadow
+password entries is obtained from the ``passwd.byname'' map. This map stores
+only the information for the \fBsp_namp\fR and \fBsp_pwdp\fR fields of the
+\fBstruct spwd\fR structure. Shadow password entries obtained from \fBNIS\fR
+will contain the value \fB-1\fR in the remainder of the fields.
+.sp
+.LP
+When \fBNIS+\fR is used as the database source, and the caller lacks the
+permission needed to retrieve the encrypted password from the \fBNIS+\fR
+``passwd.org_dir'' table, the \fBNIS+\fR service returns the string ``*NP*''
+instead of the actual encrypted password string.  The functions described on
+this page will then return the string ``*NP*'' to the caller as the value of
+the member \fBsp_pwdp\fR in the returned shadow password structure.

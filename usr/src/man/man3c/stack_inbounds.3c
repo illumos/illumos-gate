@@ -1,0 +1,56 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stack_inbounds 3C "18 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+stack_inbounds \- determine if address is within stack boundaries
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucontext.h>
+
+\fBint\fR \fBstack_inbounds\fR(\fBvoid *\fR\fIaddr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstack_inbounds()\fR function returns a boolean value indicating whether
+the address specified by \fIaddr\fR is within the boundaries of the stack of
+the calling thread. The address is compared to the stack boundary information
+returned by a call to \fBstack_getbounds\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+The \fBstack_inbounds()\fR function returns 0 to indicate that \fIaddr\fR is
+not within the current stack bounds, or a non-zero value to indicate that
+\fIaddr\fR is within the stack bounds.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstack_getbounds\fR(3C), \fBattributes\fR(5)

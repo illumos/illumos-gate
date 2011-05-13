@@ -1,0 +1,745 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sort 1 "19 Nov 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+sort \- sort, merge, or sequence check text files
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/sort\fR [\fB-bcdfimMnru\fR] [\fB-k\fR \fIkeydef\fR] [\fB-o\fR \fIoutput\fR] 
+     [\fB-S\fR \fIkmem\fR] [\fB-t\fR \fIchar\fR] [\fB-T\fR \fIdirectory\fR] [\fB-y\fR [\fIkmem\fR]] 
+     [\fB-z\fR \fIrecsz\fR] [+\fIpos1\fR [-\fIpos2\fR]] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/sort\fR [\fB-bcdfimMnru\fR] [\fB-k\fR \fIkeydef\fR] [\fB-o\fR \fIoutput\fR] 
+     [\fB-S\fR \fIkmem\fR] [\fB-t\fR \fIchar\fR] [\fB-T\fR \fIdirectory\fR] [\fB-y\fR [\fIkmem\fR]] 
+     [\fB-z\fR \fIrecsz\fR] [+\fIpos1\fR [-\fIpos2\fR]] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsort\fR command sorts lines of all the named files together and writes
+the result on the standard output.
+.sp
+.LP
+Comparisons are based on one or more sort keys extracted from each line of
+input. By default, there is one sort key, the entire input line. Lines are
+ordered according to the collating sequence of the current locale.
+.SH OPTIONS
+.sp
+.LP
+The following options alter the default behavior:
+.SS "/usr/bin/sort"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+.rt  
+Checks that the single input file is ordered as specified by the arguments and
+the collating sequence of the current locale. The exit code is set and no
+output is produced unless the file is out of sort.
+.RE
+
+.SS "/usr/xpg4/bin/sort"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 16n
+.rt  
+Same as \fB/usr/bin/sort\fR except no output is produced under any
+circumstances.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 16n
+.rt  
+Merges only. The input files are assumed to be already sorted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIoutput\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the name of an output file to be used instead of the standard output.
+This file can be the same as one of the input files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR \fIkmem\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the maximum amount of swap-based memory used for sorting, in
+kilobytes (the default unit). \fIkmem\fR can also be specified directly as a
+number of bytes (b), kilobytes (k), megabytes (m), gigabytes (g), or terabytes
+(t); or as a percentage (%) of the installed physical memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fIdirectory\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the \fIdirectory\fR in which to place temporary files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 16n
+.rt  
+Unique: suppresses all but one in each set of lines having equal keys. If used
+with the \fB-c\fR option, checks that there are no lines with duplicate keys in
+addition to checking that the input file is sorted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-y\fR \fIkmem\fR\fR
+.ad
+.RS 16n
+.rt  
+(obsolete). This option was used to specify the amount of main memory initially
+used by \fBsort\fR. Its functionality is not appropriate for a virtual memory
+system; memory usage for \fBsort\fR is now specified using the \fB-S\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIrecsz\fR\fR
+.ad
+.RS 16n
+.rt  
+(obsolete). This option was used to prevent abnormal termination when lines
+longer than the system-dependent default buffer size are encountered. Because
+\fBsort\fR automatically allocates buffers large enough to hold the longest
+line, this option has no effect.
+.RE
+
+.SS "Ordering Options"
+.sp
+.LP
+The default sort order depends on the value of \fBLC_COLLATE\fR. If
+\fBLC_COLLATE\fR is set to \fBC\fR, sorting is in \fBASCII\fR order. If
+\fBLC_COLLATE\fR is set to \fBen_US\fR, sorting is case insensitive except when
+the two strings are otherwise equal and one has an uppercase letter earlier
+than the other. Other locales have other sort orders.
+.sp
+.LP
+The following options override the default ordering rules. When ordering
+options appear independent of any key field specifications, the requested field
+ordering rules are applied globally to all sort keys. When attached to a
+specific key (see \fBSort Key Options\fR), the specified ordering options
+override all global ordering options for that key. In the obsolescent forms, if
+one or more of these options follows a \fI+pos1\fR option, it affects only the
+key field specified by that preceding option.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Dictionary order: only letters, digits, and blanks (spaces and tabs) are
+significant in comparisons.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Folds lower-case letters into upper case.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Ignores non-printable characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fR
+.ad
+.RS 6n
+.rt  
+Compares as months. The first three non-blank characters of the field are
+folded to upper case and compared. For example, in English the sorting order is
+\fB"JAN" < "FEB" < .\|.\|. < "DEC"\fR. Invalid fields compare low to
+\fB"JAN"\fR. The \fB-M\fR option implies the \fB-b\fR option (see below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Restricts the sort key to an initial numeric string, consisting of optional
+blank characters, optional minus sign, and zero or more digits with an optional
+radix character and thousands separators (as defined in the current locale),
+which is sorted by arithmetic value.  An empty digit string is treated as zero.
+Leading zeros and signs on zeros do not affect ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Reverses the sense of comparisons.
+.RE
+
+.SS "Field Separator Options"
+.sp
+.LP
+The treatment of field separators can be altered using the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 11n
+.rt  
+Ignores leading blank characters when determining the starting and ending
+positions of a restricted sort key. If the \fB-b\fR option is specified before
+the first sort key option, it is applied to all sort key options. Otherwise,
+the \fB-b\fR option can be attached independently to each \fB-k\fR
+\fIfield_start\fR, \fIfield_end\fR, or +\fIpos1\fR or \(mi\fIpos2\fR
+option-argument (see below).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fIchar\fR\fR
+.ad
+.RS 11n
+.rt  
+Use \fIchar\fR as the field separator character. \fIchar\fR is not considered
+to be part of a field (although it can be included in a sort key).  Each
+occurrence of \fIchar\fR is significant (for example, \fI<char><char>\fR
+delimits an empty field). If \fB-t\fR is not specified, blank characters are
+used as default field separators; each maximal non-empty sequence of blank
+characters that follows a non-blank character is a field separator.
+.RE
+
+.SS "Sort Key Options"
+.sp
+.LP
+Sort keys can be specified using the options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIkeydef\fR\fR
+.ad
+.RS 19n
+.rt  
+The \fIkeydef\fR argument is a restricted sort key field definition. The format
+of this definition is:
+.sp
+.in +2
+.nf
+\fB-k\fR \fIfield_start\fR [\fItype\fR] [\fB,\fR\fIfield_end\fR [\fItype\fR] ]
+.fi
+.in -2
+.sp
+
+where:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfield_start\fR and \fIfield_end\fR\fR
+.ad
+.sp .6
+.RS 4n
+define a key field restricted to a portion of the line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.sp .6
+.RS 4n
+is a modifier from the list of characters \fBbdfiMnr\fR. The \fBb\fR modifier
+behaves like the \fB-b\fR option, but applies only to the \fIfield_start\fR or
+\fIfield_end\fR to which it is attached and characters within a field are
+counted from the first non-blank character in the field. (This applies
+separately to \fIfirst_character\fR and \fIlast_character\fR.) The other
+modifiers behave like the corresponding options, but apply only to the key
+field to which they are attached. They have this effect if specified with
+\fIfield_start\fR, \fIfield_end\fR or both.  If any modifier is attached to a
+\fIfield_start\fR or to a \fIfield_end\fR, no option applies to either.
+.RE
+
+When there are multiple key fields, later keys are compared only after all
+earlier keys compare equal. Except when the \fB-u\fR option is specified, lines
+that otherwise compare equal are ordered as if none of the options \fB-d\fR,
+\fB-f\fR, \fB-i\fR, \fB-n\fR or \fB-k\fR were present (but with \fB-r\fR still
+in effect, if it was specified) and with all bytes in the lines significant to
+the comparison.
+.sp
+The notation:
+.sp
+.in +2
+.nf
+\fB-k\fR \fIfield_start\fR[\fItype\fR][\fB,\fR\fIfield_end\fR[\fItype\fR]]
+.fi
+.in -2
+.sp
+
+defines a key field that begins at \fIfield_start\fR and ends at
+\fIfield_end\fR inclusive, unless \fIfield_start\fR falls beyond the end of the
+line or after \fIfield_end\fR, in which case the key field is empty. A missing
+\fIfield_end\fR means the last character of the line.
+.sp
+A field comprises a maximal sequence of non-separating characters and, in the
+absence of option \fB-t\fR, any preceding field separator.
+.sp
+The \fIfield_start\fR portion of the \fIkeydef\fR option-argument has the form:
+.sp
+.in +2
+.nf
+\fIfield_number\fR[\fB\&.\fR\fIfirst_character\fR]
+.fi
+.in -2
+.sp
+
+Fields and characters within fields are numbered starting with 1.
+\fIfield_number\fR and \fIfirst_character\fR, interpreted as positive decimal
+integers, specify the first character to be used as part of a sort key. If
+\fB\&.\fR\fIfirst_character\fR is omitted, it refers to the first character of
+the field.
+.sp
+The \fIfield_end\fR portion of the \fIkeydef\fR option-argument has the form:
+.sp
+.in +2
+.nf
+\fIfield_number\fR[\fB\&.\fR\fIlast_character\fR]
+.fi
+.in -2
+.sp
+
+The \fIfield_number\fR is as described above for \fIfield_start\fR.
+\fIlast_character\fR, interpreted as a non-negative decimal integer, specifies
+the last character to be used as part of the sort key. If \fIlast_character\fR
+evaluates to zero or \fB\&.\fR\fIlast_character\fR is omitted, it refers to the
+last character of the field specified by \fIfield_number\fR.
+.sp
+If the \fB-b\fR option or \fBb\fR type modifier is in effect, characters within
+a field are counted from the first non-blank character in the field. (This
+applies separately to \fIfirst_character\fR and \fIlast_character\fR.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[\fB+\fR\fIpos1\fR [\fB-\fR\fIpos2\fR]]\fR
+.ad
+.RS 19n
+.rt  
+(obsolete). Provide functionality equivalent to the \fB-k\fR\fIkeydef\fR
+option.
+.sp
+\fIpos1\fR and \fIpos2\fR each have the form \fIm\fR\fB\&.\fR\fIn\fR optionally
+followed by one or more of the flags \fBbdfiMnr\fR. A starting position
+specified by \fB+\fR\fIm\fR\fB\&.\fR\fIn\fR is interpreted to mean the
+\fIn\fR+1st character in the \fIm\fR+1st field. A missing \fB\&.\fR\fIn\fR
+means \fB\&.0\fR, indicating the first character of the \fIm\fR+1st field. If
+the \fBb\fR flag is in effect \fIn\fR is counted from the first non-blank in
+the \fIm\fR+1st field; \fB+\fR\fIm\fR\fB\&.0b\fR refers to the first non-blank
+character in the \fIm\fR+1st field.
+.sp
+A last position specified by \fB\(mi\fR\fIm\fR\fB\&.\fR\fIn\fR is interpreted
+to mean the \fIn\fRth character (including separators) after the last character
+of the \fIm\fRth field. A missing \fB\&.\fR\fIn\fR means \fB\&.\fR0, indicating
+the last character of the \fIm\fRth field. If the \fBb\fR flag is in effect
+\fIn\fR is counted from the last leading blank in the \fIm\fR+1st field;
+\fB\(mi\fR\fIm\fR\fB\&.\fR1\fBb\fR refers to the first non-blank in the
+\fIm\fR+1st field.
+.sp
+The fully specified \fI+pos1\fR \fI\(mipos2\fR form with type modifiers \fBT\fR
+and \fBU\fR:
+.sp
+.in +2
+.nf
++\fBw\fR.\fBxT\fR -\fBy\fR.\fBzU\fR
+.fi
+.in -2
+.sp
+
+is equivalent to:
+.sp
+.in +2
+.nf
+undefined (z==0 & U contains \fIb\fR & \fI-t\fR is present)
+-k w+1.x+1T,y.0U     (z==0 otherwise)
+-k w+1.x+1T,y+1.zU   (z > 0) 
+.fi
+.in -2
+.sp
+
+Implementations support at least nine occurrences of the sort keys (the
+\fB-k\fR option and obsolescent \fB+\fR\fIpos1\fR and
+\fB\(mi\fR\fIpos2\fR\fB)\fR which are significant in command line order. If no
+sort key is specified, a default sort key of the entire line is used.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of a file to be sorted, merged or checked. If no \fIfile\fR
+operands are specified, or if a \fIfile\fR operand is \fB\(mi\fR, the standard
+input is used.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBsort\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXAMPLES
+.sp
+.LP
+In the following examples, first the preferred and then the obsolete way of
+specifying \fBsort\fR keys are given as an aid to understanding the
+relationship between the two forms.
+.LP
+\fBExample 1 \fRSorting with the Second Field as a sort Key
+.sp
+.LP
+Either of the following commands sorts the contents of \fBinfile\fR with the
+second field as the sort key:
+
+.sp
+.in +2
+.nf
+example% \fBsort -k 2,2 infile\fR
+example% \fBsort +1 \(mi2 infile\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSorting in Reverse Order
+.sp
+.LP
+Either of the following commands sorts, in reverse order, the contents of
+\fBinfile1\fR and \fBinfile2\fR, placing the output in \fBoutfile\fR and using
+the second character of the second field as the sort key (assuming that the
+first character of the second field is the field separator):
+
+.sp
+.in +2
+.nf
+example% \fBsort -r -o outfile -k 2.2,2.2 infile1 infile2\fR 
+example% \fBsort -r -o outfile +1.1 \(mi1.2 infile1 infile2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSorting Using a Specified Character in One of the Files
+.sp
+.LP
+Either of the following commands sorts the contents of \fBinfile1\fR and
+\fBinfile2\fR using the second non-blank character of the second field as the
+sort key:
+
+.sp
+.in +2
+.nf
+example% \fBsort -k 2.2b,2.2b infile1 infile2\fR 
+example% \fBsort +1.1b \(mi1.2b infile1 infile2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSorting by Numeric User ID
+.sp
+.LP
+Either of the following commands prints the \fBpasswd\fR(4) file (user
+database) sorted by the numeric user ID (the third colon-separated field):
+
+.sp
+.in +2
+.nf
+example% \fBsort -t : -k 3,3n /etc/passwd\fR 
+example% \fBsort -t : +2 \(mi3n /etc/passwd\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRPrinting Sorted Lines Excluding Lines that Duplicate a Field
+.sp
+.LP
+Either of the following commands prints the lines of the already sorted file
+\fBinfile\fR, suppressing all but one occurrence of lines having the same third
+field:
+
+.sp
+.in +2
+.nf
+example% \fBsort -um -k 3.1,3.0 infile\fR 
+example% \fBsort -um +2.0 \(mi3.0 infile\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRSorting by Host IP Address
+.sp
+.LP
+Either of the following commands prints the \fBhosts\fR(4) file (IPv4 hosts
+database), sorted by the numeric \fBIP\fR address (the first four numeric
+fields):
+
+.sp
+.in +2
+.nf
+example$ \fBsort -t . -k 1,1n -k 2,2n -k 3,3n -k 4,4n /etc/hosts\fR
+example$ \fBsort -t . +0 -1n +1 -2n +2 -3n +3 -4n /etc/hosts\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Since '\fB\&.\fR' is both the field delimiter and, in many locales, the decimal
+separator, failure to specify both ends of the field leads to results where the
+second field is interpreted as a fractional portion of the first, and so forth.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBsort\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_CTYPE\fR\fR
+.ad
+.RS 14n
+.rt  
+Determine the locale for the interpretation of sequences of bytes of text data
+as characters (for example, single- versus multi-byte characters in arguments
+and input files) and the behavior of character classification for the \fB-b\fR,
+\fB-d\fR, \fB-f\fR, \fB-i\fR and \fB-n\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_NUMERIC\fR\fR
+.ad
+.RS 14n
+.rt  
+Determine the locale for the definition of the radix character and thousands
+separator for the \fB-n\fR option.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All input files were output successfully, or \fB-c\fR was specified and the
+input file was correctly sorted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+Under the \fB-c\fR option, the file was not ordered as specified, or if the
+\fB-c\fR and \fB-u\fR options were both specified, two input lines were found
+with equal keys.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>1\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/tmp/stm???\fR\fR
+.ad
+.RS 19n
+.rt  
+Temporary files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/sort"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SS "/usr/xpg4/bin/sort"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcomm\fR(1), \fBjoin\fR(1), \fBuniq\fR(1), \fBnl_langinfo\fR(3C),
+\fBstrftime\fR(3C), \fBhosts\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+Comments and exits with non-zero status for various trouble conditions (for
+example, when input lines are too long), and for disorders discovered under the
+\fB-c\fR option.
+.SH NOTES
+.sp
+.LP
+When the last line of an input file is missing a \fBnew-line\fR character,
+\fBsort\fR appends one, prints a warning message, and continues.
+.sp
+.LP
+\fBsort\fR does not guarantee preservation of relative line ordering on equal
+keys.
+.sp
+.LP
+One can tune \fBsort\fR performance for a specific scenario using the \fB-S\fR
+option. However, one should note in particular that \fBsort\fR has greater
+knowledge of how to use a finite amount of memory for sorting than the virtual
+memory system. Thus, a sort invoked to request an extremely large amount of
+memory via the \fB-S\fR option could perform extremely poorly.
+.sp
+.LP
+As noted, certain of the field modifiers (such as \fB-M\fR and \fB-d\fR) cause
+the interpretation of input data to be done with reference to locale-specific
+settings. The results of this interpretation can be unexpected if one's
+expectations are not aligned with the conventions established by the locale. In
+the case of the month keys, \fBsort\fR does not attempt to compensate for
+approximate month abbreviations. The precise month abbreviations from
+\fBnl_langinfo\fR(3C) or \fBstrftime\fR(3C) are the only ones recognized. For
+printable or dictionary order, if these concepts are not well-defined by the
+locale, an empty sort key might be the result, leading to the next key being
+the significant one for determining the appropriate ordering.

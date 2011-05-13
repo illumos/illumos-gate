@@ -1,0 +1,164 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf32_xlatetof 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf32_xlatetof, elf32_xlatetom, elf64_xlatetof, elf64_xlatetom \-
+class-dependent data translation
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf_Data *\fR\fBelf32_xlatetof\fR(\fBElf_Data *\fR\fIdst\fR, \fBconst Elf_Data *\fR\fIsrc\fR,
+     \fBunsigned\fR \fIencode\fR);
+.fi
+
+.LP
+.nf
+\fBElf_Data *\fR\fBelf32_xlatetom\fR(\fBElf_Data *\fR\fIdst\fR, \fBconst Elf_Data *\fR\fIsrc\fR,
+     \fBunsigned\fR \fIencode\fR);
+.fi
+
+.LP
+.nf
+\fBElf_Data *\fR\fBelf64_xlatetof\fR(\fBElf_Data *\fR\fIdst\fR, \fBconst Elf_Data *\fR\fIsrc\fR,
+     \fBunsigned\fR \fIencode\fR);
+.fi
+
+.LP
+.nf
+\fBElf_Data *\fR\fBelf64_xlatetom\fR(\fBElf_Data *\fR\fIdst\fR, \fBconst Elf_Data *\fR\fIsrc\fR,
+     \fBunsigned\fR \fIencode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBelf32_xlatetom()\fR translates various data structures from their 32-bit
+class file representations to their memory representations;
+\fBelf32_xlatetof()\fR provides the inverse. This conversion is particularly
+important for cross development environments. \fIsrc\fR is a pointer to the
+source buffer that holds the original data; \fIdst\fR is a pointer to a
+destination buffer that will hold the translated copy. \fIencode\fR gives the
+byte encoding in which the file objects are to be represented and must have one
+of the encoding values defined for the \fBELF\fR header's
+\fBe_ident[EI_DATA]\fR entry (see \fBelf_getident\fR(3ELF)). If the data can be
+translated, the functions return \fIdst\fR. Otherwise, they return \fINULL\fR
+because an error occurred, such as incompatible types, destination buffer
+overflow, etc.
+.sp
+.LP
+\fBelf_getdata\fR(3ELF) describes the \fBElf_Data\fR descriptor, which the
+translation routines use as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd_buf\fR\fR
+.ad
+.RS 13n
+.rt  
+Both the source and destination must have valid buffer pointers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd_type\fR\fR
+.ad
+.RS 13n
+.rt  
+This member's value specifies the type of the data to which \fBd_buf\fR points
+and the type of data to be created in the destination. The program supplies a
+\fBd_type\fR value in the source; the library sets the destination's
+\fBd_type\fR to the same value. These values are summarized below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd_size\fR\fR
+.ad
+.RS 13n
+.rt  
+This member holds the total size, in bytes, of the memory occupied by the
+source data and the size allocated for the destination data. If the destination
+buffer is not large enough, the routines do not change its original contents.
+The translation routines reset the destination's \fBd_size\fR member to the
+actual size required, after the translation occurs. The source and destination
+sizes may differ.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd_version\fR\fR
+.ad
+.RS 13n
+.rt  
+This member holds the version number of the objects (desired) in the buffer.
+The source and destination versions are independent.
+.RE
+
+.sp
+.LP
+Translation routines allow the source and destination buffers to coincide. That
+is, \fBdst\(->d_buf\fR may equal \fBsrc\(->d_buf\fR. Other cases where the
+source and destination buffers overlap give undefined behavior.
+.sp
+.in +2
+.nf
+\fBElf_Type   	32-Bit Memory Type
+ELF_T_ADDR	Elf32_Addr
+ELF_T_BYTE	unsigned char
+ELF_T_DYN	Elf32_Dyn
+ELF_T_EHDR	Elf32_Ehdr
+ELF_T_HALF	Elf32_Half
+ELT_T_OFF	Elf32_Off
+ELF_T_PHDR	Elf32_Phdr
+ELF_T_REL	Elf32_Rel
+ELF_T_RELA	Elf32_Rela
+ELF_T_SHDR	Elf32_Shdr
+ELF_T_SWORD	Elf32_Sword
+ELF_T_SYM	Elf32_Sym
+ELF_T_WORD	Elf32_Word\fR
+.fi
+.in -2
+
+.sp
+.LP
+Translating buffers of type \fBELF_T_BYTE\fR does not change the byte order.
+.sp
+.LP
+For the 64\(mibit class, replace 32 with 64 as appropriate.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_fsize\fR(3ELF), \fBelf_getdata\fR(3ELF),
+\fBelf_getident\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)

@@ -1,0 +1,163 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fstyp_mod_init 3FSTYP "29 Jun 2006" "SunOS 5.11" "File System Type Identification Library Functions"
+.SH NAME
+fstyp_mod_init, fstyp_mod_fini, fstyp_mod_ident, fstyp_mod_get_attr,
+fstyp_mod_dump \- libfstyp module interface
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lfstyp\fR \fB -lnvpair \fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <libnvpair.h>
+#include <libfstyp.h>
+
+\fBint\fR \fBfstyp_mod_init\fR(\fBint\fR \fIfd\fR, \fBoff64_t **\fR\fIoffset\fR, \fBfstyp_mod_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfstyp_mod_fini\fR(\fBfstyp_mod_handle_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfstyp_mod_ident\fR(\fBfstyp_mod_handle_t\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfstyp_mod_get_attr\fR(\fBfstyp_mod_handle_t\fR \fIhandle\fR, \fBnvlist_t **\fR\fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfstyp_mod_dump\fR(\fBfstyp_mod_handle_t\fR \fIhandle\fR, \fBFILE *\fR\fIfout\fR, \fBFILE *\fR\fIferr\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfd\fR\fR
+.ad
+.RS 10n
+.rt  
+Open file descriptor of a block or a raw device that contains the file system
+to be identified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoffset\fR\fR
+.ad
+.RS 10n
+.rt  
+Offset from the beginning of the device where the file system is located.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 10n
+.rt  
+Opaque handle that the module returns in \fBfstyp_mod_init()\fR and is used
+with other module functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfout\fR\fR
+.ad
+.RS 10n
+.rt  
+Output stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIferr\fR\fR
+.ad
+.RS 10n
+.rt  
+Error stream.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+A \fBlibfstyp\fR module implements heuristics required to identify a file
+system type. The modules are shared objects loaded by \fBlibfstyp\fR. The
+\fBlibfstyp\fR modules are located in \fB/usr/lib/fs\fR subdirectories. A
+subdirectory name defines the name of the file system.
+.sp
+.LP
+Each module exports the \fBfstyp_mod_init()\fR, \fBfstyp_mod_fini()\fR,
+\fBfstyp_mod_ident()\fR, and \fBfstyp_mod_get_attr()\fR functions. All of these
+functions map directly to the respective \fBlibfstyp\fR interfaces.
+.sp
+.LP
+The \fBfstyp_mod_dump()\fR function is optional. It can be used to output
+unformatted information about the file system. This function is used by the
+\fBfstyp\fR(1M) command when the \fB-v\fR option is specified. The
+\fBfstyp_mod_dump()\fR function is not recommended and should be used only in
+legacy modules.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/fs/\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default module directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/fs/\fIfstype\fR/fstyp.so.1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default path to a \fBlibfstyp\fR module for an \fIfstype\fR file system.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfstyp\fR(1M), \fBfstyp_strerror\fR(3FSTYP), \fBlibfstyp\fR(3LIB),
+\fBattributes\fR(5)

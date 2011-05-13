@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH flockfile 3C "10 Sep 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+flockfile, funlockfile, ftrylockfile \- acquire and release stream lock
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBvoid\fR \fBflockfile\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfunlockfile\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBftrylockfile\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBflockfile()\fR function acquires an internal lock of a stream
+\fIstream\fR. If the lock is already acquired by another thread, the thread
+calling \fBflockfile()\fR is suspended until it can acquire the lock.  In the
+case that the stream lock is available, \fBflockfile()\fR not only acquires the
+lock, but keeps track of the number of times it is being called by the current
+thread.  This implies that the stream lock can be acquired more than once by
+the same thread.
+.sp
+.LP
+The \fBfunlockfile()\fR function releases the lock being held by the current
+thread.  In the case of recursive locking, this function must be called the
+same number of times \fBflockfile()\fR was called.  After the number of
+\fBfunlockfile()\fR calls is equal to the number of \fBflockfile()\fR calls,
+the stream lock is available for other threads to acquire.
+.sp
+.LP
+The \fBftrylockfile()\fR function acquires an internal lock of a stream
+\fIstream\fR, only if that object is available.  In essence
+\fBftrylockfile()\fR is a non-blocking version of \fBflockfile()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBftrylockfile()\fR function returns \fB0\fR on success and non-zero to
+indicate a lock cannot be acquired.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample program of \fBflockfile()\fR.
+.sp
+.LP
+The following example prints everything out together, blocking other threads
+that might want to write to the same file between calls to \fBfprintf\fR(3C):
+
+.sp
+.in +2
+.nf
+FILE iop;
+flockfile(iop);
+fprintf(iop, "hello ");
+fprintf(iop, "world);
+fputc(iop, 'a');
+funlockfile(iop);
+.fi
+.in -2
+
+.sp
+.LP
+An unlocked interface is available in case performance is an issue.  For
+example:
+
+.sp
+.in +2
+.nf
+flockfile(iop);
+while (!feof(iop)) {
+        *c++ = getc_unlocked(iop);
+}
+funlockfile(iop);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fB__fsetlocking\fR(3C), \fBferror\fR(3C), \fBfprintf\fR(3C),
+\fBgetc\fR(3C), \fBputc\fR(3C), \fBstdio\fR(3C), \fBungetc\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The interfaces on this page  are as specified in IEEE Std 1003.1:2001.  See
+\fBstandards\fR(5).

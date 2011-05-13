@@ -1,0 +1,940 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH login 1 "7 Jan 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+login \- sign on to the system
+.SH SYNOPSIS
+.LP
+.nf
+\fBlogin\fR [\fB-p\fR] [\fB-d\fR \fIdevice\fR] [\fB-R\fR \fIrepository\fR] [\fB-s\fR \fIservice\fR] 
+     [\fB-t\fR \fIterminal\fR] [\fB-u\fR \fIidentity\fR] [\fB-U\fR \fIruser\fR] 
+     [\fB-h\fR \fIhostname\fR \fI[terminal]\fR | \fB-r\fR \fIhostname\fR] 
+     [\fIname\fR [\fIenviron\fR]...]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlogin\fR command is used at the beginning of each terminal session to
+identify oneself to the system. \fBlogin\fR is invoked by the system when a
+connection is first established, after the previous user has terminated the
+login shell by issuing the \fBexit\fR command.
+.sp
+.LP
+If \fBlogin\fR is invoked as a command, it must replace the initial command
+interpreter. To invoke \fBlogin\fR in this fashion, type:
+.sp
+.in +2
+.nf
+\fBexec login\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+from the initial shell. The C shell and Korn shell have their own built-ins of
+\fBlogin\fR. See \fBksh\fR(1), \fBksh93\fR(1), and \fBcsh\fR(1) for
+descriptions of login built-ins and usage.
+.sp
+.LP
+\fBlogin\fR asks for your user name, if it is not supplied as an argument, and
+your password, if appropriate. Where possible, echoing is turned off while you
+type your password, so it does not appear on the written record of the session.
+.sp
+.LP
+If you make any mistake in the login procedure, the message:
+.sp
+.in +2
+.nf
+Login incorrect
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is printed and a new login prompt appears. If you make five incorrect login
+attempts, all five can be logged in \fB/var/adm/loginlog\fR, if it exists. The
+\fBTTY\fR line is dropped.
+.sp
+.LP
+If password aging is turned on and the password has aged (see \fBpasswd\fR(1)
+for more information), the user is forced to changed the password. In this case
+the \fB/etc/nsswitch.conf\fR file is consulted to determine password
+repositories (see \fBnsswitch.conf\fR(4)). The password update configurations
+supported are limited to the following five cases.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpasswd: files\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpasswd: files nis\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpasswd: files nisplus\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpasswd: compat\fR (==> files nis)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBpasswd: compat\fR (==> files nisplus)
+.sp
+\fBpasswd_compat: nisplus\fR
+.RE
+.sp
+.LP
+Failure to comply with the configurations prevents the user from logging onto
+the system because \fBpasswd\fR(1) fails. If you do not complete the login
+successfully within a certain period of time, it is likely that you are
+silently disconnected.
+.sp
+.LP
+After a successful login, accounting files are updated. Device owner, group,
+and permissions are set according to the contents of the
+\fB/etc/logindevperm\fR file, and the time you last logged in is printed (see
+\fBlogindevperm\fR(4)).
+.sp
+.LP
+The user-ID, group-ID, supplementary group list, and working directory are
+initialized, and the command interpreter (usually \fBksh\fR) is started.
+.sp
+.LP
+The basic \fIenvironment\fR is initialized to:
+.sp
+.in +2
+.nf
+HOME=\fIyour-login-directory\fR
+LOGNAME=\fIyour-login-name\fR
+PATH=/usr/bin:
+SHELL=\fIlast-field-of-passwd-entry\fR
+MAIL=/var/mail/
+TZ=\fItimezone-specification\fR
+.fi
+.in -2
+
+.sp
+.LP
+For Bourne shell and Korn shell logins, the shell executes \fB/etc/profile\fR
+and \fB$HOME/.profile\fR, if it exists.
+.sp
+.LP
+For the \fBksh93\fR Korn shell, an interactive shell then executes
+\fB/etc/ksh.kshrc\fR, followed by the file specified by the \fBENV\fR
+environment variable. If \fB$ENV\fR is not set, this defaults to
+\fB$HOME/.kshrc\fR. For the \fBksh\fR and \fB/usr/xpg4/bin/sh\fR Korn Shell, an
+interactive shell executes the file named by \fB$ENV\fR (no default).
+.sp
+.LP
+For C shell logins, the shell executes \fB/etc/.login\fR, \fB$HOME/.cshrc\fR,
+and \fB$HOME/.login\fR. The default \fB/etc/profile\fR and \fB/etc/.login\fR
+files check quotas (see \fBquota\fR(1M)), print \fB/etc/motd\fR, and check for
+mail. None of the messages are printed if the file \fB$HOME/.hushlogin\fR
+exists. The name of the command interpreter is set to \fB\(mi\fR (dash),
+followed by the last component of the interpreter's path name, for example,
+\fB\(mish\fR\&.
+.sp
+.LP
+If the \fIlogin-shell\fR field in the password file (see \fBpasswd\fR(4)) is
+empty, then the default command interpreter, \fB/usr/bin/sh\fR, is used. If
+this field is * (asterisk), then the named directory becomes the root
+directory. At that point, \fBlogin\fR is re-executed at the new level, which
+must have its own root structure.
+.sp
+.LP
+The environment can be expanded or modified by supplying additional arguments
+to \fBlogin\fR, either at execution time or when \fBlogin\fR requests your
+login name. The arguments can take either the form \fIxxx\fR or \fIxxx=yyy\fR.
+Arguments without an \fB=\fR (equal sign) are placed in the environment as:
+.sp
+.in +2
+.nf
+L\fIn=xxx\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIn\fR is a number starting at \fB0\fR and is incremented each time a
+new variable name is required. Variables containing an \fB=\fR (equal sign) are
+placed in the environment without modification. If they already appear in the
+environment, then they replace the older values.
+.sp
+.LP
+There are two exceptions: The variables \fBPATH\fR and \fBSHELL\fR cannot be
+changed. This prevents people logged into restricted shell environments from
+spawning secondary shells that are not restricted. \fBlogin\fR understands
+simple single-character quoting conventions. Typing a \fB\e\fR\| (backslash) in
+front of a character quotes it and allows the inclusion of such characters as
+spaces and tabs.
+.sp
+.LP
+Alternatively, you can pass the current environment by supplying the \fB-p\fR
+flag to \fBlogin\fR. This flag indicates that all currently defined environment
+variables should be passed, if possible, to the new environment. This option
+does not bypass any environment variable restrictions mentioned above.
+Environment variables specified on the login line take precedence, if a
+variable is passed by both methods.
+.sp
+.LP
+To enable remote logins by root, edit the \fB/etc/default/login\fR file by
+inserting a \fB#\fR (pound sign) before the \fBCONSOLE=/dev/console\fR entry.
+See FILES.
+.SH SECURITY
+.sp
+.LP
+For accounts in name services which support automatic account locking, the
+account can be configured to be automatically locked (see \fBuser_attr\fR(4)
+and \fBpolicy.conf\fR(4)) if successive failed login attempts equals or exceeds
+\fBRETRIES\fR. Currently, only the files repository (see \fBpasswd\fR(4) and
+\fBshadow\fR(4)) supports automatic account locking. See also
+\fBpam_unix_auth\fR(5).
+.sp
+.LP
+The \fBlogin\fR command uses \fBpam\fR(3PAM) for authentication, account
+management, session management, and password management. The \fBPAM\fR
+configuration policy, listed through \fB/etc/pam.conf\fR, specifies the modules
+to be used for \fBlogin\fR. Here is a partial \fBpam.conf\fR file with entries
+for the \fBlogin\fR command using the UNIX authentication, account management,
+and session management modules:
+.sp
+.in +2
+.nf
+login  auth       required  pam_authtok_get.so.1
+login  auth       required  pam_dhkeys.so.1
+login  auth       required  pam_unix_auth.so.1
+login  auth       required  pam_dial_auth.so.1
+
+login  account    requisite pam_roles.so.1
+login  account    required  pam_unix_account.so.1
+
+login  session    required  pam_unix_session.so.1
+.fi
+.in -2
+
+.sp
+.LP
+The Password Management stack looks like the following:
+.sp
+.in +2
+.nf
+other  password   required   pam_dhkeys.so.1
+other  password   requisite  pam_authtok_get.so.1
+other  password   requisite  pam_authtok_check.so.1
+other  password   required   pam_authtok_store.so.1
+.fi
+.in -2
+
+.sp
+.LP
+If there are no entries for the service, then the entries for the \fBother\fR
+service is used. If multiple authentication modules are listed, then the user
+can be prompted for multiple passwords.
+.sp
+.LP
+When \fBlogin\fR is invoked through \fBrlogind\fR or \fBtelnetd\fR, the service
+name used by \fBPAM\fR is \fBrlogin\fR or \fBtelnet\fR, respectively.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdevice\fR\fR
+.ad
+.RS 26n
+.rt  
+\fBlogin\fR accepts a device option, \fIdevice\fR. \fIdevice\fR is taken to be
+the path name of the \fBTTY\fR port \fBlogin\fR is to operate on. The use of
+the device option can be expected to improve \fBlogin\fR performance, since
+\fBlogin\fR does not need to call \fBttyname\fR(3C). The \fB-d\fR option is
+available only to users whose \fBUID\fR and effective \fBUID\fR are root. Any
+other attempt to use \fB-d\fR causes \fBlogin\fR to quietly exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fIhostname\fR [\fIterminal\fR]\fR
+.ad
+.RS 26n
+.rt  
+Used by \fBin.telnetd\fR(1M) to pass information about the remote host and
+terminal type.
+.sp
+Terminal type as a second argument to the \fB-h\fR option should not start with
+a hyphen (\fB-\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 26n
+.rt  
+Used to pass environment variables to the login shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fIhostname\fR\fR
+.ad
+.RS 26n
+.rt  
+Used by \fBin.rlogind\fR(1M) to pass information about the remote host.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR \fIrepository\fR\fR
+.ad
+.RS 26n
+.rt  
+Used to specify the \fBPAM\fR repository that should be used to tell \fBPAM\fR
+about the "\fBidentity\fR" (see option \fB-u\fR below). If no "\fBidentity\fR"
+information is passed, the repository is not used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIservice\fR\fR
+.ad
+.RS 26n
+.rt  
+Indicates the \fBPAM\fR service name that should be used. Normally, this
+argument is not necessary and is used only for specifying alternative \fBPAM\fR
+service names. For example: "\fBktelnet\fR" for the Kerberized telnet process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIidentity\fR\fR
+.ad
+.RS 26n
+.rt  
+Specifies the "\fBidentity\fR" string associated with the user who is being
+authenticated. This usually is \fBnot\fR be the same as that user's Unix login
+name. For Kerberized login sessions, this is the Kerberos principal name
+associated with the user.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR \fIruser\fR\fR
+.ad
+.RS 26n
+.rt  
+Indicates the name of the person attempting to login on the remote side of the
+rlogin connection. When \fBin.rlogind\fR(1M) is operating in Kerberized mode,
+that daemon processes the terminal and remote user name information prior to
+invoking \fBlogin\fR, so the "\fBruser\fR" data is indicated using this command
+line parameter. Normally (non-Kerberos authenticated \fBrlogin\fR), the
+\fBlogin\fR daemon reads the remote user information from the client.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+Error.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.cshrc\fR\fR
+.ad
+.RS 23n
+.rt  
+Initial commands for each \fBcsh\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.hushlogin\fR\fR
+.ad
+.RS 23n
+.rt  
+Suppresses login messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.kshrc\fR\fR
+.ad
+.RS 23n
+.rt  
+User's commands for interactive \fBksh93\fR, if \fB$ENV\fR is unset; executes
+after \fB/etc/ksh.kshrc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.login\fR\fR
+.ad
+.RS 23n
+.rt  
+User's login commands for \fBcsh\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.profile\fR\fR
+.ad
+.RS 23n
+.rt  
+User's login commands for \fBsh\fR, \fBksh\fR, and \fBksh93\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.rhosts\fR\fR
+.ad
+.RS 23n
+.rt  
+Private list of trusted hostname/username combinations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/.login\fR\fR
+.ad
+.RS 23n
+.rt  
+System-wide \fBcsh\fR login commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/issue\fR\fR
+.ad
+.RS 23n
+.rt  
+Issue or project identification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/ksh.kshrc\fR\fR
+.ad
+.RS 23n
+.rt  
+System-wide commands for interactive \fBksh93\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/logindevperm\fR\fR
+.ad
+.RS 23n
+.rt  
+Login-based device permissions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/motd\fR\fR
+.ad
+.RS 23n
+.rt  
+Message-of-the-day.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nologin\fR\fR
+.ad
+.RS 23n
+.rt  
+Message displayed to users attempting to login during machine shutdown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 23n
+.rt  
+Password file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/profile\fR\fR
+.ad
+.RS 23n
+.rt  
+System-wide \fBsh\fR, \fBksh\fR, and \fBksh93\fR login commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/shadow\fR\fR
+.ad
+.RS 23n
+.rt  
+List of users' encrypted passwords.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/sh\fR\fR
+.ad
+.RS 23n
+.rt  
+User's default command interpreter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/lastlog\fR\fR
+.ad
+.RS 23n
+.rt  
+Time of last login.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/loginlog\fR\fR
+.ad
+.RS 23n
+.rt  
+Record of failed login attempts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/utmpx\fR\fR
+.ad
+.RS 23n
+.rt  
+Accounting.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/wtmpx\fR\fR
+.ad
+.RS 23n
+.rt  
+Accounting.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/mail/\fR\fIyour-name\fR\fR
+.ad
+.RS 23n
+.rt  
+Mailbox for user \fIyour-name\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/default/login\fR\fR
+.ad
+.RS 23n
+.rt  
+Default value can be set for the following flags in \fB/etc/default/login\fR.
+Default values are specified as comments in the \fB/etc/default/login\fR file,
+for example, \fBTIMEZONE=EST5EDT\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIMEZONE\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the \fBTZ\fR environment variable of the shell (see \fBenviron\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHZ\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the \fBHZ\fR environment variable of the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBULIMIT\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the file size limit for the login. Units are disk blocks. Default is zero
+(no limit).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCONSOLE\fR\fR
+.ad
+.RS 24n
+.rt  
+If set, root can login on that device only. This does not prevent execution of
+remote commands with \fBrsh\fR(1). Comment out this line to allow login by
+root.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPASSREQ\fR\fR
+.ad
+.RS 24n
+.rt  
+Determines if login requires a non-null password.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBALTSHELL\fR\fR
+.ad
+.RS 24n
+.rt  
+Determines if login should set the \fBSHELL\fR environment variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPATH\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the initial shell \fBPATH\fR variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSUPATH\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the initial shell \fBPATH\fR variable for root.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTIMEOUT\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the number of seconds (between \fB0\fR and \fB900\fR) to wait before
+abandoning a login session.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUMASK\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the initial shell file creation mode mask. See \fBumask\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSYSLOG\fR\fR
+.ad
+.RS 24n
+.rt  
+Determines whether the \fBsyslog\fR(3C) \fBLOG_AUTH\fR facility should be used
+to log all root logins at level \fBLOG_NOTICE\fR and multiple failed login
+attempts at\fBLOG_CRIT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDISABLETIME\fR\fR
+.ad
+.RS 24n
+.rt  
+If present, and greater than zero, the number of seconds that \fBlogin\fR waits
+after \fBRETRIES\fR failed attempts or the \fBPAM \fRframework returns
+\fBPAM_ABORT\fR. Default is \fB20\fR seconds. Minimum is \fB0\fR seconds. No
+maximum is imposed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEPTIME\fR\fR
+.ad
+.RS 24n
+.rt  
+If present, sets the number of seconds to wait before the login failure message
+is printed to the screen. This is for any login failure other than
+\fBPAM_ABORT\fR. Another login attempt is allowed, providing \fBRETRIES\fR has
+not been reached or the \fBPAM\fR framework is returned \fBPAM_MAXTRIES\fR.
+Default is \fB4\fR seconds. Minimum is \fB0\fR seconds. Maximum is \fB5\fR
+seconds.
+.sp
+Both \fBsu\fR(1M) and \fBsulogin\fR(1M) are affected by the value of
+\fBSLEEPTIME\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRETRIES\fR\fR
+.ad
+.RS 24n
+.rt  
+Sets the number of retries for logging in (see \fBpam\fR(3PAM)). The default is
+5. The maximum number of retries is 15. For accounts configured with automatic
+locking (see \fBSECURITY\fR above), the account is locked and \fBlogin\fR
+exits. If automatic locking has not been configured, \fBlogin\fR exits without
+locking the account.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSYSLOG_FAILED_LOGINS\fR\fR
+.ad
+.RS 24n
+.rt  
+Used to determine how many failed login attempts are allowed by the system
+before a failed login message is logged, using the \fBsyslog\fR(3C)
+\fBLOG_NOTICE\fR facility. For example, if the variable is set to \fB0\fR,
+\fBlogin\fR logs \fIall\fR failed login attempts.
+.RE
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBexit\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBmail\fR(1),
+\fBmailx\fR(1), \fBnewgrp\fR(1), \fBpasswd\fR(1), \fBrlogin\fR(1),
+\fBrsh\fR(1), \fBsh\fR(1), \fBshell_builtins\fR(1), \fBtelnet\fR(1),
+\fBumask\fR(1), \fBin.rlogind\fR(1M), \fBin.telnetd\fR(1M), \fBlogins\fR(1M),
+\fBquota\fR(1M), \fBsu\fR(1M), \fBsulogin\fR(1M), \fBsyslogd\fR(1M),
+\fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBpam\fR(3PAM), \fBrcmd\fR(3SOCKET),
+\fBsyslog\fR(3C), \fBttyname\fR(3C), \fBauth_attr\fR(4), \fBexec_attr\fR(4),
+\fBhosts.equiv\fR(4), \fBissue\fR(4), \fBlogindevperm\fR(4), \fBloginlog\fR(4),
+\fBnologin\fR(4), \fBnsswitch.conf\fR(4), \fBpam.conf\fR(4), \fBpasswd\fR(4),
+\fBpolicy.conf\fR(4), \fBprofile\fR(4), \fBshadow\fR(4), \fBuser_attr\fR(4),
+\fButmpx\fR(4), \fBwtmpx\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5),
+\fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
+\fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
+\fBtermio\fR(7I)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLogin incorrect\fR\fR
+.ad
+.sp .6
+.RS 4n
+The user name or the password cannot be matched.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNot on system console\fR\fR
+.ad
+.sp .6
+.RS 4n
+Root login denied. Check the \fBCONSOLE\fR setting in \fB/etc/default/login\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNo directory! Logging in with home=/\fR\fR
+.ad
+.sp .6
+.RS 4n
+The user's home directory named in the \fBpasswd\fR(4) database cannot be found
+or has the wrong permissions. Contact your system administrator.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNo shell\fR\fR
+.ad
+.sp .6
+.RS 4n
+Cannot execute the shell named in the \fBpasswd\fR(4) database. Contact your
+system administrator.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO LOGINS: System going down in\fR \fIN\fR \fBminutes\fR\fR
+.ad
+.sp .6
+.RS 4n
+The machine is in the process of being shut down and logins have been disabled.
+.RE
+
+.SH WARNINGS
+.sp
+.LP
+Users with a \fBUID\fR greater than 76695844 are not subject to password aging,
+and the system does not record their last login time.
+.sp
+.LP
+If you use the \fBCONSOLE\fR setting to disable root logins, you should arrange
+that remote command execution by root is also disabled. See \fBrsh\fR(1),
+\fBrcmd\fR(3SOCKET), and \fBhosts.equiv\fR(4) for further details.
+.SH NOTES
+.sp
+.LP
+The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
+provided by \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
+\fBpam_unix_session\fR(5), \fBpam_authtok_check\fR(5),
+\fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), and
+\fBpam_passwd_auth\fR(5).

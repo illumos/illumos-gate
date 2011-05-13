@@ -1,0 +1,579 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_add_softintr 9F "19 Oct 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_add_softintr, ddi_get_soft_iblock_cookie, ddi_remove_softintr,
+ddi_trigger_softintr \- software interrupt handling routines
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h> 
+#include <sys/conf.h> 
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBddi_get_soft_iblock_cookie\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fIpreference\fR, \fBddi_iblock_cookie_t *\fR\fIiblock_cookiep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_add_softintr\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIpreference\fR, \fBddi_softintr_t *\fR\fIidp\fR,
+     \fBddi_iblock_cookie_t *\fR\fIiblock_cookiep\fR, \fBddi_idevice_cookie_t *\fR
+     \fIidevice_cookiep\fR,
+     \fBuint_t(*\fR\fIint_handler\fR) (caddr_t \fIint_handler_arg\fR), \fBcaddr_t\fR 
+     \fIint_handler_arg\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBddi_remove_softintr\fR(\fBddi_softintr_t\fR \fIid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBddi_trigger_softintr\fR(\fBddi_softintr_t\fR \fIid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). These interfaces are obsolete. Use the new
+interrupt interfaces referenced in \fBIntro\fR(9F). Refer to \fIWriting Device
+Drivers\fR for more information.
+.SH PARAMETERS
+.sp
+.LP
+\fBddi_get_soft_iblock_cookie()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 18n
+.rt  
+Pointer to a \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpreference\fR\fR
+.ad
+.RS 18n
+.rt  
+The type of soft interrupt to retrieve the cookie for.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIiblock_cookiep\fR\fR
+.ad
+.RS 18n
+.rt  
+Pointer to a location to store the interrupt block cookie.
+.RE
+
+.sp
+.LP
+\fBddi_add_softintr()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 19n
+.rt  
+Pointer to \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpreference\fR\fR
+.ad
+.RS 19n
+.rt  
+A hint value describing the type of soft interrupt to generate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIidp\fR\fR
+.ad
+.RS 19n
+.rt  
+Pointer to a soft interrupt identifier where a returned soft interrupt
+identifier is stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIiblock_cookiep\fR\fR
+.ad
+.RS 19n
+.rt  
+Optional pointer to an interrupt block cookie where a returned interrupt block
+cookie is stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIidevice_cookiep\fR\fR
+.ad
+.RS 19n
+.rt  
+Optional pointer to an interrupt device cookie where a returned interrupt
+device cookie is stored (not used).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIint_handler\fR\fR
+.ad
+.RS 19n
+.rt  
+Pointer to interrupt handler.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIint_handler_arg\fR\fR
+.ad
+.RS 19n
+.rt  
+Argument for interrupt handler.
+.RE
+
+.sp
+.LP
+\fBddi_remove_softintr()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIid\fR\fR
+.ad
+.RS 6n
+.rt  
+The identifier specifying which soft interrupt handler to remove.
+.RE
+
+.sp
+.LP
+\fBddi_trigger_softintr()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIid\fR\fR
+.ad
+.RS 6n
+.rt  
+The identifier specifying which soft interrupt to trigger and which soft
+interrupt handler will be called.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+For \fBddi_get_soft_iblock_cookie()\fR:
+.sp
+.LP
+\fBddi_get_soft_iblock_cookie()\fR retrieves the interrupt block cookie
+associated with a particular soft interrupt preference level. This routine
+should be called before \fBddi_add_softintr()\fR to retrieve the interrupt
+block cookie needed to initialize locks ( \fBmutex\fR(9F), \fBrwlock\fR(9F))
+used by the software interrupt routine. \fIpreference\fR determines which type
+of soft interrupt to retrieve the cookie for. The possible values for
+\fIpreference\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SOFTINT_LOW\fR\fR
+.ad
+.RS 20n
+.rt  
+Low priority soft interrupt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SOFTINT_MED\fR\fR
+.ad
+.RS 20n
+.rt  
+Medium priority soft interrupt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SOFTINT_HIGH\fR\fR
+.ad
+.RS 20n
+.rt  
+High priority soft interrupt.
+.RE
+
+.sp
+.LP
+On a successful return, \fIiblock_cookiep\fR contains information needed for
+initializing locks associated with this soft interrupt (see
+\fBmutex_init\fR(9F) and \fBrw_init\fR(9F)). The driver can then initialize
+mutexes acquired by the interrupt routine before calling
+\fBddi_add_softintr()\fR which prevents a possible race condition where the
+driver's soft interrupt handler is called immediately \fBafter\fR the driver
+has called \fBddi_add_softintr()\fR but \fBbefore\fR the driver has initialized
+the mutexes. This can happen when a soft interrupt for a different device
+occurs on the same soft interrupt priority level. If the soft interrupt routine
+acquires the mutex before it has been initialized, undefined behavior may
+result.
+.sp
+.LP
+For \fBddi_add_softintr()\fR:
+.sp
+.LP
+\fBddi_add_softintr()\fR adds a soft interrupt to the system. The user
+specified hint \fIpreference\fR identifies three suggested levels for the
+system to attempt to allocate the soft interrupt priority at. The value for
+\fIpreference\fR should be the same as that used in the corresponding call to
+\fBddi_get_soft_iblock_cookie()\fR. Refer to the description of
+\fBddi_get_soft_iblock_cookie()\fR above.
+.sp
+.LP
+The value returned in the location pointed at by \fIidp\fR is the soft
+interrupt identifier. This value is used in later calls to
+\fBddi_remove_softintr()\fR and \fBddi_trigger_softintr()\fR to identify the
+soft interrupt and the soft interrupt handler.
+.sp
+.LP
+The value returned in the location pointed at by \fIiblock_cookiep\fR is an
+interrupt block cookie which contains information used for initializing mutexes
+associated with this soft interrupt (see \fBmutex_init\fR(9F) and
+\fBrw_init\fR(9F)). Note that the interrupt block cookie is normally obtained
+using \fBddi_get_soft_iblock_cookie()\fR to avoid the race conditions described
+above (refer to the description of \fBddi_get_soft_iblock_cookie()\fR above).
+For this reason, \fIiblock_cookiep\fR is no longer useful and should be set to
+\fINULL\fR.
+.sp
+.LP
+\fIidevice_cookiep\fR is not used and should be set to \fINULL\fR.
+.sp
+.LP
+The routine \fIint_handler\fR, with its argument \fIint_handler_arg\fR, is
+called upon receipt of a software interrupt. Software interrupt handlers must
+not assume that they have work to do when they run, since (like hardware
+interrupt handlers) they may run because a soft interrupt occurred for some
+other reason. For example, another driver may have triggered a soft interrupt
+at the same level. For this reason, before triggering the soft interrupt, the
+driver must indicate to its soft interrupt handler that it should do work. This
+is usually done by setting a flag in the state structure. The routine
+\fIint_handler\fR checks this flag, reachable through \fIint_handler_arg\fR, to
+determine if it should claim the interrupt and do its work.
+.sp
+.LP
+The interrupt handler must return \fBDDI_INTR_CLAIMED\fR if the interrupt was
+claimed, \fBDDI_INTR_UNCLAIMED\fR otherwise.
+.sp
+.LP
+If successful, \fBddi_add_softintr()\fR will return \fBDDI_SUCCESS\fR; if the
+interrupt information cannot be found, it will return \fBDDI_FAILURE\fR.
+.sp
+.LP
+For \fBddi_remove_softintr()\fR:
+.sp
+.LP
+\fBddi_remove_softintr()\fR removes a soft interrupt from the system. The soft
+interrupt identifier \fIid\fR, which was returned from a call to
+\fBddi_add_softintr()\fR, is used to determine which soft interrupt and which
+soft interrupt handler to remove. Drivers must remove any soft interrupt
+handlers before allowing the system to unload the driver.
+.sp
+.LP
+For \fBddi_trigger_softintr()\fR:
+.sp
+.LP
+\fBddi_trigger_softintr()\fR triggers a soft interrupt. The soft interrupt
+identifier \fIid\fR is used to determine which soft interrupt to trigger. This
+function is used by device drivers when they wish to trigger a soft interrupt
+which has been set up using \fBddi_add_softintr()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_add_softintr()\fR and \fBddi_get_soft_iblock_cookie()\fR return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+on success
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+on failure
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user or kernel context.
+\fBddi_trigger_softintr()\fR may be called from high-level interrupt context as
+well.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRdevice using high-level interrupts
+.sp
+.LP
+In the following example, the device uses high-level interrupts. High-level
+interrupts are those that interrupt at the level of the scheduler and above.
+High level interrupts must be handled without using system services that
+manipulate thread or process states, because these interrupts are not blocked
+by the scheduler. In addition, high level interrupt handlers must take care to
+do a minimum of work because they are not preemptable. See
+\fBddi_intr_hilevel\fR(9F).
+
+.sp
+.LP
+In the example, the high-level interrupt routine minimally services the device,
+and enqueues the data for later processing by the soft interrupt handler. If
+the soft interrupt handler is not currently running, the high-level interrupt
+routine triggers a soft interrupt so the soft interrupt handler can process the
+data. Once running, the soft interrupt handler processes all the enqueued data
+before returning.
+
+.sp
+.LP
+The state structure contains two mutexes. The high-level mutex is used to
+protect data shared between the high-level interrupt handler and the soft
+interrupt handler. The low-level mutex is used to protect the rest of the
+driver from the soft interrupt handler.
+
+.sp
+.in +2
+.nf
+struct xxstate {
+      .\|.\|.
+      ddi_softintr_t             id;
+         ddi_iblock_cookie_t     high_iblock_cookie;
+         kmutex_t                      high_mutex;
+         ddi_iblock_cookie_t     low_iblock_cookie;
+         kmutex_t                      low_mutex;
+         int                              softint_running;
+      .\|.\|.
+}; 
+struct xxstate *xsp;
+static uint_t xxsoftintr(caddr_t);
+static uint_t xxhighintr(caddr_t);
+\&.\|.\|.
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRsample \fBattach()\fR routine
+.sp
+.LP
+The following code fragment would usually appear in the driver's
+\fBattach\fR(9E) routine. \fBddi_add_intr\fR(9F) is used to add the high-level
+interrupt handler and \fBddi_add_softintr()\fR is used to add the low-level
+interrupt routine.
+
+.sp
+.in +2
+.nf
+static uint_t
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+         struct xxstate *xsp;
+         .\|.\|.
+      /* get high-level iblock cookie */
+         if (ddi_get_iblock_cookie(dip, \fIinumber\fR, 
+                &xsp->high_iblock_cookie) != DDI_SUCCESS)  {
+                      /* clean up */
+                      return (DDI_FAILURE); /* fail attach */
+         }
+    
+         /* initialize high-level mutex */
+         mutex_init(&xsp->high_mutex, "xx high mutex", MUTEX_DRIVER,
+               (void *)xsp->high_iblock_cookie);
+    
+         /* add high-level routine - xxhighintr() */
+         if (ddi_add_intr(dip, \fIinumber\fR, NULL, NULL,
+                xxhighintr, (caddr_t) xsp) != DDI_SUCCESS)  {
+                      /* cleanup */
+                      return (DDI_FAILURE); /* fail attach */ 
+         }
+
+         /* get soft iblock cookie */
+         if (ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_MED,
+                &xsp->low_iblock_cookie) != DDI_SUCCESS)  {
+                      /* clean up */
+                      return (DDI_FAILURE); /* fail attach */
+         }   
+
+         /* initialize low-level mutex */ 
+         mutex_init(&xsp->low_mutex, "xx low mutex", MUTEX_DRIVER, 
+                (void *)xsp->low_iblock_cookie); 
+
+         /* add low level routine - xxsoftintr() */
+         if ( ddi_add_softintr(dip, DDI_SOFTINT_MED, &xsp->id, 
+                NULL, NULL, xxsoftintr, (caddr_t) xsp) != DDI_SUCCESS) {
+                      /* cleanup */
+                      return (DDI_FAILURE);  /* fail attach */
+         }
+     
+         .\|.\|.
+}
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRHigh-level interrupt routine
+.sp
+.LP
+The next code fragment represents the high-level interrupt routine. The
+high-level interrupt routine minimally services the device, and enqueues the
+data for later processing by the soft interrupt routine. If the soft interrupt
+routine is not already running, \fBddi_trigger_softintr()\fR is called to start
+the routine. The soft interrupt routine will run until there is no more data on
+the queue.
+
+.sp
+.in +2
+.nf
+static uint_t
+xxhighintr(caddr_t arg)
+{
+      struct xxstate *xsp = (struct xxstate *) arg;
+         int need_softint;
+         .\|.\|.
+         mutex_enter(&xsp->high_mutex);
+         /* 
+         * Verify this device generated the interrupt
+         * and disable the device interrupt.
+         * Enqueue data for xxsoftintr() processing.
+         */
+
+         /* is xxsoftintr() already running ? */
+         if (xsp->softint_running)
+                need_softint = 0;
+          else
+                need_softint = 1;
+          mutex_exit(&xsp->high_mutex);
+
+          /* read-only access to xsp->id, no mutex needed */
+          if (need_softint)
+                ddi_trigger_softintr(xsp->id);
+          .\|.\|.
+          return (DDI_INTR_CLAIMED);
+}
+
+static uint_t
+xxsoftintr(caddr_t arg)
+{
+      struct xxstate *xsp = (struct xxstate *) arg;
+      .\|.\|.
+         mutex_enter(&xsp->low_mutex);
+      mutex_enter(&xsp->high_mutex);
+
+      /* verify there is work to do */
+      if (\fBwork queue empty\fR || xsp->softint_running )  {
+                mutex_exit(&xsp->high_mutex);
+                mutex_exit(&xsp->low_mutex);
+                return (DDI_INTR_UNCLAIMED);
+      }
+
+      xsp->softint_running = 1;
+
+         while ( \fBdata on queue\fR )  {
+                ASSERT(mutex_owned(&xsp->high_mutex));
+
+                /* de-queue data */
+
+                mutex_exit(&xsp->high_mutex);
+        
+                /* Process data on queue */
+
+                mutex_enter(&xsp->high_mutex);
+          }
+
+          xsp->softint_running = 0;
+          mutex_exit(&xsp->high_mutex);
+          mutex_exit(&xsp->low_mutex);
+
+          return (DDI_INTR_CLAIMED);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_add_intr\fR(9F), \fBddi_in_panic\fR(9F), \fBddi_intr_hilevel\fR(9F),
+\fBddi_remove_intr\fR(9F), \fBIntro\fR(9F), \fBmutex_init\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+\fBddi_add_softintr()\fR may not be used to add the same software interrupt
+handler more than once. This is true even if a different value is used for
+\fIint_handler_arg\fR in each of the calls to \fBddi_add_softintr()\fR.
+Instead, the argument passed to the interrupt handler should indicate what
+service(s) the interrupt handler should perform. For example, the argument
+could be a pointer to the device's soft state structure, which could contain
+a 'which_service' field that the handler examines. The driver must set this field
+to the appropriate value before calling \fBddi_trigger_softintr()\fR.

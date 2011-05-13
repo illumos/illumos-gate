@@ -1,0 +1,216 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pool_get_pool 3POOL "18 Jul 2005" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.SH NAME
+pool_get_pool, pool_get_resource, pool_query_components, pool_query_pools,
+pool_query_resources \- retrieve resource pool configuration elements
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR]\&.\|.\|.  \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <pool.h>
+
+\fBpool_t *\fR\fBpool_get_pool\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpool_resource_t *\fR\fBpool_get_resource\fR(\fBpool_conf_t *\fR\fIconf\fR
+     \fBconst char *\fR\fItype\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBpool_component_t **\fR\fBpool_query_components\fR(\fBpool_conf_t *\fR\fIconf\fR,
+     \fBuint_t *\fR\fInelem\fR, \fBpool_value_t **\fR\fIprops\fR);
+.fi
+
+.LP
+.nf
+\fBpool_t **\fR\fBpool_query_pools\fR(\fBpool_conf_t *\fR\fIconf\fR, \fBuint_t *\fR\fInelem\fR,
+     \fBpool_value_t **\fR\fIprops\fR);
+.fi
+
+.LP
+.nf
+\fBpool_component_t **\fR\fBpool_query_resources\fR(\fBpool_conf_t *\fR\fIconf\fR,
+     \fBuint_t *\fR\fInelem\fR, \fBpool_value_t **\fR\fIprops\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide a means for querying the contents of the specified
+configuration. The \fIconf\fR argument for each function refers to the target
+configuration to which the operation applies.
+.sp
+.LP
+The \fBpool_get_pool()\fR function returns the pool with the given name from
+the provided configuration.
+.sp
+.LP
+The \fBpool_get_resource()\fR function returns the resource with the given name
+and type from the provided configuration.
+.sp
+.LP
+The \fBpool_query_components()\fR function retrieves all resource components
+that match the given list of properties. If the list of properties is
+\fINULL\fR, all components are returned. The number of elements returned is
+stored in the location pointed to by \fInelem\fR. The value returned by
+\fBpool_query_components()\fR is allocated with \fBmalloc\fR(3C) and must be
+explicitly freed.
+.sp
+.LP
+The \fBpool_query_pools()\fR function behaves similarly to
+\fBpool_query_components()\fR and returns the list of pools that match the
+given list of properties. The value returned must be freed by the caller.
+.sp
+.LP
+The \fBpool_query_resources()\fR function similarly returns the list of
+resources that match the given list of properties. The return value must be
+freed by the caller.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBpool_get_pool()\fR and \fBpool_get_resource()\fR functions return the
+matching pool and resource, respectively. Otherwise, they return \fINULL\fR and
+\fBpool_error\fR(3POOL) returns the pool-specific error value.
+.sp
+.LP
+The \fBpool_query_components()\fR, \fBpool_query_pools()\fR, and
+\fBpool_query_resources()\fR functions return a null-terminated array of
+components, pools, and resources, respectively. If the query was unsuccessful
+or there were no matches, \fINULL\fR is returned and \fBpool_error()\fR returns
+the pool-specific error value.
+.SH ERRORS
+.sp
+.LP
+The \fBpool_get_pool()\fR will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.LP
+The \fBpool_get_resource()\fR will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 16n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 16n
+.rt  
+There is not enough memory available to allocate working buffers. Check
+\fBerrno\fR for the specific system error code.
+.RE
+
+.sp
+.LP
+The \fBpool_query_components()\fR, \fBpool_query_pools()\fR, and
+\fBpool_query_resources()\fR will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_BADPARAM\fR\fR
+.ad
+.RS 20n
+.rt  
+The supplied configuration's status is not \fBPOF_VALID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_INVALID_CONF\fR\fR
+.ad
+.RS 20n
+.rt  
+The query generated results that were not of the correct type. The
+configuration is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPOE_SYSTEM\fR\fR
+.ad
+.RS 20n
+.rt  
+There is not enough memory available to allocate working buffers. Check
+\fBerrno\fR for the specific system error code.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRRetrieve the pool named "foo" from a given configuration.
+.sp
+.in +2
+.nf
+#include <pool.h>
+#include <stdio.h>
+ 
+\&...
+ 
+pool_conf_t *conf;
+pool_t *pool;
+ 
+\&...
+ 
+if ((pool = pool_get_pool(conf, "foo")) == NULL) {
+        (void) fprintf(stderr, "Cannot retrieve pool named
+        'foo'\B{}n");
+        ...
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityUnstable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

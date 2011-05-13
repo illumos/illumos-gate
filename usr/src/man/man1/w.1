@@ -1,0 +1,173 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH w 1 "19 Mar 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+w \- display information about currently logged-in users
+.SH SYNOPSIS
+.LP
+.nf
+\fBw\fR [\fB-hlsuw\fR] [\fIuser\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBw\fR command displays a summary of the current activity on the system,
+including what each user is doing. The heading line shows the current time, the
+length of time the system has been up, the number of users logged into the
+system, and the average number of jobs in the run queue over the last 1, 5 and
+15 minutes.
+.sp
+.LP
+The fields displayed are: the user's login name, the name of the tty the user
+is on, the time of day the user logged on (in \fIhours:minutes\fR), the idle
+time\(emthat is, the number of minutes since the user last typed anything (in
+\fIhours:minutes\fR), the \fBCPU\fR time used by all processes and their
+children on that terminal (in \fIminutes:seconds\fR), the \fBCPU\fR time used
+by the currently active processes (in \fIminutes:seconds\fR), and the name and
+arguments of the current process.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Suppresses the heading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Produces a long form of output, which is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Produces a short form of output. In the short form, the tty is abbreviated, the
+login time and \fBCPU\fR times are left off, as are the arguments to commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 6n
+.rt  
+Produces the heading line which shows the current time, the length of time the
+system has been up, the number of users logged into the system, and the average
+number of jobs in the run queue over the last 1, 5 and 15 minutes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 6n
+.rt  
+Produces a long form of output, which is also the same as the default.
+.RE
+
+.SH OPERANDS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser\fR\fR
+.ad
+.RS 8n
+.rt  
+Name of a particular user for whom login information is displayed. If
+specified, output is restricted to that user.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample Output From the \fBw\fR Command
+.sp
+.in +2
+.nf
+example% \fBw\fR
+
+
+10:54am  up 27 day(s), 57 mins,  1 user,  load average: 0.28, 0.26, 0.22
+User	    tty		    login@    idle	   JCPU	   PCPU	    what
+ralph    console  7:10am    1       10:05   4:31     w
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See  \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBw\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
+\fBLC_TIME\fR.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/utmpx\fR\fR
+.ad
+.RS 18n
+.rt  
+user and accounting information
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBps\fR(1), \fBwho\fR(1), \fBwhodo\fR(1M), \fButmpx\fR(4),
+\fBattributes\fR(5), \fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+The notion of the "current process" is unclear. The current algorithm is "the
+highest numbered process on the terminal that is not ignoring interrupts, or,
+if there is none, the highest numbered process on the terminal". This fails,
+for example, in critical sections of programs like the shell and editor, or
+when faulty programs running in the background fork and fail to ignore
+interrupts. In cases where no process can be found, \fBw\fR prints
+\fB\(mi\fR\&.
+.sp
+.LP
+The \fBCPU\fR time is only an estimate, in particular, if someone leaves a
+background process running after logging out, the person currently on that
+terminal is ``charged'' with the time.
+.sp
+.LP
+Background processes are not shown, even though they account for much of the
+load on the system.
+.sp
+.LP
+Sometimes processes, typically those in the background, are printed with null
+or garbaged arguments. In these cases, the name of the command is printed in
+parentheses.
+.sp
+.LP
+\fBw\fR does not know about the conventions for detecting background jobs. It
+will sometimes find a background job instead of the right one.

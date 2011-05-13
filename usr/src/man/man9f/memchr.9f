@@ -1,0 +1,126 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH memchr 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+memchr, memcmp, memcpy, memmove, memset \- Memory operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+
+
+
+\fBvoid *\fR\fBmemchr\fR(\fBconst void *\fR\fIs\fR, \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmemcmp\fR(\fBconst void *\fR\fIs1\fR, \fBconst void *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBmemcpy\fR(\fBvoid *restrict\fR \fIs1\fR, \fBconst void *restrict\fR \fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBmemmove\fR(\fBvoid *\fR\fIs1\fR, \fBconst void *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBmemset\fR(\fBvoid *\fR\fIs\fR, \fBint\fR \fIc\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdst\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointers to character strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 10n
+.rt  
+Count of characters to be copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs1\fR, \fIs2\fR\fR
+.ad
+.RS 10n
+.rt  
+Pointers to character strings.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions operate as efficiently as possible on memory areas (arrays of
+bytes bounded by a count, not terminated by a null character). They do not
+check for the overflow of any receiving memory area.
+.sp
+.LP
+The \fBmemchr()\fR function returns a pointer to the first occurrence of
+\fIc\fR (converted to an \fBunsigned char\fR) in the first \fIn\fR bytes (each
+interpreted as an \fBunsigned char\fR) of memory area \fIs\fR, or a null
+pointer if \fIc\fR does not occur.
+.sp
+.LP
+The \fBmemcmp()\fR function compares its arguments, looking at the first
+\fIn\fR bytes (each interpreted as an \fBunsigned char\fR), and returns an
+integer less than, equal to, or greater than 0, according as \fIs1\fR is
+lexicographically less than, equal to, or greater than \fIs2\fR when taken to
+be unsigned characters.
+.sp
+.LP
+The \fBmemcpy()\fR function copies \fIn\fR bytes from memory area \fIs2\fR to
+\fIs1\fR. It returns \fIs1\fR. If copying takes place between objects that
+overlap, the behavior is undefined.
+.sp
+.LP
+The \fBmemmove()\fR function copies \fIn\fR bytes from memory area \fIs2\fR to
+memory area \fIs1\fR. Copying between objects that overlap will take place
+correctly. It returns \fIs1\fR.
+.sp
+.LP
+The \fBmemset()\fR function sets the first \fIn\fR bytes in memory area \fIs\fR
+to the value of \fIc\fR (converted to an \fBunsigned char\fR). It returns
+\fIs\fR.
+.SH USAGE
+.sp
+.LP
+Using \fBmemcpy()\fR might be faster than using \fBmemmove()\fR if the
+application knows that the objects being copied do not overlap.
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBbcopy\fR(9F), \fBddi_copyin\fR(9F), \fBstrcpy\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

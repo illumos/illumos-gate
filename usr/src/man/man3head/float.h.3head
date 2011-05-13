@@ -1,0 +1,429 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH float.h 3HEAD "17 Dec 2003" "SunOS 5.11" "Headers"
+.SH NAME
+float.h, float \- floating types
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBfloat.h\fR> 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The characteristics of floating types are defined in terms of a model that
+describes a representation of floating-point numbers and values that provide
+information about an implementation's floating-point arithmetic.
+.sp
+.LP
+The following parameters are used to define the model for each floating-point
+type:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs\fR\fR
+.ad
+.RS 6n
+.rt  
+sign (\(+-1)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIb\fR\fR
+.ad
+.RS 6n
+.rt  
+base or radix of exponent representation (an integer >1)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIe\fR\fR
+.ad
+.RS 6n
+.rt  
+exponent (an integer between a minimum e(min) and a maximum e(max))
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIp\fR\fR
+.ad
+.RS 6n
+.rt  
+precision (the number of base-\fIb\fR digits in the significand)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIf\fR(\fIk\fR)\fR
+.ad
+.RS 6n
+.rt  
+non-negative integers less than \fIb\fR (the significand digits)
+.RE
+
+.sp
+.LP
+In addition to normalized floating-point numbers (\fIf\fR(1)>0 if
+\fIx\fR\(!=0), floating types might be able to contain other kinds of
+floating-point numbers, such as subnormal floating-point numbers (x\(!=0,
+e=e(min), f(1)=0) and unnormalized floating-point numbers (x\(!=0, e=e(min),
+f(1)=0), and values that are not floating-point numbers, such as infinities and
+NaNs. A \fBNaN\fR is an encoding signifying Not-a-Number. A \fBquiet NaN\fR
+propagates through almost every arithmetic operation without raising a
+floating-point exception; a \fBsignaling NaN\fR generally raises a
+floating-point exception when occurring as an arithmetic operand.
+.sp
+.LP
+The accuracy of the library functions in \fBmath.h\fR(3HEAD) and
+\fBcomplex.h\fR(3HEAD) that return floating-point results is defined on the
+\fBlibm\fR(3LIB) manual page.
+.sp
+.LP
+All integer values in the <\fBfloat.h\fR> header, except \fBFLT_ROUNDS\fR, are
+constant expressions suitable for use in \fB#if\fR preprocessing directives;
+all floating values are constant expressions. All except \fBDECIMAL_DIG\fR,
+\fBFLT_EVAL_METHOD\fR, \fBFLT_RADIX\fR, and \fBFLT_ROUNDS\fR have separate
+names for all three floating-point types. The floating-point model
+representation is provided for all values except \fBFLT_EVAL_METHOD\fR and
+\fBFLT_ROUNDS\fR.
+.sp
+.LP
+The rounding mode for floating-point addition is characterized by the value of
+\fBFLT_ROUNDS\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.RS 6n
+.rt  
+Indeterminable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Toward zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+To nearest.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+.rt  
+Toward positive infinity.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 6n
+.rt  
+Toward negative infinity.
+.RE
+
+.sp
+.LP
+The values of operations with floating operands and values subject to the usual
+arithmetic conversions and of floating constants are evaluated to a format
+whose range and precision might be greater than required by the type. The use
+of evaluation formats is characterized by the architecture-dependent value of
+\fBFLT_EVAL_METHOD\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.RS 6n
+.rt  
+Indeterminable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Evaluate all operations and constants just to the range and precision of the
+type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+Evaluate operations and constants of type float and double to the range and
+precision of the double type; evaluate long double operations and constants to
+the range and precision of the long double type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+.rt  
+Evaluate all operations and constants to the range and precision of the long
+double type.
+.RE
+
+.sp
+.LP
+The values given in the following list are defined as constants.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Radix of exponent representation, \fIb\fR.
+.sp
+.in +2
+.nf
+FLT_RADIX
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Number of base-\fBFLT_RADIX\fR digits in the floating-point significand,
+\fIp\fR.
+.sp
+.in +2
+.nf
+FLT_MANT_DIG
+DBL_MANT_DIG
+LDBL_MANT_DIG
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Number of decimal digits, \fIn\fR, such that any floating-point number in the
+widest supported floating type with \fIp\fR(max) radix \fIb\fR digits can be
+rounded to a floating-point number with \fIn\fR decimal digits and back again
+without change to the value.
+.sp
+.in +2
+.nf
+DECIMAL_DIG
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Number of decimal digits, \fIq\fR, such that any floating-point number with
+\fIq\fR decimal digits can be rounded into a floating-point number with \fIp\fR
+radix \fIb\fR digits and back again without change to the \fIq\fR decimal
+digits.
+.sp
+.in +2
+.nf
+FLT_DIG
+DBL_DIG
+LDBL_DIG
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum negative integer such that \fBFLT_RADIX\fR raised to that power minus 1
+is a normalized floating-point number, e(min).
+.sp
+.in +2
+.nf
+FLT_MIN_EXP
+DBL_MIN_EXP
+LDBL_MIN_EXP
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum negative integer such that 10 raised to that power is in the range of
+normalized floating-point numbers.
+.sp
+.in +2
+.nf
+FLT_MIN_10_EXP
+DBL_MIN_10_EXP
+LDBL_MIN_10_EXP
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum integer such that \fBFLT_RADIX\fR raised to that power minus 1 is a
+representable finite floating-point number, e(max).
+.sp
+.in +2
+.nf
+FLT_MAX_EXP
+DBL_MAX_EXP
+LDBL_MAX_EXP
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum integer such that 10 raised to that power is in the range of
+representable finite floating-point numbers.
+.sp
+.in +2
+.nf
+FLT_MAX_10_EXP
+DBL_MAX_10_EXP
+LDBL_MAX_10_EXP
+.fi
+.in -2
+
+.RE
+.sp
+.LP
+The values given in the following list are defined as constant expressions with
+values that are greater than or equal to those shown:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum representable finite floating-point number.
+.sp
+.in +2
+.nf
+FLT_MAX
+DBL_MAX
+LDBL_MAX
+.fi
+.in -2
+
+.RE
+.sp
+.LP
+The values given in the following list are defined as constant expressions with
+implementation-defined (positive) values that are less than or equal to those
+shown:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The difference between 1 and the least value greater than 1 that is
+representable in the given floating-point type, \fIb\fR^1 -\fI p\fR.
+.sp
+.in +2
+.nf
+FLT_EPSILON
+DBL_EPSILON
+LDBL_EPSILON
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum normalized positive floating-point number, \fIb\fR^e(min)^-1.
+.sp
+.in +2
+.nf
+FLT_MIN
+DBL_MIN
+LDBL_MIN
+.fi
+.in -2
+
+.RE
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcomplex.h\fR(3HEAD), \fBmath.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)

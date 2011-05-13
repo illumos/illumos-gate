@@ -1,0 +1,357 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH catopen 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+catopen, catclose \- open/close a message catalog
+.SH SYNOPSIS
+.LP
+.nf
+#include <nl_types.h>
+
+\fBnl_catd\fR \fBcatopen\fR(\fBconst char *\fR\fIname\fR, \fBint\fR \fIoflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcatclose\fR(\fBnl_catd\fR \fIcatd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcatopen()\fR function opens a message catalog and returns a message
+catalog descriptor. \fIname\fR specifies the name of the message catalog to be
+opened. If \fIname\fR contains a "/", then  \fIname\fR specifies a complete
+pathname for the message catalog; otherwise, the environment variable
+\fBNLSPATH\fR is used and  \fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES\fR
+must exist. If \fBNLSPATH\fR does not exist in the environment, or if a message
+catalog cannot be opened in any of the paths specified by \fBNLSPATH\fR, then
+the default path \fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR is used. In the
+"C" locale,  \fBcatopen()\fR will always succeed without checking the default
+search path.
+.sp
+.LP
+The names of message catalogs and their location in the filesystem can vary
+from one system to another. Individual applications can choose to name or
+locate message catalogs according to their own special needs. A mechanism is
+therefore required to specify where the catalog resides.
+.sp
+.LP
+The \fBNLSPATH\fR variable provides both the location of message catalogs, in
+the form of a search path, and the naming conventions associated with message
+catalog files.  For example:
+.sp
+.in +2
+.nf
+NLSPATH=/nlslib/%L/%N.cat:/nlslib/%N/%L 
+.fi
+.in -2
+
+.sp
+.LP
+The metacharacter \fB%\fR introduces a substitution field, where \fB%L\fR
+substitutes the current setting of either the \fBLANG\fR environment variable,
+if the value of \fIoflag\fR is  \fB0\fR, or the \fBLC_MESSAGES\fR category, if
+the value of \fIoflag\fR is  \fBNL_CAT_LOCALE\fR, and  \fB%N\fR substitutes the
+value of the \fIname\fR parameter passed to \fBcatopen()\fR. Thus, in the above
+example, \fBcatopen()\fR will search in  \fB/nlslib/$LANG/\fIname\fR.cat\fR, if
+\fIoflag\fR is \fB0\fR, or in \fB/nlslib/{LC_MESSAGES}/\fIname\fR.cat\fR, if
+\fIoflag\fR is \fBNL_CAT_LOCALE\fR.
+.sp
+.LP
+The \fBNLSPATH\fR variable will normally be set up on a system wide basis (in
+\fB/etc/profile\fR) and thus makes the location and naming conventions
+associated with message catalogs transparent to both programs and users.
+.sp
+.LP
+The full set of metacharacters is:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%N\fR\fR
+.ad
+.RS 6n
+.rt  
+The value of the name parameter passed to \fBcatopen()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%L\fR\fR
+.ad
+.RS 6n
+.rt  
+The value of \fBLANG\fR or \fBLC_MESSAGES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%l\fR\fR
+.ad
+.RS 6n
+.rt  
+The value of the \fIlanguage\fR element of \fBLANG\fR or \fBLC_MESSAGES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%t\fR\fR
+.ad
+.RS 6n
+.rt  
+The value of the \fIterritory\fR element of \fBLANG\fR or \fBLC_MESSAGES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%c\fR\fR
+.ad
+.RS 6n
+.rt  
+The value of the \fIcodeset\fR element of \fBLANG\fR or \fBLC_MESSAGES\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+A single %.
+.RE
+
+.sp
+.LP
+The \fBLANG\fR environment variable provides the ability to specify the user's
+requirements for native languages, local customs and character set, as an ASCII
+string in the form
+.sp
+.in +2
+.nf
+LANG=language[_territory[.codeset]]
+.fi
+.in -2
+
+.sp
+.LP
+A user who speaks German as it is spoken in Austria and has a terminal which
+operates in ISO 8859/1 codeset, would want the setting of the LANG variable to
+be
+.sp
+.in +2
+.nf
+LANG=De_A.88591
+.fi
+.in -2
+
+.sp
+.LP
+With this setting it should be possible for that user to find any  relevant
+catalogs should they exist.
+.sp
+.LP
+Should the \fBLANG\fR variable not be set, the value of \fBLC_MESSAGES\fR as
+returned by \fBsetlocale()\fR is used.  If this is \fINULL,\fR the default path
+as defined in <\fBnl_types.h\fR> is used.
+.sp
+.LP
+A message catalogue descriptor remains valid in a process until that process
+closes it, or a successful call to one of the \fBexec\fR functions. A change in
+the setting of the \fBLC_MESSAGES\fR category may invalidate existing open
+catalogues.
+.sp
+.LP
+If a file descriptor is used to implement message catalogue descriptors, the
+\fBFD_CLOEXEC\fR flag will be set; see <\fBfcntl.h\fR>.
+.sp
+.LP
+If the value of \fIoflag\fR argument is \fB0\fR, the  \fBLANG\fR environment
+variable is used to locate the catalogue without regard to the
+\fBLC_MESSAGES\fR category.  If the \fIoflag\fR argument is
+\fBNL_CAT_LOCALE\fR, the \fBLC_MESSAGES\fR category is used to locate the
+message catalogue.
+.sp
+.LP
+The \fBcatclose()\fR function closes the message catalog identified by
+\fIcatd\fR. If a file descriptor is used to implement the type \fBnl_catd\fR,
+that file descriptor will be closed.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBcatopen()\fR returns a message catalog
+descriptor for use on  subsequent calls to  \fBcatgets()\fR and
+\fBcatclose()\fR. Otherwise it returns \fB(nl_catd) \(mi1\fR.
+.sp
+.LP
+Upon successful completion, \fBcatclose()\fR returns 0. Otherwise it returns
+\(mi1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBcatopen()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+Search permission is denied for the component of the path prefix of the message
+catalogue or read permission is denied for the message catalogue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 16n
+.rt  
+There are \fBOPEN_MAX\fR file descriptors currently open in the calling
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the pathname of the message catalogue exceeds \fIPATH_MAX\fR, or
+a pathname component is longer than \fINAME_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+Pathname resolution of a symbolic link produced an intermediate result whose
+length exceeds \fIPATH_MAX\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many files are currently open in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+The message catalogue does not exist or the \fIname\fR argument points to an
+empty string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 16n
+.rt  
+Insufficient storage space is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+A component of the path prefix of the message catalogue is not a directory.
+.RE
+
+.sp
+.LP
+The \fBcatclose()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 9n
+.rt  
+The catalogue descriptor is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fBcatclose()\fR function was interrupted by a signal.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBcatopen()\fR and \fBcatclose()\fR functions can be used safely in
+multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
+to change the locale.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgencat\fR(1), \fBcatgets\fR(3C), \fBgettext\fR(3C), \fBnl_types.h\fR(3HEAD),
+\fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5)

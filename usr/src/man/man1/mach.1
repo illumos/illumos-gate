@@ -1,0 +1,30 @@
+'\" te
+.\"  Copyright (c) 1996 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mach 1 "18 Jan 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+mach \- display the processor type of the current host
+.SH SYNOPSIS
+.LP
+.nf
+\fBmach\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmach\fR command displays the processor-type of the current host.
+.SH SEE ALSO
+.sp
+.LP
+\fBarch\fR(1), \fBuname\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBmach\fR and  \fBuname\fR \fB-p\fR return equivalent values; therefore,
+Independent Software Vendors (ISV) and  others who need to ascertain processor
+type are encouraged to use \fBuname\fR with the  \fB-p\fR option instead of the
+\fBmach\fR command. The  \fBmach\fR command is provided for compatibility with
+previous releases, but generally its use is discouraged.

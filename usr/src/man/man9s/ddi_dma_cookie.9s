@@ -1,0 +1,85 @@
+'\" te
+.\"  Copyright (c) 2000 Sun Microsystems, Inc., All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_cookie 9S "30 Sep 1996" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+ddi_dma_cookie \- DMA address cookie
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunddi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_dma_cookie_t\fR structure contains \fBDMA\fR address information
+required to program a \fBDMA\fR engine. The structure is filled in by a call to
+\fBddi_dma_getwin\fR(9F), \fBddi_dma_addr_bind_handle\fR(9F), or
+\fBddi_dma_buf_bind_handle\fR(9F), to get device-specific \fBDMA\fR transfer
+information for a \fBDMA\fR request or a \fBDMA\fR window.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+typedef struct {
+    union {
+            uint64_t        _dmac_ll;    /* 64 bit DMA add. */
+            uint32_t        _dmac_la[2]; /* 2 x 32 bit add. */
+    } _dmu;
+    size_t          dmac_size;   /* DMA cookie size */
+    uint_t          dmac_type;   /* bus spec. type bits */
+} ddi_dma_cookie_t;
+.fi
+.in -2
+
+.sp
+.LP
+You can access the DMA address through the \fB#define\fRs: \fBdmac_address\fR
+for 32-bit addresses and \fBdmac_laddress\fR for 64-bit addresses. These macros
+are defined as follows:
+.sp
+.in +2
+.nf
+#define dmac_laddress   _dmu._dmac_ll
+#ifdef _LONG_LONG_HTOL
+#define dmac_notused    _dmu._dmac_la[0]
+#define dmac_address    _dmu._dmac_la[1]
+#else
+#define dmac_address    _dmu._dmac_la[0]
+#define dmac_notused    _dmu._dmac_la[1]
+#endif
+.fi
+.in -2
+
+.sp
+.LP
+\fBdmac_laddress\fR specifies a 64-bit \fBI/O\fR address appropriate for
+programming the device's \fBDMA\fR engine. If a device has a 64-bit \fBDMA\fR
+address register a driver should use this field to program the \fBDMA\fR
+engine. \fBdmac_address\fR specifies a 32-bit \fBI/O\fR address. It should be
+used for devices that have a 32-bit \fBDMA\fR address register. The \fBI/O\fR
+address range that the device can address and other \fBDMA\fR attributes have
+to be specified in a \fBddi_dma_attr\fR(9S) structure.
+.sp
+.LP
+\fBdmac_size\fR describes the length of the transfer in bytes.
+.sp
+.LP
+\fBdmac_type\fR contains bus-specific type bits, if appropriate. For example, a
+device on a \fBPCI\fR bus has \fBPCI\fR address modifier bits placed here.
+.SH SEE ALSO
+.sp
+.LP
+\fBpci\fR(4), \fBsbus\fR(4), \fBsysbus\fR(4),
+\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
+\fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F), \fBddi_dma_attr\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

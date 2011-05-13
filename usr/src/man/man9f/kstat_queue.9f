@@ -1,0 +1,174 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_queue 9F "4 Apr 1994" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+kstat_queue, kstat_waitq_enter, kstat_waitq_exit, kstat_runq_enter,
+kstat_runq_exit, kstat_waitq_to_runq, kstat_runq_back_to_waitq \- update I/O
+kstat statistics
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+
+
+
+\fBvoid\fR \fBkstat_waitq_enter\fR(\fBkstat_io_t *\fR\fIkiop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBkstat_waitq_exit\fR(\fBkstat_io_t *\fR\fIkiop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBkstat_runq_enter\fR(\fBkstat_io_t *\fR\fIkiop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBkstat_runq_exit\fR(\fBkstat_io_t *\fR\fIkiop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBkstat_waitq_to_runq\fR(\fBkstat_io_t *\fR\fIkiop\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBkstat_runq_back_to_waitq\fR(\fBkstat_io_t *\fR\fIkiop\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIkiop\fR \fR
+.ad
+.RS 9n
+.rt  
+Pointer to a \fBkstat_io\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+A large number of \fBI/O\fR subsystems have at least two basic "lists" (or
+queues) of transactions they manage: one for transactions that have been
+accepted for processing but for which processing has yet to begin, and one for
+transactions which are actively being processed (but not done). For this
+reason, two cumulative time statistics are kept: wait (pre-service) time, and
+run (service) time.
+.sp
+.LP
+The \fBkstat_queue()\fR family of functions manage these times based on the
+transitions between the driver wait queue and run queue.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkstat_waitq_enter()\fR\fR
+.ad
+.RS 30n
+.rt  
+\fBkstat_waitq_enter()\fR should be called when a request arrives and is placed
+into a pre-service state (such as just prior to calling \fBdisksort\fR(9F)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkstat_waitq_exit()\fR\fR
+.ad
+.RS 30n
+.rt  
+\fBkstat_waitq_exit()\fR should be used when a request is removed from its
+pre-service state. (such as just prior to calling the driver's \fBstart\fR
+routine).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkstat_runq_enter()\fR\fR
+.ad
+.RS 30n
+.rt  
+\fBkstat_runq_enter()\fR is also called when a request is placed in its service
+state (just prior to calling the driver's start routine, but after
+\fBkstat_waitq_exit()\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkstat_runq_exit()\fR\fR
+.ad
+.RS 30n
+.rt  
+\fBkstat_runq_exit()\fR is used when a request is removed from its service
+state (just prior to calling \fBbiodone\fR(9F)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkstat_waitq_to_runq()\fR\fR
+.ad
+.RS 30n
+.rt  
+\fBkstat_waitq_to_runq()\fR transitions a request from the wait queue to the
+run queue. This is useful wherever the driver would have normally done a
+\fBkstat_waitq_exit()\fR followed by a call to \fBkstat_runq_enter()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkstat_runq_back_to_waitq()\fR\fR
+.ad
+.RS 30n
+.rt  
+\fBkstat_runq_back_to_waitq()\fR transitions a request from the run queue back
+to the wait queue. This may be necessary in some cases (write throttling is an
+example).
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+\fBkstat_create()\fR can be called from user or kernel context.
+.SH WARNINGS
+.sp
+.LP
+These transitions must be protected by holding the \fBkstat\fR's \fBks_lock\fR,
+and must be completely accurate (all transitions are recorded). Forgetting a
+transition may, for example, make an idle disk appear 100% busy.
+.SH SEE ALSO
+.sp
+.LP
+\fBbiodone\fR(9F), \fBdisksort\fR(9F), \fBkstat_create\fR(9F),
+\fBkstat_delete\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat\fR(9S),
+\fBkstat_io\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

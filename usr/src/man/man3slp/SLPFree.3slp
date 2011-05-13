@@ -1,0 +1,87 @@
+'\" te
+.\" Copyright (c) 1999, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLPFree 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.SH NAME
+SLPFree \- frees memory
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lslp\fR [ \fIlibrary\fR... ]
+#include <slp.h>
+
+\fBSLPError\fR \fBSLPFree\fR(\fBvoid *\fR\fIpvMem\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSLPFree()\fR function frees memory returned from \fBSLPParseSrvURL()\fR,
+\fBSLPFindScopes()\fR,  \fBSLPEscape()\fR, and \fBSLPUnescape()\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpvMem\fR\fR
+.ad
+.RS 9n
+.rt  
+ A pointer to the storage allocated by the \fBSLPParseSrvURL()\fR,
+\fBSLPFindScopes()\fR, \fBSLPEscape()\fR, and \fBSLPUnescape()\fR functions.
+\fIpvMem\fR is ignored if its value is \fINULL\fR.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+This function or its callback may return any \fBSLP\fR error code. See the
+ERRORS section in \fBslp_api\fR(3SLP).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBSLPFree()\fR
+.sp
+.LP
+The following example illustrates how to call \fBSLPFree()\fR. It assumes that
+\fBSrvURL\fR contains previously allocated memory.
+
+.sp
+.in +2
+.nf
+SLPerror err;
+
+err = SLPFree((void*) SrvURL);
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLP_CONF_FILE\fR\fR
+.ad
+.RS 17n
+.rt  
+When set, use this file for configuration.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBslpd\fR(1M), \fBSLPEscape\fR(3SLP), \fBSLPFindScopes\fR(3SLP),
+\fBSLPParseSrvURL\fR(3SLP), \fBSLPUnescape\fR(3SLP), \fBslp_api\fR(3SLP),
+\fBslp.conf\fR(4), \fBslpd.reg\fR(4), \fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Guttman, E.,  Perkins, C., Veizades, J., and Day, M. \fIRFC 2608, Service
+Location Protocol, Version 2\fR. The Internet Society. June 1999.
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

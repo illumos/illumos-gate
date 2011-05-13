@@ -1,0 +1,480 @@
+'\" te
+.\"  Copyright (c) 2004 by Sun Microsystems, Inc.  All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dldump 3C "1 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+dldump \- create a new file from a dynamic object component of the calling
+process
+.SH SYNOPSIS
+.LP
+.nf
+#include <dlfcn.h>
+
+\fBint\fR \fBdldump\fR(\fBconst char *\fR \fIipath\fR, \fBconst char *\fR \fIopath\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdldump()\fR function creates a new dynamic object \fIopath\fR from an
+existing dynamic object \fIipath\fR that is bound to the current process. An
+\fIipath\fR value of \fB0\fR is interpreted as the dynamic object that started
+the process. The new object is constructed from the existing objects' disc
+file. Relocations can be applied to the new object to pre-bind it to other
+dynamic objects, or fix the object to a specific memory location. In addition,
+data elements within the new object can be obtained from the objects' memory
+image as this data exists in the calling process.
+.sp
+.LP
+These techniques allow the new object to be executed with a lower startup cost.
+This reduction can be because of less relocations being required to load the
+object, or because of a reduction in the data processing requirements of the
+object. However, limitations can exist in using these techniques. The
+application of relocations to the new dynamic object \fIopath\fR can restrict
+its flexibility within a dynamically changing environment. In addition,
+limitations in regards to data usage can make dumping a memory image
+impractical. See \fBEXAMPLES\fR.
+.sp
+.LP
+The runtime linker verifies that the dynamic object \fIipath\fR is mapped as
+part of the current process. Thus, the object must either be the dynamic object
+that started the process, one of the process's dependencies, or an object that
+has been preloaded. See \fBexec\fR(2), and \fBld.so.1\fR(1).
+.sp
+.LP
+As part of the runtime processing of a dynamic object, \fIrelocation\fR records
+within the object are interpreted and applied to offsets within the object.
+These offsets are said to be \fIrelocated\fR. Relocations can be categorized
+into two basic types: \fInon-symbolic\fR and \fIsymbolic\fR.
+.sp
+.LP
+The \fInon-symbolic\fR relocation is a simple \fIrelative\fR relocation that
+requires the base address at which the object is mapped to perform the
+relocation. The \fIsymbolic\fR relocation requires the address of an associated
+symbol, and results in a \fIbinding\fR to the dynamic object that defines this
+symbol. The symbol definition can originate from any of the dynamic objects
+that make up the process, that is, the object that started the process, one of
+the process's dependencies, an object that has been preloaded, or the dynamic
+object being relocated.
+.sp
+.LP
+The \fIflags\fR parameter controls the relocation processing and other
+attributes of producing the new dynamic object \fIopath\fR. Without any
+\fIflags\fR, the new object is constructed solely from the contents of the
+\fIipath\fR disc file without any relocations applied.
+.sp
+.LP
+Various relocation flags can be \fBor\fR'ed into the \fIflags\fR parameter to
+affect the relocations that are applied to the new object. \fINon-symbolic\fR
+relocations can be applied using the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_RELATIVE\fR\fR
+.ad
+.RS 21n
+.rt  
+Relocation records from the object \fIipath\fR, that define \fIrelative\fR
+relocations, are applied to the object \fIopath\fR.
+.RE
+
+.sp
+.LP
+A variety of \fIsymbolic\fR relocations can be applied using the following
+flags (each of these flags also implies  \fBRTLD_REL_RELATIVE\fR is in effect):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_EXEC\fR\fR
+.ad
+.RS 20n
+.rt  
+Symbolic relocations that result in binding \fIipath\fR to the dynamic object
+that started the process, commonly a dynamic executable, are applied to the
+object \fIopath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_DEPENDS\fR\fR
+.ad
+.RS 20n
+.rt  
+Symbolic relocations that result in binding \fIipath\fR to any of the dynamic
+dependencies of the process are applied to the object \fIopath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_PRELOAD\fR\fR
+.ad
+.RS 20n
+.rt  
+Symbolic relocations that result in binding \fIipath\fR to any objects
+preloaded with the process are applied to the object \fIopath\fR. See
+\fBLD_PRELOAD\fR in \fBld.so.1\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_SELF\fR\fR
+.ad
+.RS 20n
+.rt  
+Symbolic relocations that result in binding \fIipath\fR to itself, are applied
+to the object \fIopath\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_WEAK\fR\fR
+.ad
+.RS 20n
+.rt  
+Weak relocations that remain unresolved are applied to the object \fIopath\fR
+as \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_REL_ALL\fR\fR
+.ad
+.RS 20n
+.rt  
+\fIAll\fR relocation records defined in the object \fIipath\fR are applied to
+the new object \fIopath\fR. This is basically a concatenation of all the above
+relocation flags.
+.RE
+
+.sp
+.LP
+Note that for dynamic executables, \fBRTLD_REL_RELATIVE\fR,
+\fBRTLD_REL_EXEC\fR, and \fBRTLD_REL_SELF\fR have no effect. See
+\fBEXAMPLES\fR.
+.sp
+.LP
+If relocations, knowledgeable of the base address of the mapped object, are
+applied to the new object \fIopath\fR, then the new object becomes fixed to the
+location that the \fIipath\fR image is mapped within the current process.
+.sp
+.LP
+Any relocations applied to the new object \fIopath\fR will have the original
+relocation record removed so that the relocation will not be applied more than
+once. Otherwise, the new object \fIopath\fR will retain the relocation records
+as they exist in the \fIipath\fR disc file.
+.sp
+.LP
+The following additional attributes for creating the new dynamic object
+\fIopath\fR can be specified using the \fIflags\fR parameter:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_MEMORY\fR\fR
+.ad
+.RS 15n
+.rt  
+The new object \fIopath\fR is constructed from the current memory contents of
+the \fIipath\fR image as it exists in the calling process. This option allows
+data modified by the calling process to be captured in the new object. Note
+that not all data modifications may be applicable for capture; significant
+restrictions exist in using this technique. See \fBEXAMPLES\fR. By default,
+when processing a dynamic executable, any allocated memory that follows the end
+of the data segment is captured in the new object (see \fBmalloc\fR(3C) and
+\fBbrk\fR(2)). This data, which represents the process heap, is saved as a new
+\fI\&.SUNW_heap\fR section in the object \fIopath\fR. The objects' program
+headers and symbol entries, such as \fB_end\fR, are adjusted accordingly. See
+also \fBRTLD_NOHEAP.\fR When using this attribute, any relocations that have
+been applied to the \fIipath\fR memory image that do not fall into one of the
+requested relocation categories are undone, that is, the relocated element is
+returned to the value as it existed in the \fIipath\fR disc file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_STRIP\fR\fR
+.ad
+.RS 15n
+.rt  
+Only collect allocatable sections within the object \fIopath\fR. Sections that
+are not part of the dynamic objects' memory image are removed. \fBRTLD_STRIP\fR
+reduces the size of the \fIopath\fR disc file and is comparable to having run
+the new object through \fBstrip\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_NOHEAP\fR\fR
+.ad
+.RS 15n
+.rt  
+Do not save any heap to the new object. This option is only meaningful when
+processing a dynamic executable with the \fBRTLD_MEMORY\fR attribute and allows
+for reducing the size of the \fIopath\fR disc file. The executable must confine
+its data initialization to data elements within its data segment, and must not
+use any allocated data elements that comprise the heap.
+.RE
+
+.sp
+.LP
+It should be emphasized, that an object created by \fBdldump()\fR is simply an
+updated \fBELF\fR object file. No additional state regarding the process at the
+time \fBdldump()\fR is called is maintained in the new object. \fBdldump()\fR
+does not provide a panacea for checkpoint and resume. A new dynamic executable,
+for example, will not start where the original executable called
+\fBdldump()\fR. It will gain control at the executable's normal entry point.
+See \fBEXAMPLES\fR.
+.SH RETURN VALUES
+.sp
+.LP
+On successful creation of the new object, \fBdldump()\fR returns \fB0\fR.
+Otherwise, a non-zero value is returned and more detailed diagnostic
+information is available through \fBdlerror()\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample code using \fBdldump()\fR.
+.sp
+.LP
+The following code fragment, which can be part of a dynamic executable
+\fBa.out\fR, can be used to create a new shared object from one of the dynamic
+executables' dependencies \fBlibfoo.so.1\fR:
+
+.sp
+.in +2
+.nf
+const char *	ipath = "libfoo.so.1";
+const char *	opath = "./tmp/libfoo.so.1";
+\&...
+if (dldump(ipath, opath, RTLD_REL_RELATIVE) != 0)
+        (void) printf("dldump failed: %s\en", dlerror(\|));
+.fi
+.in -2
+
+.sp
+.LP
+The new shared object \fIopath\fR is fixed to the address of the mapped
+\fIipath\fR bound to the dynamic executable \fBa.out\fR. All relative
+relocations are applied to this new shared object, which will reduce its
+relocation overhead when it is used as part of another process.
+
+.sp
+.LP
+By performing only relative relocations, any symbolic relocation records remain
+defined within the new object, and thus the dynamic binding to external symbols
+will be preserved when the new object is used.
+
+.sp
+.LP
+Use of the other relocation flags can fix specific relocations in the new
+object and thus can reduce even more the runtime relocation startup cost of the
+new object. However, this will also restrict the flexibility of using the new
+object within a dynamically changing environment, as it will bind the new
+object to some or all of the dynamic objects presently mapped as part of the
+process.
+
+.sp
+.LP
+For example, the use of \fBRTLD_REL_SELF\fR will cause any references to
+symbols from \fIipath\fR to be bound to definitions within itself if no other
+preceding object defined the same symbol. In other words, a call to
+\fIfoo(\|)\fR within \fIipath\fR will bind to the definition \fIfoo\fR within
+the same object. Therefore, \fIopath\fR will have one less binding that must be
+computed at runtime. This reduces the startup cost of using \fIopath\fR by
+other applications; however, interposition of the symbol \fIfoo\fR will no
+longer be possible.
+
+.sp
+.LP
+Using a dumped shared object with applied relocations as an applications
+dependency normally requires that the application have the same dependencies as
+the application that produced the dumped image. Dumping shared objects, and the
+various flags associated with relocation processing, have some specialized
+uses. However, the technique is intended as a building block for future
+technology.
+
+.sp
+.LP
+The following code fragment, which is part of the dynamic executable
+\fBa.out\fR, can be used to create a new version of the dynamic executable:
+
+.sp
+.in +2
+.nf
+static char *       dumped = 0;
+const char *        opath = "./a.out.new";
+\&...
+if (dumped == 0) {
+        char        buffer[100];
+        int         size;
+        time_t      seconds;
+        ...
+        /* Perform data initialization */
+        seconds = time((time_t *)0);
+        size = cftime(buffer, (char *)0, &seconds);
+        if ((dumped = (char *)malloc(size + 1)) == 0) {
+                (void) printf("malloc failed: %s\en", strerror(errno));
+                return (1);
+        }
+        (void) strcpy(dumped, buffer);
+        ...
+        /*
+         * Tear down any undesirable data initializations and
+         * dump the dynamic executables memory image.
+         */
+        _exithandle(\|);
+        _exit(dldump(0, opath, RTLD_MEMORY));
+}
+(void) printf("Dumped: %s\en", dumped);
+.fi
+.in -2
+
+.sp
+.LP
+Any modifications made to the dynamic executable, up to the point the
+\fBdldump()\fR call is made, are saved in the new object \fBa.out.new\fR. This
+mechanism allows the executable to update parts of its data segment and heap
+prior to creating the new object. In this case, the date the executable is
+dumped is saved in the new object. The new object can then be executed without
+having to carry out the same (presumably expensive) initialization.
+
+.sp
+.LP
+For greatest flexibility, this example does not save \fIany\fR relocated
+information. The elements of the dynamic executable \fIipath\fR that have been
+modified by relocations at process startup, that is, references to external
+functions, are returned to the values of these elements as they existed in the
+\fIipath\fR disc file. This preservation of relocation records allows the new
+dynamic executable to be flexible, and correctly bind and initialize to its
+dependencies when executed on the same or newer upgrades of the \fBOS\fR.
+
+.sp
+.LP
+Fixing relocations by applying some of the relocation flags would bind the new
+object to the dependencies presently mapped as part of the process calling
+\fBdldump()\fR. It may also remove necessary copy relocation processing
+required for the correct initialization of its shared object dependencies.
+Therefore, if the new dynamic executables' dependencies have no specialized
+initialization requirements, the executable may still only interact correctly
+with the dependencies to which it binds if they were mapped to the same
+locations as they were when \fBdldump()\fR was called.
+
+.sp
+.LP
+Note that for dynamic executables, \fBRTLD_REL_RELATIVE,\fR
+\fBRTLD_REL_EXEC,\fR and \fBRTLD_REL_SELF\fR have no effect, as relocations
+within the dynamic executable will have been fixed when it was created by
+\fBld\fR(1).
+
+.sp
+.LP
+When \fBRTLD_MEMORY\fR is used, care should be taken to insure that dumped data
+sections that reference external objects are not reused without appropriate
+re-initialization. For example, if a data item contains a file descriptor, a
+variable returned from a shared object, or some other external data, and this
+data item has been initialized prior to the \fBdldump()\fR call, its value will
+have no meaning in the new dumped image.
+
+.sp
+.LP
+When \fBRTLD_MEMORY\fR is used, any modification to a data item that is
+initialized via a relocation whose relocation record will be retained in the
+new image will effectively be lost or invalidated within the new image. For
+example, if a pointer to an external object is incremented prior to the
+\fBdldump()\fR call, this data item will be reset to its disc file contents so
+that it can be relocated when the new image is used; hence, the previous
+increment is lost.
+
+.sp
+.LP
+Non-idempotent data initializations may prevent the use of \fBRTLD_MEMORY\fR.
+For example, the addition of elements to a linked-list via \fBinit\fR sections
+can result in the linked-list data being captured in the new image. Running
+this new image may result in \fBinit\fR sections continuing to add new elements
+to the list without the prerequisite initialization of the list head. It is
+recommended that \fB_exithandle\fR(3C) be called before \fBdldump()\fR to tear
+down any data initializations established via initialization code.  Note that
+this may invalidate the calling image; thus, following the call to
+\fBdldump()\fR, only a call to \fB_Exit\fR(2) should be made.
+
+.SH USAGE
+.sp
+.LP
+The \fBdldump()\fR function is one of a family of functions that give the user
+direct access to the dynamic linking facilities. These facilities are available
+to dynamically-linked processes only. See \fILinker and Libraries Guide\fR).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld\fR(1), \fBld.so.1\fR(1), \fBstrip\fR(1), \fB_Exit\fR(2), \fBbrk\fR(2),
+\fBexec\fR(2), \fB_exithandle\fR(3C), \fBdladdr\fR(3C), \fBdlclose\fR(3C),
+\fBdlerror\fR(3C), \fBdlopen\fR(3C), \fBdlsym\fR(3C), \fBend\fR(3C),
+\fBmalloc\fR(3C), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.SH NOTES
+.sp
+.LP
+These functions are available to dynamically-linked processes only.
+.sp
+.LP
+Any \fBNOBITS\fR sections within the \fIipath\fR are expanded to \fBPROGBITS\fR
+sections within the \fIopath\fR. \fBNOBITS\fR sections occupy no space within
+an \fBELF\fR file image. \fBNOBITS\fR sections declare memory that must be
+created and zero-filled when the object is mapped into the runtime environment.
+\fB\&.bss\fR is a typical example of this section type. \fBPROGBITS\fR
+sections, on the other hand, hold information defined by the object within the
+\fBELF\fR file image. This section conversion reduces the runtime
+initialization cost of the new dumped object but increases the objects' disc
+space requirement.
+.sp
+.LP
+When a shared object is dumped, and relocations are applied which are
+knowledgeable of the base address of the mapped object, the new object is fixed
+to this new base address. The dumped object has its \fBELF\fR type reclassified
+to be a dynamic executable. The dumped object can be processed by the runtime
+linker, but is not valid as input to the link-editor.
+.sp
+.LP
+If relocations are applied to the new object, any remaining relocation records
+are reorganized for better locality of reference. The relocation sections are
+renamed to \fB\&.SUNW_reloc\fR and the association with the section to
+relocate, is lost. Only the offset of the relocation record is meaningful.
+\fB\&.SUNW_reloc\fR relocations do not make the new object invalid to either
+the runtime linker or link-editor, but can reduce the objects analysis with
+some \fBELF\fR readers.

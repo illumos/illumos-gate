@@ -1,0 +1,529 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH localedef 1 "11 Oct 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+localedef \- define locale environment
+.SH SYNOPSIS
+.LP
+.nf
+\fBlocaledef\fR [\fB-c\fR] [\fB-C\fR \fIcompiler_options\fR] [\fB-f\fR \fIcharmap\fR] 
+     [\fB-i\fR \fIsourcefile\fR] [\fB-L\fR \fIlinker_options\fR] [\fB-m\fR \fImodel\fR] 
+     [\fB-u\fR \fIcode_set_name\fR] [\fB-W\fR cc, \fIarg\fR] [\fB-x\fR \fIextensions_file\fR] \fIlocalename\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlocaledef\fR utility converts source definitions for locale categories
+into a format usable by the functions and utilities whose operational behavior
+is determined by the setting of the locale environment variables; see
+\fBenviron\fR(5).
+.sp
+.LP
+The utility reads source definitions for one or more locale categories
+belonging to the same locale from the file named in the \fB-i\fR option (if
+specified) or from standard input.
+.sp
+.LP
+Each category source definition is identified by the corresponding environment
+variable name and terminated by an \fBEND\fR \fIcategory-name\fR statement. The
+following categories are supported.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_CTYPE\fR\fR
+.ad
+.RS 15n
+.rt  
+Defines character classification and case conversion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_COLLATE\fR\fR
+.ad
+.RS 15n
+.rt  
+Defines collation rules.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_MONETARY\fR\fR
+.ad
+.RS 15n
+.rt  
+Defines the format and symbols used in formatting of monetary information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_NUMERIC\fR\fR
+.ad
+.RS 15n
+.rt  
+Defines the decimal delimiter, grouping and grouping symbol for non-monetary
+numeric editing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_TIME\fR\fR
+.ad
+.RS 15n
+.rt  
+Defines the format and content of date and time information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_MESSAGES\fR\fR
+.ad
+.RS 15n
+.rt  
+Defines the format and values of affirmative and negative responses.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 23n
+.rt  
+Creates permanent output even if warning messages have been issued.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR \fIcompiler_options\fR\fR
+.ad
+.RS 23n
+.rt  
+Passes the \fIcompiler_options\fR to the C compiler (\fBcc\fR). If more than
+one option is specified, then the options must be enclosed in quotes
+(\fB"\|"\fR).
+.sp
+This is an old option. Use the \fB-W\fR \fBcc\fR,\fIarg\fR option instead.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIcharmap\fR\fR
+.ad
+.RS 23n
+.rt  
+Specifies the pathname of a file containing a mapping of character symbols and
+collating element symbols to actual character encodings. This option must be
+specified if symbolic names (other than collating symbols defined in a
+\fBcollating-symbol\fR keyword) are used. If the \fB-f\fR option is not
+present, the default character mapping will be used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIsourcefile\fR\fR
+.ad
+.RS 23n
+.rt  
+The path name of a file containing the source definitions. If this option is
+not present, source definitions will be read from standard input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR \fIlinker_options\fR\fR
+.ad
+.RS 23n
+.rt  
+Passes the \fIlinker_options\fR to the C compiler (\fBcc\fR) that follows the C
+source filename. If more than one option is specified, then the options must be
+enclosed in quotes (\fB"\|"\fR).
+.sp
+This is an old option. Use the \fB-W\fR \fBcc\fR,\fIarg\fR option instead.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fImodel\fR\fR
+.ad
+.RS 23n
+.rt  
+Specifies whether \fBlocaledef\fR will generate a 64-bit or a 32-bit locale
+object.
+.sp
+Specify \fImodel\fR as \fBilp32\fR to generate a 32-bit locale object. Specify
+\fBlp64\fR to generate a 64-bit locale object. If the \fB-m\fR option is not
+specified, \fBlocaledef\fR generates a 32-bit locale object. And if no other
+options than \fB-c\fR, \fB-f\fR, and \fB-i\fR options are specified and if the
+system running \fBlocaledef\fR supports the 64-bit environment, \fBlocaledef\fR
+additionally generates a 64-bit locale object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIcode_set_name\fR\fR
+.ad
+.RS 23n
+.rt  
+Specifies the name of a codeset used as the target mapping of character symbols
+and collating element symbols whose encoding values are defined in terms of the
+ISO/IEC 10646-1: 2000 standard position constant values. See NOTES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-W\fR \fBcc\fR,\fIarg\fR\fR
+.ad
+.RS 23n
+.rt  
+Passes \fIarg\fR options to the C compiler. Each argument must be separated
+from the preceding by only a comma. A comma can be part of an argument by
+escaping it withan immediately preceding backslash character; the backslash is
+removed from the resulting argument.
+.sp
+Use this option instead of the \fB-C\fR and \fB-L\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR \fIextensions_file\fR\fR
+.ad
+.RS 23n
+.rt  
+Specifies the name of an extension file where various \fBlocaledef\fR options
+are listed. See \fBlocale\fR(5).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlocalename\fR\fR
+.ad
+.RS 14n
+.rt  
+Identifies the locale. If the name contains one or more slash characters,
+\fIlocalename\fR will be interpreted as a path name where the created locale
+definitions will be stored. This capability may be restricted to users with
+appropriate privileges. (As a consequence of specifying one \fIlocalename\fR,
+although several categories can be processed in one execution, only categories
+belonging to the same locale can be processed.)
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+\fBlocaledef\fR creates a temporary C source file that represents the locale's
+data. \fBlocaledef\fR then calls the C compiler to compile this C source file
+into a shared object.
+.sp
+.LP
+If the \fB-m\fR \fBilp32\fR option is specified, \fBlocaledef\fR calls the C
+compiler for generating 32-bit objects and generates a 32-bit locale object. If
+the \fB-m\fR \fBlp64\fR option is specified, \fBlocaledef\fR calls the C
+compiler for generating 64-bit objects and generates a 64-bit locale object.
+.sp
+.LP
+If the \fB-m\fR option is not specified, \fBlocaledef\fR calls the C compiler
+for generating 32-bit objects and generates a 32-bit locale object. If no other
+options than \fB-c\fR, \fB-f\fR, and \fB-i\fR options are specified and if the
+system running \fBlocaledef\fR supports the 64-bit environment, \fBlocaledef\fR
+additionally calls the C compiler for generating 64-bit objects and generates a
+64-bit locale object.
+.sp
+.LP
+If no option to the C compiler is explicitly specified using the \fB-W\fR,
+\fB-C\fR, or \fB-L\fR options, \fBlocaledef\fR calls the C compiler with
+appropriate C compiler options to generate a locale object or objects.
+.sp
+.LP
+If the \fB-m\fR \fBilp32\fR option is specified, \fBlocaledef\fR generates a
+32-bit locale object named:
+.sp
+.LP
+\fIlocalename\fR.so.\fIversion_number\fR
+.sp
+.LP
+If the \fB-m\fR \fBlp64\fR option is specified, \fBlocaledef\fR generates a
+64-bit locale object named:
+.sp
+.LP
+\fIlocalename\fR.so.\fIversion_number\fR
+.sp
+.LP
+If the \fB-m\fR option is not specified, \fBlocaledef\fR generates a 32-bit
+locale object named:
+.sp
+.LP
+\fIlocalename\fR.so.\fIversion_number\fR
+.sp
+.LP
+and, if appropriate, generates a 64-bit locale object named:
+.sp
+.LP
+\fI64-bit_architecture_name\fR/\fIlocalename\fR.so.\fIversion_number\fR
+.sp
+.LP
+The shared object for the 32-bit environment must be moved to:
+.sp
+.LP
+\fB/usr/lib/locale/\fR\fIlocalename\fR\fB/\fR\fIlocalename\fR\fB\&.so.\fR\fIver
+sion_number\fR
+.sp
+.LP
+The shared object for the 64-bit environment on SPARC must be moved to:
+.sp
+.LP
+\fB/usr/lib/locale/\fR\fIlocalename\fR\fB/sparcv9/\fR\fIlocalename\fR\fB\&.so.\fR\fIversion_number\fR
+.sp
+.LP
+The shared object for the 64-bit environment on AMD64 must be moved to:
+.sp
+.LP
+\fB/usr/lib/locale/\fIlocalename\fR/amd64/\fIlocalename\fR\&.so.\fIversion_number\fR\fR
+.sp
+.LP
+\fBlocaledef\fR also generates a text file named \fIlocalename\fR that is used
+for information only.
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for definitions of the following environment variables
+that affect the execution of \fBlocaledef\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+No errors occurred and the locales were successfully created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+Warnings occurred and the locales were successfully created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+.rt  
+The locale specification exceeded implementation limits or the coded character
+set or sets used were not supported by the implementation, and no locale was
+created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 6n
+.rt  
+The capability to create new locales is not supported by the implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>3\fR\fR
+.ad
+.RS 6n
+.rt  
+Warnings or errors occurred and no output was created.
+.RE
+
+.sp
+.LP
+If an error is detected, no permanent output will be created.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/localedef/extensions/generic_eucbc.x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Describes what a generic \fBEUC\fR locale uses in the system. This file is used
+by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/localedef/extensions/single_byte.x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Describes a generic single-byte file used in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fIlocalename\fR/\fIlocalename\fR.so.\fIversion_number\fR
+\fR\fR
+.ad
+.sp .6
+.RS 4n
+The shared object for the 32-bit environment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fIlocalename\fR/sparcv9/\fIlocalename\fR.so.\fIversion_n
+umber\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+The shared object for the 64-bit environment on SPARC.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fI<localename>\fR/amd64/\fI<localename>\fR\&.so.\fI<vers
+ion_number>\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+The shared object for the 64-bit environment on AMD64.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlocale\fR(1), \fBiconv_open\fR(3C), \fBnl_langinfo\fR(3C),
+\fBstrftime\fR(3C), \fBattributes\fR(5), \fBcharmap\fR(5), \fBenviron\fR(5),
+\fBextensions\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
+.SH WARNINGS
+.sp
+.LP
+If warnings occur, permanent output will be created if the \fB-c\fR option was
+specified. The following conditions will cause warning messages to be issued:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If a symbolic name not found in the \fIcharmap\fR file is used for the
+descriptions of the \fBLC_CTYPE\fR or \fBLC_COLLATE\fR categories (for other
+categories, this will be an error conditions).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If optional keywords not supported by the implementation are present in the
+source.
+.RE
+.SH NOTES
+.sp
+.LP
+When the \fB-u\fR option is used, the \fIcode_set_name\fR option-argument is
+interpreted as a name of a codeset to which the ISO/IEC 10646-1: 2000 standard
+position constant values are converted. Both the ISO/IEC 10646-1: 2000 standard
+position constant values and other formats (decimal, hexadecimal, or octal) are
+valid as encoding values within the charmap file. The codeset can be any
+codeset that is supported by the \fBiconv_open\fR(3C) function on the system.
+.sp
+.LP
+When conflicts occur between the charmap specification of \fIcode_set_name\fR,
+\fImb_cur_max\fR, or \fImb_cur_min\fR and the 	corresponding value for the
+codeset represented by the \fB-u\fR option-argument \fIcode_set_name\fR, the
+\fBlocaledef\fR utility fails as an 	error.
+.sp
+.LP
+When conflicts occur between the charmap encoding values specified for symbolic
+names of characters of the portable character set and the character encoding
+values defined by the US-ASCII, the result is unspecified.
+.sp
+.LP
+If a non-printable character in the charmap has a width specified that is not
+\fB-1\fR, \fBlocaledef\fR generates a warning.

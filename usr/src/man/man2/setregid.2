@@ -1,0 +1,104 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setregid 2 "22 Mar 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+setregid \- set real and effective group IDs
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBsetregid\fR(\fBgid_t\fR \fIrgid\fR, \fBgid_t\fR \fIegid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsetregid()\fR function is used to set the real and effective group IDs
+of the calling process.  If \fIrgid\fR is \(mi1, the real group ID is not
+changed; if \fIegid\fR is \(mi1, the effective group ID is not changed.  The
+real and effective group IDs may be set to different values in the same call.
+.sp
+.LP
+If the {\fBPRIV_PROC_SETID\fR} privilege is asserted in the effective set of
+the calling process, the real group ID and the effective group ID can be set to
+any legal value.
+.sp
+.LP
+If the {\fBPRIV_PROC_SETID\fR} privilege is not asserted in the effective set
+of the calling process, either the real group ID can be set to the saved
+set-group-ID from \fBexecve\fR(2), or the effective group ID can either be set
+to the saved set-group-ID or the real group ID.
+.sp
+.LP
+In either case, if the real group ID is being changed (that is, if \fIrgid\fR
+is not \(mi1), or the effective group ID is being changed to a value not equal
+to the real group ID, the saved set-group-ID is set equal to the new effective
+group ID.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, 0 is returned. Otherwise, \(mi1 is returned,
+\fBerrno\fR is set to indicate the error, and neither of the group IDs will be
+changed.
+.SH ERRORS
+.sp
+.LP
+The \fBsetregid()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIrgid\fR or \fIegid\fR is less than 0 or greater than
+\fBUID_MAX\fR (defined in <\fBlimits.h\fR>).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_SETID\fR} privilege is not asserted in the effective set of
+the calling processes and a change was specified other than changing the real
+group \fBID\fR to the saved set-group-\fBID\fR or changing the effective group
+\fBID\fR to the real group \fBID\fR or the saved group ID.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If a set-group-\fBID\fR process sets its effective group \fBID\fR to its real
+group \fBID\fR, it can still set its effective group \fBID\fR back to the saved
+set-group-\fBID\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexecve\fR(2), \fBgetgid\fR(2), \fBsetreuid\fR(2), \fBsetuid\fR(2),
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)

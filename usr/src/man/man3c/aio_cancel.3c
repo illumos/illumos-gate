@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aio_cancel 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aio_cancel \- cancel asynchronous I/O request
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBaio_cancel\fR(\fBint\fR \fIfildes\fR, \fBstruct aiocb *\fR\fIaiocbp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaio_cancel()\fR function attempts to cancel one or more asynchronous I/O
+requests currently outstanding against file descriptor \fIfildes\fR. The
+\fIaiocbp\fR argument points to the asynchronous I/O control block for a
+particular request to be canceled. If \fIaiocbp\fR is \fINULL\fR, then all
+outstanding cancelable asynchronous I/O requests against \fIfildes\fR are
+canceled.
+.sp
+.LP
+Normal asynchronous notification occurs for asynchronous I/O operations that
+are successfully canceled. If there are requests that cannot be canceled, then
+the normal asynchronous completion process takes place for those requests when
+they are completed.
+.sp
+.LP
+For requested operations that are successfully canceled, the associated error
+status is set to \fBECANCELED\fR and the return status is \fB\(mi1\fR\&. For
+requested operations that are not successfully canceled, the \fIaiocbp\fR is
+not modified by \fBaio_cancel()\fR.
+.sp
+.LP
+If \fIaiocbp\fR is not \fINULL\fR, then if \fIfildes\fR does not have the same
+value as the file descriptor with which the asynchronous operation was
+initiated, unspecified results occur.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBaio_cancel()\fR function returns the value \fBAIO_CANCELED\fR to the
+calling process if the requested operation(s) were canceled. The value
+\fBAIO_NOTCANCELED\fR is returned if at least one of the requested operation(s)
+cannot be canceled because it is in progress. In this case, the state of the
+other operations, if any, referenced in the call to \fBaio_cancel()\fR is not
+indicated by the return value of \fBaio_cancel()\fR. The application may
+determine the state of affairs for these operations by using
+\fBaio_error\fR(3C). The value \fBAIO_ALLDONE\fR is returned if all of the
+operations have already completed. Otherwise, the function returns \fB\(mi1\fR
+and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBaio_cancel()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBaio_cancel()\fR function is not supported.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBaio_cancel()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaio.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBaio_read\fR(3C),
+\fBaio_return\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Solaris 2.6 was the first release to support the Asynchronous Input and Output
+option. Prior to this release, this function always returned \fB\(mi1\fR and
+set \fBerrno\fR to \fBENOSYS\fR.

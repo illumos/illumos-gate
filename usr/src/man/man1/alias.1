@@ -1,0 +1,455 @@
+'\" te
+.\" Copyright 1989 AT&T 
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved 
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH alias 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+alias, unalias \- create or remove a pseudonym or shorthand for a command or
+series of commands
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/alias\fR [\fIalias-name\fR[= \fIstring\fR...]]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/unalias\fR \fIalias-name\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/unalias\fR \fB-a\fR
+.fi
+
+.SS "\fBcsh\fR"
+.LP
+.nf
+\fBalias\fR [\fIname\fR [\fIdef\fR]]
+.fi
+
+.LP
+.nf
+\fBunalias\fR \fIpattern\fR
+.fi
+
+.SS "\fBksh\fR"
+.LP
+.nf
+\fBalias\fR [\fB-tx\fR] [\fIname\fR[= \fIvalue\fR]...]
+.fi
+
+.LP
+.nf
+\fBunalias\fR \fIname\fR...
+.fi
+
+.LP
+.nf
+\fBunalias\fR [\fB-a\fR]
+.fi
+
+.SS "\fBksh93\fR"
+.LP
+.nf
+\fBalias\fR [\fB-ptx\fR] [\fIname\fR[= \fIvalue\fR]...]
+.fi
+
+.LP
+.nf
+\fBunalias\fR [\fB-a\fR] [\fIname\fR...]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBalias\fR and \fBunalias\fR utilities create or remove a pseudonym or
+shorthand term for a command or series of commands, with different
+functionality in the C-shell and Korn shell environments.
+.SS "\fB/usr/bin/alias\fR"
+.sp
+.LP
+The \fBalias\fR utility creates or redefines alias definitions or writes the
+values of existing alias definitions to standard output. An alias definition
+provides a string value that replaces a command name when it is encountered.
+.sp
+.LP
+An alias definition affects the current shell execution environment and the
+execution environments of the subshells of the current shell. When used as
+specified by this document, the alias definition does not affect the parent
+process of the current shell nor any utility environment invoked by the shell.
+.SS "\fB/usr/bin/unalias\fR"
+.sp
+.LP
+The \fBunalias\fR utility removes the definition for each alias name specified.
+The aliases are removed from the current shell execution environment. The
+\fB-a\fR option removes all alias definitions from the current execution
+environment.
+.SS "\fBcsh\fR"
+.sp
+.LP
+\fBalias\fR assigns \fIdef\fR to the alias \fIname\fR. The assigned \fIdef\fR
+is a list of words that can contain escaped history-substitution metasyntax.
+\fIname\fR is not allowed to be \fBalias\fR or \fBunalias\fR. If \fIdef\fR is
+omitted, the alias \fIname\fR is displayed along with its current definition.
+If both \fIname\fR and \fIdef\fR are omitted, all aliases are displayed.
+.sp
+.LP
+Because of implementation restrictions, an alias definition must have been
+entered on a previous command line before it can be used.
+.sp
+.LP
+\fBunalias\fR discards aliases that match (filename substitution)
+\fIpattern\fR. All aliases can be removed by `\fBunalias *\fR'.
+.SS "\fBksh\fR"
+.sp
+.LP
+\fBalias\fR with no arguments prints the list of aliases in the form
+\fIname=value\fR on standard output. An \fBalias\fR is defined for each name
+whose \fIvalue\fR is specified. A trailing space in \fIvalue\fR causes the next
+word to be checked for alias substitution. The \fB-t\fR flag is used to set and
+list tracked aliases. The value of a tracked alias is the full pathname
+corresponding to the specified \fIname\fR. The value becomes undefined when the
+value of \fBPATH\fR is reset but the aliases remained tracked. Without the
+\fB-t\fR flag, for each \fIname\fR in the argument list for which no
+\fIvalue\fR is specified, the name and value of the alias is printed. The
+\fB-x\fR flag is used to set or print \fIexported alias\fRes. An exported alias
+is defined for scripts invoked by \fIname\fR. The exit status is non-zero if a
+\fIname\fR is specified, but no value, and no alias has been defined for the
+\fIname\fR.
+.sp
+.LP
+The \fBalias\fRs specified by the list of \fIname\fRs can be removed from the
+\fBalias\fR list with \fBunalias\fR.
+.SS "\fBksh93\fR"
+.sp
+.LP
+\fBalias\fR creates or redefines alias definitions or writes the existing alias
+definitions to standard output.
+.sp
+.LP
+An alias definition provides a string value that replaces a command name when
+the command is read. Alias names can contain any printable character that is
+not special to the shell. If an alias value ends in a SPACE or TAB, the word
+following the command name the alias replaces is also checked to see whether it
+is an alias.
+.sp
+.LP
+If no names are specified, the names and values of all aliases are written to
+standard output. Otherwise, for each name that is specified, and
+\fB=\fR\fIvalue\fR is not specified, the current value of the alias
+corresponding to name is written to standard output. If \fB=\fR\fIvalue\fR is
+specified, the alias name is created or redefined.
+.sp
+.LP
+\fBalias\fR is built-in to the shell as a declaration command so that field
+splitting and pathname expansion are not performed on the arguments. Tilde
+expansion occurs on \fIvalue\fR. An alias definition only affects scripts read
+by the current shell environment. It does not affect scripts run by this shell.
+.sp
+.LP
+\fBunalias\fR removes the definition of each named alias from the current shell
+execution environment, or all aliases if \fB-a\fR is specified. It does not
+affect any commands that have already been read and subsequently executed.
+.SH OPTIONS
+.sp
+.LP
+The following option is supported by \fBunalias\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Removes all alias definitions from the current shell execution environment.
+.RE
+
+.SS "\fBksh\fR"
+.sp
+.LP
+The following option is supported by \fBalias\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Sets and lists tracked aliases.
+.RE
+
+.SS "\fBksh93\fR"
+.sp
+.LP
+The following options are supported by \fBalias\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Causes the output to be in the form of \fBalias\fR commands that can be used as
+input to the shell to recreate the current aliases.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Specifies tracked aliases.
+.sp
+Tracked aliases connect a command name to the command's pathname, and are reset
+when the \fBPATH\fR variable is unset. The tracked aliases feature is now
+obsolete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+Ignored, this option is obsolete.
+.RE
+
+.sp
+.LP
+The following option is supported by \fBunalias\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Causes all alias definitions to be removed. \fIname\fR operands are optional
+and ignored if specified.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.SS "\fBalias\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIalias-name\fR\fR
+.ad
+.RS 14n
+.rt  
+Write the alias definition to standard output.
+.RE
+
+.SS "\fBunalias\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fIalias-name\fR\fR
+.ad
+.RS 21n
+.rt  
+The name of an alias to be removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIalias-name\fR\fB=\fR\fIstring\fR\fR
+.ad
+.RS 21n
+.rt  
+Assign the value of \fIstring\fR to the alias \fIalias-name\fR.
+.RE
+
+.sp
+.LP
+If no operands are specified, all alias definitions are written to standard
+output.
+.SH OUTPUT
+.sp
+.LP
+The format for displaying aliases (when no operands or only \fIname\fR operands
+are specified) is:
+.sp
+.in +2
+.nf
+"%s=%s\en" \fIname\fR, \fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fIvalue\fR string is written with appropriate quoting so that it is
+suitable for reinput to the shell.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRModifying a Command's Output
+.sp
+.LP
+This example specifies that the output of the \fBls\fR utility is columnated
+and more annotated:
+
+.sp
+.in +2
+.nf
+example% \fBalias ls="ls \(miCF"\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRRepeating Previous Entries in the Command History File
+.sp
+.LP
+This example creates a simple "redo" command to repeat previous entries in the
+command history file:
+
+.sp
+.in +2
+.nf
+example% \fBalias r='fc \(mis'\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSpecifying a Command's Output Options
+.sp
+.LP
+This example provides that the \fBdu\fR utility summarize disk output in units
+of 1024 bytes:
+
+.sp
+.in +2
+.nf
+example% \fBalias du=du \(mik\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRDealing with an Argument That is an Alias Name
+.sp
+.LP
+This example sets up the \fBnohup\fR utility so that it can deal with an
+argument that is an alias name:
+
+.sp
+.in +2
+.nf
+example% \fBalias nohup="nohup "\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBalias\fR and \fBunalias\fR: \fBLANG\fR,
+\fBLC_ALL\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.SS "\fBalias\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+One of the \fIalias-name\fR operands specified did not have an alias
+definition, or an error occurred.
+.RE
+
+.SS "\fBunalias\fR"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+One of the \fIalias-name\fR operands specified did not represent a valid alias
+definition, or an error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "\fBcsh, ksh\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "\fBksh93\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBshell_builtins\fR(1),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

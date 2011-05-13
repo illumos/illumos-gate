@@ -1,0 +1,83 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bufsplit 3GEN "29 Dec 1996" "SunOS 5.11" "String Pattern-Matching Library Functions"
+.SH NAME
+bufsplit \- split buffer into fields
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lgen\fR [ \fIlibrary\fR ... ]
+#include <libgen.h>
+
+\fBsize_t\fR \fBbufsplit\fR(\fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIn\fR, \fBchar **\fR\fIa\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBbufsplit()\fR examines the buffer, \fIbuf\fR, and assigns values to the
+pointer array, \fIa\fR, so that the pointers point to the first \fIn\fR fields
+in \fIbuf\fR that are delimited by \fBTABs\fR or  \fBNEWLINEs.\fR
+.sp
+.LP
+To change the characters used to separate fields, call \fBbufsplit()\fR with
+\fIbuf\fR pointing to the string of characters, and \fIn\fR and \fIa\fR set to
+zero.  For example, to use colon (\|:\|), period (\|.\|), and  comma (\|,\|),
+as separators along with \fBTAB\fR and \fBNEWLINE:\fR
+.sp
+.LP
+\fBbufsplit (":.,\et\en", 0, (char**)0 );\fR
+.SH RETURN VALUES
+.sp
+.LP
+The number of fields assigned in the array \fIa\fR. If \fIbuf\fR is zero, the
+return value is zero and the array is unchanged.  Otherwise the value is  at
+least one.  The remainder of the elements in the array are assigned the address
+of the null byte at the end of the buffer.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBbufsplit()\fR function.
+.sp
+.in +2
+.nf
+/*
+ * set a[0] = "This", a[1] = "is", a[2] = "a",
+ * a[3] = "test"
+ */
+bufsplit("This\etis\eta\ettest\en", 4, a);
+.fi
+.in -2
+
+.SH NOTES
+.sp
+.LP
+\fBbufsplit()\fR changes the delimiters to null bytes in \fIbuf\fR.
+.sp
+.LP
+When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multithreaded
+applications.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

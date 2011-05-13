@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBRDR_H_
@@ -257,6 +258,8 @@ typedef struct smb_read_andx_rsp {
 	uint8_t Data[];
 #endif
 } smb_read_andx_rsp_t;
+
+extern int smbrdr_default_timeout; /* seconds */
 
 /*
  * smbrdr_netbios.c

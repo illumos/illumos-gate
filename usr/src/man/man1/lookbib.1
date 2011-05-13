@@ -1,0 +1,96 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lookbib 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+lookbib \- find references in a bibliographic database
+.SH SYNOPSIS
+.LP
+.nf
+\fBlookbib\fR \fIdatabase\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+A bibliographic reference is a set of lines, constituting fields of
+bibliographic information.  Each field starts on a line beginning with a
+`\fB%\fR', followed by a key-letter, then a blank, and finally the contents of
+the field, which may continue until the next line starting with `\fB%\fR'.
+.sp
+.LP
+The \fBlookbib\fR utility uses an inverted index made by \fBindxbib\fR to find
+sets of bibliographic references.  It reads keywords typed after the `\fB>\fR'
+prompt on the terminal, and retrieves records containing all these keywords. If
+nothing matches, nothing is returned except another `\fB>\fR' prompt.
+.sp
+.LP
+It is possible to search multiple databases, as long as they have a common
+index made by \fBindxbib\fR(1). In that case, only the first argument given to
+\fBindxbib\fR is specified to \fBlookbib\fR.
+.sp
+.LP
+If \fBlookbib\fR does not find the index files (the \fB\&.i\fR[\fBabc\fR]
+files), it looks for a reference file with the same name as the argument,
+without the suffixes.  It creates a file with a \fB\&.ig\fR suffix, suitable
+for use with \fBfgrep\fR (see \fBgrep\fR(1)). \fBlookbib\fR then uses this
+\fBfgrep\fR file to find references.  This method is simpler to use, but the
+\fB\&.ig\fR file is slower to use than the \fB\&.i\fR[\fBabc\fR] files, and
+does not allow the use of multiple reference files.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fIx\fR.ia\fR\fR
+.ad
+.RS 8n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fIx\fR.ib\fR\fR
+.ad
+.RS 8n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fIx\fR.ic\fR\fR
+.ad
+.RS 8n
+.rt  
+index files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fIx\fR.ig\fR\fR
+.ad
+.RS 8n
+.rt  
+reference file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddbib\fR(1), \fBgrep\fR(1), \fBindxbib\fR(1), \fBrefer\fR(1),
+\fBroffbib\fR(1), \fBsortbib\fR(1), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+Probably all dates should be indexed, since many disciplines refer to
+literature written in the 1800s or earlier.

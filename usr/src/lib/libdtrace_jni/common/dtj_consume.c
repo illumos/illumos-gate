@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <limits.h>
@@ -1531,7 +1529,8 @@ dtj_new_distribution(const dtrace_aggdata_t *data, const dtrace_recdesc_t *rec,
 	int n; /* number of buckets */
 
 	/* distribution */
-	if (act == DTRACEAGG_LQUANTIZE) {
+	switch (act) {
+	case DTRACEAGG_LQUANTIZE:
 		/* first "bucket" used for range and step */
 		value = *aggbuckets++;
 		base = DTRACE_LQUANTIZE_BASE(value);
@@ -1543,10 +1542,19 @@ dtj_new_distribution(const dtrace_aggdata_t *data, const dtrace_recdesc_t *rec,
 		 * less than the base.
 		 */
 		n = levels + 2;
-	} else {
+		break;
+	case DTRACEAGG_LLQUANTIZE:
+		value = *aggbuckets++;
+		size -= sizeof (int64_t);
+		levels = size / sizeof (int64_t);
+		n = levels;
+		break;
+	case DTRACEAGG_QUANTIZE:
 		n = DTRACE_QUANTIZE_NBUCKETS;
 		levels = n - 1; /* levels excludes base */
+		break;
 	}
+
 	if (size != (n * sizeof (uint64_t)) || n < 1) {
 		dtj_throw_illegal_state(jenv,
 		    "size mismatch: record %d, buckets %d", size,
@@ -1559,6 +1567,7 @@ dtj_new_distribution(const dtrace_aggdata_t *data, const dtrace_recdesc_t *rec,
 	if (!jbuckets) {
 		return (NULL); /* exception pending */
 	}
+
 	if (n > 0) {
 		(*jenv)->SetLongArrayRegion(jenv, jbuckets, 0, n, aggbuckets);
 		/* check for ArrayIndexOutOfBounds */
@@ -1569,13 +1578,20 @@ dtj_new_distribution(const dtrace_aggdata_t *data, const dtrace_recdesc_t *rec,
 		}
 	}
 
-	if (act == DTRACEAGG_LQUANTIZE) {
+	switch (act) {
+	case DTRACEAGG_LQUANTIZE:
 		/* Must pass 64-bit base and step or constructor gets junk. */
 		jdist = (*jenv)->NewObject(jenv, g_ldist_jc, g_ldistinit_jm,
 		    base, step, jbuckets);
-	} else {
+		break;
+	case DTRACEAGG_QUANTIZE:
 		jdist = (*jenv)->NewObject(jenv, g_dist_jc, g_distinit_jm,
 		    jbuckets);
+		break;
+	case DTRACEAGG_LLQUANTIZE:
+		jdist = (*jenv)->NewObject(jenv, g_lldist_jc, g_lldistinit_jm,
+		    value, jbuckets);
+		break;
 	}
 
 	(*jenv)->DeleteLocalRef(jenv, jbuckets);
@@ -2009,7 +2025,8 @@ dtj_new_aggval(dtj_java_consumer_t *jc, const dtrace_aggdata_t *data,
 		value = (*((int64_t *)addr)) / normal;
 	}
 
-	if (act == DTRACEAGG_QUANTIZE || act == DTRACEAGG_LQUANTIZE) {
+	if ((act == DTRACEAGG_QUANTIZE) || (act == DTRACEAGG_LQUANTIZE) ||
+	    (act == DTRACEAGG_LLQUANTIZE)) {
 		jvalue = dtj_new_distribution(data, rec, jc);
 	} else {
 		switch (act) {

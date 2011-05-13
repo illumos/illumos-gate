@@ -1,0 +1,353 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_ep_post_rdma_read 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_ep_post_rdma_read \- transfer all data to the local data buffer
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_ep_post_rdma_read (
+    IN    DAT_EP_HANDLE        ep_handle,
+    IN    DAT_COUNT            num_segments,
+    IN    DAT_LMR_TRIPLET      *local_iov,
+    IN    DAT_DTO_COOKIE       user_cookie,
+    IN    DAT_RMR_TRIPLET      *remote_buffer,
+    IN    DAT_COMPLETION_FLAGS completion_flags
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIep_handle\fR\fR
+.ad
+.RS 20n
+.rt  
+Handle for an instance of the Endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInum_segments\fR\fR
+.ad
+.RS 20n
+.rt  
+Number of \fIlmr_triplets\fR in \fIlocal_iov\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlocal_iov\fR\fR
+.ad
+.RS 20n
+.rt  
+I/O Vector that specifies the local buffer to fill.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser_cookie\fR\fR
+.ad
+.RS 20n
+.rt  
+User-provided cookie that is returned to the Consumer at the completion of the
+RDMA Read. Can be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIremote_buffer\fR\fR
+.ad
+.RS 20n
+.rt  
+A pointer to an RMR Triplet that specifies the remote buffer from which the
+data is read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcompletion_flags\fR\fR
+.ad
+.RS 20n
+.rt  
+Flags for posted RDMA Read. The default \fBDAT_COMPLETION_DEFAULT_FLAG\fR is
+0x00. Other values are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fBCompletion Suppression\fR
+.ad
+.RS 30n
+.rt  
+\fBDAT_COMPLETION_SUPPRESS_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x01\fR
+.ad
+.RS 8n
+.rt  
+Suppress successful Completion.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBNotification of Completion\fR
+.ad
+.RS 30n
+.rt  
+\fB\fR\fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x04\fR
+.ad
+.RS 8n
+.rt  
+Non-notification completion. Local Endpoint must be configured for Notification
+Suppression.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBBarrier Fence\fR
+.ad
+.RS 30n
+.rt  
+\fB\fR\fBDAT_COMPLETION_BARRIER_FENCE_FLAG\fR
+.sp
+.ne 2
+.mk
+.na
+\fB0x08\fR
+.ad
+.RS 8n
+.rt  
+Request for Barrier Fence.
+.RE
+
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_ep_post_rdma_read()\fR function requests the transfer of all the
+data specified by the \fIremote_buffer\fR over the connection of the
+\fIep_handle\fR Endpoint into the \fIlocal_iov\fR.
+.sp
+.LP
+The \fInum_segments\fR parameter specifies the number of segments in the
+\fIlocal_iov\fR. The \fIlocal_iov\fR segments are filled in the I/O Vector
+order until the whole message is received. This ensures that all the "front"
+segments of the \fIlocal_iov\fR I/O Vector are completely filled, only one
+segment is partially filled, if needed, and all segments that follow it are not
+filled at all.
+.sp
+.LP
+The \fIuser_cookie\fR allows Consumers to have unique identifiers for each DTO.
+These identifiers are completely under user control and are opaque to the
+Provider. There is no requirement on the Consumer that the value
+\fIuser_cookie\fR should be unique for each DTO. The \fIuser_cookie\fR is
+returned to the Consumer in the Completion event for the posted RDMA Read.
+.sp
+.LP
+A Consumer must not modify the \fIlocal_iov\fR or its content until the DTO is
+completed. When a Consumer does not adhere to this rule, the behavior of the
+Provider and the underlying Transport is not defined. Providers that allow
+Consumers to get ownership of the \fIlocal_iov\fR but not the memory it
+specifies back after the \fBdat_ep_post_rdma_read()\fR returns should document
+this behavior and also specify its support in Provider attributes. This
+behavior allows Consumers full control of the \fIlocal_iov\fR after
+\fBdat_ep_post_rdma_read()\fR returns. Because this behavior is not guaranteed
+by all Providers, portable Consumers should not rely on this behavior.
+Consumers should not rely on the Provider copying \fIlocal_iov\fR information.
+.sp
+.LP
+The completion of the posted RDMA Read is reported to the Consumer
+asynchronously through a DTO Completion event based on the specified
+\fIcompletion_flags\fR value. The value of
+\fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR is only valid if the Endpoint Request
+Completion Flags \fBDAT_COMPLETION_UNSIGNALLED_FLAG\fR. Otherwise,
+\fBDAT_INVALID_PARAMETER\fR is returned.
+.sp
+.LP
+The \fBDAT_SUCCESS\fR return of the \fBdat_ep_post_rdma_read()\fR is at least
+the equivalent of posting an RDMA Read operation directly by native Transport.
+Providers should avoid resource allocation as part of
+\fBdat_ep_post_rdma_read()\fR to ensure that this operation is nonblocking and
+thread safe for an UpCall.
+.sp
+.LP
+The operation is valid for the Endpoint in the \fBDAT_EP_STATE_CONNECTED\fR and
+\fBDAT_EP_STATE_DISCONNECTED\fR states. If the operation returns successfully
+for the Endpoint in the \fBDAT_EP_STATE_DISCONNECTED\fR state, the posted RDMA
+Read is immediately flushed to \fIrequest_evd_handle\fR.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
+.ad
+.RS 30n
+.rt  
+The operation failed due to resource limitations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_PARAMETER\fR\fR
+.ad
+.RS 30n
+.rt  
+Invalid parameter. For example, one of the IOV segments pointed to a memory
+outside its LMR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIep_handle\fR parameter is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_STATE\fR\fR
+.ad
+.RS 30n
+.rt  
+A parameter is in an invalid state. Endpoint was not in the
+\fBDAT_EP_STATE_CONNECTED\fR or \fBDAT_EP_STATE_DISCONNECTED\fR state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_LENGTH_ERROR\fR\fR
+.ad
+.RS 30n
+.rt  
+The size of the receiving buffer is too small for sending buffer data. The size
+of the local buffer is too small for the data of the remote buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_PROTECTION_VIOLATION\fR\fR
+.ad
+.RS 30n
+.rt  
+Protection violation for local or remote memory access. Protection Zone
+mismatch between either an LMR of one of the \fIlocal_iov\fR segments and the
+local Endpoint or the \fIrmr_context\fR and the remote Endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_PRIVILEGES_VIOLATION\fR\fR
+.ad
+.RS 30n
+.rt  
+Privileges violation for local or remote memory access. Either one of the LMRs
+used in \fIlocal_iov\fR is invalid or does not have the local write privileges,
+or \fIrmr_context\fR does not have the remote read privileges.
+.RE
+
+.SH USAGE
+.sp
+.LP
+For best RDMA Read operation performance, the Consumer should align each buffer
+segment of \fIlocal_iov\fR to the Optimal Buffer Alignment attribute of the
+Provider. For portable applications, the Consumer should align each buffer
+segment of \fIlocal_iov\fR to the \fBDAT_OPTIMAL_ALIGNMENT\fR.
+.sp
+.LP
+If connection was established without outstanding RDMA Read attributes matching
+on Endpoints on both sides (outstanding RDMA Read outgoing on one end is larger
+than the outstanding RDMA Read incoming on the other end), connection is broken
+when the number of incoming RDMA Read exceeds the outstanding RDMA Read
+incoming attribute of the Endpoint. The Consumer can use its own flow control
+to ensure that it does not post more RDMA Reads then the remote EP outstanding
+RDMA Read incoming attribute is. Thus, they do not rely on the underlying
+Transport enforcing it.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.1, 1.2
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdat\fR(3LIB), \fBattributes\fR(5)

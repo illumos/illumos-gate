@@ -1,0 +1,138 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_RepGet8 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_RepGet8, csx_RepGet16, csx_RepGet32, csx_RepGet64 \- read repetitively from
+the device register
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBvoid\fR \fBcsx_RepGet8\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint8_t *\fR\fIhostaddr\fR, \fBuint32_t\fR \fIoffset\fR,
+     \fBuint32_t\fR \fIrepcount\fR, \fBuint32_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcsx_RepGet16\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint16_t *\fR\fIhostaddr\fR, \fBuint32_t\fR \fIoffset\fR,
+     \fBuint32_t\fR \fIrepcount\fR, \fBuint32_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcsx_RepGet32\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint32_t *\fR\fIhostaddr\fR, \fBuint32_t\fR \fIoffset\fR,
+     \fBuint32_t\fR \fIrepcount\fR, \fBuint32_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcsx_RepGet64\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint64_t *\fR\fIhostaddr\fR, \fBuint32_t\fR \fIoffset\fR,
+     \fBuint32_t\fR \fIrepcount\fR, \fBuint32_t\fR \fIflags\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 13n
+.rt  
+The access handle returned from \fBcsx_RequestIO\fR(9F),
+\fBcsx_RequestWindow\fR(9F), or \fBcsx_DupHandle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhostaddr\fR \fR
+.ad
+.RS 13n
+.rt  
+Source host address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoffset\fR \fR
+.ad
+.RS 13n
+.rt  
+The offset in bytes from the base of the mapped resource.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrepcount\fR \fR
+.ad
+.RS 13n
+.rt  
+Number of data accesses to perform.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR \fR
+.ad
+.RS 13n
+.rt  
+Device address flags.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions generate multiple reads of various sizes from the mapped memory
+or device register.
+.sp
+.LP
+The \fBcsx_RepGet8()\fR, \fBcsx_RepGet16()\fR, \fBcsx_RepGet32()\fR, and
+\fBcsx_RepGet64()\fR functions generate \fIrepcount\fR reads of 8 bits, 16
+bits, 32 bits, and 64 bits of data, respectively, from the device address
+represented by the handle, \fIhandle\fR, at an offset in bytes represented by
+the offset, \fIoffset\fR. The data read is stored consecutively into the buffer
+pointed to by the host address pointer, \fIhostaddr\fR.
+.sp
+.LP
+Data that consists of more than one byte will automatically be translated to
+maintain a consistent view between the host and the device based on the encoded
+information in the data access handle. The translation may involve byte
+swapping if the host and the device have incompatible endian characteristics.
+.sp
+.LP
+When the \fIflags\fR argument is set to \fBCS_DEV_AUTOINCR\fR, these functions
+increment the  device offset, \fIoffset\fR, after each datum read operation.
+However, when the \fIflags\fR argument is set to \fBCS_DEV_NO_AUTOINCR\fR, the
+same device offset will be used for every datum access. For example, this flag
+may be useful when reading from a data register.
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user, kernel, or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_DupHandle\fR(9F), \fBcsx_Get8\fR(9F), \fBcsx_GetMappedAddr\fR(9F),
+\fBcsx_Put8\fR(9F), \fBcsx_RepPut8\fR(9F), \fBcsx_RequestIO\fR(9F),
+\fBcsx_RequestWindow\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA

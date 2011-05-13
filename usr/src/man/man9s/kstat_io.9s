@@ -1,0 +1,76 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_io 9S "4 Apr 1994" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+kstat_io \- structure for I/O kstats
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+I/O kstat statistics are kept in a \fBkstat_io\fR structure. When
+\fBkstat_create\fR(9F) creates an \fBI/O\fR \fBkstat\fR, the \fBks_data\fR
+field is a pointer to one of these structures. The macro \fBKSTAT_IO_PTR()\fR
+is provided to retrieve this field. It looks like this:
+.sp
+.in +2
+.nf
+#define KSTAT_IO_PTR(kptr)	((kstat_io_t *)(kptr)->ks_data)
+.fi
+.in -2
+
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+u_longlong_t      nread;      /* number of bytes read */
+u_longlong_t      nwritten;   /* number of bytes written *]/
+ulong_t           reads;      /* number of read operations */
+ulong_t           writes;     /* number of write operations */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBnread\fR field should be updated by the driver with the number of bytes
+successfully read upon completion.
+.sp
+.LP
+The \fBnwritten\fR field should be updated by the driver with the number of
+bytes successfully written upon completion.
+.sp
+.LP
+The \fBreads\fR field should be updated by the driver after each successful
+read operation.
+.sp
+.LP
+The \fBwrites\fR field should be updated by the driver after each successful
+write operation.
+.sp
+.LP
+Other \fBI/O\fR statistics are updated through the use of the
+\fBkstat_queue\fR(9F) functions.
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat_create\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat_queue\fR(9F),
+\fBkstat_runq_back_to_waitq\fR(9F), \fBkstat_runq_enter\fR(9F),
+\fBkstat_runq_exit\fR(9F), \fBkstat_waitq_enter\fR(9F),
+\fBkstat_waitq_exit\fR(9F), \fBkstat_waitq_to_runq\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

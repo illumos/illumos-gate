@@ -1,0 +1,299 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nvlist_next_nvpair 3NVPAIR "2 Feb 2004" "SunOS 5.11" "Name-value Pair Library Functions"
+.SH NAME
+nvlist_next_nvpair, nvpair_name, nvpair_type \- return data regarding
+name-value pairs
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnvpair\fR [ \fIlibrary\fR... ]
+#include <libnvpair.h>
+
+\fBnvpair_t *\fR\fBnvlist_next_nvpair\fR(\fBnvlist_t *\fR\fInvl\fR, \fBnvpair_t *\fR\fInvpair\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBnvpair_name\fR(\fBnvpair_t *\fR\fInvpair\fR);
+.fi
+
+.LP
+.nf
+\fBdata_type_t\fR \fBnvpair_type\fR(\fBnvpair_t *\fR\fInvpair\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInvl\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBnvlist_t\fR to be processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInvpair\fR\fR
+.ad
+.RS 10n
+.rt  
+Handle to a name-value pair.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnvlist_next_nvpair()\fR function returns a handle to the next
+\fBnvpair\fR in the list following \fBnvpair\fR. If \fBnvpair\fR is \fINULL\fR,
+the first pair is returned. If \fBnvpair\fR is the last pair in the
+\fBnvlist\fR, \fINULL\fR is returned.
+.sp
+.LP
+The \fBnvpair_name()\fR function returns a string containing the name of
+\fBnvpair\fR.
+.sp
+.LP
+The \fBnvpair_type()\fR function retrieves the value of the \fBnvpair\fR in the
+form of enumerated type \fBdata_type_t\fR. This is used to determine the
+appropriate \fBnvpair_*()\fR function to call for retrieving the value.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBnvpair_name()\fR returns a string containing the
+name of the name-value pair.
+.sp
+.LP
+Upon successful completion, \fBnvpair_type()\fR returns an enumerated data type
+\fBdata_type_t\fR. Possible values for \fBdata_type_t\fR are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_BOOLEAN\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_BOOLEAN_VALUE\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_BYTE\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT8\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT8\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT16\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT16\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT32\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT32\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT64\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT64\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_STRING\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_NVLIST\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_BOOLEAN_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_BYTE_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT8_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT8_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT16_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT16_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT32_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT32_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_INT64_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_UINT64_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_STRING_ARRAY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDATA_TYPE_NVLIST_ARRAY\fR
+.RE
+.sp
+.LP
+Upon reaching the end of a list, \fBnvlist_next_pair()\fR returns \fINULL\fR.
+Otherwise, the function returns a handle to next \fBnvpair\fR in the list.
+.sp
+.LP
+These and other \fBlibnvpair\fR(3LIB) functions cannot manipulate nvpairs after
+they have been removed from or replaced in an nvlist. Replacement can occur
+during pair additions to nvlists created with \fBNV_UNIQUE_NAME_TYPE\fR and
+\fBNV_UNIQUE_NAME\fR. See \fBnvlist_alloc\fR(3NVPAIR).
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of usage of \fBnvlist_next_nvpair()\fR.
+.sp
+.in +2
+.nf
+/*
+ * usage of nvlist_next_nvpair() 
+ */
+ static int 
+ edit_nvl(nvlist_t *nvl) 
+ {
+     nvpair_t *curr = nvlist_next_nvpair(nvl, NULL); 
+ 
+     while (curr != NULL) { 
+         int err; 
+        nvpair_t *next = nvlist_next_nvpair(nvl, curr); 
+ 
+        if (!nvl_check(curr)) 
+            if ((err = nvlist_remove(nvl, nvpair_name(curr), 
+                nvpair_type(curr))) != 0) 
+                    return (err); 
+ 
+         curr = next; 
+     } 
+    return (0); 
+ }
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.69i) |cw(2.81i) 
+lw(2.69i) |lw(2.81i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibnvpair\fR(3LIB), \fBnvlist_alloc\fR(3NVPAIR), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The enumerated nvpair data types might not be an exhaustive list and new data
+types can be added.  An application using the data type enumeration,
+\fBdata_type_t\fR, should be written to expect or ignore new data types.

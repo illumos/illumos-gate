@@ -1,0 +1,452 @@
+'\" te
+.\"  Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_addr_bind_handle 9F "26 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_addr_bind_handle \- binds an address to a DMA handle
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_dma_addr_bind_handle\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBstruct as *\fR\fIas\fR,
+     \fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fIflags\fR, \fBint (*\fR\fIcallback\fR) (caddr_t) ,
+     \fBcaddr_t\fR \fIarg\fR, \fBddi_dma_cookie_t *\fR\fIcookiep\fR, \fBuint_t *\fR\fIccountp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 13n
+.rt  
+The  \fBDMA\fR handle previously allocated by a call to
+\fBddi_dma_alloc_handle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIas\fR \fR
+.ad
+.RS 13n
+.rt  
+A pointer to an address space structure. This parameter should be set to
+\fINULL\fR, which implies kernel address space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR \fR
+.ad
+.RS 13n
+.rt  
+Virtual address of the memory object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR \fR
+.ad
+.RS 13n
+.rt  
+Length of the memory object in bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR \fR
+.ad
+.RS 13n
+.rt  
+Valid flags include:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_WRITE\fR \fR
+.ad
+.RS 23n
+.rt  
+Transfer direction is from memory to I/O.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_READ\fR \fR
+.ad
+.RS 23n
+.rt  
+Transfer direction is from I/O to memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_RDWR\fR \fR
+.ad
+.RS 23n
+.rt  
+Both read and write.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_REDZONE\fR \fR
+.ad
+.RS 23n
+.rt  
+Establish an \fBMMU\fR redzone at end of the object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_PARTIAL\fR \fR
+.ad
+.RS 23n
+.rt  
+Partial resource allocation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_CONSISTENT\fR \fR
+.ad
+.RS 23n
+.rt  
+Nonsequential, random, and small block transfers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_STREAMING\fR \fR
+.ad
+.RS 23n
+.rt  
+Sequential, unidirectional, block-sized, and block-aligned transfers.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR \fR
+.ad
+.RS 13n
+.rt  
+The address of a function to call back later if resources are not currently
+available. The following special function addresses may also  be used.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_SLEEP\fR \fR
+.ad
+.RS 21n
+.rt  
+Wait until resources are available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_DONTWAIT\fR \fR
+.ad
+.RS 21n
+.rt  
+Do not wait until resources are available and do not schedule a callback.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR \fR
+.ad
+.RS 13n
+.rt  
+Argument to be passed to the callback function,  \fIcallback\fR, if such a
+function is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcookiep\fR \fR
+.ad
+.RS 13n
+.rt  
+A pointer to the first  \fBddi_dma_cookie\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIccountp\fR \fR
+.ad
+.RS 13n
+.rt  
+Upon a successful return,  \fIccountp\fR points to a value representing the
+number of cookies for this \fBDMA\fR object.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_dma_addr_bind_handle()\fR allocates \fBDMA\fR resources for a memory
+object  such that a device can perform \fBDMA\fR to or from the object.
+\fBDMA\fR resources are allocated considering the device's \fBDMA\fR attributes
+as expressed by \fBddi_dma_attr\fR(9S) (see \fBddi_dma_alloc_handle\fR(9F)).
+.sp
+.LP
+\fBddi_dma_addr_bind_handle()\fR fills in the first \fBDMA\fR cookie pointed to
+by \fIcookiep\fR with the appropriate address, length, and bus type.
+\fB*\fR\fIccountp\fR is set to the number of \fBDMA\fR cookies representing
+this \fBDMA\fR object. Subsequent \fBDMA\fR cookies must be retrieved by
+calling \fBddi_dma_nextcookie\fR(9F) the number of times specified by
+\fB*\fR\fIcountp\fR-1.
+.sp
+.LP
+When a \fBDMA\fR transfer completes, the driver frees up system \fBDMA\fR
+resources by calling \fBddi_dma_unbind_handle\fR(9F).
+.sp
+.LP
+The \fIflags\fR argument contains information for mapping routines.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_WRITE\fR, \fBDDI_DMA_READ\fR, \fBDDI_DMA_RDWR\fR\fR
+.ad
+.sp .6
+.RS 4n
+These flags describe the intended direction of the \fBDMA\fR transfer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_STREAMING\fR \fR
+.ad
+.sp .6
+.RS 4n
+This flag should be set if the device is doing sequential, unidirectional,
+block-sized, and block-aligned transfers to or from memory.  The alignment and
+padding constraints specified by the \fBminxfer\fR and \fBburstsizes\fR fields
+in the \fBDMA\fR attribute structure, \fBddi_dma_attr\fR(9S) (see
+\fBddi_dma_alloc_handle\fR(9F)) is used to allocate the most effective hardware
+support for large transfers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_CONSISTENT\fR \fR
+.ad
+.sp .6
+.RS 4n
+This flag should be set if  the device accesses memory randomly, or if
+synchronization steps using \fBddi_dma_sync\fR(9F) need to be as efficient as
+possible. I/O parameter blocks used for communication between a device and a
+driver should be allocated using \fBDDI_DMA_CONSISTENT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_REDZONE\fR \fR
+.ad
+.sp .6
+.RS 4n
+If this flag is set, the system attempts to  establish a protected red zone
+after the object. The \fBDMA\fR resource allocation functions do not guarantee
+the success of this request as some implementations may not have the hardware
+ability to support a red zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_PARTIAL\fR \fR
+.ad
+.sp .6
+.RS 4n
+Setting this flag indicates the caller can accept resources for part of the
+object. That is, if the size of the object exceeds the resources available,
+only resources for a portion of the object are allocated. The system indicates
+this condition by returning status \fBDDI_DMA_PARTIAL_MAP\fR. At a later point,
+the caller can use \fBddi_dma_getwin\fR(9F) to change the valid portion of the
+object for which resources are allocated. If resources were allocated for only
+part of the object, \fBddi_dma_addr_bind_handle()\fR returns resources for the
+first \fBDMA\fRwindow. Even when \fBDDI_DMA_PARTIAL\fR is set, the system may
+decide to allocate resources for the entire object (less overhead) in which
+case \fBDDI_DMA_MAPPED\fR is returned.
+.RE
+
+.sp
+.LP
+The callback function \fIcallback\fR indicates how a caller wants to handle the
+possibility of resources not being available. If \fIcallback\fR is set to
+\fBDDI_DMA_DONTWAIT\fR, the caller does not care if the allocation fails, and
+can handle an allocation failure appropriately. If \fIcallback\fR is set to
+\fBDDI_DMA_SLEEP\fR, the caller wishes to have the allocation routines wait for
+resources to become available. If any other value is set and a \fBDMA\fR
+resource allocation fails, this value is assumed to be the address of a
+function to be called when resources  become available. When the specified
+function is called,  \fIarg\fR is passed to it as an argument. The specified
+callback function must  return either \fBDDI_DMA_CALLBACK_RUNOUT\fR or
+\fBDDI_DMA_CALLBACK_DONE\fR. \fBDDI_DMA_CALLBACK_RUNOUT\fR indicates that the
+callback function attempted to allocate \fBDMA\fR resources but failed.  In
+this case, the callback function is put back on a list to be called again
+later. \fBDDI_DMA_CALLBACK_DONE\fR indicates that either the allocation of
+\fBDMA\fR resources was successful or the driver no longer wishes to retry.
+.sp
+.LP
+The callback function is called in interrupt context. Therefore, only system
+functions accessible from interrupt context are be available. The callback
+function must take whatever steps are necessary to protect its critical
+resources, data structures, queues, and so on.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_dma_addr_bind_handle()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_MAPPED\fR \fR
+.ad
+.RS 24n
+.rt  
+Successfully allocated resources for the entire object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_PARTIAL_MAP\fR \fR
+.ad
+.RS 24n
+.rt  
+Successfully allocated resources for a part of the object. This is acceptable
+when partial transfers are permitted by setting the \fBDDI_DMA_PARTIAL\fR flag
+in \fIflags\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_INUSE\fR \fR
+.ad
+.RS 24n
+.rt  
+Another I/O transaction is using the \fBDMA\fR handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_NORESOURCES\fR \fR
+.ad
+.RS 24n
+.rt  
+No resources are available at the present time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_NOMAPPING\fR \fR
+.ad
+.RS 24n
+.rt  
+The object cannot be reached by the device requesting the resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_DMA_TOOBIG\fR \fR
+.ad
+.RS 24n
+.rt  
+The object is too big.  A request of this size can never be  satisfied on this
+particular system.  The maximum size varies depending on machine and
+configuration.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBddi_dma_addr_bind_handle()\fR can be called from user, kernel, or interrupt
+context, except when \fIcallback\fR is set to  \fBDDI_DMA_SLEEP\fR, in which
+case it can only be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_free_handle\fR(9F),
+\fBddi_dma_getwin\fR(9F), \fBddi_dma_mem_alloc\fR(9F),
+\fBddi_dma_mem_free\fR(9F), \fBddi_dma_nextcookie\fR(9F),
+\fBddi_dma_sync\fR(9F), \fBddi_dma_unbind_handle\fR(9F),
+\fBddi_umem_iosetup\fR(9F), \fBddi_dma_attr\fR(9S), \fBddi_dma_cookie\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+If the driver permits partial mapping with the  \fBDDI_DMA_PARTIAL\fR flag, the
+number of cookies in each window may exceed the size of the device's
+scatter/gather list as specified in the  \fBdma_attr_sgllen\fR field in the
+\fBddi_dma_attr\fR(9S) structure. In this case, each set of cookies comprising
+a  \fBDMA\fR window will satisfy the \fBDMA\fR attributes as described in the
+\fBddi_dma_attr\fR(9S) structure in all aspects. The driver should set up its
+\fBDMA\fR engine and perform one transfer for each set of cookies sufficient
+for its scatter/gather list, up to the number of cookies for this window,
+before advancing to the next window using \fBddi_dma_getwin\fR(9F).

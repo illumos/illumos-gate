@@ -1,0 +1,126 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rtld_db 3EXT "12 Oct 2007" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+rtld_db, rd_delete, rd_errstr, rd_event_addr, rd_event_enable, rd_event_getmsg,
+rd_init, rd_loadobj_iter, rd_log, rd_new, rd_objpad_enable, rd_plt_resolution,
+rd_reset \- runtime linker debugging functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lrtld_db\fR [ \fIlibrary\fR ... ]
+#include <proc_service.h>
+#include <rtld_db.h>
+
+\fBvoid\fR \fBrd_delete\fR(\fBstruct rd_agent *\fR\fIrdap\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBrd_errstr\fR(\fBrd_err_e\fR \fIrderr\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_event_addr\fR(\fBrd_agent *\fR\fIrdap\fR, \fBrd_notify_t *\fR\fInotify\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_event_enable\fR(\fBstruct rd_agent *\fR\fIrdap\fR, \fBint\fR \fIonoff\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_event_getmsg\fR(\fBstruct rd_agent *\fR\fIrdap\fR,
+     \fBrd_event_msg_t *\fR\fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_init\fR(\fBint\fR \fIversion\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBrl_iter_f\fR(\fBconst rd_loadobj_t *,\fR void *);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_loadobj_iter\fR(\fBrd_agent_t *\fR\fIrap\fR, \fBrl_iter_f *\fR\fIcb\fR,
+     \fBvoid *\fR\fIclnt_data\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrd_log\fR(\fBconst int\fR \fIonoff\fR);
+.fi
+
+.LP
+.nf
+\fBrd_agent_t *\fR\fBrd_new\fR(\fBstruct ps_prochandle *\fR\fIphp\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_objpad_enable\fR(\fBstruct rd_agent *\fR\fIrdap\fR, \fBsize_t\fR \fIpadsize\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_plt_resolution\fR(\fBrd_agent *\fR\fIrdap\fR, \fBpaddr_t\fR \fIpc\fR,
+     \fBlwpid_t\fR \fIlwpid\fR, \fBpaddr_t\fR \fIplt_base\fR, \fBrd_plt_info_t *\fR\fIrpi\fR);
+.fi
+
+.LP
+.nf
+\fBrd_err_e\fR \fBrd_reset\fR(\fBstruct rd_agent *\fR\fIrdap\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlibrtld_db\fR library provides support for monitoring and manipulating
+runtime linking aspects of a program. There are at least two processes
+involved,  the controlling process and one  or more target processes.  The
+controlling process is the \fBlibrtld_db\fR client that links with
+\fBlibrtld_db\fR and uses \fBlibrtld_db\fR to inspect or modify runtime linking
+aspects of one or more target processes. See the \fILinker and Libraries
+Guide\fR for a full description of the runtime linker debugger interface
+mechanism.
+.SH USAGE
+.sp
+.LP
+To use \fBlibrtld_db\fR, applications need to implement the interfaces
+documented in \fBps_pread\fR(3PROC) and \fBproc_service\fR(3PROC).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld.so.1\fR(1), \fBlibc_db\fR(3LIB), \fBlibrtld_db\fR(3LIB),
+\fBproc_service\fR(3PROC), \fBps_pread\fR(3PROC), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

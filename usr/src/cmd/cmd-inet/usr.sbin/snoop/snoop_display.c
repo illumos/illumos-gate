@@ -21,9 +21,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +36,7 @@
 #include <sys/time.h>
 #include <sys/bufmod.h>
 #include <setjmp.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in_systm.h>
@@ -190,6 +190,7 @@ xdr_init(char *addr, int len)
 	xdrmem_create(&xdrm, addr, len, XDR_DECODE);
 }
 
+/* Note: begin+end are ignored in get_detail_line */
 char *
 get_line(int begin, int end)
 {
@@ -210,7 +211,17 @@ get_line_remain(void)
 void
 show_line(char *str)
 {
-	(void) strcpy(get_line(0, 0), str);
+	(void) strlcpy(get_line(0, 0), str, get_line_remain());
+}
+
+void
+show_printf(char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	(void) vsnprintf(get_line(0, 0), get_line_remain(), fmt, ap);
+	va_end(ap);
 }
 
 char
@@ -769,4 +780,57 @@ hexdump(char *data, int datalen)
 	}
 
 	printf("\n");
+}
+
+char *
+show_string(const char *str, int dlen, int maxlen)
+/*
+ *   Prints len bytes from str enclosed in quotes.
+ *   If len is negative, length is taken from strlen(str).
+ *   No more than maxlen bytes will be printed.  Longer
+ *   strings are flagged with ".." after the closing quote.
+ *   Non-printing characters are converted to C-style escape
+ *   codes or octal digits.
+ */
+{
+#define	TBSIZE	256
+	static char tbuff[TBSIZE];
+	const char *p;
+	char *pp;
+	int printable = 0;
+	int c, len;
+
+	len = dlen > maxlen ? maxlen : dlen;
+	dlen = len;
+
+	for (p = str, pp = tbuff; len; p++, len--) {
+		switch (c = *p & 0xFF) {
+		case '\n': (void) strcpy(pp, "\\n"); pp += 2; break;
+		case '\b': (void) strcpy(pp, "\\b"); pp += 2; break;
+		case '\t': (void) strcpy(pp, "\\t"); pp += 2; break;
+		case '\r': (void) strcpy(pp, "\\r"); pp += 2; break;
+		case '\f': (void) strcpy(pp, "\\f"); pp += 2; break;
+		default:
+			if (isascii(c) && isprint(c)) {
+				*pp++ = c;
+				printable++;
+			} else {
+				(void) snprintf(pp, TBSIZE - (pp - tbuff),
+					isdigit(*(p + 1)) ?
+					"\\%03o" : "\\%o", c);
+				pp += strlen(pp);
+			}
+			break;
+		}
+		*pp = '\0';
+		/*
+		 * Check for overflow of temporary buffer.  Allow for
+		 * the next character to be a \nnn followed by a trailing
+		 * null.  If not, then just bail with what we have.
+		 */
+		if (pp + 5 >= &tbuff[TBSIZE]) {
+			break;
+		}
+	}
+	return (printable > dlen / 2 ? tbuff : "");
 }

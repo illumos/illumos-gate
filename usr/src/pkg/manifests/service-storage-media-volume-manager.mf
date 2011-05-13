@@ -39,6 +39,8 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/sbin
+dir path=usr/share/man/man1
+dir path=usr/share/man/man1m
 file path=lib/svc/manifest/system/filesystem/rmvolmgr.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-rmvolmgr mode=0555 \
@@ -48,6 +50,13 @@ file path=usr/bin/rmmount mode=0555
 file path=usr/bin/volcheck mode=0555
 file path=usr/bin/volrmmount mode=0555
 file path=usr/lib/rmvolmgr mode=0555
+file path=usr/share/man/man1/rmformat.1
+file path=usr/share/man/man1/rmmount.1
+file path=usr/share/man/man1/rmumount.1
+file path=usr/share/man/man1/volcheck.1
+file path=usr/share/man/man1/volrmmount.1
+file path=usr/share/man/man1m/rmmount.1m
+file path=usr/share/man/man1m/rmvolmgr.1m
 legacy pkg=SUNWrmvolmgr desc="Non-graphical removable volume manager" \
     name="Removable volume manager"
 legacy pkg=SUNWrmvolmgrr desc="Non-graphical removable volume manager (Root)" \

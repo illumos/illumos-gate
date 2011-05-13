@@ -1,0 +1,142 @@
+'\" te
+.\"  Copyright (c) 2001 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ps_pstop 3PROC "22 Mar 2001" "SunOS 5.11" "Process Control Library Functions"
+.SH NAME
+ps_pstop, ps_pcontinue, ps_lstop, ps_lcontinue, ps_lrolltoaddr, ps_kill \-
+process and LWP control in libthread_db
+.SH SYNOPSIS
+.LP
+.nf
+#include <proc_service.h> 
+
+\fBps_err_e\fR \fBps_pstop\fR(\fBstruct ps_prochandle *\fR\fIph\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_pcontinue\fR(\fBstruct ps_prochandle *\fR\fIph\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lstop\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lcontinue\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBlwpid_t\fR \fIlwpid\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_lrolltoaddr\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
+     \fBlwpid_t\fR \fIlwpid\fR, \fBpsaddr_t\fR \fIgo_addr\fR, \fBpsaddr_t\fR \fIstop_addr\fR);
+.fi
+
+.LP
+.nf
+\fBps_err_e\fR \fBps_kill\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBint\fR \fIsignum\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBThe ps_pstop()\fR function stops the target process identified by \fIph\fR,
+while the \fBps_pcontinue()\fR function allows it to resume.
+.sp
+.LP
+The \fBlibthread_db()\fR function uses \fBps_pstop()\fR to freeze the target
+process while it is under inspection. Within the scope of any single call from
+outside \fBlibthread_db\fR to a \fBlibthread_db\fR routine, \fBlibthread_db\fR
+will call \fBps_pstop()\fR, at most once. If it does, it will call
+\fBps_pcontinue()\fR within the scope of the same routine.
+.sp
+.LP
+The controlling process may already have stopped the target process when it
+calls \fBlibthread_db\fR. In that case, it is not obligated to resume the
+target process when \fBlibthread_db\fR calls \fBps_pcontinue()\fR. In other
+words, \fBps_pstop()\fR is mandatory, while \fBps_pcontinue()\fR is advisory.
+After \fBps_pstop()\fR, the target process must be stopped; after
+\fBps_pcontinue()\fR, the target process may be running.
+.sp
+.LP
+The \fBps_lstop()\fR and \fBps_lcontinue()\fR functions stop and resume a
+single lightweight process (\fBLWP\fR) within the target process \fIph\fR.
+.sp
+.LP
+The \fBps_lrolltoaddr()\fR function is used to roll an \fBLWP\fR forward out of
+a critical section when the process is stopped. It is also used to run the
+\fBlibthread_db\fR agent thread on behalf of \fBlibthread\fR. The
+\fBps_lrolltoaddr()\fR function is always called with the target process
+stopped, that is, there has been a preceding call to \fBps_pstop()\fR. The
+specified \fBLWP\fR must be continued at the address \fIgo_addr\fR, or at its
+current address if \fIgo_addr\fR is \fINULL\fR. It should then be stopped when
+its execution reaches \fIstop_addr\fR. This routine does not return until the
+\fBLWP\fR has stopped at \fIstop_addr\fR.
+.sp
+.LP
+The \fBps_kill()\fR function directs the signal \fIsignum\fR to the target
+process for which the handle is \fIph\fR. It has the same semantics as
+\fBkill\fR(2).
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS_OK\fR \fR
+.ad
+.RS 14n
+.rt  
+The call completed successfully. In the case of \fBps_pstop()\fR, the target
+process is stopped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS_BADLID\fR \fR
+.ad
+.RS 14n
+.rt  
+For \fBps_lstop()\fR, \fBps_lcontinue()\fR and \fBps_lrolltoaddr()\fR; there is
+no \fBLWP\fR with id \fIlwipd\fR in the target process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPS_ERR\fR \fR
+.ad
+.RS 14n
+.rt  
+The function did not return successfully.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(2), \fBlibc_db\fR(3LIB), \fBproc_service\fR(3PROC),
+\fBattributes\fR(5), \fBthreads\fR(5)

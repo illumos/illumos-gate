@@ -1,0 +1,198 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH del_curterm 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+del_curterm, restartterm, set_curterm, setupterm \- interfaces to the terminfo
+database
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <term.h>
+
+\fBint\fR \fBdel_curterm\fR(\fBTERMINAL *\fR\fIoterm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrestartterm\fR(\fBchar *\fR\fIterm\fR, \fBint\fR \fIfildes\fR, \fBint *\fR\fIerrret\fR);
+.fi
+
+.LP
+.nf
+\fBTERMINAL *\fR\fBset_curterm\fR(\fBTERMINAL *\fR\fInterm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetupterm\fR(\fBchar *\fR\fIterm\fR, \fBint\fR \fIfildes\fR, \fBint *\fR\fIerrret\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Within X/Open Curses, the \fBsetupterm()\fR function is automatically called by
+the  initscr (3XC) and newterm (3XC) functions. This function can be also be
+used outside of X/Open Curses when a program has to  deal directly with the
+\fBterminfo\fR database to handle certain terminal  capabilities.  The use of
+appropriate X/Open Curses functions is recommended in all other  situations.
+.sp
+.LP
+The \fBsetupterm()\fR function loads terminal-dependent variables for the
+\fBterminfo\fR layer of X/Open Curses. The \fBsetupterm()\fR function
+initializes the \fBterminfo\fR variables \fBlines\fR and \fBcolumns\fR such
+that if \fBuse_env(FALSE)\fR has been called, the \fBterminfo\fR values
+assigned in the database are used regardless of the environmental variables
+\fBLINES\fR and \fBCOLUMNS\fR or the program's window dimensions; when
+\fBuse_env(TRUE)\fR has been called, which is the default, the environment
+variables \fBLINES\fR and \fBCOLUMNS\fR are used, if they exist.  If the
+environment variables do not exist and the program is running in a  window, the
+current window size is used.
+.sp
+.LP
+The \fIterm\fR parameter of \fBsetupterm()\fR specifies the terminal; if null,
+terminal type is taken from the \fBTERM\fR environment variable. All output is
+sent to \fIfildes\fR which is initialized for output. If \fIerrret\fR is not
+null, \fBOK\fR or \fBERR\fR is returned and a status value is stored in the
+integer pointed to by \fIerrret\fR.  The following status values may be
+returned:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBValue\fR\fBDescription\fR
+\fB1\fRNormal
+\fB0\fRTerminal could not be found
+\fB-1\fR\fBterminfo\fR database could not be found
+.TE
+
+.sp
+.LP
+If \fIerrret\fR is null, an error message is printed, and the \fBsetupterm()\fR
+function calls the \fBexit()\fR function with a non-zero parameter.
+.sp
+.LP
+The \fBset_curterm()\fR function sets the \fBcur_term\fR variable to
+\fInterm\fR. The values from \fInterm\fR as well as other state information for
+the terminal are used by X/Open Curses functions such as \fBbeep\fR(3XCURSES),
+\fBflash\fR(3XCURSES), \fBmvcur\fR(3XCURSES), \fBtigetflag\fR(3XCURSES),
+\fBtigetstr\fR(3XCURSES), and \fBtigetnum\fR(3XCURSES).
+.sp
+.LP
+The \fBdel_curterm()\fR function frees the space pointed to by \fIoterm\fR.  If
+\fIoterm\fR and the \fBcur_term\fR variable are the same, all Boolean, numeric,
+or string \fBterminfo\fR variables will refer to invalid memory locations until
+you call \fBsetupterm()\fR and specify a new terminal  type.
+.sp
+.LP
+The \fBrestartterm()\fR function assumes that a call to \fBsetupterm()\fR has
+already been made (probably from \fBinitscr()\fR or \fBnewterm()\fR). It allows
+you to specify a new terminal type in \fIterm\fR and updates the data returned
+by \fBbaudrate\fR(3XCURSES) based on \fIfildes\fR. Other information created by
+the \fBinitscr()\fR, \fBnewterm()\fR, and  \fBsetupterm()\fR functions is
+preserved.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoterm\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the terminal type for which to free space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIterm\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the terminal type for which variables are set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfildes\fR\fR
+.ad
+.RS 10n
+.rt  
+Is a file descriptor initialized for output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrret\fR\fR
+.ad
+.RS 10n
+.rt  
+Is a pointer to an integer in which the status value is stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInterm\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the new terminal to become the current terminal.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On success, the \fBset_curterm()\fR function returns the previous value of
+\fBcur_term\fR. Otherwise, it returns a null pointer.
+.sp
+.LP
+On success, the other functions return \fBOK\fR. Otherwise, they return
+\fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbaudrate\fR(3XCURSES), \fBbeep\fR(3XCURSES), \fBinitscr\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBmvcur\fR(3XCURSES), \fBtigetflag\fR(3XCURSES),
+\fBuse_env\fR(3XCURSES), \fBattributes\fR(5), \fBstandards\fR(5)

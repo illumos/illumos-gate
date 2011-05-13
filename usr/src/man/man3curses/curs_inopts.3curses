@@ -1,0 +1,253 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_inopts 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_inopts, cbreak, nocbreak, echo, noecho, halfdelay, intrflush, keypad,
+meta, nodelay, notimeout, raw, noraw, noqiflush, qiflush, timeout, wtimeout,
+typeahead \- curses terminal input option control routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBcbreak\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnocbreak\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBecho\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnoecho\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBhalfdelay\fR(\fBint\fR \fItenths\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBintrflush\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBkeypad\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmeta\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnodelay\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnotimeout\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBraw\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBnoraw\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBnoqiflush\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBqiflush\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtimeout\fR(\fBint\fR \fIdelay\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwtimeout\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIdelay\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtypeahead\fR(\fBint\fR \fIfildes\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcbreak()\fR and \fBnocbreak()\fR routines put the terminal into and out
+of \fBcbreak()\fR mode, respectively. In this mode, characters typed by the
+user are immediately available to the program, and erase/kill
+character-processing is not performed. When out of this mode, the tty driver
+buffers the typed characters until a newline or carriage return is typed.
+Interrupt and flow control characters are unaffected by this mode. Initially
+the terminal may or may not be in \fBcbreak()\fR mode, as the mode is
+inherited; therefore, a program should call \fBcbreak()\fR or \fBnocbreak()\fR
+explicitly. Most interactive programs using \fBcurses\fR set the \fBcbreak()\fR
+mode.
+.sp
+.LP
+Note that \fBcbreak()\fR overrides \fBraw()\fR. (See \fBcurs_getch\fR(3CURSES)
+for a discussion of how these routines interact with \fBecho()\fR and
+\fBnoecho()\fR.)
+.sp
+.LP
+The \fBecho()\fR and \fBnoecho()\fR routines control whether characters typed
+by the user are echoed by \fBgetch()\fR as they are typed. Echoing by the tty
+driver is always disabled, but initially \fBgetch()\fR is in echo mode, so
+characters typed are echoed. Authors of most interactive programs prefer to do
+their own echoing in a controlled area of the screen, or not to echo at all, so
+they disable echoing by calling \fBnoecho()\fR. (See \fBcurs_getch\fR(3CURSES)
+for a discussion of how these routines interact with \fBcbreak()\fR and
+\fBnocbreak()\fR.)
+.sp
+.LP
+The \fBhalfdelay()\fR routine is used for half-delay mode, which is similar to
+\fBcbreak()\fR mode in that characters typed by the user are immediately
+available to the program. However, after blocking for \fItenths\fR tenths of
+seconds, \fBERR\fR is returned if nothing has been typed. The value of
+\fItenths\fR must be a number between 1 and 255. Use \fBnocbreak()\fR to leave
+half-delay mode.
+.sp
+.LP
+If the \fBintrflush()\fR option is enabled, (\fIbf\fR is \fBTRUE\fR), when an
+interrupt key is pressed on the keyboard (interrupt, break, quit) all output in
+the tty driver queue will be flushed, giving the effect of faster response to
+the interrupt, but causing \fBcurses\fR to have the wrong idea of what is on
+the screen. Disabling (\fIbf\fR is \fBFALSE\fR), the option prevents the flush.
+The default for the option is inherited from the tty driver settings. The
+window argument is ignored.
+.sp
+.LP
+The \fBkeypad()\fR option enables the keypad of the user's terminal. If enabled
+(\fIbf\fR is \fBTRUE\fR), the user can press a function key (such as an arrow
+key) and \fBwgetch()\fR returns a single value representing the  function key,
+as in \fBKEY_LEFT\fR. If disabled (\fIbf\fR is \fBFALSE\fR), \fBcurses\fR does
+not treat function keys specially and the program has to interpret the escape
+sequences itself. If the keypad in the terminal can be turned on (made to
+transmit) and off (made to work locally), turning on this option causes the
+terminal keypad to be turned on when \fBwgetch()\fR is called.  The default
+value for keypad is false.
+.sp
+.LP
+Initially, whether the terminal returns 7 or 8 significant bits on input
+depends on the control mode of the tty driver (see \fBtermio\fR(7I)). To force
+8 bits to be returned, invoke \fBmeta\fR(\fIwin\fR,  \fBTRUE\fR). To force 7
+bits to be returned, invoke \fBmeta\fR(\fIwin\fR,  \fBFALSE\fR). The window
+argument, \fIwin\fR, is always ignored. If the terminfo capabilities \fBsmm\fR
+(meta_on) and \fBrmm\fR (meta_off) are  defined for the terminal, \fBsmm\fR is
+sent to the terminal when  \fBmeta\fR(\fI win\fR, \fBTRUE)\fR is called and
+\fBrmm\fR is sent when  \fBmeta\fR(\fIwin\fR, \fBFALSE\fR) is called.
+.sp
+.LP
+The \fBnodelay()\fR option causes \fBgetch()\fR to be a non-blocking call.  If
+no input is ready, \fBgetch()\fR returns \fBERR\fR. If disabled (\fIbf\fR is
+\fBFALSE\fR), \fBgetch()\fR waits until a key is pressed.
+.sp
+.LP
+While interpreting an input escape sequence, \fBwgetch()\fR sets a timer while
+waiting for the next character. If \fBnotimeout(\fR\fIwin\fR, \fBTRUE\fR) is
+called, then \fBwgetch()\fR does not set a timer. The purpose of the timeout is
+to differentiate between sequences received from a function key and those typed
+by a user.
+.sp
+.LP
+With the \fBraw()\fR and \fBnoraw()\fR routines, the terminal is placed into or
+out of raw mode. Raw mode is similar to \fBcbreak()\fR mode, in that characters
+typed are immediately passed through to the user program. The differences are
+that in raw mode, the interrupt, quit, suspend, and flow control characters are
+all passed through uninterpreted, instead of generating a signal. The behavior
+of the \fBBREAK\fR key depends on other bits in the tty driver that are not set
+by \fBcurses\fR.
+.sp
+.LP
+When the \fBnoqiflush()\fR routine is used, normal flush of input and output
+queues associated with the \fBINTR\fR, \fBQUIT\fR and \fBSUSP\fR characters
+will not be done (see \fBtermio\fR(7I)). When \fBqiflush()\fR is called, the
+queues will be flushed when these control characters are read.
+.sp
+.LP
+The \fBtimeout()\fR and \fBwtimeout()\fR routines set blocking or non-blocking
+read for a given window. If \fIdelay\fR is negative, blocking read is used
+(that is, waits indefinitely for input). If \fIdelay\fR is zero, then
+non-blocking read is used (that is, read returns \fBERR\fR if no input is
+waiting). If \fIdelay\fR is positive, then read blocks for \fIdelay\fR
+milliseconds, and returns \fBERR\fR if there is still no input. Hence, these
+routines provide the same functionality as \fBnodelay()\fR, plus the additional
+capability of being able to block for only \fIdelay\fR milliseconds (where
+\fIdelay\fR is positive).
+.sp
+.LP
+\fBcurses\fR does ``line-breakout optimization'' by looking for typeahead
+periodically while updating the screen. If input is found, and it is coming
+from a tty, the current update is postponed until \fBrefresh()\fR or
+\fBdoupdate()\fR is called again. This allows faster response to commands typed
+in advance. Normally, the input \fBFILE\fR pointer passed to \fBnewterm()\fR,
+or \fBstdin\fR in the case that \fBinitscr()\fR was used, will be used to do
+this typeahead checking. The \fBtypeahead()\fR routine specifies that the file
+descriptor \fIfildes\fR is to be used to check for typeahead instead. If
+\fIfildes\fR is \(mi1, then no typeahead checking is done.
+.SH RETURN VALUES
+.sp
+.LP
+All routines that return an integer return \fBERR\fR upon failure and an
+integer value other than \fBERR\fR upon successful completion, unless otherwise
+noted in the preceding routine descriptions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_getch\fR(3CURSES), \fBcurs_initscr\fR(3CURSES), \fBcurses\fR(3CURSES),
+\fBattributes\fR(5), \fBtermio\fR(7I)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBecho()\fR, \fBnoecho()\fR, \fBhalfdelay()\fR, \fBintrflush()\fR,
+\fBmeta()\fR, \fBnodelay()\fR, \fBnotimeout()\fR, \fBnoqiflush()\fR,
+\fBqiflush()\fR, \fBtimeout()\fR, and \fBwtimeout()\fR may be macros.

@@ -1,0 +1,228 @@
+'\" te
+.\" Copyright (C) 2006, Sun Microsystems, Inc.
+.\" All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH allocb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+allocb \- allocate a message block
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBallocb\fR(\fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBallocb()\fR function tries to allocate a \fBSTREAMS\fR message block.
+Buffer allocation fails only when the system is out of memory. If no buffer is
+available, the \fBbufcall\fR(9F) function can help a module recover from an
+allocation failure.
+.sp
+.LP
+A \fBSTREAMS\fR message block is composed of three structures. The first
+structure is a message block (\fBmblk_t\fR). See \fBmsgb\fR(9S). The
+\fBmblk_t\fR structure points to a data block structure (\fBdblk_t\fR). See
+\fBdatab\fR(9S). Together these two structures describe the message type (if
+applicable) and the size and location of the third structure, the data buffer.
+The data buffer contains the data for this message block. The allocated data
+buffer is at least double-word aligned, so it can hold any C data structure.
+.sp
+.LP
+The fields in the \fBmblk_t\fR structure are initialized as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb_cont\fR\fR
+.ad
+.RS 11n
+.rt  
+set to  \fINULL\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb_rptr\fR\fR
+.ad
+.RS 11n
+.rt  
+points to the beginning of the data buffer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb_wptr\fR\fR
+.ad
+.RS 11n
+.rt  
+points to the beginning of the data buffer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb_datap\fR\fR
+.ad
+.RS 11n
+.rt  
+points to the \fBdblk_t\fR structure
+.RE
+
+.sp
+.LP
+The fields in the \fBdblk_t\fR structure are initialized as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdb_base\fR\fR
+.ad
+.RS 11n
+.rt  
+points to the first byte of the data buffer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdb_lim\fR\fR
+.ad
+.RS 11n
+.rt  
+points to the last byte + 1 of the buffer
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdb_type\fR\fR
+.ad
+.RS 11n
+.rt  
+set to \fBM_DATA\fR
+.RE
+
+.sp
+.LP
+The following figure identifies the data structure members that are affected
+when a message block is allocated.
+.sp
+Printed copy or docs.sun.com shows a figure that identifies the data structure
+members that are affected when a message block is allocated
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 8n
+.rt  
+The number of bytes in the message block.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpri\fR\fR
+.ad
+.RS 8n
+.rt  
+Priority of the request (no longer used).
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBallocb()\fR returns a pointer to the allocated message block
+of type \fBM_DATA\fR. On failure, \fBallocb()\fR returns a \fINULL\fR pointer.
+.SH CONTEXT
+.sp
+.LP
+The \fBallocb()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBallocb()\fR Code Sample
+.sp
+.LP
+Given a pointer to a queue (\fIq\fR) and an error number (\fIerr\fR), the
+\fBsend_error()\fR routine sends an  \fBM_ERROR\fR type message to the stream
+head.
+
+.sp
+.LP
+If a message cannot be allocated, \fINULL\fR is returned, indicating an
+allocation failure (line 8). Otherwise, the message type is set to
+\fBM_ERROR\fR (line 10). Line 11 increments the write pointer
+(\fBbp->b_wptr\fR) by the size (one byte) of the data in the message.
+
+.sp
+.LP
+A message must be sent up the read side of the stream to arrive at the stream
+head. To determine whether  \fIq\fR points to a read queue or to a write queue,
+the \fBq->q_flag\fR member is tested to see if \fBQREADR\fR is set (line 13).
+If it is not set, \fIq\fR points to a write queue, and in line 14 the
+\fBRD\fR(9F) function is used to find the corresponding read queue. In line 15,
+the \fBputnext\fR(9F) function is used to send the message upstream, returning
+\fB1\fR if successful.
+
+.sp
+.in +2
+.nf
+1  send_error(q,err)
+2    queue_t *q;
+3    unsigned char err;
+4  {
+5    mblk_t *bp;
+6  
+7    if ((bp = allocb(1, BPRI_HI)) == NULL) /* allocate msg. block */
+8         return(0);
+9
+10    bp->b_datap->db_type = M_ERROR;    /* set msg type to M_ERROR */
+11    *bp->b_wptr++ = err;               /* increment write pointer */
+12  
+13    if (!(q->q_flag & QREADR))         /* if not read queue     */
+14         q = RD(q);                    /*    get read queue     */
+15    putnext(q,bp);                     /* send message upstream */
+16    return(1);
+17  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBRD\fR(9F), \fBbufcall\fR(9F), \fBesballoc\fR(9F), \fBesbbcall\fR(9F),
+\fBputnext\fR(9F), \fBtestb\fR(9F), \fBdatab\fR(9S), \fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+The \fIpri\fR argument is no longer used, but is retained for compatibility
+with existing drivers.

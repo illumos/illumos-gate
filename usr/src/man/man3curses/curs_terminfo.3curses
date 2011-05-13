@@ -1,0 +1,278 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_terminfo 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_terminfo, setupterm, setterm, set_curterm, del_curterm, restartterm,
+tparm, tputs, putp, vidputs, vidattr, mvcur, tigetflag, tigetnum, tigetstr \-
+curses interfaces to terminfo database
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+#include <term.h>
+
+\fBint\fR \fBsetupterm\fR(\fBchar *\fR\fIterm\fR, \fBint\fR \fIfildes\fR, \fBint *\fR\fIerrret\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetterm\fR(\fBchar *\fR\fIterm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_curterm\fR(\fBTERMINAL *\fR\fInterm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdel_curterm\fR(\fBTERMINAL *\fR\fIoterm\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrestartterm\fR(\fBchar *\fR\fIterm\fR, \fBint\fR \fIfildes\fR, \fBint *\fR\fIerrret\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtparm\fR(\fBchar *\fR\fIstr\fR, \fBlong int\fR \fIp1\fR, \fBlong int\fR \fIp2\fR, \fBlong int\fR \fIp3\fR, \fBlong int\fR \fIp4\fR,
+     \fBlong int\fR \fIp5\fR, \fBlong int\fR \fIp6\fR, \fBlong int\fR \fIp7\fR, \fBlong int\fR \fIp8\fR, \fBlong int\fR \fIp9\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtputs\fR(\fBchar *\fR\fIstr\fR, \fBint\fR \fIaffcnt\fR, \fBint (*\fR\fIputc\fR)(\fIchar\fR));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBputp\fR(\fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvidputs\fR(\fBchtype\fR \fIattrs\fR, \fBint (*\fR\fIputc\fR)(\fIchar\fR));
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvidattr\fR(\fBchtype\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvcur\fR(\fBint\fR \fIoldrow\fR, \fBint\fR \fIoldcol\fR, \fBint\fR \fInewrow\fR, \fBint\fR \fInewcol\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtigetflag\fR(\fBchar *\fR\fIcapname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtigetnum\fR(\fBchar *\fR\fIcapname\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBtigetstr\fR(\fBchar *\fR\fIcapname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These low-level routines must be called by programs that have to deal directly
+with the \fIterminfo\fR database to handle certain terminal capabilities, such
+as programming function keys. For all other functionality, \fBcurses\fR
+routines are more suitable and their use is recommended.
+.sp
+.LP
+Initially, \fBsetupterm()\fR should be called. Note that \fBsetupterm()\fR is
+automatically called by \fBinitscr()\fR and \fBnewterm()\fR. This defines the
+set of terminal-dependent variables (listed in \fBterminfo\fR(4)). The
+\fIterminfo\fR variables \fBlines\fR and \fBcolumns\fR are initialized by
+\fBsetupterm()\fR as follows:  If \fBuse_env(FALSE)\fR has been called, values
+for \fBlines\fR and \fBcolumns\fR specified in \fIterminfo\fR are used.
+Otherwise, if the environment variables \fBLINES\fR and \fBCOLUMNS\fR exist,
+their values are used. If these environment variables do not exist and the
+program is running in a window, the current window size is used. Otherwise, if
+the environment variables do not exist, the values for \fBlines\fR and
+\fBcolumns\fR specified in the \fIterminfo\fR database are used.
+.sp
+.LP
+The headers \fB<curses.h>\fR and \fB<term.h>\fR should be included (in this
+order) to get the definitions for these strings, numbers, and flags.
+Parameterized strings should be passed through \fBtparm()\fR to instantiate
+them. All \fIterminfo\fR strings (including the output of \fBtparm()\fR) should
+be printed with \fBtputs()\fR or \fBputp()\fR. Call the
+\fBreset_shell_mode()\fR routine to restore the tty modes before exiting (see
+\fBcurs_kernel\fR(3CURSES)). Programs which use cursor addressing should output
+\fBenter_ca_mode\fR upon startup and should output \fBexit_ca_mode\fR before
+exiting. Programs desiring shell escapes should call \fBreset_shell_mode\fR and
+output \fBexit_ca_mode\fR before the shell is called and should output
+\fBenter_ca_mode\fR and call \fBreset_prog_mode\fR after returning from the
+shell.
+.sp
+.LP
+The \fBsetupterm()\fR routine reads in the \fIterminfo\fR database,
+initializing the \fIterminfo\fR structures, but does not set up the output
+virtualization structures used by \fBcurses\fR. The terminal type is the
+character string \fIterm;\fR if \fIterm\fR is null, the environment variable
+\fBTERM\fR is used. All output is to file descriptor \fIfildes\fR which is
+initialized for output. If \fIerrret\fR is not null, then \fBsetupterm()\fR
+returns \fBOK\fR or \fBERR\fR and stores a status value in the integer pointed
+to by \fIerrret\fR. A status of \fB1\fR in \fIerrret\fR is normal, \fB0\fR
+means that the terminal could not be found, and \fB\(mi1\fR means that the
+\fIterminfo\fR database could not be found. If \fIerrret\fR is null,
+\fBsetupterm()\fR prints an error message upon finding an error and exits.
+Thus, the simplest call is:
+.sp
+.LP
+setupterm((char *)0, 1, (int *)0);,
+.sp
+.LP
+which uses all the defaults and sends the output to \fBstdout\fR.
+.sp
+.LP
+The \fBsetterm()\fR routine is being replaced by \fBsetupterm()\fR. The call:
+.sp
+.LP
+\fBsetupterm(\fR\fIterm\fR, 1, (int *)0)
+.sp
+.LP
+provides the same functionality as \fBsetterm(\fR\fIterm\fR). The
+\fBsetterm()\fR routine is included here for compatibility and is supported at
+Level 2.
+.sp
+.LP
+The \fBset_curterm()\fR routine sets the variable \fBcur_term\fR to
+\fInterm\fR, and makes all of the \fIterminfo\fR boolean, numeric, and string
+variables use the values from \fInterm\fR.
+.sp
+.LP
+The \fBdel_curterm()\fR routine frees the space pointed to by \fIoterm\fR and
+makes it available for further use. If \fIoterm\fR is the same as
+\fBcur_term\fR, references to any of the \fIterminfo\fR boolean, numeric, and
+string variables thereafter may refer to invalid memory locations until another
+\fBsetupterm()\fR has been called.
+.sp
+.LP
+The \fBrestartterm()\fR routine is similar to \fBsetupterm()\fR and
+\fBinitscr()\fR, except that it is called after restoring memory to a previous
+state. It assumes that the windows and the input and output options are the
+same as when memory was saved, but the terminal type and baud rate may be
+different.
+.sp
+.LP
+The \fBtparm()\fR routine instantiates the string \fIstr\fR with parameters
+\fIpi\fR. A pointer is returned to the result of \fIstr\fR with the parameters
+applied.
+.sp
+.LP
+The \fBtputs()\fR routine applies padding information to the string \fIstr\fR
+and outputs it. The \fIstr\fR must be a terminfo string variable or the return
+value from \fBtparm()\fR, \fBtgetstr()\fR, or \fBtgoto()\fR. \fIaffcnt\fR is
+the number of lines affected, or 1 if not applicable. \fIputc\fR is a
+\fBputchar()\fR-like routine to which the characters are passed, one at a time.
+.sp
+.LP
+The \fBputp()\fR routine calls \fBtputs(\fR\fIstr\fR, 1, putchar). Note that
+the output of \fBputpA()\fR always goes to \fBstdout\fR, not to the
+\fIfildes\fR specified in \fBsetupterm()\fR.
+.sp
+.LP
+The \fBvidputs()\fR routine displays the string on the terminal in the video
+attribute mode \fIattrs\fR, which is any combination of the attributes listed
+in \fBcurses\fR(3CURSES). The characters are passed to the \fBputchar()\fR-like
+routine \fBputc()\fR \fB\&.\fR
+.sp
+.LP
+The \fBvidattr()\fR routine is like the \fBvidputs()\fR routine, except that it
+outputs through \fBputchar()\fR.
+.sp
+.LP
+The \fBmvcur()\fR routine provides low-level cursor motion.
+.sp
+.LP
+The \fBtigetflag()\fR, \fBtigetnum()\fR and \fBtigetstr()\fR routines return
+the value of the capability corresponding to the \fIterminfo\fR \fIcapname\fR
+passed to them, such as \fBxenl\fR.
+.sp
+.LP
+With the \fBtigetflag()\fR routine, the value \fB\(mi1\fR is returned if
+\fIcapname\fR is not a boolean capability.
+.sp
+.LP
+With the \fBtigetnum()\fR routine, the value \fB\(mi2\fR is returned if
+\fIcapname\fR is not a numeric capability.
+.sp
+.LP
+With the \fBtigetstr()\fR routine, the value \fB(char *)\(mi1\fR is returned if
+\fIcapname\fR is not a string capability.
+.sp
+.LP
+The \fIcapname\fR for each capability is given in the table column entitled
+\fIcapname\fR code in the capabilities section of \fBterminfo\fR(4).
+.sp
+.in +2
+.nf
+char *boolnames, *boolcodes, *boolfnames
+char *numnames, *numcodes, *numfnames
+char *strnames, *strcodes, *strfnames
+.fi
+.in -2
+
+.sp
+.LP
+These null-terminated arrays contain the \fIcapnames\fR, the \fItermcap\fR
+codes, and the full C names, for each of the \fIterminfo\fR variables.
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion, unless otherwise noted in the
+preceding routine descriptions.
+.sp
+.LP
+Routines that return pointers always return \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_initscr\fR(3CURSES), \fBcurs_kernel\fR(3CURSES),
+\fBcurs_termcap\fR(3CURSES), \fBcurses\fR(3CURSES), \fBputc\fR(3C),
+\fBterminfo\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+The \fBsetupterm()\fR routine should be used in place of \fBsetterm()\fR.
+.sp
+.LP
+Note that \fBvidattr()\fR and \fBvidputs()\fR may be macros.

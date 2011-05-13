@@ -1,0 +1,110 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qreply 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qreply \- send a message on a stream in the reverse direction
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBvoid\fR \fBqreply\fR(\fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message to be sent in the opposite direction.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqreply()\fR function sends messages in the reverse direction of normal
+flow. That is, \fBqreply(\fR\fIq\fR\fB,\fR \fImp\fR\fB)\fR is equivalent to
+\fBputnext(OTHERQ(\fR\fIq\fR\fB),\fR \fImp\fR\fB)\fR.
+.SH CONTEXT
+.sp
+.LP
+The \fBqreply()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCanonical Flushing Code for STREAMS Drivers.
+.sp
+.LP
+This example depicts the canonical flushing code for STREAMS drivers. Assume
+that the driver has service procedures so that there may be messages on its
+queues. See \fBsrv\fR(9E). Its write-side put procedure handles \fBM_FLUSH\fR
+messages by first checking the \fBFLUSHW\fR bit  in the first byte of the
+message, then the write queue is flushed (line 8) and the \fBFLUSHW\fR bit is
+turned off (line 9). See \fBput\fR(9E). If the \fBFLUSHR\fR bit is on, then the
+read queue is flushed (line 12) and the message is sent back up the read side
+of the stream with the \fBqreply()\fR function (line 13). If the \fBFLUSHR\fR
+bit is off, then the message is freed (line 15). See the example for
+\fBflushq\fR(9F) for the canonical flushing code for modules.
+
+.sp
+.in +2
+.nf
+1  xxxwput(q, mp)
+ 2    queue_t *q;
+ 3    mblk_t *mp;
+ 4  {
+ 5	    switch(mp->b_datap->db_type) {
+ 6	    case M_FLUSH:
+ 7           if (*mp->b_rptr & FLUSHW) {
+ 8                  flushq(q, FLUSHALL);
+ 9                  *mp->b_rptr &= ~FLUSHW;
+10	          }
+11           if (*mp->b_rptr & FLUSHR) {
+12                  flushq(RD(q), FLUSHALL);
+13	                 qreply(q, mp);
+14           } else {
+15	                 freemsg(mp);
+16	          }
+17           break;
+	      . . .
+18     }
+19  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBput\fR(9E), \fBsrv\fR(9E), \fBflushq\fR(9F), \fBOTHERQ\fR(9F),
+\fBputnext\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -1,0 +1,172 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.,
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_reset_notify 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_reset_notify \- notify target driver of bus resets
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBvoid\fR \fBscsi_reset_notify\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIflag\fR, 
+     \fBvoid\fR (*\fIcallback)(caddr_t)\fR, \fBcaddr_t\fR \fIarg\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to the \fBscsi_address\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 12n
+.rt  
+A flag indicating registration or cancellation of the notification request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 12n
+.rt  
+A pointer to the target driver's reset notification function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 12n
+.rt  
+The callback function argument.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_reset_notify()\fR function is used by a target driver when it needs
+to be notified of a bus reset. The bus reset could be issued by the transport
+layer (e.g. the host bus adapter (\fBHBA)\fR driver or controller) or by
+another initiator.
+.sp
+.LP
+The  argument \fIflag\fR is used to register or cancel the notification. The
+supported values for \fIflag\fR are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_RESET_NOTIFY\fR\fR
+.ad
+.RS 21n
+.rt  
+Register \fIcallback\fR as the reset notification function for the target
+driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSI_RESET_CANCEL\fR\fR
+.ad
+.RS 21n
+.rt  
+Cancel the reset notification request.
+.RE
+
+.sp
+.LP
+Target drivers can find out whether the \fBHBA\fR driver and controller support
+reset notification by checking the  \fBreset-notification\fR capability using
+the \fBscsi_ifgetcap\fR(9F) function.
+.SH RETURN VALUES
+.sp
+.LP
+If \fIflag\fR is \fBSCSI_RESET_NOTIFY\fR, \fBscsi_reset_notify()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The notification request has been accepted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+The transport layer does not support reset notification or could not accept
+this request.
+.RE
+
+.sp
+.LP
+If \fIflag\fR is \fBSCSI_RESET_CANCEL\fR, \fBscsi_reset_notify()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The notification request has been canceled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+No notification request was registered.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_reset_notify()\fR function can be called from user, interrupt, or
+kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_address\fR(9S), \fBscsi_ifgetcap\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

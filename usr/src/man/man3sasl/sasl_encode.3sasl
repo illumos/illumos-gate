@@ -1,0 +1,159 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems,
+.\" Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sasl_encode 3SASL "22 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.SH NAME
+sasl_encode, sasl_encodev \- encode data for transport to an authenticated host
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
+#include <sasl/sasl.h>
+
+\fBint\fR \fBsasl_encode\fR(\fBsasl_conn_t *\fR\fIconn\fR, \fBconst char *\fR\fIinput\fR, \fBunsigned\fR \fIinputlen\fR,
+     \fBconst char **\fR\fIoutput\fR, \fBunsigned *\fR\fIoutputlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR  \fBsasl_encodev\fR(\fBsasl_conn_t *\fR\fIconn\fR, \fBconst struct iovec *\fR\fIinvec\fR,
+     \fBunsigned\fR \fInumiov\fR, \fBconst char *\fR\fIoutputlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsasl_encode()\fR interface encodes data to be sent to a remote host for
+which there has been a successful authentication session. If there is a
+negotiated security, the data is signed or encrypted, and the output is sent
+without modification to the remote host. If there is no security layer, the
+output is identical to the input.
+.sp
+.LP
+The \fBsasl_encodev()\fR interface functions the same as the
+\fBsasl_encode()\fR interface, but operates on a \fBstruct iovec\fR instead of
+a character buffer.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconn\fR\fR
+.ad
+.RS 13n
+.rt  
+The SASL connection context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinput\fR\fR
+.ad
+.RS 13n
+.rt  
+Data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinputlen\fR\fR
+.ad
+.RS 13n
+.rt  
+\fIinput\fR length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutput\fR\fR
+.ad
+.RS 13n
+.rt  
+The encoded data. \fIoutput\fR must be allocated or freed by the library.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutputlen\fR\fR
+.ad
+.RS 13n
+.rt  
+The length of \fIoutput\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinvec\fR\fR
+.ad
+.RS 13n
+.rt  
+A pointer to set of \fBiovec\fR structures.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInumiov\fR\fR
+.ad
+.RS 13n
+.rt  
+The number of \fBiovec\fR structures in the \fIinvec\fR set.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBsasl_encode()\fR returns an integer that corresponds to a SASL error code.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSASL_OK\fR\fR
+.ad
+.RS 11n
+.rt  
+The call to \fBsasl_encode()\fR or \fBsasl_encodev()\fRwas successful.
+.RE
+
+.sp
+.LP
+See \fBsasl_errors\fR(3SASL) for information on SASL error codes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

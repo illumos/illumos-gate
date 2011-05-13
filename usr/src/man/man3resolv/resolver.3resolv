@@ -1,0 +1,600 @@
+'\" te
+.\"  Portions Copyright 1989 AT&T Portions Copyright (c) 1985, 1995 Regents of the University of California. 
+.\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.TH resolver 3RESOLV "26 Dec 2006" "SunOS 5.11" "Resolver Library Functions"
+.SH NAME
+resolver, res_ninit, fp_resstat, res_hostalias, res_nquery, res_nsearch,
+res_nquerydomain, res_nmkquery, res_nsend, res_nclose, res_nsendsigned,
+dn_comp, dn_expand, hstrerror, res_init, res_query, res_search, res_mkquery,
+res_send, herror, res_getservers, res_setservers, res_ndestroy \- resolver
+routines
+.SH SYNOPSIS
+.LP
+.nf
+BIND 8.2.2 Interfaces
+.fi
+
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lresolv\fR \fB -lsocket \fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
+#include <netdb.h>
+
+\fBint\fR \fBres_ninit\fR(\fBres_state\fR \fIstatp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBres_ndestroy\fR(\fBres_state\fR \fIstatp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfp_resstat\fR(\fBconst res_state\fR \fIstatp\fR, \fBFILE *\fR\fIfp\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBres_hostalias\fR(\fBconst res_state\fR \fIstatp\fR, \fBconst char *\fR\fIname\fR,
+     \fBchar *\fR \fIname\fR, \fBchar *\fR\fIbuf\fR, \fBsize_t\fR\fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_nquery\fR(\fBres_state\fR \fIstatp\fR, \fBconst char *\fR\fIdname\fR, \fBint\fR \fIclass\fR, \fBint\fR \fItype\fR,
+     \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIdatalen\fR, \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_nsearch\fR(\fBres_state\fR \fIstatp\fR, \fBconst char *\fR\fIdname\fR, \fBint\fR \fIclass\fR, \fBint\fR \fItype\fR,
+     \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_nquerydomain\fR(\fBres_state\fR \fIstatp\fR, \fBconst char *\fR\fIname\fR,
+     \fBconst char *\fR\fIdomain\fR, \fBint\fR \fIclass\fR, \fBint\fR \fItype\fR,
+     \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_nmkquery\fR(\fBres_state\fR \fIstatp\fR, \fBint\fR \fIop\fR, \fBconst char *\fR\fIdname\fR, \fBint\fR \fIclass\fR,
+     \fBint\fR \fItype\fR, \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIdatalen\fR,
+     \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_nsend\fR(\fBres_state\fR \fIstatp\fR, \fBconst u_char *\fR\fImsg\fR, \fBint\fR \fImsglen\fR,
+     \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBres_nclose\fR(\fBres_state\fR \fIstatp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_snendsigned\fR(\fBres_state\fR \fIstatp\fR, \fBconst u_char *\fR\fImsg\fR,
+     \fBint\fR \fImsglen\fR, \fBns_tsig_key *\fR\fIkey\fR, \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdn_comp\fR(\fBconst char *\fR\fIexp_dn\fR, \fBu_char *\fR\fIcomp_dn\fR, \fBint\fR \fIlength\fR,
+     \fBu_char **\fR\fIdnptrs\fR, \fB**\fR\fIlastdnptr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdn_expand\fR(\fBconst u_char *\fR\fImsg\fR, \fB*\fR\fIeomorig\fR, \fB*\fR\fIcomp_dn\fR, \fBchar *\fR\fIexp_dn\fR,
+     \fBint\fR \fIlength\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBhstrerror\fR(\fBint\fR \fIerr\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBres_setservers\fR(\fBres_state\fR \fIstatp\fR, \fBconst union res_sockaddr_union *\fR\fIset\fR,
+     \fBint\fR \fIcnt\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_getservers\fR(\fBres_state\fR \fIstatp\fR, \fBunion res_sockaddr_union *\fR\fIset\fR,
+     \fBint\fR \fIcnt\fR);
+.fi
+
+.LP
+.nf
+Deprecated Interfaces
+.fi
+
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lresolv\fR \fB -lsocket \fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
+#include <netdb.h>
+
+\fBint\fR \fBres_init\fR(void)
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_query\fR(\fBconst char *\fR\fIdname\fR, \fBint\fR \fIclass\fR,
+     \fBint\fR \fItype\fR, \fBu_char *\fR\fIanswer\fR,
+     \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_search\fR(\fBconst char *\fR\fIdname\fR, \fBint\fR \fIclass\fR,
+     \fBint\fR \fItype\fR, \fBu_char *\fR\fIanswer\fR, \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_mkquery\fR(\fBint\fR \fIop\fR, \fBconst char *\fR\fIdname\fR, \fBint\fR \fIclass\fR,
+     \fBint\fR \fItype\fR, \fBconst char *\fR\fIdata\fR,\fBint\fR \fIdatalen\fR,
+     \fBstruct rrec *\fR\fInewrr\fR, \fBu_char *\fR\fIbuf\fR, \fBint\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBres_send\fR(\fBconst u_char *\fR\fImsg\fR, \fBint\fR \fImsglen\fR, \fBu_char *\fR\fIanswer\fR,
+     \fBint\fR \fIanslen\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBherror\fR(\fBconst char *\fR\fIs\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines are used for making, sending, and interpreting query and reply
+messages with Internet domain name servers.
+.sp
+.LP
+State information is kept in \fIstatp\fR and is used to control the behavior of
+these functions. Set \fIstatp\fR to all zeros prior to making the first call to
+any of these functions.
+.sp
+.LP
+The \fBres_ndestroy()\fR function should be called to free memory allocated by
+\fBres_ninit()\fR after the last use of \fIstatp\fR.
+.sp
+.LP
+The functions \fBres_init()\fR, \fBres_query()\fR, \fBres_search()\fR,
+\fBres_mkquery()\fR, \fBres_send()\fR, and \fBherror()\fR are deprecated. They
+are supplied for backwards compatability. They use global configuration and
+state information that is kept in the structure \fB_res\fR rather than state
+information referenced through \fIstatp\fR.
+.sp
+.LP
+Most of the values in \fIstatp\fR and \fB_res\fR are initialized to reasonable
+defaults on the first call to \fBres_ninit()\fR or \fBres_init()\fR and can be
+ignored. Options stored in \fBstatp->options\fR or \fB_res.options\fR are
+defined in <\fBresolv.h\fR>. They are stored as a simple bit mask containing
+the bitwise \fBOR\fR of the options enabled.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_INIT\fR\fR
+.ad
+.RS 17n
+.rt  
+True if the initial name server address and default domain name are
+initialized, that is, \fBres_init()\fR or \fBres_ninit()\fR has been called.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_DEBUG\fR\fR
+.ad
+.RS 17n
+.rt  
+Print debugging messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_AAONLY\fR\fR
+.ad
+.RS 17n
+.rt  
+Accept authoritative answers only. With this option, \fBres_send()\fR will
+continue until it finds an authoritative answer or finds an error. Currently
+this option is not implemented.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_USEVC\fR\fR
+.ad
+.RS 17n
+.rt  
+Use \fBTCP\fR connections for queries instead of \fBUDP\fR datagrams.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_STAYOPEN\fR\fR
+.ad
+.RS 17n
+.rt  
+Use with \fBRES_USEVC\fR to keep the \fBTCP\fR connection open between queries.
+This is a useful option for programs that regularly do many queries. The normal
+mode used should be \fBUDP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_IGNTC\fR\fR
+.ad
+.RS 17n
+.rt  
+Ignore truncation errors; that is, do not retry with \fBTCP\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_RECURSE\fR\fR
+.ad
+.RS 17n
+.rt  
+Set the recursion-desired bit in queries. This is the default. \fBres_send()\fR
+and \fBres_nsend()\fR do not do iterative queries and expect the name server to
+handle recursion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_DEFNAMES\fR\fR
+.ad
+.RS 17n
+.rt  
+If set, \fBres_search()\fR and \fBres_nsearch()\fR append the default domain
+name to single-component names, that is, names that do not contain a dot. This
+option is enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_DNSRCH\fR\fR
+.ad
+.RS 17n
+.rt  
+If this option is set, \fBres_search()\fR and \fBres_nsearch()\fR search for
+host names in the current domain and in parent domains. See \fBhostname\fR(1).
+This option is used by the standard host lookup routine
+\fBgethostbyname\fR(3NSL). This option is enabled by default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_NOALIASES\fR\fR
+.ad
+.RS 17n
+.rt  
+This option turns off the user level aliasing feature controlled by the
+\fBHOSTALIASES\fR environment variable. Network daemons should set this option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_BLAST\fR\fR
+.ad
+.RS 17n
+.rt  
+If the \fBRES_BLAST\fR option is defined, \fBresolver()\fR queries will be sent
+to all servers. If the \fBRES_BLAST\fR option is not defined, but
+\fBRES_ROTATE\fR is , the list of nameservers are rotated according to a
+round-robin scheme. \fBRES_BLAST\fR overrides \fBRES_ROTATE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_ROTATE\fR\fR
+.ad
+.RS 17n
+.rt  
+This option causes \fBres_nsend()\fR and \fBres_send()\fR to rotate the list of
+nameservers in \fBstatp->nsaddr_list\fR or \fB_res.nsaddr_list\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRES_KEEPTSIG\fR\fR
+.ad
+.RS 17n
+.rt  
+This option causes \fBres_nsendsigned()\fR to leave the message unchanged after
+\fBTSIG\fR verification. Otherwise the \fBTSIG\fR record would be removed and
+the header would be updated.
+.RE
+
+.SS "\fBres_ninit()\fR, \fBres_init()\fR"
+.sp
+.LP
+The \fBres_ninit()\fR and \fBres_init()\fR routines read the configuration
+file, if any is present, to get the default domain name, search list and the
+Internet address of the local name server(s). See \fBresolv.conf\fR(4). If no
+server is configured, \fBres_init()\fR or \fBres_ninit()\fR will try to obtain
+name resolution services from the host on which it is running. The current
+domain name is defined by \fBdomainname\fR(1M), or by the hostname if it is not
+specified in the configuration file. Use the environment variable
+\fBLOCALDOMAIN\fR to override the domain name. This environment variable may
+contain several blank-separated tokens if you wish to override the search list
+on a per-process basis. This is similar to the search command in the
+configuration file. You can set the \fBRES_OPTIONS\fR environment variable to
+override certain internal resolver options. You can otherwise set them by
+changing fields in the \fBstatp\fR /\fB_res\fR structure. Alternatively, they
+are inherited from the configuration file's \fBoptions\fR command. See
+\fBresolv.conf\fR(4) for information regarding the syntax of the
+\fBRES_OPTIONS\fR environment variable. Initialization normally occurs on the
+first call to one of the other resolver routines.
+.SS "\fBres_nquery()\fR, \fBres_query()\fR"
+.sp
+.LP
+The \fBres_nquery()\fR and \fBres_query()\fR functions provide interfaces to
+the server query mechanism. They construct a query, send it to the local
+server, await a response, and make preliminary checks on the reply. The query
+requests information of the specified \fItype\fR and \fIclass\fR for the
+specified fully-qualified domain name \fIdname\fR. The reply message is left in
+the \fIanswer\fR buffer with length \fIanslen\fR supplied by the caller.
+\fBres_nquery()\fR and \fBres_query()\fR return the length of the \fIanswer\fR,
+or -1 upon error.
+.sp
+.LP
+The \fBres_nquery()\fR and \fBres_query()\fR routines return a length that may
+be bigger than \fIanslen\fR. In that case, retry the query with a larger
+\fIbuf\fR. The \fIanswer\fR to the second query may be larger still], so it is
+recommended that you supply a \fIbuf\fR larger than the \fIanswer\fR returned
+by the previous query. \fIanswer\fR must be large enough to receive a maximum
+\fBUDP\fR response from the server or parts of the \fIanswer\fR will be
+silently discarded. The default maximum \fBUDP\fR response size is 512 bytes.
+.SS "\fBres_nsearch()\fR, \fBres_search()\fR"
+.sp
+.LP
+The \fBres_nsearch()\fR and \fBres_search()\fR routines make a query and await
+a response, just like like \fBres_nquery()\fR and \fBres_query()\fR. In
+addition, they implement the default and search rules controlled by the
+\fBRES_DEFNAMES\fR and \fBRES_DNSRCH\fR options. They return the length of the
+first successful reply which is stored in \fIanswer\fR. On error, they reurn
+-1.
+.sp
+.LP
+The \fBres_nsearch()\fR and \fBres_search()\fR routines return a length that
+may be bigger than \fIanslen\fR. In that case, retry the query with a larger
+\fIbuf\fR. The \fIanswer\fR to the second query may be larger still], so it is
+recommended that you supply a \fIbuf\fR larger than the \fIanswer\fR returned
+by the previous query. \fIanswer\fR must be large enough to receive a maximum
+\fBUDP\fR response from the server or parts of the \fIanswer\fR will be
+silently discarded. The default maximum \fBUDP\fR response size is 512 bytes.
+.SS "\fBres_nquerydomain()\fR"
+.sp
+.LP
+The \fBres_nquerydomain()\fR function calls \fBres_query()\fR on the
+concatenation of \fIname\fR and \fIdomain\fR, removing a trailing dot from
+\fIname\fR if \fIdomain\fR is \fINULL\fR.
+.SS "\fBres_nmkquery()\fR, \fBres_mkquery()\fR"
+.sp
+.LP
+These routines are used by \fBres_nquery()\fR and \fBres_query()\fR. The
+\fBres_nmkquery()\fR and \fBres_mkquery()\fR functions construct a standard
+query message and place it in \fIbuf\fR. The routine returns the \fIsize\fR of
+the query, or -1 if the query is larger than \fIbuflen\fR. The query type
+\fIop\fR is usually \fBQUERY\fR, but can be any of the query types defined in
+<\fBarpa/nameser.h\fR>. The domain name for the query is given by \fIdname\fR.
+\fInewrr\fR is currently unused but is intended for making update messages.
+.SS "\fBres_nsend()\fR, \fBres_send()\fR, \fBres_nsendsigned()\fR"
+.sp
+.LP
+The \fBres_nsend()\fR, \fBres_send()\fR, and \fBres_nsendsigned()\fR routines
+send a pre-formatted query that returns an \fIanswer\fR. The routine calls
+\fBres_ninit()\fR or \fBres_init()\fR. If \fBRES_INIT\fR is not set, the
+routine sends the query to the local name server and handles timeouts and
+retries. Additionally, the \fBres_nsendsigned()\fR uses \fBTSIG\fR signatures
+to add authentication to the query and verify the response. In this case, only
+one name server will be contacted. The routines return the length of the reply
+message, or -1 if there are errors.
+.sp
+.LP
+The \fBres_nsend()\fR and \fBres_send()\fR routines return a length that may be
+bigger than \fIanslen\fR. In that case, retry the query with a larger
+\fIbuf\fR. The \fIanswer\fR to the second query may be larger still], so it is
+recommended that you supply a \fIbuf\fR larger than the \fIanswer\fR returned
+by the previous query. \fIanswer\fR must be large enough to receive a maximum
+\fBUDP\fR response from the server or parts of the \fIanswer\fR will be
+silently discarded. The default maximum \fBUDP\fR response size is 512 bytes.
+.SS "\fBfp_resstat()\fR"
+.sp
+.LP
+The function \fBfp_resstat()\fR prints out the active flag bits in
+\fIstatp\fR->\fBoptions\fR preceded by the text "\fB;; res options:\fR" on
+\fIfile\fR.
+.SS "\fBres_hostalias()\fR"
+.sp
+.LP
+The function \fBres_hostalias()\fR looks up \fIname\fR in the file referred to
+by the \fBHOSTALIASES\fR environment variable and returns the fully qualified
+host name. If \fIname\fR is not found or an error occurs, \fBNULL\fR is
+returned. \fBres_hostalias()\fR stores the result in \fIbuf\fR.
+.SS "\fBres_nclose()\fR"
+.sp
+.LP
+The \fBres_nclose()\fR function closes any open files referenced through
+\fIstatp\fR.
+.SS "\fBres_ndestroy()\fR"
+.sp
+.LP
+The \fBres_ndestroy()\fR function calls \fBres_nclose()\fR, then frees any
+memory allocated by \fBres_ninit()\fR referenced through \fIstatp\fR.
+.SS "\fBdn_comp()\fR"
+.sp
+.LP
+The \fBdn_comp()\fR function compresses the domain name \fIexp_dn\fR and stores
+it in \fIcomp_dn\fR. The \fBdn_comp()\fR function returns the size of the
+compressed name, or \fB\(mi1\fR if there were errors. \fIlength\fR is the size
+of the array pointed to by \fIcomp_dn\fR.
+.sp
+.LP
+The \fIdnptrs\fR parameter is a pointer to the head of the list of pointers to
+previously compressed names in the current message. The first pointer must
+point to the beginning of the message. The list ends with \fINULL\fR. The limit
+to the array is specified by \fIlastdnptr\fR.
+.sp
+.LP
+A side effect of calling \fBdn_comp()\fR is to update the list of pointers for
+labels inserted into the message by \fBdn_comp()\fR as the name is compressed.
+If \fIdnptrs\fR is \fINULL\fR, names are not compressed. If \fIlastdnptr\fR is
+\fINULL\fR, \fBdn_comp()\fR does not update the list of labels.
+.SS "\fBdn_expand()\fR"
+.sp
+.LP
+The \fBdn_expand()\fR function expands the compressed domain name \fIcomp_dn\fR
+to a full domain name. The compressed name is contained in a query or reply
+message. \fImsg\fR is a pointer to the beginning of that message. The
+uncompressed name is placed in the buffer indicated by \fIexp_dn\fR, which is
+of size \fIlength\fR. The \fBdn_expand()\fR function returns the size of the
+compressed name, or \fB\(mi1\fR if there was an error.
+.SS "\fBhstrerror()\fR, \fBherror()\fR"
+.sp
+.LP
+The variables \fIstatp->res_h_errno\fR and \fI_res.res_h_errno\fR and external
+variable \fIh_errno\fR are set whenever an error occurs during a resolver
+operation. The following definitions are given in <\fBnetdb.h\fR>:
+.sp
+.in +2
+.nf
+#define NETDB_INTERNAL -1 /* see errno */  
+#define NETDB_SUCCESS  0  /* no problem */ 
+#define HOST_NOT_FOUND 1  /* Authoritative Answer Host not found */  
+#define TRY_AGAIN      2  /* Non-Authoritative not found, or SERVFAIL */ 
+#define NO_RECOVERY    3  /* Non-Recoverable: FORMERR, REFUSED, NOTIMP*/ 
+#define NO_DATA        4  /* Valid name, no data for requested type */      
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBherror()\fR function writes a message to the diagnostic output
+consisting of the string parameters, the constant string "\fB:\fR", and a
+message corresponding to the value of \fIh_errno\fR.
+.sp
+.LP
+The \fBhstrerror()\fR function returns a string, which is the message text that
+corresponds to the value of the \fIerr\fR parameter.
+.SS "\fBres_setservers()\fR, \fBres_getservers()\fR"
+.sp
+.LP
+The functions \fBres_getservers()\fR and \fBres_setservers()\fR are used to get
+and set the list of servers to be queried.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/resolv.conf\fR\fR
+.ad
+.RS 20n
+.rt  
+resolver configuration file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityCommitted
+_
+MT-LevelT{
+Unsafe for deprecated interfaces; MT-Safe for all others.
+T}
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdomainname\fR(1M), \fBgethostbyname\fR(3NSL), \fBlibresolv\fR(3LIB),
+\fBresolv.conf\fR(4), \fBattributes\fR(5)
+.sp
+.LP
+Lottor, M. \fIRFC 1033, Domain Administrators Operations Guide\fR. Network
+Working Group. November 1987.
+.sp
+.LP
+Mockapetris, Paul. \fIRFC 1034, Domain Names - Concepts and Facilities\fR.
+Network Working Group. November 1987.
+.sp
+.LP
+Mockapetris, Paul. \fIRFC 1035, Domain Names - Implementation and
+Specification\fR. Network Working Group. November 1987.
+.sp
+.LP
+Partridge, Craig. \fIRFC 974, Mail Routing and the Domain System\fR. Network
+Working Group. January 1986.
+.sp
+.LP
+Stahl, M. \fIRFC 1032, Domain Administrators Guide\fR. Network Working Group.
+November 1987.
+.sp
+.LP
+Vixie, Paul, Dunlap, Kevin J., Karels, Michael J. \fIName Server Operations
+Guide for BIND\fR. Internet Software Consortium, 1996.
+.SH NOTES
+.sp
+.LP
+When the caller supplies a work buffer, for example the \fIanswer\fR buffer
+argument to \fBres_nsend()\fR or \fBres_send()\fR, the buffer should be aligned
+on an eight byte boundary. Otherwise, an error such as a \fBSIGBUS\fR may
+result.

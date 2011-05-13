@@ -63,11 +63,13 @@ dir path=opt/SUNWdtrt/tst/common/exit
 dir path=opt/SUNWdtrt/tst/common/fbtprovider
 dir path=opt/SUNWdtrt/tst/common/funcs
 dir path=opt/SUNWdtrt/tst/common/grammar
+dir path=opt/SUNWdtrt/tst/common/include
 dir path=opt/SUNWdtrt/tst/common/inline
 dir path=opt/SUNWdtrt/tst/common/io
 dir path=opt/SUNWdtrt/tst/common/ip
 dir path=opt/SUNWdtrt/tst/common/java_api
 dir path=opt/SUNWdtrt/tst/common/lexer
+dir path=opt/SUNWdtrt/tst/common/llquantize
 dir path=opt/SUNWdtrt/tst/common/mdb
 dir path=opt/SUNWdtrt/tst/common/mib
 dir path=opt/SUNWdtrt/tst/common/misc
@@ -841,6 +843,7 @@ file path=opt/SUNWdtrt/tst/common/grammar/err.D_ADDROF_LVAL.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/err.D_EMPTY.empty.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/tst.clauses.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/tst.stmts.d mode=0444
+file path=opt/SUNWdtrt/tst/common/include/tst.includefirst.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/inline/err.D_DECL_IDRED.redef1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/inline/err.D_DECL_IDRED.redef2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/inline/err.D_IDENT_UNDEF.recur.d mode=0444
@@ -928,6 +931,57 @@ file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/lexer/err.D_SYNTAX.paren3.d mode=0444
 file path=opt/SUNWdtrt/tst/common/lexer/tst.D_MACRO_OFLOW.ParIntOvflow.d.ksh \
     mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTOREVEN.nodivide.d \
+    mode=0444
+file \
+    path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTOREVEN.notfactor.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORNSTEPS.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORSMALL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_FACTORVAL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_HIGHVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWTYPE.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_LOWVAL.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_MAGRANGE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_MAGTOOBIG.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPMATCH.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPTYPE.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/err.D_LLQUANT_NSTEPVAL.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.bases.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.basic.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negorder.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.negvalue.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.normal.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.normal.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.range.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.range.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.steps.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.steps.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.trunc.d mode=0444
+file path=opt/SUNWdtrt/tst/common/llquantize/tst.trunc.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/mdb/tst.dtracedcmd.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/mib/tst.icmp.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/mib/tst.tcp.ksh mode=0444
@@ -1098,6 +1152,7 @@ file path=opt/SUNWdtrt/tst/common/pragma/tst.libchain.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/pragma/tst.libdep.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/pragma/tst.libdepfullyconnected.ksh \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/pragma/tst.libdepsepdir.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/err.D_PRED_SCALAR.NonScalarPred.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/err.D_SYNTAX.invalid.d mode=0444
@@ -1899,3 +1954,5 @@ legacy pkg=SUNWdtrt category=internal \
     hotline="Contact the DTrace discussion forum" name="DTrace Test Suite"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+depend fmri=runtime/java type=require
+depend fmri=runtime/java/runtime64 type=require

@@ -1,0 +1,241 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libpapi 3LIB "18 Dec 2006" "SunOS 5.11" "Interface Libraries"
+.SH NAME
+libpapi \- Free Standards Group Open Printing API (PAPI) library functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <papi.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Functions in this library provide an interface for interaction with print
+services as described in v1.0 of the Free Standards Group (FSG) Open Printing
+API (PAPI).
+.sp
+.LP
+This particular implementation of the PAPI includes naming support as described
+in the \fBprinters.conf\fR(4) and \fBprinters\fR(4) manual pages.  It also
+supplies support for interaction with local LP services, remote LPD services,
+and remote IPP services through the use of loadable modules that export the
+same interface.  These modules should not be linked with directly, but can be
+used directly at runtime through the use of \fBLD_PRELOAD\fR for debugging
+purposes.
+.SH INTERFACES
+.sp
+.LP
+The shared object \fBlibpapi.so.0\fR provides the public interfaces defined
+below.  See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.SS "Attribute"
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpapiAttributeListAddBoolean\fR\fBpapiAttributeListAddCollection\fR
+\fBpapiAttributeListAddDatetime\fR\fBpapiAttributeListAddInteger\fR
+\fBpapiAttributeListAddMetadata\fR\fBpapiAttributeListAddRange\fR
+\fBpapiAttributeListAddResolution\fR\fBpapiAttributeListAddString\fR
+\fBpapiAttributeListAddValue\fR\fBpapiAttributeListDelete\fR
+\fBpapiAttributeListFind\fR\fBpapiAttributeListFree\fR
+\fBpapiAttributeListFromString\fR\fBpapiAttributeListGetBoolean\fR
+\fBpapiAttributeListGetCollection\fR\fBpapiAttributeListGetDatetime\fR
+\fBpapiAttributeListGetInteger\fR\fBpapiAttributeListGetMetadata\fR
+\fBpapiAttributeListGetNext\fR\fBpapiAttributeListGetRange\fR
+\fBpapiAttributeListGetResolution\fR\fBpapiAttributeListGetString\fR
+\fBpapiAttributeListGetValue\fR\fBpapiAttributeListToString\fR
+.TE
+
+.SS "Service"
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpapiServiceCreate\fR\fBpapiServiceDestroy\fR
+\fBpapiServiceGetAppData\fR\fBpapiServiceGetAttributeList\fR
+\fBpapiServiceGetEncryption\fR\fBpapiServiceGetPassword\fR
+\fBpapiServiceGetServiceName\fR\fBpapiServiceGetStatusMessage\fR
+\fBpapiServiceGetUserName\fR\fBpapiServiceSetAppData\fR
+\fBpapiServiceSetAuthCB\fR\fBpapiServiceSetEncryption\fR
+\fBpapiServiceSetPassword\fR\fBpapiServiceSetUserName\fR
+.TE
+
+.SS "Printer"
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpapiPrinterAdd\fR\fBpapiPrinterDisable\fR
+\fBpapiPrinterEnable\fR\fBpapiPrinterFree\fR
+\fBpapiPrinterGetAttributeList\fR\fBpapiPrinterListFree\fR
+\fBpapiPrinterListJobs\fR\fBpapiPrinterModify\fR
+\fBpapiPrinterPause\fR\fBpapiPrinterPurgeJobs\fR
+\fBpapiPrinterQuery\fR\fBpapiPrinterRemove\fR
+\fBpapiPrinterResume\fR\fBpapiPrintersList\fR
+.TE
+
+.SS "Job"
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpapiJobCancel\fR\fBpapiJobFree\fR
+\fBpapiJobGetAttributeList\fR\fBpapiJobGetId\fR
+\fBpapiJobGetJobTicket\fR\fBpapiJobGetPrinterName\fR
+\fBpapiJobHold\fR\fBpapiJobListFree\fR
+\fBpapiJobModify\fR\fBpapiJobMove\fR
+\fBpapiJobPromote\fR\fBpapiJobQuery\fR
+\fBpapiJobRelease\fR\fBpapiJobRestart\fR
+\fBpapiJobStreamClose\fR\fBpapiJobStreamOpen\fR
+\fBpapiJobStreamWrite\fR\fBpapiJobSubmit\fR
+\fBpapiJobSubmitByReference\fR\fBpapiJobValidate\fR
+.TE
+
+.SS "Miscellaneous"
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBpapiLibrarySupportedCall\fR\fBpapiLibrarySupportedCalls\fR
+\fBpapiStatusString\fR
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libpapi.so.0\fR\fR
+.ad
+.sp .6
+.RS 4n
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libpapi-common.so.0\fR\fR
+.ad
+.sp .6
+.RS 4n
+private shared code
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/print/psm-lpd.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+private rfc1179 support
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/print/psm-lpsched.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+private LP support
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/print/psm-ipp.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+private IPP support
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libipp-core.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+private IPP marshalling support
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/libipp-listener.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+private IPP operations support
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lip/libhttp-core.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+private HTTP support
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(3), \fBprinters\fR(4), \fBprinters.conf\fR(4), \fBattributes\fR(5)

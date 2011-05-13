@@ -1,0 +1,145 @@
+'\" te
+.\" Copyright (c) 2000-2007 AT&T Knowledge Ventures
+.\" To view license terms, see http://www.opensource.org/licenses/cpl1.0.txt
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc.
+.TH msgget 1 "9 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+msgget \- get a message from a message catalog
+.SH SYNOPSIS
+.LP
+.nf
+\fBmsgget\fR \fIlocale\fR [\fIcommand\fR\fB:\fR]\fIcatalog\fR [\fIset\fR.]\fInumber\fR [\fItext\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBmsgget\fR gets the message corresponding to the parameters. See
+\fBOPERANDS\fR.
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcatalog\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the message catalog name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcommand\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies command-specific message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlocale\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the locale. If \fIlocale\fR is \fB-\fR then the current locale is
+used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\fR\fIset\fR\fB].\fR\fInumber\fR\fR
+.ad
+.RS 16n
+.rt  
+Identifies the message by message number and an optional message set. If
+specified as \fB-\fR , the message set and number are determined by looking up
+text in the corresponding C locale message catalog.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItext\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the text of the message to be output upon error.
+.RE
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRGetting a Message in the Current Locale
+.sp
+.LP
+The following example gets \fBmsg 1\fR in the current locale from message
+catalog \fBhello\fR:
+
+.sp
+.in +2
+.nf
+example% msgget - hello 1
+hello world
+.fi
+.in -2
+.sp
+
+.SH AUTHORS
+.sp
+.LP
+Glenn Fowler, \fBgsf@research.att.com\fR
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityVolatile
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBiconv\fR(1), \fBmsgcc\fR(1), \fBmsggen\fR(1), \fBattributes\fR(5)

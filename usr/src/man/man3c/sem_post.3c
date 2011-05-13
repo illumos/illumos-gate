@@ -1,0 +1,125 @@
+'\" te
+.\" Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sem_post 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sem_post \- increment the count of a semaphore
+.SH SYNOPSIS
+.LP
+.nf
+#include <semaphore.h>
+
+\fBint\fR \fBsem_post\fR(\fBsem_t *\fR\fIsem\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsem_post()\fR function unlocks the semaphore referenced by \fIsem\fR by
+performing a semaphore unlock operation on that semaphore.
+.sp
+.LP
+If the semaphore value resulting from this operation is positive, then no
+threads  were blocked waiting for the semaphore to become unlocked; the
+semaphore value is simply incremented.
+.sp
+.LP
+If the value of the semaphore resulting from this operation is 0, then one of
+the threads  blocked waiting for the semaphore will be allowed to return
+successfully from its call to \fBsem_wait\fR(3C). If the symbol
+\fB_POSIX_PRIORITY_SCHEDULING\fR is defined, the thread  to be unblocked will
+be chosen in a manner appropriate to the scheduling policies and parameters in
+effect for the blocked threads. In the case of the schedulers \fBSCHED_FIFO\fR
+and \fBSCHED_RR\fR, the highest priority waiting thread  will be unblocked, and
+if there is more than one highest priority thread  blocked waiting for the
+semaphore, then the highest priority thread that has been waiting the longest
+will be unblocked. If the symbol \fB_POSIX_PRIORITY_SCHEDULING\fR is not
+defined, the choice of a thread  to unblock is unspecified.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBsem_post()\fR returns \fB0\fR; otherwise it returns
+\fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsem_post()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 14n
+.rt  
+The \fIsem\fR argument does not refer to a valid semaphore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR \fR
+.ad
+.RS 14n
+.rt  
+The \fBsem_post()\fR function is not supported by the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR \fR
+.ad
+.RS 14n
+.rt  
+The semaphore value exceeds \fBSEM_VALUE_MAX\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBsem_post()\fR function is reentrant with respect to signals and may be
+invoked from a signal-catching function. The semaphore functionality described
+on this manual page is for the POSIX (see \fBstandards\fR(5)) threads
+implementation. For the documentation of the Solaris threads interface, see
+\fBsemaphore\fR(3C)).
+.SH EXAMPLES
+.sp
+.LP
+See \fBsem_wait\fR(3C).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsched_setscheduler\fR(3C), \fBsem_wait\fR(3C), \fBsemaphore\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

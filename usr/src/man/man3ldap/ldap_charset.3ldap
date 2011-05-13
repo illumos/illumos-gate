@@ -1,0 +1,127 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_charset 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_charset, ldap_set_string_translators, ldap_t61_to_8859, ldap_8859_to_t61,
+ldap_translate_from_t61, ldap_translate_to_t61, ldap_enable_translation \- LDAP
+character set translation functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBvoid\fR \fBldap_set_string_translators\fR(\fBLDAP\fR \fI*ld\fR,
+     \fBBERTranslateProc\fR \fIencode_proc\fR, \fBBERTranslateProc\fR \fIdecodeproc\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fBint\fR(\fB*BERTranslateProc)(char\fR \fI**bufp\fR, \fBunsigned long\fR \fI*buflenp\fR,
+     \fBint\fR \fIfree_input\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_t61_to_8859\fR(\fBchar\fR \fI**bufp\fR, \fBunsigned long\fR \fI*buflenp\fR,
+     \fBint\fR \fIfree_input\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_8859_to_t61\fR(\fBchar\fR \fI**bufp\fR, \fBunsigned long\fR \fI*buflenp\fR,
+     \fBint\fR \fIfree_input\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_translate_from_t61\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI**bufp\fR,
+     \fBunsigned long\fR \fI*lenp\fR, \fBint\fR \fIfree_input\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_translate_to_t61\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI**bufp\fR, \fBunsigned long\fR \fI*lenp\fR,
+     \fBint\fR \fIfree_input\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_enable_translation\fR(\fBLDAP\fR \fI*ld\fR, \fBLDAPMessage\fR \fI*entry\fR, \fBint\fR \fIenable\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to used to enable translation  of character strings
+used in the LDAP library to and from  the T.61 character set used in the LDAP
+protocol.  These  functions are only available if the LDAP and LBER libraries
+are compiled with  \fBSTR_TRANSLATION\fR defined. It is also  possible to turn
+on character translation by default so that all LDAP library callers will
+experience translation; see the LDAP Make-common source file for details.
+.sp
+.LP
+\fBldap_set_string_translators()\fR sets the translation functions that will be
+used by the LDAP library.  They are not actually used until the
+\fIld_lberoptions\fR field of the LDAP structure is set to include the
+\fBLBER_TRANSLATE_STRINGS\fR option.
+.sp
+.LP
+\fBldap_t61_to_8859()\fR and \fBldap_8859_to_t61()\fR are translation functions
+for converting between T.61 characters and ISO-8859 characters.  The specific
+8859 character set used is determined at compile time.
+.sp
+.LP
+\fBldap_translate_from_t61()\fR is used to translate a string of characters
+from the T.61 character set to a different character set.  The actual
+translation is done using the \fIdecode_proc\fR that was passed to a previous
+call to \fBldap_set_string_translators()\fR. On entry, \fI*bufp\fR should point
+to the start of the T.61 characters to be translated and \fI*lenp\fR should
+contain the number of bytes to translate.  If \fIfree_input\fR is non-zero, the
+input buffer will be freed if translation is a success.  If the translation is
+a success, \fBLDAP_SUCCESS\fR will be returned, \fI*bufp\fR will point to a
+newly malloc'd buffer that contains the translated characters, and \fI*lenp\fR
+will contain the length of the result. If translation fails, an LDAP error code
+will be returned.
+.sp
+.LP
+\fBldap_translate_to_t61()\fR is used to translate a string of characters to
+the T.61 character set from a different character set.  The actual translation
+is done using the \fIencode_proc\fR that was passed to a previous call to
+\fBldap_set_string_translators()\fR. This function is called just like
+\fBldap_translate_from_t61()\fR.
+.sp
+.LP
+\fBldap_enable_translation()\fR is used to turn on or off string translation
+for the LDAP entry \fIentry\fR (typically obtained by calling
+\fBldap_first_entry()\fR or \fBldap_next_entry()\fR after a successful LDAP
+search operation). If \fBenable\fR is zero, translation is disabled; if
+non-zero, translation is enabled.  This function is useful if you need to
+ensure that a particular attribute is not translated when it is extracted using
+\fBldap_get_values()\fR or \fBldap_get_values_len()\fR. For example, you would
+not want to translate a binary attributes such as \fBjpegPhoto\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBattributes\fR(5)

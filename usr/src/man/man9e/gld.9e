@@ -1,0 +1,453 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gld 9E "3 Jan 2001" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+gld, gldm_reset, gldm_start, gldm_stop, gldm_set_mac_addr, gldm_set_multicast,
+gldm_set_promiscuous, gldm_send, gldm_intr, gldm_get_stats, gldm_ioctl \-
+Generic LAN Driver entry points
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/gld.h>
+
+\fBint\fR \fBprefix_reset\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_start\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_stop\fR(\fBgld_mac_info_t *\fR
+     \fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_set_mac_addr\fR(\fBgld_mac_info_t *\fR
+     \fImacinfo\fR, \fBunsigned char *\fR\fImacaddr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_set_multicast\fR(\fBgld_mac_info_t *\fR
+     \fImacinfo\fR, \fBunsigned char *\fR\fImulticastaddr\fR,
+     \fBint\fR \fImultiflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_set_promiscuous\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR,
+      \fBint\fR \fIpromiscflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_send\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, 
+     \fBmblk_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBuint_t\fR \fBprefix_intr\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_get_stats\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, 
+     \fBstruct gld_stats *\fR\fIstats\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprefix_ioctl\fR(\fBgld_mac_info_t *\fR\fImacinfo\fR, 
+     \fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fImp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImacinfo\fR \fR
+.ad
+.RS 18n
+.rt  
+Pointer to a \fBgld_mac_info\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImacaddr\fR \fR
+.ad
+.RS 18n
+.rt  
+Pointer to the beginning of a character array containing a valid MAC address.
+The array will be of the length specified by the driver in the
+\fBgldm_addrlen\fR element of the \fBgld_mac_info\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImulticastaddr\fR \fR
+.ad
+.RS 18n
+.rt  
+Pointer to the beginning of a character array containing a multicast, group, or
+functional address. The array will be of the length specified by the driver in
+the \fBgldm_addrlen\fR element of the \fBgld_mac_info\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImultiflag\fR \fR
+.ad
+.RS 18n
+.rt  
+A flag indicating whether reception of the multicast address is to be enabled
+or disabled. This argument is specified as \fBGLD_MULTI_ENABLE\fR or
+\fBGLD_MULTI_DISABLE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpromiscflag\fR \fR
+.ad
+.RS 18n
+.rt  
+A flag indicating what type of promiscuous mode, if any, is to be enabled. This
+argument is specified as \fBGLD_MAC_PROMISC_PHYS\fR,
+\fBGLD_MAC_PROMISC_MULTI\fR, or \fBGLD_MAC_PROMISC_NONE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR \fR
+.ad
+.RS 18n
+.rt  
+Pointer to a STREAMS message block containing the packet to be transmitted or
+the ioctl to be executed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstats\fR \fR
+.ad
+.RS 18n
+.rt  
+Pointer to a \fBgld_stats\fR(9S) structure to be filled in with the current
+values of statistics counters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR \fR
+.ad
+.RS 18n
+.rt  
+Pointer to the \fBqueue\fR(9S) structure to be used in the reply to the ioctl.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These entry points must be implemented by a device-specific network driver
+designed to interface with the Generic LAN Driver (GLD).
+.sp
+.LP
+As described in \fBgld\fR(7D), the main data structure for communication
+between the device-specific driver and the GLD module is the
+\fBgld_mac_info\fR(9S) structure. Some of the elements in that structure are
+function pointers to the entry points described here. The device-specific
+driver must, in its \fBattach\fR(9E) routine, initialize these function
+pointers before calling \fBgld_register\fR(\|).
+.sp
+.LP
+\fBgldm_reset\fR(\|) resets the hardware to its initial state.
+.sp
+.LP
+\fBgldm_start\fR(\|) enables the device to generate interrupts and prepares the
+driver to call \fBgld_recv\fR(\|) for delivering received data packets to GLD.
+.sp
+.LP
+\fBgldm_stop\fR(\|) disables the device from generating any interrupts and
+stops the driver from calling \fBgld_recv\fR(\|) for delivering data packets to
+GLD. GLD depends on the \fBgldm_stop\fR(\|) routine to ensure that the device
+will no longer interrupt, and it must do so without fail.
+.sp
+.LP
+\fBgldm_set_mac_addr\fR(\|) sets the physical address that the hardware is to
+use for receiving data. This function should program the device to the passed
+MAC address \fImacaddr\fR.
+.sp
+.LP
+\fBgldm_set_multicast\fR(\|) enables and disables device-level reception of
+specific multicast addresses. If the third argument \fImultiflag\fR is set to
+\fBGLD_MULTI_ENABLE\fR, then the function sets the interface to receive packets
+with the multicast address pointed to by the second argument; if
+\fImultiflag\fR is set to \fBGLD_MULTI_DISABLE\fR, the driver is allowed to
+disable reception of the specified multicast address.
+.sp
+.LP
+This function is called whenever GLD wants to enable or disable reception of a
+multicast, group, or functional address. GLD makes no assumptions about how the
+device does multicast support and calls this function to enable or disable a
+specific multicast address. Some devices may use a hash algorithm and a bitmask
+to enable collections of multicast addresses; this is allowed, and GLD will
+filter out any superfluous packets that are not required. If disabling an
+address could result in disabling more than one address at the device level, it
+is the responsibility of the device driver to keep whatever information it
+needs to avoid disabling an address that GLD has enabled but not disabled.
+.sp
+.LP
+\fBgldm_set_multicast\fR(\|) will not be called to enable a particular
+multicast address that is already enabled, nor to disable an address that is
+not currently enabled. GLD keeps track of multiple requests for the same
+multicast address and only calls the driver's entry point when the first
+request to enable, or the last request to disable a particular multicast
+address is made.
+.sp
+.LP
+\fBgldm_set_promiscuous\fR(\|) enables and disables promiscuous mode. This
+function is called whenever GLD wants to enable or disable the reception of all
+packets on the medium, or all multicast packets on the medium. If the second
+argument \fIpromiscflag\fR is set to the value of \fBGLD_MAC_PROMISC_PHYS\fR,
+then the function enables physical-level promiscuous mode, resulting in the
+reception of all packets on the medium. If \fIpromiscflag\fR is set to
+\fBGLD_MAC_PROMISC_MULTI\fR, then reception of all multicast packets will be
+enabled. If \fIpromiscflag\fR is set to \fBGLD_MAC_PROMISC_NONE\fR, then
+promiscuous mode is disabled.
+.sp
+.LP
+In the case of a request for promiscuous multicast mode, drivers for devices
+that have no multicast-only promiscuous mode must set the device to physical
+promiscuous mode to ensure that all multicast packets are received. In this
+case the routine should return \fBGLD_SUCCESS\fR. The GLD software will filter
+out any superfluous packets that are not required.
+.sp
+.LP
+For forward compatibility, \fBgldm_set_promiscuous\fR(\|) routines should treat
+any unrecognized values for \fIpromiscflag\fR as though they were
+\fBGLD_MAC_PROMISC_PHYS\fR.
+.sp
+.LP
+\fBgldm_send()\fR queues a packet to the device for transmission. This routine
+is passed a STREAMS message containing the packet to be sent. The message may
+comprise multiple message blocks, and the send routine must chain through all
+the message blocks in the message to access the entire packet to be sent. The
+driver should be prepared to handle and skip over any zero-length message
+continuation blocks in the chain. The driver should check to ensure that the
+packet does not exceed the maximum allowable packet size, and must pad the
+packet, if necessary, to the minimum allowable packet size. If the send routine
+successfully transmits or queues the packet, it should return
+\fBGLD_SUCCESS\fR.
+.sp
+.LP
+The send routine should return \fBGLD_NORESOURCES\fR if it cannot immediately
+accept the packet for transmission; in this case GLD will retry it later. If
+\fBgldm_send\fR(\|) ever returns \fBGLD_NORESOURCES\fR, the driver must, at a
+later time when resources have become available, call \fBgld_sched\fR(\|) to
+inform GLD that it should retry packets that the driver previously failed to
+queue for transmission. (If the driver's \fBgldm_stop\fR(\|) routine is called,
+the driver is absolved from this obligation until it later again returns
+\fBGLD_NORESOURCES\fR from its \fBgldm_send\fR(\|) routine; however, extra
+calls to \fBgld_sched\fR(\|) will not cause incorrect operation.)
+.sp
+.LP
+If the driver's send routine returns \fBGLD_SUCCESS\fR, then the driver is
+responsible for freeing the message when the driver and the hardware no longer
+need it. If the send routine copied the message into the device, or into a
+private buffer, then the send routine may free the message after the copy is
+made. If the hardware uses DMA to read the data directly out of the message
+data blocks, then the driver must not free the message until the hardware has
+completed reading the data. In this case the driver will probably free the
+message in the interrupt routine, or in a buffer-reclaim operation at the
+beginning of a future send operation. If the send routine returns anything
+other than \fBGLD_SUCCESS\fR, then the driver must not free the message.
+.sp
+.LP
+\fBgldm_intr()\fR is called when the device might have interrupted. Since it is
+possible to share interrupts with other devices, the driver must check the
+device status to determine whether it actually caused an interrupt. If the
+device that the driver controls did not cause the interrupt, then this routine
+must return \fBDDI_INTR_UNCLAIMED\fR. Otherwise it must service the interrupt
+and should return \fBDDI_INTR_CLAIMED\fR. If the interrupt was caused by
+successful receipt of a packet, this routine should put the received packet
+into a STREAMS message of type \fBM_DATA\fR and pass that message to
+\fBgld_recv\fR(\|).
+.sp
+.LP
+\fBgld_recv()\fR will pass the inbound packet upstream to the appropriate next
+layer of the network protocol stack. It is important to correctly set the
+\fBb_rptr\fR and \fBb_wptr\fR members of the STREAMS message before calling
+\fBgld_recv\fR(\|).
+.sp
+.LP
+The driver should avoid holding mutex or other locks during the call to
+\fBgld_recv\fR(\|). In particular, locks that could be taken by a transmit
+thread may not be held during a call to \fBgld_recv\fR(\|): the interrupt
+thread that calls \fBgld_recv\fR(\|) may in some cases carry out processing
+that includes sending an outgoing packet, resulting in a call to the driver's
+\fBgldm_send\fR(\|) routine. If the \fBgldm_send\fR(\|) routine were to try to
+acquire a mutex being held by the \fBgldm_intr\fR(\|) routine at the time it
+calls \fBgld_recv\fR(\|), this could result in a panic due to recursive mutex
+entry.
+.sp
+.LP
+The interrupt code should increment statistics counters for any errors. This
+includes failure to allocate a buffer needed for the received data and any
+hardware-specific errors such as CRC errors or framing errors.
+.sp
+.LP
+\fBgldm_get_stats\fR(\|) gathers statistics from the hardware and/or driver
+private counters, and updates the \fBgld_stats\fR(9S) structure pointed to by
+\fIstats\fR. This routine is called by GLD when it gets a request for
+statistics, and provides the mechanism by which GLD acquires device dependent
+statistics from the driver before composing its reply to the statistics
+request. See \fBgld_stats\fR(9S) and \fBgld\fR(7D) for a description of the
+defined statistics counters.
+.sp
+.LP
+\fBgldm_ioctl\fR(\|) implements any device-specific ioctl commands. This
+element may be specified as \fINULL\fR if the driver does not implement any
+ioctl functions. The driver is responsible for converting the message block
+into an ioctl reply message and calling the \fBqreply\fR(9F) function before
+returning \fBGLD_SUCCESS\fR. This function should always return
+\fBGLD_SUCCESS\fR; any errors the driver may wish to report should be returned
+via the message passed to \fBqreply\fR(9F). If the \fBgldm_ioctl\fR element is
+specified as \fINULL\fR, GLD will return a message of type \fBM_IOCNAK\fR with
+an error of \fBEINVAL\fR.
+.SH RETURN VALUES
+.sp
+.LP
+\fBgldm_intr\fR(\|) must return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_INTR_CLAIMED\fR \fR
+.ad
+.RS 23n
+.rt  
+if and only if the device definitely interrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_INTR_UNCLAIMED\fR \fR
+.ad
+.RS 23n
+.rt  
+if the device did not interrupt.
+.RE
+
+.sp
+.LP
+The other functions must return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_SUCCESS\fR \fR
+.ad
+.RS 21n
+.rt  
+on success. \fBgldm_stop\fR(\|) and \fBgldm_ioctl\fR(\|) should always return
+this value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_NORESOURCES\fR \fR
+.ad
+.RS 21n
+.rt  
+if there are insufficient resources to carry out the request at this time. Only
+\fBgldm_set_mac_addr\fR(\|), \fBgldm_set_multicast\fR(\|),
+\fBgldm_set_promiscuous\fR(\|), and \fBgldm_send\fR(\|) may return this value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_NOLINK\fR \fR
+.ad
+.RS 21n
+.rt  
+if \fBgldm_send\fR(\|) is called when there is no physical connection to a
+network or link partner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_NOTSUPPORTED\fR \fR
+.ad
+.RS 21n
+.rt  
+if the requested function is not supported. Only \fBgldm_set_mac_addr\fR(\|),
+\fBgldm_set_multicast\fR(\|), and \fBgldm_set_promiscuous\fR(\|) may return
+this value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_BADARG\fR \fR
+.ad
+.RS 21n
+.rt  
+if the function detected an unsuitable argument, for example, a bad multicast
+address, a bad MAC address, or a bad packet or packet length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLD_FAILURE\fR \fR
+.ad
+.RS 21n
+.rt  
+on hardware failure.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgld\fR(7D), \fBgld\fR(9F), \fBgld_mac_info\fR(9S), \fBgld_stats\fR(9S),
+\fBdlpi\fR(7P), \fBattach\fR(9E), \fBddi_add_intr\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

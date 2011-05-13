@@ -1,0 +1,103 @@
+'\" te
+.\" Copyright (c) 2009 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH biomodified 9F "20 Nov 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+biomodified \- check if a buffer is modified
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBbiomodified\fR(\fBstruct buf *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the buffer header structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbiomodified()\fR function returns status to indicate if the buffer is
+modified. The  \fBbiomodified()\fR function is only supported for paged- \fBI/O
+\fRrequest, that is the \fBB_PAGEIO\fRflag must be set in the \fIb_flags\fR
+field of the \fBbuf\fR(9S) structure.  The  \fBbiomodified()\fR function will
+check the memory pages associated with this buffer whether the Virtual Memory
+system's modification bit is set.  If at least one of these pages is modified,
+the buffer is indicated as modified.  A filesystem will mark the pages
+\fBunmodified\fR when it writes the pages to the backing store.  The
+\fBbiomodified()\fR function can be used to detect any modifications to the
+memory pages while \fBI/O \fRis in progress.
+.sp
+.LP
+A device driver can use \fBbiomodified()\fR for disk mirroring.  An application
+is allowed to mmap a file which can  reside on a disk which is mirrored by
+multiple submirrors. If the file system writes the file to the backing store,
+it is written to all  submirrors in parallel. It must be ensured that the
+copies on all submirrors are identical. The \fBbiomodified()\fR function can be
+used in the device driver to detect any modifications to  the buffer by the
+user program during the time the buffer is written to multiple submirrors.
+.SH RETURN VALUES
+.sp
+.LP
+The  \fBbiomodified()\fR function returns the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+Buffer is modified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Buffer is not modified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-1\fR\fR
+.ad
+.RS 6n
+.rt  
+Buffer is not used for paged \fBI/O\fR request.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBbiomodified()\fR can be called from any context.
+.SH SEE ALSO
+.sp
+.LP
+\fBbp_mapin\fR(9F), \fBbuf\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

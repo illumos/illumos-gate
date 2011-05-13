@@ -1,0 +1,255 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH newtask 1 "17 Nov 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+newtask \- create new task and optionally change project
+.SH SYNOPSIS
+.LP
+.nf
+\fBnewtask\fR [\fB-p\fR \fIproject\fR] [\fB-v\fR] [\fB-c\fR \fIpid\fR | [\fB-Fl\fR] [\fIcommand...\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnewtask\fR command executes the user's default shell or a specified
+command, placing the executed command in a new task owned by the specified
+project. The user's default shell is the one specified in the \fBpasswd\fR
+database, and is determined using \fBgetpwnam()\fR.
+.sp
+.LP
+Alternatively, newtask can be used to cause an already running process to enter
+a newly created task. A project for the new task can also be specified in this
+form of the command. This might be desirable for processes that are mission
+critical and cannot be restarted in order to put them into a new project.
+.sp
+.LP
+In the case that extended accounting is active, the \fBnewtask\fR command can
+additionally cause the creation of a task accounting record marking the
+completion of the preceding system task.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIpid\fR\fR
+.ad
+.RS 10n
+.rt  
+Cause a running process to enter a newly created task. A project for the new
+task can also be specified using the \fB-p\fR option. The invoking user must
+either own the process or have super-user privileges.
+.sp
+If the project is being changed, the process owner must be a member of the
+specified project, or the invoking user must have super-user privileges. When
+the project is changed for a running process, its pool binding as well as
+resource controls are modified to match the configuration of the new project.
+Controls not explicitly specified in the project entry is preserved.
+.sp
+This option is incompatible with the \fB-F\fR and \fB-l\fR options.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 10n
+.rt  
+Creates a finalized task, within which further \fBnewtask\fR or
+\fBsettaskid\fR(2) invocations would fail. Finalized tasks can be useful at
+some sites for simplifying the attribution of resource consumption.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 10n
+.rt  
+Changes the environment to what would be expected if the user actually logged
+in again as a member of the new project.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 10n
+.rt  
+Changes the project \fBID\fR of the new task to that associated with the given
+project name. The invoking user must be a valid member of the requested
+project, or must have super-user privileges, for the command to succeed. If no
+project name is specified, the new task is started in the invoking user's
+current project.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 10n
+.rt  
+Verbose: displays the system task id as the new system task is begun.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIproject\fR\fR
+.ad
+.RS 11n
+.rt  
+The project to which resource usage by the created task should be charged. The
+requested project must be defined in the project databases defined in
+\fBnsswitch.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcommand\fR\fR
+.ad
+.RS 11n
+.rt  
+The command to be executed as the new task. If no command is given, the user's
+login shell is invoked. (If the login shell is not available, \fB/bin/sh\fR is
+invoked.)
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating a New Shell
+.sp
+.LP
+The following example creates a new shell in the \fBcanada\fR project,
+displaying the task id:
+
+.sp
+.in +2
+.nf
+example$ \fBid -p\fR
+uid=565(gh) gid=10(staff) projid=10(default)
+example$ \fBnewtask -v -p canada\fR
+38
+example$ \fBid -p\fR
+uid=565(gh) gid=10(staff) projid=82(canada)
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRRunning the \fBdate\fR Command
+.sp
+.LP
+The following example runs the date command in the \fBrussia\fR project:
+
+.sp
+.in +2
+.nf
+example$ \fBnewtask -p russia date\fR
+Tue Aug 31 11:12:10 PDT 1999
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRChanging the Project of an Existing Process
+.sp
+.LP
+The following example changes the project of the existing process with a pid of
+\fB9999\fR to \fBrussia\fR:
+
+.sp
+.in +2
+.nf
+example$ \fBnewtask -c 9999 -p russia\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+A fatal error occurred during execution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid command line options were specified.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/project\fR\fR
+.ad
+.RS 16n
+.rt  
+Local database containing valid project definitions for this machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/pid/*\fR\fR
+.ad
+.RS 16n
+.rt  
+Process information and control files.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBproc\fR(1), \fBid\fR(1M), \fBpoolbind\fR(1M), \fBexecvp\fR(2),
+\fBsetrctl\fR(2), \fBsettaskid\fR(2), \fBsetproject\fR(3PROJECT),
+\fBnsswitch.conf\fR(4), \fBproc\fR(4), \fBproject\fR(4), \fBattributes\fR(5)

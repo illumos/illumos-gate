@@ -1,0 +1,342 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH addbib 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+addbib \- create or extend a bibliographic database
+.SH SYNOPSIS
+.LP
+.nf
+\fBaddbib\fR [\fB-a\fR] [\fB-p\fR \fIpromptfile\fR] \fIdatabase\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+When \fBaddbib\fR starts up, answering \fBy\fR to the initial
+\fBInstructions?\fR prompt yields directions. Typing \fBn\fR (or RETURN) skips
+the directions. \fBaddbib\fR then prompts for various bibliographic fields,
+reads responses from the terminal, and sends output records to \fIdatabase.\fR
+A null response (just RETURN) means to leave out that field. A `\fB\(mi\fR\&'
+(minus sign) means to go back to the previous field. A trailing backslash
+allows a field to be continued on the next line. The repeating \fBContinue?\fR
+prompt allows the user either to resume by typing \fBy\fR (or RETURN), to quit
+the current session by typing \fBn\fR or \fBq\fR, or to edit \fIdatabase\fR
+with any system editor  (see \fBvi\fR(1), \fBex\fR(1), \fBed\fR(1)).
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 17n
+.rt  
+Suppresses prompting for an abstract. Asking for an abstract is the default.
+Abstracts are ended with a Control\(miD.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpromptfile\fR\fR
+.ad
+.RS 17n
+.rt  
+Uses a new prompting skeleton, defined in \fIpromptfile\fR. This file should
+contain prompt strings, a TAB, and the key-letters to be written to the
+\fIdatabase\fR.
+.RE
+
+.SH USAGE
+.SS "Bibliography Key Letters"
+.sp
+.LP
+The most common key-letters and their meanings are given below. \fBaddbib\fR
+insulates you from these key-letters, since it gives you prompts in English,
+but if you edit the bibliography file later on, you will need to know this
+information.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%A\fR\fR
+.ad
+.RS 8n
+.rt  
+Author's name
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%B\fR\fR
+.ad
+.RS 8n
+.rt  
+Book containing article referenced
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%C\fR\fR
+.ad
+.RS 8n
+.rt  
+City (place of publication)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%D\fR\fR
+.ad
+.RS 8n
+.rt  
+Date of publication
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%E\fR\fR
+.ad
+.RS 8n
+.rt  
+Editor of book containing article referenced
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%F\fR\fR
+.ad
+.RS 8n
+.rt  
+Footnote number or label (supplied by   \fBrefer\fR)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%G\fR\fR
+.ad
+.RS 8n
+.rt  
+Government order number
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%H\fR\fR
+.ad
+.RS 8n
+.rt  
+Header commentary, printed before reference
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%I\fR\fR
+.ad
+.RS 8n
+.rt  
+Issuer (publisher)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%J\fR\fR
+.ad
+.RS 8n
+.rt  
+Journal containing article
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%K\fR\fR
+.ad
+.RS 8n
+.rt  
+Keywords to use in locating reference
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%L\fR\fR
+.ad
+.RS 8n
+.rt  
+Label field used by \fB-k\fR option of  \fBrefer\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%M\fR\fR
+.ad
+.RS 8n
+.rt  
+Bell Labs Memorandum (undefined)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%N\fR\fR
+.ad
+.RS 8n
+.rt  
+Number within volume
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%O\fR\fR
+.ad
+.RS 8n
+.rt  
+Other commentary, printed at end of reference
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%P\fR\fR
+.ad
+.RS 8n
+.rt  
+Page number(s)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Q\fR\fR
+.ad
+.RS 8n
+.rt  
+Corporate or Foreign Author (unreversed)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%R\fR\fR
+.ad
+.RS 8n
+.rt  
+Report, paper, or thesis (unpublished)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%S\fR\fR
+.ad
+.RS 8n
+.rt  
+Series title
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%T\fR\fR
+.ad
+.RS 8n
+.rt  
+Title of article or book
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%V\fR\fR
+.ad
+.RS 8n
+.rt  
+Volume number
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%X\fR\fR
+.ad
+.RS 8n
+.rt  
+Abstract \(em used by \fBroffbib\fR, not by \fBrefer\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%Y,Z\fR\fR
+.ad
+.RS 8n
+.rt  
+Ignored by \fBrefer\fR
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fREditing the bibliography file
+.sp
+.LP
+Except for \fBA\fR, each field should be given just once. Only relevant fields
+should be supplied.
+
+.sp
+.in +2
+.nf
+\fB%A	Mark Twain
+%T	Life on the Mississippi
+%I	Penguin Books
+%C	New York
+%D	1978\fR
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBex\fR(1), \fBindxbib\fR(1), \fBlookbib\fR(1), \fBrefer\fR(1),
+\fBroffbib\fR(1), \fBsortbib\fR(1), \fBvi\fR(1), \fBattributes\fR(5)

@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rusage 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+rusage \- print resource usage for a command
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/rusage\fR \fIcommand\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrusage\fR command is similar to \fBtime\fR(1). It runs the given
+\fIcommand\fR, which must be specified; that is, \fIcommand\fR is not optional
+as it is in the C shell's timing facility. When the command is complete,
+\fBrusage\fR displays the real (wall clock), the system \fBCPU,\fR and the user
+\fBCPU\fR times which elapsed during execution of the command, plus other
+fields in the \fBrusage\fR structure, all on one long line. Times are reported
+in seconds and hundredths of a second.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe format of rusage output
+.sp
+.LP
+The example below shows the format of \fBrusage\fR output.
+
+.sp
+.in +2
+.nf
+example% \fBrusage wc /usr/share/man/man1/csh (1)
+3045   13423   78071 /usr/share/man/man1/csh (1)
+2.26 real 0.80 user 0.36 sys 11 pf 38 pr 0 sw 11 rb 0 wb 16 vcx 37
+         icx 24 mx 0 ix 1230 id 9 is\fR
+example%
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each of the fields identified corresponds to an element of the \fBrusage\fR
+structure, as described in \fBgetrusage\fR(3C), as follows:
+
+.sp
+
+.sp
+.TS
+tab();
+lw(.69i) lw(1.38i) lw(3.44i) 
+lw(.69i) lw(1.38i) lw(3.44i) 
+.
+\fBreal\fR\fBelapsed real time\fR
+\fBuser\fR\fBru_utime\fR\fBuser time used\fR
+\fBsys\fR\fBru_stime\fR\fBsystem time used\fR
+\fBpf\fR\fBru_majflt\fR\fBpage faults requiring physical I/O\fR
+\fBpr\fR\fBru_minflt\fR\fBpage faults not requiring physical I/O\fR
+\fBsw\fR\fBru_nswap\fR\fBswaps\fR
+\fBrb\fR\fBru_inblock\fR\fBblock input operations\fR
+\fBwb\fR\fBru_oublock\fR\fBblock output operations\fR
+\fBvcx\fR\fBru_nvcsw\fR\fBvoluntary context switches\fR
+\fBicx\fR\fBru_nivcsw\fR\fBinvoluntary context switches\fR
+\fBmx\fR\fBru_maxrss\fR\fBmaximum resident set size\fR
+\fBix\fR\fBru_ixrss\fR\fBcurrently 0\fR
+\fBid\fR\fBru_idrss\fR\fBintegral resident set size\fR
+\fBis\fR\fBru_isrss\fR\fBcurrently 0\fR
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBtime\fR(1), \fBgetrusage\fR(3C), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+When the command being timed is interrupted, the timing values displayed may be
+inaccurate.

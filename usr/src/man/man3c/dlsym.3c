@@ -1,0 +1,219 @@
+'\" te
+.\" Copyright 1989 AT&T. Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlsym 3C "26 Sep 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+dlsym \- get the address of a symbol in a shared object or executable
+.SH SYNOPSIS
+.LP
+.nf
+#include <dlfcn.h>
+
+\fBvoid *\fR\fBdlsym\fR(\fBvoid *restrict\fR \fIhandle\fR, \fBconst char *restrict\fR \fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlsym()\fR function allows a process to obtain the address of a symbol
+that is defined within a shared object or executable. The \fIhandle\fR argument
+is either the value returned from a call to \fBdlopen()\fR or one of a family
+of special handles. The \fIname\fR argument is the symbol's name as a character
+string.
+.sp
+.LP
+If \fIhandle\fR is returned from \fBdlopen()\fR, the associated shared object
+must not have been closed using \fBdlclose()\fR. A \fIhandle\fR can be obtained
+from \fBdlopen()\fR using the \fBRTLD_FIRST\fR mode. With this mode, the
+\fBdlsym()\fR function searches for the named symbol in the initial object
+referenced by \fIhandle\fR. Without this mode, the \fBdlsym()\fR function
+searches for the named symbol in the group of shared objects loaded
+automatically as a result of loading the object referenced by \fIhandle\fR. See
+\fBdlopen\fR(3C) and NOTES.
+.sp
+.LP
+The following special handles are supported.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_DEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+Instructs \fBdlsym()\fR to search for the named symbol starting with the first
+object loaded, typically the dynamic executable. The search continues through
+the list of initial dependencies that are loaded with the process, followed by
+any objects obtained with \fBdlopen\fR(3C). This search follows the default
+model that is used to relocate all objects within the process.
+.sp
+This model also provides for transitioning into a lazy loading environment. If
+a symbol can not be found in the presently loaded objects, any pending lazy
+loaded objects are processed in an attempt to locate the symbol. This loading
+compensates for objects that have not fully defined their dependencies.
+However, this compensation can undermine the advantages of lazy loading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_PROBE\fR\fR
+.ad
+.RS 16n
+.rt  
+Instructs \fBdlsym()\fR to search for the named symbol in the same manner as
+occurs with a \fIhandle\fR of \fBRTLD_DEFAULT\fR. However, this model only
+searches for symbols in the presently loaded objects, together with any lazy
+loadable objects specifically identified by the caller to provide the named
+symbol. This handle does not trigger an exhaustive load of any lazy loadable
+symbols in an attempt to find the named symbol. This handle can provide a more
+optimal search than would occur using \fBRTLD_DEFAULT\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_NEXT\fR\fR
+.ad
+.RS 16n
+.rt  
+Instructs \fBdlsym()\fR to search for the named symbol in the objects that were
+loaded following the object from which the \fBdlsym()\fR call is being made.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBRTLD_SELF\fR\fR
+.ad
+.RS 16n
+.rt  
+Instructs \fBdlsym()\fR to search for the named symbol in the objects that were
+loaded starting with the object from which the \fBdlsym()\fR call is being
+made.
+.RE
+
+.sp
+.LP
+When used with a special handle, \fBdlsym()\fR is selective in searching
+objects that have been loaded using \fBdlopen()\fR. These objects are searched
+for symbols if one of the following conditions are true.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The object is part of the same local \fBdlopen()\fR dependency hierarchy as the
+calling object. See the \fILinker and Libraries Guide\fR for a description of
+\fBdlopen()\fR dependency hierarchies.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The object has global search access. See \fBdlopen\fR(3C) for a discussion of
+the \fBRTLD_GLOBAL\fR mode.
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+The \fBdlsym()\fR function returns \fINULL\fR if \fIhandle\fR does not refer to
+a valid object opened by \fBdlopen()\fR or is not one of the special handles.
+The function also returns \fINULL\fR if the named symbol cannot be found within
+any of the objects associated with \fIhandle\fR. Additional diagnostic
+information is available through \fBdlerror\fR(3C).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBdlopen()\fR and \fBdlsym()\fR to access a function or
+data objects.
+.sp
+.LP
+The following code fragment demonstrates how to use \fBdlopen()\fR and
+\fBdlsym()\fR to access either function or data objects. For simplicity, error
+checking has been omitted.
+
+.sp
+.in +2
+.nf
+void      *handle;
+int       *iptr, (*fptr)(int);
+
+/* open the needed object */
+handle = dlopen("/usr/home/me/libfoo.so.1", RTLD_LAZY);
+
+/* find the address of function and data objects */
+fptr = (int (*)(int))dlsym(handle, "my_function");
+iptr = (int *)dlsym(handle, "my_object");
+
+/* invoke function, passing value of integer as a parameter */
+(*fptr)(*iptr);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUse \fBdlsym()\fR to verify that a particular function is
+defined.
+.sp
+.LP
+The following code fragment shows how to use \fBdlsym()\fR to verify that a
+function is defined. If the function exists, the function is called.
+
+.sp
+.in +2
+.nf
+int (*fptr)();
+
+if ((fptr = (int (*)())dlsym(RTLD_DEFAULT,
+    "my_function")) != NULL) {
+        (*fptr)();
+}
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+The \fBdlsym()\fR function is one of a family of functions that give the user
+direct access to the dynamic linking facilities. These facilities are available
+to dynamically-linked processes only. See the \fILinker and Libraries Guide\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBld\fR(1), \fBld.so.1\fR(1), \fBdladdr\fR(3C), \fBdlclose\fR(3C),
+\fBdldump\fR(3C), \fBdlerror\fR(3C), \fBdlinfo\fR(3C), \fBdlopen\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.SH NOTES
+.sp
+.LP
+If an object is acting as a filter, care should be taken when interpreting the
+address of any symbol obtained using a handle to this object. For example,
+using dlsym(3C) to obtain the symbol \fI_end\fR for this object, results in
+returning the address of the symbol \fI_end\fR within the filtee, not the
+filter. For more information on filters see the \fILinker and Libraries
+Guide\fR.

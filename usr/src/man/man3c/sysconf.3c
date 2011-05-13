@@ -1,0 +1,504 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sysconf 3C "26 Mar 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sysconf \- get configurable system variables
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBlong\fR \fBsysconf\fR(\fBint\fR \fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsysconf()\fR function provides a method for an application to determine
+the current value of a configurable system limit or option (variable).
+.sp
+.LP
+The \fIname\fR argument represents the system variable to be queried. The
+following table lists the minimal set of system variables from \fB<limits.h>\fR
+and \fB<unistd.h>\fR that can be returned by \fBsysconf()\fR and the symbolic
+constants defined in \fB<unistd.h>\fR that are the corresponding values used
+for \fIname\fR on the  SPARC and x86 platforms.
+.sp
+.in +2
+.nf
+    Name                   Return Value               Meaning
+_______________________________________________________________________
+_SC_2_C_BIND            _POSIX2_C_BIND             Supports the C lang-
+                                                   uage binding option
+_SC_2_C_DEV             _POSIX2_C_DEV              Supports the C lang-
+                                                   uage development
+                                                   utilities option
+_SC_2_C_VERSION         _POSIX2_C_VERSION          Integer value
+                                                   indicates version
+                                                   of ISO POSIX-2
+                                                   standard (Commands)
+_SC_2_CHAR_TERM         _POSIX2_CHAR_TERM          Supports at least
+                                                   one terminal
+_SC_2_FORT_DEV          _POSIX2_FORT_DEV           Supports FORTRAN
+                                                   Development
+                                                   Utilities Option
+_SC_2_FORT_RUN          _POSIX2_FORT_RUN           Supports FORTRAN
+                                                   Run-time Utilities
+                                                   Option
+_SC_2_LOCALEDEF         _POSIX2_LOCALEDEF          Supports creation
+                                                   of locales by the
+                                                   localedef utility
+_SC_2_SW_DEV            _POSIX2_SW_DEV             Supports Software
+                                                   Development Utility
+                                                   Option
+_SC_2_UPE               _POSIX2_UPE                Supports User
+                                                   Portability
+                                                   Utilities Option
+_SC_2_VERSION           _POSIX2_VERSION            Integer value
+                                                   indicates version
+                                                   of ISO POSIX-2
+                                                   standard (C language
+                                                   binding)
+_SC_AIO_LISTIO_MAX      AIO_LISTIO_MAX             Max number of I/O
+                                                   operations in a
+                                                   single list I/O call
+                                                   supported
+_SC_AIO_MAX             AIO_MAX                    Max number of
+                                                   outstanding
+                                                   asynchronous I/O
+                                                   operations supported
+_SC_AIO_PRIO_DELTA_MAX  AIO_PRIO_DELTA_MAX         Max amount by which
+                                                   process can decrease
+                                                   its asynchronous
+                                                   I/O priority level
+                                                   from its own
+                                                   scheduling priority
+_SC_ARG_MAX             ARG_MAX                    Max size of argv[]
+                                                   plus envp[]
+_SC_ASYNCHRONOUS_IO     _POSIX_ASYNCHRONOUS_IO     Supports
+                                                   Asynchronous I/O
+_SC_ATEXIT_MAX          ATEXIT_MAX                 Max number of
+                                                   functions that can
+                                                   be registered with
+                                                   atexit()
+_SC_AVPHYS_PAGES                                   Number of physical
+                                                   memory pages not
+                                                   currently in use by
+                                                   system
+_SC_BARRIERS            _POSIX_BARRIERS            Supports Barriers
+                                                   option
+_SC_BC_BASE_MAX         BC_BASE_MAX                Maximum obase values
+                                                   allowed by bc
+_SC_BC_DIM_MAX          BC_DIM_MAX                 Max number of
+                                                   elements permitted
+                                                   in array by bc
+_SC_BC_SCALE_MAX        BC_SCALE_MAX               Max scale value
+                                                   allowed by bc
+_SC_BC_STRING_MAX       BC_STRING_MAX              Max length of string
+                                                   constant allowed by
+                                                   bc
+_SC_CHILD_MAX           CHILD_MAX                  Max processes
+                                                   allowed to a UID
+_SC_CLK_TCK             CLK_TCK                    Ticks per second
+                                                   (clock_t)
+_SC_CLOCK_SELECTION     _POSIX_CLOCK_SELECTION     Supports Clock 
+                                                   Selection option
+_SC_COLL_WEIGHTS_MAX    COLL_WEIGHTS_MAX           Max number of
+                                                   weights that can be
+                                                   assigned to entry of
+                                                   the LC_COLLATE order
+                                                   keyword in locale
+                                                   definition file
+_SC_CPUID_MAX                                      Max possible 
+                                                   processor ID
+_SC_DELAYTIMER_MAX      DELAYTIMER_MAX             Max number of timer
+                                                   expiration overruns
+_SC_EXPR_NEST_MAX       EXPR_NEST_MAX              Max number of
+                                                   parentheses by expr
+_SC_FSYNC               _POSIX_FSYNC               Supports File
+                                                   Synchronization
+_SC_GETGR_R_SIZE_MAX                               Max size of group
+                                                   entry buffer
+_SC_GETPW_R_SIZE_MAX                               Max size of password
+                                                   entry buffer
+_SC_HOST_NAME_MAX       _POSIX_HOST_NAME_MAX       Maximum length of a
+                                                   host name (excluding
+                                                   terminating null)
+_SC_IOV_MAX             IOV_MAX                    Max number of iovec
+                                                   structures available
+                                                   to one process for
+                                                   use with readv()
+                                                   and writev()
+_SC_JOB_CONTROL         _POSIX_JOB_CONTROL         Job control
+                                                   supported?
+_SC_LINE_MAX            LINE_MAX                   Max length of input
+                                                   line
+_SC_LOGIN_NAME_MAX      LOGNAME_MAX + 1            Max length of login
+                                                   name
+_SC_LOGNAME_MAX         LOGNAME_MAX
+_SC_MAPPED_FILES        _POSIX_MAPPED_FILES        Supports Memory
+                                                   Mapped Files
+_SC_MAXPID                                         Max pid value
+_SC_MEMLOCK             _POSIX_MEMLOCK             Supports Process
+                                                   Memory Locking
+_SC_MEMLOCK_RANGE       _POSIX_MEMLOCK_RANGE       Supports Range
+                                                   Memory Locking
+_SC_MEMORY_PROTECTION   _POSIX_MEMORY_PROTECTION   Supports Memory
+                                                   Protection
+_SC_MESSAGE_PASSING     _POSIX_MESSAGE_PASSING     Supports Message
+                                                   Passing
+_SC_MONOTONIC_CLOCK     _POSIX_MONOTONIC_CLOCK     Supports Monotonic
+                                                   Clock option
+_SC_MQ_OPEN_MAX         MQ_OPEN_MAX                Max number of open
+                                                   message queues a
+                                                   process can hold
+_SC_MQ_PRIO_MAX         MQ_PRIO_MAX                Max number of
+                                                   message priorities
+                                                   supported
+_SC_NGROUPS_MAX         NGROUPS_MAX                Max simultaneous
+                                                   groups to which
+                                                   one can belong
+_SC_NPROCESSORS_CONF                               Number of processors
+                                                   configured
+_SC_NPROCESSORS_MAX                                Max number of
+                                                   processors supported
+                                                   by platform
+_SC_NPROCESSORS_ONLN                               Number of processors
+                                                   online
+_SC_OPEN_MAX            OPEN_MAX                   Max open files per
+                                                   process
+_SC_PAGESIZE            PAGESIZE                   System memory page
+                                                   size
+_SC_PAGE_SIZE           PAGESIZE                   Same as _SC_PAGESIZE
+_SC_PASS_MAX            PASS_MAX                   Max number of
+                                                   significant bytes
+                                                   in a password
+_SC_PHYS_PAGES                                     Total number of
+                                                   pages of physical
+                                                   memory in system
+_SC_PRIORITIZED_IO      _POSIX_PRIORITIZED_IO      Supports Prioritized
+                                                   I/O
+_SC_PRIORITY_SCHEDULING _POSIX_PRIORITY_SCHEDULING Supports Process
+                                                   Scheduling
+_SC_RAW_SOCKETS         _POSIX_RAW_SOCKETS         Supports Raw Sockets
+                                                   option
+_SC_RE_DUP_MAX          RE_DUP_MAX                 Max number of
+                                                   repeated occurrences
+                                                   of a regular
+                                                   expression permitted
+                                                   when using interval
+                                                   notation \e{m,n\e}
+_SC_READER_WRITER_LOCKS _POSIX_READER_WRITER_LOCKS Supports IPV6 option
+_SC_REALTIME_SIGNALS    _POSIX_REALTIME_SIGNALS    Supports Realtime
+                                                   Signals
+_SC_REGEXP              _POSIX_REGEXP              Supports Regular
+                                                   Expression Handling
+                                                   option
+_SC_RTSIG_MAX           RTSIG_MAX                  Max number of
+                                                   realtime signals
+                                                   reserved for
+                                                   application use
+_SC_SAVED_IDS           _POSIX_SAVED_IDS           Saved IDs
+                                                   (seteuid())
+                                                   supported?
+_SC_SEM_NSEMS_MAX       SEM_NSEMS_MAX              Max number of POSIX
+                                                   semaphores a process
+                                                   can have
+_SC_SEM_VALUE_MAX       SEM_VALUE_MAX              Max value a POSIX
+                                                   semaphore can have
+_SC_SEMAPHORES          _POSIX_SEMAPHORES          Supports Semaphores
+_SC_SHARED_MEMORY_      _POSIX_SHARED_MEMORY_      Supports Shared
+   OBJECTS                 OBJECTS                 Memory Objects
+_SC_SHELL               _POSIX_SHELL               Supports POSIX shell
+_SC_SIGQUEUE_MAX        SIGQUEUE_MAX               Max number of queued
+                                                   signals that a
+                                                   process can send and
+                                                   have pending at
+                                                   receiver(s) at a
+                                                   time
+_SC_SPAWN               _POSIX_SPAWN               Supports Spawn option
+_SC_SPIN_LOCKS          _POSIX_SPIN_LOCKS          Supports Spin Locks
+                                                   option
+_SC_STACK_PROT                                     Default stack
+                                                   protection
+_SC_STREAM_MAX          STREAM_MAX                 Number of streams
+                                                   one process can
+                                                   have open at a time
+_SC_SYMLOOP_MAX         _POSIX_SYMLOOP_MAX         Max number of symbolic
+                                                   links that can be
+                                                   reliably traversed in
+                                                   the resolution of a
+                                                   pathname in the absence
+                                                   of a loop
+_SC_SYNCHRONIZED_IO     _POSIX_SYNCHRONIZED_IO     Supports
+                                                   Synchronized I/O
+_SC_THREAD_ATTR_        _POSIX_THREAD_ATTR_        Supports Thread
+   STACKADDR               STACKADDR               Stack Address
+                                                   Attribute option
+_SC_THREAD_ATTR_        _POSIX_THREAD_ATTR_        Supports Thread
+   STACKSIZE               STACKSIZE               Stack Size
+                                                   Attribute option
+_SC_THREAD_DESTRUCTOR_  PTHREAD_DESTRUCTOR_        Number attempts made
+   ITERATIONS              ITERATIONS              to destroy thread-
+                                                   specific data on
+                                                   thread exit
+_SC_THREAD_KEYS_MAX     PTHREAD_KEYS_MAX           Max number of data
+                                                   keys per process
+_SC_THREAD_PRIO_        _POSIX_THREAD_PRIO_        Supports Priority
+   INHERIT                 INHERIT                 Inheritance option
+_SC_THREAD_PRIO_        _POSIX_THREAD_PRIO_        Supports Priority
+   PROTECT                 PROTECT                 Protection option
+_SC_THREAD_PRIORITY_    _POSIX_THREAD_PRIORITY_    Supports Thread
+   SCHEDULING              SCHEDULING              Execution
+                                                   Scheduling option
+_SC_THREAD_PROCESS_     _POSIX_THREAD_PROCESS_     Supports
+   SHARED                  SHARED                  Process-Shared
+                                                   Synchronization
+                                                   option
+_SC_THREAD_SAFE_        _POSIX_THREAD_SAFE_        Supports Thread-Safe
+   FUNCTIONS               FUNCTIONS               Functions option
+_SC_THREAD_STACK_MIN    PTHREAD_STACK_MIN          Min byte size of
+                                                   thread stack storage
+_SC_THREAD_THREADS_MAX  PTHREAD_THREADS_MAX        Max number of
+                                                   threads per process
+_SC_THREADS             _POSIX_THREADS             Supports Threads
+                                                   option
+_SC_TIMEOUTS            _POSIX_TIMEOUTS            Supports Timeouts
+                                                   option
+_SC_TIMER_MAX           TIMER_MAX                  Max number of timer
+                                                   per process
+                                                   supported
+_SC_TIMERS              _POSIX_TIMERS              Supports Timers
+_SC_TTY_NAME_MAX        TTYNAME_MAX                Max length of tty
+                                                   device name
+_SC_TZNAME_MAX          TZNAME_MAX                 Max number of bytes
+                                                   supported for name
+                                                   of a time zone
+_SC_V6_ILP32_OFF32      _POSIX_V6_ILP32_OFF32      Supports  X/Open
+                                                   ILP32 w/32-bit
+                                                   offset build 
+                                                   environment
+_SC_V6_ILP32_OFFBIG     _POSIX_V6_ILP32_OFFBIG     Supports  X/Open
+                                                   ILP32 w/64-bit
+                                                   offset build 
+                                                   environment
+_SC_V6_LP64_OFF64       _POSIX_V6_LP64_OFF64       Supports  X/Open
+                                                   LP64 w/64-bit
+                                                   offset build 
+                                                   environment
+_SC_V6_LPBIG_OFFBIG     _POSIX_V6_LPBIG_OFFBIG     Same as 
+                                                   _SC_V6_LP64_OFF64
+_SC_VERSION             _POSIX_VERSION             POSIX.1 version
+                                                   supported
+_SC_XBS5_ILP32_OFF32    _XBS_ILP32_OFF32           Indicates support
+                                                   for X/Open ILP32
+                                                   w/32-bit offset
+                                                   build environment
+_SC_XBS5_ILP32_OFFBIG   _XBS5_ILP32_OFFBIG         Indicates support
+                                                   for X/Open ILP32
+                                                   w/64-bit offset
+                                                   build environment
+_SC_XBS5_LP64_OFF64     _XBS5_LP64_OFF64           Indicates support of
+                                                   X/Open LP64,
+                                                   64-bit offset
+                                                   build environment
+_SC_XBS5_LPBIG_OFFBIG   _XBS5_LP64_OFF64           Same as
+                                                   _SC_XBS5_LP64_OFF64
+_SC_XOPEN_CRYPT         _XOPEN_CRYPT               Supports X/Open
+                                                   Encryption Feature
+                                                   Group
+_SC_XOPEN_ENH_I18N      _XOPEN_ENH_I18N            Supports X/Open
+                                                   Enhanced
+                                                   Internationalization
+                                                   Feature Group
+_SC_XOPEN_LEGACY        _XOPEN_LEGACY              Supports X/Open
+                                                   Legacy Feature Group
+_SC_XOPEN_REALTIME      _XOPEN_REALTIME            Supports X/Open
+                                                   POSIX Realtime
+                                                   Feature Group
+_SC_XOPEN_REALTIME_     _XOPEN_REALTIME_THREADS    Supports X/Open
+     THREADS                                       POSIX Reatime
+                                                   Threads Feature
+                                                   Group
+_SC_XOPEN_SHM           _XOPEN_SHM                 Supports X/Open
+                                                   Shared Memory
+                                                   Feature Group
+_SC_XOPEN_STREAMS       _POSIX_XOPEN_STREAMS       Supports XSI Streams
+                                                   option group
+_SC_XOPEN_UNIX          _XOPEN_UNIX                Supports X/Open CAE
+                                                   Specification,
+                                                   August 1994, System
+                                                   Interfaces and
+                                                   Headers, Issue 4,
+                                                   Version 2
+_SC_XOPEN_VERSION       _XOPEN_VERSION             Integer value
+                                                   indicates version of
+                                                   X/Open Portability
+                                                   Guide to which
+                                                   implementation
+                                                   conforms
+_SC_XOPEN_XCU_VERSION   _XOPEN_XCU_VERSION         Integer value
+                                                   indicates version of
+                                                   XCU specification to
+                                                   which implementation
+                                                   conforms
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following options are not supported and return \(mi1:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fB_SC_2_PBS\fR\fB_POSIX2_PBS\fR
+\fB_SC_2_PBS_ACCOUNTING\fR\fB_POSIX2_PBS_ACCOUNTING\fR
+\fB_SC_2_PBS_CHECKPOINT\fR\fB_POSIX2_PBS_CHECKPOINT\fR
+\fB_SC_2_PBS_LOCATE\fR\fB_POSIX2_PBS_LOCATE\fR
+\fB_SC_2_PBS_MESSAGE\fR\fB_POSIX2_PBS_MESSAGE\fR
+\fB_SC_2_PBS_TRACK\fR\fB_POSIX2_PBS_TRACK\fR
+\fB_SC_ADVISORY_INFO\fR\fB_POSIX_ADVISORY_INFO\fR
+\fB_SC_CPUTIME\fR\fB_POSIX_CPUTIME\fR
+\fB_SC_SPORADIC_SERVER\fR\fB_POSIX_SPORADIC_SERVER\fR
+\fB_SC_SS_REPL_MAX\fR\fB_POSIX_SS_REPL_MAX\fR
+\fB_SC_THREAD_CPUTIME\fR\fB_POSIX_THREAD_CPUTIME\fR
+\fB_SC_THREAD_SPORADIC_SERVER\fR\fB_POSIX_THREAD_SPORADIC_SERVER\fR
+\fB_SC_TRACE\fR\fB_POSIX_TRACE\fR
+\fB_SC_TRACE_EVENT_FILTER\fR\fB_POSIX_TRACE_EVENT_FILTER\fR
+\fB_SC_TRACE_EVENT_NAME_MAX\fR\fB_POSIX_TRACE_EVENT_NAME_MAX\fR
+\fB_SC_TRACE_INHERIT\fR\fB_POSIX_TRACE_INHERIT\fR
+\fB_SC_TRACE_LOG\fR\fB_POSIX_TRACE_LOG\fR
+\fB_SC_TRACE_NAME_MAX\fR\fB_POSIX_TRACE_NAME_MAX\fR
+\fB_SC_TRACE_SYS_MAX\fR\fB_POSIX_TRACE_SYS_MAX\fR
+\fB_SC_TRACE_USER_EVENT_MAX\fR\fB_POSIX_TRACE_USER_EVENT_MAX\fR
+\fB_SC_TYPED_MEMORY_OBJECTS\fR\fB_POSIX_TYPED_MEMORY_OBJECTS\fR
+.TE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsysconf()\fR returns the current variable value
+on the system. The value returned will not be more restrictive than the
+corresponding value described to the application when it was compiled with the
+implementation's <\fBlimits.h\fR>, <\fBunistd.h\fR> or <\fBtime.h\fR>. With
+only a few obvious exceptions such as \fB_SC_AVPHYS_PAGES\fR and
+\fB_SC_NPROCESSORS_ONLN\fR, the value will not change during the lifetime of
+the calling process.
+.sp
+.LP
+If \fIname\fR is an invalid value, \fBsysconf()\fR returns \fB\(mi1\fR and sets
+\fBerrno\fR to indicate the error. If the variable corresponding to \fIname\fR
+is associated with functionality that is not supported by the system,
+\fBsysconf()\fR returns \fB\(mi1\fR without changing the value of \fIerrno\fR.
+.sp
+.LP
+Calling \fBsysconf()\fR with the following returns \fB\(mi1\fR without setting
+\fBerrno\fR, because no maximum limit can be determined. The system supports at
+least the minimum values and can support higher values depending upon system
+resources.
+.sp
+.in +2
+.nf
+Variable                            Minimum supported value
+_SC_AIO_MAX                        _POSIX_AIO_MAX
+_SC_ATEXIT_MAX                     32
+_SC_MQ_OPEN_MAX                    32
+_SC_THREAD_THREADS_MAX             _POSIX_THREAD_THREADS_MAX
+_SC_THREAD_KEYS_MAX                _POSIX_THREAD_KEYS_MAX
+_SC_THREAD_DESTRUCTOR_ITERATIONS   _POSIX_THREAD_DESTRUCTOR_ITERATIONS
+.fi
+.in -2
+
+.sp
+.LP
+The following SPARC and x86 platform variables return \fBEINVAL\fR:
+.sp
+.in +2
+.nf
+_SC_COHER_BLKSZ        _SC_DCACHE_ASSOC
+_SC_DCACHE_BLKSZ       _SC_DCACHE_LINESZ
+_SC_DCACHE_SZ          _SC_DCACHE_TBLKSZ
+_SC_ICACHE_ASSOC       _SC_ICACHE_BLKSZ
+_SC_ICACHE_LINESZ      _SC_ICACHE_SZ
+_SC_SPLIT_CACHE
+.fi
+.in -2
+
+.SH ERRORS
+.sp
+.LP
+The \fBsysconf()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIname\fR argument is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitectureSPARC and x86
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe, Async-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBzoneadm\fR(1M), \fBfpathconf\fR(2), \fBseteuid\fR(2),
+\fBsetrlimit\fR(2), \fBconfstr\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+A call to \fBsetrlimit()\fR can cause the value of \fBOPEN_MAX\fR to change.
+.sp
+.LP
+Multiplying  \fBsysconf\fR(\fB_SC_PHYS_PAGES\fR) or
+\fBsysconf\fR(\fB_SC_AVPHYS_PAGES\fR) by \fBsysconf\fR(\fB_SC_PAGESIZE\fR) to
+determine memory amount in bytes can exceed the maximum values representable in
+a 32-bit signed or unsigned integer.
+.sp
+.LP
+The value of \fBCLK_TCK\fR can be variable and it should not be assumed that
+\fBCLK_TCK\fR is a compile-time constant.
+.sp
+.LP
+If the caller is in a non-global zone and the pools facility is active,
+\fBsysconf\fR(\fB_SC_NPROCESSORS_CONF\fR) and
+\fBsysconf\fR(\fB_SC_NPROCESSORS_ONLN\fR) return the number of processors in
+the processor set of the pool to which the zone is bound.

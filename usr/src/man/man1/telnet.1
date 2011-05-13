@@ -1,0 +1,1682 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved 
+.\" Copyright (c) 1983, 1990, 1993 The Regents of the University of California. All rights reserved.
+.TH telnet 1 "17 Aug 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+telnet \- user interface to a remote system using the TELNET protocol
+.SH SYNOPSIS
+.LP
+.nf
+\fBtelnet\fR [\fB-8EFKLacdfrx\fR] [\fB-X\fR \fIatype\fR] [\fB-e\fR \fIescape_char\fR] 
+     [\fB-k\fR \fIrealm\fR] [\fB-l\fR \fIuser\fR] [\fB-n\fR \fIfile\fR] 
+     [ [ [!] @hop1 [@hop2...] @] \fIhost\fR [\fIport\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtelnet\fR utility communicates with another host using the \fBTELNET\fR
+protocol. If \fBtelnet\fR is invoked without arguments, it enters command mode,
+indicated by its prompt, \fBtelnet>\fR. In this mode, it accepts and executes
+its associated commands. See \fBUSAGE\fR. If it is invoked with arguments, it
+performs an \fBopen\fR command with those arguments.
+.sp
+.LP
+If, for example, a \fIhost\fR is specified as \fI@hop1@hop2@host\fR, the
+connection goes through hosts \fIhop1\fR and \fIhop2\fR, using loose source
+routing to end at \fIhost\fR. If a leading \fB!\fR is used, the connection
+follows strict source routing. Notice that when \fBtelnet\fR uses IPv6, it can
+only use loose source routing, and the connection ignores the \fB!\fR.
+.sp
+.LP
+Once a connection has been opened, \fBtelnet\fR enters input mode. In this
+mode, text typed is sent to the remote host. The input mode entered will be
+either "line mode", "character at a time", or "old line by line", depending
+upon what the remote system supports.
+.sp
+.LP
+In "line mode", character processing is done on the local system, under the
+control of the remote system. When input editing or character echoing is to be
+disabled, the remote system will relay that information. The remote system will
+also relay changes to any special characters that happen on the remote system,
+so that they can take effect on the local system.
+.sp
+.LP
+In "character at a time" mode, most text typed is immediately sent to the
+remote host for processing.
+.sp
+.LP
+In "old line by line" mode, all text is echoed locally, and (normally) only
+completed lines are sent to the remote host. The "local echo character"
+(initially \fB^E\fR) may be used to turn off and on the local echo. (Use this
+mostly to enter passwords without the password being echoed.).
+.sp
+.LP
+If the "line mode" option is enabled, or if the \fBlocalchars\fR toggle is
+\fBTRUE\fR (the default in "old line by line" mode), the user's \fBquit\fR,
+\fBintr\fR, and \fBflush\fR characters are trapped locally, and sent as
+\fBTELNET\fR protocol sequences to the remote side. If "line mode" has ever
+been enabled, then the user's \fBsusp\fR and \fBeof\fR are also sent as
+\fBTELNET\fR protocol sequences. \fBquit\fR is then sent as a \fBTELNET
+ABORT\fR instead of \fBBREAK\fR. The options \fBtoggle\fR \fBautoflush\fR and
+\fBtoggle\fR \fBautosynch\fR cause this action to flush subsequent output to
+the terminal (until the remote host acknowledges the \fBTELNET\fR sequence);
+and to flush previous terminal input, in the case of \fBquit\fR and \fBintr\fR.
+.sp
+.LP
+While connected to a remote host, the user can enter \fBtelnet\fR command mode
+by typing the \fBtelnet\fR escape character (initially \fB^]\fR). When in
+command mode, the normal terminal editing conventions are available. Pressing
+RETURN at the \fBtelnet\fR command prompt causes \fBtelnet\fR to exit command
+mode.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-8\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an 8-bit data path. Negotiating the \fBTELNET BINARY\fR option is
+attempted for both input and output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Attempts automatic login. This sends the user name by means of the \fBUSER\fR
+variable of the \fBENVIRON\fR option, if supported by the remote system. The
+name used is that of the current user as returned by \fBgetlogin\fR(3C) if it
+agrees with the current user \fBID\fR. Otherwise, it is the name associated
+with the user \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disables the reading of the user's \fBtelnetrc\fR file. (See the \fBtoggle\fR
+\fBskiprc\fR command on this reference page.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the initial value of the \fBdebug\fR toggle to \fBTRUE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR \fIescape_char\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the initial escape character to \fIescape_char\fR. \fIescape_char\fR may
+also be a two character sequence consisting of \fB^\fR (Control key) followed
+by one character. If the second character is \fB?\fR, the \fBDEL\fR character
+is selected. Otherwise, the second character is converted to a control
+character and used as the escape character. If \fIescape_char\fR is defined as
+the null string (that is, \fB-e\fR \fB\&''\fR), this is equivalent to
+\fB-e\fR '\fB^@\fR' (Control-@). To specify that no character can be the escape
+character, use the \fB-E\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stops any character from being recognized as an escape character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.sp .6
+.RS 4n
+Forwards a copy of the local credentials to the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Forwards a forwardable copy of the local credentials to the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIrealm\fR\fR
+.ad
+.sp .6
+.RS 4n
+If Kerberos authentication is being used, requests that \fBtelnet\fR obtain
+tickets for the remote host in \fIrealm\fR instead of the remote host's default
+realm as determined in\fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-K\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies no automatic login to the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fIuser\fR\fR
+.ad
+.sp .6
+.RS 4n
+When connecting to a remote system that understands the \fBENVIRON\fR option,
+then \fIuser\fR will be sent to the remote system as the value for the
+\fBENVIRON\fR variable \fBUSER\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an 8-bit data path on output. This causes the \fBBINARY\fR option to
+be negotiated on output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fItracefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Opens \fItracefile\fR for recording trace information. See the \fBset\fR
+\fItracefile\fR command below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a user interface similar to \fBrlogin\fR. In this mode, the escape
+character is set to the tilde (\fB~\fR) character, unless modified by the
+\fB-e\fR option. The \fBrlogin\fR escape character is only recognized when it
+is preceded by a carriage return. In this mode, the \fBtelnet\fR escape
+character, normally '\fB^]\fR', must still precede a \fBtelnet\fR command. The
+\fBrlogin\fR escape character can also be followed by '\fB\&.\er\fR'
+or '\fB^Z\fR', and, like \fBrlogin\fR(1), closes or suspends the connection,
+respectively. This option is an uncommitted interface and may change in the
+future.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Turns on encryption of the data stream. When this option is turned on,
+\fBtelnet\fR will exit with an error if authentication cannot be negotiated or
+if encryption cannot be turned on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-X\fR \fIatype\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disables the \fIatype\fR type of authentication.
+.RE
+
+.SH USAGE
+.SS "telnet Commands"
+.sp
+.LP
+The commands described in this section are available with \fBtelnet\fR. It is
+necessary to type only enough of each command to uniquely identify it. (This is
+also true for arguments to the \fBmode\fR, \fBset\fR, \fBtoggle\fR,
+\fBunset\fR, \fBenviron\fR, and \fBdisplay\fR commands.)
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauth\fR \fIargument\fR ...\fR
+.ad
+.sp .6
+.RS 4n
+The \fBauth\fR command manipulates the information sent through the
+\fBTELNET\fR \fBAUTHENTICATE\fR option. Valid arguments for the \fBauth\fR
+command are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisable\fR \fItype\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disables the specified type of authentication. To obtain a list of available
+types, use the \fBauth\fR \fBdisable ?\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBenable\fR \fItype\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables the specified type of authentication. To obtain a list of available
+types, use the \fBauth\fR \fBenable ?\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the current status of the various types of authentication.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBopen\fR [\fB\fR\fB-l\fR \fIuser\fR ] [ [!] @\fIhop1\fR
+[@\fIhop2\fR ...]@\fIhost\fR [ \fIport\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Open a connection to the named host. If no port number is specified,
+\fBtelnet\fR will attempt to contact a \fBTELNET\fR server at the default port.
+The host specification may be either a host name (see \fBhosts\fR(4)) or an
+Internet address specified in the "dot notation" (see \fBinet\fR(7P) or
+\fBinet6\fR(7P)). If the \fIhost\fR is specified as \fI@hop1@hop2@host\fR, the
+connection goes through hosts \fIhop1\fR and \fIhop2\fR, using loose source
+routing to end at \fIhost\fR. The \fB@\fR symbol is required as a separator
+between the hosts specified. If a leading \fB!\fR is used with IPv4, the
+connection follows strict source routing.
+.sp
+The \fB-l\fR option passes the \fIuser\fR as the value of the \fBENVIRON\fR
+variable \fBUSER\fR to the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclose\fR\fR
+.ad
+.sp .6
+.RS 4n
+Close any open \fBTELNET\fR session and exit \fBtelnet\fR. An \fBEOF\fR (in
+command mode) will also close a session and exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBencrypt\fR\fR
+.ad
+.sp .6
+.RS 4n
+The encrypt command manipulates the information sent through the \fBTELNET\fR
+\fBENCRYPT\fR option.
+.sp
+Valid arguments for the encrypt command are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisable\fR \fItype\fR [\fBinput\fR|\fBoutput\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Disables the specified type of encryption. If you omit the input and output,
+both input and output are disabled. To obtain a list of available types, use
+the \fBencrypt\fR \fBdisable ?\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBenable\fR \fItype\fR [\fBinput\fR|\fBoutput\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Enables the specified type of encryption. If you omit input and output, both
+input and output are enabled. To obtain a list of available types, use the
+\fBencrypt\fR \fBenable ?\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinput\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the same as the \fBencrypt\fR \fBstart input\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-input\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the same as the \fBencrypt\fR \fBstop input\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutput\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the same as the \fBencrypt\fR \fBstart output\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-output\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the same as the \fBencrypt\fR \fBstop output\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstart\fR [\fBinput\fR|\fBoutput\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Attempts to start encryption. If you omit input and output, both input and
+output are enabled. To obtain a list of available types, use the \fBencrypt\fR
+\fBenable ?\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the current status of encryption.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstop\fR [\fBinput\fR|\fBoutput\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Stops encryption. If you omit input and output, encryption is on both input and
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtype\fR \fItype\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the default type of encryption to be used with later \fBencrypt\fR
+\fBstart\fR or \fBencrypt\fR \fBstop\fR commands.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBquit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Same as \fBclose\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBz\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suspend \fBtelnet\fR. This command only works when the user is using a shell
+that supports job control, such as \fBsh\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmode\fR \fItype\fR\fR
+.ad
+.sp .6
+.RS 4n
+The remote host is asked for permission to go into the requested mode. If the
+remote host is capable of entering that mode, the requested mode will be
+entered. The argument \fItype\fR is one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcharacter\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable the \fBTELNET LINEMODE\fR option, or, if the remote side does not
+understand the \fBLINEMODE\fR option, then enter "character at a time" mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBline\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable the \fBTELNET LINEMODE\fR option, or, if the remote side does not
+understand the \fBLINEMODE\fR option, then attempt to enter "old-line-by-line"
+mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBisig\fR (\fB-isig\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Attempt to enable (disable) the \fBTRAPSIG\fR mode of the \fBLINEMODE\fR
+option. This requires that the \fBLINEMODE\fR option be enabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBedit\fR (\fB-edit\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Attempt to enable (disable) the \fBEDIT\fR mode of the \fBLINEMODE\fR option.
+This requires that the \fBLINEMODE\fR option be enabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsofttabs\fR (\fB-softtabs\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Attempt to enable (disable) the \fBSOFT_TAB\fR mode of the \fBLINEMODE\fR
+option. This requires that the \fBLINEMODE\fR option be enabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlitecho\fR (\fB-litecho\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Attempt to enable (disable) the \fBLIT_ECHO\fR mode of the \fBLINEMODE\fR
+option. This requires that the \fBLINEMODE\fR option be enabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints out help information for the \fBmode\fR command.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus\fR\fR
+.ad
+.sp .6
+.RS 4n
+Show the current status of \fBtelnet\fR. This includes the peer one is
+connected to, as well as the current mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisplay\fR\fR
+.ad
+.sp .6
+.RS 4n
+[\fIargument\fR\|.\|.\|.\|] Display all, or some, of the \fBset\fR and
+\fBtoggle\fR values (see \fBtoggle\fR \fIargument\fR.\|.\|.).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+[\fIcommand\fR] Get help. With no arguments, \fBtelnet\fR prints a help
+summary. If a command is specified, \fBtelnet\fR will print the help
+information for just that command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsend\fR \fIargument\fR\fB\|.\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send one or more special character sequences to the remote host. The following
+are the arguments that can be specified (more than one argument may be
+specified at a time):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBescape\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the current \fBtelnet\fR escape character (initially \fB^]\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsynch\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET SYNCH\fR sequence. This sequence discards all previously
+typed, but not yet read, input on the remote system. This sequence is sent as
+\fBTCP\fR urgent data and may not work if the remote system is a 4.2 \fBBSD\fR
+system. If it does not work, a lowercase "r" may be echoed on the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbrk\fR or \fBbreak\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET BRK\fR (Break) sequence, which may have significance to the
+remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBip\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET IP\fR (Interrupt Process) sequence, which aborts the
+currently running process on the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBabort\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET ABORT\fR (Abort Process) sequence.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBao\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET AO\fR (Abort Output) sequence, which flushes all output from
+the remote system to the user's terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBayt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET AYT\fR (Are You There) sequence, to which the remote system
+may or may not respond.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBec\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET EC\fR (Erase Character) sequence, which erases the last
+character entered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET EL\fR (Erase Line) sequence, which should cause the remote
+system to erase the line currently being entered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeof\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET EOF\fR (End Of File) sequence.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET EOR\fR (End Of Record) sequence.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBga\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET GA\fR (Go Ahead) sequence, which probably has no
+significance for the remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetstatus\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the remote side supports the \fBTELNET STATUS\fR command, \fBgetstatus\fR
+will send the subnegotiation to request that the server send its current option
+status.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnop\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET NOP\fR (No Operation) sequence.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsusp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET SUSP\fR (Suspend Process) sequence.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdo\fR \fIoption\fR\fR
+.ad
+.br
+.na
+\fB\fBdont\fR \fIoption\fR\fR
+.ad
+.br
+.na
+\fB\fBwill\fR \fIoption\fR\fR
+.ad
+.br
+.na
+\fB\fBwont\fR \fIoption\fR\fR
+.ad
+.sp .6
+.RS 4n
+Send the \fBTELNET\fR protocol option negotiation indicated. Option may be the
+text name of the protocol option, or the number corresponding to the option.
+The command will be silently ignored if the option negotiation indicated is not
+valid in the current state. If the \fIoption\fR is given as \fBhelp\fR or
+\fB?\fR, the list of option names known is listed. This command is mostly
+useful for unusual debugging situations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print out help information for the \fBsend\fR command.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBset\fR \fIargument\fR [\fIvalue\fR]\fR
+.ad
+.br
+.na
+\fB\fBunset\fR \fIargument\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set any one of a number of \fBtelnet\fR variables to a specific value. The
+special value \fBoff\fR turns off the function associated with the variable.
+The values of variables may be interrogated with the \fBdisplay\fR command. If
+\fIvalue\fR is omitted, the value is taken to be true, or "on". If the
+\fBunset\fR form is used, the value is taken to be false, or \fBoff\fR. The
+variables that may be specified are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBecho\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the value (initially \fB^E\fR) that, when in "line by line" mode,
+toggles between local echoing of entered characters for normal processing, and
+suppressing echoing of entered characters, for example, entering a password.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBescape\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the \fBtelnet\fR escape character (initially \fB^]\fR) that enters
+\fBtelnet\fR command mode when connected to a remote system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinterrupt\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode (see \fBtoggle\fR,
+\fBlocalchars\fR) and the \fBinterrupt\fR character is typed, a \fBTELNET IP\fR
+sequence (see \fBsend\fR and \fBip\fR) is sent to the remote host. The initial
+value for the interrupt character is taken to be the terminal's \fBintr\fR
+character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBquit\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode and the \fBquit\fR character is
+typed, a \fBTELNET BRK\fR sequence (see \fBsend\fR, \fBbrk\fR) is sent to the
+remote host. The initial value for the quit character is taken to be the
+terminal's \fBquit\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBflushoutput\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode and the \fBflushoutput\fR character
+is typed, a \fBTELNET AO\fR sequence (see \fBsend\fR, \fBao\fR) is sent to the
+remote host. The initial value for the flush character is taken to be the
+terminal's \fBflush\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBerase\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode \fIand\fR operating in "character
+at a time" mode, then when the \fBerase\fR character is typed, a \fBTELNET
+EC\fR sequence (see \fBsend\fR, \fBec\fR) is sent to the remote system. The
+initial value for the \fBerase\fR character is taken to be the terminal's
+\fBerase\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkill\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode \fIand\fR operating in "character
+at a time" mode, then when the \fBkill\fR character is typed, a \fBTELNET EL\fR
+sequence (see \fBsend\fR, \fBel\fR) is sent to the remote system. The initial
+value for the \fBkill\fR character is taken to be the terminal's \fBkill\fR
+character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBeof\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is operating in "line by line"/ mode, entering the \fBeof\fR
+character as the first character on a line sends this character to the remote
+system. The initial value of \fBeof\fR is taken to be the terminal's \fBeof\fR
+character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBayt\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode, or \fBLINEMODE\fR is enabled, and
+the status character is typed, a \fBTELNET AYT\fR ("Are You There") sequence is
+sent to the remote host. (See \fBsend\fR, \fBayt\fR above.) The initial value
+for \fBayt\fR is the terminal's status character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBforw1\fR\fR
+.ad
+.br
+.na
+\fB\fBforw2\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is operating in \fBLINEMODE,\fR and the \fBforw1\fR or
+\fBforw2\fR characters are typed, this causes the forwarding of partial lines
+to the remote system. The initial values for the forwarding characters come
+from the terminal's \fBeol\fR and \fBeol2\fR characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlnext\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is operating in \fBLINEMODE\fR or "old line by line" mode, then
+the \fBlnext\fR character is assumed to be the terminal's \fBlnext\fR
+character. The initial value for the \fBlnext\fR character is taken to be the
+terminal's \fBlnext\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreprint\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is operating in \fBLINEMODE\fR or "old line by line" mode, then
+the \fBreprint\fR character is assumed to be the terminal's \fBreprint\fR
+character. The initial value for \fBreprint\fR is taken to be the terminal's
+\fBreprint\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrlogin\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the \fBrlogin\fR escape character. If set, the normal \fBtelnet\fR
+escape character is ignored, unless it is preceded by this character at the
+beginning of a line. The \fBrlogin\fR character, at the beginning of a line
+followed by a "\fB\&.\fR" closes the connection. When followed by a \fB^Z\fR,
+the \fBrlogin\fR command suspends the \fBtelnet\fR command. The initial state
+is to disable the \fBrlogin\fR escape character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstart\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the \fBTELNET TOGGLE-FLOW-CONTROL\fR option has been enabled, then the
+\fBstart\fR character is taken to be the terminal's \fBstart\fR character. The
+initial value for the \fBkill\fR character is taken to be the terminal's
+\fBstart\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstop\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the \fBTELNET TOGGLE-FLOW-CONTROL\fR option has been enabled, then the
+\fBstop\fR character is taken to be the terminal's \fBstop\fR character. The
+initial value for the \fBkill\fR character is taken to be the terminal's
+\fBstop\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsusp\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is in \fBlocalchars\fR mode, or \fBLINEMODE\fR is enabled, and
+the \fBsuspend\fR character is typed, a \fBTELNET SUSP\fR sequence (see
+\fBsend\fR, \fBsusp\fR above) is sent to the remote host. The initial value for
+the \fBsuspend\fR character is taken to be the terminal's \fBsuspend\fR
+character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtracefile\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is the file to which the output, generated when the \fBnetdata\fR or the
+\fBdebug\fR option is \fBTRUE\fR, will be written. If \fBtracefile\fR is set to
+"\fB-\fR", then tracing information will be written to standard output (the
+default).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBworderase\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBtelnet\fR is operating in \fBLINEMODE\fR or "old line by line" mode, then
+this character is taken to be the terminal's \fBworderase\fR character. The
+initial value for the \fBworderase\fR character is taken to be the terminal's
+\fBworderase\fR character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays the legal \fBset\fR and \fBunset\fR commands.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBslc\fR \fIstate\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBslc\fR (Set Local Characters) command is used to set or change the state
+of special characters when the \fBTELNET LINEMODE\fR option has been enabled.
+Special characters are characters that get mapped to \fBTELNET\fR commands
+sequences (like \fBip\fR or \fBquit\fR) or line editing characters (like
+\fBerase\fR and \fBkill\fR). By default, the local special characters are
+exported. The following values for \fIstate\fR are valid:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcheck\fR\fR
+.ad
+.sp .6
+.RS 4n
+Verifies the settings for the current special characters. The remote side is
+requested to send all the current special character settings. If there are any
+discrepancies with the local side, the local settings will switch to the remote
+values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Switches to the local defaults for the special characters. The local default
+characters are those of the local terminal at the time when \fBtelnet\fR was
+started.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Switches to the remote defaults for the special characters. The remote default
+characters are those of the remote system at the time when the \fBTELNET\fR
+connection was established.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints out help information for the \fBslc\fR command.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtoggle\fR \fIargument\fR...\fR
+.ad
+.sp .6
+.RS 4n
+Toggle between \fBTRUE\fR and \fBFALSE\fR the various flags that control how
+\fBtelnet\fR responds to events. More than one argument may be specified. The
+state of these flags may be interrogated with the \fBdisplay\fR command. Valid
+arguments are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauthdebug\fR\fR
+.ad
+.RS 20n
+.rt  
+Turns on debugging information for the authentication code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBautodecrypt\fR\fR
+.ad
+.RS 20n
+.rt  
+When the \fBTELNET\fR \fBENCRYPT\fR option is negotiated, by default the actual
+encryption (decryption) of the data stream does not start automatically. The
+autoencrypt (autodecrypt) command states that encryption of the output (input)
+stream should be enabled as soon as possible.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBautologin\fR\fR
+.ad
+.RS 20n
+.rt  
+If the remote side supports the \fBTELNET\fR \fBAUTHENTICATION\fR option,
+\fBtelnet\fR attempts to use it to perform automatic authentication. If the
+\fBAUTHENTICATION\fR option is not supported, the user's login name is
+propagated through the \fBTELNET\fR \fBENVIRON\fR option. This command is the
+same as specifying the \fB-a\fR option on the \fBopen\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBautoflush\fR\fR
+.ad
+.RS 20n
+.rt  
+If \fBautoflush\fR and \fBlocalchars\fR are both \fBTRUE,\fR then when the
+\fBao\fR, \fBintr\fR, or \fBquit\fR characters are recognized (and transformed
+into \fBTELNET\fR sequences; see \fBset\fR for details), \fBtelnet\fR refuses
+to display any data on the user's terminal until the remote system acknowledges
+(using a \fBTELNET\fR Timing Mark option) that it has processed those
+\fBTELNET\fR sequences. The initial value for this toggle is \fBTRUE\fR if the
+terminal user has not done an "stty noflsh". Otherwise, the value is
+\fBFALSE\fR (see \fBstty\fR(1)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBautosynch\fR\fR
+.ad
+.RS 20n
+.rt  
+If \fBautosynch\fR and \fBlocalchars\fR are both \fBTRUE\fR, then when either
+the \fBinterrupt\fR or \fBquit\fR characters are typed (see \fBset\fR for
+descriptions of \fBinterrupt\fR and \fBquit\fR), the resulting \fBTELNET\fR
+sequence sent is followed by the \fBTELNET SYNCH\fR sequence. This procedure
+\fIshould\fR cause the remote system to begin throwing away all previously
+typed input until both of the \fBTELNET\fR sequences have been read and acted
+upon. The initial value of this toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbinary\fR\fR
+.ad
+.RS 20n
+.rt  
+Enable or disable the \fBTELNET BINARY\fR option on both input and output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinbinary\fR\fR
+.ad
+.RS 20n
+.rt  
+Enable or disable the \fBTELNET BINARY\fR option on input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoutbinary\fR\fR
+.ad
+.RS 20n
+.rt  
+Enable or disable the \fBTELNET BINARY\fR option on output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrlf\fR\fR
+.ad
+.RS 20n
+.rt  
+Determines how carriage returns are sent. If the value is \fBTRUE\fR, then
+carriage returns will be sent as \fB<CR><LF>\fR\&. If the value is \fBFALSE\fR,
+then carriage returns will be send as \fB<CR><NUL>\fR\&. The initial value for
+this toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrmod\fR\fR
+.ad
+.RS 20n
+.rt  
+Toggle RETURN mode. When this mode is enabled, most RETURN characters received
+from the remote host will be mapped into a RETURN followed by a line feed. This
+mode does not affect those characters typed by the user, only those received
+from the remote host. This mode is useful only for remote hosts that send
+RETURN but never send LINEFEED. The initial value for this toggle is
+\fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdebug\fR\fR
+.ad
+.RS 20n
+.rt  
+Toggle socket level debugging (only available to the super-user). The initial
+value for this toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBencdebug\fR\fR
+.ad
+.RS 20n
+.rt  
+Turns on debugging information for the encryption code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlocalchars\fR\fR
+.ad
+.RS 20n
+.rt  
+If this toggle is \fBTRUE\fR, then the \fBflush\fR, \fBinterrupt\fR,
+\fBquit\fR, \fBerase\fR, and \fBkill\fR characters (see \fBset\fR) are
+recognized locally, and transformed into appropriate \fBTELNET\fR control
+sequences, respectively \fBao\fR, \fBip\fR, \fBbrk\fR, \fBec\fR, and \fBel\fR
+(see \fBsend\fR). The initial value for this toggle is \fBTRUE\fR in "line by
+line" mode, and \fBFALSE\fR in "character at a time" mode. When the
+\fBLINEMODE\fR option is enabled, the value of \fBlocalchars\fR is ignored, and
+assumed always to be \fBTRUE\fR. If \fBLINEMODE\fR has ever been enabled, then
+\fBquit\fR is sent as \fBabort\fR, and \fBeof\fR and \fBsuspend\fR are sent as
+\fBeof\fR and \fBsusp\fR (see \fBsend\fR above).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnetdata\fR\fR
+.ad
+.RS 20n
+.rt  
+Toggle the display of all network data (in hexadecimal format). The initial
+value for this toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBoptions\fR\fR
+.ad
+.RS 20n
+.rt  
+Toggle the display of some internal \fBTELNET\fR protocol processing (having to
+do with \fBtelnet\fR options). The initial value for this toggle is
+\fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprettydump\fR\fR
+.ad
+.RS 20n
+.rt  
+When the \fBnetdata\fR toggle is enabled, if \fBprettydump\fR is enabled, the
+output from the \fBnetdata\fR command will be formatted in a more user readable
+format. Spaces are put between each character in the output. The beginning of
+any \fBTELNET\fR escape sequence is preceded by an asterisk (\fB*\fR) to aid in
+locating them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBskiprc\fR\fR
+.ad
+.RS 20n
+.rt  
+When the \fBskiprc\fR toggle is \fBTRUE\fR, \fBTELNET\fR skips the reading of
+the \fB\&.telnetrc\fR file in the user's home directory when connections are
+opened. The initial value for this toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtermdata\fR\fR
+.ad
+.RS 20n
+.rt  
+Toggles the display of all terminal data (in hexadecimal format). The initial
+value for this toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBverbose_encrypt\fR\fR
+.ad
+.RS 20n
+.rt  
+When the \fBverbose_encrypt\fR flag is \fBTRUE\fR, \fBTELNET\fR prints out a
+message each time encryption is enabled or disabled. The initial value for this
+toggle is \fBFALSE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.RS 20n
+.rt  
+Display the legal \fBtoggle\fR commands.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBenviron\fR \fIargument\|.\|.\|.\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBenviron\fR command is used to manipulate variables that may be sent
+through the \fBTELNET ENVIRON\fR option. The initial set of variables is taken
+from the users environment. Only the \fBDISPLAY\fR and \fBPRINTER\fR variables
+are exported by default. Valid arguments for the \fBenviron\fR command are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdefine\fR \fIvariable value\fR\fR
+.ad
+.sp .6
+.RS 4n
+Define \fIvariable\fR to have a value of \fIvalue\fR. Any variables defined by
+this command are automatically exported. The \fIvalue\fR may be enclosed in
+single or double quotes, so that tabs and spaces may be included.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBundefine\fR \fIvariable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remove \fIvariable\fR from the list of environment variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexport\fR \fIvariable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mark the \fIvariable\fR to be exported to the remote side.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBunexport\fR \fIvariable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mark the \fIvariable\fR to not be exported unless explicitly requested by the
+remote side.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the current set of environment variables. Those marked with an asterisk
+(\fB*\fR) will be sent automatically. Other variables will be sent only if
+explicitly requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints out help information for the \fBenviron\fR command.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogout\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sends the \fBtelnet logout\fR option to the remote side. This command is
+similar to a \fBclose\fR command. However, if the remote side does not support
+the \fBlogout\fR option, nothing happens. If, however, the remote side does
+support the \fBlogout\fR option, this command should cause the remote side to
+close the \fBTELNET\fR connection. If the remote side also supports the concept
+of suspending a user's session for later reattachment, the \fBlogout\fR
+argument indicates that the remote side should terminate the session
+immediately.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.telnetrc\fR\fR
+.ad
+.RS 19n
+.rt  
+file that contains commands to be executed before initiating a \fBtelnet\fR
+session
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrlogin\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBgetlogin\fR(3C),
+\fBhosts\fR(4), \fBkrb5.conf\fR(4), \fBnologin\fR(4), \fBtelnetrc\fR(4),
+\fBattributes\fR(5), \fBinet\fR(7P), \fBinet6\fR(7P)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO LOGINS: System going down in\fR \fIN\fR \fBminutes\fR\fR
+.ad
+.sp .6
+.RS 4n
+The machine is in the process of being shut down and logins have been disabled.
+.RE
+
+.SH NOTES
+.sp
+.LP
+On some remote systems, echo has to be turned off manually when in "line by
+line" mode.
+.sp
+.LP
+In "old line by line" mode, or \fBLINEMODE\fR, the terminal's \fBEOF\fR
+character is only recognized (and sent to the remote system) when it is the
+first character on a line.
+.sp
+.LP
+The \fBtelnet\fR protocol only uses single DES for session
+protection\(emclients request service tickets with single DES session keys. The
+KDC must know that host service principals that offer the \fBtelnet\fR service
+support single DES, which, in practice, means that such principals must have
+single DES keys in the KDC database.

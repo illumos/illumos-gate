@@ -1,0 +1,109 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH roles 1 "14 Feb 2001" "SunOS 5.11" "User Commands"
+.SH NAME
+roles \- print roles granted to a user
+.SH SYNOPSIS
+.LP
+.nf
+\fBroles\fR [ \fIuser\fR ]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The command \fBroles\fR prints on standard output the roles that you or the
+optionally-specified user have been granted. Roles are special accounts that
+correspond to a functional responsibility rather than to an actual person
+(referred to as a normal user).
+.sp
+.LP
+Each user may have zero or more roles. Roles have most of the attributes of
+normal users and are identified like normal users in \fBpasswd\fR(4) and
+\fBshadow\fR(4). Each role must have an entry in the \fBuser_attr\fR(4) file
+that identifies it as a role. Roles can have their own authorizations and
+profiles. See \fBauths\fR(1) and \fBprofiles\fR(1).
+.sp
+.LP
+Roles are not allowed to log into a system as a primary user. Instead, a user
+must log in as him\(em or herself and assume the role. The actions of a role
+are attributable to the normal user. When auditing is enabled, the audited
+events of the role contain the audit \fBID\fR of the original user who assumed
+the role.
+.sp
+.LP
+A role may not assume itself or any other role. Roles are not hierarchical.
+However, rights profiles (see \fBprof_attr\fR(4)) are hierarchical and can be
+used to achieve the same effect as hierarchical roles.
+.sp
+.LP
+Roles must have valid passwords and one of the shells that interprets profiles:
+either \fBpfcsh\fR, \fBpfksh\fR, or \fBpfsh\fR. See \fBpfexec\fR(1).
+.sp
+.LP
+Role assumption may be performed using \fBsu\fR(1M), \fBrlogin\fR(1), or some
+other service that supports the \fBPAM_RUSER\fR variable. Successful assumption
+requires knowledge of the role's password and membership in the role. Role
+assignments are specified in \fBuser_attr\fR(4).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample output
+.sp
+.LP
+The output of the \fBroles\fR command has the following form:
+
+.sp
+.in +2
+.nf
+example% \fBroles tester01 tester02\fRtester01 : admin
+tester02 : secadmin, root
+example%
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.LP
+\fB/etc/user_attr\fR
+.sp
+.LP
+\fB/etc/security/auth_attr\fR
+.sp
+.LP
+\fB/etc/security/prof_attr\fR
+.SH SEE ALSO
+.sp
+.LP
+\fBauths\fR(1), \fBpfexec\fR(1), \fBprofiles\fR(1), \fBrlogin\fR(1),
+\fBsu\fR(1M), \fBgetauusernam\fR(3BSM), \fBauth_attr\fR(4), \fBpasswd\fR(4),
+\fBprof_attr\fR(4), \fBshadow\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)

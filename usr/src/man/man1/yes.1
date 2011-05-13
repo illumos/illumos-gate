@@ -1,0 +1,30 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH yes 1 "20 Dec 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+yes \- generate repetitive affirmative output
+.SH SYNOPSIS
+.LP
+.nf
+\fByes\fR [\fIterm\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fByes\fR utility repeatedly outputs \fBy\fR, or if \fIterm\fR is
+specified, \fIterm\fR is output repeatedly. In the output, either \fBy\fR or
+\fIterm\fR is followed by a NEWLINE. Multiple arguments are output separated by
+spaces and followed by a NEWLINE. To terminate \fByes\fR, issue an interrupt
+character.
+.sp
+.LP
+\fByes\fR can be used to respond programatically to programs that require an
+interactive response.
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

@@ -1,0 +1,226 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wcstol 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wcstol, wcstoll, wstol, watol, watoll, watoi \- convert wide character string
+to long integer
+.SH SYNOPSIS
+.LP
+.nf
+#include <wchar.h> 
+
+\fBlong\fR \fBwcstol\fR(\fBconst wchar_t *restrict\fR \fInptr\fR, \fBwchar_t **restrict\fR \fIendptr\fR,
+     \fBint\fR \fIbase\fR);
+.fi
+
+.LP
+.nf
+\fBlong long\fR \fBwcstoll\fR(\fBconst wchar_t *restrict\fR \fInptr\fR, \fBwchar_t **restrict\fR \fIendptr\fR,
+     \fBint\fR \fIbase\fR);
+.fi
+
+.LP
+.nf
+#include <widec.h> 
+
+\fBlong\fR \fBwstol\fR(\fBconst wchar_t *\fR\fInptr\fR, \fBwchar_t **\fR\fIendptr\fR, \fBint\fR \fIbase\fR);
+.fi
+
+.LP
+.nf
+\fBlong\fR \fBwatol\fR(\fBwchar_t *\fR\fInptr\fR);
+.fi
+
+.LP
+.nf
+\fBlong long\fR \fBwatoll\fR(\fBwchar_t *\fR\fInptr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwatoi\fR(\fBwchar_t *\fR\fInptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwcstol()\fR and \fBwcstoll()\fR functions convert the initial portion of
+the wide character string pointed to by \fInptr\fR to \fBlong\fR and \fBlong
+long\fR representation, respectively. They first decompose the input string
+into three parts:
+.RS +4
+.TP
+1.
+an initial, possibly empty, sequence of white-space wide-character codes (as
+specified by \fBiswspace\fR(3C))
+.RE
+.RS +4
+.TP
+2.
+a subject sequence interpreted as an integer represented in some radix
+determined by the value of \fIbase\fR
+.RE
+.RS +4
+.TP
+3.
+a final wide character string of one or more unrecognised wide character
+codes, including the terminating null wide-character code of the input wide
+character string
+.RE
+.sp
+.LP
+They then attempt to convert the subject sequence to an integer, and return the
+result.
+.sp
+.LP
+If the value of \fIbase\fR is \fB0\fR, the expected form of the subject
+sequence is that of a decimal constant, octal constant or hexadecimal constant,
+any of which may be preceded by a `+' or `\(mi' sign. A decimal constant begins
+with a non-zero digit, and consists of a sequence of decimal digits. An octal
+constant consists of the prefix `0' optionally followed by a sequence of the
+digits `0' to `7' only. A hexadecimal constant consists of the prefix `0x' or
+`0X' followed by a sequence of the decimal digits and letters `a' (or `A') to
+`f' (or `F') with values 10 to 15 respectively.
+.sp
+.LP
+If the value of \fIbase\fR is between \fB2\fR and \fB36\fR, the expected form
+of the subject sequence is a sequence of letters and digits representing an
+integer with the radix specified by  \fIbase\fR, optionally preceded by a `+'
+or `\(mi' sign, but not including an integer suffix. The letters from `a' (or
+`A') to `z' (or `Z') inclusive  are ascribed the values 10 to 35; only letters
+whose ascribed values are less than that of \fIbase\fR are permitted. If the
+value of \fIbase\fR is \fB16\fR, the wide-character code representations of
+`0x' or `0X' may optionally precede the sequence of letters and digits,
+following the sign if present.
+.sp
+.LP
+The subject sequence is defined as the longest initial subsequence of the input
+wide character string, starting with the first non-white-space wide-character
+code, that is of the expected form. The subject sequence contains no
+wide-character codes if the input wide character string is empty or consists
+entirely of white-space wide-character code, or if the first non-white-space
+wide-character code is other than a sign or a permissible letter or digit.
+.sp
+.LP
+If the subject sequence has the expected form and the value of \fIbase\fR is
+\fB0\fR, the sequence of wide-character codes starting with the first digit is
+interpreted as an integer constant. If the subject sequence has the expected
+form and the value of \fIbase\fR is between \fB2\fR and \fB36\fR, it is used as
+the base for conversion, ascribing to each letter its value as given above. If
+the subject sequence begins with a minus sign (-), the value resulting from the
+conversion is negated. A pointer to the final wide character string is stored
+in the object pointed to by \fIendptr\fR, provided that  \fIendptr\fR is not a
+null pointer.
+.sp
+.LP
+If the subject sequence is empty or does not have the expected form, no
+conversion is performed; the value of \fInptr\fR is stored in the object
+pointed to by \fIendptr\fR, provided that  \fIendptr\fR is not a null pointer.
+.sp
+.LP
+These functions do not change the setting of \fBerrno\fR if successful.
+.sp
+.LP
+Since 0, {\fBLONG_MIN\fR} or {\fBLLONG_MIN\fR}, and {\fBLONG_MAX\fR} or
+{\fBLLONG_MAX\fR} are returned on error and are also valid returns on success,
+an application wanting to check for error situations should set \fBerrno\fR to
+0, call one of these functions, then check \fBerrno\fR.
+.sp
+.LP
+The \fBwstol()\fR function is equivalent to \fBwcstol()\fR.
+.sp
+.LP
+The \fBwatol()\fR function is equivalent to \fBwstol(\fR\fIstr\fR\fB,(wchar_t
+**)NULL, 10)\fR\fI\&.\fR
+.sp
+.LP
+The \fBwatoll()\fR function is the long-long (double long) version of
+\fBwatol()\fR.
+.sp
+.LP
+The \fBwatoi()\fR function is equivalent to \fB(int)watol(\|)\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the converted value, if any.
+If no conversion could be performed, 0 is returned and \fBerrno\fR may be set
+to indicate the error. If the correct value is outside the range of
+representable values, {\fBLONG_MIN\fR}, {\fBLONG_MAX\fR}, {\fBLLONG_MIN\fR}, or
+{\fBLLONG_MAX\fR} is returned (according to the sign of the value), and
+\fBerrno\fR is set to \fBERANGE\fR.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIbase\fR is not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The value to be returned is not representable.
+.RE
+
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+No conversion could be performed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability\fBwcstol()\fR and \fBwcstoll()\fR are Standard.
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBiswalpha\fR(3C), \fBiswspace\fR(3C), \fBscanf\fR(3C), \fBwcstod\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Truncation from \fBlong long\fR to \fBlong\fR can take place upon assignment or
+by an explicit cast.

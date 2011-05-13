@@ -1,0 +1,150 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_intr_set_mask 9F "05 Apri 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_intr_set_mask, ddi_intr_clr_mask \- set or clear mask for a given interrupt
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBddi_intr_set_mask\fR(\fBddi_intr_handle_t\fR \fIh\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_clr_mask\fR(\fBddi_intr_handle_t\fR \fIh\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 5n
+.rt  
+DDI interrupt handle
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_intr_set_mask()\fR function masks the given interrupt pointed to by
+the device's interrupt handle \fIh\fR if the device or host bridge supports the
+masking operation. The \fBddi_intr_get_cap()\fR function returns the \fBRO\fR
+flag \fBDDI_INTR_FLAG_MASKABLE\fR if the device or host bridge supports
+interrupt mask bits for the given interrupt type. In flight interrupts can
+still be taken and delivered to the driver.
+.sp
+.LP
+The \fBddi_intr_clr_mask()\fR function unmasks the given interrupt pointed by
+the device's interrupt handle \fIh\fR if the device or host bridge supports the
+masking operation.
+.sp
+.LP
+The \fBddi_intr_set_mask()\fR and \fBddi_intr_clr_mask()\fR functions should be
+called only if an interrupt is enabled. Otherwise the framework will return
+\fBDDI_EINVAL\fR to such calls.
+.sp
+.LP
+The mask cannot be cleared directly if the OS implementation has also
+temporarily masked the interrupt. A call to \fBddi_intr_clr_mask()\fR must be
+preceded by a call to \fBddi_intr_set_mask()\fR. It is not necessary to call
+\fBddi_intr_clr_mask()\fR when adding and enabling the interrupt.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_intr_set_mask()\fR and \fBddi_intr_clr_mask()\fR functions return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+On success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EINVAL\fR\fR
+.ad
+.RS 15n
+.rt  
+On encountering invalid input parameters or when an interrupt is not enabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+On any implementation specific failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_ENOTSUP\fR\fR
+.ad
+.RS 15n
+.rt  
+On device not supporting operation.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_intr_set_mask()\fR and \fBddi_intr_clr_mask()\fR functions can be
+called from any context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_intr_block_disable\fR(9F),
+\fBddi_intr_block_enable\fR(9F), \fBddi_intr_disable\fR(9F),
+\fBddi_intr_enable\fR(9F), \fBddi_intr_get_pending\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Consumers of these interfaces should verify that the return value is not equal
+to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
+inconsistent behavior among platforms.

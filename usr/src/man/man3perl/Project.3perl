@@ -1,0 +1,277 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Project 3PERL "1 Dec 2002" "SunOS 5.11" "Perl Library Functions"
+.SH NAME
+Project \- Perl interface to Projects
+.SH SYNOPSIS
+.LP
+.nf
+use Sun::Solaris::Project qw(:ALL);
+my $projid = getprojid();
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This module provides wrappers for the Project-related system calls and the
+\fBlibproject\fR(3LIB) library. Also provided are constants from the various
+Project-related headers.
+.SS "Constants"
+.sp
+.LP
+\fBMAXPROJID\fR, \fBPROJNAME_MAX\fR, \fBPROJF_PATH\fR, \fBPROJECT_BUFSZ\fR,
+\fBSETPROJ_ERR_TASK\fR, and \fBSETPROJ_ERR_POOL\fR.
+.SS "Functions"
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetprojid()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the numeric project ID of the calling process or
+\fBundef\fR if the underlying \fBgetprojid\fR(2) system call is unsuccessful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsetproject($project, $user, $flags)\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB$user\fR is a member of the project specified by \fB$project\fR,
+\fBsetproject()\fR creates a new task and associates the appropriate resource
+controls with the process, task, and project. This function returns 0 on
+success. If the underlying task creation fails, \fBSETPROJ_ERR_TASK\fR is
+returned. If pool assignment fails, \fBSETPROJ_ERR_POOL\fR is returned. If any
+resource attribute assignments fail, an integer value corresponding to the
+offset of the failed attribute assignment in the project database is returned.
+See \fBsetproject\fR(3PROJECT).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBactiveprojects()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function returns a list of the currently active projects on the system.
+Each value in the list is the numeric ID of a currently active project.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetprojent()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the next entry from the project database. When called in
+a scalar context, \fBgetprojent()\fR returns only the name of the project. When
+called in a list context, \fBgetprojent()\fR returns a 6-element list
+consisting of:
+.sp
+.in +2
+.nf
+($name, $projid, $comment, \e@users, \e@groups, $attr)
+.fi
+.in -2
+
+\e@users and \e@groups are returned as arrays containing the appropriate user
+or project lists. On end-of-file \fBundef\fR is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsetprojent()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function rewinds the project database to the beginning of the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBendprojent()\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function closes the project database.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetprojbyname($name)\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function searches the project database for an entry with the specified
+nam. It returns a 6-element list as returned by \fBgetprojent()\fR if the entry
+is found and \fBundef\fR if it cannot be found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetprojbyid($id)\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function searches the project database for an entry with the specified ID.
+It returns a 6-element list as returned by \fBgetprojent()\fR if the entry is
+found or \fBundef\fR if it cannot be found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetdefaultproj($user)\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the default project entry for the specified user in the
+same format as \fBgetprojent()\fR. It returns \fBundef\fR if the user cannot be
+found. See \fBgetdefaultproj\fR(3PROJECT) for information about the lookup
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfgetprojent($filehandle)\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function returns the next project entry from \fB$filehandle\fR, a Perl
+file handle that must refer to a previously opened file in \fBproject\fR(4)
+format.  Return values are the same as for \fBgetprojent()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinproj($user, $project)\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function checks whether the specified user is able to use the project.
+This function returns true if the user can use the project and false otherwise.
+See \fBinproj\fR(3PROJECT).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgetprojidbyname($project)\fR\fR
+.ad
+.sp .6
+.RS 4n
+This function searches the project database for the specified project. It
+returns the project ID if the project is found and \fBundef\fR if it is not
+found.
+.RE
+
+.SS "Class methods"
+.sp
+.LP
+None.
+.SS "Object methods"
+.sp
+.LP
+None.
+.SS "Exports"
+.sp
+.LP
+By default nothing is exported from this module. The following tags can be used
+to selectively import constants and functions defined in this module:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:SYSCALLS\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBgetprojid()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:LIBCALLS\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBsetproject()\fR, \fBactiveprojects()\fR, \fBgetprojent()\fR,
+\fBsetprojent()\fR, \fBendprojent()\fR, \fBgetprojbyname()\fR,
+\fBgetprojbyid()\fR, \fBgetdefaultproj()\fR, \fBfgetprojent()\fR,
+\fBinproj()\fR, and \fBgetprojidbyname()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:CONSTANTS\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBMAXPROJID\fR, \fBPROJNAME_MAX\fR, \fBPROJF_PATH\fR, \fBPROJECT_BUFSZ\fR,
+\fBSETPROJ_ERR_TASK\fR, and \fBSETPROJ_ERR_POOL\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB:ALL\fR\fR
+.ad
+.RS 14n
+.rt  
+:SYSCALLS\fB\fR, \fB:LIBCALLS\fR, and \fB:CONSTANTS\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetprojid\fR(2), \fBgetdefaultproj\fR(3PROJECT), \fBinproj\fR(3PROJECT),
+\fBlibproject\fR(3LIB), \fBsetproject\fR(3PROJECT), \fBproject\fR(4),
+\fBattributes\fR(5)
