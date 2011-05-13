@@ -4848,6 +4848,7 @@ zone_boot(zoneid_t zoneid)
 static int
 zone_empty(zone_t *zone)
 {
+	int cnt = 0;
 	int waitstatus;
 
 	/*
@@ -4858,7 +4859,16 @@ zone_empty(zone_t *zone)
 	ASSERT(MUTEX_NOT_HELD(&zonehash_lock));
 	while ((waitstatus = zone_status_timedwait_sig(zone,
 	    ddi_get_lbolt() + hz, ZONE_IS_EMPTY)) == -1) {
-		killall(zone->zone_id);
+		boolean_t force = B_FALSE;
+
+		/* Every 30 seconds, try harder */
+		if (cnt++ >= 30) {
+			cmn_err(CE_WARN, "attempt to force kill zone %d\n",
+			    zone->zone_id);
+			force = B_TRUE;
+			cnt = 0;
+		}
+		killall(zone->zone_id, force);
 	}
 	/*
 	 * return EINTR if we were signaled
@@ -6743,7 +6753,7 @@ zone_kadmin(int cmd, int fcn, const char *mdep, cred_t *credp)
 	 * zone_ki_call_zoneadmd() will do a more thorough job of this
 	 * later.
 	 */
-	killall(zone->zone_id);
+	killall(zone->zone_id, B_FALSE);
 	/*
 	 * Now, create the thread to contact zoneadmd and do the rest of the
 	 * work.  This thread can't be created in our zone otherwise
