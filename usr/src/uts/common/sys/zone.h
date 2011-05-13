@@ -423,6 +423,9 @@ typedef struct {
 	kstat_named_t	zm_nover;
 	kstat_named_t	zm_pagedout;
 	kstat_named_t	zm_pgpgin;
+	kstat_named_t	zm_anonpgin;
+	kstat_named_t	zm_execpgin;
+	kstat_named_t	zm_fspgin;
 } zone_mcap_kstat_t;
 
 typedef struct zone {
@@ -626,6 +629,9 @@ typedef struct zone {
 	kstat_t		*zone_mcap_ksp;
 	zone_mcap_kstat_t *zone_mcap_stats;
 	uint64_t	zone_pgpgin;		/* pages paged in */
+	uint64_t	zone_anonpgin;		/* anon pages paged in */
+	uint64_t	zone_execpgin;		/* exec pages paged in */
+	uint64_t	zone_fspgin;		/* fs pages paged in */
 } zone_t;
 
 /*

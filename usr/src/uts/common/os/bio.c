@@ -1340,12 +1340,18 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 		if (pp != NULL && pp->p_vnode != NULL) {
 			if (IS_SWAPFSVP(pp->p_vnode)) {
 				CPU_STATS_ADDQ(cpup, vm, anonpgin, btopr(len));
+				atomic_add_64(&curzone->zone_anonpgin,
+				    btopr(len));
 			} else {
 				if (pp->p_vnode->v_flag & VVMEXEC) {
 					CPU_STATS_ADDQ(cpup, vm, execpgin,
 					    btopr(len));
+					atomic_add_64(&curzone->zone_execpgin,
+					    btopr(len));
 				} else {
 					CPU_STATS_ADDQ(cpup, vm, fspgin,
+					    btopr(len));
+					atomic_add_64(&curzone->zone_fspgin,
 					    btopr(len));
 				}
 			}
