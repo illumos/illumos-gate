@@ -915,7 +915,8 @@ mcap_zone()
 		rewinddir(pdir);
 	}
 
-	(void) closedir(pdir);
+	if (pdir != NULL)
+		(void) closedir(pdir);
 	debug("thread shutdown\n");
 }
 
