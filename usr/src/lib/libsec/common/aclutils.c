@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -393,8 +394,14 @@ acl_strip(const char *file, uid_t owner, gid_t group, mode_t mode)
 	ace_t	*min_ace_acl;
 	int	acl_flavor;
 	int	aclcnt;
+	struct stat64 statbuf;
 
 	acl_flavor = pathconf(file, _PC_ACL_ENABLED);
+
+	if (stat64(file, &statbuf) != 0) {
+		error = 1;
+		return (error);
+	}
 
 	/*
 	 * force it through aclent flavor when file system doesn't
@@ -419,8 +426,8 @@ acl_strip(const char *file, uid_t owner, gid_t group, mode_t mode)
 		aclcnt = 4;
 		error = acl(file, SETACL, aclcnt, min_acl);
 	} else if (acl_flavor & _ACL_ACE_ENABLED) {
-		if ((error = acl_trivial_create(mode, &min_ace_acl,
-		    &aclcnt)) != 0)
+		if ((error = acl_trivial_create(mode, S_ISDIR(statbuf.st_mode),
+		    &min_ace_acl, &aclcnt)) != 0)
 			return (error);
 		error = acl(file, ACE_SETACL, aclcnt, min_ace_acl);
 		free(min_ace_acl);
