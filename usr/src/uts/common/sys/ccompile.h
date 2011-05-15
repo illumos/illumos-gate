@@ -83,7 +83,7 @@ extern "C" {
  *
  * Should only be used on 'extern inline' definitions for GCC.
  */
-#if __GNUC_VERSION > 40300
+#if __GNUC_VERSION >= 40300
 #define	__sun_attr___gnu_inline__	__attribute__((__gnu_inline__))
 #else
 #define	__sun_attr___gnu_inline__
