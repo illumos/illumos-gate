@@ -26,8 +26,7 @@
 #ifndef _ASM_MMU_H
 #define	_ASM_MMU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -38,7 +37,8 @@ extern "C" {
 
 #if defined(__amd64)
 
-extern __inline__ ulong_t getcr3(void)
+extern __GNU_INLINE ulong_t
+getcr3(void)
 {
 	uint64_t value;
 
@@ -48,7 +48,8 @@ extern __inline__ ulong_t getcr3(void)
 	return (value);
 }
 
-extern __inline__ void setcr3(ulong_t value)
+extern __GNU_INLINE void
+setcr3(ulong_t value)
 {
 	__asm__ __volatile__(
 	    "movq %0, %%cr3"
@@ -56,14 +57,16 @@ extern __inline__ void setcr3(ulong_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void reload_cr3(void)
+extern __GNU_INLINE void
+reload_cr3(void)
 {
 	setcr3(getcr3());
 }
 
 #elif defined(__i386)
 
-extern __inline__ ulong_t getcr3(void)
+extern __GNU_INLINE ulong_t
+getcr3(void)
 {
 	uint32_t value;
 
@@ -73,7 +76,8 @@ extern __inline__ ulong_t getcr3(void)
 	return (value);
 }
 
-extern __inline__ void setcr3(ulong_t value)
+extern __GNU_INLINE void
+setcr3(ulong_t value)
 {
 	__asm__ __volatile__(
 	    "movl %0, %%cr3"
@@ -81,7 +85,8 @@ extern __inline__ void setcr3(ulong_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void reload_cr3(void)
+extern __GNU_INLINE void
+reload_cr3(void)
 {
 	setcr3(getcr3());
 }

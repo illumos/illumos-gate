@@ -27,8 +27,6 @@
 #ifndef	_SYS_CCOMPILE_H
 #define	_SYS_CCOMPILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains definitions designed to enable different compilers
  * to be used harmoniously on Solaris systems.
@@ -79,6 +77,17 @@ extern "C" {
  */
 #define	__sun_attr___noreturn__ __attribute__((__noreturn__))
 
+/*
+ * The function is 'extern inline' and expects GNU C89 behaviour, not C99
+ * behaviour.
+ *
+ * Should only be used on 'extern inline' definitions for GCC.
+ */
+#if __GNUC_VERSION > 40300
+#define	__sun_attr___gnu_inline__	__attribute__((__gnu_inline__))
+#else
+#define	__sun_attr___gnu_inline__
+#endif
 
 /*
  * This is an appropriate label for functions that do not
@@ -116,9 +125,9 @@ extern "C" {
 #define	__KPRINTFLIKE(__n)	__sun_attr__((__KPRINTFLIKE__(__n)))
 #define	__KVPRINTFLIKE(__n)	__sun_attr__((__KVPRINTFLIKE__(__n)))
 #define	__NORETURN		__sun_attr__((__noreturn__))
+#define	__GNU_INLINE		__inline__ __sun_attr__((__gnu_inline__))
 #define	__CONST			__sun_attr__((__const__))
 #define	__PURE			__sun_attr__((__pure__))
-
 
 #ifdef	__cplusplus
 }

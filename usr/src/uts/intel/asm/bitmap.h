@@ -27,8 +27,7 @@
 #ifndef _ASM_BITMAP_H
 #define	_ASM_BITMAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -37,73 +36,73 @@ extern "C" {
 
 #if !defined(__lint) && defined(__GNUC__)
 
-extern __inline__ int
+extern __GNU_INLINE int
 highbit(ulong_t i)
 {
 	long __value = -1l;
 
 #if defined(__amd64)
 	__asm__(
-		"bsrq	%1,%0"
-		: "+r" (__value)
-		: "r" (i)
-		: "cc");
+	    "bsrq	%1,%0"
+	    : "+r" (__value)
+	    : "r" (i)
+	    : "cc");
 #elif defined(__i386)
 	__asm__(
-		"bsrl	%1,%0"
-		: "+r" (__value)
-		: "r" (i)
-		: "cc");
+	    "bsrl	%1,%0"
+	    : "+r" (__value)
+	    : "r" (i)
+	    : "cc");
 #else
 #error	"port me"
 #endif
 	return ((int)(__value + 1));
 }
 
-extern __inline__ int
+extern __GNU_INLINE int
 lowbit(ulong_t i)
 {
 	long __value = -1l;
 
 #if defined(__amd64)
 	__asm__(
-		"bsfq	%1,%0"
-		: "+r" (__value)
-		: "r" (i)
-		: "cc");
+	    "bsfq	%1,%0"
+	    : "+r" (__value)
+	    : "r" (i)
+	    : "cc");
 #elif defined(__i386)
 	__asm__(
-		"bsfl	%1,%0"
-		: "+r" (__value)
-		: "r" (i)
-		: "cc");
+	    "bsfl	%1,%0"
+	    : "+r" (__value)
+	    : "r" (i)
+	    : "cc");
 #else
 #error	"port me"
 #endif
 	return ((int)(__value + 1));
 }
 
-extern __inline__ uint_t
+extern __GNU_INLINE uint_t
 atomic_btr32(uint32_t *memory, uint_t bitnum)
 {
 	uint8_t __value;
 
 #if defined(__amd64)
 	__asm__ __volatile__(
-		"lock;"
-		"btrl %2, (%0);"
-		"setc %1"
-		: "+r" (memory), "+r" (__value)
-		: "ir" (bitnum)
-		: "cc");
+	    "lock;"
+	    "btrl %2, (%0);"
+	    "setc %1"
+	    : "+r" (memory), "+r" (__value)
+	    : "ir" (bitnum)
+	    : "cc");
 #elif defined(__i386)
 	__asm__ __volatile__(
-		"lock;"
-		"btrl %2, (%0);"
-		"setc %1"
-		: "+r" (memory), "=r" (__value)
-		: "ir" (bitnum)
-		: "cc");
+	    "lock;"
+	    "btrl %2, (%0);"
+	    "setc %1"
+	    : "+r" (memory), "=r" (__value)
+	    : "ir" (bitnum)
+	    : "cc");
 #else
 #error	"port me"
 #endif
