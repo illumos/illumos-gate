@@ -52,8 +52,7 @@ static const char __idstring[] =
 static int myri10ge_small_bytes = 510;
 static int myri10ge_intr_coal_delay = 125;
 static int myri10ge_flow_control = 1;
-#if #cpu(i386) || defined __i386 || defined i386 ||	\
-	defined __i386__ || #cpu(x86_64) || defined __x86_64__
+#if defined __i386 || defined i386 || defined __i386__ || defined __x86_64__
 static int myri10ge_nvidia_ecrc_enable = 1;
 #endif
 static int myri10ge_mtu_override = 0;
@@ -4227,8 +4226,7 @@ myri10ge_slice_stat_init(struct myri10ge_slice_state *ss)
 
 
 
-#if #cpu(i386) || defined __i386 || defined i386 ||	\
-	defined __i386__ || #cpu(x86_64) || defined __x86_64__
+#if defined __i386 || defined i386 || defined __i386__ || defined __x86_64__
 
 #include <vm/hat.h>
 #include <sys/ddi_isa.h>
@@ -4672,8 +4670,7 @@ myri10ge_get_props(dev_info_t *dip)
 	myri10ge_intr_coal_delay = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "myri10ge_intr_coal_delay", myri10ge_intr_coal_delay);
 
-#if #cpu(i386) || defined __i386 || defined i386 ||	\
-	defined __i386__ || #cpu(x86_64) || defined __x86_64__
+#if defined __i386 || defined i386 || defined __i386__ || defined __x86_64__
 	myri10ge_nvidia_ecrc_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "myri10ge_nvidia_ecrc_enable", 1);
 #endif
