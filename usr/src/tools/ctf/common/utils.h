@@ -27,9 +27,8 @@
 #ifndef	_UTILS_H
 #define	_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdarg.h>
+#include <ctf_headers.h>
 
 #ifdef	__cplusplus
 extern "C" {
