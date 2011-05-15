@@ -2815,7 +2815,7 @@ emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port, emlxs_buf_t *sbp, int channel)
 	}
 	sbp->class = wqe->Class;
 	wqe->RequestTag = iotag;
-	wqe->CQId = (uint16_t)0xffff;  /* default CQ for response */
+	wqe->CQId = 0x3ff;  /* default CQ for response */
 	return (FC_SUCCESS);
 } /* emlxs_sli4_prep_fcp_iocb() */
 
@@ -3268,7 +3268,7 @@ emlxs_sli4_prep_ct_iocb(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 	sbp->class = wqe->Class;
 	wqe->RequestTag = xp->iotag;
-	wqe->CQId = (uint16_t)0xffff;  /* default CQ for response */
+	wqe->CQId = 0x3ff;
 	return (FC_SUCCESS);
 
 } /* emlxs_sli4_prep_ct_iocb() */
