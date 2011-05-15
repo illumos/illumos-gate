@@ -27,8 +27,7 @@
 #ifndef _ASM_ATOMIC_H
 #define	_ASM_ATOMIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -39,52 +38,57 @@ extern "C" {
 
 #if defined(__amd64)
 
-extern __inline__ void atomic_or_long(ulong_t *target, ulong_t bits)
+extern __GNU_INLINE void
+atomic_or_long(ulong_t *target, ulong_t bits)
 {
 	__asm__ __volatile__(
-		"lock; orq %1, (%0)"
-		: /* no output */
-		: "r" (target), "r" (bits));
+	    "lock; orq %1, (%0)"
+	    : /* no output */
+	    : "r" (target), "r" (bits));
 }
 
-extern __inline__ void atomic_and_long(ulong_t *target, ulong_t bits)
+extern __GNU_INLINE void
+atomic_and_long(ulong_t *target, ulong_t bits)
 {
 	__asm__ __volatile__(
-		"lock; andq %1, (%0)"
-		: /* no output */
-		: "r" (target), "r" (bits));
+	    "lock; andq %1, (%0)"
+	    : /* no output */
+	    : "r" (target), "r" (bits));
 }
 
 #ifdef notdef
-extern __inline__ uint64_t cas64(uint64_t *target, uint64_t cmp,
+extern __GNU_INLINE uint64_t
+cas64(uint64_t *target, uint64_t cmp,
 	uint64_t newval)
 {
 	uint64_t retval;
 
 	__asm__ __volatile__(
-		"movq %2, %%rax; lock; cmpxchgq %3, (%1)"
-		: "=a" (retval)
-		: "r" (target), "r" (cmp), "r" (newval));
+	    "movq %2, %%rax; lock; cmpxchgq %3, (%1)"
+	    : "=a" (retval)
+	    : "r" (target), "r" (cmp), "r" (newval));
 	return (retval);
 }
 #endif
 
 #elif defined(__i386)
 
-extern __inline__ void atomic_or_long(ulong_t *target, ulong_t bits)
+extern __GNU_INLINE void
+atomic_or_long(ulong_t *target, ulong_t bits)
 {
 	__asm__ __volatile__(
-		"lock; orl %1, (%0)"
-		: /* no output */
-		: "r" (target), "r" (bits));
+	    "lock; orl %1, (%0)"
+	    : /* no output */
+	    : "r" (target), "r" (bits));
 }
 
-extern __inline__ void atomic_and_long(ulong_t *target, ulong_t bits)
+extern __GNU_INLINE void
+atomic_and_long(ulong_t *target, ulong_t bits)
 {
 	__asm__ __volatile__(
-		"lock; andl %1, (%0)"
-		: /* no output */
-		: "r" (target), "r" (bits));
+	    "lock; andl %1, (%0)"
+	    : /* no output */
+	    : "r" (target), "r" (bits));
 }
 
 #else

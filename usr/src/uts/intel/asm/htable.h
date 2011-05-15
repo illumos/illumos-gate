@@ -27,8 +27,7 @@
 #ifndef _ASM_HTABLE_H
 #define	_ASM_HTABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/ccompile.h>
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -44,7 +43,8 @@ extern "C" {
  * for some ia32 hat layer operations.
  */
 
-extern __inline__ void atomic_orb(uint8_t *addr, uint8_t value)
+extern __GNU_INLINE void
+atomic_orb(uint8_t *addr, uint8_t value)
 {
 	__asm__ __volatile__(
 	    "lock; orb %%dl,%0"
@@ -53,7 +53,8 @@ extern __inline__ void atomic_orb(uint8_t *addr, uint8_t value)
 	    : "cc");
 }
 
-extern __inline__ void atomic_andb(uint8_t *addr, uint8_t value)
+extern __GNU_INLINE void
+atomic_andb(uint8_t *addr, uint8_t value)
 {
 	__asm__ __volatile__(
 	    "lock; andb %%dl,%0"
@@ -62,7 +63,8 @@ extern __inline__ void atomic_andb(uint8_t *addr, uint8_t value)
 	    : "cc");
 }
 
-extern __inline__ void atomic_inc16(uint16_t *addr)
+extern __GNU_INLINE void
+atomic_inc16(uint16_t *addr)
 {
 	__asm__ __volatile__(
 	    "lock; incw %0"
@@ -71,7 +73,8 @@ extern __inline__ void atomic_inc16(uint16_t *addr)
 	    : "cc");
 }
 
-extern __inline__ void atomic_dec16(uint16_t *addr)
+extern __GNU_INLINE void
+atomic_dec16(uint16_t *addr)
 {
 	__asm__ __volatile__(
 	    "lock; decw %0"
@@ -80,7 +83,8 @@ extern __inline__ void atomic_dec16(uint16_t *addr)
 	    : "cc");
 }
 
-extern __inline__ void mmu_tlbflush_entry(caddr_t addr)
+extern __GNU_INLINE void
+mmu_tlbflush_entry(caddr_t addr)
 {
 	__asm__ __volatile__(
 	    "invlpg %0"
