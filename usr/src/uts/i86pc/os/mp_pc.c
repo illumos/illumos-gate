@@ -165,8 +165,8 @@ rmp_gdt_init(rm_platter_t *rm)
 	 * mapped address, we need to calculate it here.
 	 */
 	rm->rm_longmode64_addr = rm_platter_pa +
-	    ((uint32_t)(uintptr_t)long_mode_64 -
-	    (uint32_t)(uintptr_t)real_mode_start_cpu);
+	    (uint32_t)((uintptr_t)long_mode_64 -
+	    (uintptr_t)real_mode_start_cpu);
 #endif	/* __amd64 */
 }
 
