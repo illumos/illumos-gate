@@ -376,8 +376,7 @@ kgss_add_cred_wrapped(minor_status,
 
 	arg.uid = (OM_uint32)uid;
 	arg.input_cred_handle.GSS_CRED_ID_T_len =
-			input_cred_handle ==
-			(gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+			input_cred_handle == GSSD_NO_CREDENTIAL ?
 			0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.input_cred_handle.GSS_CRED_ID_T_val = (char *)&input_cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
@@ -496,8 +495,9 @@ kgss_add_cred(minor_status,
 	if (input_cred_handle != GSS_C_NO_CREDENTIAL) {
 		gssd_cred_verifier = KCRED_TO_CREDV(input_cred_handle);
 		gssd_input_cred_handle = KCRED_TO_CRED(input_cred_handle);
-	} else
-		gssd_input_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+	} else {
+		gssd_input_cred_handle = GSSD_NO_CREDENTIAL;
+	}
 
 	err = kgss_add_cred_wrapped(minor_status, gssd_input_cred_handle,
 			gssd_cred_verifier, desired_name, desired_mech_type,
@@ -661,14 +661,14 @@ kgss_init_sec_context_wrapped(
 	arg.uid = (OM_uint32)uid;
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-	    *context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
+	    *context_handle == GSSD_NO_CONTEXT ?
 	    0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 
 	arg.gssd_context_verifier =  *gssd_context_verifier;
 
 	arg.claimant_cred_handle.GSS_CRED_ID_T_len =
-	    claimant_cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+	    claimant_cred_handle == GSSD_NO_CREDENTIAL ?
 	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.claimant_cred_handle.GSS_CRED_ID_T_val =
 	    (char *)&claimant_cred_handle;
@@ -678,8 +678,7 @@ kgss_init_sec_context_wrapped(
 	arg.target_name.GSS_BUFFER_T_val = (char *)external_name.value;
 
 	arg.name_type.GSS_OID_len =
-	    name_type == GSS_C_NULL_OID ?
-	    0 : (uint_t)name_type->length;
+	    name_type == GSS_C_NULL_OID ? 0 : (uint_t)name_type->length;
 
 	arg.name_type.GSS_OID_val =
 	    name_type == GSS_C_NULL_OID ?
@@ -769,8 +768,7 @@ kgss_init_sec_context_wrapped(
 		output_token->value =
 		    (void *)MALLOC(output_token->length);
 		(void) memcpy(output_token->value,
-		    res.output_token.GSS_BUFFER_T_val,
-		    output_token->length);
+		    res.output_token.GSS_BUFFER_T_val, output_token->length);
 	}
 
 	/* if the call was successful, copy out the results */
@@ -782,8 +780,7 @@ kgss_init_sec_context_wrapped(
 		 * status codes, output token and context handle.
 		 */
 		*context_handle =
-		    *((gssd_ctx_id_t *)
-		    res.context_handle.GSS_CTX_ID_T_val);
+		    *((gssd_ctx_id_t *)res.context_handle.GSS_CTX_ID_T_val);
 		*gssd_context_verifier = res.gssd_context_verifier;
 
 		if (res.status == GSS_S_COMPLETE) {
@@ -791,13 +788,11 @@ kgss_init_sec_context_wrapped(
 				*actual_mech_type =
 				    (gss_OID) MALLOC(sizeof (gss_OID_desc));
 				(*actual_mech_type)->length =
-				    (OM_UINT32)
-				    res.actual_mech_type.GSS_OID_len;
+				    (OM_UINT32)res.actual_mech_type.GSS_OID_len;
 				(*actual_mech_type)->elements =
-				    (void *)
-				    MALLOC((*actual_mech_type)->length);
+				    (void *)MALLOC((*actual_mech_type)->length);
 				(void) memcpy((*actual_mech_type)->elements,
-				    (void *) res.actual_mech_type.GSS_OID_val,
+				    (void *)res.actual_mech_type.GSS_OID_val,
 				    (*actual_mech_type)->length);
 			}
 
@@ -891,7 +886,7 @@ kgss_init_sec_context(
 		 * upcalls to gssd.
 		 */
 		kctx->mech = &default_gc;
-		kctx->gssd_ctx = (gssd_ctx_id_t)GSS_C_NO_CONTEXT;
+		kctx->gssd_ctx = GSSD_NO_CONTEXT;
 		*context_handle = (gss_ctx_id_t)kctx;
 	} else
 		kctx = (struct kgss_ctx *)*context_handle;
@@ -899,8 +894,9 @@ kgss_init_sec_context(
 	if (claimant_cred_handle != GSS_C_NO_CREDENTIAL) {
 		gssd_cred_verifier = KCRED_TO_CREDV(claimant_cred_handle);
 		gssd_cl_cred_handle = KCRED_TO_CRED(claimant_cred_handle);
-	} else
-		gssd_cl_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+	} else {
+		gssd_cl_cred_handle = GSSD_NO_CREDENTIAL;
+	}
 
 	/*
 	 * We need to know the resulting mechanism oid, so allocate
@@ -973,25 +969,22 @@ kgss_accept_sec_context_wrapped(
 	arg.uid = (OM_uint32)uid;
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-	    *context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
+	    *context_handle == GSSD_NO_CONTEXT ?
 	    0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 	arg.gssd_context_verifier = *gssd_context_verifier;
 
 	arg.verifier_cred_handle.GSS_CRED_ID_T_len =
-	    verifier_cred_handle ==
-	    (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
+	    verifier_cred_handle == GSSD_NO_CREDENTIAL ?
 	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.verifier_cred_handle.GSS_CRED_ID_T_val =
 	    (char *)&verifier_cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
 	arg.input_token_buffer.GSS_BUFFER_T_len =
-	    (uint_t)(input_token != GSS_C_NO_BUFFER ?
-	    input_token->length : 0);
+	    (uint_t)(input_token != GSS_C_NO_BUFFER ? input_token->length : 0);
 	arg.input_token_buffer.GSS_BUFFER_T_val =
-	    (char *)(input_token != GSS_C_NO_BUFFER ?
-	    input_token->value : 0);
+	    (char *)(input_token != GSS_C_NO_BUFFER ? input_token->value : 0);
 
 	if (input_chan_bindings != GSS_C_NO_CHANNEL_BINDINGS) {
 		arg.input_chan_bindings.present = YES;
@@ -1055,19 +1048,16 @@ kgss_accept_sec_context_wrapped(
 		*minor_status = res.minor_status;
 
 	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
-		output_token->length =
-		    res.output_token.GSS_BUFFER_T_len;
-		output_token->value =
-		    (void *)  MALLOC(output_token->length);
+		output_token->length = res.output_token.GSS_BUFFER_T_len;
+		output_token->value = (void *)MALLOC(output_token->length);
 		(void) memcpy(output_token->value,
-		    res.output_token.GSS_BUFFER_T_val,
-		    output_token->length);
+		    res.output_token.GSS_BUFFER_T_val, output_token->length);
 	}
 
 	/* if the call was successful, copy out the results */
 
-	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
-	    res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
+	if (res.status == (OM_uint32)GSS_S_COMPLETE ||
+	    res.status == (OM_uint32)GSS_S_CONTINUE_NEEDED) {
 
 		/*
 		 * the only parameters that are ready when we
@@ -1080,7 +1070,7 @@ kgss_accept_sec_context_wrapped(
 		*gssd_context_verifier = res.gssd_context_verifier;
 
 		/* these other parameters are only ready upon GSS_S_COMPLETE */
-		if (res.status == (OM_uint32) GSS_S_COMPLETE) {
+		if (res.status == (OM_uint32)GSS_S_COMPLETE) {
 
 			if (src_name != NULL) {
 				src_name->length =
@@ -1095,12 +1085,12 @@ kgss_accept_sec_context_wrapped(
 			 * for gss_import_name_for_mech()
 			 */
 			if (mech_type != NULL) {
-				*mech_type = (gss_OID)
-				    MALLOC(sizeof (gss_OID_desc));
+				*mech_type =
+				    (gss_OID)MALLOC(sizeof (gss_OID_desc));
 				(*mech_type)->length =
-				    (OM_UINT32) res.mech_type.GSS_OID_len;
+				    (OM_UINT32)res.mech_type.GSS_OID_len;
 				(*mech_type)->elements =
-				    (void *) MALLOC((*mech_type)->length);
+				    (void *)MALLOC((*mech_type)->length);
 				(void) memcpy((*mech_type)->elements,
 				    res.mech_type.GSS_OID_val,
 				    (*mech_type)->length);
@@ -1116,8 +1106,9 @@ kgss_accept_sec_context_wrapped(
 			    (res.delegated_cred_handle.GSS_CRED_ID_T_len
 			    != 0)) {
 				kcred = KGSS_CRED_ALLOC();
-			kcred->gssd_cred = *((gssd_cred_id_t *)
-			    res.delegated_cred_handle.GSS_CRED_ID_T_val);
+				kcred->gssd_cred =
+				    *((gssd_cred_id_t *)
+				    res.delegated_cred_handle.GSS_CRED_ID_T_val);
 				kcred->gssd_cred_verifier =
 				    res.gssd_context_verifier;
 				*delegated_cred_handle = (gss_cred_id_t)kcred;
@@ -1170,7 +1161,7 @@ kgss_accept_sec_context(
 	if (*context_handle == GSS_C_NO_CONTEXT) {
 		kctx = KGSS_ALLOC();
 		kctx->mech = &default_gc;
-		kctx->gssd_ctx = (gssd_ctx_id_t)GSS_C_NO_CONTEXT;
+		kctx->gssd_ctx = GSSD_NO_CONTEXT;
 		*context_handle = (gss_ctx_id_t)kctx;
 	} else
 		kctx = (struct kgss_ctx *)*context_handle;
@@ -1178,8 +1169,9 @@ kgss_accept_sec_context(
 	if (verifier_cred_handle != GSS_C_NO_CREDENTIAL) {
 		gssd_cred_verifier = KCRED_TO_CREDV(verifier_cred_handle);
 		gssd_ver_cred_handle = KCRED_TO_CRED(verifier_cred_handle);
-	} else
-		gssd_ver_cred_handle = (gssd_cred_id_t)GSS_C_NO_CREDENTIAL;
+	} else {
+		gssd_ver_cred_handle = GSSD_NO_CREDENTIAL;
+	}
 
 	err = kgss_accept_sec_context_wrapped(minor_status,
 	    &kctx->gssd_ctx, &kctx->gssd_ctx_verifier,
@@ -1302,7 +1294,7 @@ kgss_delete_sec_context_wrapped(void *private,
 	/* copy the procedure arguments into the rpc arg parameter */
 
 	arg.context_handle.GSS_CTX_ID_T_len =
-		*context_handle == (gssd_ctx_id_t)GSS_C_NO_CONTEXT ?
+		*context_handle == GSSD_NO_CONTEXT ?
 			0 : (uint_t)sizeof (gssd_ctx_id_t);
 	arg.context_handle.GSS_CTX_ID_T_val =  (char *)context_handle;
 
@@ -1375,7 +1367,7 @@ kgss_delete_sec_context(
 		kctx = (struct kgss_ctx *)*context_handle;
 
 	if (kctx->ctx_imported == FALSE) {
-		if (kctx->gssd_ctx == (gssd_ctx_id_t)GSS_C_NO_CONTEXT) {
+		if (kctx->gssd_ctx == GSSD_NO_CONTEXT) {
 			KGSS_FREE(kctx);
 			*context_handle = GSS_C_NO_CONTEXT;
 			return (GSS_S_COMPLETE);
@@ -1551,7 +1543,7 @@ gss_buffer_desc token;
 gss_ctx_id_t	internal_ctx_id;
 	kctx = (struct kgss_ctx *)context_handle;
 
-	if (kctx->gssd_ctx != (gssd_ctx_id_t)GSS_C_NO_CONTEXT) {
+	if (kctx->gssd_ctx != GSSD_NO_CONTEXT) {
 		return (GSS_S_FAILURE);
 	}
 
@@ -1794,9 +1786,7 @@ kgss_verify(OM_uint32 *minor_status,
 	if (context_handle == GSS_C_NO_CONTEXT)
 		return (GSS_S_FAILURE);
 	return (KGSS_VERIFY(minor_status, context_handle,
-	    message_buffer,
-	    token_buffer,
-	    qop_state));
+	    message_buffer, token_buffer, qop_state));
 }
 
 /* EXPORT DELETE START */
@@ -2256,8 +2246,8 @@ kgss_inquire_cred_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.cred_handle.GSS_CRED_ID_T_len =
-			cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
-			0 : (uint_t)sizeof (gssd_cred_id_t);
+	    cred_handle == GSSD_NO_CREDENTIAL ?
+	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.cred_handle.GSS_CRED_ID_T_val = (char *)&cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
@@ -2408,8 +2398,8 @@ kgss_inquire_cred_by_mech_wrapped(minor_status,
 	arg.uid = (OM_uint32) uid;
 
 	arg.cred_handle.GSS_CRED_ID_T_len =
-			cred_handle == (gssd_cred_id_t)GSS_C_NO_CREDENTIAL ?
-			0 : (uint_t)sizeof (gssd_cred_id_t);
+	    cred_handle == GSSD_NO_CREDENTIAL ?
+	    0 : (uint_t)sizeof (gssd_cred_id_t);
 	arg.cred_handle.GSS_CRED_ID_T_val = (char *)&cred_handle;
 	arg.gssd_cred_verifier = gssd_cred_verifier;
 
