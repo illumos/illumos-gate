@@ -36,6 +36,7 @@
 #include "sun_fc.h"
 #include <libnvpair.h>
 #include <iostream>
+#include <limits.h>
 
 using namespace std;
 

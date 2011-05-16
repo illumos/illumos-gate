@@ -24,12 +24,12 @@
  */
 
 
-
 #include "Lockable.h"
 #include <iostream>
 #include <cstdio>
 #include <cerrno>
 #include <unistd.h>
+#include <string.h>
 
 using namespace std;
 
