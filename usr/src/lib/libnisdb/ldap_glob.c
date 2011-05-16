@@ -79,13 +79,13 @@ __local_unlockTransLog(const char *msg, int wr) {
 
 int
 __local__nis_lock_db_table(nis_name name, int readwrite, int *trylock,
-				char *msg) {
+				const char *msg) {
 	return (1);
 }
 
 int
 __local__nis_ulock_db_table(nis_name name, int readwrite, int remove,
-				char *msg) {
+				const char *msg) {
 	return (1);
 }
 

@@ -449,9 +449,9 @@ db_list_entries(char *table_name, int numattrs, nis_attr *attrname) {
  * Both the return value and '*tableP' must be freed by the caller.
  */
 char *
-entryName(char *msg, char *objName, char **tableP) {
-	char	*name, *table, *dir;
-	char	*myself = (char *)"entryName";
+entryName(const char *msg, char *objName, char **tableP) {
+	char		*name, *table, *dir;
+	const char	*myself = "entryName";
 
 	if (msg == 0)
 		msg = myself;
@@ -973,7 +973,7 @@ dbRefreshObj(char *name, nis_object *o) {
 	if (strcmp(ROOTDIRFILE, objTable) == 0) {
 		sfree(objTable);
 
-		rstat = update_root_object((char *)ROOTOBJFILE, o);
+		rstat = update_root_object((nis_name)ROOTOBJFILE, o);
 		if (rstat == 1)
 			stat = DB_SUCCESS;
 		else
@@ -1416,7 +1416,7 @@ loadAllLDAP(int fromLDAP, void *cookie, db_status *dstatP) {
 				ent = 0;
 			} else {
 				objPath = 0;
-				ent = entryName((char *)myself, t->objName,
+				ent = entryName(myself, t->objName,
 				    &objPath);
 				if (ent == 0 || objPath == 0) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
