@@ -644,7 +644,7 @@ process_exited(pid_t pid)
  * FUNCTION: reclaim_getent_ctx
  */
 /*ARGSUSED*/
-static void *
+static void * __NORETURN
 reclaim_getent_ctx(void *arg)
 {
 	void			*cookie = NULL;
