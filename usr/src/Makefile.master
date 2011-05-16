@@ -116,6 +116,13 @@ __GNUC64=	$(__GNUC)
 # to the 'next' version of the Sun Studio compiler to be used.
 __SSNEXT=	$(POUND_SIGN)
 
+# set __GNUC4 in the environment to build with GCC 4.4 These two variables are
+# operative even when __GNUC is not, as they affect flags that will be used by
+# the shadow compile.
+__GNUC3=
+__GNUC4=		$(POUND_SIGN)
+$(__GNUC4)__GNUC3=	$(POUND_SIGN)
+
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
 CLOSED=		$(SRC)/../closed
@@ -132,6 +139,11 @@ SFW_ROOT=	/usr/sfw
 SFWINCDIR=	$(SFW_ROOT)/include
 SFWLIBDIR=	$(SFW_ROOT)/lib
 SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
+
+$(__GNUC3)GCC_ROOT=	$(SFW_ROOT)
+$(__GNUC4)GCC_ROOT=	/opt/gcc/4.4.4
+GCCLIBDIR=	$(GCC_ROOT)/lib
+GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
 
 RPCGEN=		/usr/bin/rpcgen
 STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
@@ -377,6 +389,10 @@ XSTRCONST=		-xstrconst
 CERRWARN = -errtags=yes -errwarn=%all
 CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
+
+# Normally cw(1) would translate -v into a set of options including these
+# but as they're GCC 4.x specific, we can't do that
+$(__GNUC4)CERRWARN +=	-_gcc=-Wno-address
 
 #
 # turn warnings into errors (C++)
@@ -640,7 +656,7 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 # Link time macros
 #
 CCNEEDED		= -lC
-$(__GNUC)CCNEEDED	= -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+$(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -R$(GCCLIBDIR) -lstdc++ -lgcc_s
 
 LINK.c=		$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 LINK64.c=	$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS)
@@ -730,7 +746,6 @@ sparcv9_AS=		/usr/ccs/bin/as -xregsym=no
 sparcv9_LD=		/usr/ccs/bin/ld
 sparcv9_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
-# We compile 32-bit objects with cc by default
 i386_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC)i386_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 i386_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
@@ -741,7 +756,6 @@ $(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
 i386_LD=		/usr/ccs/bin/ld
 i386_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
-# We compile 64-bit objects with gcc
 amd64_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC64)amd64_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 amd64_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
