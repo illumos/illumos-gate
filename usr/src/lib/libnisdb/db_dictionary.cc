@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "db_headers.h"
 #include "db_entry.h"
 #include "db_dictionary.h"
@@ -1509,7 +1507,7 @@ db_dictionary::find_table(char *tab, db_table_desc **where,
 	db			*res;
 	int			lstat;
 	db_status		dstat;
-	char			*myself = "db_dictionary::find_table";
+	const char		*myself = "db_dictionary::find_table";
 
 	res = find_table_noLDAP(tab, where, searchDeferred, doLoad);
 	/* If found, or shouldn't try LDAP, we're done */
@@ -1992,9 +1990,9 @@ DECLMUTEXLOCK(db_standby_list);
 static int
 close_standby_list()
 {
-	db	*database;
-	int	i, ret;
-	char	*myself = "close_standby_list";
+	db		*database;
+	int		i, ret;
+	const char	*myself = "close_standby_list";
 
 	MUTEXLOCK(db_standby_list, "close_standby_list");
 
@@ -2046,8 +2044,8 @@ close_standby_list()
 int
 add_to_standby_list(db* database)
 {
-	int	i;
-	char	*myself = "add_to_standby_list";
+	int		i;
+	const char	*myself = "add_to_standby_list";
 
 	MUTEXLOCK(db_standby_list, "add_to_standby_list");
 
@@ -2239,7 +2237,7 @@ db_dictionary::defer(char *table) {
 	WRITELOCK(this, DB_LOCK_ERROR, "w db_dictionary::defer");
 	db_table_desc	*tbl = find_table_desc(table);
 	int		res;
-	char		*myself = "db_dictionary::defer";
+	const char	*myself = "db_dictionary::defer";
 
 	if (tbl != NULL) {
 		db_table_desc	*clone, *savenext = tbl->next;
