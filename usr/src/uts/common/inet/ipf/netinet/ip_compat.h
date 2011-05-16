@@ -1777,7 +1777,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	IP_HL(x)	(x)->ip_hl
 #endif
 #ifndef	IP_HL_A
-# define	IP_HL_A(x,y)	(x)->ip_hl = (y)
+# define	IP_HL_A(x,y)	(x)->ip_hl = (y & 0xf)
 #endif
 #ifndef	TCP_X2
 # define	TCP_X2(x)	(x)->th_x2
