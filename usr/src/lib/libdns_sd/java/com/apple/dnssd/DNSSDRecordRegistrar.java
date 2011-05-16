@@ -5,9 +5,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,9 +25,6 @@ Re-licensed mDNSResponder daemon source code under Apache License, Version 2.0
 
 Revision 1.1  2006/06/20 23:00:12  rpantos
 <rdar://problem/3839132> Java needs to implement DNSServiceRegisterRecord equivalent
-
-ident	"%Z%%M%	%I%	%E% SMI"
-
  */
 
 
@@ -38,7 +35,7 @@ package	com.apple.dnssd;
 
 public interface	DNSSDRecordRegistrar extends DNSSDService
 {
-	/** Register an independent {@link DNSRecord}.<P> 
+	/** Register an independent {@link DNSRecord}.<P>
 		@param	flags
 					Possible values are SHARED or UNIQUE (see flag type definitions for details).
 		<P>
@@ -55,25 +52,22 @@ public interface	DNSSDRecordRegistrar extends DNSSDService
 					as defined in nameser.h.
 		<P>
 		@param	rrclass
-					The class of the resource record, as defined in nameser.h 
+					The class of the resource record, as defined in nameser.h
 					(usually 1 for the Internet class).
 		<P>
-		@param	rData
+		@param	rdata
 					The new rdata  as it is to appear in the DNS record.
 		<P>
 		@param	ttl
 					The time to live of the resource record, in seconds. Pass 0 to use a default value.
-		<P>
-		@param	listener
-					This object will get called when the service is registered.
 		<P>
 		@return		A {@link DNSSDService} that can be used to abort the record registration.
 
 		@throws SecurityException If a security manager is present and denies <tt>RuntimePermission("getDNSSDInstance")</tt>.
 		@see    RuntimePermission
 	*/
-	public DNSRecord	registerRecord( int flags, int ifIndex, String fullname, int rrtype, 
+	public DNSRecord	registerRecord( int flags, int ifIndex, String fullname, int rrtype,
 									int rrclass, byte[] rdata, int ttl)
 	throws DNSSDException;
-} 
+}
 
