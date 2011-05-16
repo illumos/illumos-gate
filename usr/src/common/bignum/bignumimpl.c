@@ -1462,7 +1462,7 @@ big_sqr_vec(BIG_CHUNK_TYPE *r, BIG_CHUNK_TYPE *a, int len)
 #else /* ! UMUL64 */
 
 #if (BIG_CHUNK_SIZE != 32)
-#error Don't use 64-bit chunks without defining UMUL64
+#error "Don't use 64-bit chunks without defining UMUL64"
 #endif
 
 
