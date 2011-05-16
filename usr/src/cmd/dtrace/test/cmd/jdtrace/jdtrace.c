@@ -58,5 +58,6 @@ main(int argc, char **argv)
 		asprintf(av, "/usr/java/bin/%s/java", isaname);
 
 	(void) execv(av[0], av);
-	err(1, "exec failed");
+	perror("exec");
+	return (1);
 }
