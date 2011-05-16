@@ -3295,7 +3295,7 @@ hald_exec_method_cb (HalDevice *d, guint32 exit_type,
 			 * otherwise, dbus will be messed up.
 			 */
 			invalid_name = TRUE;
-			exp_detail = g_strconcat (exp_name, " \n ", exp_detail, NULL);
+			exp_detail = g_strconcat (exp_name, " \n ", exp_detail, (void *)NULL);
 			exp_name = "org.freedesktop.Hal.Device.UnknownError";
 		}
 		reply = dbus_message_new_error (message, exp_name, exp_detail);
