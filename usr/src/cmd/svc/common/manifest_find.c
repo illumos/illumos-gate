@@ -258,7 +258,7 @@ find_manifests(scf_handle_t *hndl, const char *dir,
 
 	tsdp = get_thread_specific_data();
 	if (tsdp == NULL)
-		return (NULL);
+		return (-1);
 
 	tsdp->tsd_flags = flags;
 
