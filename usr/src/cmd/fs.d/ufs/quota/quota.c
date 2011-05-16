@@ -289,8 +289,8 @@ showquotas(uid_t uid, char *name)
 			 */
 			if ((mntopt = hasmntopt(&mnt, MNTOPT_ZONE)) &&
 			    (my_zonename[0] != '\0')) {
-				mntopt += strcspn(mntopt, "=");
-				if (strncmp(++mntopt, my_zonename,
+				mntopt += strcspn(mntopt, "=") + 1;
+				if (strncmp(mntopt, my_zonename,
 				    strcspn(mntopt, ",")) != 0)
 					continue;
 			}
