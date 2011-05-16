@@ -2552,25 +2552,25 @@ ql_get_serdes_regs(qlge_t *qlge, struct ql_mpi_coredump *mpi_coredump)
 		}
 	}
 
-	for (i = 0x1c00; i <= 0x1c1f; i++) {
+	for (i = 0x1c00, j = 0; i <= 0x1c1f; i++) {
 		status = ql_read_serdes_reg(qlge, i,
-		    &mpi_coredump->serdes_xfi_hss_tx[i]);
+		    &mpi_coredump->serdes_xfi_hss_tx[j++]);
 		if (status != DDI_SUCCESS) {
 			goto err;
 		}
 	}
 
-	for (i = 0x1c40; i <= 0x1c5f; i++) {
+	for (i = 0x1c40, j = 0; i <= 0x1c5f; i++) {
 		status = ql_read_serdes_reg(qlge, i,
-		    &mpi_coredump->serdes_xfi_hss_rx[i]);
+		    &mpi_coredump->serdes_xfi_hss_rx[j++]);
 		if (status != DDI_SUCCESS) {
 			goto err;
 		}
 	}
 
-	for (i = 0x1e00; i <= 0x1e1f; i++) {
+	for (i = 0x1e00, j = 0; i <= 0x1e1f; i++) {
 		status = ql_read_serdes_reg(qlge, i,
-		    &mpi_coredump->serdes_xfi_hss_pll[i]);
+		    &mpi_coredump->serdes_xfi_hss_pll[j++]);
 		if (status != DDI_SUCCESS) {
 			goto err;
 		}
