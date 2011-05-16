@@ -1518,8 +1518,9 @@ KMS_AGENT_STATUS KMSAgent_CreateKey (
     CAutoMutex oAutoMutex((K_MUTEX_HANDLE) i_pProfile->m_pLock);
 
     struct KMS_Agent::KMS_Agent__DataUnit
-                        stDataUnit = {"", "", "", "",
-                            (KMS_Agent::KMS_Agent__DataUnitState) 0};
+                        stDataUnit = {(char *)"", (char *)"", (char *)"",
+                                      (char *)"",
+				      (KMS_Agent::KMS_Agent__DataUnitState) 0};
 
     struct soap *pstSoap = (struct soap *) i_pProfile->m_pvSoap;
     struct KMS_Agent::KMS_Agent__CreateKeyResponse oResponse;
@@ -2120,7 +2121,8 @@ KMS_AGENT_STATUS KMSAgent_DisassociateDataUnitKeys (
 
     CAutoMutex oAutoMutex((K_MUTEX_HANDLE) i_pProfile->m_pLock);
 
-    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {"", "", "", "",
+    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {(char *)"",
+        (char *)"", (char *)"", (char *)"",
         (KMS_Agent::KMS_Agent__DataUnitState) 0};
 
     struct soap *pstSoap = (struct soap *) i_pProfile->m_pvSoap;
@@ -2262,7 +2264,8 @@ KMS_AGENT_STATUS KMSAgent_RetrieveKey (
         RETURN(KMS_AGENT_STATUS_INVALID_PARAMETER);
     }
 
-    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {"", "", "", "",
+    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {
+        (char *)"", (char *)"", (char *)"", (char *)"",
         (KMS_Agent::KMS_Agent__DataUnitState) 0};
 
     struct soap *pstSoap = (struct soap *) i_pProfile->m_pvSoap;
@@ -3146,7 +3149,8 @@ KMS_AGENT_STATUS KMSAgent_RetrieveDataUnitKeys (
 
     // prepare args to soap transaction
 
-    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {"", "", "", "",
+    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {
+        (char *)"", (char *)"", (char *)"", (char *)"",
         (KMS_Agent::KMS_Agent__DataUnitState) 0};
 
     struct soap *pstSoap = (struct soap *) i_pProfile->m_pvSoap;
@@ -3380,7 +3384,8 @@ KMS_AGENT_STATUS KMSAgent_RetrieveProtectAndProcessKey (
 
     CAutoMutex oAutoMutex((K_MUTEX_HANDLE) i_pProfile->m_pLock);
 
-    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit ={"", "", "", "",
+    struct KMS_Agent::KMS_Agent__DataUnit stDataUnit = {
+        (char *)"", (char *)"", (char *)"", (char *)"",
         (KMS_Agent::KMS_Agent__DataUnitState) 0};
 
     struct soap *pstSoap = (struct soap *) i_pProfile->m_pvSoap;
