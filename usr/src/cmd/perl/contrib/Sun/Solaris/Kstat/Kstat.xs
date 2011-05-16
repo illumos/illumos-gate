@@ -133,7 +133,7 @@
     newSVnv((NVTYPE) (V / 1000000000.0))
 
 #define	SAVE_FNP(H, F, K) \
-    hv_store(H, K, sizeof (K) - 1, newSViv((IVTYPE) &F), 0)
+    hv_store(H, K, sizeof (K) - 1, newSViv((IVTYPE)(uintptr_t)&F), 0)
 #define	SAVE_STRING(H, S, K, SS) \
     hv_store(H, #K, sizeof (#K) - 1, \
     newSVpvn(S->K, SS ? strlen(S->K) : sizeof(S->K)), 0)
