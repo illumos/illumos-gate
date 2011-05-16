@@ -39,7 +39,7 @@ extern "C" {
 extern int	useLDAPrespository;
 
 void		db_free_result(db_result *dr);
-char		*entryName(char *msg, char *objName, char **tableP);
+char		*entryName(const char *msg, char *objName, char **tableP);
 nis_object	*dbFindObject(char *objName, db_status *statP);
 db_status	dbDeleteObj(char *objName);
 db_status	dbTouchObj(char *objName);

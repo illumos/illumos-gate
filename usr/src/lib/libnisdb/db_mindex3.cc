@@ -99,7 +99,7 @@ db_mindex::entriesFromLDAP(__nis_table_mapping_t *t, db_query *qin, db_query *q,
 	__entries_from_ldap_arg_t	*arg;
 	int				stat;
 	db_status			dstat;
-	char				*myself = "db_mindex::entriesFromLDAP";
+	const char			*myself = "db_mindex::entriesFromLDAP";
 
 	arg = (__entries_from_ldap_arg_t *)am(myself, sizeof (*arg));
 	if (arg == 0) {
@@ -343,7 +343,7 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 	bool_t				doEnum;
 	db_status			dstat;
 	struct timeval			start;
-	char				*myself =
+	const char			*myself =
 					"db_mindex::entriesFromLDAPreal";
 
 	if (arg == 0)
@@ -708,9 +708,9 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 				o.zo_ttl = to->zo_ttl;
 		} else {
 			tc = 0;
-			o.zo_owner = "";
-			o.zo_group = "";
-			o.zo_domain = "";
+			o.zo_owner = (nis_name)"";
+			o.zo_group = (nis_name)"";
+			o.zo_domain = (nis_name)"";
 		}
 
 		o.zo_data.zo_type = NIS_ENTRY_OBJ;

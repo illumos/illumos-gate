@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
@@ -398,7 +396,7 @@ db_table::allocateExpire(long oldSize, long newSize) {
 db_status
 db_table::allocateEnumArray(long oldSize, long newSize) {
 	entry_object	**newEnumArray;
-	char		*myself = "db_table::allocateEnumArray";
+	const char	*myself = "db_table::allocateEnumArray";
 
 	if (enumCount.flag > 0) {
 		if (enumIndex.ptr == 0) {
@@ -558,7 +556,7 @@ db_table::get_entry(entryp where)
 void
 db_table::setEntryExp(entryp where, entry_obj *obj, int initialLoad) {
 	nis_object		*o;
-	char			*myself = "db_table::setEntryExp";
+	const char		*myself = "db_table::setEntryExp";
 
 	/*
 	 * If we don't know what type of object this is yet, we
@@ -766,7 +764,7 @@ bool_t
 db_table::configure(char *tablePath) {
 	long		i;
 	struct timeval	now;
-	char		*myself = "db_table::configure";
+	const char	*myself = "db_table::configure";
 
 	(void) gettimeofday(&now, NULL);
 
@@ -951,7 +949,7 @@ db_table::dupEntry(entry_object *obj, entryp loc) {
  */
 void
 db_table::setEnumMode(long enumNum) {
-	char	*myself = "setEnumMode";
+	const char	*myself = "setEnumMode";
 
 	enumMode.flag++;
 	if (enumMode.flag == 1) {

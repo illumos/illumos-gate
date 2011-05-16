@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ldap_glob.h"
 
 /* These are the local versions we use if the app doesn't provide overrides */
@@ -71,23 +69,23 @@ __local_addUpdate(log_entry_t type, char *name, int numAttr, nis_attr *attr,
 }
 
 int
-__local_lockTransLog(char *msg, int wr, int trylock) {
+__local_lockTransLog(const char *msg, int wr, int trylock) {
 	return (0);
 }
 
 void
-__local_unlockTransLog(char *msg, int wr) {
+__local_unlockTransLog(const char *msg, int wr) {
 }
 
 int
 __local__nis_lock_db_table(nis_name name, int readwrite, int *trylock,
-				char *msg) {
+				const char *msg) {
 	return (1);
 }
 
 int
 __local__nis_ulock_db_table(nis_name name, int readwrite, int remove,
-				char *msg) {
+				const char *msg) {
 	return (1);
 }
 
