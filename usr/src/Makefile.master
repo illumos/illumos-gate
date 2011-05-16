@@ -98,10 +98,13 @@ STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
 TONICBUILD=     $(POUND_SIGN)
 $(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
 
-
 # set __GNUC= in the environment to build 32-bit with the gcc compiler.
 # The default is to use the Sun Studio compiler for all processor types.
 __GNUC=		$(POUND_SIGN)
+
+# __SUNC is the default, Sun C compiler, set to $(POUND_SIGN) if __GNUC is
+# primary to facilitate conditional make rules.
+$(__GNUC)__SUNC=	$(POUND_SIGN)
 
 # set __GNUC64= in the environment to build 64-bit with the gcc compiler.
 # Inherit the __GNUC value by default, and if that is set to $(POUND_SIGN)
