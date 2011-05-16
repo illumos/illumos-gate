@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <jni.h>
 #include <kadm5/admin.h>
 #include <adm_err.h>
@@ -162,8 +160,8 @@ Java_Kadmin_sessionInit(JNIEnv *env, jobject obj, jstring name,
 	}
 
 	ret = kadm5_init_with_password(ka_name, (char *)cpasswd,
-				ka_service, &params, KADM5_STRUCT_VERSION,
-				KADM5_API_VERSION_2, NULL, &server_handle);
+	    ka_service, &params, KADM5_STRUCT_VERSION, KADM5_API_VERSION_2,
+	    NULL, &server_handle);
 
 	/* Release string arguments and variables */
 	if (cname)
@@ -297,7 +295,9 @@ Java_Kadmin_getEncList(JNIEnv *env,
 		handle_error(env, errno);
 		return (NULL);
 	}
-	for (i = 0; i < num_keysalts; grp[i] = i++);
+	for (i = 0; i < num_keysalts; i++)
+		grp[i] = i;
+
 	for (i = 0; i < num_keysalts; i++) {
 		if (grp[i] != i)
 			continue;
@@ -548,7 +548,7 @@ Java_Kadmin_savePrincipal(JNIEnv *env, jobject obj, jobject prin)
 	memset((char *)&pr_rec, 0, sizeof (pr_rec));
 	memset((char *)&params, 0, sizeof (params));
 	ret = Principal_to_kadmin(env, prin, 0, &kprin, &pr_rec, &mask,
-					&pw, &comments, &params);
+	    &pw, &comments, &params);
 	if (ret) {
 		handle_error(env, ret);
 		return (JNI_FALSE);
@@ -615,7 +615,7 @@ Java_Kadmin_createPrincipal(JNIEnv *env, jobject obj, jobject prin)
 	memset((char *)&pr_rec, 0, sizeof (pr_rec));
 	memset((char *)&params, 0, sizeof (params));
 	ret = Principal_to_kadmin(env, prin, 1, &kprin, &pr_rec, &mask,
-					&pw, &comments, &params);
+	    &pw, &comments, &params);
 	if (ret) {
 		handle_error(env, ret);
 		return (JNI_FALSE);
@@ -626,7 +626,7 @@ Java_Kadmin_createPrincipal(JNIEnv *env, jobject obj, jobject prin)
 	 */
 	if (params.mask & KADM5_CONFIG_ENCTYPES) {
 		ret = kadm5_create_principal_3(server_handle, &pr_rec, mask,
-			params.num_keysalts, params.keysalts, pw);
+		    params.num_keysalts, params.keysalts, pw);
 		if (params.keysalts != NULL)
 			free(params.keysalts);
 	} else
@@ -1068,7 +1068,7 @@ Principal_to_kadmin(JNIEnv *env, jobject prin, int new, krb5_principal *kprin,
 	if (b == JNI_TRUE) {
 
 		f = (*env)->GetFieldID(env, prcl, "Comments",
-				"Ljava/lang/String;");
+		    "Ljava/lang/String;");
 		if (!f)
 			return (KADM_JNI_FIELD);
 		obj = (*env)->GetObjectField(env, prin, f);
@@ -1101,7 +1101,7 @@ Principal_to_kadmin(JNIEnv *env, jobject prin, int new, krb5_principal *kprin,
 	 * Get the Principal.flags field id
 	 */
 	flagsID = (*env)->GetFieldID(env, prcl, "flags",
-				    "LFlags;");
+	    "LFlags;");
 	if (!f)
 		return (KADM_JNI_FIELD);
 
@@ -1197,7 +1197,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!obj)
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
-			(jlong) (p->princ_expire_time * 1000LL));
+	    (jlong) (p->princ_expire_time * 1000LL));
 
 	f = (*env)->GetFieldID(env, prcl, "EncTypes", "Ljava/lang/String;");
 	if (!f)
@@ -1270,7 +1270,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!obj)
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
-			(jlong) (p->last_pwd_change * 1000LL));
+	    (jlong) (p->last_pwd_change * 1000LL));
 
 	f = (*env)->GetFieldID(env, prcl, "PwExpireTime", "Ljava/util/Date;");
 	if (!f)
@@ -1282,7 +1282,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!obj)
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
-			(jlong) (p->pw_expiration * 1000LL));
+	    (jlong) (p->pw_expiration * 1000LL));
 
 	f = (*env)->GetFieldID(env, prcl, "MaxLife", "Ljava/lang/Integer;");
 	if (!f)
@@ -1302,7 +1302,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!mid)
 		return (KADM_JNI_METHOD);
 	obj = (*env)->NewObject(env, intclass, mid,
-			(jint) p->max_renewable_life);
+	    (jint) p->max_renewable_life);
 	if (!obj)
 		return (KADM_JNI_OBJECT);
 	(*env)->SetObjectField(env, prin, f, obj);
@@ -1317,7 +1317,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!obj)
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
-			(jlong) (p->mod_date * 1000LL));
+	    (jlong) (p->mod_date * 1000LL));
 
 	ret = krb5_init_context(&context);
 	if (ret)
@@ -1344,7 +1344,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!obj)
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
-			(jlong) (p->last_success * 1000LL));
+	    (jlong) (p->last_success * 1000LL));
 
 	f = (*env)->GetFieldID(env, prcl, "LastFailure", "Ljava/util/Date;");
 	if (!f)
@@ -1356,7 +1356,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!obj)
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
-			(jlong) (p->last_failed * 1000LL));
+	    (jlong) (p->last_failed * 1000LL));
 
 	f = (*env)->GetFieldID(env, prcl, "NumFailures", "Ljava/lang/Integer;");
 	if (!f)
@@ -1365,7 +1365,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	if (!mid)
 		return (KADM_JNI_METHOD);
 	obj = (*env)->NewObject(env, intclass, mid,
-			(jint) p->fail_auth_count);
+	    (jint) p->fail_auth_count);
 	if (!obj)
 		return (KADM_JNI_OBJECT);
 	(*env)->SetObjectField(env, prin, f, obj);
@@ -1410,7 +1410,7 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	 * Get the Principal.flags field id
 	 */
 	flagsID = (*env)->GetFieldID(env, prcl, "flags",
-				    "LFlags;");
+	    "LFlags;");
 	if (!f)
 		return (KADM_JNI_FIELD);
 
@@ -1515,7 +1515,7 @@ Policy_to_kadmin(JNIEnv *env, jobject pol, int new,
 	*mask |= KADM5_PW_MIN_LENGTH;
 
 	f = (*env)->GetFieldID(env, pocl, "PwMinClasses",
-				"Ljava/lang/Integer;");
+	    "Ljava/lang/Integer;");
 	if (!f)
 		return (KADM_JNI_FIELD);
 	obj = (*env)->GetObjectField(env, pol, f);
@@ -1602,7 +1602,7 @@ kadmin_to_Policy(kadm5_policy_ent_rec *p, JNIEnv *env, jobject pol)
 	(*env)->SetObjectField(env, pol, f, obj);
 
 	f = (*env)->GetFieldID(env, pocl, "PwMinClasses",
-				"Ljava/lang/Integer;");
+	    "Ljava/lang/Integer;");
 	if (!f)
 		return (KADM_JNI_FIELD);
 	mid = (*env)->GetMethodID(env, intclass, "<init>", "(I)V");
@@ -1789,5 +1789,5 @@ handle_error(JNIEnv *env, int error)
 		}
 	}
 	(*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/Exception"),
-			(const char *)s);
+	    (const char *)s);
 }
