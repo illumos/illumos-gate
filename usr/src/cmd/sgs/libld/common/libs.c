@@ -602,7 +602,7 @@ ar_extract_bysym(const char *name, int fd, Ar_desc *adp,
 				/* Construct the member's full pathname */
 				if ((arpath = ar_member_path(name, arname)) ==
 				    NULL)
-					return (S_ERROR);
+					return (FALSE);
 
 				/*
 				 * Determine whether the support libraries wish
@@ -769,7 +769,7 @@ ar_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
 
 		/* Construct the member's full pathname */
 		if ((arpath = ar_member_path(name, arname)) == NULL)
-			return (S_ERROR);
+			return (FALSE);
 
 		/*
 		 * Determine whether the support libraries wish to process
