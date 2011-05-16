@@ -31,6 +31,7 @@
  */
 #include	<stdio.h>
 #include	<string.h>
+#include	<errno.h>
 #include	<ar.h>
 #include	<debug.h>
 #include	"msg.h"
@@ -334,18 +335,22 @@ ar_member_name(const char *name, Elf *arelf, Ofl_desc *ofl)
  * entry:
  *	name - Name of archive
  *	arname - Name of archive member
+ *	ofl - output descriptor
  * exit:
  *	Returns pointer to constructed pathname on success, NULL on error.
  */
 static const char *
-ar_member_path(const char *name, const char *arname)
+ar_member_path(const char *name, const char *arname, Ofl_desc *ofl)
 {
 	size_t		len;
 	char		*path;
 
 	len = strlen(name) + strlen(arname) + 3;
-	if ((path = libld_malloc(len)) == NULL)
+	if ((path = libld_malloc(len)) == NULL) {
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYS_MALLOC),
+		    strerror(errno));
 		return (NULL);
+	}
 	(void) snprintf(path, len, MSG_ORIG(MSG_FMT_ARMEM), name, arname);
 	return (path);
 }
@@ -600,9 +605,9 @@ ar_extract_bysym(const char *name, int fd, Ar_desc *adp,
 					return (FALSE);
 
 				/* Construct the member's full pathname */
-				if ((arpath = ar_member_path(name, arname)) ==
-				    NULL)
-					return (S_ERROR);
+				if ((arpath = ar_member_path(name, arname,
+				    ofl)) == NULL)
+					return (FALSE);
 
 				/*
 				 * Determine whether the support libraries wish
@@ -768,8 +773,8 @@ ar_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
 		next_off = _elf_getnextoff(adp->ad_elf);
 
 		/* Construct the member's full pathname */
-		if ((arpath = ar_member_path(name, arname)) == NULL)
-			return (S_ERROR);
+		if ((arpath = ar_member_path(name, arname, ofl)) == NULL)
+			return (FALSE);
 
 		/*
 		 * Determine whether the support libraries wish to process
