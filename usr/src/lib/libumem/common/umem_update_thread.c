@@ -24,15 +24,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "umem_base.h"
 #include "vmem_base.h"
 
 #include <signal.h>
 
 /*ARGSUSED*/
-static void *
+static void * __NORETURN
 umem_update_thread(void *arg)
 {
 	struct timeval now;
