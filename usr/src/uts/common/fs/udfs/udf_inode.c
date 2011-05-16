@@ -1237,7 +1237,7 @@ ud_iupdat(struct ud_inode *ip, int32_t waitfor)
 
 		ud_update_regid(&fe->fe_impl_id);
 
-		crc_len = ((uint32_t)&((struct file_entry *)0)->fe_spec) +
+		crc_len = offsetof(struct file_entry, fe_spec) +
 		    SWAP_32(fe->fe_len_ear);
 		if (ip->i_desc_type == ICB_FLAG_ONE_AD) {
 			crc_len += ip->i_size;

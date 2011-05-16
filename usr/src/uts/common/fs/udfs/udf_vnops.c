@@ -2831,7 +2831,7 @@ ud_putapage(struct vnode *vp,
 			(void) kcopy(kaddr, caddr, ip->i_size);
 			ppmapout(kaddr);
 		}
-		crc_len = ((uint32_t)&((struct file_entry *)0)->fe_spec) +
+		crc_len = offsetof(struct file_entry, fe_spec) +
 		    SWAP_32(fe->fe_len_ear);
 		crc_len += ip->i_size;
 		ud_make_tag(ip->i_udf, &fe->fe_tag,
