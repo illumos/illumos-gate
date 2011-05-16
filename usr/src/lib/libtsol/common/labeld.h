@@ -26,8 +26,6 @@
 #ifndef	_LABELD_H
 #define	_LABELD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <tsol/label.h>
 #include <sys/tsol/label_macro.h>
@@ -45,7 +43,7 @@ extern "C" {
 
 #define	DOOR_PATH	"/var/tsol/doors/"
 #define	DOOR_NAME	"labeld"
-#define	COOKIE		(void *)0x6c616264	/* "labd" */
+#define	COOKIE		0x6c616264ull	/* "labd" */
 
 /*	Op codes */
 
