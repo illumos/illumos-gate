@@ -278,7 +278,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			}
 		} else {
 			inqp = (struct scsi_inquiry *)rp;
-			inqp->inq_qual = (LE_16(id->word0) & 0x80) ? 0x80 : 0;
+			inqp->inq_qual = 0;
 			inqp->inq_ansi = 5;	/* spc3 */
 			inqp->inq_rdf = 2;	/* response format 2 */
 			inqp->inq_len = 32;
