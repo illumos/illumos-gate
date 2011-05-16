@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -174,7 +172,7 @@ merge_table_mapping(
 	}
 
 	if (out->commentChar == DEFAULT_COMMENT_CHAR &&
-		in->commentChar != DEFAULT_COMMENT_CHAR)
+	    in->commentChar != DEFAULT_COMMENT_CHAR)
 		out->commentChar = in->commentChar;
 
 	if (out->usedns_flag == 0)
@@ -183,8 +181,8 @@ merge_table_mapping(
 	if (out->securemap_flag == 0)
 		out->securemap_flag = in->securemap_flag;
 
-	if (out->separatorStr == DEFAULT_SEP_STRING &&
-		in->separatorStr != DEFAULT_SEP_STRING) {
+	if ((strcmp(out->separatorStr, DEFAULT_SEP_STRING) == 0) &&
+	    (strcmp(in->separatorStr, DEFAULT_SEP_STRING) != 0)) {
 		out->separatorStr = s_strdup(in->separatorStr);
 		if (!out->separatorStr)
 			return (2);
@@ -193,8 +191,8 @@ merge_table_mapping(
 	if (!out->numSplits && !out->e && in->e) {
 		out->numSplits = in->numSplits;
 		out->e = (__nis_mapping_element_t *)
-			s_calloc(1, (in->numSplits+1) *
-			sizeof (__nis_mapping_element_t));
+		    s_calloc(1, (in->numSplits+1) *
+		    sizeof (__nis_mapping_element_t));
 		if (!out->e)
 			return (2);
 		for (i = 0; i <= in->numSplits; i++) {
@@ -209,20 +207,20 @@ merge_table_mapping(
 	}
 
 	if (out->initTtlLo == (time_t)NO_VALUE_SET &&
-		in->initTtlLo != (time_t)NO_VALUE_SET)
+	    in->initTtlLo != (time_t)NO_VALUE_SET)
 		out->initTtlLo = in->initTtlLo;
 
 	if (out->initTtlHi == (time_t)NO_VALUE_SET &&
-		in->initTtlHi != (time_t)NO_VALUE_SET)
+	    in->initTtlHi != (time_t)NO_VALUE_SET)
 		out->initTtlHi = in->initTtlHi;
 
 	if (out->ttl == (time_t)NO_VALUE_SET &&
-		in->ttl != (time_t)NO_VALUE_SET)
+	    in->ttl != (time_t)NO_VALUE_SET)
 		out->ttl = in->ttl;
 
 	if (!out->numRulesFromLDAP && in->numRulesFromLDAP) {
 		out->ruleFromLDAP = dup_mapping_rules(in->ruleFromLDAP,
-			in->numRulesFromLDAP);
+		    in->numRulesFromLDAP);
 		if (!out->ruleFromLDAP)
 			return (1);
 		out->numRulesFromLDAP = in->numRulesFromLDAP;
@@ -231,7 +229,7 @@ merge_table_mapping(
 		for (i = 0; i < in->numRulesFromLDAP; i++) {
 			if (append_mapping_rule(in->ruleFromLDAP[i], out, 0)) {
 				for (i = out->numRulesFromLDAP;
-					i > orig_num_rules; i--) {
+				    i > orig_num_rules; i--) {
 					free_mapping_rule(out->ruleFromLDAP[i]);
 					out->ruleFromLDAP[i] = NULL;
 				}
@@ -243,7 +241,7 @@ merge_table_mapping(
 
 	if (!out->numRulesToLDAP && in->numRulesToLDAP) {
 		out->ruleToLDAP = dup_mapping_rules(in->ruleToLDAP,
-			in->numRulesToLDAP);
+		    in->numRulesToLDAP);
 		if (!out->ruleToLDAP)
 			return (1);
 		out->numRulesToLDAP = in->numRulesToLDAP;
@@ -252,7 +250,7 @@ merge_table_mapping(
 		for (i = 0; i < in->numRulesToLDAP; i++) {
 			if (append_mapping_rule(in->ruleToLDAP[i], out, 1)) {
 				for (i = out->numRulesToLDAP;
-					i > orig_num_rules; i--) {
+				    i > orig_num_rules; i--) {
 					free_mapping_rule(out->ruleToLDAP[i]);
 					out->ruleToLDAP[i] = NULL;
 				}
@@ -262,7 +260,7 @@ merge_table_mapping(
 	}
 	if (!out->objectDN && in->objectDN) {
 		out->objectDN = (__nis_object_dn_t *)
-			s_calloc(1, sizeof (__nis_object_dn_t));
+		    s_calloc(1, sizeof (__nis_object_dn_t));
 		if (!out->objectDN)
 			return (2);
 		if (copy_object_dn(in->objectDN, out->objectDN)) {
@@ -274,9 +272,9 @@ merge_table_mapping(
 
 	if (!out->objName && in->objName) {
 		if (!strchr(in->objName, SPACE_CHAR)) {
-		/* objName has no space- a single map dbIdMapping */
+			/* objName has no space- a single map dbIdMapping */
 			out->objName = s_strndup(in->objName,
-				strlen(in->objName));
+			    strlen(in->objName));
 			if (!out->objName)
 				return (2);
 		}
@@ -306,9 +304,7 @@ merge_table_mapping(
  */
 
 static int
-copy_object_dn(
-	__nis_object_dn_t	*in,
-	__nis_object_dn_t	*newdn)
+copy_object_dn(__nis_object_dn_t *in, __nis_object_dn_t *newdn)
 {
 	if (in == NULL) {
 		p_error = parse_no_object_dn;
@@ -319,16 +315,14 @@ copy_object_dn(
 			newdn->read.base = NULL;
 		} else {
 			newdn->read.base = s_strndup(
-				in->read.base,
-				strlen(in->read.base));
+			    in->read.base, strlen(in->read.base));
 			if (newdn->read.base == NULL)
 				return (2);
 		}
 		newdn->read.scope = in->read.scope;
 		if (in->read.attrs) {
 			newdn->read.attrs = s_strndup(
-					in->read.attrs,
-					strlen(in->read.attrs));
+			    in->read.attrs, strlen(in->read.attrs));
 			if (newdn->read.attrs == NULL) {
 				return (2);
 			}
@@ -338,8 +332,7 @@ copy_object_dn(
 		newdn->read.element = in->read.element;
 		if (in->write.base != NULL) {
 			newdn->write.base = s_strndup(
-				in->write.base,
-				strlen(in->write.base));
+			    in->write.base, strlen(in->write.base));
 			if (newdn->write.base == NULL)
 				return (2);
 		} else {
@@ -348,8 +341,7 @@ copy_object_dn(
 		newdn->write.scope = in->write.scope;
 		if (in->write.attrs != NULL) {
 			newdn->write.attrs = s_strndup(
-				in->write.attrs,
-				strlen(in->write.attrs));
+			    in->write.attrs, strlen(in->write.attrs));
 			if (newdn->write.attrs == NULL) {
 				return (2);
 			}
@@ -359,7 +351,7 @@ copy_object_dn(
 		newdn->write.element = in->write.element;
 		if (in->dbIdName) {
 			newdn->dbIdName = s_strndup(in->dbIdName,
-						strlen(in->dbIdName));
+			    strlen(in->dbIdName));
 			if (newdn->dbIdName == NULL)
 				return (2);
 		}
@@ -369,14 +361,14 @@ copy_object_dn(
 
 		if (in->dbId && in->numDbIds > 0) {
 			newdn->dbId = dup_mapping_rules(in->dbId,
-					in->numDbIds);
+			    in->numDbIds);
 			if (!newdn->dbId)
 				return (1);
 			newdn->numDbIds = in->numDbIds;
 		}
 		if (in->next != NULL) {
 			newdn->next = (__nis_object_dn_t *)s_calloc(1,
-					sizeof (__nis_object_dn_t));
+			    sizeof (__nis_object_dn_t));
 			if (newdn->next == NULL)
 				return (1);
 			newdn = newdn->next;
@@ -417,8 +409,8 @@ free_yp_domain_context(__yp_domain_context_t *domains)
 		for (i = 0; i < domains->numYppasswdd; i++) {
 			if (domains->yppasswddDomainLabels[i] != NULL) {
 				free(domains->yppasswddDomainLabels[i]);
-				domains->yppasswddDomainLabels[i]
-					= NULL;
+				domains->yppasswddDomainLabels[i] =
+				    NULL;
 			}
 		}
 		domains->yppasswddDomainLabels = NULL;
@@ -437,8 +429,7 @@ free_yp_domain_context(__yp_domain_context_t *domains)
  * RETURN VALUE: 0 on success, > 0 on failure.
  */
 int
-second_parser_pass(
-	__nis_table_mapping_t   **table_mapping)
+second_parser_pass(__nis_table_mapping_t **table_mapping)
 {
 	__nis_table_mapping_t   *t, *t2;
 	__nis_table_mapping_t   *t_new = NULL, *tg;
@@ -466,7 +457,7 @@ second_parser_pass(
 		if (!t->dbId) {
 			p_error = parse_bad_map_error;
 			logmsg(MSG_NOTIMECHECK, LOG_ERR,
-			"%s: no dbId field", myself);
+			    "%s: no dbId field", myself);
 			return (1);
 		}
 		tg = NULL;
@@ -476,24 +467,25 @@ second_parser_pass(
 			if (objName == NULL) {
 				p_error = parse_no_mem_error;
 				logmsg(MSG_NOMEM, LOG_ERR,
-		"%s: Cannot allocate memory for objName", myself);
+				    "%s: Cannot allocate memory for objName",
+				    myself);
 				return (1);
 			}
 			objs = (char *)strtok_r(objName, " ", &lasts);
 			/* Get the generic mapping */
 			if (dom != NULL) {
 				tg = find_table_mapping(t->dbId, dom - t->dbId,
-								*table_mapping);
+				    *table_mapping);
 			}
 		} else {
 			objs = NULL;
 			if (dom == NULL) {
 				t->objName = s_strndup(t->dbId,
-						strlen(t->dbId));
+				    strlen(t->dbId));
 				if (!t->objName) {
 					logmsg(MSG_NOMEM, LOG_ERR,
-"%s: Cannot allocate memory for t->objName",
-						myself);
+					    "%s: Cannot allocate memory for "
+					    "t->objName", myself);
 					objs = NULL;
 					return (2);
 				}
@@ -502,39 +494,39 @@ second_parser_pass(
 
 				/* Get the generic mapping */
 				tg = find_table_mapping(t->dbId, dom - t->dbId,
-								*table_mapping);
+				    *table_mapping);
 				if (tg == NULL || tg->objName == NULL) {
 					/* If not found, use dbId for objName */
 					t->objName = s_strndup(t->dbId,
-							strlen(t->dbId));
+					    strlen(t->dbId));
 					if (t->objName == NULL) {
 						logmsg(MSG_NOMEM, LOG_ERR,
-"%s: Cannot allocate memory for t->objName",
-							myself);
+				    "%s: Cannot allocate memory for t->objName",
+						    myself);
 						return (2);
 					}
 				} else {
 					dom++;
 					tobj = s_strndup(tg->objName,
-							strlen(tg->objName));
+					    strlen(tg->objName));
 					if (tobj == NULL) {
 						logmsg(MSG_NOMEM, LOG_ERR,
-"%s: Cannot allocate memory for t->objName",
-							myself);
+				    "%s: Cannot allocate memory for t->objName",
+						    myself);
 						return (2);
 					}
 					alias = (char *)strtok_r(tobj, " ",
-									&lasts);
+					    &lasts);
 
 					/* Loop 'breaks' on errors */
 					while (alias) {
 						tmp = NULL;
 						dupalias = s_strndup(alias,
-								strlen(alias));
+						    strlen(alias));
 						if (!dupalias)
 							break;
 						if (getfullmapname(&dupalias,
-								dom)) {
+						    dom)) {
 							i = 1;
 							break;
 						}
@@ -542,41 +534,43 @@ second_parser_pass(
 							t->objName = dupalias;
 						else {
 							len = strlen(t->objName)
-							+ strlen(dupalias) + 2;
+							    + strlen(dupalias) +
+							    2;
 							tmp = s_calloc(1, len);
 							if (tmp == NULL)
 								break;
 							snprintf(tmp, len,
-								"%s %s",
-								t->objName,
-								dupalias);
+							    "%s %s",
+							    t->objName,
+							    dupalias);
 							free(dupalias);
 							dupalias = NULL;
 							free(t->objName);
 							t->objName = tmp;
 						}
 						alias = (char *)strtok_r(NULL,
-								" ", &lasts);
+						    " ", &lasts);
 					}
 
 					if (tobj)
 						free(tobj);
 
 					if (alias ||
-						(objName = s_strdup(t->objName))
-								== NULL) {
+					    (objName = s_strdup(t->objName))
+					    == NULL) {
 						if (i)
 							logmsg(MSG_NOTIMECHECK,
-							LOG_ERR,
-"%s: getfullmapname failed for %s for domain \"%s\"",
-							myself, dupalias, dom);
+							    LOG_ERR,
+		    "%s: getfullmapname failed for %s for domain \"%s\"",
+							    myself, dupalias,
+							    dom);
 						else {
 							p_error =
-							parse_no_mem_error;
+							    parse_no_mem_error;
 							logmsg(MSG_NOMEM,
-							LOG_ERR,
-"%s: Cannot allocate memory",
-							myself);
+							    LOG_ERR,
+					    "%s: Cannot allocate memory",
+							    myself);
 						}
 						if (dupalias)
 							free(dupalias);
@@ -586,7 +580,7 @@ second_parser_pass(
 
 					}
 					objs = (char *)strtok_r(objName, " ",
-								&lasts);
+					    &lasts);
 				}
 			}
 		}
@@ -594,8 +588,8 @@ second_parser_pass(
 		if (tg != NULL) {
 			if (merge_table_mapping(tg, t)) {
 				logmsg(MSG_NOTIMECHECK, LOG_ERR,
-"Error merging information from the %s to the %s mapping structure",
-					tg->dbId, t->dbId);
+	    "Error merging information from the %s to the %s mapping structure",
+				    tg->dbId, t->dbId);
 				objs = NULL;
 				if (objName)
 					free(objName);
@@ -609,14 +603,14 @@ second_parser_pass(
 		 * Also skip it if t->objName is null.
 		 */
 		if (objs && strncasecmp(objs, t->objName,
-			strlen(t->objName))) {
+		    strlen(t->objName))) {
 			t2 = find_table_mapping(objs, strlen(objs),
-							*table_mapping);
+			    *table_mapping);
 			if (t2) {
 				if (merge_table_mapping(t, t2)) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
-"Error merging information from the %s to the %s mapping structure",
-						t->dbId, t2->dbId);
+	    "Error merging information from the %s to the %s mapping structure",
+					    t->dbId, t2->dbId);
 					objs = NULL;
 					if (objName)
 						free(objName);
@@ -635,8 +629,8 @@ second_parser_pass(
 					prev->next = t;
 				} else {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
-"Error creating a new mapping structure %s",
-						objs);
+				    "Error creating a new mapping structure %s",
+					    objs);
 					objs = NULL;
 					if (objName)
 						free(objName);
@@ -644,14 +638,14 @@ second_parser_pass(
 				}
 			}
 			while ((objs = (char *)strtok_r(NULL, " ", &lasts))
-				!= NULL) {
+			    != NULL) {
 				t2 = find_table_mapping(objs, strlen(objs),
-								*table_mapping);
+				    *table_mapping);
 				if (t2) {
 					if (merge_table_mapping(t, t2)) {
 						logmsg(MSG_NOTIMECHECK, LOG_ERR,
-"Error merging information from the %s to the %s mapping structure",
-							t->dbId, t2->dbId);
+	    "Error merging information from the %s to the %s mapping structure",
+						    t->dbId, t2->dbId);
 						objs = NULL;
 						if (objName)
 							free(objName);
@@ -674,8 +668,8 @@ second_parser_pass(
 						prev->next = t;
 					} else {
 						logmsg(MSG_NOTIMECHECK, LOG_ERR,
-"Error creating a new mapping structure %s",
-							objs);
+				    "Error creating a new mapping structure %s",
+						    objs);
 						objs = NULL;
 						if (objName)
 							free(objName);
@@ -705,7 +699,7 @@ new_merged_mapping(const char *match,
 	__nis_table_mapping_t	*outtable = NULL;
 
 	outtable = (__nis_table_mapping_t *)
-		s_calloc(1, sizeof (__nis_table_mapping_t));
+	    s_calloc(1, sizeof (__nis_table_mapping_t));
 	if (outtable == NULL)
 		return (NULL);
 	initialize_table_mapping(outtable);
@@ -750,13 +744,13 @@ final_parser_pass(
 		if (!ypDomains->numDomains) {
 			p_error = parse_internal_error;
 			logmsg(MSG_NOTIMECHECK, LOG_ERR,
-				"%s:No domains specified.", myself);
+			    "%s:No domains specified.", myself);
 			return (-1);
 		}
 	} else {
 		p_error = parse_internal_error;
 		logmsg(MSG_NOTIMECHECK, LOG_ERR,
-				"%s:No domain structure supplied.", myself);
+		    "%s:No domain structure supplied.", myself);
 		return (-1);
 	}
 	prev = NULL;
@@ -779,7 +773,7 @@ final_parser_pass(
 			t->objName = s_strndup(t->dbId, strlen(t->dbId));
 			if (!t->objName) {
 				logmsg(MSG_NOMEM, LOG_ERR,
-					"%s:Could not allocate.", myself);
+				    "%s:Could not allocate.", myself);
 				return (-1);
 			}
 		}
@@ -788,23 +782,24 @@ final_parser_pass(
 			if (i == 1) {
 			/* modify existing table_mapping's */
 				nm = checkfullmapname(t->dbId,
-					ypDomains->domainLabels[0],
-					table_mapping, &returned_map);
+				    ypDomains->domainLabels[0],
+				    table_mapping, &returned_map);
 				if (nm == 1) {
 					/* delete this mapping structure */
 					logmsg(MSG_NOTIMECHECK,
-						LOG_WARNING,
-						"Mapping structure %s,%s "
-						"already exists.",
-						t->dbId,
-						ypDomains->domainLabels[0]);
+					    LOG_WARNING,
+					    "Mapping structure %s,%s "
+					    "already exists.",
+					    t->dbId,
+					    ypDomains->domainLabels[0]);
 					if (merge_table_mapping(t,
-						returned_map)) {
+					    returned_map)) {
 						logmsg(MSG_NOTIMECHECK, LOG_ERR,
 						    "Error merging information "
 						    "from the %s to the %s "
 						    "mapping structure.",
-						t->dbId, returned_map->dbId);
+						    t->dbId,
+						    returned_map->dbId);
 						return (-1);
 					}
 					if (del_tbl_flag == 0)
@@ -812,15 +807,16 @@ final_parser_pass(
 				} else if (nm == -1) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
 			"Error searching for %s,%s structure",
-					t->dbId, ypDomains->domainLabels[0]);
+					    t->dbId,
+					    ypDomains->domainLabels[0]);
 					return (-1);
 				} else if (nm == 0 || nm == 2) {
 					if ((append_domainContext(&t,
-					ypDomains->domainLabels[0],
-					ypDomains->domains[0])) != 0) {
+					    ypDomains->domainLabels[0],
+					    ypDomains->domains[0])) != 0) {
 						logmsg(MSG_NOTIMECHECK, LOG_ERR,
 					"Error appending domainContext %s",
-						ypDomains->domainLabels[0]);
+						    ypDomains->domainLabels[0]);
 						return (-1);
 					}
 					del_tbl_flag = 0;
@@ -828,12 +824,13 @@ final_parser_pass(
 			} else { /* if (i > 1) */
 				/* need to create new table_mapping's */
 				nm = checkfullmapname(t->dbId,
-					ypDomains->domainLabels[i - 1],
-					table_mapping, &returned_map);
+				    ypDomains->domainLabels[i - 1],
+				    table_mapping, &returned_map);
 				if (nm == -1) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
 				"Error searching for %s,%s structure",
-				t->dbId, ypDomains->domainLabels[i - 1]);
+					    t->dbId,
+					    ypDomains->domainLabels[i - 1]);
 					return (-1);
 				} else if (nm == 0) {
 					t1 = new_merged_mapping(t->dbId, t);
@@ -854,7 +851,7 @@ final_parser_pass(
 							prev = prev->next;
 						} else {
 							t1->next =
-								*table_mapping;
+							    *table_mapping;
 							*table_mapping = t1;
 							prev = t1;
 						}
@@ -863,14 +860,14 @@ final_parser_pass(
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
 					"%s:Could not create new table -"
 					" check all instances of %s for errors",
-						myself, t->dbId);
+					    myself, t->dbId);
 						return (-1);
 					}
 				} else if (nm == 1) {
 					logmsg(MSG_NOTIMECHECK, LOG_WARNING,
 				"Mapping structure %s,%s already exists.",
-						t->dbId,
-						ypDomains->domainLabels[i - 1]);
+					    t->dbId,
+					    ypDomains->domainLabels[i - 1]);
 					/*
 					 * We should be deleting this, but can't
 					 * really do it here, because we need to
@@ -878,19 +875,18 @@ final_parser_pass(
 					 * too. So we will just flag it for now.
 					 */
 					if (merge_table_mapping(t,
-						returned_map)) {
+					    returned_map)) {
 						logmsg(MSG_NOTIMECHECK, LOG_ERR,
 	"Error merging information from the %s to the %s mapping structure.",
-							t->dbId,
-							returned_map->dbId);
+						    t->dbId,
+						    returned_map->dbId);
 						return (-1);
 					}
 					del_tbl_flag = 1;
 				} else if (nm == 2) {
 					if ((append_domainContext(&t,
-						ypDomains->domainLabels[i - 1],
-						ypDomains->domains[i - 1]))
-						!= 0) {
+					    ypDomains->domainLabels[i - 1],
+					    ypDomains->domains[i - 1])) != 0) {
 						logmsg(MSG_NOTIMECHECK, LOG_ERR,
 					"Error appending domainContext %s",
 						ypDomains->domainLabels[i - 1]);
@@ -908,21 +904,21 @@ final_parser_pass(
 			 */
 			if (nm == 1 && returned_map && returned_map->objectDN) {
 				r = make_fqdn(
-					returned_map->objectDN,
-					ypDomains->domains[i - 1]);
+				    returned_map->objectDN,
+				    ypDomains->domains[i - 1]);
 				if (r == TRUE &&
-					returned_map->objectDN->write.base) {
+				    returned_map->objectDN->write.base) {
 					r = make_full_dn(
-					&returned_map->objectDN->write.base,
-					ypDomains->domains[i - 1]);
+					    &returned_map->objectDN->write.base,
+					    ypDomains->domains[i - 1]);
 				}
 
 				if (r == FALSE) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
-						"Error appending domainContext "
-						"%s to %s",
-						ypDomains->domainLabels[i - 1],
-						returned_map->dbId);
+					    "Error appending domainContext "
+					    "%s to %s",
+					    ypDomains->domainLabels[i - 1],
+					    returned_map->dbId);
 					return (-2);
 				}
 			}
@@ -949,15 +945,15 @@ final_parser_pass(
 	for (t = *table_mapping; t != NULL; t = t->next) {
 		if (!t->dbId) {
 			logmsg(MSG_NOTIMECHECK, LOG_ERR,
-				"%s:Fatal error: structure with no dbId found.",
-				myself);
-				return (-2);
+			    "%s:Fatal error: structure with no dbId found.",
+			    myself);
+			return (-2);
 		}
 		append_dot(&t->dbId);
 		if (!t->objectDN) {
 			p_error = parse_internal_error;
 			logmsg(MSG_NOTIMECHECK, LOG_ERR,
-				"%s:No objectDN for %s.", myself, t->dbId);
+			    "%s:No objectDN for %s.", myself, t->dbId);
 			return (-1);
 		}
 	}
@@ -987,9 +983,9 @@ append_mapping_rule(__nis_mapping_rule_t *src_rule,
 			return (1);
 		}
 		rules = (__nis_mapping_rule_t **)
-			s_realloc(dst->ruleFromLDAP,
-			(dst->numRulesFromLDAP + 1) *
-			sizeof (__nis_mapping_rule_t *));
+		    s_realloc(dst->ruleFromLDAP,
+		    (dst->numRulesFromLDAP + 1) *
+		    sizeof (__nis_mapping_rule_t *));
 		if (rules == NULL)
 			return (2);
 		dst->ruleFromLDAP = rules;
@@ -1005,9 +1001,9 @@ append_mapping_rule(__nis_mapping_rule_t *src_rule,
 			return (1);
 		}
 		rules = (__nis_mapping_rule_t **)
-			s_realloc(dst->ruleToLDAP,
-			(dst->numRulesToLDAP + 1) *
-			sizeof (__nis_mapping_rule_t *));
+		    s_realloc(dst->ruleToLDAP,
+		    (dst->numRulesToLDAP + 1) *
+		    sizeof (__nis_mapping_rule_t *));
 		if (rules == NULL)
 			return (2);
 		dst->ruleToLDAP = rules;
@@ -1052,12 +1048,12 @@ check_domain_specific_order(const char *sd,
 	if (ypDomains) {
 		if (!ypDomains->numDomains) {
 			logmsg(MSG_NOTIMECHECK, LOG_ERR,
-				"%s:No domains specified.", myself);
+			    "%s:No domains specified.", myself);
 			return (-1);
 		}
 	} else {
 		logmsg(MSG_NOTIMECHECK, LOG_ERR,
-			"%s:No domain structure supplied.", myself);
+		    "%s:No domain structure supplied.", myself);
 		return (-1);
 	}
 
@@ -1065,43 +1061,43 @@ check_domain_specific_order(const char *sd,
 		for (t = table_mapping; t != NULL; t = t->next) {
 			len = strlen(sd);
 			if ((strcasecmp(t->dbId, sd) == 0) && (len ==
-				strlen(t->dbId)))
+			    strlen(t->dbId)))
 				/* prevent from matching against itself */
 				continue;
 			dbId = s_strndup(t->dbId, strlen(t->dbId));
 			if (dbId == NULL) {
 				logmsg(MSG_NOMEM, LOG_ERR,
-					"%s:Memory allocation error.", myself);
+				    "%s:Memory allocation error.", myself);
 				return (-1);
 			}
 
 			if (getfullmapname(&dbId,
-				ypDomains->domainLabels[i])) {
+			    ypDomains->domainLabels[i])) {
 				logmsg(MSG_NOTIMECHECK, LOG_ERR,
 				"Error getting fully qualified name for %s",
-					dbId);
+				    dbId);
 				free(dbId);
 				return (-1);
 			}
 			if ((strcasecmp(dbId, sd) == 0) && (len ==
-				strlen(dbId))) {
+			    strlen(dbId))) {
 				match = 0;
 				switch (attrib_num) {
 					case key_yp_map_flags:
 						if (t->usedns_flag != 0 ||
-							t->securemap_flag != 0)
+						    t->securemap_flag != 0)
 							match = 1;
 						type = YP_MAP_FLAGS;
 						break;
 					case key_yp_comment_char:
 						if (t->commentChar !=
-							DEFAULT_COMMENT_CHAR)
+						    DEFAULT_COMMENT_CHAR)
 							match = 1;
 						type = YP_COMMENT_CHAR;
 						break;
 					case key_yp_repeated_field_separators:
-						if (t->separatorStr !=
-							DEFAULT_SEP_STRING)
+						if (strcmp(t->separatorStr,
+						    DEFAULT_SEP_STRING) != 0)
 							match = 1;
 						type =
 					YP_REPEATED_FIELD_SEPARATORS;
@@ -1122,7 +1118,7 @@ check_domain_specific_order(const char *sd,
 						break;
 					case key_yp_entry_ttl:
 						if (t->initTtlLo !=
-							(time_t)NO_VALUE_SET)
+						    (time_t)NO_VALUE_SET)
 							match = 1;
 						type = YP_ENTRY_TTL;
 						break;
@@ -1149,7 +1145,7 @@ check_domain_specific_order(const char *sd,
 				if (match) {
 					logmsg(MSG_NOTIMECHECK, LOG_ERR,
 "Relative attribute '%s' of type '%s' found before fully qualified one '%s'",
-						t->dbId, type, sd);
+					    t->dbId, type, sd);
 					free(dbId);
 					dbId = NULL;
 					return (1);
@@ -1173,7 +1169,7 @@ getfullmapname(char **mapname, const char *domainname)
 	int domainlen = strlen(domainname);
 
 	if (!maplen || !domainlen ||
-		maps[maplen - 1] == PERIOD_CHAR)
+	    maps[maplen - 1] == PERIOD_CHAR)
 		return (1);
 	else if (strchr(maps, COMMA_CHAR)) {
 		/* map already has a domain part, do nothing */
@@ -1184,7 +1180,7 @@ getfullmapname(char **mapname, const char *domainname)
 		maps = realloc(maps, (maplen + domainlen + 1));
 		if (maps != NULL) {
 			if (strlcat(maps, domainname, (maplen + domainlen + 1))
-				>= (maplen + domainlen + 1))
+			    >= (maplen + domainlen + 1))
 				return (1);
 			*mapname = maps;
 			return (0);
@@ -1317,11 +1313,11 @@ char   *DomainLabel, char *Domain)
 	if (tmp_map->objectDN == NULL) {
 		/* Allocate memory to objectDN */
 		tmp_map->objectDN = (__nis_object_dn_t *)
-			s_calloc(1, sizeof (__nis_object_dn_t));
+		    s_calloc(1, sizeof (__nis_object_dn_t));
 		if (tmp_map->objectDN == NULL) {
 			logmsg(MSG_NOMEM, LOG_ERR,
 "%s: Cannot allocate memory for objectDN",
-				myself);
+			    myself);
 			return (2);
 		}
 		tmp_map->objectDN->read.base = NULL;
