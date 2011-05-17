@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -203,6 +204,12 @@ gss_add_cred_with_password(
  * member contains an OID identifying the session key type.
  */
 extern const gss_OID GSS_C_INQ_SSPI_SESSION_KEY;
+
+/*
+ * For compatability with other GSSAPI implementations.
+ * This is needed by Samba.
+ */
+extern const gss_OID_desc * const gss_mech_krb5;
 
 #else	/*	_KERNEL	*/
 
