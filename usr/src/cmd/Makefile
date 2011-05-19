@@ -219,6 +219,7 @@ COMMON_SUBDIRS=		\
 	krb5		\
 	ksh		\
 	kstat		\
+	kvmstat		\
 	last		\
 	lastcomm	\
 	ldap		\
