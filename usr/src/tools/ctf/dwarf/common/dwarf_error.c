@@ -1,6 +1,7 @@
 /*
 
-  Copyright (C) 2000, 2002 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000-2005 Silicon Graphics, Inc. All Rights Reserved.
+  Portions Copyright (C) 2008-2010 David Anderson.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License 
@@ -19,10 +20,10 @@
 
   You should have received a copy of the GNU Lesser General Public 
   License along with this program; if not, write the Free Software 
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, 
+  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1600 Amphitheatre Pky,
+  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
   Mountain View, CA 94043, or:
 
   http://www.sgi.com
@@ -79,52 +80,52 @@ const char *_dwarf_errmsgs[] = {
 
     "DW_DLE_DBG_ALLOC 23 Unable to malloc a Dwarf_Debug structure",
     "DW_DLE_FSTAT_ERROR 24 The file fd passed to dwarf_init "
-	"cannot be fstat()ed",
+        "cannot be fstat()ed",
     "DW_DLE_FSTAT_MODE_ERROR 25 The file mode bits do not "
-	"indicate that the file being opened via "
-	"dwarf_init() is a normal file",
+        "indicate that the file being opened via "
+        "dwarf_init() is a normal file",
     "DW_DLE_INIT_ACCESS_WRONG 26 A call to dwarf_init had an "
-	"access of other than DW_DLC_READ",
+        "access of other than DW_DLC_READ",
     "DW_DLE_ELF_BEGIN_ERROR 27 a call to "
-	"elf_begin(... ELF_C_READ_MMAP... ) failed",
+        "elf_begin(... ELF_C_READ_MMAP... ) failed",
     "DW_DLE_ELF_GETEHDR_ERROR 28 a call to "
-	"elf32_getehdr() or elf64_getehdr() failed",
+        "elf32_getehdr() or elf64_getehdr() failed",
     "DW_DLE_ELF_GETSHDR_ERROR 29 a call to "
-	"elf32_getshdr() or elf64_getshdr() failed",
+        "elf32_getshdr() or elf64_getshdr() failed",
     "DW_DLE_ELF_STRPTR_ERROR 30 a call to "
-	"elf_strptr() failed trying to get a section name",
+        "elf_strptr() failed trying to get a section name",
     "DW_DLE_DEBUG_INFO_DUPLICATE 31  Only one .debug_info  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_INFO_NULL 32 .debug_info section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_ABBREV_DUPLICATE 33 Only one .debug_abbrev  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_ABBREV_NULL 34 .debug_abbrev section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_ARANGES_DUPLICATE 35 Only one .debug_aranges  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_ARANGES_NULL 36 .debug_aranges section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_LINE_DUPLICATE 37 Only one .debug_line  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_LINE_NULL (38) .debug_line section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_LOC_DUPLICATE (39) Only one .debug_loc  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_LOC_NULL (40) .debug_loc section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_MACINFO_DUPLICATE (41) Only one .debug_macinfo  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_MACINFO_NULL (42) .debug_macinfo section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_PUBNAMES_DUPLICATE (43) Only one .debug_pubnames  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_PUBNAMES_NULL (44) .debug_pubnames section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_STR_DUPLICATE (45)  Only one .debug_str  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_STR_NULL (46) .debug_str section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_CU_LENGTH_ERROR (47)",
     "DW_DLE_VERSION_STAMP_ERROR (48)",
     "DW_DLE_ABBREV_OFFSET_ERROR (49)",
@@ -186,9 +187,9 @@ const char *_dwarf_errmsgs[] = {
     "DW_DLE_FIRST_DIE_NOT_CU",
     "DW_DLE_NEXT_DIE_PTR_NULL",
     "DW_DLE_DEBUG_FRAME_DUPLICATE  Only one .debug_frame  "
-	"section is allowed",
+        "section is allowed",
     "DW_DLE_DEBUG_FRAME_NULL  .debug_frame section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_ABBREV_DECODE_ERROR",
     "DW_DLE_DWARF_ABBREV_NULL",
     "DW_DLE_ATTR_NULL",
@@ -234,28 +235,28 @@ const char *_dwarf_errmsgs[] = {
     "DW_DLE_DIE_ABBREV_LIST_NULL",
     "DW_DLE_DEBUG_FUNCNAMES_DUPLICATE",
     "DW_DLE_DEBUG_FUNCNAMES_NULL .debug_funcnames section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_FUNCNAMES_VERSION_ERROR",
     "DW_DLE_DEBUG_FUNCNAMES_LENGTH_BAD",
     "DW_DLE_FUNC_NULL",
     "DW_DLE_FUNC_CONTEXT_NULL",
     "DW_DLE_DEBUG_TYPENAMES_DUPLICATE",
     "DW_DLE_DEBUG_TYPENAMES_NULL .debug_typenames section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_TYPENAMES_VERSION_ERROR",
     "DW_DLE_DEBUG_TYPENAMES_LENGTH_BAD",
     "DW_DLE_TYPE_NULL",
     "DW_DLE_TYPE_CONTEXT_NULL",
     "DW_DLE_DEBUG_VARNAMES_DUPLICATE",
     "DW_DLE_DEBUG_VARNAMES_NULL .debug_varnames section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
     "DW_DLE_DEBUG_VARNAMES_VERSION_ERROR",
     "DW_DLE_DEBUG_VARNAMES_LENGTH_BAD",
     "DW_DLE_VAR_NULL",
     "DW_DLE_VAR_CONTEXT_NULL",
     "DW_DLE_DEBUG_WEAKNAMES_DUPLICATE",
     "DW_DLE_DEBUG_WEAKNAMES_NULL .debug_weaknames section present but "
-	"elf_getdata() failed or section is zero-length",
+        "elf_getdata() failed or section is zero-length",
 
     "DW_DLE_DEBUG_WEAKNAMES_VERSION_ERROR",
     "DW_DLE_DEBUG_WEAKNAMES_LENGTH_BAD",
@@ -279,9 +280,40 @@ const char *_dwarf_errmsgs[] = {
     "DW_DLE_DF_POP_EMPTY_STACK(191)",
     "DW_DLE_DF_ALLOC_FAIL(192)",
     "DW_DLE_DF_FRAME_DECODING_ERROR(193)",
-
-
-
+    "DW_DLE_DEBUG_LOC_SECTION_SHORT(194)",
+    "DW_DLE_FRAME_AUGMENTATION_UNKNOWN(195)",
+    "DW_DLE_PUBTYPE_CONTEXT(196)",
+    "DW_DLE_DEBUG_PUBTYPES_LENGTH_BAD(197)",
+    "DW_DLE_DEBUG_PUBTYPES_VERSION_ERROR(198)",
+    "DW_DLE_DEBUG_PUBTYPES_DUPLICATE(199)",
+    "DW_DLE_FRAME_CIE_DECODE_ERROR(200)",
+    "DW_DLE_FRAME_REGISTER_UNREPRESENTABLE(201)",
+    "DW_DLE_FRAME_REGISTER_COUNT_MISMATCH(202)",
+    "DW_DLE_LINK_LOOP(203)",
+    "DW_DLE_STRP_OFFSET_BAD(204)",
+    "DW_DLE_DEBUG_RANGES_DUPLICATE(205)",
+    "DW_DLE_DEBUG_RANGES_OFFSET_BAD(206)",
+    "DW_DLE_DEBUG_RANGES_MISSING_END(207)",
+    "DW_DLE_DEBUG_RANGES_OUT_OF_MEM(208)",
+    "DW_DLE_DEBUG_SYMTAB_ERR(209)",
+    "DW_DLE_DEBUG_STRTAB_ERR(210)",
+    "DW_DLE_RELOC_MISMATCH_INDEX(211)",
+    "DW_DLE_RELOC_MISMATCH_RELOC_INDEX(212)",
+    "DW_DLE_RELOC_MISMATCH_STRTAB_INDEX(213)",
+    "DW_DLE_RELOC_SECTION_MISMATCH(214)",
+    "DW_DLE_RELOC_SECTION_MISSING_INDEX(215)",
+    "DW_DLE_RELOC_SECTION_LENGTH_ODD(216)",
+    "DW_DLE_RELOC_SECTION_PTR_NULL(217)",
+    "DW_DLE_RELOC_SECTION_MALLOC_FAIL(218)",
+    "DW_DLE_NO_ELF64_SUPPORT(219)",
+    "DW_DLE_MISSING_ELF64_SUPPORT(220)",
+    "DW_DLE_ORPHAN_FDE(221)",
+    "DW_DLE_DUPLICATE_INST_BLOCK(222)",
+    "DW_DLE_BAD_REF_SIG8_FORM(223)",
+    "DW_DLE_ATTR_EXPRLOC_FORM_BAD(224)",
+    "DW_DLE_FORM_SEC_OFFSET_LENGTH_BAD(225)",
+    "DW_DLE_NOT_REF_FORM(226)",
+    "DW_DLE_DEBUG_FRAME_LENGTH_NOT_MULTIPLE(227)"
 };
 
 
@@ -304,48 +336,48 @@ _dwarf_error(Dwarf_Debug dbg, Dwarf_Error * error, Dwarf_Sword errval)
        want to report the upper-level error, not this one. */
     if (error != NULL) {
 
-	/* 
-	   If dbg is NULL, use the alternate error struct. However,
-	   this will overwrite the earlier error. */
-	if (dbg != NULL) {
-	    errptr =
-		(Dwarf_Error) _dwarf_get_alloc(dbg, DW_DLA_ERROR, 1);
-	    if (errptr == NULL) {
-		fprintf(stderr,
-			"Could not allocate Dwarf_Error structure, "
-			"abort() in libdwarf.\n");
-		abort();
-	    }
-	} else {
-	    /* We have no dbg to work with. dwarf_init failed. We hack
-	       up a special area. */
-	    errptr = _dwarf_special_no_dbg_error_malloc();
-	    if (errptr == NULL) {
-		fprintf(stderr,
-			"Could not allocate Dwarf_Error structure, "
-			"abort() in libdwarf..\n");
-		abort();
-	    }
-	}
+        /* 
+           If dbg is NULL, use the alternate error struct. However,
+           this will overwrite the earlier error. */
+        if (dbg != NULL) {
+            errptr =
+                (Dwarf_Error) _dwarf_get_alloc(dbg, DW_DLA_ERROR, 1);
+            if (errptr == NULL) {
+                fprintf(stderr,
+                        "Could not allocate Dwarf_Error structure, "
+                        "abort() in libdwarf.\n");
+                abort();
+            }
+        } else {
+            /* We have no dbg to work with. dwarf_init failed. We hack
+               up a special area. */
+            errptr = _dwarf_special_no_dbg_error_malloc();
+            if (errptr == NULL) {
+                fprintf(stderr,
+                        "Could not allocate Dwarf_Error structure, "
+                        "abort() in libdwarf..\n");
+                abort();
+            }
+        }
 
-	errptr->er_errval = errval;
-	*error = errptr;
-	return;
+        errptr->er_errval = errval;
+        *error = errptr;
+        return;
     }
 
     if (dbg != NULL && dbg->de_errhand != NULL) {
-	errptr = (Dwarf_Error) _dwarf_get_alloc(dbg, DW_DLA_ERROR, 1);
-	if (errptr == NULL) {
-	    fprintf(stderr, "Could not allocate Dwarf_Error structure,"
-		    " abort() in libdwarf.\n");
-	    abort();
-	}
-	errptr->er_errval = errval;
-	dbg->de_errhand(errptr, dbg->de_errarg);
-	return;
+        errptr = (Dwarf_Error) _dwarf_get_alloc(dbg, DW_DLA_ERROR, 1);
+        if (errptr == NULL) {
+            fprintf(stderr, "Could not allocate Dwarf_Error structure,"
+                    " abort() in libdwarf.\n");
+            abort();
+        }
+        errptr->er_errval = errval;
+        dbg->de_errhand(errptr, dbg->de_errarg);
+        return;
     }
     fprintf(stderr,
-	    "abort() in libdwarf. No error argument, no handler.\n");
+            "abort() in libdwarf. No error argument, no handler.\n");
     abort();
 }
 
@@ -354,7 +386,7 @@ Dwarf_Unsigned
 dwarf_errno(Dwarf_Error error)
 {
     if (error == NULL) {
-	return (0);
+        return (0);
     }
 
     return (error->er_errval);
@@ -367,11 +399,11 @@ char *
 dwarf_errmsg(Dwarf_Error error)
 {
     if (error == NULL) {
-	return "Dwarf_Error is NULL";
+        return "Dwarf_Error is NULL";
     }
 
     if (error->er_errval > (sizeof(_dwarf_errmsgs) / sizeof(char *))) {
-	return "Dwarf_Error value out of range";
+        return "Dwarf_Error value out of range";
     }
 
     return ((char *) _dwarf_errmsgs[error->er_errval]);
