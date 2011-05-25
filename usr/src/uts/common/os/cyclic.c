@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ */
+
+/*
  *  The Cyclic Subsystem
  *  --------------------
  *
@@ -1139,7 +1143,7 @@ top:
 	CYC_TRACE(cpu, level, "softint-top", cyclics, pc);
 
 	while (consndx != pc->cypc_prodndx) {
-		int pend, npend, opend;
+		uint32_t pend, npend, opend;
 		int consmasked = consndx & sizemask;
 		cyclic_t *cyclic = &cyclics[buf[consmasked]];
 		cyc_func_t handler = cyclic->cy_handler;
