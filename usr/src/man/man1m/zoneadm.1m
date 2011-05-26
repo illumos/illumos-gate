@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2011 Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH zoneadm 1M "13 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH zoneadm 1M "8 Mar 2011" "SunOS 5.11" "System Administration Commands"
 .SH NAME
 zoneadm \- administer zones
 .SH SYNOPSIS
@@ -136,11 +137,13 @@ Use the following command to attach a zone:
 .ne 2
 .mk
 .na
-\fB\fBboot\fR [\fB--\fR \fIboot_options\fR]\fR
+\fB\fBboot\fR [\fB-X\fR] [\fB--\fR \fIboot_options\fR]\fR
 .ad
 .sp .6
 .RS 4n
 Boot (or activate) the specified zones.
+.sp
+The \fI-X\fR option enables debug for the zone's brand while booting.
 .sp
 The following \fIboot_options\fR are supported:
 .sp
@@ -264,12 +267,14 @@ The source zone must be halted before this subcommand can be used.
 .ne 2
 .mk
 .na
-\fB\fBhalt\fR\fR
+\fB\fBhalt [\fB-X\fR]\fR\fR
 .ad
 .sp .6
 .RS 4n
 Halt the specified zones. \fBhalt\fR bypasses running the shutdown scripts
 inside the zone. It also removes run time resources of the zone.
+.sp
+The \fI-X\fR option enables debug for the zone's brand while halting.
 .sp
 Use:
 .sp
@@ -441,24 +446,28 @@ and normal restrictions for \fIzonepath\fR apply.
 .ne 2
 .mk
 .na
-\fB\fBready\fR\fR
+\fB\fBready [\fB-X\fR]\fR\fR
 .ad
 .sp .6
 .RS 4n
 Prepares a zone for running applications but does not start any user processes
 in the zone.
+.sp
+The \fI-X\fR option enables debug for the zone's brand while readying.
 .RE
 
 .sp
 .ne 2
 .mk
 .na
-\fB\fBreboot\fR\fR
+\fB\fBreboot [\fB-X\fR]\fR\fR
 .ad
 .sp .6
 .RS 4n
 Restart the zones. This is equivalent to a \fBhalt\fR \fBboot\fR sequence. This
 subcommand fails if the specified zones are not active.
+.sp
+The \fI-X\fR option enables debug for the zone's brand while rebooting.
 .RE
 
 .sp
