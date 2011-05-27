@@ -508,6 +508,7 @@ usr/src/lib/krb5/ss/ss_internal.h
 usr/src/lib/krb5/ss/ss.h
 usr/src/lib/krb5/ss/std_rqs.c
 usr/src/lib/krb5/ss/utils.c
+usr/src/lib/libgss/g_glue.c
 usr/src/lib/librstp/common/base.h
 usr/src/lib/librstp/common/choose.h
 usr/src/lib/librstp/common/edge.c
@@ -547,6 +548,7 @@ usr/src/lib/librstp/common/transmit.h
 usr/src/lib/librstp/common/uid_stp.h
 usr/src/lib/librstp/common/vector.c
 usr/src/lib/librstp/common/vector.h
+usr/src/uts/common/gssapi/gssapi.h
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/checksum_length.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/cksumtypes.c

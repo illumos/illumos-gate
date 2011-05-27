@@ -36,18 +36,12 @@ PERL_VERSIONS = 5.12
 
 .PARALLEL: $(PERL_VERSIONS)
 
-#
-# copy_contrib is used by all the versions of perl to copy the files under
-# contrib into their contrib build directory.  We therefore need to make sure
-# it is fetched from SCCS before calling the version-specific makefiles so that
-# they don't race over it.
-#
-all install test: contrib/copy_contrib $(PERL_VERSIONS)
+all install test: $(PERL_VERSIONS)
 
-clean: $(PERL_VERSIONS)
+clean: FRC
 
-clobber: $(PERL_VERSIONS)
-	$(RM) -r contrib/copy_contrib $(WOS_PERL)
+clobber: clean
+	$(RM) -r $(PERL_VERSIONS)
 
 #
 # Perl is not lint-clean.  Fake up a target.

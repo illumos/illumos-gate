@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "mglueP.h"
@@ -256,12 +257,14 @@ OM_uint32 gssint_get_mech_type_oid(OID, token)
  * peers. We include the OIDs here so we do not have to link
  * with the mechanism.
  */
-static gss_OID_desc gss_ntlm_mechanism_oid_desc =
-	{10, (void *)"\x2b\x06\x01\x04\x01\x82\x37\x02\x02\x0a"};
-static gss_OID_desc gss_spnego_mechanism_oid_desc =
-	{6, (void *)"\x2b\x06\x01\x05\x05\x02"};
-static gss_OID_desc gss_krb5_mechanism_oid_desc =
-	{9, (void *)"\x2a\x86\x48\x86\xf7\x12\x01\x02\x02"};
+static const gss_OID_desc gss_ntlm_mechanism_oid_desc =
+	{10, "\x2b\x06\x01\x04\x01\x82\x37\x02\x02\x0a"};
+static const gss_OID_desc gss_spnego_mechanism_oid_desc =
+	{6, "\x2b\x06\x01\x05\x05\x02"};
+static const gss_OID_desc gss_krb5_mechanism_oid_desc =
+	{9, "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02"};
+const gss_OID_desc * const gss_mech_krb5 =
+	&gss_krb5_mechanism_oid_desc;
 
 #define NTLMSSP_SIGNATURE "NTLMSSP"
 

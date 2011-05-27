@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -129,6 +130,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__gss_get_modOptions;
 	__gss_mech_qops;
 	__gss_mech_to_oid;
+	gss_mech_krb5;
 	gss_nt_exported_name;
 	gss_nt_service_name;
 	gss_nt_service_name_v2;

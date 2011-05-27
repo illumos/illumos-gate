@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -55,7 +55,7 @@ wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
 	/* Add null termination at the correct location. */
 	if (len > slen) {
 		dest[slen] = 0;
-	} else if (len) {
+	} else if (len != 0) {
 		dest[len-1] = 0;
 	}
 
@@ -65,7 +65,7 @@ error:
 	slen = wcslen(src);
 	if (slen < len)
 		(void) wcscpy(dest, src);
-	else {
+	else if (len != 0) {
 		(void) wcsncpy(dest, src, len - 1);
 		dest[len - 1] = L'\0';
 	}
