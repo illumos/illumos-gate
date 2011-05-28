@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -382,8 +383,6 @@ void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
 int smb_server_spooldoc(smb_ioc_spooldoc_t *);
 int smb_spool_add_doc(smb_kspooldoc_t *);
 int smb_spool_add_fid(uint16_t);
-boolean_t smb_spool_lookup_doc_byfid(uint16_t, smb_kspooldoc_t *);
-uint16_t smb_spool_get_fid();
 
 void smb_server_inc_nbt_sess(smb_server_t *);
 void smb_server_dec_nbt_sess(smb_server_t *);

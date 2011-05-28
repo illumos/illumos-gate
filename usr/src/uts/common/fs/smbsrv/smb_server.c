@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -255,6 +256,9 @@ static void smb_server_receiver(void *);
 static void smb_server_create_session(smb_listener_daemon_t *, ksocket_t);
 static void smb_server_destroy_session(smb_listener_daemon_t *,
     smb_session_t *);
+static uint16_t smb_spool_get_fid(smb_server_t *);
+static boolean_t smb_spool_lookup_doc_byfid(smb_server_t *, uint16_t,
+    smb_kspooldoc_t *);
 
 int smb_event_debug = 0;
 
@@ -407,7 +411,6 @@ smb_server_create(void)
 	smb_server_kstat_init(sv);
 
 	mutex_init(&sv->sv_mutex, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&sv->sp_info.sp_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sv->sv_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&sv->sp_info.sp_cv, NULL, CV_DEFAULT, NULL);
 
@@ -748,32 +751,42 @@ smb_server_spooldoc(smb_ioc_spooldoc_t *ioc)
 	smb_kspooldoc_t *spdoc;
 	uint16_t	fid;
 
-	if ((rc = smb_server_lookup(&sv)) == 0) {
+	if ((rc = smb_server_lookup(&sv)) != 0)
+		return (rc);
+
+	mutex_enter(&sv->sv_mutex);
+	for (;;) {
 		if (sv->sv_state != SMB_SERVER_STATE_RUNNING) {
-			smb_server_release(sv);
-			return (ECANCELED);
-		}
-		mutex_enter(&sv->sp_info.sp_mutex);
-		spdoc = kmem_zalloc(sizeof (smb_kspooldoc_t), KM_SLEEP);
-		cv_wait(&sv->sp_info.sp_cv, &sv->sp_info.sp_mutex);
-		if (sv->sv_state != SMB_SERVER_STATE_RUNNING)
 			rc = ECANCELED;
-		else {
-			fid = smb_spool_get_fid();
-			atomic_inc_32(&sv->sp_info.sp_cnt);
-			if (smb_spool_lookup_doc_byfid(fid, spdoc)) {
-				ioc->spool_num = spdoc->sd_spool_num;
-				ioc->ipaddr = spdoc->sd_ipaddr;
-				(void) strlcpy(ioc->path, spdoc->sd_path,
-				    MAXPATHLEN);
-				(void) strlcpy(ioc->username,
-				    spdoc->sd_username, MAXNAMELEN);
-			}
+			break;
 		}
-		kmem_free(spdoc, sizeof (smb_kspooldoc_t));
-		mutex_exit(&sv->sp_info.sp_mutex);
-		smb_server_release(sv);
+		if ((fid = smb_spool_get_fid(sv)) != 0) {
+			rc = 0;
+			break;
+		}
+		if (cv_wait_sig(&sv->sp_info.sp_cv, &sv->sv_mutex) == 0) {
+			rc = EINTR;
+			break;
+		}
 	}
+	mutex_exit(&sv->sv_mutex);
+	if (rc == 0) {
+		spdoc = kmem_zalloc(sizeof (*spdoc), KM_SLEEP);
+		if (smb_spool_lookup_doc_byfid(sv, fid, spdoc)) {
+			ioc->spool_num = spdoc->sd_spool_num;
+			ioc->ipaddr = spdoc->sd_ipaddr;
+			(void) strlcpy(ioc->path, spdoc->sd_path,
+			    MAXPATHLEN);
+			(void) strlcpy(ioc->username,
+			    spdoc->sd_username, MAXNAMELEN);
+		} else {
+			/* Did not find that print job. */
+			rc = EAGAIN;
+		}
+		kmem_free(spdoc, sizeof (*spdoc));
+	}
+
+	smb_server_release(sv);
 	return (rc);
 }
 
@@ -2095,17 +2108,12 @@ smb_event_alloc_txid(void)
  *
  */
 
-boolean_t
-smb_spool_lookup_doc_byfid(uint16_t fid, smb_kspooldoc_t *spdoc)
+static boolean_t
+smb_spool_lookup_doc_byfid(smb_server_t *sv, uint16_t fid,
+    smb_kspooldoc_t *spdoc)
 {
 	smb_kspooldoc_t *sp;
 	smb_llist_t	*splist;
-	smb_server_t	*sv;
-	int		rc;
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (B_FALSE);
 
 	splist = &sv->sp_info.sp_list;
 	smb_llist_enter(splist, RW_WRITER);
@@ -2119,14 +2127,12 @@ smb_spool_lookup_doc_byfid(uint16_t fid, smb_kspooldoc_t *spdoc)
 			smb_llist_remove(splist, sp);
 			smb_llist_exit(splist);
 			kmem_free(sp, sizeof (smb_kspooldoc_t));
-			smb_server_release(sv);
 			return (B_TRUE);
 		}
 		sp = smb_llist_next(splist, sp);
 	}
 	cmn_err(CE_WARN, "smb_spool_lookup_user_byfid: no fid:%d", fid);
 	smb_llist_exit(splist);
-	smb_server_release(sv);
 	return (B_FALSE);
 }
 
@@ -2172,18 +2178,12 @@ smb_spool_add_fid(uint16_t fid)
  *
  */
 
-uint16_t
-smb_spool_get_fid()
+static uint16_t
+smb_spool_get_fid(smb_server_t *sv)
 {
 	smb_spoolfid_t	*spfid;
 	smb_llist_t	*splist;
-	smb_server_t	*sv;
-	int 		rc = 0;
 	uint16_t	fid;
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (0);
 
 	splist = &sv->sp_info.sp_fidlist;
 	smb_llist_enter(splist, RW_WRITER);
@@ -2196,7 +2196,6 @@ smb_spool_get_fid()
 		fid = 0;
 	}
 	smb_llist_exit(splist);
-	smb_server_release(sv);
 	return (fid);
 }
 
@@ -2220,7 +2219,7 @@ smb_spool_add_doc(smb_kspooldoc_t *sp)
 
 	splist = &sv->sp_info.sp_list;
 	smb_llist_enter(splist, RW_WRITER);
-	sp->sd_spool_num = sv->sp_info.sp_cnt;
+	sp->sd_spool_num = atomic_inc_32_nv(&sv->sp_info.sp_cnt);
 	smb_llist_insert_tail(splist, sp);
 	smb_llist_exit(splist);
 	smb_server_release(sv);
