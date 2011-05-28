@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1830,8 +1831,8 @@ typedef enum smb_server_state {
 } smb_server_state_t;
 
 typedef struct {
+	/* protected by sv_mutex */
 	kcondvar_t		sp_cv;
-	kmutex_t		sp_mutex;
 	uint32_t 		sp_cnt;
 	smb_llist_t		sp_list;
 	smb_llist_t		sp_fidlist;
