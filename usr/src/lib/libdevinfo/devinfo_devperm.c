@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -394,7 +396,8 @@ is_login_user(uid_t uid)
 	char pwd_buf[NSS_BUFLEN_PASSWD];
 	struct utmpx *utx;
 
-	if ((getpwuid_r(uid, &pwd, pwd_buf, NSS_BUFLEN_PASSWD, &ppwd))) {
+	if ((getpwuid_r(uid, &pwd, pwd_buf, NSS_BUFLEN_PASSWD, &ppwd) != 0) ||
+	    (ppwd == NULL)) {
 		return (0);
 	}
 
