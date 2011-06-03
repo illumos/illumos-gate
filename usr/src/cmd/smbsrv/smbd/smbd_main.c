@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -60,7 +61,6 @@
 
 #define	SMBD_ONLINE_WAIT_INTERVAL	10
 #define	SMBD_REFRESH_INTERVAL		10
-#define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
 #define	SMB_DBDIR "/var/smb"
 
 static int smbd_daemonize_init(void);

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <regex.h>
@@ -176,13 +177,16 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name,
 	},
 	{ "pseudo", "ddi_pseudo", "nsmb",
-	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name,
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, minor_name,
 	},
 	{ "pseudo", "ddi_pseudo", "mem_cache",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name,
 	},
 	{ "pseudo", "ddi_pseudo", "fm",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name,
+	},
+	{ "pseudo", "ddi_pseudo", "smbsrv",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, minor_name,
 	},
 	{ "pseudo", "ddi_pseudo", "tpm",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name

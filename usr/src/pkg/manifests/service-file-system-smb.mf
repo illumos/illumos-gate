@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/smb@$(PKGVERS)
@@ -29,11 +30,6 @@ set name=pkg.summary value="SMB Server"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/File System"
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/kmdb group=sys
-dir path=kernel/kmdb/$(ARCH64) group=sys
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/manifest group=sys
@@ -41,6 +37,11 @@ dir path=lib/svc/manifest/network group=sys
 dir path=lib/svc/manifest/network/smb group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
+dir path=usr/kernel group=sys
+dir path=usr/kernel/drv group=sys
+dir path=usr/kernel/drv/$(ARCH64) group=sys
+dir path=usr/kernel/kmdb group=sys
+dir path=usr/kernel/kmdb/$(ARCH64) group=sys
 dir path=usr/lib
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/smb group=sys
@@ -64,20 +65,18 @@ dir path=var/smb/cvol/windows/system32 group=sys
 dir path=var/smb/cvol/windows/system32/vss group=sys
 dir path=var/svc group=sys
 driver name=smbsrv perms="* 0640 root sys"
-file path=kernel/drv/$(ARCH64)/smbsrv group=sys
-$(i386_ONLY)file path=kernel/drv/smbsrv group=sys
-file path=kernel/drv/smbsrv.conf group=sys
-file path=kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/smbsrv group=sys mode=0555
 file path=lib/svc/manifest/network/smb/server.xml group=sys mode=0444
 file path=lib/svc/method/svc-smbd mode=0555
+file path=usr/kernel/drv/$(ARCH64)/smbsrv group=sys
+$(i386_ONLY)file path=usr/kernel/drv/smbsrv group=sys
+file path=usr/kernel/drv/smbsrv.conf group=sys
+file path=usr/kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555
+$(i386_ONLY)file path=usr/kernel/kmdb/smbsrv group=sys mode=0555
 file path=usr/lib/fs/smb/$(ARCH64)/libshare_smb.so.1
 file path=usr/lib/fs/smb/libshare_smb.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/smbsrv.so group=sys mode=0555
 file path=usr/lib/reparse/libreparse_smb.so.1
-file path=usr/lib/reparse/llib-lreparse_smb
-file path=usr/lib/reparse/llib-lreparse_smb.ln
 file path=usr/lib/security/pam_smb_passwd.so.1
 file path=usr/lib/smbsrv/libmlrpc.so.1
 file path=usr/lib/smbsrv/libmlsvc.so.1
@@ -85,16 +84,6 @@ file path=usr/lib/smbsrv/libsmb.so.1
 file path=usr/lib/smbsrv/libsmbns.so.1
 file path=usr/lib/smbsrv/libsmbrdr.so.1
 file path=usr/lib/smbsrv/libsqlite.so.1
-file path=usr/lib/smbsrv/llib-lmlrpc
-file path=usr/lib/smbsrv/llib-lmlrpc.ln
-file path=usr/lib/smbsrv/llib-lmlsvc
-file path=usr/lib/smbsrv/llib-lmlsvc.ln
-file path=usr/lib/smbsrv/llib-lsmb
-file path=usr/lib/smbsrv/llib-lsmb.ln
-file path=usr/lib/smbsrv/llib-lsmbns
-file path=usr/lib/smbsrv/llib-lsmbns.ln
-file path=usr/lib/smbsrv/llib-lsmbrdr
-file path=usr/lib/smbsrv/llib-lsmbrdr.ln
 file path=usr/lib/smbsrv/smbd mode=0555
 file path=usr/sbin/smbadm mode=0555
 file path=usr/sbin/smbstat mode=0555
