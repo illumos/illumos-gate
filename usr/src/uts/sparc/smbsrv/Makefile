@@ -21,6 +21,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 
 #
 #	This makefile drives the production of the cifs server file system
@@ -38,7 +39,7 @@ UTSBASE	= ../..
 MODULE		= smbsrv
 OBJECTS		= $(SMBSRV_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SMBSRV_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/fs/smbsrv
 
 #
