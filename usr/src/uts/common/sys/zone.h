@@ -430,6 +430,7 @@ typedef struct {
 } zone_mcap_kstat_t;
 
 typedef struct {
+	kstat_named_t	zm_zonename;	/* full name, kstat truncates name */
 	kstat_named_t	zm_utime;
 	kstat_named_t	zm_stime;
 	kstat_named_t	zm_wtime;

@@ -2095,6 +2095,7 @@ zone_mcap_kstat_create(zone_t *zone)
 	ksp->ks_lock = &zone->zone_mcap_lock;
 	zone->zone_mcap_stats = zmp;
 
+	/* The kstat "name" field is not large enough for a full zonename */
 	kstat_named_init(&zmp->zm_zonename, "zonename", KSTAT_DATA_STRING);
 	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
 	kstat_named_init(&zmp->zm_rss, "rss", KSTAT_DATA_UINT64);
@@ -2156,9 +2157,13 @@ zone_misc_kstat_create(zone_t *zone)
 		kstat_zone_add(ksp, GLOBAL_ZONEID);
 
 	zmp = ksp->ks_data = kmem_zalloc(sizeof (zone_misc_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
 	ksp->ks_lock = &zone->zone_misc_lock;
 	zone->zone_misc_stats = zmp;
 
+	/* The kstat "name" field is not large enough for a full zonename */
+	kstat_named_init(&zmp->zm_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
 	kstat_named_init(&zmp->zm_utime, "nsec_user", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_stime, "nsec_sys", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_wtime, "nsec_waitrq", KSTAT_DATA_UINT64);
