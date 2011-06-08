@@ -3,11 +3,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
-
-  Copyright (C) 2000, 2001 Silicon Graphics, Inc.  All Rights Reserved.
+  Copyright (C) 2000, 2001, 2002 Silicon Graphics, Inc.  All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2.1 of the GNU Lesser General Public License
@@ -48,7 +45,7 @@ extern "C" {
 #endif
 /*
 	libdwarf.h  
-	$Revision: 1.71 $ $Date: 2001/05/23 23:34:52 $
+	$Revision: 1.74 $ $Date: 2002/06/11 17:49:06 $
 
 	For libdwarf producers and consumers
 
@@ -65,6 +62,14 @@ extern "C" {
 	The declarations are a little harder to read this way, but...
 
 */
+
+#ifdef __SGI_FAST_LIBELF
+struct elf_sgi;
+typedef struct elf_sgi* dwarf_elf_handle;
+#else
+struct Elf;
+typedef struct Elf* dwarf_elf_handle;
+#endif
 
 #if (_MIPS_SZLONG == 64)
 /* Special case for MIPS, so -64 (LP64) build gets simple -long-.
@@ -92,11 +97,14 @@ typedef unsigned long long  Dwarf_Addr;     /* target memory address */
 #endif
 typedef void*		Dwarf_Ptr;          /* host machine pointer */
 
-/* uninterpreted block of data
+/* Contains info on an uninterpreted block of data
 */
 typedef struct {
         Dwarf_Unsigned  bl_len;         /* length of block */
         Dwarf_Ptr       bl_data;        /* uninterpreted data */
+	Dwarf_Small     bl_from_loclist; /*non-0 if loclist, else debug_info*/
+	Dwarf_Unsigned  bl_section_offset; /* Section (not CU) offset
+                                        which 'data' comes from. */
 } Dwarf_Block;
 
 
@@ -117,6 +125,11 @@ typedef struct {
         Dwarf_Addr      ld_hipc;        /* end of active range */
         Dwarf_Half      ld_cents;       /* count of location records */
         Dwarf_Loc*      ld_s;           /* pointer to list of same */
+	Dwarf_Small     ld_from_loclist; 
+				      /* non-0 if loclist, else debug_info*/
+
+	Dwarf_Unsigned  ld_section_offset; /* Section (not CU) offset
+					where loc-expr begins*/
 } Dwarf_Locdesc;
 
 /* Frame description instructions expanded.
@@ -458,9 +471,10 @@ typedef void  (*Dwarf_Handler)(Dwarf_Error /*error*/, Dwarf_Ptr /*errarg*/);
 #define DW_DLE_DF_POP_EMPTY_STACK              	191
 #define DW_DLE_DF_ALLOC_FAIL                   	192
 #define DW_DLE_DF_FRAME_DECODING_ERROR         	193
+#define DW_DLE_DEBUG_LOC_SECTION_SHORT         	194
 
     /* DW_DLE_LAST MUST EQUAL LAST ERROR NUMBER */
-#define DW_DLE_LAST        			193
+#define DW_DLE_LAST        			194
 #define DW_DLE_LO_USER     0x10000
 
         /* taken as meaning 'undefined value', this is not
@@ -516,7 +530,7 @@ int dwarf_init(int 	/*fd*/,
     Dwarf_Error* 	/*error*/);
 
 /* elf intialization */
-int dwarf_elf_init(Elf* /*elf*/, 
+int dwarf_elf_init(dwarf_elf_handle /*elf*/,
     Dwarf_Unsigned 	/*access*/, 
     Dwarf_Handler 	/*errhand*/, 
     Dwarf_Ptr 		/*errarg*/, 
@@ -528,7 +542,7 @@ void dwarf_print_memory_stats(Dwarf_Debug  /*dbg*/);
 
 
 int dwarf_get_elf(Dwarf_Debug /*dbg*/,
-    Elf **              /*return_elfptr*/,
+    dwarf_elf_handle*   /*return_elfptr*/,
     Dwarf_Error*	/*error*/);
 
 int dwarf_finish(Dwarf_Debug /*dbg*/, Dwarf_Error* /*error*/);
@@ -604,7 +618,13 @@ int dwarf_hasattr(Dwarf_Die /*die*/,
     Dwarf_Bool     *    /*returned_bool*/,
     Dwarf_Error* 	/*error*/);
 
-int dwarf_loclist(Dwarf_Attribute /*attr*/, 
+/* dwarf_loclist_n preferred over dwarf_loclist */
+int dwarf_loclist_n(Dwarf_Attribute /*attr*/,  
+    Dwarf_Locdesc***	/*llbuf*/, 
+    Dwarf_Signed *      /*locCount*/,
+    Dwarf_Error* 	/*error*/);
+
+int dwarf_loclist(Dwarf_Attribute /*attr*/,  /* inflexible! */
     Dwarf_Locdesc** 	/*llbuf*/, 
     Dwarf_Signed *      /*locCount*/,
     Dwarf_Error* 	/*error*/);
@@ -673,6 +693,10 @@ int dwarf_hasform(Dwarf_Attribute /*attr*/,
     Dwarf_Error* 	/*error*/);
 
 int dwarf_whatform(Dwarf_Attribute /*attr*/, 
+    Dwarf_Half *        /*returned_form*/,
+    Dwarf_Error* 	/*error*/);
+
+int dwarf_whatform_direct(Dwarf_Attribute /*attr*/, 
     Dwarf_Half *        /*returned_form*/,
     Dwarf_Error* 	/*error*/);
 
@@ -1262,13 +1286,6 @@ Dwarf_P_Attribute dwarf_add_AT_targ_address(Dwarf_P_Debug /*dbg*/,
     Dwarf_Signed 	/*sym_index*/, 
     Dwarf_Error* 	/*error*/);
 
-Dwarf_P_Attribute dwarf_add_AT_block(Dwarf_P_Debug /*dbg*/, 
-    Dwarf_P_Die 	/*ownerdie*/, 
-    Dwarf_Half 		/*attr*/, 
-    Dwarf_Small* 	/*block_data*/,
-    Dwarf_Unsigned	/*block_len*/,
-    Dwarf_Error* 	/*error*/);
-
 Dwarf_P_Attribute dwarf_add_AT_targ_address_b(Dwarf_P_Debug /*dbg*/, 
     Dwarf_P_Die 	/*ownerdie*/, 
     Dwarf_Half 		/*attr*/, 
@@ -1462,36 +1479,6 @@ Dwarf_P_Die dwarf_die_link(
     Dwarf_P_Die		/*left*/,
     Dwarf_P_Die		/*right*/, 
     Dwarf_Error* 	/*error*/);
-
-void dwarf_dealloc_compressed_block(
-    Dwarf_P_Debug,
-    void *
-);
-
-void dwarf_dealloc_uncompressed_block(
-    Dwarf_Debug,
-    void *
-);
-
-void * dwarf_compress_integer_block(
-    Dwarf_P_Debug,    /* dbg */
-    Dwarf_Bool,       /* signed==true (or unsigned) */
-    Dwarf_Small,      /* size of integer units: 8, 16, 32, 64 */
-    void*,            /* data */
-    Dwarf_Unsigned,   /* number of elements */
-    Dwarf_Unsigned*,  /* number of bytes in output block */
-    Dwarf_Error*      /* error */
-);
-
-void * dwarf_uncompress_integer_block(
-    Dwarf_Debug,    /* dbg */
-    Dwarf_Bool,       /* signed==true (or unsigned) */
-    Dwarf_Small,      /* size of integer units: 8, 16, 32, 64 */
-    void*,            /* data */
-    Dwarf_Unsigned,   /* number of bytes in input */
-    Dwarf_Unsigned*,  /* number of units in output block */
-    Dwarf_Error*      /* error */
-);
 
 /* Operations to create location expressions. */
 Dwarf_P_Expr dwarf_new_expr(Dwarf_P_Debug /*dbg*/, Dwarf_Error* /*error*/);

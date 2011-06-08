@@ -939,6 +939,13 @@ usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 #
 opt/onbld/bin/i386/elfsign	i386
 opt/onbld/bin/sparc/elfsign	sparc
+
+#
+# Private libdwarf
+#
+opt/onbld/lib/i386/libdwarf.so	i386
+opt/onbld/lib/sparc/libdwarf.so	sparc
+
 #
 # Private socket filter API
 #
