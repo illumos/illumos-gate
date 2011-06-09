@@ -135,6 +135,9 @@ dls_stat_create(const char *module, int instance, const char *name,
 	ksp->ks_update = update;
 	ksp->ks_private = private;
 	dkp = ksp->ks_data = kmem_zalloc(sizeof (dls_kstat_t), KM_SLEEP);
+	if ((zone = zone_find_by_id(newzoneid)) != NULL) {
+		ksp->ks_data_size += strlen(zone->zone_name) + 1;
+	}
 
 	kstat_named_init(&dkp->dk_ifspeed, "ifspeed", KSTAT_DATA_UINT64);
 	kstat_named_init(&dkp->dk_multircv, "multircv", KSTAT_DATA_UINT32);
@@ -160,9 +163,8 @@ dls_stat_create(const char *module, int instance, const char *name,
 	kstat_named_init(&dkp->dk_unknowns, "unknowns", KSTAT_DATA_UINT32);
 	kstat_named_init(&dkp->dk_zonename, "zonename", KSTAT_DATA_STRING);
 
-	if ((zone = zone_find_by_id(newzoneid)) != NULL) {
+	if (zone != NULL) {
 		kstat_named_setstr(&dkp->dk_zonename, zone->zone_name);
-		ksp->ks_data_size += strlen(zone->zone_name) + 1;
 		zone_rele(zone);
 	}
 
