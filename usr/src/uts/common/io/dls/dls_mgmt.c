@@ -764,7 +764,7 @@ dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid, zoneid_t newzoneid)
 	}
 
 	if (dls_stat_create("link", 0, nm, zoneid,
-	    dls_devnet_stat_update, ddp, &ksp) == 0) {
+	    dls_devnet_stat_update, ddp, &ksp, newzoneid) == 0) {
 		ASSERT(ksp != NULL);
 		if (zoneid == ddp->dd_owner_zid) {
 			ASSERT(ddp->dd_ksp == NULL);
@@ -784,12 +784,12 @@ dls_devnet_stat_destroy(dls_devnet_t *ddp, zoneid_t zoneid)
 {
 	if (zoneid == ddp->dd_owner_zid) {
 		if (ddp->dd_ksp != NULL) {
-			kstat_delete(ddp->dd_ksp);
+			dls_stat_delete(ddp->dd_ksp);
 			ddp->dd_ksp = NULL;
 		}
 	} else {
 		if (ddp->dd_zone_ksp != NULL) {
-			kstat_delete(ddp->dd_zone_ksp);
+			dls_stat_delete(ddp->dd_zone_ksp);
 			ddp->dd_zone_ksp = NULL;
 		}
 	}
@@ -803,11 +803,11 @@ static void
 dls_devnet_stat_rename(dls_devnet_t *ddp, boolean_t zoneinit)
 {
 	if (ddp->dd_ksp != NULL) {
-		kstat_delete(ddp->dd_ksp);
+		dls_stat_delete(ddp->dd_ksp);
 		ddp->dd_ksp = NULL;
 	}
 	if (zoneinit && ddp->dd_zone_ksp != NULL) {
-		kstat_delete(ddp->dd_zone_ksp);
+		dls_stat_delete(ddp->dd_zone_ksp);
 		ddp->dd_zone_ksp = NULL;
 	}
 	/*
