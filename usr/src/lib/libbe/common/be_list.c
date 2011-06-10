@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -872,7 +873,7 @@ be_get_node_data(
 	}
 
 	(void) zpool_get_prop(zphp, ZPOOL_PROP_BOOTFS, prop_buf, ZFS_MAXPROPLEN,
-	    NULL);
+	    NULL, B_FALSE);
 	if (be_has_grub() &&
 	    (be_default_grub_bootfs(rpool, &grub_default_bootfs)
 	    == BE_SUCCESS) && grub_default_bootfs != NULL)

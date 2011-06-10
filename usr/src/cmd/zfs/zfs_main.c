@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -224,7 +225,7 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tupgrade [-v]\n"
 		    "\tupgrade [-r] [-V version] <-a | filesystem ...>\n"));
 	case HELP_LIST:
-		return (gettext("\tlist [-rH][-d max] "
+		return (gettext("\tlist [-rHp][-d max] "
 		    "[-o property[,...]] [-t type[,...]] [-s property] ...\n"
 		    "\t    [-S property] ... "
 		    "[filesystem|volume|snapshot] ...\n"));
@@ -2549,11 +2550,12 @@ zfs_do_userspace(int argc, char **argv)
 }
 
 /*
- * list [-r][-d max] [-H] [-o property[,property]...] [-t type[,type]...]
+ * list [-r][-p][-d max] [-H] [-o property[,property]...] [-t type[,type]...]
  *      [-s property [-s property]...] [-S property [-S property]...]
  *      <dataset> ...
  *
  *	-r	Recurse over all children
+ *	-p	Display values in parsable (literal) format.
  *	-d	Limit recursion by depth.
  *	-H	Scripted mode; elide headers and separate columns by tabs
  *	-o	Control which fields to display.
@@ -2568,6 +2570,7 @@ zfs_do_userspace(int argc, char **argv)
 typedef struct list_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_scripted;
+	boolean_t	cb_literal;
 	zprop_list_t	*cb_proplist;
 } list_cbdata_t;
 
@@ -2617,7 +2620,8 @@ print_header(zprop_list_t *pl)
  * to the described layout.
  */
 static void
-print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
+print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted,
+    boolean_t literal)
 {
 	boolean_t first = B_TRUE;
 	char property[ZFS_MAXPROPLEN];
@@ -2639,7 +2643,7 @@ print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
 
 		if (pl->pl_prop != ZPROP_INVAL) {
 			if (zfs_prop_get(zhp, pl->pl_prop, property,
-			    sizeof (property), NULL, NULL, 0, B_FALSE) != 0)
+			    sizeof (property), NULL, NULL, 0, literal) != 0)
 				propstr = "-";
 			else
 				propstr = property;
@@ -2647,7 +2651,7 @@ print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
 			right_justify = zfs_prop_align_right(pl->pl_prop);
 		} else if (zfs_prop_userquota(pl->pl_user_prop)) {
 			if (zfs_prop_get_userquota(zhp, pl->pl_user_prop,
-			    property, sizeof (property), B_FALSE) != 0)
+			    property, sizeof (property), literal) != 0)
 				propstr = "-";
 			else
 				propstr = property;
@@ -2694,7 +2698,7 @@ list_callback(zfs_handle_t *zhp, void *data)
 		cbp->cb_first = B_FALSE;
 	}
 
-	print_dataset(zhp, cbp->cb_proplist, cbp->cb_scripted);
+	print_dataset(zhp, cbp->cb_proplist, cbp->cb_scripted, cbp->cb_literal);
 
 	return (0);
 }
@@ -2717,8 +2721,11 @@ zfs_do_list(int argc, char **argv)
 	int flags = ZFS_ITER_PROP_LISTSNAPS | ZFS_ITER_ARGS_CAN_BE_PATHS;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":d:o:rt:Hs:S:")) != -1) {
+	while ((c = getopt(argc, argv, ":pd:o:rt:Hs:S:")) != -1) {
 		switch (c) {
+		case 'p':
+			cb.cb_literal = B_TRUE;
+			break;
 		case 'o':
 			fields = optarg;
 			break;
