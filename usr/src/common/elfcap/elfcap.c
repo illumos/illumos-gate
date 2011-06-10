@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -295,6 +296,14 @@ static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 	{						/* 0x20000000 */
 		AV_386_AVX, STRDESC("AV_386_AVX"),
 		STRDESC("AVX"), STRDESC("avx"),
+	},
+	{						/* 0x40000000 */
+		AV_386_VMX, STRDESC("AV_386_VMX"),
+		STRDESC("VMX"), STRDESC("vmx"),
+	},
+	{						/* 0x80000000 */
+		AV_386_AMD_SVM, STRDESC("AV_386_AMD_SVM"),
+		STRDESC("AMD_SVM"), STRDESC("amd_svm"),
 	}
 };
 
