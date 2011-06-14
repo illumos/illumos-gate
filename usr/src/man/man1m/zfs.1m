@@ -7,6 +7,7 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2011 by Delphix.  All rights reserved.
 .TH zfs 1M "24 Sep 2009" "SunOS 5.11" "System Administration Commands"
 .SH NAME
 zfs \- configures ZFS file systems
@@ -465,7 +466,11 @@ This property can also be referred to by its shortened column name,
 .ad
 .sp .6
 .RS 4n
-The compression ratio achieved for this dataset, expressed as a multiplier.
+For non-snapshots, the compression ratio achieved for the \fBused\fR
+space of this dataset, expressed as a multiplier.  The \fBused\fR
+property includes descendant datasets, and, for clones, does not include
+the space shared with the origin snapshot.  For snapshots, the
+\fBcompressratio\fR is the same as the \fBrefcompressratio\fR property.
 Compression can be turned on by running: \fBzfs set compression=on
 \fIdataset\fR\fR. The default value is \fBoff\fR.
 .RE
@@ -534,6 +539,19 @@ was created from, since its contents are identical.
 .sp
 This property can also be referred to by its shortened column name,
 \fBrefer\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrefcompressratio\fR\fR
+.ad
+.sp .6
+.RS 4n
+The compression ratio achieved for the \fBreferenced\fR space of this
+dataset, expressed as a multiplier.  See also the \fBcompressratio\fR
+property.
 .RE
 
 .sp
@@ -1688,7 +1706,7 @@ Force an unmount of any file systems using the \fBunmount -f\fR command. This
 option has no effect on non-file systems or unmounted file systems.
 .RE
 
-Extreme care should be taken when applying either the \fB-r\fR or the \fB-f\fR
+Extreme care should be taken when applying either the \fB-r\fR or the \fB-R\fR
 options, as they can destroy large portions of a pool and cause unexpected
 behavior for mounted file systems in use.
 .RE
