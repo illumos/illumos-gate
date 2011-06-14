@@ -3423,6 +3423,92 @@ zone_find_by_path(const char *path)
 }
 
 /*
+ * Public interface for updating per-zone load averages.  Called once per
+ * second.
+ *
+ * Based on loadavg_update(), genloadavg() and calcloadavg() from clock.c.
+ */
+void
+zone_loadavg_update()
+{
+	zone_t *zp;
+	zone_status_t status;
+	struct loadavg_s *lavg;
+	hrtime_t zone_total;
+	int i;
+	hrtime_t hr_avg;
+	int nrun;
+	static int64_t f[3] = { 135, 27, 9 };
+	int64_t q, r;
+
+	mutex_enter(&zonehash_lock);
+	for (zp = list_head(&zone_active); zp != NULL;
+	    zp = list_next(&zone_active, zp)) {
+		mutex_enter(&zp->zone_lock);
+
+		/* Skip zones that are on the way down or not yet up */
+		status = zone_status_get(zp);
+		if (status < ZONE_IS_READY || status >= ZONE_IS_DOWN) {
+			/* For all practical purposes the zone doesn't exist. */
+			mutex_exit(&zp->zone_lock);
+			continue;
+		}
+
+		/*
+		 * Update the 10 second moving average data in zone_loadavg.
+		 */
+		lavg = &zp->zone_loadavg;
+
+		zone_total = zp->zone_utime + zp->zone_stime + zp->zone_wtime;
+		scalehrtime(&zone_total);
+
+		/* The zone_total should always be increasing. */
+		lavg->lg_loads[lavg->lg_cur] = (zone_total > lavg->lg_total) ?
+		    zone_total - lavg->lg_total : 0;
+		lavg->lg_cur = (lavg->lg_cur + 1) % S_LOADAVG_SZ;
+		/* lg_total holds the prev. 1 sec. total */
+		lavg->lg_total = zone_total;
+
+		/*
+		 * To simplify the calculation, we don't calculate the load avg.
+		 * until the zone has been up for at least 10 seconds and our
+		 * moving average is thus full.
+		 */
+		if ((lavg->lg_len + 1) < S_LOADAVG_SZ) {
+			lavg->lg_len++;
+			mutex_exit(&zp->zone_lock);
+			continue;
+		}
+
+		/* Now calculate the 1min, 5min, 15 min load avg. */
+		hr_avg = 0;
+		for (i = 0; i < S_LOADAVG_SZ; i++)
+                	hr_avg += lavg->lg_loads[i];
+		hr_avg = hr_avg / S_LOADAVG_SZ;
+		nrun = hr_avg / (NANOSEC / LGRP_LOADAVG_IN_THREAD_MAX);
+
+		/* Compute load avg. See comment in calcloadavg() */
+		for (i = 0; i < 3; i++) {
+			q = (zp->zone_hp_avenrun[i] >> 16) << 7;
+			r = (zp->zone_hp_avenrun[i] & 0xffff) << 7;
+			zp->zone_hp_avenrun[i] +=
+			    ((nrun - q) * f[i] - ((r * f[i]) >> 16)) >> 4;
+
+			/* avenrun[] can only hold 31 bits of load avg. */
+			if (zp->zone_hp_avenrun[i] <
+			    ((uint64_t)1<<(31+16-FSHIFT)))
+				zp->zone_avenrun[i] = (int32_t)
+				    (zp->zone_hp_avenrun[i] >> (16 - FSHIFT));
+			else
+				zp->zone_avenrun[i] = 0x7fffffff;
+		}
+
+		mutex_exit(&zp->zone_lock);
+	}
+	mutex_exit(&zonehash_lock);
+}
+
+/*
  * Get the number of cpus visible to this zone.  The system-wide global
  * 'ncpus' is returned if pools are disabled, the caller is in the
  * global zone, or a NULL zone argument is passed in.
