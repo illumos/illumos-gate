@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 PROG= bootadm
 
@@ -36,7 +38,7 @@ include ../Makefile.com
 .KEEP_STATE:
 
 LDLIBS_i386= -lfdisk
-LDLIBS +=	-lnvpair -lgen -ladm -lefi -lscf -lz $(LDLIBS_$(MACH))
+LDLIBS +=	-lnvpair -lgen -ladm -lefi -lscf -lz -lbe -lzfs $(LDLIBS_$(MACH))
 
 # Writing into string literals is incorrect.  We need to match gcc's
 # behavior, which causes us to take SIGSEGV on such a write.
