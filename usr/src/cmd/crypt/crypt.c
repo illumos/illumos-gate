@@ -28,7 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	A one-rotor machine designed along the lines of Enigma
  *	but considerably trivialized.
@@ -115,7 +114,7 @@ main(int argc, char **argv)
 	int kflag = 0;
 	char *buf;
 	char key[8];
-	char *keyvar = "CrYpTkEy=XXXXXXXX";
+	char keyvar[] = "CrYpTkEy=XXXXXXXX";
 	char *s;
 
 	if (argc < 2) {
