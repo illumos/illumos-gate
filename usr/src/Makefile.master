@@ -423,8 +423,16 @@ sparcv9_COPTFLAG=	-xO3
 i386_COPTFLAG=		-O
 amd64_COPTFLAG=		-xO3
 
+# This would normally be added by cw(1) but cannot be while we want to support
+# Both GCC 3.x and GCC 4.x
+$(__GNUC4)$(MACH)_COPTFLAG += -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once
+$(__GNUC4)$(MACH64)_COPTFLAG += -_gcc=-fno-inline-small-functions \
+	-_gcc=-fno-inline-functions-called-once
+
 COPTFLAG= $($(MACH)_COPTFLAG)
 COPTFLAG64= $($(MACH64)_COPTFLAG)
+
 
 # When -g is used, the compiler globalizes static objects
 # (gives them a unique prefix). Disable that.
