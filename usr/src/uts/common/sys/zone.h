@@ -435,6 +435,9 @@ typedef struct {
 	kstat_named_t	zm_utime;
 	kstat_named_t	zm_stime;
 	kstat_named_t	zm_wtime;
+	kstat_named_t	zm_avenrun1;
+	kstat_named_t	zm_avenrun5;
+	kstat_named_t	zm_avenrun15;
 } zone_misc_kstat_t;
 
 typedef struct zone {

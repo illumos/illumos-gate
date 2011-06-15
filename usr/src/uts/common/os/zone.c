@@ -2138,6 +2138,10 @@ zone_misc_kstat_update(kstat_t *ksp, int rw)
 	scalehrtime(&tmp);
 	zmp->zm_wtime.value.ui64 = tmp;
 
+	zmp->zm_avenrun1.value.ui32 = zone->zone_avenrun[0];
+	zmp->zm_avenrun5.value.ui32 = zone->zone_avenrun[1];
+	zmp->zm_avenrun15.value.ui32 = zone->zone_avenrun[2];
+
 	return (0);
 }
 
@@ -2167,6 +2171,10 @@ zone_misc_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_utime, "nsec_user", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_stime, "nsec_sys", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_wtime, "nsec_waitrq", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_avenrun1, "avenrun_1min", KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_avenrun5, "avenrun_5min", KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_avenrun15, "avenrun_15min",
+	    KSTAT_DATA_UINT32);
 
 	ksp->ks_update = zone_misc_kstat_update;
 	ksp->ks_private = zone;
