@@ -921,7 +921,14 @@ catman(struct man_node *manp, char **argv, int argc)
 	int	i;
 	struct dupnode *dnp = NULL;
 	char   **realsecv;
-	char   *fakesecv[2] = { " catman ", NULL };
+	/*
+	 * May be overwritten in dupcheck() so must be kept out of .rodata.
+	 */
+	char	fakename[] = " catman ";
+	char	*fakesecv[2];
+
+	fakesecv[0] = fakename;
+	fakesecv[1] = NULL;
 
 	for (p = manp; p != NULL; p = p->next) {
 		/*
