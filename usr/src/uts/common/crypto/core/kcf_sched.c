@@ -1027,9 +1027,9 @@ kcfpool_svc(void *arg)
 			case 0:
 			case -1:
 				/*
-				 * Woke up with no work to do. Check
-				 * if this thread should exit. We keep
-				 * at least kcf_minthreads.
+				 * Woke up with no work to do. Check if we
+				 * should lwp_exit() (which won't return). We
+				 * keep at least kcf_minthreads.
 				 */
 				if (kcfpool->kp_threads > kcf_minthreads) {
 					KCF_ATOMIC_DECR(kcfpool->kp_threads);
