@@ -130,6 +130,7 @@ usage(void)
 	    "\n"
 	    "\tsubcommands:\n"
 	    "\n"
+	    "\tbeadm activate beName\n"
 	    "\tbeadm create [-d BE_desc]\n"
 	    "\t\t[-o property=value] ... [-p zpool] \n"
 	    "\t\t[-e nonActiveBe | beName@snapshot] beName\n"
