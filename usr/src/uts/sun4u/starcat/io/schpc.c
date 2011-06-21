@@ -2069,13 +2069,6 @@ restart_test:
 
 		schpc_p->schpc_slot[slot].state &=  ~SCHPC_SLOTSTATE_REC_GOOD;
 		return;
-	case PCIMSG_SLOTCOND_NOHOTPLUG:
-		cmn_err(CE_WARN, "schpc - Expander %d Board %d PCI Slot %d "
-		    "is not hot pluggable\n", expander, board,
-		    SCHPC_SLOT_NUM(slot));
-
-		schpc_p->schpc_slot[slot].state &=  ~SCHPC_SLOTSTATE_REC_GOOD;
-		return;
 	}
 
 	if (slotstatus.slot_power_on) {
