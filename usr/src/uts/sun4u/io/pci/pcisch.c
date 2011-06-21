@@ -2973,11 +2973,12 @@ iommu_tlb_scrub(iommu_t *iommu_p, int scrub)
 		"\tContext=%lx %sWritable %sStreamable\n"
 		"\tPCI Page Size=%sk Address in page %lx\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip), errstat, i,
-		    (tag & TLBTAG_CONTEXT_BITS) >> TLBTAG_CONTEXT_SHIFT,
+		    (uint64_t)(tag & TLBTAG_CONTEXT_BITS) >>
+		    TLBTAG_CONTEXT_SHIFT,
 		    (tag & TLBTAG_WRITABLE_BIT) ? "" : neg,
 		    (tag & TLBTAG_STREAM_BIT) ? "" : neg,
 		    (tag & TLBTAG_PGSIZE_BIT) ? "64" : "8",
-		    (tag & TLBTAG_PCIVPN_BITS) << 13);
+		    (uint64_t)(tag & TLBTAG_PCIVPN_BITS) << 13);
 		cmn_err(CE_CONT, "Memory: %sValid %sCacheable Page Frame=%lx\n",
 		    (data & TLBDATA_VALID_BIT) ? "" : neg,
 		    (data & TLBDATA_CACHE_BIT) ? "" : neg, pfn);
