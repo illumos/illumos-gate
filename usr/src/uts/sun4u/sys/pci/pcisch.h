@@ -26,8 +26,6 @@
 #ifndef _SYS_PCISCH_H
 #define	_SYS_PCISCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -504,13 +502,13 @@ typedef struct pcix_err_tbl {
  */
 #define	TLBTAG_CONTEXT_SHIFT		25
 #define	TLBTAG_ERRSTAT_SHIFT		23
-#define	TLBTAG_CONTEXT_BITS		(0xfffull << TLBTAG_CONTEXT_SHIFT)
-#define	TLBTAG_ERRSTAT_BITS		(0x3ull << TLBTAG_ERRSTAT_SHIFT)
-#define	TLBTAG_ERR_BIT			(0x1ull << 22)
-#define	TLBTAG_WRITABLE_BIT		(0x1ull << 21)
-#define	TLBTAG_STREAM_BIT		(0x1ull << 20)
-#define	TLBTAG_PGSIZE_BIT		(0x1ull << 19)
-#define	TLBTAG_PCIVPN_BITS		0x7ffffull
+#define	TLBTAG_CONTEXT_BITS		(0xffful << TLBTAG_CONTEXT_SHIFT)
+#define	TLBTAG_ERRSTAT_BITS		(0x3ul << TLBTAG_ERRSTAT_SHIFT)
+#define	TLBTAG_ERR_BIT			(0x1ul << 22)
+#define	TLBTAG_WRITABLE_BIT		(0x1ul << 21)
+#define	TLBTAG_STREAM_BIT		(0x1ul << 20)
+#define	TLBTAG_PGSIZE_BIT		(0x1ul << 19)
+#define	TLBTAG_PCIVPN_BITS		0x7fffful
 
 #define	TLBTAG_ERRSTAT_PROT		0
 #define	TLBTAG_ERRSTAT_INVALID		1
