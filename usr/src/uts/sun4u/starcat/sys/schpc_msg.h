@@ -27,8 +27,6 @@
 #ifndef _SYS_SCHPC_MSG_H
 #define	_SYS_SCHPC_MSG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This header file describes the messages that are sent between the
  * schpc Hot Plug Controller Driver running on the domain and the System
@@ -135,7 +133,6 @@ typedef struct {
 #define	PCIMSG_SLOTCOND_GOOD		0x1
 #define	PCIMSG_SLOTCOND_REC_FAIL	0x2
 #define	PCIMSG_SLOTCOND_OCC_FAIL	0x3
-#define	PCIMSG_SLOTCOND_NOHOTPLUG	0x4
 
 /*
  * Values for the slot_freq_cap and slot_freq_setting fields of the get
