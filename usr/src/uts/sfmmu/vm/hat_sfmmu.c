@@ -4061,7 +4061,7 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 
 	srdp = sfmmup->sfmmu_srdp;
 	rid = (uint_t)((uint64_t)rcookie);
-	ASSERT(rid < SFMMU_MAX_HME_REGIONS);
+	VERIFY3U(rid, <, SFMMU_MAX_HME_REGIONS);
 	eaddr = addr + len;
 	va = addr;
 	list = NULL;
