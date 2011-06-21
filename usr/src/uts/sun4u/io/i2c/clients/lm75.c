@@ -293,10 +293,21 @@ lm75_set16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
 				unitp->lm75_name));
 		return (ENOMEM);
 	}
+
+	/* BEGIN CSTYLED */
+	/*
+	 * The temperature is 16bits where the top 9 are a twos-complement
+	 * word with the the least significant bit used to indicate 0.5C
+	 *
+	 * |15|14|13|12|11|10| 9| 8| 7| 6| 5| 4| 3| 2| 1| 0|
+	 * |-----------------------------------------------|
+	 * |+-|	     Temperature      |	      Unused       |
+	 */
+	/* END CSTYLED */
 	i2c_tran_pointer->i2c_flags = I2C_WR;
 	i2c_tran_pointer->i2c_wbuf[0] = (uchar_t)reg;
-	i2c_tran_pointer->i2c_wbuf[1] = (temp16 >> 1);
-	i2c_tran_pointer->i2c_wbuf[2] =	((temp16 & 0xFF) << 7);
+	i2c_tran_pointer->i2c_wbuf[1] = ((temp16 >> 1) & 0xff);
+	i2c_tran_pointer->i2c_wbuf[2] = ((temp16 & 0x1) << 7);
 
 	err = i2c_transfer(unitp->lm75_hdl, i2c_tran_pointer);
 	i2c_transfer_free(unitp->lm75_hdl, i2c_tran_pointer);
