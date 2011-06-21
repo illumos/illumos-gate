@@ -620,7 +620,7 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 #ifndef	lint
 	ASSERT(sizeof (idnsb_t) == IDNSB_SIZE);
-	ASSERT((uint_t)&((struct idnsb *)0)->id_hwchkpt[0] == 0x40);
+	ASSERT(offsetof(struct idnsb, id_hwchkpt[0]) == 0x40);
 #endif	/* lint */
 
 	switch (cmd) {
