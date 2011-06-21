@@ -1961,9 +1961,13 @@ zone_vfs_kstat_create(zone_t *zone)
 		kstat_zone_add(ksp, GLOBAL_ZONEID);
 
 	zvp = ksp->ks_data = kmem_zalloc(sizeof (zone_vfs_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
 	ksp->ks_lock = &zone->zone_vfs_lock;
 	zone->zone_vfs_stats = zvp;
 
+	/* The kstat "name" field is not large enough for a full zonename */
+	kstat_named_init(&zvp->zv_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zvp->zv_zonename, zone->zone_name);
 	kstat_named_init(&zvp->zv_nread, "nread", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_reads, "reads", KSTAT_DATA_UINT64);
 	kstat_named_init(&zvp->zv_rtime, "rtime", KSTAT_DATA_UINT64);
@@ -2033,9 +2037,13 @@ zone_zfs_kstat_create(zone_t *zone)
 		kstat_zone_add(ksp, GLOBAL_ZONEID);
 
 	zzp = ksp->ks_data = kmem_zalloc(sizeof (zone_zfs_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
 	ksp->ks_lock = &zone->zone_zfs_lock;
 	zone->zone_zfs_stats = zzp;
 
+	/* The kstat "name" field is not large enough for a full zonename */
+	kstat_named_init(&zzp->zz_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zzp->zz_zonename, zone->zone_name);
 	kstat_named_init(&zzp->zz_nread, "nread", KSTAT_DATA_UINT64);
 	kstat_named_init(&zzp->zz_reads, "reads", KSTAT_DATA_UINT64);
 	kstat_named_init(&zzp->zz_rtime, "rtime", KSTAT_DATA_UINT64);
@@ -3491,7 +3499,7 @@ zone_loadavg_update()
 		/* Now calculate the 1min, 5min, 15 min load avg. */
 		hr_avg = 0;
 		for (i = 0; i < S_LOADAVG_SZ; i++)
-                	hr_avg += lavg->lg_loads[i];
+			hr_avg += lavg->lg_loads[i];
 		hr_avg = hr_avg / S_LOADAVG_SZ;
 		nrun = hr_avg / (NANOSEC / LGRP_LOADAVG_IN_THREAD_MAX);
 

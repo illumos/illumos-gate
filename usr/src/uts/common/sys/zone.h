@@ -390,6 +390,7 @@ typedef struct {
 } sys_zio_cntr_t;
 
 typedef struct {
+	kstat_named_t	zv_zonename;
 	kstat_named_t	zv_nread;
 	kstat_named_t	zv_reads;
 	kstat_named_t	zv_rtime;
@@ -406,6 +407,7 @@ typedef struct {
 } zone_vfs_kstat_t;
 
 typedef struct {
+	kstat_named_t	zz_zonename;
 	kstat_named_t	zz_nread;
 	kstat_named_t	zz_reads;
 	kstat_named_t	zz_rtime;
