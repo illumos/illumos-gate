@@ -29,8 +29,6 @@
 #ifndef	_SYS_IDN_SMR_H
 #define	_SYS_IDN_SMR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 
 #ifdef	__cplusplus
@@ -64,7 +62,8 @@ typedef uint_t	smr_offset_t;
 #define	IDN_BUF2DATA(b, o)	((caddr_t)((uintptr_t)(b) + (uintptr_t)(o)))
 #define	IDN_BUF2HDR(b)		((smr_pkthdr_t *)(b))
 
-#define	IDN_CKSUM_PKT_COUNT	(((int)&((smr_pkthdr_t *)(0))->b_cksum) / 2)
+#define	IDN_CKSUM_PKT_COUNT	(((int)(uintptr_t) \
+	&((smr_pkthdr_t *)(0))->b_cksum) / 2)
 #define	IDN_CKSUM_PKT(h)	\
 		(IDN_CHECKSUM ? \
 		idn_cksum((ushort_t *)(h), IDN_CKSUM_PKT_COUNT) : 0)
