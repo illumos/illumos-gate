@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -23,10 +21,16 @@
 
 static int ringring;
 
+static void
+sleepx(void)
+{
+
+	ringring = 1;
+}
+
 void
 usleep(unsigned n)
 {
-	static void sleepx();
 	int omask;
 	struct itimerval itv, oitv;
 	struct itimerval *itp = &itv;
@@ -64,11 +68,4 @@ usleep(unsigned n)
 	(void) sigvec(SIGALRM, &ovec, (struct sigvec *)0);
 	(void) sigsetmask(omask);
 	(void) setitimer(ITIMER_REAL, &oitv, (struct itimerval *)0);
-}
-
-static void
-sleepx(void)
-{
-
-	ringring = 1;
 }
