@@ -29,6 +29,6 @@
 # information about overriding the defaults.
 #
 <include global_zone_only_component>
-set name=pkg.fmri value=pkg:/system/floating-point-scrubber@0.5.11,5.11-0.148
+set name=pkg.fmri value=pkg:/system/floating-point-scrubber@$(PKGVERS)
 set name=pkg.obsolete value=true
 set name=variant.arch value=sparc
