@@ -4745,7 +4745,8 @@ static char	_bd2hexascii[] = {
 		mutex_enter(&snoop_mutex); \
 		if (snoop_data == NULL) { \
 			snoop_data = (struct snoop_buffer *) \
-				(((uint_t)snoop_buffer + 0xf) & ~0xf); \
+				(((uint_t)(uintptr_t)snoop_buffer + 0xf) & \
+				    ~0xf);				\
 		} \
 		snoop_data[snoop_index].io = ((in) == 0) ? 'o' : 'i'; \
 		snoop_data[snoop_index].board = \

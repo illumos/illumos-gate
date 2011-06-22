@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/bootconf.h>
 #include <sys/param.h>
@@ -58,7 +56,7 @@ setup_bootops(void)
 {
 	bootops.bsys_version = BO_VERSION;
 	bootops.bsys_1275_call = (uint64_t)boot_fail;
-	bootops.bsys_printf = (uint32_t)boot_fail;
+	bootops.bsys_printf = (uint32_t)(uintptr_t)boot_fail;
 
 	if (!memlistpage) /* paranoia runs rampant */
 		prom_panic("\nMemlistpage not setup yet.");
