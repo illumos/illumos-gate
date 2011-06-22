@@ -372,6 +372,8 @@ PORTFP=				\
 	divdi3.o		\
 	floatdidf.o		\
 	floatdisf.o		\
+	floatundidf.o		\
+	floatundisf.o		\
 	lshrdi3.o		\
 	moddi3.o		\
 	muldi3.o		\
