@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Implementation to get PORT nodes state and condition information
  */
@@ -70,6 +68,7 @@ static int serial_port_state(kstat_ctl_t *, char *, int);
 static int serial_port_cond(kstat_ctl_t *kc, char *, int);
 static int parallel_port_state(kstat_ctl_t *, char *, int);
 static int parallel_port_cond(kstat_ctl_t *kc, char *, int);
+static void		sig_alarm_handler(int);
 
 static funcp port_state[] = {
 	kstat_network_port_state,
@@ -144,13 +143,13 @@ kstat_name_lookup(kstat_ctl_t *kc, char *ks_module, int ks_instance, char *name)
 
 	for (ksp = kc->kc_chain; ksp; ksp = ksp->ks_next) {
 		if (strcmp(ksp->ks_module, ks_module) == 0 &&
-			ksp->ks_instance == ks_instance &&
-			ksp->ks_type == KSTAT_TYPE_NAMED &&
-			kstat_read(kc, ksp, NULL) != -1 &&
-			kstat_data_lookup(ksp, name)) {
+		    ksp->ks_instance == ks_instance &&
+		    ksp->ks_type == KSTAT_TYPE_NAMED &&
+		    kstat_read(kc, ksp, NULL) != -1 &&
+		    kstat_data_lookup(ksp, name)) {
 
 			ksp = kstat_lookup(kc, ks_module, ks_instance,
-				ksp->ks_name);
+			    ksp->ks_name);
 			if (!ksp)
 				return (NULL);
 			if (kstat_read(kc, ksp, NULL) == -1)
@@ -171,7 +170,7 @@ kstat_network_port_state(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	kstat_named_t	*port_datap = NULL;
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		LINK_UP)) == NULL) {
+	    LINK_UP)) == NULL) {
 		return (-1);
 	}
 	if (port_datap == NULL) {
@@ -208,7 +207,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	uint64_t	ifspeed, ierrors, ipackets, oerrors, opackets;
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		LINK_UP)) == NULL) {
+	    LINK_UP)) == NULL) {
 		return (-1);
 	}
 
@@ -222,7 +221,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		DUPLEX)) == NULL) {
+	    DUPLEX)) == NULL) {
 		return (-1);
 	}
 
@@ -236,7 +235,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		IF_SPEED)) == NULL) {
+	    IF_SPEED)) == NULL) {
 		return (-1);
 	}
 	if (port_datap->data_type == KSTAT_DATA_UINT32) {
@@ -250,7 +249,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 
 	/* check for FAILING conditions */
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		IERRORS)) == NULL) {
+	    IERRORS)) == NULL) {
 		return (-1);
 	}
 	if (port_datap->data_type == KSTAT_DATA_UINT32) {
@@ -260,7 +259,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		IPACKETS)) == NULL) {
+	    IPACKETS)) == NULL) {
 		return (-1);
 	}
 
@@ -274,7 +273,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		OERRORS)) == NULL) {
+	    OERRORS)) == NULL) {
 		return (-1);
 	}
 	if (port_datap->data_type == KSTAT_DATA_UINT32) {
@@ -284,7 +283,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		OPACKETS)) == NULL) {
+	    OPACKETS)) == NULL) {
 		return (-1);
 	}
 	if (port_datap->data_type == KSTAT_DATA_UINT32) {
@@ -297,7 +296,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		RUNT_ERRORS)) == NULL) {
+	    RUNT_ERRORS)) == NULL) {
 		return (-1);
 	}
 	if (port_datap->data_type == KSTAT_DATA_UINT32) {
@@ -310,7 +309,7 @@ kstat_network_port_cond(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	}
 
 	if ((port_datap = kstat_name_lookup(kc, ks_module, ks_instance,
-		COLLISIONS)) == NULL) {
+	    COLLISIONS)) == NULL) {
 		return (-1);
 	}
 	if (port_datap->data_type == KSTAT_DATA_UINT32) {
@@ -337,7 +336,6 @@ serial_port_state(kstat_ctl_t *kc, char *driver, int instance)
 	char			device[20];
 	struct termios		flags;
 	struct sigaction	old_sa, new_sa;
-	static void		sig_alarm_handler(int);
 
 	(void) memset(&old_sa, 0, sizeof (old_sa));
 	(void) memset(&new_sa, 0, sizeof (new_sa));
@@ -404,7 +402,7 @@ parallel_port_state(kstat_ctl_t *kc, char *ks_module, int ks_instance)
 	char		ks_name[20];
 
 	(void) snprintf(ks_name, sizeof (ks_name), "%s%d", ks_module,
-		ks_instance);
+	    ks_instance);
 	if ((ksp = kstat_lookup(kc, ks_module, ks_instance, ks_name)) == NULL) {
 		return (-1);
 	}
