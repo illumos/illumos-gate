@@ -2491,7 +2491,7 @@ drmach_cpu_stop_self(void)
 	int		cpuid = (int)CPU->cpu_id;
 	tte_t		tte;
 	volatile uint_t	*src, *dst;
-	uint_t		funclen;
+	size_t		funclen;
 	uint64_t	bbsram_pa, bbsram_offset;
 	uint_t		bbsram_pfn;
 	uint64_t	bbsram_addr;
@@ -2512,7 +2512,7 @@ drmach_cpu_stop_self(void)
 	bbsram_pfn = (uint_t)(bbsram_pa >> MMU_PAGESHIFT);
 
 	bbsram_addr = (uint64_t)drmach_shutdown_va;
-	drmach_shutdown_asm_mbox->estack = bbsram_addr + (uint64_t)funclen;
+	drmach_shutdown_asm_mbox->estack = bbsram_addr + funclen;
 
 	tte.tte_inthi = TTE_VALID_INT | TTE_SZ_INT(TTE8K) |
 	    TTE_PFN_INTHI(bbsram_pfn);
