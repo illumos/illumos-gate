@@ -245,12 +245,6 @@
 ./usr/src/cmd/sgs/rtld/common/mapfile-order-gcc
 
 #
-# Ignore compiler dependent header files for fpscrubber
-# and sparc prototype files
-#
-./usr/src/cmd/fps/fptest/singdoub*
-
-#
 # The sharemgr command is built 32-bit only by default, but support
 # for building 64-bit is latent in the Makefiles.
 #

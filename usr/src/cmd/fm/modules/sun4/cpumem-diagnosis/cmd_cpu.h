@@ -26,8 +26,6 @@
 #ifndef _CMD_CPU_H
 #define	_CMD_CPU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Each CPU of interest has a cmd_cpu_t structure.  CPUs become of interest when
  * they are the focus of ereports, or when they detect UEs.  CPUs may be the
@@ -602,25 +600,6 @@ extern void cmd_cpuerr_close(fmd_hdl_t *, void *);
  */
 extern cmd_evdisp_t cmd_fpu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-
-
-
-/*
- * FPU (FP-Scrubber) errors
- *
- *         SERD name
- *   Type  (if any)   Fault
- *  ------ --------- -------------------------------
- *   FPU       -     fault.cpu.<cputype>.fpu
- *
- * The expected resolution of FPU faults is the disabling of the CPU
- * indicted in the resource FMRI.
- */
-extern cmd_evdisp_t cmd_fps(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
-    const char *, cmd_errcl_t);
-
-
-
 
 
 /*
