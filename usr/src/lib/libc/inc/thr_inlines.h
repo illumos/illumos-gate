@@ -36,17 +36,19 @@
 extern __GNU_INLINE ulwp_t *
 _curthread(void)
 {
+	ulwp_t *__value;
+	__asm__ __volatile__(
 #if defined(__amd64)
-	ulwp_t *__value;
-	__asm__ __volatile__("movq %%fs:0, %0" : "=r" (__value));
+	    "movq %%fs:0, %0\n\t"
 #elif defined(__i386)
-	ulwp_t *__value;
-	__asm__ __volatile__("movl %%gs:0, %0" : "=r" (__value));
+	    "movl %%gs:0, %0\n\t"
 #elif defined(__sparc)
-	register ulwp_t *__value __asm__("g7");
+	    ".register %%g7, #scratch\n\t"
+	    "mov %%g7, %0\n\t"
 #else
 #error	"port me"
 #endif
+	    : "=r" (__value));
 	return (__value);
 }
 
