@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -103,6 +101,7 @@ struct cpu_node cpunodes[NCPU];
 
 static void	check_cpus_ver(void);
 static void	check_cpus_set(void);
+static void fill_address(pnode_t, char *);
 void	fill_cpu(pnode_t);
 void	fill_cpu_ddi(dev_info_t *);
 void	empty_cpu(int);
@@ -243,7 +242,6 @@ map_wellknown(pnode_t curnode)
 {
 	extern int status_okay(int, char *, int);
 	char tmp_name[MAXSYSNAME];
-	static void fill_address(pnode_t, char *);
 	int sok;
 
 #ifdef VPRINTF

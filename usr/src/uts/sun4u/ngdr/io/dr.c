@@ -156,6 +156,8 @@ struct {
 
 int dr_modunload_okay = 0;		/* set to non-zero to allow unload */
 
+static int	dr_dev_type_to_nt(char *);
+
 /*
  * State transition table.  States valid transitions for "board" state.
  * Recall that non-zero return value terminates operation, however
@@ -556,8 +558,6 @@ static int
 dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	cred_t *cred_p, int *rval_p)
 {
-	static int	dr_dev_type_to_nt(char *);
-
 	int		rv = 0;
 	int		instance;
 	int		bd;

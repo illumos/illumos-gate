@@ -82,6 +82,22 @@ static void 		drmach_fini(void);
 static int		drmach_name2type_idx(char *);
 static sbd_error_t	*drmach_mem_update_lgrp(drmachid_t);
 
+static void drmach_board_dispose(drmachid_t id);
+static sbd_error_t *drmach_board_release(drmachid_t);
+static sbd_error_t *drmach_board_status(drmachid_t, drmach_status_t *);
+
+static void drmach_io_dispose(drmachid_t);
+static sbd_error_t *drmach_io_release(drmachid_t);
+static sbd_error_t *drmach_io_status(drmachid_t, drmach_status_t *);
+
+static void drmach_cpu_dispose(drmachid_t);
+static sbd_error_t *drmach_cpu_release(drmachid_t);
+static sbd_error_t *drmach_cpu_status(drmachid_t, drmach_status_t *);
+
+static void drmach_mem_dispose(drmachid_t);
+static sbd_error_t *drmach_mem_release(drmachid_t);
+static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
+
 #ifdef DEBUG
 int drmach_debug = 1;		 /* set to non-zero to enable debug messages */
 #endif /* DEBUG */
@@ -523,10 +539,6 @@ drmach_device_status(drmachid_t id, drmach_status_t *stat)
 drmach_board_t *
 drmach_board_new(uint_t bnum, int boot_board)
 {
-	static void drmach_board_dispose(drmachid_t id);
-	static sbd_error_t *drmach_board_release(drmachid_t);
-	static sbd_error_t *drmach_board_status(drmachid_t, drmach_status_t *);
-
 	sbd_error_t *err;
 	drmach_board_t	*bp;
 	dev_info_t *dip = NULL;
@@ -961,10 +973,6 @@ drmach_fini(void)
 sbd_error_t *
 drmach_io_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_io_dispose(drmachid_t);
-	static sbd_error_t *drmach_io_release(drmachid_t);
-	static sbd_error_t *drmach_io_status(drmachid_t, drmach_status_t *);
-
 	drmach_io_t	*ip;
 	int		portid;
 
@@ -1037,10 +1045,6 @@ drmach_io_status(drmachid_t id, drmach_status_t *stat)
 sbd_error_t *
 drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_cpu_dispose(drmachid_t);
-	static sbd_error_t *drmach_cpu_release(drmachid_t);
-	static sbd_error_t *drmach_cpu_status(drmachid_t, drmach_status_t *);
-
 	int		 portid;
 	processorid_t	 cpuid;
 	drmach_cpu_t	*cp = NULL;
@@ -1250,10 +1254,6 @@ drmach_setup_mc_info(DRMACH_HANDLE hdl, drmach_mem_t *mp)
 sbd_error_t *
 drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_mem_dispose(drmachid_t);
-	static sbd_error_t *drmach_mem_release(drmachid_t);
-	static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
-
 	DRMACH_HANDLE	hdl;
 	drmach_mem_t	*mp;
 	int		portid;
