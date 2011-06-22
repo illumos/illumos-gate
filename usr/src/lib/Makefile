@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 
 include ../Makefile.master
 
@@ -82,6 +83,8 @@ SUBDIRS += \
 	librt			\
 	libadm			\
 	libctf			\
+	libbrand	.WAIT   \
+	libzonecfg	.WAIT	\
 	libdtrace		\
 	libdtrace_jni		\
 	libcurses		\
@@ -201,8 +204,6 @@ SUBDIRS += \
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
-	libbrand	.WAIT   \
-	libzonecfg	\
 	libzdoor	\
 	libzoneinfo	\
 	libzonestat	\
