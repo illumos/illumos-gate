@@ -100,7 +100,8 @@ main()
 	/* Initialize */
 	cc_version = lib_version = lib_patch = lib_update = 0;
 	TableElem = sizeof (version_details) / sizeof (v_d);
-	for (i = 0; i < LIM_CI; i++) CompilerIndex[i] = -1;
+	for (i = 0; i < LIM_CI; i++)
+		CompilerIndex[i] = -1;
 
 	/* get the info about the current compiler and libsunperf */
 #ifndef __lint
@@ -110,19 +111,19 @@ main()
 	cc_version = __SUNPRO_C;
 
 	for (i = 0; i < TableElem; i++) {
-		if (version_details[i].cc_version == cc_version) break;
+		if (version_details[i].cc_version == cc_version)
+			break;
 	}
 
 
 	/* Check the compiler  __SUNPRO_C  version */
-	if ((i - TableElem > 0) ||
-	    (cc_version != version_details[i].cc_version)) {
+	if ((i >= TableElem) || (cc_version != version_details[i].cc_version)) {
 #if 0
 		printError("Unknown",
 		    cc_version, lib_version, lib_patch,
 		    lib_update, lib_ver_string);
 #endif
-	return (-1);
+		return (-1);
 	}
 
 	/*
@@ -145,7 +146,7 @@ main()
 	for (j = 0; (j < LIM_CI) && (-1 != CompilerIndex[j]); j++) {
 		if (strlen(version_details[CompilerIndex[j]].lib_ver_string) !=
 		    strlen(lib_ver_string))
-	continue;
+			continue;
 		if (
 		    (0 !=
 		    strcmp(version_details[CompilerIndex[j]].lib_ver_string,
