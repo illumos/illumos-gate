@@ -66,11 +66,16 @@ bc_uname(struct utsname *uts)
 		if (strlen(n_uts.sysname) > SYS_NMLN)
 			uts->sysname[SYS_NMLN-1] = '\0';
 
+		/*
+		 * The nodename was originally 9 bytes (including NUL), but a
+		 * field was added, following it, extending it to SYS_NDLN.
+		 * So we have to copy it in two passes
+		 */
 		memcpy(uts->nodename, n_uts.nodename, SYS_NMLN);
 		memcpy(uts->nodeext, n_uts.nodename + SYS_NMLN,
 		    SYS_NDLN - SYS_NMLN);
-		if (strlen(n_uts.nodename + SYS_NMLN) > SYS_NDLN - SYS_NMLN)
-			uts->nodeext[SYS_NDLN - SYS_NMLN - 1] = '\0';
+		if (strlen(n_uts.nodename) > SYS_NDLN)
+			uts->nodeext[sizeof (uts->nodeext) - 1] = '\0';
 
 		memcpy(uts->release, n_uts.release, SYS_NMLN);
 		if (strlen(n_uts.release) > SYS_NMLN)
