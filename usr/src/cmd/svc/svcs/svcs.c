@@ -3683,6 +3683,10 @@ again:
 			uu_warn(gettext("Could not bind to repository "
 			    "server for zone %s: %s\n"), g_zonename,
 			    scf_strerror(scf_error()));
+
+			if (!show_zones)
+				return (UU_EXIT_FATAL);
+
 			goto nextzone;
 		}
 
@@ -3741,9 +3745,6 @@ again:
 	}
 
 	if (opt_mode == 'L') {
-		if (argc == 0)
-			argserr(progname);
-
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
 		    print_log, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "

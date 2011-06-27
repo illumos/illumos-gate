@@ -4193,6 +4193,15 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
 	ZFS_VERIFY_ZP(zp);
 
 	/*
+	 * There's nothing to do if no data is cached.
+	 */
+	if (!vn_has_cached_data(vp)) {
+		ASSERT(len == 0);
+		ZFS_EXIT(zfsvfs);
+		return (0);
+	}
+
+	/*
 	 * Align this request to the file block size in case we kluster.
 	 * XXX - this can result in pretty aggresive locking, which can
 	 * impact simultanious read/write access.  One option might be

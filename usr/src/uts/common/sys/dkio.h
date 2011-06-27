@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_DKIO_H
@@ -515,6 +517,19 @@ typedef struct dk_updatefw_32 {
 #define	FW_TYPE_TEMP	0x0		/* temporary use */
 #define	FW_TYPE_PERM	0x1		/* permanent use */
 
+/*
+ * ioctl to free space (e.g. SCSI UNMAP) off a disk.
+ */
+#define	DKIOCFREE	(DKIOC|50)
+
+typedef struct dkioc_free_s {
+	uint32_t df_flags;
+	uint32_t df_reserved;   /* For easy 64-bit alignment below... */
+	diskaddr_t df_start;
+	diskaddr_t df_length;
+} dkioc_free_t;
+
+#define	DF_WAIT_SYNC	0x00000001	/* Wait for full write-out of free. */
 
 #ifdef	__cplusplus
 }

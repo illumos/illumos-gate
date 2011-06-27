@@ -133,7 +133,7 @@ typedef enum {
  */
 extern zoneid_t vplat_create(zlog_t *, zone_mnt_t, zoneid_t);
 extern int vplat_bringup(zlog_t *, zone_mnt_t, zoneid_t);
-extern int vplat_teardown(zlog_t *, boolean_t, boolean_t);
+extern int vplat_teardown(zlog_t *, boolean_t, boolean_t, boolean_t);
 extern int vplat_get_iptype(zlog_t *, zone_iptype_t *);
 
 /*
@@ -159,7 +159,7 @@ extern int init_template(void);
 /*
  * Routine to manage child processes.
  */
-extern int do_subproc(zlog_t *, char *, char **);
+extern int do_subproc(zlog_t *, char *, char **, boolean_t);
 
 #ifdef __cplusplus
 }

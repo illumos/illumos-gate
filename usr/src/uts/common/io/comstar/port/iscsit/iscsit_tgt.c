@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -852,6 +853,7 @@ iscsit_tgt_create(it_tgt_t *cfg_tgt)
 {
 	iscsit_tgt_t		*result;
 	stmf_local_port_t	*lport;
+	char			*alias;
 
 	/*
 	 * Each target is an STMF local port.
@@ -888,6 +890,10 @@ iscsit_tgt_create(it_tgt_t *cfg_tgt)
 	    offsetof(tgt_event_ctx_t, te_ctx_node));
 	idm_refcnt_init(&result->target_refcnt, result);
 	idm_refcnt_init(&result->target_sess_refcnt, result);
+
+	/* Set target alias */
+	if (nvlist_lookup_string(cfg_tgt->tgt_properties, "alias", &alias) == 0)
+		lport->lport_alias = strdup(alias);
 
 	/* Finish initializing local port */
 	/*
@@ -939,6 +945,7 @@ iscsit_tgt_modify(iscsit_tgt_t *tgt, it_tgt_t *cfg_tgt)
 {
 	idm_status_t	idmrc = IDM_STATUS_SUCCESS;
 	list_t		tpgt_del_list;
+	char		*alias;
 
 	/* Merge TPGT */
 	list_create(&tpgt_del_list, sizeof (iscsit_tpgt_t),
@@ -951,6 +958,14 @@ iscsit_tgt_modify(iscsit_tgt_t *tgt, it_tgt_t *cfg_tgt)
 	}
 	(void) nvlist_dup(cfg_tgt->tgt_properties, &tgt->target_props,
 	    KM_SLEEP);
+
+	/* Update alias */
+	if (tgt->target_stmf_lport->lport_alias) {
+		strfree(tgt->target_stmf_lport->lport_alias);
+		tgt->target_stmf_lport->lport_alias = NULL;
+	}
+	if (nvlist_lookup_string(tgt->target_props, "alias", &alias) == 0)
+		tgt->target_stmf_lport->lport_alias = strdup(alias);
 
 	if ((idmrc = iscsit_tgt_merge_tpgt(tgt, cfg_tgt, &tpgt_del_list)) !=
 	    IDM_STATUS_SUCCESS) {
@@ -1046,6 +1061,8 @@ iscsit_tgt_destroy(iscsit_tgt_t *tgt)
 	avl_destroy(&tgt->target_tpgt_list);
 	avl_destroy(&tgt->target_sess_list);
 	mutex_destroy(&tgt->target_mutex);
+	if (tgt->target_stmf_lport->lport_alias)
+		strfree(tgt->target_stmf_lport->lport_alias);
 	stmf_free(tgt->target_stmf_lport); /* Also frees "tgt' */
 	iscsit_global_rele();
 }

@@ -21,6 +21,8 @@
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+
 #
 #	This makefile contains the common definitions for all intel
 #	implementation architecture independent modules.
@@ -195,6 +197,7 @@ DRV_KMODS	+= audio
 DRV_KMODS	+= audio1575
 DRV_KMODS	+= audio810
 DRV_KMODS	+= audiocmi
+DRV_KMODS	+= audiocmihd
 DRV_KMODS	+= audioemu10k
 DRV_KMODS	+= audioens
 DRV_KMODS	+= audiohd

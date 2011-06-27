@@ -181,10 +181,6 @@ void	hat_thread_exit(kthread_t *);
  * pfn_t hat_getpfnum(hat, addr)
  *	returns pfn for <hat, addr> or PFN_INVALID if mapping is invalid.
  *
- * pfn_t hat_getkpfnum(addr)
- *	returns pfn for non-memory mapped addr in kernel address space
- *	or PFN_INVALID if mapping is invalid or is kernel memory.
- *
  * int hat_probe(hat, addr)
  *	return 0 if no valid mapping is present.  Faster version
  *	of hat_getattr in certain architectures.
@@ -237,15 +233,6 @@ void	hat_chgprot(struct hat *, caddr_t, size_t, uint_t);
 void	hat_reserve(struct as *, caddr_t, size_t);
 pfn_t	va_to_pfn(void *);
 uint64_t va_to_pa(void *);
-
-/*
- * hat_getkpfnum() is never supported on amd64 and will be
- * removed from other platforms in future release
- */
-#if !defined(__amd64)
-pfn_t	hat_getkpfnum(caddr_t);
-#endif
-
 
 /*
  * Kernel Physical Mapping (segkpm) hat interface routines.
@@ -517,13 +504,6 @@ int	hat_startstat(struct as *);
 void	hat_getstat(struct as *, caddr_t, size_t, uint_t, char *, int);
 void	hat_freestat(struct as *, int);
 void	hat_resvstat(size_t, struct as *, caddr_t);
-
-/*
- * Transitionary routine while we still allow hat_getkpfnum(caddr_t)
- * to return a pfn for kernel memory, but want to warn the user that
- * it isn't supported.
- */
-void	hat_getkpfnum_badcall(void *caller);
 
 /*
  * Relocation callback routines. Currently only sfmmu HAT supports

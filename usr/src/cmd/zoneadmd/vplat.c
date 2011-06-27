@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * This module contains functions used to bring up and tear down the
  * Virtual Platform: [un]mounting file-systems, [un]plumbing network
  * interfaces, [un]configuring devices, establishing resource controls,
@@ -2510,10 +2514,10 @@ add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 		if (err != DLADM_STATUS_OK) {
 			zerror(zlogp, B_FALSE, "WARNING: unable to set "
 			    "pool %s to datalink %s", pool_name, dlname);
-			bzero(pool_name, MAXPATHLEN);
+			bzero(pool_name, sizeof (pool_name));
 		}
 	} else {
-		bzero(pool_name, MAXPATHLEN);
+		bzero(pool_name, sizeof (pool_name));
 	}
 	return (0);
 }
@@ -2947,12 +2951,10 @@ configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 		    nwiftab.zone_nwif_physical) == 0) {
 			added = B_TRUE;
 		} else {
-			char emsg[80 + LIFNAMSIZ];
-
-			(void) snprintf(emsg, sizeof (emsg),
-			    "failed to add network device %s",
-			    nwiftab.zone_nwif_physical);
-			zerror(zlogp, B_FALSE, emsg);
+			/*
+			 * Failed to add network device, but the brand hook
+			 * might be doing this for us, so keep silent.
+			 */
 			continue;
 		}
 		/* set up the new IP interface, and add them all later */
@@ -3044,7 +3046,7 @@ remove_datalink_pool(zlog_t *zlogp, zoneid_t zoneid)
 			return (-1);
 		}
 
-		bzero(pool_name, MAXPATHLEN);
+		bzero(pool_name, sizeof (pool_name));
 		for (i = 0, dllink = dllinks; i < dlnum; i++, dllink++) {
 			err = dladm_set_linkprop(dld_handle, *dllink, "pool",
 			    NULL, 0, DLADM_OPT_ACTIVE);
@@ -3115,20 +3117,17 @@ remove_datalink_protect(zlog_t *zlogp, zoneid_t zoneid)
 			/* datalink does not belong to the GZ */
 			continue;
 		}
-		if (dlstatus != DLADM_STATUS_OK) {
+		if (dlstatus != DLADM_STATUS_OK)
 			zerror(zlogp, B_FALSE,
+			    "clear 'protection' link property: %s",
 			    dladm_status2str(dlstatus, dlerr));
-			free(dllinks);
-			return (-1);
-		}
+
 		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
 		    "allowed-ips", NULL, 0, DLADM_OPT_ACTIVE);
-		if (dlstatus != DLADM_STATUS_OK) {
+		if (dlstatus != DLADM_STATUS_OK)
 			zerror(zlogp, B_FALSE,
+			    "clear 'allowed-ips' link property: %s",
 			    dladm_status2str(dlstatus, dlerr));
-			free(dllinks);
-			return (-1);
-		}
 	}
 	free(dllinks);
 	return (0);
@@ -3491,7 +3490,7 @@ get_implicit_datasets(zlog_t *zlogp, char **retstr)
 	    > sizeof (cmdbuf))
 		return (-1);
 
-	if (do_subproc(zlogp, cmdbuf, retstr) != 0)
+	if (do_subproc(zlogp, cmdbuf, retstr, B_FALSE) != 0)
 		return (-1);
 
 	return (0);
@@ -4518,7 +4517,8 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	}
 
 	/* Update saved pool name in case it has changed */
-	(void) zonecfg_get_poolname(handle, zone_name, pool_name, MAXPATHLEN);
+	(void) zonecfg_get_poolname(handle, zone_name, pool_name,
+	    sizeof (pool_name));
 
 	zonecfg_fini_handle(handle);
 	return (Z_OK);
@@ -5099,7 +5099,8 @@ unmounted:
 }
 
 int
-vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
+vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
+    boolean_t debug)
 {
 	char *kzone;
 	zoneid_t zoneid;
@@ -5138,16 +5139,12 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
-	if (remove_datalink_pool(zlogp, zoneid) != 0) {
+	if (remove_datalink_pool(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE, "unable clear datalink pool property");
-		goto error;
-	}
 
-	if (remove_datalink_protect(zlogp, zoneid) != 0) {
+	if (remove_datalink_protect(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE,
 		    "unable clear datalink protect property");
-		goto error;
-	}
 
 	/*
 	 * The datalinks assigned to the zone will be removed from the NGZ as
@@ -5187,7 +5184,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	brand_close(bh);
 
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
-	    (do_subproc(zlogp, cmdbuf, NULL) != Z_OK)) {
+	    (do_subproc(zlogp, cmdbuf, NULL, debug) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		goto error;
 	}
@@ -5223,7 +5220,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 			    zoneid) != 0) {
 				zerror(zlogp, B_FALSE, "unable to unconfigure "
 				    "network interfaces in zone");
-				goto error;
 			}
 			status = dladm_zone_halt(dld_handle, zoneid);
 			if (status != DLADM_STATUS_OK) {

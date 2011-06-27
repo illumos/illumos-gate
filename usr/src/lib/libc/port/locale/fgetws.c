@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
  *
@@ -63,7 +63,7 @@ _fgetws_impl(wchar_t *_RESTRICT_KYWD ws, int n, FILE *_RESTRICT_KYWD fp,
 	}
 
 	wsp = ws;
-	while (n--) {
+	while (--n) {
 		wc = _fgetwc_unlocked(fp);
 		if (wc == EOF) {
 			/*

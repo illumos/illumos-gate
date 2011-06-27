@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <zone.h>
+#include <libzonecfg.h>
 
 #include <dt_impl.h>
 #include <dt_string.h>
@@ -787,29 +788,34 @@ dt_opt_bufresize(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 static int
 dt_opt_zone(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
-	dtrace_optval_t val = 0;
 	zoneid_t z, did;
 
 	if (arg == NULL)
 		return (dt_set_errno(dtp, EDT_BADOPTVAL));
 
 	/*
-	 * First attempt to treat the argument as a zone name; if that fails,
-	 * treat it as an identifier (and validate that it corresponds to a
-	 * zone).
+	 * If the specified zone is currently running, we'll query the kernel
+	 * for its debugger ID.  If it doesn't appear to be running, we'll look
+	 * for it for among all installed zones (thereby allowing a zdefs
+	 * enabling against a halted zone).
 	 */
-	if ((z = getzoneidbyname(arg)) == -1) {
-		char n[ZONENAME_MAX];
-
-		if (dt_optval_parse(arg, &val) != 0)
+	if ((z = getzoneidbyname(arg)) != -1) {
+		if (zone_getattr(z, ZONE_ATTR_DID, &did, sizeof (did)) < 0)
 			return (dt_set_errno(dtp, EDT_BADOPTVAL));
+	} else {
+		zone_dochandle_t handle;
 
-		if (getzonenamebyid(z = (zoneid_t)val, n, sizeof (n)) < 0)
+		if ((handle = zonecfg_init_handle()) == NULL)
+			return (dt_set_errno(dtp, errno));
+
+		if (zonecfg_get_handle(arg, handle) != Z_OK) {
+			zonecfg_fini_handle(handle);
 			return (dt_set_errno(dtp, EDT_BADOPTVAL));
+		}
+
+		did = zonecfg_get_did(handle);
+		zonecfg_fini_handle(handle);
 	}
-
-	if (zone_getattr(z, ZONE_ATTR_DID, &did, sizeof (did)) < 0)
-		return (dt_set_errno(dtp, EDT_BADOPTVAL));
 
 	dtp->dt_options[DTRACEOPT_ZONE] = did;
 

@@ -106,6 +106,10 @@ setup_manifests()
 		of =  dest "/" fname
 
 		while (getline <f > 0) {
+			# Fix up the console svc to work with zones.
+			if (fname == "system/console-login.xml")
+				sub("wscons", "console")
+
 			if (($1 == "<instance" &&
 			    $2 == "name=\047default\047") ||
 			    $1 == "<create_default_instance") {

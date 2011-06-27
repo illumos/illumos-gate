@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_STMF_SBD_H
@@ -247,26 +249,27 @@ typedef struct sbd_lu {
 /*
  * sl_flags
  */
-#define	SL_LINKED			    0x00001
-#define	SL_META_OPENED			    0x00002
-#define	SL_REGISTERED			    0x00004
-#define	SL_META_NEEDS_FLUSH		    0x00008
-#define	SL_DATA_NEEDS_FLUSH		    0x00010
-#define	SL_VID_VALID			    0x00020
-#define	SL_PID_VALID			    0x00040
-#define	SL_REV_VALID			    0x00080
-#define	SL_WRITE_PROTECTED		    0x00100
-#define	SL_MEDIA_LOADED			    0x00200
-#define	SL_LU_HAS_SCSI2_RESERVATION	    0x00400
-#define	SL_WRITEBACK_CACHE_DISABLE	    0x00800
-#define	SL_SAVED_WRITE_CACHE_DISABLE	    0x01000
-#define	SL_MEDIUM_REMOVAL_PREVENTED	    0x02000
-#define	SL_NO_DATA_DKIOFLUSH		    0x04000
-#define	SL_SHARED_META			    0x08000
-#define	SL_ZFS_META			    0x10000
-#define	SL_WRITEBACK_CACHE_SET_UNSUPPORTED  0x20000
-#define	SL_FLUSH_ON_DISABLED_WRITECACHE	    0x40000
-#define	SL_CALL_ZVOL			    0x80000
+#define	SL_LINKED			    0x00000001
+#define	SL_META_OPENED			    0x00000002
+#define	SL_REGISTERED			    0x00000004
+#define	SL_META_NEEDS_FLUSH		    0x00000008
+#define	SL_DATA_NEEDS_FLUSH		    0x00000010
+#define	SL_VID_VALID			    0x00000020
+#define	SL_PID_VALID			    0x00000040
+#define	SL_REV_VALID			    0x00000080
+#define	SL_WRITE_PROTECTED		    0x00000100
+#define	SL_MEDIA_LOADED			    0x00000200
+#define	SL_LU_HAS_SCSI2_RESERVATION	    0x00000400
+#define	SL_WRITEBACK_CACHE_DISABLE	    0x00000800
+#define	SL_SAVED_WRITE_CACHE_DISABLE	    0x00001000
+#define	SL_MEDIUM_REMOVAL_PREVENTED	    0x00002000
+#define	SL_NO_DATA_DKIOFLUSH		    0x00004000
+#define	SL_SHARED_META			    0x00008000
+#define	SL_ZFS_META			    0x00010000
+#define	SL_WRITEBACK_CACHE_SET_UNSUPPORTED  0x00020000
+#define	SL_FLUSH_ON_DISABLED_WRITECACHE	    0x00040000
+#define	SL_CALL_ZVOL			    0x00080000
+#define	SL_UNMAP_ENABLED		    0x00100000
 
 /*
  * sl_trans_op. LU is undergoing some transition and this field
@@ -297,6 +300,7 @@ sbd_status_t sbd_write_lu_info(sbd_lu_t *sl);
 sbd_status_t sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done);
 sbd_status_t sbd_wcd_set(int wcd, sbd_lu_t *sl);
 void sbd_wcd_get(int *wcd, sbd_lu_t *sl);
+int sbd_unmap(sbd_lu_t *, uint64_t, uint64_t);
 
 #ifdef	__cplusplus
 }

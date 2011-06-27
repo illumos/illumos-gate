@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -2565,6 +2566,9 @@ iscsit_process_negotiated_values(iscsit_conn_t *ict)
 		ict->ict_sess->ist_initiator_alias =
 		    kmem_alloc(strlen(string_val) + 1, KM_SLEEP);
 		(void) strcpy(ict->ict_sess->ist_initiator_alias, string_val);
+		if (ict->ict_sess->ist_stmf_sess)
+			ict->ict_sess->ist_stmf_sess->ss_rport_alias =
+			    strdup(string_val);
 	}
 
 	if ((nvrc = nvlist_lookup_string(lsm->icl_negotiated_values,

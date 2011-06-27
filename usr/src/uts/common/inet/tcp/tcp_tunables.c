@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -471,6 +472,11 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 
 	{ "_listener_limit_conf_del", MOD_PROTO_TCP,
 	    tcp_listener_conf_del, NULL, {0}, {0} },
+
+	{ "_iss_incr", MOD_PROTO_TCP,
+	    mod_set_uint32, mod_get_uint32,
+	    {1, ISS_INCR, ISS_INCR},
+	    {ISS_INCR} },
 
 	{ "?", MOD_PROTO_TCP, NULL, mod_get_allprop, {0}, {0} },
 

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -496,6 +497,9 @@ extern void 	*tcp_get_conn(void *arg, tcp_stack_t *);
 extern mblk_t	*tcp_snmp_get(queue_t *, mblk_t *, boolean_t);
 extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
 
+/* Pad for the tf_t structure to avoid false cache line sharing. */
+#define	TF_CACHEL_PAD	64
+
 /*
  * The TCP Fanout structure for bind and acceptor hashes.
  * The hash tables and their linkage (tcp_*_hash, tcp_ptp*hn) are
@@ -508,6 +512,8 @@ extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
 typedef struct tf_s {
 	tcp_t		*tf_tcp;
 	kmutex_t	tf_lock;
+	unsigned char	tf_pad[TF_CACHEL_PAD -
+	    (sizeof (tcp_t *) + sizeof (kmutex_t))];
 } tf_t;
 
 

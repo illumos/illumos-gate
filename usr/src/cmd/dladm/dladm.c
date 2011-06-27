@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Joyent Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -154,6 +155,7 @@ typedef struct show_vnic_state {
 	dladm_status_t	vs_status;
 	uint32_t	vs_flags;
 	ofmt_handle_t	vs_ofmt;
+	char		*vs_zonename;
 } show_vnic_state_t;
 
 typedef struct show_part_state {
@@ -265,7 +267,7 @@ typedef struct	cmd {
 
 static cmd_t	cmds[] = {
 	{ "rename-link",	do_rename_link,
-	    "    rename-link      <oldlink> <newlink>"			},
+	    "    rename-link      [-z zonename] <oldlink> <newlink>"	},
 	{ "show-link",		do_show_link,
 	    "    show-link        [-pP] [-o <field>,..] [-s [-i <interval>]] "
 	    "[<link>]\n"						},
@@ -300,12 +302,13 @@ static cmd_t	cmds[] = {
 	{ "show-wifi",		do_show_wifi,
 	    "    show-wifi        [-p] [-o <field>,...] [<link>]\n"	},
 	{ "set-linkprop",	do_set_linkprop,
-	    "    set-linkprop     [-t] -p <prop>=<value>[,...] <name>"	},
+	    "    set-linkprop     [-t] [-z zonename] -p <prop>=<value>[,...] "
+	    "<name>"							},
 	{ "reset-linkprop",	do_reset_linkprop,
-	    "    reset-linkprop   [-t] [-p <prop>,...] <name>"		},
+	    "    reset-linkprop   [-t] [-z zonename] [-p <prop>,...] <name>"},
 	{ "show-linkprop",	do_show_linkprop,
-	    "    show-linkprop    [-cP] [-o <field>,...] [-p <prop>,...] "
-	    "<name>\n"							},
+	    "    show-linkprop    [-cP] [-o <field>,...] [-z zonename] "
+	    "[-p <prop>,...] <name>\n"					},
 	{ "show-ether",		do_show_ether,
 	    "    show-ether       [-px][-o <field>,...] <link>\n"	},
 	{ "create-secobj",	do_create_secobj,
@@ -346,10 +349,10 @@ static cmd_t	cmds[] = {
 	    "\t\t     {vrrp -V <vrid> -A {inet | inet6}} [-v <vid> [-f]]\n"
 	    "\t\t     [-p <prop>=<value>[,...]] <vnic-link>"	},
 	{ "delete-vnic",	do_delete_vnic,
-	    "    delete-vnic      [-t] <vnic-link>"			},
+	    "    delete-vnic      [-t] [-z zonename] <vnic-link>"	},
 	{ "show-vnic",		do_show_vnic,
-	    "    show-vnic        [-pP] [-l <link>] [-s [-i <interval>]] "
-	    "[<link>]\n"						},
+	    "    show-vnic        [-pP] [-l <link>] [-z zonename] "
+	    "[-s [-i <interval>]] [<link>]\n"						},
 	{ "up-vnic",		do_up_vnic,		NULL		},
 	{ "create-part",	do_create_part,
 	    "    create-part      [-t] [-f] -l <link> [-P <pkey>]\n"
@@ -1010,21 +1013,24 @@ typedef struct vnic_fields_buf_s
 	char vnic_macaddr[18];
 	char vnic_macaddrtype[19];
 	char vnic_vid[6];
+	char vnic_zone[ZONENAME_MAX];
 } vnic_fields_buf_t;
 
 static const ofmt_field_t vnic_fields[] = {
 { "LINK",		13,
 	offsetof(vnic_fields_buf_t, vnic_link),	print_default_cb},
-{ "OVER",		13,
+{ "OVER",		11,
 	offsetof(vnic_fields_buf_t, vnic_over),	print_default_cb},
-{ "SPEED",		7,
+{ "SPEED",		6,
 	offsetof(vnic_fields_buf_t, vnic_speed), print_default_cb},
 { "MACADDRESS",		18,
 	offsetof(vnic_fields_buf_t, vnic_macaddr), print_default_cb},
-{ "MACADDRTYPE",	20,
+{ "MACADDRTYPE",	12,
 	offsetof(vnic_fields_buf_t, vnic_macaddrtype), print_default_cb},
-{ "VID",		7,
+{ "VID",		5,
 	offsetof(vnic_fields_buf_t, vnic_vid), print_default_cb},
+{ "ZONE",		20,
+	offsetof(vnic_fields_buf_t, vnic_zone), print_default_cb},
 { NULL,			0, 0, NULL}}
 ;
 
@@ -2494,12 +2500,16 @@ do_rename_link(int argc, char *argv[], const char *use)
 	char		*link1, *link2;
 	char		*altroot = NULL;
 	dladm_status_t	status;
+	char		*zonename = NULL;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":R:", lopts, NULL)) != -1) {
+	while ((option = getopt_long(argc, argv, ":R:z:", lopts, NULL)) != -1) {
 		switch (option) {
 		case 'R':
 			altroot = optarg;
+			break;
+		case 'z':
+			zonename = optarg;
 			break;
 		default:
 			die_opterr(optopt, option, use);
@@ -2516,7 +2526,7 @@ do_rename_link(int argc, char *argv[], const char *use)
 
 	link1 = argv[optind++];
 	link2 = argv[optind];
-	if ((status = dladm_rename_link(handle, link1, link2)) !=
+	if ((status = dladm_rename_link(handle, zonename, link1, link2)) !=
 	    DLADM_STATUS_OK)
 		die_dlerr(status, "rename operation failed");
 }
@@ -3406,11 +3416,12 @@ do_show_link(int argc, char *argv[], const char *use)
 	ofmt_handle_t	ofmt;
 	ofmt_status_t	oferr;
 	uint_t		ofmtflags = 0;
+	char		*zonename = NULL;
 
 	bzero(&state, sizeof (state));
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":pPsSi:o:",
+	while ((option = getopt_long(argc, argv, ":pPsSi:o:z:",
 	    show_lopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
@@ -3449,6 +3460,9 @@ do_show_link(int argc, char *argv[], const char *use)
 			if (!dladm_str2interval(optarg, &interval))
 				die("invalid interval value '%s'", optarg);
 			break;
+		case 'z':
+			zonename = optarg;
+			break;
 		default:
 			die_opterr(optopt, option, use);
 			break;
@@ -3474,8 +3488,8 @@ do_show_link(int argc, char *argv[], const char *use)
 		if (strlcpy(linkname, argv[optind], MAXLINKNAMELEN) >=
 		    MAXLINKNAMELEN)
 			die("link name too long");
-		if ((status = dladm_name2info(handle, linkname, &linkid, &f,
-		    NULL, NULL)) != DLADM_STATUS_OK) {
+		if ((status = dladm_zname2info(handle, zonename, linkname,
+		    &linkid, &f, NULL, NULL)) != DLADM_STATUS_OK) {
 			die_dlerr(status, "link %s is not valid", linkname);
 		}
 
@@ -4831,9 +4845,10 @@ do_delete_vnic_common(int argc, char *argv[], const char *use,
 	datalink_id_t linkid;
 	char *altroot = NULL;
 	dladm_status_t status;
+	char	*zonename = NULL;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":R:t", lopts,
+	while ((option = getopt_long(argc, argv, ":R:tz:", lopts,
 	    NULL)) != -1) {
 		switch (option) {
 		case 't':
@@ -4841,6 +4856,9 @@ do_delete_vnic_common(int argc, char *argv[], const char *use,
 			break;
 		case 'R':
 			altroot = optarg;
+			break;
+		case 'z':
+			zonename = optarg;
 			break;
 		default:
 			die_opterr(optopt, option, use);
@@ -4854,8 +4872,8 @@ do_delete_vnic_common(int argc, char *argv[], const char *use,
 	if (altroot != NULL)
 		altroot_cmd(altroot, argc, argv);
 
-	status = dladm_name2info(handle, argv[optind], &linkid, NULL, NULL,
-	    NULL);
+	status = dladm_zname2info(handle, zonename, argv[optind], &linkid, NULL,
+	    NULL, NULL);
 	if (status != DLADM_STATUS_OK)
 		die("invalid link name '%s'", argv[optind]);
 
@@ -4987,6 +5005,9 @@ print_vnic(show_vnic_state_t *state, datalink_id_t linkid)
 	char			vnic_name[MAXLINKNAMELEN];
 	char			mstr[MAXMACADDRLEN * 3];
 	vnic_fields_buf_t	vbuf;
+	uint_t			valcnt = 1;
+	char			zonename[DLADM_PROP_VAL_MAX + 1];
+	char			*valptr[1];
 
 	if ((status = dladm_vnic_info(handle, linkid, vnic, state->vs_flags)) !=
 	    DLADM_STATUS_OK)
@@ -5015,6 +5036,18 @@ print_vnic(show_vnic_state_t *state, datalink_id_t linkid)
 	    dladm_datalink_id2info(handle, vnic->va_link_id, NULL, NULL,
 	    NULL, devname, sizeof (devname)) != DLADM_STATUS_OK)
 		(void) sprintf(devname, "?");
+
+	
+	zonename[0] = '\0';
+	if (!is_etherstub) {
+		valptr[0] = zonename;
+		(void) dladm_get_linkprop(handle, linkid,
+		    DLADM_PROP_VAL_CURRENT, "zone", (char **)valptr, &valcnt);
+	}
+
+	if (state->vs_zonename != NULL &&
+	     strcmp(state->vs_zonename, zonename) != 0)
+		return (DLADM_STATUS_OK);
 
 	state->vs_found = B_TRUE;
 	if (state->vs_stats) {
@@ -5091,6 +5124,13 @@ print_vnic(show_vnic_state_t *state, datalink_id_t linkid)
 
 			(void) snprintf(vbuf.vnic_vid, sizeof (vbuf.vnic_vid),
 			    "%d", vnic->va_vid);
+
+			if (zonename[0] != '\0')
+				(void) snprintf(vbuf.vnic_zone,
+				    sizeof (vbuf.vnic_zone), "%s", zonename);
+			else
+				(void) strlcpy(vbuf.vnic_zone, "--",
+				     sizeof (vbuf.vnic_zone));
 		}
 
 		ofmt_print(state->vs_ofmt, &vbuf);
@@ -5129,10 +5169,11 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = 0;
+	char			*zonename = NULL;
 
 	bzero(&state, sizeof (state));
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":pPl:si:o:", lopts,
+	while ((option = getopt_long(argc, argv, ":pPl:si:o:z:", lopts,
 	    NULL)) != -1) {
 		switch (option) {
 		case 'p':
@@ -5171,6 +5212,9 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 			o_arg = B_TRUE;
 			fields_str = optarg;
 			break;
+		case 'z':
+			zonename = optarg;
+			break;
 		default:
 			die_opterr(optopt, option, use);
 		}
@@ -5181,8 +5225,8 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 
 	/* get vnic ID (optional last argument) */
 	if (optind == (argc - 1)) {
-		status = dladm_name2info(handle, argv[optind], &linkid, NULL,
-		    NULL, NULL);
+		status = dladm_zname2info(handle, zonename, argv[optind],
+		    &linkid, NULL, NULL, NULL);
 		if (status != DLADM_STATUS_OK) {
 			die_dlerr(status, "invalid vnic name '%s'",
 			    argv[optind]);
@@ -5193,8 +5237,8 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	}
 
 	if (l_arg) {
-		status = dladm_name2info(handle, state.vs_link, &dev_linkid,
-		    NULL, NULL, NULL);
+		status = dladm_zname2info(handle, zonename, state.vs_link,
+		    &dev_linkid, NULL, NULL, NULL);
 		if (status != DLADM_STATUS_OK) {
 			die_dlerr(status, "invalid link name '%s'",
 			    state.vs_link);
@@ -5206,6 +5250,7 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	state.vs_etherstub = etherstub;
 	state.vs_found = B_FALSE;
 	state.vs_flags = flags;
+	state.vs_zonename = zonename;
 
 	if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0)) {
 		if (etherstub)
@@ -6694,6 +6739,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = 0;
+	char			*zonename = NULL;
 
 	bzero(propstr, DLADM_STRSIZE);
 	opterr = 0;
@@ -6704,7 +6750,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	state.ls_header = B_TRUE;
 	state.ls_retstatus = DLADM_STATUS_OK;
 
-	while ((option = getopt_long(argc, argv, ":p:cPo:",
+	while ((option = getopt_long(argc, argv, ":p:cPo:z:",
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
@@ -6723,6 +6769,9 @@ do_show_linkprop(int argc, char **argv, const char *use)
 		case 'o':
 			fields_str = optarg;
 			break;
+		case 'z':
+			zonename = optarg;
+			break;
 		default:
 			die_opterr(optopt, option, use);
 			break;
@@ -6730,8 +6779,8 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	}
 
 	if (optind == (argc - 1)) {
-		if ((status = dladm_name2info(handle, argv[optind], &linkid,
-		    NULL, NULL, NULL)) != DLADM_STATUS_OK) {
+		if ((status = dladm_zname2info(handle, zonename, argv[optind],
+		    &linkid, NULL, NULL, NULL)) != DLADM_STATUS_OK) {
 			die_dlerr(status, "link %s is not valid", argv[optind]);
 		}
 	} else if (optind != argc) {
@@ -6868,11 +6917,12 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 	dladm_status_t		status = DLADM_STATUS_OK;
 	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
+	char			*zonename = NULL;
 
 	opterr = 0;
 	bzero(propstr, DLADM_STRSIZE);
 
-	while ((option = getopt_long(argc, argv, ":p:R:t",
+	while ((option = getopt_long(argc, argv, ":p:R:tz:",
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
@@ -6886,6 +6936,9 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 			break;
 		case 'R':
 			altroot = optarg;
+			break;
+		case 'z':
+			zonename = optarg;
 			break;
 		default:
 			die_opterr(optopt, option, use);
@@ -6909,8 +6962,8 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 		altroot_cmd(altroot, argc, argv);
 	}
 
-	status = dladm_name2info(handle, argv[optind], &linkid, NULL, NULL,
-	    NULL);
+	status = dladm_zname2info(handle, zonename, argv[optind], &linkid,
+	    NULL, NULL, NULL);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "link %s is not valid", argv[optind]);
 

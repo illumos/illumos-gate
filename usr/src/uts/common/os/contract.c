@@ -497,7 +497,7 @@ contract_abandon(contract_t *ct, proc_t *p, int explicit)
 	contract_t *parent = &p->p_ct_process->conp_contract;
 	int inherit = 0;
 
-	ASSERT(p == curproc);
+	VERIFY(p == curproc);
 
 	mutex_enter(&ct->ct_lock);
 
@@ -547,7 +547,7 @@ contract_abandon(contract_t *ct, proc_t *p, int explicit)
 
 	if (inherit) {
 		ct->ct_state = CTS_INHERITED;
-		ASSERT(ct->ct_regent == parent);
+		VERIFY(ct->ct_regent == parent);
 		contract_process_take(parent, ct);
 
 		/*
@@ -2063,8 +2063,8 @@ cte_copy(ct_equeue_t *q, ct_equeue_t *newq)
 {
 	ct_kevent_t *e, *first = NULL;
 
-	ASSERT(q->ctq_listno == CTEL_CONTRACT);
-	ASSERT(newq->ctq_listno == CTEL_PBUNDLE);
+	VERIFY(q->ctq_listno == CTEL_CONTRACT);
+	VERIFY(newq->ctq_listno == CTEL_PBUNDLE);
 
 	mutex_enter(&q->ctq_lock);
 	mutex_enter(&newq->ctq_lock);
@@ -2077,8 +2077,19 @@ cte_copy(ct_equeue_t *q, ct_equeue_t *newq)
 		if ((e->cte_flags & (CTE_INFO | CTE_ACK)) == 0) {
 			if (first == NULL)
 				first = e;
-			list_insert_tail(&newq->ctq_events, e);
-			cte_hold(e);
+			/*
+			 * In cte_publish_all() ct_evtlock is used to
+			 * ensure events are properly delivered.  However,
+			 * during adoption we have a totally different locking
+			 * order. Thus its possible for a race to occur and
+			 * we could get an event inserted multiple times unless
+			 * we double check for that case.
+			 */
+			if (!list_link_active((list_node_t *)
+			    ((uintptr_t)e + newq->ctq_events.list_offset))) {
+				list_insert_tail(&newq->ctq_events, e);
+				cte_hold(e);
+			}
 		}
 	}
 
@@ -2117,7 +2128,7 @@ cte_trim(ct_equeue_t *q, contract_t *ct)
 	int flags, stopper;
 	int start = 1;
 
-	ASSERT(MUTEX_HELD(&q->ctq_lock));
+	VERIFY(MUTEX_HELD(&q->ctq_lock));
 
 	for (e = list_head(&q->ctq_events); e != NULL; e = next) {
 		next = list_next(&q->ctq_events, e);
@@ -2247,6 +2258,8 @@ cte_publish(ct_equeue_t *q, ct_kevent_t *e, timespec_t *tsp)
 	/*
 	 * Enqueue event
 	 */
+	VERIFY(!list_link_active((list_node_t *)
+	    ((uintptr_t)e + q->ctq_events.list_offset)));
 	list_insert_tail(&q->ctq_events, e);
 
 	/*

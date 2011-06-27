@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -792,9 +794,8 @@ after_ilb:
 			ire_refrele(rtc->rtc_ire);
 		rtc->rtc_ire = ire;
 		rtc->rtc_ipaddr = nexthop;
-	} else if (nexthop == rtc->rtc_ipaddr) {
+	} else if (nexthop == rtc->rtc_ipaddr && rtc->rtc_ire != NULL) {
 		/* Use the route cache */
-		ASSERT(rtc->rtc_ire != NULL);
 		ire = rtc->rtc_ire;
 	} else {
 		/* Update the route cache */

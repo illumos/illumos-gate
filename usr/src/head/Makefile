@@ -204,6 +204,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	wordexp.h	\
 	xti.h		\
 	xti_inet.h	\
+	zdoor.h		\
 	zone.h
 
 ISOHDRS = \

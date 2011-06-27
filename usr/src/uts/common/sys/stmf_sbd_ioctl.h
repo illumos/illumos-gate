@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_STMF_SBD_IOCTL_H
@@ -76,6 +78,7 @@ typedef enum sbd_ret {
 #define	SBD_IOCTL_SET_LU_STANDBY			SBD_IOCTL_DEF(7)
 #define	SBD_IOCTL_SET_GLOBAL_LU				SBD_IOCTL_DEF(8)
 #define	SBD_IOCTL_GET_GLOBAL_LU				SBD_IOCTL_DEF(9)
+#define	SBD_IOCTL_GET_UNMAP_PROPS			SBD_IOCTL_DEF(10)
 
 typedef struct sbd_create_and_reg_lu {
 	uint32_t	slu_struct_size;
@@ -221,6 +224,16 @@ typedef struct sbd_lu_props {
 	uint8_t		slp_guid[16];
 	uint8_t		slp_buf[8];	/* likely more than 8 */
 } sbd_lu_props_t;
+
+typedef struct sbd_unmap_props {
+	uint32_t	sup_found_lu:1,
+			sup_zvol_path_valid:1,
+			sup_guid_valid:1,
+			sup_unmap_enabled;
+	uint32_t	sup_rsvd;
+	char		sup_zvol_path[256];
+	uint8_t		sup_guid[16];
+} sbd_unmap_props_t;
 
 #ifdef	__cplusplus
 }

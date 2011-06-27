@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -55,7 +56,7 @@ extern sock_downcalls_t sock_tcp_downcalls;
  * Bind hash list size and has function.  It has to be a power of 2 for
  * hashing.
  */
-#define	TCP_BIND_FANOUT_SIZE	512
+#define	TCP_BIND_FANOUT_SIZE	1024
 #define	TCP_BIND_HASH(lport) (ntohs(lport) & (TCP_BIND_FANOUT_SIZE - 1))
 
 /*
@@ -496,6 +497,7 @@ extern uint32_t tcp_early_abort;
 #define	tcps_wroff_xtra			tcps_propinfo_tbl[57].prop_cur_uval
 #define	tcps_dev_flow_ctl		tcps_propinfo_tbl[58].prop_cur_bval
 #define	tcps_reass_timeout		tcps_propinfo_tbl[59].prop_cur_uval
+#define	tcps_iss_incr			tcps_propinfo_tbl[65].prop_cur_uval
 
 extern struct qinit tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;

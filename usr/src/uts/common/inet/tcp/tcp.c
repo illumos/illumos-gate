@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -240,7 +241,7 @@ uint_t tcp_free_list_max_cnt = 0;
 /*
  * Size of acceptor hash list.  It has to be a power of 2 for hashing.
  */
-#define	TCP_ACCEPTOR_FANOUT_SIZE		256
+#define	TCP_ACCEPTOR_FANOUT_SIZE		512
 
 #ifdef	_ILP32
 #define	TCP_ACCEPTOR_HASH(accid)					\
@@ -3917,7 +3918,7 @@ tcp_iss_init(tcp_t *tcp)
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
 
-	tcps->tcps_iss_incr_extra += (ISS_INCR >> 1);
+	tcps->tcps_iss_incr_extra += (tcps->tcps_iss_incr >> 1);
 	tcp->tcp_iss = tcps->tcps_iss_incr_extra;
 	switch (tcps->tcps_strong_iss) {
 	case 2:
@@ -3940,7 +3941,8 @@ tcp_iss_init(tcp_t *tcp)
 		tcp->tcp_iss += (gethrtime() >> ISS_NSEC_SHT) + tcp_random();
 		break;
 	default:
-		tcp->tcp_iss += (uint32_t)gethrestime_sec() * ISS_INCR;
+		tcp->tcp_iss += (uint32_t)gethrestime_sec() *
+		    tcps->tcps_iss_incr;
 		break;
 	}
 	tcp->tcp_valid_bits = TCP_ISS_VALID;

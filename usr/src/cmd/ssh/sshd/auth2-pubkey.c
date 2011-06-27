@@ -26,6 +26,8 @@
  * Use is subject to license terms.
  */
 
+#include <dlfcn.h>
+
 #include "includes.h"
 RCSID("$OpenBSD: auth2-pubkey.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
 
@@ -53,6 +55,13 @@ RCSID("$OpenBSD: auth2-pubkey.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
 extern ServerOptions options;
 extern u_char *session_id2;
 extern int session_id2_len;
+
+/* global plugin function requirements */
+static const char *RSA_SYM_NAME = "sshd_user_rsa_key_allowed";
+static const char *DSA_SYM_NAME = "sshd_user_rsa_key_allowed";
+typedef int (*RSA_SYM)(struct passwd *, RSA *, const char *);
+typedef int (*DSA_SYM)(struct passwd *, DSA *, const char *);
+
 
 static void
 userauth_pubkey(Authctxt *authctxt)
@@ -309,7 +318,95 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 	return found_key;
 }
 
-/* check whether given key is in .ssh/authorized_keys* */
+/**
+ * Checks whether or not access is allowed based on a plugin specified
+ * in sshd_config (PubKeyPlugin).
+ *
+ * Note that this expects a symbol in the loaded library that takes
+ * the current user (pwd entry), the current RSA key and it's fingerprint.
+ * The symbol is expected to return 1 on success and 0 on failure.
+ *
+ * While we could optimize this code to dlopen once in the process' lifetime,
+ * sshd is already a slow beast, so this is really not a concern.
+ * The overhead is basically a rounding error compared to everything else, and
+ * it keeps this code minimally invasive.
+ */
+static int
+user_key_allowed_from_plugin(struct passwd *pw, Key *key)
+{
+	RSA_SYM rsa_sym = NULL;
+	DSA_SYM dsa_sym = NULL;
+	char *fp = NULL;
+	void *handle = NULL;
+	int success = 0;
+
+	if (options.pubkey_plugin == NULL || pw == NULL || key == NULL ||
+	    (key->type != KEY_RSA && key->type != KEY_RSA1 &&
+	     key->type != KEY_DSA && key->type != KEY_ECDSA))
+		return success;
+
+	handle = dlopen(options.pubkey_plugin, RTLD_NOW);
+	if ((handle == NULL)) {
+		debug("Unable to open library %s: %s", options.pubkey_plugin,
+			dlerror());
+		goto out;
+	}
+
+	fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+	if (fp == NULL) {
+		debug("failed to generate fingerprint");
+		goto out;
+	}
+
+	switch (key->type) {
+	case KEY_RSA1:
+	case KEY_RSA:
+		rsa_sym = (RSA_SYM)dlsym(handle, RSA_SYM_NAME);
+		if (rsa_sym == NULL) {
+			debug("Unable to resolve symbol %s: %s", RSA_SYM_NAME,
+				dlerror());
+			goto out;
+		}
+		debug2("Invoking %s from %s", RSA_SYM_NAME,
+			options.pubkey_plugin);
+		success = (*rsa_sym)(pw, key->rsa, fp);
+		break;
+	case KEY_DSA:
+	case KEY_ECDSA:
+		dsa_sym = (DSA_SYM)dlsym(handle, RSA_SYM_NAME);
+		if (dsa_sym == NULL) {
+			debug("Unable to resolve symbol %s: %s", DSA_SYM_NAME,
+				dlerror());
+			goto out;
+		}
+		debug2("Invoking %s from %s", DSA_SYM_NAME,
+			options.pubkey_plugin);
+		success = (*dsa_sym)(pw, key->dsa, fp);
+		break;
+	default:
+		debug2("user_key_plugins only support RSA keys");
+	}
+
+	debug("sshd_plugin returned: %d", success);
+
+out:
+	if (handle != NULL) {
+		dlclose(handle);
+		dsa_sym = NULL;
+		rsa_sym = NULL;
+		handle = NULL;
+	}
+
+	if (fp != NULL) {
+		xfree(fp);
+		fp = NULL;
+	}
+
+	return success;
+}
+
+
+/* check whether given key is in .ssh/authorized_keys or a plugin */
 int
 user_key_allowed(struct passwd *pw, Key *key)
 {
@@ -329,6 +426,13 @@ user_key_allowed(struct passwd *pw, Key *key)
 	file = authorized_keys_file2(pw);
 	success = user_key_allowed2(pw, key, file);
 	xfree(file);
+
+	if (success)
+		return success;
+
+	/* try from a plugin */
+	success = user_key_allowed_from_plugin(pw, key);
+
 	return success;
 }
 

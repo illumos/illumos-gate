@@ -20,11 +20,12 @@
 #
 
 #
-# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROGS =		jattach jinstall juninstall pinstall prestate poststate
+PROGS =		jattach jinstall juninstall pinstall prestate poststate \
+		statechange
 XMLDOCS=	config.xml platform.xml common.ksh
 USERFILES=
 MANIFEST=	joyinit.xml
@@ -48,8 +49,8 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
-	$(ROOTTEMPLATES) $(ETCUSER)
+install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTMANIFEST) \
+	$(ROOTSVCMETHOD) $(ROOTTEMPLATES) $(ETCUSER)
 
 lint:
 

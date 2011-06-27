@@ -22,6 +22,9 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+#
+# Copyright 2011 Joyent Inc
+#
 
 require 5.8.4;
 use strict;
@@ -50,6 +53,12 @@ my $pver = sprintf('%vd', $^V);
 
 # Figure out the appropriate Config.pm.  Use an older version if necessary.
 my $perlarch = ($arch eq "sparc") ? "sun4-solaris-64int":"i86pc-solaris-64int";
+
+if (! -d "/usr/perl5/$pver") {
+   my ($maj, $min, $micro);
+   ($maj, $min, $micro)  = split(/\./, $pver, 3);
+   $pver = join(".", $maj, $min);
+}
 
 my $configpm = "/usr/perl5/$pver/lib/$perlarch/Config.pm";
 if (! -f $configpm) {

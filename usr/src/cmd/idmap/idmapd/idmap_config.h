@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IDMAP_CONFIG_H
@@ -74,6 +75,8 @@ typedef struct idmap_trustedforest {
 
 typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
+	uint64_t	id_cache_timeout;
+	uint64_t	name_cache_timeout;
 	char		*machine_sid;		/* machine sid */
 	char		*default_domain;	/* default domain name */
 	char		*domain_name;		/* AD domain name */

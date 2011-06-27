@@ -83,19 +83,22 @@ if ( defined($ARGV[0]) ) {
 }
 
 my $HEADER_FMT = $USE_COMMA ?
-    "r/%s,w/%s,%sr/%s,%sw/%s,wait_t,ractv,wactv,read_t,writ_t,%%r,%%w,zone\n" :
-    "   r/%s    w/%s   %sr/%s   %sw/%s wait_t ractv wactv " .
-    "read_t writ_t  %%r  %%w zone\n";
+    "r/%s,w/%s,%sr/%s,%sw/%s,ractv,wactv,read_t,writ_t,%%r,%%w," .
+    "d/%s,del_t,zone\n" :
+    "  r/%s   w/%s  %sr/%s  %sw/%s ractv wactv read_t writ_t  " .
+    "%%r  %%w   d/%s  del_t zone\n";
 my $DATA_FMT = $USE_COMMA ?
-    "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%s\n" :
-    "%6.1f %6.1f %6.1f %6.1f %6.1f %5.1f %5.1f %6.1f %6.1f %3d %3d %s\n";
+    "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d,%.1f,%.1f,%s,%d\n" :
+    "%5.1f %5.1f %5.1f %5.1f %5.1f %5.1f %6.1f %6.1f %3d %3d " .
+    "%5.1f %6.1f %s (%d)\n";
 
 my $BYTES_PREFIX = $USE_MB ? "M" : "k";
 my $BYTES_DIVISOR = $USE_MB ? 1024 * 1024 : 1024;
 my $INTERVAL_SUFFIX = $USE_INTERVAL ? "i" : "s";
+my $NANOSEC = 1000000000;
 
 my @fields = ( 'reads', 'writes', 'nread', 'nwritten', 'rtime', 'wtime',
-    'rlentime', 'wlentime', 'snaptime' );
+    'rlentime', 'wlentime', 'delay_cnt', 'delay_time', 'snaptime' );
 
 chomp(my $curzone = (`/sbin/zonename`));
 
@@ -111,12 +114,19 @@ foreach $line (@lines) {
 }
 
 my %old = ();
+my $rows_printed = 0;
 
 $Kstat->update();
 
 for (my $ii = 0; $ii < $count; $ii++) {
-	printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX, $BYTES_PREFIX,
-	    $INTERVAL_SUFFIX, $BYTES_PREFIX, $INTERVAL_SUFFIX);
+	# Print the column header every 20 rows
+	if ($rows_printed == 0 || $ALL_ZONES) {
+		printf($HEADER_FMT, $INTERVAL_SUFFIX, $INTERVAL_SUFFIX,
+		    $BYTES_PREFIX, $INTERVAL_SUFFIX, $BYTES_PREFIX,
+		    $INTERVAL_SUFFIX, $INTERVAL_SUFFIX);
+	}
+
+	$rows_printed = $rows_printed >= 20 ? 0 : $rows_printed + 1;
 
 	foreach $zone (@zones) {
 		if ((!$ALL_ZONES) && ($zone ne $curzone)) {
@@ -128,9 +138,16 @@ for (my $ii = 0; $ii < $count; $ii++) {
 			foreach $field (@fields) { $old->{$zone}->{$field} = 0; }
 		}
 
+		#
+		# Kstats have a 30-character limit (KSTAT_STRLEN) on their
+		# names, so if the zone name exceeds that limit, use the first
+		# 30 characters.
+		#
+		my $trimmed_zone = substr($zone, 0, 30);
 		my $zoneid = $zoneids->{$zone};
-		print_stats($zone, $Kstat->{'zone_vfs'}{$zoneid}{$zone},
-		    $old->{$zone});
+
+		print_stats($zone, $zoneid,
+		    $Kstat->{'zone_vfs'}{$zoneid}{$trimmed_zone}, $old->{$zone});
 	}
 
 	sleep ($interval);
@@ -141,8 +158,9 @@ exit(0);
 
 sub print_stats {
 	my $zone = $_[0];
-	my $data = $_[1];
-	my $old = $_[2];
+	my $zoneid = $_[1];
+	my $data = $_[2];
+	my $old = $_[3];
 
 	my $etime = $data->{'snaptime'} -
 	    ($old->{'snaptime'} > 0 ? $old->{'snaptime'} : $data->{'crtime'});
@@ -156,30 +174,37 @@ sub print_stats {
 	my $nwritten = ($data->{'nwritten'} - $old->{'nwritten'}) /
 	    $rate_divisor / $BYTES_DIVISOR;
 	
-	# XXX Need to investigate how to calculate this
-	my $wait_t = 0.0;
-
 	# Calculate transactions per second
 	my $r_tps = ($data->{'reads'} - $old->{'reads'}) / $etime;
 	my $w_tps = ($data->{'writes'} - $old->{'writes'}) / $etime;
 
 	# Calculate average length of active queue
-	my $r_actv = ($data->{'rlentime'} - $old->{'rlentime'}) / $etime;
-	my $w_actv = ($data->{'wlentime'} - $old->{'wlentime'}) / $etime;
+	my $r_actv = (($data->{'rlentime'} - $old->{'rlentime'}) / $NANOSEC) /
+	    $etime;
+	my $w_actv = (($data->{'wlentime'} - $old->{'wlentime'}) / $NANOSEC) /
+	    $etime;
 
 	# Calculate average service time
 	my $read_t = $r_tps > 0 ? $r_actv * (1000 / $r_tps) : 0.0;
 	my $writ_t = $w_tps > 0 ? $w_actv * (1000 / $w_tps) : 0.0;
 
+	# Calculate I/O throttle delay metrics
+	my $delays = $data->{'delay_cnt'} - $old->{'delay_cnt'};
+	my $d_tps = $delays / $etime;
+	my $del_t = $delays > 0 ?
+	    ($data->{'delay_time'} - $old->{'delay_time'}) / $delays : 0.0;
+
 	# Calculate the % time the VFS layer is active
-	my $r_b_pct = (($data->{'rtime'} - $old->{'rtime'}) / $etime) * 100;
-	my $w_b_pct = (($data->{'wtime'} - $old->{'wtime'}) / $etime) * 100;
+	my $r_b_pct = ((($data->{'rtime'} - $old->{'rtime'}) / $NANOSEC) /
+	    $etime) * 100;
+	my $w_b_pct = ((($data->{'wtime'} - $old->{'wtime'}) / $NANOSEC) /
+	    $etime) * 100;
 
 	if (! $HIDE_ZEROES || $reads != 0.0 || $writes != 0.0 ||
 	    $nread != 0.0 || $nwritten != 0.0) {
-		printf($DATA_FMT, $reads, $writes, $nread, $nwritten,
-		    $wait_t, $r_actv, $w_actv, $read_t, $writ_t,
-		    $r_b_pct, $w_b_pct, $zone);
+		printf($DATA_FMT, $reads, $writes, $nread, $nwritten, $r_actv,
+		    $w_actv, $read_t, $writ_t, $r_b_pct, $w_b_pct,
+		    $d_tps, $del_t, substr($zone, 0, 8), $zoneid);
 	}
 
 	# Save current calculations for next loop

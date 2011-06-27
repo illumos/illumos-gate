@@ -167,6 +167,7 @@ typedef struct {
 	char   *pre_userauth_hook;
 	char   *pam_service_prefix;
 	char   *pam_service_name;
+	char   *pubkey_plugin;	
 
 }       ServerOptions;
 

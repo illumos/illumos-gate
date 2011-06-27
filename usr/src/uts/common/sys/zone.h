@@ -244,7 +244,7 @@ typedef enum zone_cmd {
 typedef struct zone_cmd_arg {
 	uint64_t	uniqid;		/* unique "generation number" */
 	zone_cmd_t	cmd;		/* requested action */
-	uint32_t	_pad;		/* need consistent 32/64 bit alignmt */
+	uint32_t debug;			/* enable brand hook debug */
 	char locale[MAXPATHLEN];	/* locale in which to render messages */
 	char bootbuf[BOOTARGS_MAX];	/* arguments passed to zone_boot() */
 } zone_cmd_arg_t;
@@ -386,6 +386,32 @@ typedef struct {
 	uint_t		cycle_cnt;
 	hrtime_t	zone_avg_cnt;
 } sys_zio_cntr_t;
+
+typedef struct {
+	kstat_named_t	zv_nread;
+	kstat_named_t	zv_reads;
+	kstat_named_t	zv_rtime;
+	kstat_named_t	zv_rlentime;
+	kstat_named_t	zv_nwritten;
+	kstat_named_t	zv_writes;
+	kstat_named_t	zv_wtime;
+	kstat_named_t	zv_wlentime;
+	kstat_named_t	zv_10ms_ops;
+	kstat_named_t	zv_100ms_ops;
+	kstat_named_t	zv_1s_ops;
+	kstat_named_t 	zv_delay_cnt;
+	kstat_named_t	zv_delay_time;
+} zone_vfs_kstat_t;
+
+typedef struct {
+	kstat_named_t	zz_nread;
+	kstat_named_t	zz_reads;
+	kstat_named_t	zz_rtime;
+	kstat_named_t	zz_rlentime;
+	kstat_named_t	zz_nwritten;
+	kstat_named_t	zz_writes;
+	kstat_named_t	zz_waittime;
+} zone_zfs_kstat_t;
 
 typedef struct zone {
 	/*
@@ -544,18 +570,20 @@ typedef struct zone {
 	sys_zio_cntr_t	zone_lwr_ops;
 
 	/*
-	 * kstats and counters for I/O ops and bytes.
-	 */
-	kmutex_t	zone_io_lock;		/* protects I/O statistics */
-	kstat_t		*zone_io_ksp;
-	kstat_io_t	*zone_io_kiop;
-
-	/*
 	 * kstats and counters for VFS ops and bytes.
 	 */
 	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
 	kstat_t		*zone_vfs_ksp;
-	kstat_io_t	*zone_vfs_kiop;
+	kstat_io_t	zone_vfs_rwstats;
+	zone_vfs_kstat_t *zone_vfs_stats;
+
+	/*
+	 * kstats for ZFS I/O ops and bytes.
+	 */
+	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
+	kstat_t		*zone_zfs_ksp;
+	kstat_io_t	zone_zfs_rwstats;
+	zone_zfs_kstat_t *zone_zfs_stats;
 
 	/*
 	 * Solaris Auditing per-zone audit context

@@ -1861,6 +1861,148 @@ zone_rctl_kstat_create_common(zone_t *zone, char *name,
 	return (ksp);
 }
 
+static int
+zone_vfs_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_vfs_kstat_t *zvp = ksp->ks_data;
+	kstat_io_t *kiop = &zone->zone_vfs_rwstats;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	/*
+	 * Extract the VFS statistics from the kstat_io_t structure used by
+	 * kstat_runq_enter() and related functions.  Since the slow ops
+	 * counters are updated directly by the VFS layer, there's no need to
+	 * copy those statistics here.
+	 *
+	 * Note that kstat_runq_enter() and the related functions use
+	 * gethrtime_unscaled(), so scale the time here.
+	 */
+	zvp->zv_nread.value.ui64 = kiop->nread;
+	zvp->zv_reads.value.ui64 = kiop->reads;
+	zvp->zv_rtime.value.ui64 = kiop->rtime;
+	zvp->zv_rlentime.value.ui64 = kiop->rlentime;
+	zvp->zv_nwritten.value.ui64 = kiop->nwritten;
+	zvp->zv_writes.value.ui64 = kiop->writes;
+	zvp->zv_wtime.value.ui64 = kiop->wtime;
+	zvp->zv_wlentime.value.ui64 = kiop->wlentime;
+
+	scalehrtime((hrtime_t *)&zvp->zv_rtime.value.ui64);
+	scalehrtime((hrtime_t *)&zvp->zv_rlentime.value.ui64);
+	scalehrtime((hrtime_t *)&zvp->zv_wtime.value.ui64);
+	scalehrtime((hrtime_t *)&zvp->zv_wlentime.value.ui64);
+
+	return (0);
+}
+
+static kstat_t *
+zone_vfs_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_vfs_kstat_t *zvp;
+
+	if ((ksp = kstat_create_zone("zone_vfs", zone->zone_id,
+	    zone->zone_name, "zone_vfs", KSTAT_TYPE_NAMED,
+	    sizeof (zone_vfs_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zvp = ksp->ks_data = kmem_zalloc(sizeof (zone_vfs_kstat_t), KM_SLEEP);
+	ksp->ks_lock = &zone->zone_vfs_lock;
+	zone->zone_vfs_stats = zvp;
+
+	kstat_named_init(&zvp->zv_nread, "nread", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_reads, "reads", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_rtime, "rtime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_rlentime, "rlentime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_nwritten, "nwritten", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_writes, "writes", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_wtime, "wtime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_wlentime, "wlentime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_10ms_ops, "10ms_ops", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_100ms_ops, "100ms_ops", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_1s_ops, "1s_ops", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_delay_cnt, "delay_cnt", KSTAT_DATA_UINT64);
+	kstat_named_init(&zvp->zv_delay_time, "delay_time", KSTAT_DATA_UINT64);
+
+	ksp->ks_update = zone_vfs_kstat_update;
+	ksp->ks_private = zone;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
+static int
+zone_zfs_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_zfs_kstat_t *zzp = ksp->ks_data;
+	kstat_io_t *kiop = &zone->zone_zfs_rwstats;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	/*
+	 * Extract the ZFS statistics from the kstat_io_t structure used by
+	 * kstat_runq_enter() and related functions.  Since the I/O throttle
+	 * counters are updated directly by the ZFS layer, there's no need to
+	 * copy those statistics here.
+	 *
+	 * Note that kstat_runq_enter() and the related functions use
+	 * gethrtime_unscaled(), so scale the time here.
+	 */
+	zzp->zz_nread.value.ui64 = kiop->nread;
+	zzp->zz_reads.value.ui64 = kiop->reads;
+	zzp->zz_rtime.value.ui64 = kiop->rtime;
+	zzp->zz_rlentime.value.ui64 = kiop->rlentime;
+	zzp->zz_nwritten.value.ui64 = kiop->nwritten;
+	zzp->zz_writes.value.ui64 = kiop->writes;
+
+	scalehrtime((hrtime_t *)&zzp->zz_rtime.value.ui64);
+	scalehrtime((hrtime_t *)&zzp->zz_rlentime.value.ui64);
+
+	return (0);
+}
+
+static kstat_t *
+zone_zfs_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_zfs_kstat_t *zzp;
+
+	if ((ksp = kstat_create_zone("zone_zfs", zone->zone_id,
+	    zone->zone_name, "zone_zfs", KSTAT_TYPE_NAMED,
+	    sizeof (zone_zfs_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zzp = ksp->ks_data = kmem_zalloc(sizeof (zone_zfs_kstat_t), KM_SLEEP);
+	ksp->ks_lock = &zone->zone_zfs_lock;
+	zone->zone_zfs_stats = zzp;
+
+	kstat_named_init(&zzp->zz_nread, "nread", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_reads, "reads", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_rtime, "rtime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_rlentime, "rlentime", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_nwritten, "nwritten", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_writes, "writes", KSTAT_DATA_UINT64);
+	kstat_named_init(&zzp->zz_waittime, "waittime", KSTAT_DATA_UINT64);
+
+	ksp->ks_update = zone_zfs_kstat_update;
+	ksp->ks_private = zone;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
 static void
 zone_kstat_create(zone_t *zone)
 {
@@ -1871,36 +2013,14 @@ zone_kstat_create(zone_t *zone)
 	zone->zone_nprocs_kstat = zone_rctl_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
 
-	zone->zone_io_ksp = kstat_create_zone("zone_io", zone->zone_id,
-	    zone->zone_name, "zone_io", KSTAT_TYPE_IO, 1,
-	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
-
-	if (zone->zone_io_ksp != NULL) {
-		if (zone->zone_id != GLOBAL_ZONEID)
-			kstat_zone_add(zone->zone_io_ksp, GLOBAL_ZONEID);
-
-		zone->zone_io_ksp->ks_lock = &zone->zone_io_lock;
-		kstat_install(zone->zone_io_ksp);
-		zone->zone_io_kiop = zone->zone_io_ksp->ks_data;
-	} else {
-		zone->zone_io_kiop = kmem_zalloc(
-		    sizeof (kstat_io_t), KM_SLEEP);
+	if ((zone->zone_vfs_ksp = zone_vfs_kstat_create(zone)) == NULL) {
+		zone->zone_vfs_stats = kmem_zalloc(
+		    sizeof (zone_vfs_kstat_t), KM_SLEEP);
 	}
 
-	zone->zone_vfs_ksp = kstat_create_zone("zone_vfs", zone->zone_id,
-	    zone->zone_name, "zone_vfs", KSTAT_TYPE_IO, 1,
-	    KSTAT_FLAG_PERSISTENT, zone->zone_id);
-
-	if (zone->zone_vfs_ksp != NULL) {
-		if (zone->zone_id != GLOBAL_ZONEID)
-			kstat_zone_add(zone->zone_vfs_ksp, GLOBAL_ZONEID);
-
-		zone->zone_vfs_ksp->ks_lock = &zone->zone_vfs_lock;
-		kstat_install(zone->zone_vfs_ksp);
-		zone->zone_vfs_kiop = zone->zone_vfs_ksp->ks_data;
-	} else {
-		zone->zone_vfs_kiop = kmem_zalloc(
-		    sizeof (kstat_io_t), KM_SLEEP);
+	if ((zone->zone_zfs_ksp = zone_zfs_kstat_create(zone)) == NULL) {
+		zone->zone_zfs_stats = kmem_zalloc(
+		    sizeof (zone_zfs_kstat_t), KM_SLEEP);
 	}
 }
 
@@ -1927,19 +2047,10 @@ zone_kstat_delete(zone_t *zone)
 	zone_kstat_delete_common(&zone->zone_nprocs_kstat,
 	    sizeof (zone_kstat_t));
 
-	if (zone->zone_io_ksp != NULL) {
-		kstat_delete(zone->zone_io_ksp);
-		zone->zone_io_ksp = NULL;
-	} else {
-		kmem_free(zone->zone_io_kiop, sizeof (kstat_io_t));
-	}
-
-	if (zone->zone_vfs_ksp != NULL) {
-		kstat_delete(zone->zone_vfs_ksp);
-		zone->zone_vfs_ksp = NULL;
-	} else {
-		kmem_free(zone->zone_vfs_kiop, sizeof (kstat_io_t));
-	}
+	zone_kstat_delete_common(&zone->zone_vfs_ksp,
+	    sizeof (zone_vfs_kstat_t));
+	zone_kstat_delete_common(&zone->zone_zfs_ksp,
+	    sizeof (zone_zfs_kstat_t));
 }
 
 /*

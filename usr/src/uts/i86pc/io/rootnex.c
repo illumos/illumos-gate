@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * x86 root nexus driver
@@ -4755,7 +4758,7 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		return (DDI_FAILURE);
 	}
 
-	dmao = dma->dp_dvma_used ? &dma->dp_dma : &dma->dp_dvma;
+	dmao = dma->dp_dvma_used ? &dma->dp_dvma : &dma->dp_dma;
 
 	/*
 	 * if we don't have any windows, and they're asking for the first

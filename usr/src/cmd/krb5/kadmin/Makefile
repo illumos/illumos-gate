@@ -27,7 +27,7 @@ include ../../Makefile.cmd
 
 SUBDIRS= cli dbutil ktutil kpasswd server kclient kdcmgr
 # EXPORT DELETE START
-SUBDIRS += gui
+#SUBDIRS += gui
 # EXPORT DELETE END
 
 all :=		TARGET= all

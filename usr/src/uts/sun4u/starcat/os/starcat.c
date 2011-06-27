@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
@@ -178,7 +182,7 @@ set_platform_defaults(void)
 	/*
 	 * KPR (kernel page relocation) is supported on this platform.
 	 */
-	if (hat_kpr_enabled && kernel_cage_enable && ncpunode >= 32) {
+	if (kernel_cage_enable && ncpunode >= 32) {
 		segkmem_reloc = 1;
 		cmn_err(CE_NOTE, "!Kernel Page Relocation is ENABLED");
 	} else {
@@ -1318,8 +1322,7 @@ plat_lpkmem_is_supported(void)
 {
 	extern int segkmem_reloc;
 
-	if (hat_kpr_enabled && kernel_cage_enable &&
-	    (ncpunode >= 32 || segkmem_reloc == 1))
+	if (kernel_cage_enable && (ncpunode >= 32 || segkmem_reloc == 1))
 		return (0);
 
 	return (1);

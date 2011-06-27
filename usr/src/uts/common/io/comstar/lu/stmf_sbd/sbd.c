@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -83,7 +85,9 @@ int sbd_get_global_props(sbd_global_props_t *oslp, uint32_t oslp_sz,
     uint32_t *err_ret);
 int sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
     sbd_lu_props_t *oslp, uint32_t oslp_sz, uint32_t *err_ret);
-char *sbd_get_zvol_name(sbd_lu_t *sl);
+static char *sbd_get_zvol_name(sbd_lu_t *);
+static int sbd_get_unmap_props(sbd_unmap_props_t *sup, sbd_unmap_props_t *osup,
+    uint32_t *err_ret);
 sbd_status_t sbd_create_zfs_meta_object(sbd_lu_t *sl);
 sbd_status_t sbd_open_zfs_meta(sbd_lu_t *sl);
 sbd_status_t sbd_read_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
@@ -447,6 +451,18 @@ stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		mutex_exit(&sbd_lock);
 		ret = 0;
 		iocd->stmf_error = 0;
+		break;
+	case SBD_IOCTL_GET_UNMAP_PROPS:
+		if (iocd->stmf_ibuf_size < sizeof (sbd_unmap_props_t)) {
+			ret = EFAULT;
+			break;
+		}
+		if (iocd->stmf_obuf_size < sizeof (sbd_unmap_props_t)) {
+			ret = EINVAL;
+			break;
+		}
+		ret = sbd_get_unmap_props((sbd_unmap_props_t *)ibuf,
+		    (sbd_unmap_props_t *)obuf, &iocd->stmf_error);
 		break;
 	default:
 		ret = ENOTTY;
@@ -1372,11 +1388,27 @@ sbd_write_lu_info(sbd_lu_t *sl)
 	return (ret);
 }
 
+/*
+ * Will scribble SL_UNMAP_ENABLED into sl_flags if we succeed.
+ */
+static void
+do_unmap_setup(sbd_lu_t *sl)
+{
+	ASSERT((sl->sl_flags & SL_UNMAP_ENABLED) == 0);
+
+	if ((sl->sl_flags & SL_ZFS_META) == 0)
+		return;	/* No UNMAP for you. */
+
+	sl->sl_flags |= SL_UNMAP_ENABLED;
+}
+
 int
 sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret)
 {
 	stmf_lu_t *lu = sl->sl_lu;
 	stmf_status_t ret;
+
+	do_unmap_setup(sl);
 
 	lu->lu_id = (scsi_devid_desc_t *)sl->sl_device_id;
 	if (sl->sl_alias) {
@@ -3132,6 +3164,46 @@ sbd_get_global_props(sbd_global_props_t *oslp, uint32_t oslp_sz,
 	return (0);
 }
 
+static int
+sbd_get_unmap_props(sbd_unmap_props_t *sup,
+    sbd_unmap_props_t *osup, uint32_t *err_ret)
+{
+	sbd_status_t sret;
+	sbd_lu_t *sl = NULL;
+
+	if (sup->sup_guid_valid) {
+		sret = sbd_find_and_lock_lu(sup->sup_guid,
+		    NULL, SL_OP_LU_PROPS, &sl);
+	} else {
+		sret = sbd_find_and_lock_lu(NULL,
+		    (uint8_t *)sup->sup_zvol_path, SL_OP_LU_PROPS,
+		    &sl);
+	}
+	if (sret != SBD_SUCCESS) {
+		if (sret == SBD_BUSY) {
+			*err_ret = SBD_RET_LU_BUSY;
+			return (EBUSY);
+		} else if (sret == SBD_NOT_FOUND) {
+			*err_ret = SBD_RET_NOT_FOUND;
+			return (ENOENT);
+		}
+		return (EIO);
+	}
+
+	sup->sup_found_lu = 1;
+	sup->sup_guid_valid = 1;
+	bcopy(sl->sl_device_id + 4, sup->sup_guid, 16);
+	if (sl->sl_flags & SL_UNMAP_ENABLED)
+		sup->sup_unmap_enabled = 1;
+	else
+		sup->sup_unmap_enabled = 0;
+
+	*osup = *sup;
+	sl->sl_trans_op = SL_OP_NONE;
+
+	return (0);
+}
+
 int
 sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
     sbd_lu_props_t *oslp, uint32_t oslp_sz, uint32_t *err_ret)
@@ -3272,7 +3344,10 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 	return (0);
 }
 
-char *
+/*
+ * Returns an allocated string with the "<pool>/..." form of the zvol name.
+ */
+static char *
 sbd_get_zvol_name(sbd_lu_t *sl)
 {
 	char *src;
@@ -3286,9 +3361,9 @@ sbd_get_zvol_name(sbd_lu_t *sl)
 	if (SBD_IS_ZVOL(src) != 0) {
 		ASSERT(0);
 	}
-	src += 14;
+	src += 14;	/* Past /dev/zvol/dsk/ */
 	if (*src == '/')
-		src++;
+		src++;	/* or /dev/zvol/rdsk/ */
 	p = (char *)kmem_alloc(strlen(src) + 1, KM_SLEEP);
 	(void) strcpy(p, src);
 	return (p);
@@ -3622,4 +3697,34 @@ out:
 	nvlist_free(nv);
 	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
 	return (rc);
+}
+
+/*
+ * Unmap a region in a volume.  Currently only supported for zvols.
+ */
+int
+sbd_unmap(sbd_lu_t *sl, uint64_t offset, uint64_t length)
+{
+	vnode_t *vp;
+	int unused;
+	dkioc_free_t df;
+
+	/* Right now, we only support UNMAP on zvols. */
+	if (!(sl->sl_flags & SL_ZFS_META))
+		return (EIO);
+
+	df.df_flags = (sl->sl_flags & SL_WRITEBACK_CACHE_DISABLE) ?
+	    DF_WAIT_SYNC : 0;
+	df.df_start = offset;
+	df.df_length = length;
+
+	/* Use the data vnode we have to send a fop_ioctl(). */
+	vp = sl->sl_data_vp;
+	if (vp == NULL) {
+		cmn_err(CE_WARN, "Cannot unmap - no vnode pointer.");
+		return (EIO);
+	}
+
+	return (VOP_IOCTL(vp, DKIOCFREE, (intptr_t)(&df), FKIOCTL, kcred,
+	    &unused, NULL));
 }

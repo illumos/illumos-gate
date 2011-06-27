@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -510,11 +511,11 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	if ((flags & TH_SYN) && gap > 0 && rgap < 0) {
 		/*
 		 * Make sure that when we accept the connection, pick
-		 * an ISS greater than (tcp_snxt + ISS_INCR/2) for the
+		 * an ISS greater than (tcp_snxt + tcp_iss_incr/2) for the
 		 * old connection.
 		 *
 		 * The next ISS generated is equal to tcp_iss_incr_extra
-		 * + ISS_INCR/2 + other components depending on the
+		 * + tcp_iss_incr/2 + other components depending on the
 		 * value of tcp_strong_iss.  We pre-calculate the new
 		 * ISS here and compare with tcp_snxt to determine if
 		 * we need to make adjustment to tcp_iss_incr_extra.
@@ -557,12 +558,13 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 			break;
 		default:
 			/* Add only time component. */
-			new_iss += (uint32_t)gethrestime_sec() * ISS_INCR;
+			new_iss += (uint32_t)gethrestime_sec() *
+			    tcps->tcps_iss_incr;
 			break;
 		}
 		if ((adj = (int32_t)(tcp->tcp_snxt - new_iss)) > 0) {
 			/*
-			 * New ISS not guaranteed to be ISS_INCR/2
+			 * New ISS not guaranteed to be tcp_iss_incr/2
 			 * ahead of the current tcp_snxt, so add the
 			 * difference to tcp_iss_incr_extra.
 			 */

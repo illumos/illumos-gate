@@ -27,35 +27,17 @@ unset LD_LIBRARY_PATH
 PATH=/usr/bin:/usr/sbin
 export PATH
 
-# state
-# ZONE_STATE_CONFIGURED		0 (script will never see this)
-# ZONE_STATE_INCOMPLETE		1 (script will never see this)
-# ZONE_STATE_INSTALLED		2
-# ZONE_STATE_READY		3
-# ZONE_STATE_RUNNING		4
-# ZONE_STATE_SHUTTING_DOWN	5
-# ZONE_STATE_DOWN		6
-# ZONE_STATE_MOUNTED		7
+if [[ -n $_ZONEADMD_brand_debug ]]; then
+	logfile=/var/log/zone_bh.$1
+	date >>$logfile
+	echo "zone $1 post-state-change $3 $4" >>$logfile
+	ksh -x /usr/lib/brand/joyent/statechange "post" $1 $2 $3 $4 \
+	    >>$logfile 2>&1
+	res=$?
+	echo "zone $1 post-state-change result $?" >>$logfile
+else
+	/usr/lib/brand/joyent/statechange "post" $1 $2 $3 $4
+	res=$?
+fi
 
-# cmd
-#
-# ready				0
-# boot				1
-# halt				4
-
-ZONENAME=$1
-ZONEPATH=$2
-state=$3
-cmd=$4
-ALTROOT=$5
-
-# We only do work if we're halting the zone.
-(( $cmd != 4 )) && exit 0;
-
-for nic in $_ZONECFG_net_resources
-do
-	dladm delete-vnic $nic
-done
-
-exit 0
-
+exit $res

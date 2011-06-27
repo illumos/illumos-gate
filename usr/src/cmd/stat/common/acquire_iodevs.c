@@ -536,9 +536,6 @@ acquire_iodev_errors(struct snapshot *ss, kstat_ctl_t *kc)
 {
 	kstat_t *ksp;
 
-	if (!(ss->s_types && SNAP_IODEV_ERRORS))
-		return (0);
-
 	for (ksp = kc->kc_chain; ksp; ksp = ksp->ks_next) {
 		char kstat_name[KSTAT_STRLEN];
 		char *dname = kstat_name;

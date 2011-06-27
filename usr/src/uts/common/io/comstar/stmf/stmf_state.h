@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ */
 #ifndef	_STMF_STATE_H
 #define	_STMF_STATE_H
 
@@ -60,7 +63,7 @@ typedef struct stmf_state {
 	stmf_i_lu_t		*stmf_svc_ilu_draining;
 	stmf_i_lu_t		*stmf_svc_ilu_timing;
 	struct stmf_svc_req	*stmf_svc_active;
-	struct stmf_svc_req	*stmf_svc_waiting;
+	struct stmf_svc_req	**stmf_svc_tailp;
 
 	stmf_id_list_t		stmf_hg_list;
 	stmf_id_list_t		stmf_tg_list;

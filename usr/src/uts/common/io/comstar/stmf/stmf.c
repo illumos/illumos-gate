@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -87,6 +90,8 @@ void stmf_svc_init();
 stmf_status_t stmf_svc_fini();
 void stmf_svc(void *arg);
 void stmf_svc_queue(int cmd, void *obj, stmf_state_change_info_t *info);
+static void stmf_svc_kill_obj_requests(void *obj);
+static void stmf_svc_timeout(void);
 void stmf_check_freetask();
 void stmf_abort_target_reset(scsi_task_t *task);
 stmf_status_t stmf_lun_reset_poll(stmf_lu_t *lu, struct scsi_task *task,
@@ -3313,6 +3318,9 @@ stmf_deregister_local_port(stmf_local_port_t *lport)
 		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_BUSY);
 	}
+
+	/* dequeue all object requests from active queue */
+	stmf_svc_kill_obj_requests(lport);
 
 	ilport = (stmf_i_local_port_t *)lport->lport_stmf_private;
 
@@ -7735,6 +7743,7 @@ stmf_svc_init()
 {
 	if (stmf_state.stmf_svc_flags & STMF_SVC_STARTED)
 		return;
+	stmf_state.stmf_svc_tailp = &stmf_state.stmf_svc_active;
 	stmf_state.stmf_svc_taskq = ddi_taskq_create(0, "STMF_SVC_TASKQ", 1,
 	    TASKQ_DEFAULTPRI, 0);
 	(void) ddi_taskq_dispatch(stmf_state.stmf_svc_taskq,
@@ -7772,46 +7781,45 @@ stmf_svc_fini()
 void
 stmf_svc(void *arg)
 {
-	stmf_svc_req_t *req, **preq;
-	clock_t td;
-	clock_t	drain_start, drain_next = 0;
-	clock_t	timing_start, timing_next = 0;
-	clock_t worker_delay = 0;
-	int deq;
+	stmf_svc_req_t *req;
 	stmf_lu_t *lu;
 	stmf_i_lu_t *ilu;
 	stmf_local_port_t *lport;
-	stmf_i_local_port_t *ilport, *next_ilport;
-	stmf_i_scsi_session_t *iss;
-
-	td = drv_usectohz(20000);
 
 	mutex_enter(&stmf_state.stmf_lock);
 	stmf_state.stmf_svc_flags |= STMF_SVC_STARTED | STMF_SVC_ACTIVE;
 
-stmf_svc_loop:
-	if (stmf_state.stmf_svc_flags & STMF_SVC_TERMINATE) {
-		stmf_state.stmf_svc_flags &=
-		    ~(STMF_SVC_STARTED | STMF_SVC_ACTIVE);
-		mutex_exit(&stmf_state.stmf_lock);
-		return;
-	}
+	while (!(stmf_state.stmf_svc_flags & STMF_SVC_TERMINATE)) {
+		if (stmf_state.stmf_svc_active == NULL) {
+			stmf_svc_timeout();
+			continue;
+		}
 
-	if (stmf_state.stmf_svc_active) {
-		int waitq_add = 0;
+		/*
+		 * Pop the front request from the active list.  After this,
+		 * the request will no longer be referenced by global state,
+		 * so it should be safe to access it without holding the
+		 * stmf state lock.
+		 */
 		req = stmf_state.stmf_svc_active;
 		stmf_state.stmf_svc_active = req->svc_next;
+
+		if (stmf_state.stmf_svc_active == NULL)
+			stmf_state.stmf_svc_tailp = &stmf_state.stmf_svc_active;
 
 		switch (req->svc_cmd) {
 		case STMF_CMD_LPORT_ONLINE:
 			/* Fallthrough */
 		case STMF_CMD_LPORT_OFFLINE:
-			/* Fallthrough */
-		case STMF_CMD_LU_ONLINE:
-			/* Nothing to do */
-			waitq_add = 1;
+			mutex_exit(&stmf_state.stmf_lock);
+			lport = (stmf_local_port_t *)req->svc_obj;
+			lport->lport_ctl(lport, req->svc_cmd, &req->svc_info);
 			break;
-
+		case STMF_CMD_LU_ONLINE:
+			mutex_exit(&stmf_state.stmf_lock);
+			lu = (stmf_lu_t *)req->svc_obj;
+			lu->lu_ctl(lu, req->svc_cmd, &req->svc_info);
+			break;
 		case STMF_CMD_LU_OFFLINE:
 			/* Remove all mappings of this LU */
 			stmf_session_lu_unmapall((stmf_lu_t *)req->svc_obj);
@@ -7819,182 +7827,161 @@ stmf_svc_loop:
 			mutex_exit(&stmf_state.stmf_lock);
 			stmf_task_lu_killall((stmf_lu_t *)req->svc_obj, NULL,
 			    STMF_ABORTED);
-			mutex_enter(&stmf_state.stmf_lock);
-			waitq_add = 1;
+			lu = (stmf_lu_t *)req->svc_obj;
+			ilu = (stmf_i_lu_t *)lu->lu_stmf_private;
+			if (ilu->ilu_ntasks != ilu->ilu_ntasks_free)
+				break;
+			lu->lu_ctl(lu, req->svc_cmd, &req->svc_info);
 			break;
 		default:
 			cmn_err(CE_PANIC, "stmf_svc: unknown cmd %d",
 			    req->svc_cmd);
 		}
 
-		if (waitq_add) {
-			/* Put it in the wait queue */
-			req->svc_next = stmf_state.stmf_svc_waiting;
-			stmf_state.stmf_svc_waiting = req;
-		}
+		mutex_enter(&stmf_state.stmf_lock);
 	}
 
-	/* The waiting list is not going to be modified by anybody else */
+	stmf_state.stmf_svc_flags &= ~(STMF_SVC_STARTED | STMF_SVC_ACTIVE);
 	mutex_exit(&stmf_state.stmf_lock);
+}
 
-	for (preq = &stmf_state.stmf_svc_waiting; (*preq) != NULL; ) {
-		req = *preq;
-		deq = 0;
+static void
+stmf_svc_timeout(void)
+{
+	clock_t td;
+	clock_t	drain_start, drain_next = 0;
+	clock_t	timing_start, timing_next = 0;
+	clock_t worker_delay = 0;
+	stmf_i_local_port_t *ilport, *next_ilport;
+	stmf_i_scsi_session_t *iss;
 
-		switch (req->svc_cmd) {
-		case STMF_CMD_LU_ONLINE:
-			lu = (stmf_lu_t *)req->svc_obj;
-			deq = 1;
-			lu->lu_ctl(lu, req->svc_cmd, &req->svc_info);
-			break;
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
 
-		case STMF_CMD_LU_OFFLINE:
-			lu = (stmf_lu_t *)req->svc_obj;
-			ilu = (stmf_i_lu_t *)lu->lu_stmf_private;
-			if (ilu->ilu_ntasks != ilu->ilu_ntasks_free)
-				break;
-			deq = 1;
-			lu->lu_ctl(lu, req->svc_cmd, &req->svc_info);
-			break;
+	td = drv_usectohz(20000);
 
-		case STMF_CMD_LPORT_OFFLINE:
-			/* Fallthrough */
-		case STMF_CMD_LPORT_ONLINE:
-			lport = (stmf_local_port_t *)req->svc_obj;
-			deq = 1;
-			lport->lport_ctl(lport, req->svc_cmd, &req->svc_info);
-			break;
+	/* Do timeouts */
+	if (stmf_state.stmf_nlus &&
+	    ((!timing_next) || (ddi_get_lbolt() >= timing_next))) {
+		if (!stmf_state.stmf_svc_ilu_timing) {
+			/* we are starting a new round */
+			stmf_state.stmf_svc_ilu_timing =
+			    stmf_state.stmf_ilulist;
+			timing_start = ddi_get_lbolt();
 		}
-		if (deq) {
-			*preq = req->svc_next;
-			kmem_free(req, req->svc_req_alloc_size);
+
+		stmf_check_ilu_timing();
+		if (!stmf_state.stmf_svc_ilu_timing) {
+			/* we finished a complete round */
+			timing_next = timing_start + drv_usectohz(5*1000*1000);
 		} else {
-			preq = &req->svc_next;
+			/* we still have some ilu items to check */
+			timing_next =
+			    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
 		}
+
+		if (stmf_state.stmf_svc_active)
+			return;
 	}
 
-	mutex_enter(&stmf_state.stmf_lock);
-	if (stmf_state.stmf_svc_active == NULL) {
-		/* Do timeouts */
-		if (stmf_state.stmf_nlus &&
-		    ((!timing_next) || (ddi_get_lbolt() >= timing_next))) {
-			if (!stmf_state.stmf_svc_ilu_timing) {
-				/* we are starting a new round */
-				stmf_state.stmf_svc_ilu_timing =
-				    stmf_state.stmf_ilulist;
-				timing_start = ddi_get_lbolt();
-			}
-			stmf_check_ilu_timing();
-			if (!stmf_state.stmf_svc_ilu_timing) {
-				/* we finished a complete round */
-				timing_next =
-				    timing_start + drv_usectohz(5*1000*1000);
-			} else {
-				/* we still have some ilu items to check */
-				timing_next =
-				    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
-			}
-			if (stmf_state.stmf_svc_active)
-				goto stmf_svc_loop;
-		}
-		/* Check if there are free tasks to clear */
-		if (stmf_state.stmf_nlus &&
-		    ((!drain_next) || (ddi_get_lbolt() >= drain_next))) {
-			if (!stmf_state.stmf_svc_ilu_draining) {
-				/* we are starting a new round */
-				stmf_state.stmf_svc_ilu_draining =
-				    stmf_state.stmf_ilulist;
-				drain_start = ddi_get_lbolt();
-			}
-			stmf_check_freetask();
-			if (!stmf_state.stmf_svc_ilu_draining) {
-				/* we finished a complete round */
-				drain_next =
-				    drain_start + drv_usectohz(10*1000*1000);
-			} else {
-				/* we still have some ilu items to check */
-				drain_next =
-				    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
-			}
-			if (stmf_state.stmf_svc_active)
-				goto stmf_svc_loop;
+	/* Check if there are free tasks to clear */
+	if (stmf_state.stmf_nlus &&
+	    ((!drain_next) || (ddi_get_lbolt() >= drain_next))) {
+		if (!stmf_state.stmf_svc_ilu_draining) {
+			/* we are starting a new round */
+			stmf_state.stmf_svc_ilu_draining =
+			    stmf_state.stmf_ilulist;
+			drain_start = ddi_get_lbolt();
 		}
 
-		/* Check if we need to run worker_mgmt */
-		if (ddi_get_lbolt() > worker_delay) {
-			stmf_worker_mgmt();
-			worker_delay = ddi_get_lbolt() +
-			    stmf_worker_mgmt_delay;
+		stmf_check_freetask();
+		if (!stmf_state.stmf_svc_ilu_draining) {
+			/* we finished a complete round */
+			drain_next =
+			    drain_start + drv_usectohz(10*1000*1000);
+		} else {
+			/* we still have some ilu items to check */
+			drain_next =
+			    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
 		}
 
-		/* Check if any active session got its 1st LUN */
-		if (stmf_state.stmf_process_initial_luns) {
-			int stmf_level = 0;
-			int port_level;
-			for (ilport = stmf_state.stmf_ilportlist; ilport;
-			    ilport = next_ilport) {
-				int ilport_lock_held;
-				next_ilport = ilport->ilport_next;
-				if ((ilport->ilport_flags &
-				    ILPORT_SS_GOT_INITIAL_LUNS) == 0) {
+		if (stmf_state.stmf_svc_active)
+			return;
+	}
+
+	/* Check if we need to run worker_mgmt */
+	if (ddi_get_lbolt() > worker_delay) {
+		stmf_worker_mgmt();
+		worker_delay = ddi_get_lbolt() +
+		    stmf_worker_mgmt_delay;
+	}
+
+	/* Check if any active session got its 1st LUN */
+	if (stmf_state.stmf_process_initial_luns) {
+		int stmf_level = 0;
+		int port_level;
+
+		for (ilport = stmf_state.stmf_ilportlist; ilport;
+		    ilport = next_ilport) {
+			int ilport_lock_held;
+			next_ilport = ilport->ilport_next;
+
+			if ((ilport->ilport_flags &
+			    ILPORT_SS_GOT_INITIAL_LUNS) == 0)
+				continue;
+
+			port_level = 0;
+			rw_enter(&ilport->ilport_lock, RW_READER);
+			ilport_lock_held = 1;
+
+			for (iss = ilport->ilport_ss_list; iss;
+			    iss = iss->iss_next) {
+				if ((iss->iss_flags &
+				    ISS_GOT_INITIAL_LUNS) == 0)
 					continue;
-				}
-				port_level = 0;
-				rw_enter(&ilport->ilport_lock, RW_READER);
-				ilport_lock_held = 1;
-				for (iss = ilport->ilport_ss_list; iss;
-				    iss = iss->iss_next) {
-					if ((iss->iss_flags &
-					    ISS_GOT_INITIAL_LUNS) == 0) {
-						continue;
-					}
-					port_level++;
-					stmf_level++;
-					atomic_and_32(&iss->iss_flags,
-					    ~ISS_GOT_INITIAL_LUNS);
-					atomic_or_32(&iss->iss_flags,
-					    ISS_EVENT_ACTIVE);
-					rw_exit(&ilport->ilport_lock);
-					ilport_lock_held = 0;
-					mutex_exit(&stmf_state.stmf_lock);
-					stmf_generate_lport_event(ilport,
-					    LPORT_EVENT_INITIAL_LUN_MAPPED,
-					    iss->iss_ss, 0);
-					atomic_and_32(&iss->iss_flags,
-					    ~ISS_EVENT_ACTIVE);
-					mutex_enter(&stmf_state.stmf_lock);
-					/*
-					 * scan all the ilports again as the
-					 * ilport list might have changed.
-					 */
-					next_ilport =
-					    stmf_state.stmf_ilportlist;
-					break;
-				}
-				if (port_level == 0) {
-					atomic_and_32(&ilport->ilport_flags,
-					    ~ILPORT_SS_GOT_INITIAL_LUNS);
-				}
-				/* drop the lock if we are holding it. */
-				if (ilport_lock_held == 1)
-					rw_exit(&ilport->ilport_lock);
 
-				/* Max 4 session at a time */
-				if (stmf_level >= 4) {
-					break;
-				}
+				port_level++;
+				stmf_level++;
+				atomic_and_32(&iss->iss_flags,
+				    ~ISS_GOT_INITIAL_LUNS);
+				atomic_or_32(&iss->iss_flags,
+				    ISS_EVENT_ACTIVE);
+				rw_exit(&ilport->ilport_lock);
+				ilport_lock_held = 0;
+				mutex_exit(&stmf_state.stmf_lock);
+				stmf_generate_lport_event(ilport,
+				    LPORT_EVENT_INITIAL_LUN_MAPPED,
+				    iss->iss_ss, 0);
+				atomic_and_32(&iss->iss_flags,
+				    ~ISS_EVENT_ACTIVE);
+				mutex_enter(&stmf_state.stmf_lock);
+				/*
+				 * scan all the ilports again as the
+				 * ilport list might have changed.
+				 */
+				next_ilport = stmf_state.stmf_ilportlist;
+				break;
 			}
-			if (stmf_level == 0) {
-				stmf_state.stmf_process_initial_luns = 0;
-			}
+
+			if (port_level == 0)
+				atomic_and_32(&ilport->ilport_flags,
+				    ~ILPORT_SS_GOT_INITIAL_LUNS);
+			/* drop the lock if we are holding it. */
+			if (ilport_lock_held == 1)
+				rw_exit(&ilport->ilport_lock);
+
+			/* Max 4 session at a time */
+			if (stmf_level >= 4)
+				break;
 		}
 
-		stmf_state.stmf_svc_flags &= ~STMF_SVC_ACTIVE;
-		(void) cv_reltimedwait(&stmf_state.stmf_cv,
-		    &stmf_state.stmf_lock, td, TR_CLOCK_TICK);
-		stmf_state.stmf_svc_flags |= STMF_SVC_ACTIVE;
+		if (stmf_level == 0)
+			stmf_state.stmf_process_initial_luns = 0;
 	}
-	goto stmf_svc_loop;
+
+	stmf_state.stmf_svc_flags &= ~STMF_SVC_ACTIVE;
+	(void) cv_reltimedwait(&stmf_state.stmf_cv,
+	    &stmf_state.stmf_lock, td, TR_CLOCK_TICK);
+	stmf_state.stmf_svc_flags |= STMF_SVC_ACTIVE;
 }
 
 void
@@ -8020,14 +8007,45 @@ stmf_svc_queue(int cmd, void *obj, stmf_state_change_info_t *info)
 		    info->st_additional_info);
 	}
 	req->svc_req_alloc_size = s;
+	req->svc_next = NULL;
 
 	mutex_enter(&stmf_state.stmf_lock);
-	req->svc_next = stmf_state.stmf_svc_active;
-	stmf_state.stmf_svc_active = req;
+	*stmf_state.stmf_svc_tailp = req;
+	stmf_state.stmf_svc_tailp = &req->svc_next;
 	if ((stmf_state.stmf_svc_flags & STMF_SVC_ACTIVE) == 0) {
 		cv_signal(&stmf_state.stmf_cv);
 	}
 	mutex_exit(&stmf_state.stmf_lock);
+}
+
+static void
+stmf_svc_kill_obj_requests(void *obj)
+{
+	stmf_svc_req_t *prev_req = NULL;
+	stmf_svc_req_t *next_req;
+	stmf_svc_req_t *req;
+
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
+
+	for (req = stmf_state.stmf_svc_active; req != NULL; req = next_req) {
+		next_req = req->svc_next;
+
+		if (req->svc_obj == obj) {
+			if (prev_req != NULL)
+				prev_req->svc_next = next_req;
+			else
+				stmf_state.stmf_svc_active = next_req;
+
+			if (next_req == NULL)
+				stmf_state.stmf_svc_tailp = (prev_req != NULL) ?
+				    &prev_req->svc_next :
+				    &stmf_state.stmf_svc_active;
+
+			kmem_free(req, req->svc_req_alloc_size);
+		} else {
+			prev_req = req;
+		}
+	}
 }
 
 void
