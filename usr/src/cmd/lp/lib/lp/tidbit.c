@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12	*/
-
 #include "errno.h"
 #include "string.h"
 #include "sys/types.h"
@@ -441,7 +438,7 @@ open_terminfo_file(terminfo, term)
 				*term;
 #endif
 {
-	char			*first_letter	= "X",
+	char			first_letter[]	= "X",
 				*path;
 
 	int			fd;
