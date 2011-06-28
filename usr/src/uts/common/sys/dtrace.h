@@ -206,6 +206,7 @@ typedef enum dtrace_probespec {
 #define	DIF_VAR_ARGS		0x0000	/* arguments array */
 #define	DIF_VAR_REGS		0x0001	/* registers array */
 #define	DIF_VAR_UREGS		0x0002	/* user registers array */
+#define	DIF_VAR_VMREGS		0x0003	/* virtual machine registers array */
 #define	DIF_VAR_CURTHREAD	0x0100	/* thread pointer */
 #define	DIF_VAR_TIMESTAMP	0x0101	/* timestamp */
 #define	DIF_VAR_VTIMESTAMP	0x0102	/* virtual timestamp */

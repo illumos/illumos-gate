@@ -1,0 +1,185 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH _fini 9E "22 Jan 2002" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+_fini, _info, _init \- loadable module configuration entry points
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/modctl.h>
+
+
+
+\fBint\fR \fB_fini\fR(void)
+.fi
+
+.LP
+.nf
+\fBint\fR \fB_info\fR(\fBstruct modinfo *\fR\fImodinfop\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB_init\fR(void)
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). These entry points are required. You must
+write them.
+.SH PARAMETERS
+.SS "_info(\|)"
+.sp
+.ne 2
+.mk
+.na
+\fB\fImodinfop\fR \fR
+.ad
+.RS 13n
+.rt  
+A pointer to an opaque \fBmodinfo\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fB_init()\fR initializes a loadable module. It is called before any other
+routine in a loadable module. \fB_init()\fR returns the value returned by
+\fBmod_install\fR(9F). The module may optionally perform some other work before
+the \fBmod_install\fR(9F) call is performed. If the module has done some setup
+before the \fBmod_install\fR(9F) function is called, then it should be prepared
+to undo that setup if \fBmod_install\fR(9F) returns an error.
+.sp
+.LP
+\fB_info()\fR returns information about a loadable module. \fB_info()\fR
+returns the value returned by \fBmod_info\fR(9F).
+.sp
+.LP
+\fB_fini()\fR prepares a loadable module for unloading. It is called when the
+system wants to unload a module. If the module determines that it can be
+unloaded, then \fB_fini()\fR returns the value returned by
+\fBmod_remove\fR(9F). Upon successful return from \fB_fini()\fR no other
+routine in the module will be called before \fB_init()\fR is called.
+.SH RETURN VALUES
+.sp
+.LP
+\fB_init()\fR should return the appropriate error number if there is an error,
+otherwise it should return the return value from \fBmod_install\fR(9F).
+.sp
+.LP
+\fB_info()\fR should return the return value from \fBmod_info\fR(9F)
+.sp
+.LP
+\fB_fini()\fR should return the return value from \fBmod_remove\fR(9F).
+\fB_fini()\fR is permitted to return \fBEBUSY\fR prior to calling
+\fBmod_remove\fR(9F) if the driver should not be unloaded. Driver global
+resources, such as mutexes and calls to \fBddi_soft_state_fini\fR(9F), should
+only be destroyed in \fB_fini()\fR after \fBmod_remove()\fR returns
+successfully.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInitializing and Freeing a Mutex
+.sp
+.LP
+The following example demonstrates how to initialize and free a
+\fBmutex\fR(9F).
+
+.sp
+.in +2
+.nf
+#include <sys/modctl.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+static struct dev_ops  drv_ops;
+/*
+ * Module linkage information for the kernel.
+ */
+static struct modldrv modldrv = {
+     &mod_driverops,     /* Type of module.  This one is a driver */
+    "Sample Driver",
+    &drv_ops       /* driver ops */
+};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        &modldrv,
+        NULL
+};
+
+
+/*
+ * Global driver mutex
+ */
+static kmutex_t   xx_global_mutex;
+
+
+int
+_init(void)
+{
+        int     i;
+
+        /*
+          * Initialize global mutex before mod_install'ing driver.
+          * If mod_install() fails, must clean up mutex initialization
+          */
+        mutex_init(&xx_global_mutex, NULL,
+                MUTEX_DRIVER, (void *)NULL);
+
+        if ((i = mod_install(&modlinkage)) != 0) {
+                mutex_destroy(&xx_global_mutex);
+        }
+
+        return (i);
+}
+ 
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&modlinkage, modinfop));
+}
+
+
+int
+_fini(void)
+{
+        int       i;
+ 
+        /*
+          * If mod_remove() is successful, we destroy our global mutex
+          */
+        if ((i = mod_remove(&modlinkage)) == 0) {
+                 mutex_destroy(&xx_global_mutex);
+        }
+        return (i);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBadd_drv\fR(1M), \fBmod_info\fR(9F), \fBmod_install\fR(9F),
+\fBmod_remove\fR(9F), \fBmutex\fR(9F), \fBmodldrv\fR(9S), \fBmodlinkage\fR(9S),
+\fBmodlstrmod\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.sp
+.LP
+Do not change the structures referred to by the \fBmodlinkage\fR structure
+after the call to \fBmod_install()\fR, as the system may copy or change them.
+.SH NOTES
+.sp
+.LP
+Even though the identifiers \fB_fini()\fR, \fB_info()\fR, and \fB_init()\fR
+appear to be declared as globals, their scope is restricted by the kernel to
+the module that they are defined in.
+.SH BUGS
+.sp
+.LP
+On some implementations \fB_info()\fR may be called before \fB_init()\fR.

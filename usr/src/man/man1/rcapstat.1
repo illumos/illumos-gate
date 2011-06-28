@@ -1,0 +1,423 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rcapstat 1 "16 Jun 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+rcapstat \- report resource cap enforcement daemon statistics
+.SH SYNOPSIS
+.LP
+.nf
+\fBrcapstat\fR [\fB-g\fR] [\fB-p | -z\fR] [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrcapstat\fR command reports on the projects or zones capped by
+\fBrcapd\fR(1M). Each report contains statistics that pertain to the project or
+zone and paging statistics. Paging refers to the act of relocating portions of
+memory, called pages, to or from physical memory. \fBrcapd\fR pages out the
+most infrequently used pages.
+.sp
+.LP
+The paging statistics in the first report issued show the activity since the
+daemon was started. Subsequent reports reflect the activity since the last
+report was issued.
+.sp
+.LP
+Reports are issued every \fIinterval\fR seconds up to the quantity specified by
+\fIcount\fR, or forever if \fIcount\fR is not specified.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 12n
+.rt  
+Global statistics. Reports the minimum memory utilization for memory cap
+enforcement (see \fBrcapadm\fR(1M)) and reports current memory utilization as a
+percentage of installed physical memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 12n
+.rt  
+Report statistics for capped projects.  This is the default if no option is
+specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fBu\fR | \fBd\fR\fR
+.ad
+.RS 12n
+.rt  
+Display a time stamp.
+.sp
+Specify \fBu\fR for a printed representation of the internal representation of
+time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
+\fBdate\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR\fR
+.ad
+.RS 12n
+.rt  
+Report statistics for capped zones.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+The following list defines the column headings in the \fBrcapstat\fR report and
+provides information about how to interpret the report.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBid\fR\fR
+.ad
+.RS 11n
+.rt  
+The project ID or zone \fBID\fR of the capped project or zone.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBproject\fR\fR
+.ad
+.RS 11n
+.rt  
+The project name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBzone\fR\fR
+.ad
+.RS 11n
+.rt  
+The zone name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnproc\fR\fR
+.ad
+.RS 11n
+.rt  
+The number of processes in the project or zone since the last report.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvm\fR\fR
+.ad
+.RS 11n
+.rt  
+The total virtual memory size of the project or zone's processes, including all
+mapped files and devices, in kilobytes (\fBK\fR), megabytes (\fBM\fR), or
+gigabytes (\fBG\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrss\fR\fR
+.ad
+.RS 11n
+.rt  
+The total resident set size (\fBRSS\fR) of the project or zone's processes, in
+kilobytes (\fBK\fR), megabytes (\fBM\fR), or gigabytes (\fBG\fR). The count
+does not account for shared pages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcap\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBRSS\fR cap for the project or zone. See \fBrcapd\fR(1M) for information
+about how to specify memory caps.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBat\fR\fR
+.ad
+.RS 11n
+.rt  
+The total amount of memory that \fBrcapd\fR attempted to page out.
+.sp
+Paging refers to the act of relocating portions of memory, called pages, to or
+from physical memory. \fBrcapd\fR pages out the most infrequently used pages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBavgat\fR\fR
+.ad
+.RS 11n
+.rt  
+The average amount of memory that \fBrcapd\fR attempted to page out during
+each sample cycle. The rate at which \fBrcapd\fR samples \fBRSS\fR can be set
+with \fBrcapadm\fR(1M).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpg\fR\fR
+.ad
+.RS 11n
+.rt  
+An estimate of the total amount of memory that \fBrcapd\fR successfully paged
+out.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBavgpg\fR\fR
+.ad
+.RS 11n
+.rt  
+An estimate of the average amount of memory that \fBrcapd\fR successfully paged
+out during each sample cycle. The rate at which \fBrcapd\fR samples process
+\fBRSS\fR sizes can be set with \fBrcapadm\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinterval\fR\fR
+.ad
+.RS 12n
+.rt  
+Specifies the reporting interval in seconds. The default interval is 5 seconds.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 12n
+.rt  
+Specifies the number of reports to produce. By default, \fBrcapstat\fR reports
+statistics until a termination signal is received or until the \fBrcapd\fR
+process exits.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBrcapstat\fR to Report Cap and Project Information
+.sp
+.LP
+Caps are defined for two projects associated with two users. \fBuser1\fR has a
+cap of 50 megabytes and \fBuser2\fR has a cap of 10 megabytes.
+
+.sp
+.LP
+The following command produces five reports at 5-second sampling intervals.
+
+.sp
+.in +2
+.nf
+example# \fBrcapstat 5 5\fR
+    id project  nproc     vm    rss   cap    at avgat    pg avgpg
+112270   user1     24   123M    35M   50M   50M    0K 3312K    0K
+ 78194   user2      1  2368K  1856K   10M    0K    0K    0K    0K
+    id project  nproc     vm    rss   cap    at avgat    pg avgpg
+112270   user1     24   123M    35M   50M    0K    0K    0K    0K
+ 78194   user2      1  2368K  1856K   10M    0K    0K    0K    0K
+    id project  nproc     vm    rss   cap    at avgat    pg avgpg
+112270   user1     24   123M    35M   50M    0K    0K    0K    0K
+ 78194   user2      1  2368K  1928K   10M    0K    0K    0K    0K
+    id project  nproc     vm    rss   cap    at avgat    pg avgpg
+112270   user1     24   123M    35M   50M    0K    0K    0K    0K
+ 78194   user2      1  2368K  1928K   10M    0K    0K    0K    0K
+    id project  nproc     vm    rss   cap    at avgat    pg avgpg
+112270   user1     24   123M    35M   50M    0K    0K    0K    0K
+ 78194   user2      1  2368K  1928K   10M    0K    0K    0K    0K 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The first three lines of output constitute the first report, which contains the
+cap and project information for the two projects and paging statistics since
+\fBrcapd\fR was started. The \fBat\fR and \fBpg\fR columns are a number greater
+than zero for \fBuser1\fR and zero for \fBuser2\fR, which indicates that at
+some time in the daemon's history, \fBuser1\fR exceeded its cap but \fBuser2\fR
+did not.
+
+.sp
+.LP
+The subsequent reports show no significant activity.
+
+.LP
+\fBExample 2 \fRUsing \fBrcapstat\fR to Monitor the RSS of a Project
+.sp
+.in +2
+.nf
+example% \fBrcapstat 5 5\fR
+    id project  nproc    vm   rss   cap    at avgat     pg  avgpg
+376565   user1     57  209M   46M   10M  440M  220M  5528K  2764K
+376565   user1     57  209M   44M   10M  394M  131M  4912K  1637K
+376565   user1     56  207M   43M   10M  440M  147M  6048K  2016K
+376565   user1     56  207M   42M   10M  522M  174M  4368K  1456K
+376565   user1     56  207M   44M   10M  482M  161M  3376K  1125K
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The project \fBuser1\fR has an \fBRSS\fR in excess of its physical memory cap.
+The nonzero values in the \fBpg\fR column indicate that \fBrcapd\fR is
+consistently paging out memory as it attempts to meet the cap by lowering the
+physical memory utilization of the project's processes. However, \fBrcapd\fR is
+unsuccessful, as indicated by the varying \fBrss\fR values that do not show a
+corresponding decrease. This means that the application's resident memory is
+being actively used, forcing \fBrcapd\fR to affect the working set. Under this
+condition, the system continues to experience high page fault rates, and
+associated I/O, until the working set size (\fBWSS\fR) is reduced, the cap is
+raised, or the application changes its memory access pattern. Notice that a
+page fault occurs when either a new page must be created, or the system must
+copy in a page from the swap device.
+
+.LP
+\fBExample 3 \fRDetermining the Working Set Size of a Project
+.sp
+.LP
+This example is a continuation of \fBExample 1\fR, and it uses the same
+project.
+
+.sp
+.in +2
+.nf
+example% \fBrcapstat 5 5\fR
+    id project  nproc    vm   rss   cap    at avgat     pg  avgpg
+376565   user1     56  207M   44M   10M  381M  191M    15M  7924K
+376565   user1     56  207M   46M   10M  479M  160M  2696K   898K
+376565   user1     56  207M   46M   10M  424M  141M  7280K  2426K
+376565   user1     56  207M   43M   10M  401M  201M  4808K  2404K
+376565   user1     56  207M   43M   10M  456M  152M  4800K  1600K
+376565   user1     56  207M   44M   10M  486M  162M  4064K  1354K
+376565   user1     56  207M   52M  100M  191M   95M  1944K   972K
+376565   user1     56  207M   55M  100M    0K    0K     0K     0K
+376565   user1     56  207M   56M  100M    0K    0K     0K     0K
+376565   user1     56  207M   56M  100M    0K    0K     0K     0K
+376565   user1     56  207M   56M  100M    0K    0K     0K     0K
+376565   user1     56  207M   56M  100M    0K    0K     0K     0K
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+By inhibiting cap enforcement, either by raising the cap of a project or by
+changing the minimum physical  memory utilization for cap enforcement (see
+\fBrcapadm\fR(1M)), the resident set can become the working set. The \fBrss\fR
+column might stabilize to show the project \fBWSS\fR, as shown in the previous
+example. The \fBWSS\fR is the minimum cap value that allows the project's
+processes to operate without perpetually incurring page faults.
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid command-line options were specified.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrcapadm\fR(1M), \fBrcapd\fR(1M), \fBattributes\fR(5)
+.sp
+.LP
+\fIPhysical Memory Control Using the Resource Capping Daemon\fR in \fISystem
+Administration Guide: Resource Management\fR
+.SH NOTES
+.sp
+.LP
+If the interval specified to \fBrcapstat\fR is shorter than the reporting
+interval specified to \fBrcapd\fR (with \fBrcapadm\fR(1M)), the output for some
+intervals can be zero. This is because \fBrcapd\fR does not update statistics
+more frequently than the interval specified with \fBrcapadm\fR, and this
+interval is independent of (and less precise than) the sampling interval used
+by \fBrcapstat\fR.

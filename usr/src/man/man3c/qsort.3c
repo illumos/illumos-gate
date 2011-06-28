@@ -1,0 +1,122 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qsort 3C "6 Dec 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+qsort \- quick sort
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBvoid\fR \fBqsort\fR(\fBvoid *\fR\fIbase\fR, \fBsize_t\fR \fInel\fR, \fBsize_t\fR \fIwidth\fR,
+     \fBint (*\fR\fIcompar\fR)(const void *, const void *));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqsort()\fR function is an implementation of the quick-sort algorithm. It
+sorts a table of data in place. The contents of the table are sorted in
+ascending order according to the  user-supplied comparison function.
+.sp
+.LP
+The \fIbase\fR argument points to the element at the base of the table.  The
+\fInel\fR argument is the number of elements in the table.  The \fIwidth\fR
+argument specifies the size of each element in bytes.  The \fIcompar\fR
+argument is the name of the comparison function, which is called with two
+arguments that point to the elements being compared.
+.sp
+.LP
+The function must return an integer less than, equal to, or greater than zero
+to indicate if the first argument is to be considered less than, equal to, or
+greater than the second argument.
+.sp
+.LP
+The contents of the table are sorted in ascending order according to the user
+supplied comparison function.
+.SH USAGE
+.sp
+.LP
+The \fBqsort()\fR function safely allows concurrent access by  multiple threads
+to disjoint data, such as overlapping subtrees or tables.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRProgram sorts.
+.sp
+.LP
+The following program sorts a simple array:
+
+.sp
+.in +2
+.nf
+#include <stdlib.h>
+#include <stdio.h>
+
+static int
+intcompare(const void *p1, const void *p2)
+{
+    int i = *((int *)p1);
+    int j = *((int *)p2);
+
+    if (i > j)
+        return (1);
+    if (i < j)
+        return (-1);
+    return (0);
+}
+
+int
+main()
+{
+    int i;
+    int a[10] = { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 };
+    size_t nelems = sizeof (a) / sizeof (int);
+
+    qsort((void *)a, nelems, sizeof (int), intcompare);
+
+    for (i = 0; i < nelems; i++) {
+        (void) printf("%d ", a[i]);
+    }
+
+    (void) printf("\en");
+    return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsort\fR(1), \fBbsearch\fR(3C), \fBlsearch\fR(3C), \fBstring\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The comparison function need not compare every byte, so arbitrary data may be
+contained in the elements in addition to the values being compared.
+.sp
+.LP
+The relative order in the output of two items that compare as equal is
+unpredictable.

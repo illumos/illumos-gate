@@ -1,0 +1,50 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\"  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_get_pid 9F "18 Feb 1998" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_get_pid \- returns the process \fBID\fR
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBpid_t\fR \fBddi_get_pid\fR(\fBvoid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_get_pid()\fR obtains the process \fBID\fR of the current process. This
+value can be used to allow only a select process to perform a certain
+operation. It can also be used to determine whether a device context belongs to
+the current process.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_get_pid()\fR returns the process \fBID\fR.
+.SH CONTEXT
+.sp
+.LP
+ This routine can be called from user context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBdrv_getparm\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+ \fISTREAMS Programming Guide\fR

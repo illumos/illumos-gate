@@ -1,0 +1,199 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pam_chauthtok 3PAM "1 Mar 2005" "SunOS 5.11" "PAM Library Functions"
+.SH NAME
+pam_chauthtok \- perform password related functions within the PAM framework
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lpam\fR [ \fIlibrary\fR ... ]
+#include <security/pam_appl.h>
+
+\fBint\fR \fBpam_chauthtok\fR(\fBpam_handle_t *\fR\fIpamh\fR, \fBconst int\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_chauthtok()\fR function is called to change the authentication token
+associated with a particular user referenced by the authentication handle
+\fIpamh\fR.
+.sp
+.LP
+The following flag may be passed in to \fBpam_chauthtok()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should not generate any messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_CHANGE_EXPIRED_AUTHTOK\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should only update those passwords that have aged. If this
+flag is not passed, all password services should update their passwords.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_NO_AUTHTOK_CHECK\fR\fR
+.ad
+.RS 30n
+.rt  
+The password service should not perform conformance checks on the password
+entered.
+.RE
+
+.sp
+.LP
+Upon successful completion of the call, the authentication token of the user
+will be changed in accordance with the password service configured in the
+system through \fBpam.conf\fR(4).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBPAM_SUCCESS\fR is returned. In addition to the
+error return values described in \fBpam\fR(3PAM), the following values may be
+returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_PERM_DENIED\fR\fR
+.ad
+.RS 29n
+.rt  
+No permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_ERR\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication token manipulation error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_RECOVERY_ERR\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication information cannot be recovered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_LOCK_BUSY\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication token lock busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_AUTHTOK_DISABLE_AGING\fR\fR
+.ad
+.RS 29n
+.rt  
+Authentication token aging disabled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 29n
+.rt  
+User unknown to password service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPAM_TRY_AGAIN\fR\fR
+.ad
+.RS 29n
+.rt  
+Preliminary check by password service failed.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability Stable
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlogin\fR(1), \fBpasswd\fR(1), \fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM),
+\fBpam_start\fR(3PAM), \fBattributes\fR
+.SH NOTES
+.sp
+.LP
+The flag \fBPAM_CHANGE_EXPIRED_AUTHTOK\fR is typically used by a \fBlogin\fR
+application which has determined that the user's password has aged or expired.
+Before allowing the user to login, the \fBlogin\fR application may invoke
+\fBpam_chauthtok()\fR with this flag to allow the user to update the password.
+Typically, applications such as \fBpasswd\fR(1) should not use this flag.
+.sp
+.LP
+The \fBpam_chauthtok()\fR functions performs a preliminary check before
+attempting to update passwords. This check is performed for each password
+module in the stack as listed in \fBpam.conf\fR(4). The check may include
+pinging remote name services to determine if they are available. If
+\fBpam_chauthtok()\fR returns \fBPAM_TRY_AGAIN\fR, then the check has failed,
+and passwords are not updated.
+.sp
+.LP
+The flag \fBPAM_NO_AUTHTOK_CHECK\fR is typically used by programs that allow an
+administrator to bypass various password conformance checks when setting a
+password for a user.
+.sp
+.LP
+The interfaces in \fBlibpam\fR are MT-Safe only if each thread within the
+multithreaded application uses its own \fBPAM\fR handle.

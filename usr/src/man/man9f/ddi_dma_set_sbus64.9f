@@ -1,0 +1,129 @@
+'\" te
+.\" Copyright (c) 1997, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_set_sbus64 9F "1 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_set_sbus64 \- allow 64-bit transfers on SBus
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBddi_dma_set_sbus64\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBuint_t\fR \fIburstsizes\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 15n
+.rt  
+The handle filled in by a call to \fBddi_dma_alloc_handle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIburstsizes\fR \fR
+.ad
+.RS 15n
+.rt  
+The possible burst sizes the device's \fBDMA\fR engine can accept in 64-bit
+mode.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBddi_dma_set_sbus64()\fR informs the system that the device wishes to perform
+64-bit data transfers on the SBus. The driver must first allocate a  \fBDMA\fR
+handle using  \fBddi_dma_alloc_handle\fR(9F) with a \fBddi_dma_attr\fR(9S)
+structure describing the  \fBDMA\fR attributes for a 32-bit transfer mode.
+.sp
+.LP
+\fIburstsizes\fR describes the possible burst sizes the device's  \fBDMA\fR
+engine can accept in 64-bit mode. It may be  distinct from the burst sizes for
+32-bit mode set in the  \fBddi_dma_attr\fR(9S) structure. The system will
+activate 64-bit SBus transfers if the SBus supports them. Otherwise, the SBus
+will operate in 32-bit mode.
+.sp
+.LP
+After  \fBDMA\fR resources have been allocated (see
+\fBddi_dma_addr_bind_handle\fR(9F) or  \fBddi_dma_buf_bind_handle\fR(9F)), the
+driver should retrieve the available burst sizes by calling
+\fBddi_dma_burstsizes\fR(9F). This function will return the burst sizes  in
+64-bit mode if the system was able to  activate 64-bit transfers.  Otherwise
+burst sizes will be  returned in 32-bit mode.
+.SH RETURN VALUES
+.sp
+.LP
+\fBddi_dma_set_sbus64()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR \fR
+.ad
+.RS 16n
+.rt  
+Successfully set the SBus to 64-bit mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR \fR
+.ad
+.RS 16n
+.rt  
+64-bit mode could not be set.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBddi_dma_set_sbus64()\fR can be called from user, kernel, or interrupt
+context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+ArchitectureSBus
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_dma_addr_bind_handle\fR(9F),
+\fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
+\fBddi_dma_burstsizes\fR(9F), \fBddi_dma_attr\fR(9S)
+.SH NOTES
+.sp
+.LP
+64-bit SBus mode is activated on a per SBus slot basis. If there are multiple
+SBus cards in one slot, they all must operate in 64-bit mode or they all must
+operate in 32-bit mode.

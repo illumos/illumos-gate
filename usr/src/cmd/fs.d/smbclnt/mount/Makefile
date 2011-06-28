@@ -43,7 +43,7 @@ $(ROOTLIBFSTYPE)/mount := FILEMODE= 04555
 CFLAGS += $(CCVERBOSE)
 C99MODE= $(C99_ENABLE)
 
-LDLIBS += -lsmbfs -lscf
+LDLIBS += -lsmbfs
 
 CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/lib/libsmbfs 
 

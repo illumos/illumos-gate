@@ -1,0 +1,170 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH in_wchnstr 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+in_wchnstr, in_wchstr, mvin_wchnstr, mvin_wchstr, mvwin_wchnstr, mvwin_wchstr,
+win_wchnstr, win_wchstr \- retrieve complex character string (with rendition)
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+#include <curses.h>
+
+\fBint\fR \fBin_wchnstr\fR(\fBcchar_t *\fR\fIwchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBin_wchstr\fR(\fBcchar_t *\fR\fIwchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvin_wchnstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBcchar_t *\fR\fIwchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvin_wchstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBcchar_t *\fR\fIwchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwin_wchnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBcchar_t *\fR\fIwchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwin_wchstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBcchar_t *\fR\fIwchstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwin_wchnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBcchar_t *\fR\fIwchstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwin_wchstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBcchar_t *\fR\fIwchstr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBin_wchstr()\fR and \fBwin_wchstr()\fR functions retrieve a complex
+character string (with rendition) starting at the current cursor position of
+the \fBstdscr\fR window and window \fIwin\fR, respectively, and ending at  the
+right margin. The \fBmvin_wchstr()\fR and \fBmvwin_wchstr()\fR functions
+retrieve a complex character string located at the position indicated by the
+\fIx\fR  (column) and \fIy\fR (row) parameters (the former in the \fBstdscr\fR
+window; the latter in window \fIwin\fR).
+.sp
+.LP
+The \fBin_wchnstr()\fR, \fBwin_wchnstr()\fR, \fBmvin_wchnstr()\fR, and
+\fBmvwin_wchnstr()\fR functions retrieve at most \fIn\fR characters from the
+window \fBstdscr\fR and \fIwin\fR, respectively. The former two functions
+retrieve the string, starting at the current cursor  position; the latter two
+commands retrieve the string, starting at the position  specified by the
+\fIx\fR and \fIy\fR parameters.
+.sp
+.LP
+The retrieved character string (with renditions) is stored in the object
+pointed to by \fIwcval\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwchstr\fR\fR
+.ad
+.RS 10n
+.rt  
+Is a pointer to an object where the retrieved complex character string can be
+stored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the number of characters not to exceed when retrieving \fIwchstr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the y (row) coordinate of the starting position of the string to be
+retrieved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 10n
+.rt  
+Is the x (column) coordinate of the starting position of the string to be
+retrieved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 10n
+.rt  
+Is a pointer to the window in which the string is to be retrieved.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+On success, these functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBin_wch\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

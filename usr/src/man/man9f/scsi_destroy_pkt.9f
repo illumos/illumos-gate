@@ -1,0 +1,62 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_destroy_pkt 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_destroy_pkt \- free an allocated SCSI packet and its DMA resource
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBvoid\fR \fBscsi_destroy_pkt\fR(\fBstruct scsi_pkt *\fR\fIpktp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpktp\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_destroy_pkt()\fR function releases all necessary resources,
+typically at the end of an I/O transfer. The data is synchronized to memory,
+then the \fBDMA\fR resources are deallocated and \fIpktp\fR is freed.
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_destroy_pkt()\fR function may be called from user, interrupt, or
+kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRReleasing resources
+.sp
+.in +2
+.nf
+scsi_destroy_pkt(un->un_rqs);
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_destroy_pkt\fR(9E), \fBscsi_init_pkt\fR(9F), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

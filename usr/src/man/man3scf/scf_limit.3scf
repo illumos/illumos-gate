@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_limit 3SCF "17 Aug 2004" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_limit \- limit information for Service Configuration Facility
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBssize_t\fR \fBscf_limit\fR(\fBuint32_t\fR \fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscf_limit()\fR function returns information about implementation-defined
+limits in the service configuration facility. These limits are generally
+maximum lengths for various strings. The values returned do not change during
+the execution of a program, but they should not be cached between executions.
+.sp
+.LP
+The available values for \fIname\fR are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_LIMIT_MAX_FMRI_LENGTH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the maximum length of an FMRI the service configuration facility
+accepts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_LIMIT_MAX_PG_TYPE_LENGTH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the maximum length for property group types in the service configuration
+facility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_LIMIT_MAX_NAME_LENGTH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the maximum length for names in the service configuration facility. This
+value does not include space for the required terminating null byte.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_LIMIT_MAX_VALUE_LENGTH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the maximum string length a scf_value_t can hold, not including the
+terminating null byte.
+.RE
+
+.sp
+.LP
+Lengths do not include space for the required terminating null byte.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_limit()\fR returns the requested value.
+Otherwise, it returns -1.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_limit()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIname\fR argument is not a recognized request.
+.RE
+
+.sp
+.LP
+The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBattributes\fR(5)

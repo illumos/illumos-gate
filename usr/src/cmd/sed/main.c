@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2011 Gary Mills
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992 Diomidis Spinellis.
  * Copyright (c) 1992, 1993
@@ -141,7 +142,7 @@ main(int argc, char *argv[])
 			break;
 		case 'e':
 			eflag = 1;
-			if (asprintf(&temp_arg, "%s\n", optarg) <= 1)
+			if (asprintf(&temp_arg, "%s\n", optarg) < 1)
 				err(1, "asprintf");
 			add_compunit(CU_STRING, temp_arg);
 			break;

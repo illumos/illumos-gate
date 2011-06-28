@@ -1,0 +1,658 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH confstr 3C "15 Dec 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+confstr \- get configurable variables
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBsize_t\fR \fBconfstr\fR(\fBint\fR \fIname\fR, \fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBconfstr()\fR function provides a method for applications to get
+configuration-defined string values.  Its use and purpose are similar to the
+\fBsysconf\fR(3C) function, but it is used where string values rather than
+numeric values are returned.
+.sp
+.LP
+The \fIname\fR argument represents the system variable to be queried.
+.sp
+.LP
+If \fIlen\fR is not \fB0\fR, and if \fIname\fR has a configuration-defined
+value, \fBconfstr()\fR copies that value into the  \fIlen\fR-byte buffer
+pointed to by \fIbuf\fR. If the string to be returned is longer than \fIlen\fR
+bytes, including the terminating null, then \fBconfstr()\fR truncates the
+string to  \fIlen\fR\(mi1 bytes and null-terminates the result. The application
+can detect that the string was truncated by comparing the value returned by
+\fBconfstr()\fR with \fIlen\fR.
+.sp
+.LP
+If \fIlen\fR is \fB0\fR, \fBconfstr()\fR still returns the integer value as
+defined below, but does not return the string.
+.sp
+.LP
+The \fBconfstr()\fR function supports the following values for \fIname\fR,
+defined in \fB<unistd.h>\fR, for both SPARC and x86:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS64_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of initial options to be given to the \fBcc\fR and \fBc89\fR utilities to build
+an application using the Large File Summit transitional compilation environment
+(see \fBlfcompile64\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS64_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of final options to be given to the \fBcc\fR and \fBc89\fR utilities to build
+an application using the Large File Summit transitional compilation environment
+(see \fBlfcompile64\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS64_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of libraries to be given to the \fBcc\fR and \fBc89\fR utilities to build an
+application using the Large File Summit transitional compilation environment
+(see \fBlfcompile64\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS64_LINTFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of options to be given to the \fBlint\fR utility to check application source
+using the Large File Summit transitional compilation environment (see
+\fBlfcompile64\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of initial options to be given to the \fBcc\fR and \fBc89\fR utilities to build
+an application using the Large File Summit large file compilation environment
+for 32-bit applications (see \fBlfcompile\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of final options to be given to the \fBcc\fR and \fBc89\fR utilities to build
+an application using the Large File Summit large file compilation environment
+for 32-bit applications (see \fBlfcompile\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of libraries to be given to the \fBcc\fR and \fBc89\fR utilities to build an
+application using the Large File Summit large file compilation environment for
+32-bit applications (see \fBlfcompile\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_LFS_LINTFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
+of options to be given to the \fBlint\fR utility to check application source
+using the Large File Summit large file compilation environment for 32-bit
+applications (see \fBlfcompile\fR(5)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_PATH\fR\fR
+.ad
+.sp .6
+.RS 4n
+If the ISO POSIX.2 standard is supported, this is the value for the \fBPATH\fR
+environment variable that finds all standard utilities.  Otherwise the meaning
+of this value is unspecified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_ILP32_OFF32_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_ILP32_OFF32\fR) returns -1, the meaning of this
+value is unspecified.  Otherwise, this value is the set of initial options to
+be given to the \fBc99\fR utility to build an application using a programming
+model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_ILP32_OFF32_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_ILP32_OFF32\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of final options to be
+given to the \fBc99\fR utility to build an application using a programming
+model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_ILP32_OFF32_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_ILP32_OFF32\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of libraries to be given
+to the \fBc99\fR utility to build an application using a programming model with
+32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+ If \fBsysconf\fR(\fB_SC_V6_ILP32_OFFBIG\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of initial options to be
+given to the \fBc99\fR utility to build an application using a programming
+model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types, and an
+\fBoff_t\fR type using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_ILP32_OFFBIG\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of final options to be
+given to the \fBc99\fR utility to build an application using a programming
+model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types, and an
+\fBoff_t\fR type using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_ILP32_OFFBIG_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_ILP32_OFFBIG\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of libraries to be given
+to the \fBc99\fR utility to build an application using a programming model with
+32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types, and an \fBoff_t\fR type
+using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_LP64_OFF64_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_LP64_OFF64\fR) returns -1, the meaning of this value
+is unspecified. Otherwise, this value is the set of initial options to be given
+to the \fBc99\fR utility to build an application using a programming model with
+64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_LP64_OFF64_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_LP64_OFF64\fR) returns -1, the meaning of this value
+is unspecified. Otherwise, this value is the set of final options to be given
+to the \fBc99\fR utility to build an application using a programming model with
+64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_LP64_OFF64_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_LP64_OFF64\fR) returns -1, the meaning of this value
+is unspecified. Otherwise, this value is the set of libraries to be given to
+the \fBc99\fR utility to build an application using a programming model with
+64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_LPBIG_OFFBIG\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of initial options to be
+given to the \fBc99\fR utility to build an application using a programming
+model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
+\fBpointer\fR, and \fBoff_t\fR types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_LPBIG_OFFBIG\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of final options to be
+given to the \fBc99\fR utility to build an application using a programming
+model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
+\fBpointer\fR, and \fBoff_t\fR types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_LPBIG_OFFBIG_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf\fR(\fB_SC_V6_LPBIG_OFFBIG\fR) returns -1, the meaning of this
+value is unspecified. Otherwise, this value is the set of libraries to be given
+to the \fBc99\fR utility to build an application using a programming model with
+an \fBint\fR type using at least 32 bits and \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS\fR\fR
+.ad
+.sp .6
+.RS 4n
+This value is a <newline>-separated list of names of programming environments
+supported  by the implementation in which the widths of the \fBblksize_t\fR,
+\fBcc_t\fR, \fBmode_t\fR, \fBnfds_t\fR, \fBpid_t\fR, \fBptrdiff_t\fR,
+\fBsize_t\fR, \fBspeed_t\fR, \fBssize_t\fR, \fBsuseconds_t\fR, \fBtcflag_t\fR,
+\fBuseconds_t\fR, \fBwchar_t\fR, and \fBwint_t\fR types are no greater than the
+width of type \fBlong\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFF32_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFF32)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of initial options to be
+given to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFF32_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFF32)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of final options to be given
+to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFF32_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFF32)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of libraries to be given to
+the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFF32_LINTFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFF32)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of options to be given to the
+\fBlint\fR utility to check application source using a programming model with
+32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFFBIG_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of initial options to be
+given to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types,
+and an \fBoff_t\fR type using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFFBIG_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(SC_XBS5_ILP32_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of final options to be given
+to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types,
+and an \fBoff_t\fR type using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFFBIG_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of libraries to be given to
+the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types,
+and an \fBoff_t\fR type using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_ILP32_OFFBIG_LINTFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_ILP32_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of options to be given to the
+\fBlint\fR utility to check an application using a programming model with
+32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types, and an \fBoff_t\fR type
+using at least 64 bits.
+.RE
+
+.sp
+.LP
+The \fBconfstr()\fR function supports the following values for \fIname\fR,
+defined in \fB<unistd.h>\fR, for SPARC only:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LP64_OFF64_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LP64_OFF64)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of initial options to be
+given to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LP64_OFF64_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LP64_OFF64)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of final options to be given
+to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LP64_OFF64_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LP64_OFF64)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of libraries to be given to
+the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with 64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LP64_OFF64_LINTFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LP64_OFF64)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of options to be given to the
+\fBlint\fR utility to check application source using a programming model with
+64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LPBIG_OFFBIG_CFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LPBIG_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of initial options to be
+given to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
+\fBpointer\fR, and \fBoff_t\fR types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LPBIG_OFFBIG_LDFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LPBIG_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of final options to be given
+to the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
+\fBpointer\fR, and \fBoff_t\fR types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LPBIG_OFFBIG_LIBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LPBIG_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of libraries to be given to
+the \fBcc\fR and \fBc89\fR utilities to build an application using a
+programming model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
+\fBpointer\fR, and \fBoff_t\fR types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_CS_XBS5_LPBIG_OFFBIG_LINTFLAGS\fR\fR
+.ad
+.sp .6
+.RS 4n
+If \fBsysconf(_SC_XBS5_LPBIG_OFFBIG)\fR returns \(mi1 the meaning of this value
+is unspecified.  Otherwise, this value is the set of options to be given to the
+\fBlint\fR utility to check application source using a programming model with
+an \fBint\fR type using at least 32 bits and \fBlong\fR, \fBpointer\fR, and
+\fBoff_t\fR types using at least 64 bits.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+If \fIname\fR has a configuration-defined value, the \fBconfstr()\fR function
+returns the size of buffer that would be needed to hold the entire
+configuration-defined value.  If this return value is greater than \fIlen\fR,
+the string returned in \fIbuf\fR is truncated.
+.sp
+.LP
+If \fIname\fR is invalid, \fBconfstr()\fR returns \fB0\fR and sets  \fBerrno\fR
+to indicate the error.
+.sp
+.LP
+If \fIname\fR does not have a configuration-defined value, \fBconfstr()\fR
+returns  \fB0\fR and leaves \fBerrno\fR unchanged.
+.SH ERRORS
+.sp
+.LP
+The \fBconfstr()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIname\fR argument is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMt-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpathconf\fR(2), \fBsysconf\fR(3C), \fBattributes\fR(5), \fBlfcompile\fR(5),
+\fBlfcompile64\fR(5), \fBstandards\fR(5)

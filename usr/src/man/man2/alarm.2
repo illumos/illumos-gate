@@ -1,0 +1,76 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH alarm 2 "6 Jun 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+alarm \- schedule an alarm signal
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBunsigned int\fR \fBalarm\fR(\fBunsigned int\fR \fIseconds\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBalarm()\fR function causes the system to generate a \fBSIGALRM\fR signal
+for the process after the number of real-time seconds specified by seconds
+have  elapsed (see  \fBsignal.h\fR(3HEAD)). Processor scheduling delays may
+prevent the process from handling the signal as soon as it is generated.
+.sp
+.LP
+If \fIseconds\fR is 0, a pending alarm request, if any, is cancelled. If
+\fIseconds\fR is greater than \fBLONG_MAX\fR/\fIhz\fR, \fIseconds\fR is rounded
+down to \fBLONG_MAX\fR/\fIhz\fR. The value of \fIhz\fR is normally 100.
+.sp
+.LP
+Alarm requests are not stacked; only one \fBSIGALRM\fR  generation can  be
+scheduled in this manner; if the \fBSIGALRM\fR signal has not yet been
+generated, the call will result in rescheduling the time at which the
+\fBSIGALRM\fR signal will be generated.
+.sp
+.LP
+The \fBfork\fR(2) function clears pending alarms in the child process. A new
+process image created by one of the \fBexec\fR(2) functions inherits the time
+left to an alarm signal in the old process's image.
+.SH RETURN VALUES
+.sp
+.LP
+If there is a previous alarm request with time  remaining, \fBalarm()\fR
+returns  a  non-zero  value  that  is the number of seconds until the previous
+request would  have  generated  a \fBSIGALRM\fR signal.  Otherwise,
+\fBalarm()\fR returns 0.
+.SH ERRORS
+.sp
+.LP
+The \fBalarm()\fR function is always successful; no return value is reserved to
+indicate an error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBfork\fR(2), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)

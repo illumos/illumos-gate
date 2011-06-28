@@ -1,0 +1,319 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_handle_create 3SCF "17 Aug 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_handle_create, scf_handle_destroy, scf_handle_decorate, scf_handle_bind,
+scf_handle_unbind, scf_myname \- Service Configuration Facility handle
+functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBscf_handle_t *\fR\fBscf_handle_create\fR(\fBscf_version_t\fR \fIversion\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscf_handle_destroy\fR(\fBscf_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_handle_decorate\fR(\fBscf_handle_t *\fR\fIhandle\fR, \fBconst char *\fR\fIparam\fR,
+     \fBscf_value_t *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_handle_bind\fR(\fBscf_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscf_handle_unbind\fR(\fBscf_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBscf_myname\fR(\fBscf_handle_t *\fR\fIhandle\fR, \fBchar *\fR\fIout\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscf_handle_create()\fR function creates a new Service Configuration
+Facility handle that is used as the base for all communication with the
+configuration repository. The version argument must be \fBSCF_VERSION\fR.
+.sp
+.LP
+The \fBscf_handle_decorate()\fR function sets a single connection-level
+parameter, \fIparam\fR, to the supplied value. If \fIvalue\fR is
+\fBSCF_DECORATE_CLEAR\fR, \fIparam\fR is reset to its default state. Values
+passed to \fBscf_handle_decorate()\fR can be reset, reused, or destroyed. The
+values set do not take effect until \fBscf_handle_bind()\fR is called. Any
+invalid values will not cause errors prior to the call to
+\fBscf_handle_bind()\fR. The only available decorations is:
+.sp
+.ne 2
+.mk
+.na
+\fBdebug\fR
+.ad
+.RS 9n
+.rt  
+(count) Set the debugging flags.
+.RE
+
+.sp
+.LP
+The \fBscf_handle_bind()\fR function binds the handle to a running
+\fBsvc.configd\fR(1M) daemon, using the current decorations to modify the
+connection. All states derived from the handle are reset immediately after a
+successful binding.
+.sp
+.LP
+The \fBscf_handle_unbind()\fR function severs an existing repository connection
+or clears the in-client state for a broken connection.
+.sp
+.LP
+The \fBscf_handle_destroy()\fR function destroys and frees an SCF handle. It is
+illegal to use the handle after calling \fBscf_handle_destroy()\fR. Actions on
+subordinate objects act as if the handle is unbound.
+.sp
+.LP
+The \fBscf_myname()\fR function retrieves the FMRI for the service of which the
+connecting process is a part. If the full FMRI does not fit in the provided
+buffer, it is truncated and, if \fIsz\fR > 0, zero-terminated.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_handle_create()\fR returns the new handle.
+Otherwise, it returns \fINULL\fR.
+.sp
+.LP
+Upon successful completion, \fBscf_handle_decorate()\fR,
+\fBscf_handle_bind()\fR, and \fBscf_handle_unbind()\fR return 0. Otherwise,
+they return -1.
+.sp
+.LP
+The \fBscf_myname()\fR function returns the length of the full FMRI. Otherwise,
+it returns -1.
+.SH ERRORS
+.sp
+.LP
+The \fBscf_handle_create()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_MEMORY\fR\fR
+.ad
+.RS 30n
+.rt  
+There is no memory available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_VERSION_MISMATCH\fR\fR
+.ad
+.RS 30n
+.rt  
+The version is invalid, or the application was compiled against a version of
+the library that is more recent than the one on the system.
+.RE
+
+.sp
+.LP
+The \fBscf_handle_decorate()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIparam\fR argument is not a recognized parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIvalue\fR argument does not match the expected type for param.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIvalue\fR argument is not set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_IN_USE\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle is currently bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
+.ad
+.RS 30n
+.rt  
+The \fIvalue\fR argument is not derived from \fIhandle\fR.
+.RE
+
+.sp
+.LP
+The \fBscf_handle_bind()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
+.ad
+.RS 30n
+.rt  
+One of the decorations was invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_SERVER\fR\fR
+.ad
+.RS 30n
+.rt  
+The repository server is not running.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
+.ad
+.RS 30n
+.rt  
+The server does not have adequate resources for a new connection.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_IN_USE\fR\fR
+.ad
+.RS 30n
+.rt  
+The handle is already bound.
+.RE
+
+.sp
+.LP
+The \fBscf_handle_unbind()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.RS 23n
+.rt  
+The handle is not bound.
+.RE
+
+.sp
+.LP
+The \fBscf_handle_myname()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
+.ad
+.sp .6
+.RS 4n
+The connection to the repository was lost.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_BOUND\fR\fR
+.ad
+.sp .6
+.RS 4n
+The handle is not bound.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCF_ERROR_NOT_SET\fR\fR
+.ad
+.sp .6
+.RS 4n
+This process is not marked as a SMF service.
+.RE
+
+.sp
+.LP
+The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSee below.
+.TE
+
+.sp
+.LP
+Operations on a single handle (and the objects associated with it) are Safe.
+Operations on different handles are MT-Safe. Objects associated with different
+handles cannot be mixed, as this will lead to an
+\fBSCF_ERROR_HANDLE_MISMATCH\fR error.
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBattributes\fR(5)

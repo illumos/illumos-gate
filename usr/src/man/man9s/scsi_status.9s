@@ -1,0 +1,190 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.
+.\" , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_status 9S "30 Aug 1995" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+scsi_status \- SCSI status structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSCSI-2\fRstandard defines a status byte that is normally sent by the
+target to the initiator during the status phase at the completion of each
+command.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+uchar  sts_scsi2    :1;       /* SCSI-2 modifier bit */
+uchar  sts_is       :1;       /* intermediate status sent */
+uchar  sts_busy     :1;       /* device busy or reserved */
+uchar  sts_cm       :1;       /* condition met */
+ucha   sts_chk      :1;       /* check condition */
+.fi
+.in -2
+
+.sp
+.LP
+\fBsts_chk\fR indicates that a contingent allegiance condition has occurred.
+.sp
+.LP
+\fBsts_cm\fR is returned whenever the requested operation is satisfied
+.sp
+.LP
+\fBsts_busy\fR indicates that the target is busy. This status is returned
+whenever a target is unable to accept a command from an otherwise acceptable
+initiator (that is, no reservation conflicts). The recommended initiator
+recovery action is to issue the command again later.
+.sp
+.LP
+\fBsts_is\fR is returned for every successfully completed command in a series
+of linked commands (except the last command), unless the command is terminated
+with a check condition status, reservation conflict, or command terminated
+status. Note that host bus adapter drivers may not support linked commands (see
+\fBscsi_ifsetcap\fR(9F)). If \fBsts_is\fR and \fBsts_busy\fR are both set, then
+a reservation conflict has occurred.
+.sp
+.LP
+\fBsts_scsi2\fR is the \fBSCSI-2 \fRmodifier bit. If \fBsts_scsi2\fR and
+\fBsts_chk\fR are both set, this indicates a command terminated status. If
+\fBsts_scsi2\fR and \fBsts_busy\fR are both set, this indicates that the
+command queue in the target is full.
+.sp
+.LP
+For accessing the status as a byte, the following values are appropriate:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_GOOD\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status indicates that the target has successfully completed the command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_CHECK\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status indicates that a contingent allegiance condition has occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_MET\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status is returned when the requested operations are satisfied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_BUSY\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status indicates that the target is busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_INTERMEDIATE\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status is returned for every successfully completed command in a series of
+linked commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_SCSI2\fR \fR
+.ad
+.sp .6
+.RS 4n
+This is the \fBSCSI-2 \fRmodifier bit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_INTERMEDIATE_MET\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status is a combination of \fBSTATUS_MET\fR and \fBSTATUS_INTERMEDIATE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_RESERVATION_CONFLICT\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status is a combination of \fBSTATUS_INTERMEDIATE\fR and
+\fBSTATUS_BUSY\fR, and it is returned whenever an initiator attempts to access
+a logical unit or an extent within a logical unit is reserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_TERMINATED\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status is a combination of \fBSTATUS_SCSI2\fR and \fBSTATUS_CHECK,\fR and
+it is returned whenever the target terminates the current \fBI/O\fR process
+after receiving a terminate \fBI/O\fR process message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTATUS_QFULL\fR \fR
+.ad
+.sp .6
+.RS 4n
+This status is a combination of \fBSTATUS_SCSI2\fR and \fBSTATUS_BUSY\fR, and
+it is returned when the command queue in the target is full.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F),
+\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

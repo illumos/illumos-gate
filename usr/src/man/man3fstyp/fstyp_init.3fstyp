@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fstyp_init 3FSTYP "20 Jun 2006" "SunOS 5.11" "File System Type Identification Library Functions"
+.SH NAME
+fstyp_init, fstyp_fini \- initialize and finalize libfstyp handle
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lfstyp\fR \fB -lnvpair \fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <libnvpair.h>
+#include <libfstyp.h>
+
+\fBint\fR \fBfstyp_init\fR(\fBint\fR \fIfd\fR, \fBoff64_t **\fR\fIoffset\fR, \fBchar *\fR\fImodule_dir\fR,
+     \fBfstyp_handle_t *\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfstyp_fini\fR(\fBvoid *\fR\fIhandle\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfd\fR\fR
+.ad
+.RS 14n
+.rt  
+Open file descriptor of a block or a raw device that contains the file system
+to be identified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoffset\fR\fR
+.ad
+.RS 14n
+.rt  
+Offset from the beginning of the device where the file system is located.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImodule_dir\fR\fR
+.ad
+.RS 14n
+.rt  
+Optional location of the \fBlibfstyp\fR modules.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 14n
+.rt  
+Opaque handle to be used with \fBlibfstyp\fR functions.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfstyp_init()\fR function returns a \fIhandle\fR associated with the
+specified parameters. This \fIhandle\fR should be used with all other
+\fBlibfstyp\fR functions.
+.sp
+.LP
+If \fImodule_dir\fR is \fINULL\fR, \fBfstyp_init()\fR looks for modules in the
+default location: \fB/usr/lib/fs\fR subdirectories. The \fBfstyp_init()\fR
+function locates \fBlibfstyp\fR modules, but might defer loading the modules
+until the subsequent \fBfstyp_ident()\fR call.
+.sp
+.LP
+If \fImodule_dir\fR is other than \fINULL\fR, the \fBfstyp_init()\fR function
+locates a module in the directory that is specified. If no module is found,
+\fBfstyp_init\fR fails with \fBFSTYP_ERR_MOD_NOT_FOUND\fR.
+.sp
+.LP
+Modules that do not support non-zero offset can fail \fBfstyp_init()\fR with
+\fBFSTYP_ERR_OFFSET\fR.
+.sp
+.LP
+The \fBfstyp_fini()\fR function releases all resources associated with a handle
+and invalidates the handle.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBfstyp_init()\fR function returns \fB0\fR on success and an error value
+on failure. See \fBfstyp_strerror\fR(3FSTYP).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfstyp_ident\fR(3FSTYP), \fBfstyp_mod_init\fR(3FSTYP),
+\fBfstyp_strerror\fR(3FSTYP), \fBlibfstyp\fR(3LIB), \fBattributes\fR(5)

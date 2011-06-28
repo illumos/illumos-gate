@@ -1,0 +1,142 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH testb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+testb \- check for an available buffer
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBtestb\fR(\fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 8n
+.rt  
+Size of the requested buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpri\fR\fR
+.ad
+.RS 8n
+.rt  
+Priority of the allocb request.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtestb()\fR function checks to see if an \fBallocb\fR(9F) call is likely
+to succeed if a buffer of \fBsize\fR bytes at priority \fIpri\fR is requested.
+Even if \fBtestb()\fR returns successfully, the call to \fBallocb\fR(9F) can
+fail. The \fIpri\fR argument is no longer used, but is retained for
+compatibility.
+.SH RETURN VALUES
+.sp
+.LP
+Returns \fB1\fR if a buffer of the requested size is available, and \fB0\fR if
+one is not.
+.SH CONTEXT
+.sp
+.LP
+The \fBtestb()\fR function can be called user, interrupt, or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fR\fBtestb()\fR example
+.sp
+.LP
+In a service routine, if \fBcopymsg\fR(9F) fails (line 6), the message is put
+back on the queue (line 7) and a routine, \fBtryagain\fR, is scheduled to be
+run in one tenth of a second. Then the service routine returns.
+
+.sp
+.LP
+When the \fBtimeout\fR(9F) function runs, if there is no message on the front
+of the queue, it just returns. Otherwise, for each message block in the first
+message, check to see if an allocation would succeed.  If the number of message
+blocks equals the number we can allocate, then enable the service procedure.
+Otherwise, reschedule \fBtryagain\fR to run again in another tenth of a second.
+Note that \fBtryagain\fR is merely an approximation. Its accounting may be
+faulty. Consider the case of a message comprised of two 1024-byte message
+blocks. If there is only one free 1024-byte message block and no free 2048-byte
+message blocks, then \fBtestb()\fR will still succeed twice. If no message
+blocks are freed of these sizes before the service procedure runs again, then
+the \fBcopymsg\fR(9F) will still fail. The reason \fBtestb()\fR is used here is
+because it is significantly faster than calling \fBcopymsg\fR. We must minimize
+the amount of time spent in a \fBtimeout()\fR routine.
+
+.sp
+.in +2
+.nf
+\fB1  xxxsrv(q)
+ 2      queue_t *q;
+ 3  {
+ 4	mblk_t *mp;
+ 5	mblk_t *nmp;
+        . . .
+ 6	if ((nmp = copymsg(mp)) == NULL) {
+ 7		putbq(q, mp);
+ 8		timeout(tryagain, (intptr_t)q, drv_usectohz(100000));
+ 9		return;
+10	}
+	. . .
+11  }
+12
+13  tryagain(q)
+14      queue_t *q;
+15  {
+16	register int can_alloc = 0;
+17	register int num_blks = 0;
+18	register mblk_t *mp;
+19
+20	if (!q->q_first)
+21		return;
+22	for (mp = q->q_first; mp; mp = mp->b_cont) {
+23		num_blks++;
+24		can_alloc += testb((mp->b_datap->db_lim -
+25		    mp->b_datap->db_base), BPRI_MED);
+26	}
+27	if (num_blks == can_alloc)
+28		qenable(q);
+29	else
+30		timeout(tryagain, (intptr_t)q, drv_usectohz(100000));
+31  }\fR
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBallocb\fR(9F), \fBbufcall\fR(9F), \fBcopymsg\fR(9F), \fBtimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+The \fIpri\fR argument is provided for compatibility only. Its value is
+ignored.

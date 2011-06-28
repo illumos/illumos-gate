@@ -1,0 +1,88 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH deroff 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.SH NAME
+deroff \- remove nroff/troff, tbl, and eqn constructs
+.SH SYNOPSIS
+.LP
+.nf
+\fBderoff\fR [\fB-m\fR [m | s | l]] [\fB-w\fR] [\fB-i\fR] [\fIfilename\fR...]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBderoff\fR reads each of the \fIfilenames\fR in sequence and removes all
+\fBtroff\fR(1) requests, macro calls, backslash constructs, \fBeqn\fR(1)
+constructs (between \fB\&.EQ\fR and \fB\fR\fB\&.EN\fR\fB \fR lines, and between
+delimiters), and \fBtbl\fR(1) descriptions, perhaps replacing them with white
+space (blanks and blank lines), and writes the remainder of the file on the
+standard output. \fBderoff\fR follows chains of included files (\fB\&.so\fR and
+\fB\&.nx\fR \fBtroff\fR commands); if a file has already been included, a
+\fB\&.so\fR naming that file is ignored and a \fB\&.nx\fR naming that file
+terminates execution. If no input file is given, \fBderoff\fR reads the
+standard input.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+The \fB-m\fR option may be followed by an \fBm\fR, \fBs\fR, or \fBl\fR. The
+\fB-mm\fR option causes the macros to be interpreted so that only running text
+is output (that is, no text from macro lines.)  The \fB-ml\fR option forces the
+\fB-mm\fR option and also causes deletion of lists associated with the \fBmm\fR
+macros.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 6n
+.rt  
+If the \fB-w\fR option is given, the output is a word list, one ``word'' per
+line, with all other characters deleted. Otherwise, the output follows the
+original, with the deletions mentioned above. In text, a ``word'' is any string
+that \fIcontains\fR at least two letters and is composed of letters, digits,
+ampersands (\fB&\fR), and apostrophes (\fB\&'\fR); in a macro call, however, a
+``word'' is a string that \fIbegins\fR with at least two letters and contains a
+total of at least three letters. Delimiters are any characters other than
+letters, digits, apostrophes, and ampersands. Trailing apostrophes and
+ampersands are removed from ``words.''
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+The  \fB-i\fR option causes  \fBderoff\fR to ignore  \fB\&.so\fR and
+\fB\&.nx\fR commands.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBeqn\fR(1), \fBnroff\fR(1), \fBtbl\fR(1), \fBtroff\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBderoff\fR is not a complete \fBtroff\fR interpreter, so it can be confused
+by subtle constructs. Most such errors result in too much rather than too
+little output.
+.sp
+.LP
+The \fB-ml\fR option does not handle nested lists correctly.

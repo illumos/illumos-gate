@@ -1,0 +1,98 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceEnumerateDomains 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceEnumerateDomains \- enumerate recommended domains
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceErrorType\fR \fIDNSServiceEnumerateDomains\fR(\fBDNSServiceRef\fR *\fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR,
+     \fBDNSServiceDomainEnumReply\fR \fIcallBack\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fIvoid\fR(*\fBDNSServiceDomainEnumReply\fR)(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint31_t\fR \fIinterfaceIndex\fR,
+     \fBDNSServiceErrorType\fR \fIerrorCode\fR, \fBconst char\fR *\fIreplyDomain\fR,
+     \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBDNSServiceEnumerateDomains()\fR function allows applications to
+determine recommended browsing and registration domains for performing service
+discovery \fBDNS\fR queries. The \fIcallback\fR argument points to a function
+to be called to return results or if the asynchronous call to
+\fBDNSServiceEnumerateDomains()\fR fails. The callback function should point to
+a function of type \fBDNSServiceDomainEnumReply\fR listed above.
+.sp
+.LP
+A pointer to an uninitialized \fBDNSServiceRef\fR, \fIsdRef\fR must be passed
+to \fBDNSServiceEnumerateDomains()\fR. If the call succeeds, \fIsdRef\fR is
+initialized and \fBkDNSServiceErr_NoError\fR is returned. The enumeration call
+runs indefinitely until the client terminates the call. The enumeration call
+must be terminated by passing the \fBDNSServiceRef\fR initialized by the
+enumeration call to \fBDNSServiceRefDeallocate()\fR when no more domains are to
+be found.
+.sp
+.LP
+The value of flags is constructed by a bitwise-inclusive-OR of the \fIflags\fR
+used in \fBDNSService\fR functions and defined in \fB<dns_sd.h>\fR\&. Possible
+values for \fIflags\fR to the \fBDNSServiceEnumerateDomains()\fR call are:
+\fBkDNSServiceFlagsBrowseDomains\fR and
+\fBkDNSServiceFlagsRegistrationDomains\fR. The
+\fBkDNSServiceFlagsBrowseDomains\fR value is passed to enumerate domains
+recommended for browsing. The \fBkDNSServiceFlagsRegistrationDomains\fR value
+is passed to enumerate domains recommended for registration. Possible values of
+flags returned in the callback function are: \fBkDNSServiceFlagsMoreComing\fR,
+\fBkDNSServiceFlagsAdd\fR, and \fBkDNSServiceFlagsDefault\fR.
+.sp
+.LP
+The \fIinterfaceIndex\fR parameter to the enumeration call specifies the
+interface index searched for domains. Most applications pass \fB0\fR to
+enumerate domains on all interfaces. See the section "Constants for specifying
+an interface index" in \fB<dns_sd.h>\fR for more details. The context parameter
+can be \fINULL\fR and is passed to the enumeration callback function. The
+\fIinterfaceIndex\fR value passed to the callback specifies the interface on
+which the domain exists.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBDNSServiceEnumerateDomains()\fR function returns
+\fBkDNSServiceErr_NoError\fR on success. Otherwise, the function returns an
+error code defined in \fB<dns_sd.h>\fR\&. The callback is not invoked on error
+and the \fIDNSServiceRef\fR that is passed is not initialized. Upon a
+successful call to \fBDNSServiceEnumerateDomains()\fR, subsequent asynchronous
+errors are delivered to the callback.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceRefDeallocate\fR(3DNS_SD), \fBattributes\fR(5)

@@ -46,6 +46,9 @@ dir path=lib/svc/manifest/network group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/lib
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man7d
 driver name=heci perms="* 0644 root sys" \
     alias=pci8086,2974 \
     alias=pci8086,2984 \
@@ -60,6 +63,8 @@ file path=kernel/drv/heci group=sys
 file path=lib/svc/manifest/network/lms.xml group=sys mode=0444
 file path=lib/svc/method/svc-lms mode=0555
 file path=usr/lib/lms mode=0555
+file path=usr/share/man/man1m/lms.1m
+file path=usr/share/man/man7d/heci.7d
 legacy pkg=SUNWamt \
     desc="Solaris support for Intel Active Management Technology" \
     name="Solaris support for Intel AMT"

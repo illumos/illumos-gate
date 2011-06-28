@@ -1,0 +1,52 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_ev_get_type 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_ev_get_type \- get event name string from event cookie
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_ev_get_type\fR(\fIldi_ev_cookie_t cookie\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIldi_ev_cookie_t cookie\fR\fR
+.ad
+.sp .6
+.RS 4n
+An opaque event cookie for the event type returned by a previous call to
+\fBldi_ev_get_cookie\fR(9F).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_ev_get_type()\fR function returns the event string represented by
+the \fBLDI\fR event cookie "\fBcookie\fR".
+.SH RETURN VALUES
+.sp
+.LP
+On success, this function returns the event string represented by
+"\fBcookie\fR". On failure, this function returns \fBNULL\fR.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user and kernel contexts only.
+.SH SEE ALSO
+.sp
+.LP
+\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
+\fBldi_ev_remove_callbacks\fR(9F)

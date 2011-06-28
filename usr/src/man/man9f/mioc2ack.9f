@@ -1,0 +1,97 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mioc2ack 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+mioc2ack \- Convert an M_IOCTL message to an M_IOCACK message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBvoid\fR \fBmioc2ack\fR(\fBmblk_t *\fR\fImp\fR, \fBmblk_t *\fR\fIdp\fR, \fBsize_t\fR \fIcount\fR, \fBint\fR \fIrval\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 9n
+.rt  
+M_IOCTL message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdp\fR\fR
+.ad
+.RS 9n
+.rt  
+Payload to associate with M_IOCACK message.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 9n
+.rt  
+Value to set the ioc_count of the \fBiocblk\fR(9S) to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrval\fR\fR
+.ad
+.RS 9n
+.rt  
+Value to set the ioc_rval of the  \fBiocblk\fR(9S) to.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmioc2ack()\fR function converts an M_IOCTL message into an M_IOCACK
+message using the supplied arguments.
+.sp
+.LP
+To convert the message, \fBmioc2ack()\fR changes the message type to M_IOCACK,
+sets the \fBioc_count\fR and \fBioc_rval\fR members of the \fBiocblk\fR(9S)
+associated with \fImp\fR to the passed-in values, and clears the
+\fBioc_error\fR field. Further, it frees any message blocks chained off of
+\fBmp->b_cont\fR and resets \fBmp->b_cont\fR to \fIdp\fR. Finally, if \fIdp\fR
+is not NULL, \fBmioc2ack()\fR resets \fBdp->b_wptr\fR to be \fBdp->b_rptr +
+count\fR (that is, it sets \fIdp\fR to be exactly \fIcount\fR bytes in length).
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBmiocack\fR(9F), \fBmiocnak\fR(9F), \fBiocblk\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

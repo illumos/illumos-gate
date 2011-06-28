@@ -1,0 +1,400 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setfacl 1 "19 Dec 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+setfacl \- modify the Access Control List (ACL) for a file or files
+.SH SYNOPSIS
+.LP
+.nf
+\fBsetfacl\fR [\fB-r\fR] \fB-s\fR \fIacl_entries\fR \fIfile\fR
+.fi
+
+.LP
+.nf
+\fBsetfacl\fR [\fB-r\fR] \fB-md\fR \fIacl_entries\fR \fIfile\fR
+.fi
+
+.LP
+.nf
+\fBsetfacl\fR [\fB-r\fR] \fB-f\fR \fIacl_file\fR \fIfile\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For each file specified, \fBsetfacl\fR either replaces its entire \fBACL\fR,
+including the default \fBACL\fR on a directory, or it adds, modifies, or
+deletes one or more \fBACL\fR entries, including default entries on
+directories.
+.sp
+.LP
+When the \fBsetfacl\fR command is used, it can result in changes to the file
+permission bits. When the user \fBACL\fR entry for the file owner is changed,
+the file owner class permission bits are modified. When the group \fBACL\fR
+entry for the file group class is changed, the file group class permission bits
+are modified. When the other \fBACL\fR entry is changed, the file other class
+permission bits are modified.
+.sp
+.LP
+If you use the \fBchmod\fR(1) command to change the file group owner
+permissions on a file with \fBACL\fR entries, both the file group owner
+permissions and the \fBACL\fR mask are changed to the new permissions. Be aware
+that the new \fBACL\fR mask permissions can change the effective permissions
+for additional users and groups who have \fBACL\fR entries on the file.
+.sp
+.LP
+A directory can contain default \fBACL\fR entries. If a file or directory is
+created in a directory that contains default \fBACL\fR entries, the newly
+created file has permissions generated according to the intersection of the
+default \fBACL\fR entries and the permissions requested at creation time. The
+\fBumask\fR(1) are not applied if the directory contains default \fBACL\fR
+entries. If a default \fBACL\fR is specified for a specific user (or users),
+the file has a regular \fBACL\fR created. Otherwise, only the mode bits are
+initialized according to the intersection described above. The default
+\fBACL\fR should be thought of as the maximum discretionary access permissions
+that can be granted.
+.sp
+.LP
+Use the \fBsetfacl\fR command to set ACLs on files in a UFS file system, which
+supports POSIX-draft ACLS (or \fBaclent_t\fR style ACLs). Use the \fBchmod\fR
+command to set ACLs on files in a ZFS file system, which supports NFSv4-style
+ACLS (or \fBace_t\fR style ACLs).
+.SS "\fIacl_entries\fR Syntax"
+.sp
+.LP
+For the \fB-m\fR and \fB-s\fR options, \fIacl_entries\fR are one or more
+comma-separated \fBACL\fR entries.
+.sp
+.LP
+An \fBACL\fR entry consists of the following fields separated by colons:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIentry_type\fR\fR
+.ad
+.RS 14n
+.rt  
+Type of \fBACL\fR entry on which to set file permissions. For example,
+\fIentry_type\fR can be \fBuser\fR (the owner of a file) or \fBmask\fR (the
+\fBACL\fR mask).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuid\fR or \fIgid\fR\fR
+.ad
+.RS 14n
+.rt  
+User name or user identification number. Or, group name or group identification
+number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIperms\fR\fR
+.ad
+.RS 14n
+.rt  
+Represents the permissions that are set on \fIentry_type\fR. \fIperms\fR can be
+indicated by the symbolic characters \fBrwx\fR or a number (the same
+permissions numbers used with the \fBchmod\fR command).
+.RE
+
+.sp
+.LP
+The following table shows the valid \fBACL\fR entries (default entries can only
+be specified for directories):
+.sp
+
+.sp
+.TS
+tab();
+cw(2i) cw(3.5i) 
+lw(2i) lw(3.5i) 
+.
+\fBACL\fR EntryDescription
+_
+u[ser]::\fIperms\fR File owner permissions.
+g[roup]::\fIperms\fR File group owner permissions.
+o[ther]:\fIperms\fR T{
+Permissions for users other than the file owner or members of file group owner.
+T}
+m[ask]:\fIperms\fR T{
+The \fBACL\fR mask. The mask entry indicates the maximum permissions allowed for users (other than the owner) and for groups. The mask is a quick way to change permissions on all the users and groups.
+T}
+u[ser]:\fIuid:perms\fRT{
+Permissions for a specific user. For \fIuid\fR, you can specify either a user name or a numeric UID.
+T}
+g[roup]:\fIgid:perms\fRT{
+Permissions for a specific group. For \fIgid\fR, you can specify either a group name or a numeric GID.
+T}
+d[efault]:u[ser]::\fIperms\fR Default file owner permissions.
+d[efault]:g[roup]::\fIperms\fR Default file group owner permissions.
+d[efault]:o[ther]:\fIperms\fR T{
+Default permissions for users other than the file owner or members of the file group owner.
+T}
+d[efault]:m[ask]:\fIperms\fR Default \fBACL\fR mask.
+d[efault]:u[ser]:\fIuid\fR:\fIperms\fRT{
+Default permissions for a specific user. For \fIuid\fR, you can specify either a user name or a numeric UID.
+T}
+d[efault]:g[roup]:\fIgid\fR:\fIperms\fRT{
+Default permissions for a specific group. For \fIgid\fR, you can specify either a group name or a numeric GID.
+T}
+.TE
+
+.sp
+.LP
+For the \fB-d\fR option, \fIacl_entries\fR are one or more comma-separated
+\fBACL\fR entries without permissions. Notice that the entries for file owner,
+file group owner, \fBACL\fR mask, and others can not be deleted.
+.SH OPTIONS
+.sp
+.LP
+The options have the following meaning:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIacl_entries\fR\fR
+.ad
+.RS 18n
+.rt  
+Deletes one or more entries from the file. The entries for the file owner, the
+file group owner, and others can not be deleted from the \fBACL\fR. Notice that
+deleting an entry does not necessarily have the same effect as removing all
+permissions from the entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIacl_file\fR\fR
+.ad
+.RS 18n
+.rt  
+Sets a file's \fBACL\fR with the \fBACL\fR entries contained in the file named
+\fIacl_file\fR. The same constraints on specified entries hold as with the
+\fB-s\fR option. The entries are not required to be in any specific order in
+the file. Also, if you specify a dash (\fB-\fR) for \fIacl_file\fR, standard
+input is used to set the file's \fBACL\fR.
+.sp
+The character \fB#\fR in \fIacl_file\fR can be used to indicate a comment. All
+characters, starting with the \fB#\fR until the end of the line, are ignored.
+Notice that if the \fIacl_file\fR has been created as the output of the
+\fBgetfacl\fR(1) command, any effective permissions, which follow a \fB#\fR,
+are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fIacl_entries\fR\fR
+.ad
+.RS 18n
+.rt  
+Adds one or more new \fBACL\fR entries to the file, and/or modifies one or more
+existing \fBACL\fR entries on the file. If an entry already exists for a
+specified \fIuid\fR or \fIgid\fR, the specified permissions replace the current
+permissions. If an entry does not exist for the specified \fIuid\fR or
+\fIgid\fR, an entry is created. When using the \fB-m\fR option to modify a
+default \fBACL\fR, you must specify a complete default \fBACL\fR (user, group,
+other, mask, and any additional entries) the first time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 18n
+.rt  
+Recalculates the permissions for the \fBACL\fR mask entry. The permissions
+specified in the \fBACL\fR mask entry are ignored and replaced by the maximum
+permissions necessary to grant the access to all additional user, file group
+owner, and additional group entries in the \fBACL\fR. The permissions in the
+additional user, file group owner, and additional group entries are left
+unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIacl_entries\fR\fR
+.ad
+.RS 18n
+.rt  
+Sets a file's \fBACL\fR. All old \fBACL\fR entries are removed and replaced
+with the newly specified \fBACL\fR. The entries need not be in any specific
+order. They are sorted by the command before being applied to the file.
+.sp
+Required entries:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBuser\fR entry specified for the file owner.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBgroup\fR entry for the file group owner.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBother\fR entry specified.
+.RE
+If there are additional user and group entries:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBmask\fR entry specified for the \fBACL\fR mask that indicates
+the maximum permissions allowed for users (other than the owner) and groups.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Must not be duplicate \fBuser\fR entries with the same \fIuid\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Must not be duplicate \fBgroup\fR entries with the same \fIgid\fR.
+.RE
+If \fIfile\fR is a directory, the following default \fBACL\fR entries can be
+specified:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBdefault user\fR entry for the file owner.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBdefault group\fR entry for the file group owner.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBdefault mask\fR entry for the \fBACL\fR mask.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Exactly one \fBdefault other\fR entry.
+.RE
+There can be additional \fBdefault user\fR entries and additional \fBdefault
+group\fR entries specified, but there can not be duplicate additional
+\fBdefault user\fR entries with the same \fIuid\fR, or duplicate \fBdefault
+group\fR entries with the same \fIgid\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAdding read permission only
+.sp
+.LP
+The following example adds one \fBACL\fR entry to file \fBabc\fR, which gives
+user \fBshea\fR read permission only.
+
+.sp
+.in +2
+.nf
+\fBsetfacl -m user:shea:r\(mi\(mi abc\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRReplacing a file's entire \fBACL\fR
+.sp
+.LP
+The following example replaces the entire \fBACL\fR for the file \fBabc\fR,
+which gives \fBshea\fR read access, the file owner all access, the file group
+owner read access only, the \fBACL\fR mask read access only, and others no
+access.
+
+.sp
+.in +2
+.nf
+\fBsetfacl -s user:shea:rwx,user::rwx,group::rw-,mask:r--,other:--- abc\fR 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Notice that after this command, the file permission bits are \fBrwxr-----\fR.
+Even though the file group owner was set with read/write permissions, the
+\fBACL\fR mask entry limits it to have only read permission. The mask entry
+also specifies the maximum permissions available to all additional user and
+group \fBACL\fR entries. Once again, even though the user \fBshea\fR was set
+with all access, the mask limits it to have only read permission. The \fBACL\fR
+mask entry is a quick way to limit or open access to all the user and group
+entries in an \fBACL\fR. For example, by changing the mask entry to read/write,
+both the file group owner and user \fBshea\fR would be given read/write access.
+
+.LP
+\fBExample 3 \fRSetting the same \fBACL\fR on two files
+.sp
+.LP
+The following example sets the same \fBACL\fR on file \fBabc\fR as the file
+\fBxyz\fR.
+
+.sp
+.in +2
+.nf
+\fBgetfacl xyz | setfacl -f \(mi abc\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 15n
+.rt  
+password file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.RS 15n
+.rt  
+group file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBgetfacl\fR(1), \fBumask\fR(1), \fBaclcheck\fR(3SEC),
+\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5)

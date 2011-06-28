@@ -1,0 +1,161 @@
+'\" te
+.\"  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH td_ta_enable_stats 3C_DB "20 Oct 1998" "SunOS 5.11" "Threads Debugging Library Functions"
+.SH NAME
+td_ta_enable_stats, td_ta_reset_stats, td_ta_get_stats \- collect target
+process statistics for libc_db
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
+#include <proc_service.h>
+#include <thread_db.h>
+
+\fBtd_err_e\fR \fBtd_ta_enable_stats\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBint\fR\fI on_off\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e_stats\fR \fBtd_ta_reset\fR(\fBconst td_thragent_t *\fR\fIta_p\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_get_stats\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_ta_stats_t *\fR\fItstats\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The controlling process can request the collection of certain statistics about
+a target process.  Statistics gathering is disabled by default. Each target
+process has a \fBtd_ta_stats_t\fR structure that contains current values when
+statistic gathering is enabled.
+.sp
+.LP
+The \fBtd_ta_enable_stats()\fR function turns statistics gathering on or off
+for the process identified by \fIta_p\fR, depending on whether or not
+\fIon_off\fR is non-zero. When statistics gathering is turned on, all
+statistics are implicitly reset as though \fBtd_ta_reset_stats()\fR had been
+called.  Statistics are not reset when statistics gathering  is turned off.
+Except for \fBnthreads\fR \fBand\fR \fBr_concurrency\fR, the values do not
+change further, but they remain available for inspection by way of
+\fBtd_ta_get_stats()\fR.
+.sp
+.LP
+The \fBtd_ta_reset_stats()\fR function resets all counters in the
+\fBtd_ta_stats_t\fR structure to zero for the target process.
+.sp
+.LP
+The \fBtd_ta_get_stats()\fR function returns the structure for the process in
+\fItstats\fR.
+.sp
+.LP
+The \fBtd_ta_stats_t\fR structure is defined in <\fBthread_db.h\fR> and
+contains the following members:
+.sp
+.in +2
+.nf
+typedef struct { 
+   int nthreads;            /* total number of threads in use */
+   int r_concurrency;       /* requested concurrency level */
+   int nrunnable_num;       /* numerator of avg runnable threads */
+   int nrunnable_den;       /* denominator of avg runnable threads */
+   int a_concurrency_num;   /* numerator, avg achieved concurrency */
+   int a_concurrency_den;   /* denominator, avg achieved concurrency */
+   int nlwps_num;           /* numerator, avg number of LWPs in use */
+   int nlwps_den;           /* denominator, avg number of LWPs in use */
+   int nidle_num;           /* numerator, avg number of idling LWPs */
+   int nidle_den;           /* denominator, avg number of idling LWPs */
+} td_ta_stats_t;\fI\fR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBnthreads\fR member is the number of threads that are currently part of
+the target process.  The \fBr_concurrency\fR member is the current requested
+concurrency level, such as would be returned by \fBthr_setconcurrency\fR(3C).
+The remaining members are averages over time, each expressed as  a fraction
+with an integral numerator and denominator. The \fBnrunnable_num\fR and
+\fBnrunnable_den\fR members represent the average number of runnable threads.
+The \fBa_concurrency_num\fR and \fBa_concurrency_den\fR members represent the
+average achieved concurrency, the number of actually running threads.  The
+\fBa_concurrency_num\fR and \fBa_concurrency_den\fR members are less than or
+equal to \fBnrunnable_num\fR and \fBnrunnable_den\fR, respectively. The
+\fBnlwps_num\fR and \fBnlwps_den\fR members represent the average number of
+lightweight processes  (\fBLWP\fRs) participating in this process. They must be
+greater than or equal to \fBa_concurrency_num\fR and \fBa_concurrency_den\fR,
+respectively, since every running thread is assigned to an  \fBLWP\fR, but
+there can at times be additional idling \fBLWP\fRs with no thread assigned to
+them. The \fBnidle_num\fR and \fBnidle_den\fR members represent the average
+number of idle \fBLWP\fRs.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_OK\fR \fR
+.ad
+.RS 13n
+.rt  
+The call completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_BADTA\fR \fR
+.ad
+.RS 13n
+.rt  
+An invalid internal process handle was passed in.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_DBERR\fR \fR
+.ad
+.RS 13n
+.rt  
+A call to one of the imported interface routines failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_ERR\fR \fR
+.ad
+.RS 13n
+.rt  
+Something else went wrong.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBthr_getconcurrency\fR(3C), \fBattributes\fR(5)

@@ -1,0 +1,464 @@
+'\" te
+.\" Copyright (c) 1980 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.TH lpr 1B "2 Jun 2006" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+lpr \- submit print requests
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/lpr\fR [\fB-P\fR \fIdestination\fR] [\fB-#\fR \fInumber\fR] [\fB-C\fR \fIclass\fR] 
+     [\fB-J\fR \fIjob\fR] [\fB-T\fR \fItitle\fR] [\fB-i\fR [\fIindent\fR]] 
+     [\fB-1\fR | \fB-2\fR | \fB-3\fR | \fB-4\fR \fIfont\fR] [\fB-w\fR \fIcols\fR] [\fB-m\fR] [\fB-h\fR] [\fB-s\fR] 
+     [\fB-filter_option\fR] [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlpr\fR utility submits print requests to a destination. \fBlpr\fR prints
+files (\fIfile\fR) and associated information, collectively called a \fIprint
+request\fR. If \fIfile\fR is not specified, \fBlpr\fR assumes the standard
+input.
+.sp
+.LP
+The print client commands locate destination information using the "printers"
+database in the name service switch. See \fBnsswitch.conf\fR(4),
+\fBprinters\fR(4), and \fBprinters.conf\fR(4) for details.
+.sp
+.LP
+Print requests with more than 52 \fIfile\fRs specified is truncated to 52 files
+when the BSD print protocol is used for job submission.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR \fIclass\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints \fIclass\fR as the job classification on the banner page of the output.
+Enclose \fIclass\fR in double quotes if it contains blanks. If \fIclass\fR is
+not specified, the name of the system (as returned by \fBhostname\fR) is
+printed as the job classification. See \fBhostname\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suppresses printing of the banner page of the output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIindent\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indents the output a specific number of \fISPACE\fR characters. Use
+\fIindent\fR to indicate the number of \fISPACE\fR characters to be indented.
+Specify \fIindent\fR as a positive integer. If the optional argument to indent
+is not specified, then eight \fISPACE\fR characters is the default. The
+\fB-i\fR option is ignored unless it is specified with the \fB-p\fR filter
+option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-J\fR \fIjob\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints \fIjob\fR as the \fIjob name\fR on the banner page of the output.
+Enclose \fIjob\fR in double quotes if it contains blanks. If \fIjob\fR is not
+specified, \fIfile\fR (or in the case of multiple files, the first \fIfile\fR
+specified on the command line) is printed as the job name on the banner page of
+the output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sends mail after \fIfile\fR has printed. See \fBmail\fR(1). By default, no mail
+is sent upon normal completion of a print request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR \fIdestination\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints \fIfile\fR on a specific printer or class of printers (see
+\fBlpadmin\fR(1M)). Specify \fIdestination\fR using atomic, URI-style
+(\fIscheme\fR\fB://\fR\fBendpoint\fR), or POSIX-style
+(\fIserver\fR\fB:\fR\fIdestination\fR) names. See \fBprinters.conf\fR(4) for
+information regarding destination names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints files by reference rather than copying them. This means that files
+should not be modified or removed until they have completed printing. This
+option only prevents copying of files when the print queue is on the local
+machine and the files are specified on the command line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fItitle\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints a title on the page header of the output. Enclose \fItitle\fR in double
+quotes if it contains blanks. The \fB-T\fR option is ignored unless it is
+specified with the \fB-p\fR filter option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fIcols\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints \fIfile\fR with pages of a specific width. \fIcols\fR indicates the
+number of columns wide. The \fB-w\fR option is ignored unless it is specified
+with the \fB-p\fR filter option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\(mi\fB1\fR|\(mi\fB2\fR|\(mi\fB3\fR|\(mi\fB4\fR \fIfont\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mounts the specified font in the font position \fB1\fR, \fB2\fR, \fB3\fR, or
+\fB4\fR. Specify \fIfont\fR as a valid font name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR \fIfilter_option\fR\fR
+.ad
+.sp .6
+.RS 4n
+Notifies the print spooler that \fIfile\fR is not a standard text file. Enables
+the spooling daemon to use the appropriate filters to print \fIfile\fR.
+.sp
+\fIfilter_option\fRs offer a standard user interface. All filter options might
+not be available for, or applicable to, all printers.
+.sp
+Specify \fIfilter_option\fR as a single character.
+.sp
+If \fIfilter_option\fR is not specified and the printer can interpret
+PostScript\(rg, inserting `\fB%!\fR' as the first two characters of \fIfile\fR
+causes \fIfile\fR to be interpreted as PostScript.
+.sp
+The following filter options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fBc\fR
+.ad
+.RS 5n
+.rt  
+\fIfile\fR contains data produced by \fIcifplot\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBd\fR
+.ad
+.RS 5n
+.rt  
+\fIfile\fR contains \fBtex\fR data in \fBDVI\fR format from Stanford.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBf\fR
+.ad
+.RS 5n
+.rt  
+Interprets the first character of each line as a standard FORTRAN carriage
+control character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBg\fR
+.ad
+.RS 5n
+.rt  
+\fIfile\fR contains standard plot data produced by \fBplot\fR(1B) routines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBl\fR
+.ad
+.RS 5n
+.rt  
+Print control characters and suppress page breaks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBn\fR
+.ad
+.RS 5n
+.rt  
+\fIfile\fR contains \fBditroff\fR data from device independent troff.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBp\fR
+.ad
+.RS 5n
+.rt  
+Use \fBpr\fR to format the files. See \fBpr\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBt\fR
+.ad
+.RS 5n
+.rt  
+\fIfile\fR contains \fBtroff\fR (cat phototypesetter) binary data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBv\fR
+.ad
+.RS 5n
+.rt  
+\fIfile\fR contains a raster image. \fIprinter\fR must support an appropriate
+imaging model such as PostScript in order to print the image.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-#\fR \fInumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+Prints a specific number of copies. Specify \fInumber\fR as a positive integer.
+The default for \fInumber\fR is \fB1\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+The name of the file to be printed. Specify \fIfile\fR as a pathname. If
+\fIfile\fR is not specified, \fBlpr\fR uses the standard input.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBlpr\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/printers.conf\fR\fR
+.ad
+.RS 24n
+.rt  
+System printer configuration database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.printers\fR\fR
+.ad
+.RS 24n
+.rt  
+User-configurable printer database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBou=printers\fR\fR
+.ad
+.RS 24n
+.rt  
+LDAP version of \fB/etc/printers.conf\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprinters.conf.byname\fR\fR
+.ad
+.RS 24n
+.rt  
+NIS version of \fB/etc/printers.conf\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprinters.org_dir\fR\fR
+.ad
+.RS 24n
+.rt  
+NIS+ version of \fB/etc/printers.conf\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitlyStandard
+_
+CSIEnabled. See NOTES
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBhostname\fR(1), \fBlp\fR(1), \fBlpc\fR(1B), \fBlpq\fR(1B), \fBlprm\fR(1B),
+\fBlpstat\fR(1), \fBmail\fR(1), \fBplot\fR(1B), \fBpr\fR(1), \fBtroff\fR(1),
+\fBlpadmin\fR(1M), \fBnsswitch.conf\fR(4), \fBprinters\fR(4),
+\fBprinters.conf\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5),
+\fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlpr:\fR \fIdestination\fR \fB|: unknown destination\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIdestination\fR was not found in the \fBLP\fR configuration database. Usually
+this is a typing mistake; however, it can indicate that the \fIdestination\fR
+does not exist on the system. Use \fBlpstat\fR \fB-p\fR to display information
+about the status of the print service.
+.RE
+
+.SH NOTES
+.sp
+.LP
+\fBlpr\fR is CSI-enabled except for the \fIprinter\fR name.
+.sp
+.LP
+Print jobs are assumed to contain one type of data. That type of data is either
+specified on the command line or autodetected (simple, PostScript) based on the
+contents of the first file in the job.
+.sp
+.LP
+When IPP is in use, the user is prompted for a passphrase if the remote print
+service is configured to require authentication.

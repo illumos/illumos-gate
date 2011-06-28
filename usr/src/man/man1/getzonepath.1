@@ -1,0 +1,99 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getzonepath 1 "20 Jul 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+getzonepath \- display root path of the zone corresponding to the specified
+label
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/getzonepath\fR  {\fIsensitivity-label\fR}
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBgetzonepath\fR displays the root pathname of the running labeled zone that
+corresponds to the specified sensitivity label. The returned pathname is
+relative to the caller's root pathname, and has the specified sensitivity
+label.
+.sp
+.LP
+If the caller is in the global zone, the returned pathname is not traversable
+unless the caller's processes have the \fBfile_dac_search\fR privilege.
+.sp
+.LP
+If the caller is in a labeled zone, the caller's label must dominate the
+specified label. Access to files under the returned pathname is restricted to
+read-only operations.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+StabilityCommitted
+.TE
+
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBgetzonepath\fR exits with one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Success
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Usage error
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Failure; error message is the system error number from
+\fBgetzonerootbylabel\fR(3TSOL)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetzonerootbylabel\fR(3TSOL), \fBattributes\fR(5)
+.sp
+.LP
+\fIAcquiring a Sensitivity Label\fR in \fISolaris Trusted Extensions
+Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

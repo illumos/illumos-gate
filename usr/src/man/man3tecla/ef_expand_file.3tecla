@@ -1,0 +1,280 @@
+'\" te
+.\" Copyright (c) 2000, 2001, 2002, 2003, 2004 by Martin C. Shepherd. All Rights Reserved.
+.\" Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
+.\" "Software"), to deal in the Software without restriction, including
+.\" without limitation the rights to use, copy, modify, merge, publish,
+.\" distribute, and/or sell copies of the Software, and to permit persons
+.\" to whom the Software is furnished to do so, provided that the above
+.\" copyright notice(s) and this permission notice appear in all copies of
+.\" the Software and that both the above copyright notice(s) and this
+.\" permission notice appear in supporting documentation.
+.\" 
+.\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+.\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+.\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+.\" OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+.\" HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+.\" INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+.\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+.\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+.\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\" 
+.\" Except as contained in this notice, the name of a copyright holder
+.\" shall not be used in advertising or otherwise to promote the sale, use
+.\" or other dealings in this Software without prior written authorization
+.\" of the copyright holder.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.TH ef_expand_file 3TECLA "1 Jun 2004" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.SH NAME
+ef_expand_file, del_ExpandFile, ef_last_error, ef_list_expansions,
+new_ExpandFile \- expand filename and wildcard expressions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libtecla.h>
+
+\fBExpandFile *\fR\fBef_expand_file\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBExpandFile *\fR\fBdel_ExpandFile\fR(\fBExpandFile *\fR\fIef\fR);
+.fi
+
+.LP
+.nf
+\fBFileExpansion *\fR\fBef_last_error\fR(\fBExpandFile *\fR\fIef\fR, \fBconst char *\fR\fIpath\fR,
+     \fBint\fR \fIpathlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBef_list_expansions\fR(\fBFileExpansion *\fR\fIresult\fR, \fBFILE *\fR\fIfp\fR, \fBint\fR \fIterm_width\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBnew_ExpandFile\fR(\fBExpandFile *\fR\fIef\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBef_expand_file()\fR function is part of the \fBlibtecla\fR(3LIB)
+library. It expands a specified filename, converting ~user/ and ~/ expressions
+at the start of the filename to the corresponding home directories, replacing
+$\fBenvvar\fR with the value of the corresponding environment variable, and
+then, if there are any wildcards, matching these against existing filenames.
+Backslashes in the input filename are interpreted as escaping any special
+meanings of the characters that follow them. Only backslashes that are
+themselves preceded by backslashes are preserved in the expanded filename.
+.sp
+.LP
+In the presence of wildcards, the returned list of filenames includes only the
+names of existing files which match the wildcards. Otherwise, the original
+filename is returned after expansion of tilde and dollar expressions, and the
+result is not checked against existing files. This mimics the file-globbing
+behavior of the UNIX \fBtcsh\fR shell.
+.sp
+.LP
+The supported wildcards and their meanings are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB*\fR\fR
+.ad
+.RS 12n
+.rt  
+Match any sequence of zero or more characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.RS 12n
+.rt  
+Match any single character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[\fB\fIchars\fR\fR]\fR
+.ad
+.RS 12n
+.rt  
+Match any single character that appears in \fIchars\fR. If \fIchars\fR contains
+an expression of the form a-b, then any character between a and b, including a
+and b, matches. The '-' character loses its special meaning as a range
+specifier when it appears at the start of the sequence of characters. The ']'
+character also looses its significance as the terminator of the range
+expression if it appears immediately after the opening '[', at which point it
+is treated one of the characters of the range. If you want both '-' and ']' to
+be part of the range, the '-' should come first and the ']' second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[^\fIchars\fR]\fR
+.ad
+.RS 12n
+.rt  
+The same as [\fIchars\fR] except that it matches any single character that does
+not appear in \fIchars\fR.
+.RE
+
+.sp
+.LP
+Note that wildcards never match the initial dot in filenames that start
+with '.'. The initial '.' must be explicitly specified in the filename. This again
+mimics the globbing behavior of most UNIX shells, and its rational is based in
+the fact that in UNIX, files with names that start with \&'.' are usually
+hidden configuration files, which are not listed by default by the \fBls\fR(1)
+command.
+.sp
+.LP
+The \fBnew_ExpandFile()\fR function creates the resources used by the
+\fBef_expand_file()\fR function. In particular, it maintains the memory that is
+used to record the array of matching file names that is returned by
+\fBef_expand_file()\fR. This array is expanded as needed, so there is no
+builtin limit to the number of files that can be matched.
+.sp
+.LP
+The \fBdel_ExpandFile()\fR function deletes the resources that were returned by
+a previous call to \fBnew_ExpandFile()\fR. It always returns NULL (that is, a
+deleted object). It does nothing if the \fIef\fR argument is NULL.
+.sp
+.LP
+The \fBef_expand_file()\fR function performs filename expansion. Its first
+argument is a resource object returned by \fBnew_ExpandFile()\fR. A pointer to
+the start of the filename to be matched is passed by the \fIpath\fR argument.
+This must be a normal null-terminated string, but unless a length of -1 is
+passed in \fIpathlen\fR, only the first \fIpathlen\fR characters will be used
+in the filename expansion. If the length is specified as -1, the whole of the
+string will be expanded. A container of the following type is returned by
+\fBef_expand_file()\fR.
+.sp
+.in +2
+.nf
+typedef struct {
+    int exists;   /* True if the files in files[] exist */
+    int nfile;    /* The number of files in files[] */
+    char **files; /* An array of 'nfile' filenames. */
+} FileExpansion;
+.fi
+.in -2
+
+.sp
+.LP
+The \fBef_expand_file()\fR function returns a pointer to a container whose
+contents are the results of the expansion. If there were no wildcards in the
+filename, the \fInfile\fR member will be 1, and the \fIexists\fR member should
+be queried if it is important to know if the expanded file currently exists. If
+there were wild cards, then the contained \fIfiles\fR[] array will contain the
+names of the \fInfile\fR existing files that matched the wild-carded filename,
+and the \fIexists\fR member will have the value 1. Note that the returned
+container belongs to the specified ef object, and its contents will change on
+each call, so if you need to retain the results of more than one call to
+\fBef_expand_file()\fR, you should either make a private copy of the returned
+results, or create multiple file-expansion resource objects with multiple calls
+to \fBnew_ExpandFile()\fR.
+.sp
+.LP
+On error, \fINULL\fR is returned, and an explanation of the error can be
+determined by calling \fBef_last_error\fR(\fIef\fR).
+.sp
+.LP
+The \fBef_last_error()\fR function returns the message which describes the
+error that occurred on the last call to \fBef_expand_file()\fR, for the given
+(\fBExpandFile *\fR\fIef\fR) resource object.
+.sp
+.LP
+The \fBef_list_expansions()\fR function provides a convenient way to list the
+filename expansions returned by \fBef_expand_file()\fR. Like the \fBls\fR
+utility, it arranges the filenames into equal width columns, each column having
+the width of the largest file. The number of columns used is thus determined by
+the length of the longest filename, and the specified terminal width. Beware
+that filenames that are longer than the specified terminal width are printed
+without being truncated, so output longer than the specified terminal width can
+occur. The list is written to the \fBstdio\fR stream specified by the \fIfp\fR
+argument.
+.SS "Thread Safety"
+.sp
+.LP
+It is safe to use the facilities of this module in multiple threads, provided
+that each thread uses a separately allocated \fBExpandFile\fR object. In other
+words, if two threads want to do file expansion, they should each call
+\fBnew_ExpandFile()\fR to allocate their own file-expansion objects.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse of file expansion function.
+.sp
+.LP
+The following is a complete example of how to use the file expansion function.
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <libtecla.h>
+ 
+int main(int argc, char *argv[])
+{
+    ExpandFile *ef;      /* The expansion resource object */
+    char *filename;      /* The filename being expanded */
+    FileExpansion *expn; /* The results of the expansion */
+    int i;
+ 
+    ef = new_ExpandFile();
+    if(!ef)
+        return 1;
+ 
+    for(arg = *(argv++); arg; arg = *(argv++)) {
+       if((expn = ef_expand_file(ef, arg, -1)) == NULL) {
+          fprintf(stderr, "Error expanding %s (%s).\en", arg,
+              ef_last_error(ef));
+       } else {
+          printf("%s matches the following files:\en", arg);
+          for(i=0; i<expn->nfile; i++)
+              printf(" %s\en", expn->files[i]);
+       }
+    }
+ 
+    ef = del_ExpandFile(ef);
+    return 0;
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpl_complete_word\fR(3TECLA), \fBgl_get_line\fR(3TECLA),
+\fBlibtecla\fR(3LIB), \fBpca_lookup_file\fR(3TECLA), \fBattributes\fR(5)

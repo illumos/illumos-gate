@@ -1,0 +1,112 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scf_simple_walk_instances 3SCF "17 Aug 2004" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.SH NAME
+scf_simple_walk_instances \- observational interface for Service Configuration
+Facility
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libscf.h>
+
+\fBint\fR \fBscf_simple_walk_instances\fR(\fBuint_t\fR \fIflags\fR, \fBvoid *\fR\fIprivate\fR,
+     \fBint (*\fR\fIinst_callback\fR)(scf_handle_t *, scf_instance_t *, void *));
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscf_simple_walk_instances()\fR function iterates over every service
+instance in a specified state and calls a callback function provided by the
+user on each specified instance.
+.sp
+.LP
+The function takes a \fIflags\fR argument to indicate which instance states are
+involved in the iteration, an opaque buffer to be passed to the callback
+function, and a callback function with three arguments, a handle, an instance
+pointer, and an opaque buffer. If the callback function returns a value other
+than success, iteration is ended, an error is set, and the function returns -1.
+.sp
+.LP
+The handle passed to the callback function is provided to the callback function
+by the library. This handle is used by the callback function for all low-level
+allocation involved in the function.
+.sp
+.LP
+The simplified library provides defined constants for the \fIflags\fR argument.
+The user can use a bitwise OR to apply more than one flag. The
+\fBSCF_STATE_ALL\fR flag is a bitwise OR of all the other states.The flags are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_UNINIT\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_MAINT\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_OFFLINE\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_DISABLED\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_ONLINE\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_DEGRADED\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSCF_STATE_ALL\fR
+.RE
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBscf_simple_walk_instances()\fR returns 0.
+Otherwise, it returns -1.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibscf\fR(3LIB), \fBattributes\fR(5)

@@ -1,0 +1,131 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qbufcall 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+qbufcall \- call a function when a buffer becomes available
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+
+\fBbufcall_id_t\fR \fBqbufcall\fR(\fBqueue_t *\fR\fIq\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR, 
+     \fBvoid\fR(\fI*func\fR)(\fBvoid\fR \fI*arg\fR), \fBvoid\fR \fI*arg\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to \fBSTREAMS \fRqueue structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 8n
+.rt  
+Number of bytes required for the buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpri\fR\fR
+.ad
+.RS 8n
+.rt  
+Priority of the \fBallocb\fR(9F) allocation request (not used).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfunc\fR\fR
+.ad
+.RS 8n
+.rt  
+Function or driver routine to be called when a buffer becomes available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 8n
+.rt  
+Argument to the function to be called when a buffer becomes available.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBqbufcall()\fR function serves as a \fBqtimeout\fR(9F) call of
+indeterminate length. When a buffer allocation request fails, \fBqbufcall()\fR
+can be used to schedule the routine \fIfunc\fR to be called with the argument
+\fIarg\fR when a buffer becomes available. \fIfunc\fR may call \fBallocb()\fR
+or it may do something else.
+.sp
+.LP
+The \fBqbufcall()\fR function is tailored to be used with the enhanced
+\fBSTREAMS \fRframework interface, which is based on the concept of perimeters.
+(See \fBmt-streams\fR(9F).) \fBqbufcall()\fR schedules the specified function
+to execute after entering the perimeters associated with the queue passed in as
+the first parameter to \fBqbufcall()\fR. All outstanding timeouts and bufcalls
+must be cancelled (using, respectively, \fBquntimeout\fR(9F) and
+\fBqunbufcall\fR(9F)) before a driver close routine can block and before the
+close  routine calls \fBqprocsoff\fR(9F).
+.sp
+.LP
+\fBqprocson\fR(9F) must be called before calling either \fBqbufcall()\fR or
+\fBqtimeout\fR(9F).
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBqbufcall()\fR function returns a \fBqbufcall\fR \fBID\fR
+that can be used in a call to \fBqunbufcall\fR(9F) to cancel the request. If
+the \fBqbufcall()\fR scheduling fails, \fIfunc\fR is never called and \fB0\fR
+is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBqbufcall()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBallocb\fR(9F), \fBmt-streams\fR(9F), \fBqprocson\fR(9F), \fBqtimeout\fR(9F),
+\fBqunbufcall\fR(9F), \fBquntimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH WARNINGS
+.sp
+.LP
+Even when \fIfunc\fR is called by \fBqbufcall()\fR, \fBallocb\fR(9F) can fail
+if another module or driver had allocated the memory before \fIfunc\fR was able
+to call \fBallocb\fR(9F).

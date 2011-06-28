@@ -1,0 +1,166 @@
+'\" te
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH net_inject 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+net_inject \- determine if a network interface name exists for a network
+protocol
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/neti.h>
+
+\fBint\fR \fBnet_inject\fR(\fBconst\fR \fBnet_data_t\fR \fInet\fR, \fBinject_t\fR \fIstyle\fR, 
+      \fBnet_inject_t\fR *\fIpacket\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fInet\fR\fR
+.ad
+.RS 10n
+.rt  
+value returned from a successful call to \fBnet_protocol_lookup\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstyle\fR\fR
+.ad
+.RS 10n
+.rt  
+method that determines how this packet is to be injected into the network or
+kernel.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpacket\fR\fR
+.ad
+.RS 10n
+.rt  
+details about the packet to be injected.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnet_inject()\fR function provides an interface to allow delivery of
+network layer (layer 3) packets either into the kernel or onto the network. The
+method of delivery is determined by style.
+.sp
+.LP
+If \fBNI_QUEUE_IN\fR is specified, the packet is scheduled for delivery up into
+the kernel, imitating its reception by a network interface. In this mode,
+\fBpacket->ni_addr\fR is ignored and \fB packet->ni_physical\fR  specifies the
+interface for which the packet is made to appear as if it arrived on.
+.sp
+.LP
+If \fBNI_QUEUE_OUT\fR is specified, the packet is scheduled for delivery out of
+the kernel, as if it were being sent by a raw socket. In this mode,
+\fBpacket->ni_addr\fR and \fBpacket->ni_physical\fR are both ignored.
+.sp
+.LP
+Neither \fBNI_QUEUE_IN\fR or \fBNI_QUEUE_OUT\fR cause the packet to be
+immediately processed by the kernel. Instead, the packet is added to a list and
+a timeout is scheduled (if there are none already pending) to deliver the
+packet. The  call to \fBnet_inject()\fR returns once the setup has been
+completed, and not after the packet has been processed. The packet processing
+is completed on a different thread and in a different context to that of the
+original packet. Thus, a packet queued up using \fBnet_inject()\fR for either
+\fBNI_QUEUE_IN\fR or \fBNI_QUEUE_OUT\fR is presented to the packet event again.
+A packet received by a hook from \fBNH_PHYSICAL_IN\fR and then queued up with
+\fBNI_QUEUE_IN\fR is seen by the hook as another \fBNH_PHYSICAL_IN\fR packet.
+This also applies to both \fBNH_PHYSICAL_OUT\fR and \fBNI_QUEUE_OUT\fR packets.
+.sp
+.LP
+If \fBNI_DIRECT_OUT\fR is specified, an attempt is made to send the packet out
+to a network interface immediately. No processing on the packet, aside from
+prepending any required layer 2 information, is made. In this instance,
+\fBpacket->ni_addr\fR may be used to specify the next hop (for the purpose of
+link layer address resolution) and \fBpacket->ni_physical\fR determines which
+interface the packet should be sent out.
+.sp
+.LP
+For all three packets, \fBpacket->ni_packet\fR must point to an \fBmblk\fR
+structure with the packet to be delivered.
+.sp
+.LP
+See \fBnet_inject_t\fR(9S) for more details on the structure
+\fBnet_inject_t\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBnet_inject()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB-1\fR
+.ad
+.RS 6n
+.rt  
+The network protocol does not support this function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB0\fR
+.ad
+.RS 6n
+.rt  
+The packet is successfully queued or sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB1\fR
+.ad
+.RS 6n
+.rt  
+The packet could not be queued up or sent out immediately.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBnet_inject()\fR function may be called from user,  kernel, or interrupt
+context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnet_protocol_lookup\fR(9F), \fBnetinfo\fR(9F), \fBnet_inject_t\fR(9S)

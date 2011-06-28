@@ -1,0 +1,62 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sdp_new_session 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.SH NAME
+sdp_new_session, sdp_free_session \- allocate a new SDP session structure
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR...] \fIfile\fR... -\fBlcommputil\fR [ \fIlibrary\fR...]
+#include <sdp.h>
+
+\fBsdp_session_t *\fR\fBsdp_new_session\fR();
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsdp_free_session\fR(\fBsdp_session_t *\fR\fIsession\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsdp_new_session()\fR function allocates memory for an SDP session
+structure specified by \fIsession\fR, assigns a version number to the session
+structure, and returns a new session structure. It is the responsibility of the
+user to free the memory allocated to the session structure using the
+\fBsdp_free_session()\fR function.
+.sp
+.LP
+The \fBsdp_free_session()\fR function destroys the SDP session structure and
+frees the resources associated with it.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsdp_new_session()\fR function returns the newly allocated SDP session
+structure on success and \fINULL\fR on failure.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcommputil\fR(3LIB), \fBattributes\fR(5)

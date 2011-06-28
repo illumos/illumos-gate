@@ -1,0 +1,151 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_poke 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_poke, ddi_poke8, ddi_poke16, ddi_poke32, ddi_poke64, ddi_pokec, ddi_pokes,
+ddi_pokel, ddi_poked \- write a value to a location
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBddi_poke8\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint8_t\fR \fI*addr\fR, \fBint8_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_poke16\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint16_t\fR \fI*addr\fR, \fBint16_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_poke32\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint32_t\fR \fI*addr\fR, \fBint32_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_poke64\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint64_t\fR \fI*addr\fR, \fBint64_t\fR \fIvalue\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI). The \fBddi_pokec()\fR, \fBddi_pokes()\fR,
+\fBddi_pokel()\fR, and \fBddi_poked()\fR functions are obsolete. Use,
+respectively, \fBddi_poke8()\fR, \fBddi_poke16()\fR, \fBddi_poke32()\fR, and
+\fBddi_poke64()\fR, instead.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 9n
+.rt  
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fR
+.ad
+.RS 9n
+.rt  
+Virtual address of the location to be written to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvalue\fR\fR
+.ad
+.RS 9n
+.rt  
+Value to be written to the location.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines cautiously attempt to write a value to a specified virtual
+address, using the parent nexus driver to assist in the process where
+necessary.
+.sp
+.LP
+If the address is not valid, or the value cannot be written without an error
+occurring, an error code is returned.
+.sp
+.LP
+These routines are most useful when first trying to establish the presence of a
+given device on the system in a driver's \fBprobe\fR(9E) or \fBattach\fR(9E)
+routines.
+.sp
+.LP
+On multiprocessing machines these routines can be extremely heavy-weight, so
+use the \fBddi_peek\fR(9F) routines instead if possible.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The value was successfully written to the given virtual address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+An error occurred while trying to write to the location.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBprobe\fR(9E), \fBddi_peek\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The functions described in this manual page previously used symbolic names
+which specified their data access size; the function names have been changed so
+they now specify a fixed-width data size. See the following table for the new
+name equivalents:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBPrevious Name\fR\fBNew Name\fR
+\fBddi_pokec\fR\fBddi_poke8\fR
+\fBddi_pokes\fR\fBddi_poke16\fR
+\fBddi_pokel\fR\fBddi_poke32\fR
+\fBddi_poked\fR\fBddi_poke64\fR
+.TE
+

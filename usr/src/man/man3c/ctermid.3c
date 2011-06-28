@@ -1,0 +1,83 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ctermid 3C "25 Jul 2000" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ctermid, ctermid_r \- generate path name for controlling terminal
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBchar *\fR\fBctermid\fR(\fBchar *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBctermid_r\fR(\fBchar *\fR\fIs\fR);
+.fi
+
+.SH DESCRIPTION
+.SS "\fBctermid()\fR"
+.sp
+.LP
+The \fBctermid()\fR function generates the path name of the controlling
+terminal for the current process and stores it in a string.
+.sp
+.LP
+If \fIs\fR is a null pointer, the string is stored in an internal static area
+whose address is returned and whose contents are overwritten at the next call
+to \fBctermid()\fR. Otherwise, \fIs\fR is assumed to point to a character array
+of at least \fBL_ctermid\fR elements. The path name is placed in this array and
+the value of \fIs\fR is returned. The constant \fBL_ctermid\fR is defined in
+the header \fB<stdio.h>\fR\&.
+.SS "\fBctermid_r()\fR"
+.sp
+.LP
+The \fBctermid_r()\fR function behaves as \fBctermid()\fR except that if
+\fIs\fR is a null pointer, the function returns \fINULL\fR.
+.SH USAGE
+.sp
+.LP
+The difference between \fBctermid()\fR and \fBttyname\fR(3C) is that
+\fBttyname()\fR must be passed a file descriptor and returns the actual name of
+the terminal associated with that file descriptor, while \fBctermid()\fR
+returns a string (\fB/dev/tty\fR) that will refer to the terminal if used as a
+file name. The \fBttyname()\fR function is useful only if the process already
+has at least one file open to a terminal.
+.sp
+.LP
+The \fBctermid()\fR function is unsafe in multithreaded applications.  The
+\fBctermid_r()\fR function is MT-Safe and should be used instead.
+.sp
+.LP
+When compiling multithreaded applications, the  \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should be used only with multithreaded
+applications.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface Stability\fBctermid()\fR is Standard
+_
+MT-LevelT{
+\fBctermid()\fR is Unsafe; \fBctermid_r()\fR is MT-Safe
+T}
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBttyname\fR(3C), \fBattributes\fR(5)

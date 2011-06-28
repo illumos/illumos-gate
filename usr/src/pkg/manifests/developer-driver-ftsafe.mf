@@ -35,6 +35,7 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/sbin
+dir path=usr/share/man/man1m
 driver name=bofi perms="* 0600 bin bin"
 file path=kernel/drv/$(ARCH64)/bofi group=sys mode=0644
 $(i386_ONLY)file path=kernel/drv/bofi group=sys mode=0644
@@ -42,6 +43,8 @@ file path=kernel/drv/bofi.conf group=sys
 file path=usr/lib/th_script mode=0555
 file path=usr/sbin/th_define mode=0555
 file path=usr/sbin/th_manage mode=0555
+file path=usr/share/man/man1m/th_define.1m
+file path=usr/share/man/man1m/th_manage.1m
 legacy pkg=SUNWftdur desc="Driver Hardening Test Harness" \
     name="ftSafe developer utilities package (Root)"
 legacy pkg=SUNWftduu desc="Driver Hardening Test Harness (usr)" \

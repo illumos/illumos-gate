@@ -1,0 +1,56 @@
+'\" te
+.\" Copyright (c) 2003 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH datab 9S "24 Oct 2003" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+datab, dblk \- STREAMS message data structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdatab\fR structure describes the data of a STREAMS message. The actual
+data contained in a STREAMS message is stored in a data buffer pointed to by
+this structure. A  \fBmsgb\fR (message block) structure includes a field that
+points to a \fBdatab\fR structure.
+.sp
+.LP
+Because a data block can have more than one message block pointing to it at one
+time, the \fBdb_ref\fR member keeps track of a data block's references,
+preventing it from being deallocated until all message blocks are finished with
+it.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+unsigned char     *db_base;     /* first byte of buffer */
+unsigned char     *db_lim;      /* last byte (+1) of buffer */
+unsigned char      db_ref;      /* # of message pointers to this data */
+unsigned char      db_type;     /* message type */
+.fi
+.in -2
+
+.sp
+.LP
+A \fBdatab\fR structure is defined as type \fBdblk_t\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBfree_rtn\fR(9S), \fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLPOpen 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.SH NAME
+SLPOpen \- open an SLP handle
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lslp\fR [ \fIlibrary\fR... ]
+#include <slp.h>
+
+\fBSLPError\fR \fBSLPOpen\fR(\fBconst char *\fR\fIpcLang\fR, \fBSLPBoolean\fR \fIisAsync\fR, \fBSLPHandle *\fR\fIphSLP\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSLPOpen()\fR function returns a \fBSLPHandle\fR handle in the
+\fIphSLP\fR parameter  for  the  language   locale  passed   in  as   the
+\fIpcLang\fR  parameter.  The client indicates if operations on  the  handle
+are  to be synchronous or asynchronous  through  the \fIisAsync\fR  parameter.
+The  handle encapsulates  the  language locale  for \fBSLP\fR requests  issued
+through  the  handle,  and  any  other  resources  required  by  the
+implementation.  \fBSLP\fR properties  are not  encapsulated by the handle,
+they  are global.  The return value  of  the  function  is  an  \fBSLPError\fR
+code  indicating  the  status of  the  operation.  Upon  failure,  the
+\fIphSLP\fR parameter is \fINULL\fR.
+.sp
+.LP
+An \fBSLPHandle\fR can only be used for one \fBSLP\fR \fBAPI\fR operation at a
+time. If the original operation was started asynchronously, any attempt to
+start an additional operation on the handle while the original operation is
+pending results in the return of an \fBSLP_HANDLE_IN_USE\fR error from the
+\fBAPI\fR function.  The \fBSLPClose()\fR  function terminates any outstanding
+calls on the handle.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpcLang\fR\fR
+.ad
+.RS 11n
+.rt  
+A pointer  to an  array of  characters containing  the  language tag set forth
+in \fIRFC 1766\fR for the natural language  locale of requests issued on the
+handle.  This parameter cannot be \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIisAsync\fR\fR
+.ad
+.RS 11n
+.rt  
+An \fBSLPBoolean\fR indicating whether or not the \fBSLPHandle\fR should be
+opened for an asynchronous operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIphSLP\fR\fR
+.ad
+.RS 11n
+.rt  
+A pointer to an \fBSLPHandle\fR in which the open \fBSLPHandle\fR is returned.
+If an error occurs, the value upon return is \fINULL\fR.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+This function or its callback may return any \fBSLP\fR error code. See the
+ERRORS section in \fBslp_api\fR(3SLP).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBSLPOpen()\fR
+.sp
+.LP
+Use the following example to open a synchronous handle for the German ("de")
+locale:
+
+.sp
+.in +2
+.nf
+SLPHandle HSLP; SLPError err;  err = SLPOpen("de", SLP_FALSE, &hSLP)
+.fi
+.in -2
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLP_CONF_FILE\fR\fR
+.ad
+.RS 17n
+.rt  
+When set, use this file for configuration.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBslp.conf\fR(4), \fBslpd.reg\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Alvestrand, H. \fIRFC 1766, Tags for the Identification of Languages\fR.
+Network Working Group. March 1995.
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

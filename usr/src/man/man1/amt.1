@@ -1,0 +1,101 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH amt 1 "19 Aug 2003" "SunOS 5.11" "User Commands"
+.SH NAME
+amt \- run abstract machine test
+.SH SYNOPSIS
+.LP
+.nf
+\fBamt\fR [\fB-s\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBamt\fR command is for use in a Common Criteria security certified
+system. The command is used to verify that the low level functions necessary to
+enforce the object reuse requirements of the Controlled Access Protection
+Profile are working correctly. \fB/usr/bin/amt\fR is a shell script that
+executes tests specific to your system. For a 32-bit system, the tests run as a
+32-bit application. For a 64-bit system, the tests run twice; once as a 32-bit
+application and once as a 64-bit application.
+.sp
+.LP
+\fBamt\fR lists test results with a \fBpass\fR or \fBfail\fR for each test it
+performs, unless output is suppressed with the \fB-s\fR option.
+.SH OPTIONS
+.sp
+.LP
+The following option is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Suppresses output.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following error values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All tests passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+Count of the number of tests that failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB<0\fR\fR
+.ad
+.RS 6n
+.rt  
+Incorrect command line argument.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

@@ -1,0 +1,199 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_getident 3ELF "18 Jun 2009" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_getident, elf_getphdrnum, elf_getshdrnum, elf_getshdrstrndx, elf_getphnum,
+elf_getshnum, elf_getshstrndx \- retrieve \fBELF\fR header data
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBchar *\fR\fBelf_getident\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBelf_getphdrnum\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBelf_getshdrnum\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBelf_getshdrstrndx\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.SS "Obsolete Interfaces"
+.LP
+.nf
+\fBint\fR \fBelf_getphnum\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBelf_getshnum\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBelf_getshstrndx\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIdst\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+As \fBelf\fR(3ELF) explains, \fBELF\fR provides a framework for various classes
+of files, where basic objects might have 32 or 64 bits. To accommodate these
+differences, without forcing the larger sizes on smaller machines, the initial
+bytes in an \fBELF\fR file hold identification information common to all file
+classes. The \fBe_ident\fR of every \fBELF\fR header has \fBEI_NIDENT\fR bytes
+with interpretations described in the following table.
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+\fBe_ident Index\fR\fBValue\fR\fBPurpose\fR
+
+\fBEI_MAG0\fR\fBELFMAG0\fRFile identification
+\fBEI_MAG1\fR\fBELFMAG1\fR
+\fBEI_MAG2\fR\fBELFMAG2\fR
+\fBEI_MAG3\fR\fBELFMAG3\fR
+
+\fBEI_CLASS\fR\fBELFCLASSNONE\fRFile class
+\fBELFCLASS32\fR
+\fBELFCLASS64\fR
+
+\fBEI_DATA\fR\fBELFDATANONE\fRData encoding
+\fBELFDATA2LSB\fR
+\fBELFDATA2MSB\fR
+
+\fBEI_VERSION\fR\fBEV_CURRENT\fRFile version
+
+7-150Unused, set to zero
+.TE
+
+.sp
+.LP
+Other kinds of files might have identification data, though they would not
+conform to \fBe_ident\fR. See \fBelf_kind\fR(3ELF) for information on other
+kinds of files.
+.sp
+.LP
+The \fBelf_getident()\fR function returns a pointer to the initial bytes of the
+file. If the library recognizes the file, a conversion from the file image to
+the memory image can occur. The identification bytes are guaranteed to be
+unmodified, though the size of the unmodified area depends on the file type. If
+the \fIdst\fR argument is non-null, the library stores the number of
+identification bytes in the location to which \fIdst\fR points. If no data are
+present, \fIelf\fR is \fINULL\fR, or an error occurs, the return value is a
+null pointer, with \fB0\fR stored through \fIdst\fR, if \fIdst\fR is non-null.
+.sp
+.LP
+The \fBelf_getphdrnum()\fR function obtains the number of program headers
+recorded in the \fBELF\fR file. The number of sections in a file is typically
+recorded in the \fBe_phnum\fR field of the \fBELF\fR header. A file that
+requires the \fBELF\fR extended program header records the value \fBPN_XNUM\fR
+in the \fBe_phnum\fR field and records the number of sections in the
+\fBsh_info\fR field of section header 0. See USAGE. The \fIdst\fR argument
+points to the location where the number of sections is stored. If \fIelf\fR is
+\fINULL\fR or an error occurs, \fBelf_getphdrnum()\fR returns \fB\(mi1\fR\&.
+.sp
+.LP
+The \fBelf_getshdrnum()\fR function obtains the number of sections recorded in
+the \fBELF\fR file. The number of sections in a file is typically recorded in
+the \fBe_shnum\fR field of the \fBELF\fR header. A file that requires \fBELF\fR
+extended section records the value \fB0\fR in the \fBe_shnum\fR field and
+records the number of sections in the \fBsh_size\fR field of section header 0.
+See USAGE. The \fIdst\fR argument points to the location where the number of
+sections is stored. If a call to \fBelf_newscn\fR(3ELF) that uses the same
+\fIelf\fR descriptor is performed, the value obtained by \fBelf_getshnum()\fR
+is valid only after a successful call to \fBelf_update\fR(3ELF). If \fIelf\fR
+is \fINULL\fR or an error occurs, \fBelf_getshdrnum()\fR returns \fB\(mi1\fR\&.
+.sp
+.LP
+The \fBelf_getshdrstrndx()\fR function obtains the section index of the string
+table associated with the section headers in the \fBELF\fR file. The section
+header string table index is typically recorded in the \fBe_shstrndx\fR field
+of the \fBELF\fR header. A file that requires \fBELF\fR extended section
+records the value \fBSHN_XINDEX\fR in the \fBe_shstrndx\fR field and records
+the string table index in the \fBsh_link\fR field of section header 0. See
+USAGE. The \fIdst\fR argument points to the location where the section header
+string table index is stored. If \fIelf\fR is \fINULL\fR or an error occurs,
+\fBelf_getshdrstrndx()\fR returns \fB\(mi1\fR\&.
+.sp
+.LP
+The \fBelf_getphnum()\fR, \fBelf_getshnum()\fR, and \fBelf_getshstrndx()\fR
+functions behave in a manner similar to \fBelf_getphdrnum()\fR,
+\fBelf_getshdrnum()\fR, and \fBelf_getshdrstrndx()\fR, respectively, except
+that they return 0 if \fIelf\fR is \fINULL\fR or an error occurs. Because these
+return values differ from those used by some other systems, they are therefore
+non-portable and their use is discouraged. The \fBelf_getphdrnum()\fR,
+\fBelf_getshdrnum()\fR, and \fBelf_getshdrstrndx()\fR functions should be used
+instead.
+.SH USAGE
+.sp
+.LP
+ELF extended sections allow an ELF file to contain more than \fB0xff00\fR
+(\fBSHN_LORESERVE\fR) section. ELF extended program headers allow an ELF file
+to contain \fB0xffff\fR (\fBPN_XNUM\fR) or more program headers. See the
+\fILinker and Libraries Guide\fR for more information.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBelf_getident()\fR function returns 1.
+Otherwise, it return 0.
+.sp
+.LP
+Upon successful completion, the \fBelf_getphdrnum()\fR, \fBelf_getshdrnum()\fR,
+and  \fBelf_getshdrstrndx()\fR  functions return 0. Otherwise, they return -1.
+.sp
+.LP
+Upon successful completion, the \fBelf_getphnum()\fR, \fBelf_getshnum()\fR, and
+\fBelf_getshstrndx()\fR  functions return 1. Otherwise, they return 0.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+_
+MT-LevelMT-Safe
+.TE
+
+.sp
+.LP
+The \fBelf_getident()\fR, \fBelf_getphdrnum()\fR, \fBelf_getshdrnum()\fR, and
+\fBelf_getshdrstrndx()\fR functions are Committed. The \fBelf_getphnum()\fR,
+\fBelf_getshnum()\fR, and  \fBelf_getshstrndx()\fR functions are Committed
+(Obsolete).
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF), \fBelf_begin\fR(3ELF),
+\fBelf_kind\fR(3ELF), \fBelf_newscn\fR(3ELF), \fBelf_rawfile\fR(3ELF),
+\fBelf_update\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

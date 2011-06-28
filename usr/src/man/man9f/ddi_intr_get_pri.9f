@@ -1,0 +1,195 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_intr_get_pri 9F "04 Jun 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_intr_get_pri, ddi_intr_set_pri \- get or set priority of a given interrupt
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBddi_intr_get_pri\fR(\fBddi_intr_handle_t\fR \fIh\fR, \fBuint_t\fR *\fIprip\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_intr_set_pri\fR(\fBddi_intr_handle_t\fR \fIh\fR, \fBuint_t\fR \fIpri\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+\fBddi_intr_get_pri()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 8n
+.rt  
+DDI interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprip\fR\fR
+.ad
+.RS 8n
+.rt  
+Pointer to the priority returned for this handle
+.RE
+
+.sp
+.LP
+\fBddi_intr_set_pri()\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fIh\fR\fR
+.ad
+.RS 7n
+.rt  
+DDI interrupt handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpri\fR\fR
+.ad
+.RS 7n
+.rt  
+Contains the priority to be set
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_intr_get_pri()\fR function returns the current priority of the
+interrupt handle \fIh\fR of a given device. Upon a successful return,
+\fIprip\fR points to a small integer value, typically in the
+\fBDDI_INTR_PRI_MIN\fR...\fBDDI_INTR_PRI_MAX\fR range, that represents the
+current software priority setting for the interrupt. See <\fBsys/ddi_intr.h\fR>
+for values of \fBDDI_INTR_PRI_MIN\fR or \fBDDI_INTR_PRI_MAX\fR.
+.sp
+.LP
+The \fBddi_intr_get_pri()\fR function can be called any time, even if the
+driver adds an interrupt handler for the interrupt specification.
+.sp
+.LP
+The software priority returned from \fBddi_intr_get_pri()\fR can be used in
+calls to \fBmutex_init()\fR and \fBrw_init()\fR.
+.sp
+.LP
+The \fBddi_intr_set_pri()\fR function sets the priority \fIpri\fR of the
+interrupt handle \fIh\fR of a given device. The function validates that the
+argument is within the supported range.
+.sp
+.LP
+The \fBddi_intr_set_pri()\fR function can only be called prior to adding the
+interrupt handler or when an interrupt handler is unassigned. \fBDDI_FAILURE\fR
+is returned in all other cases.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_intr_get_pri()\fR and \fBddi_intr_set_pri()\fR functions return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+On success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_EINVAL\fR\fR
+.ad
+.RS 15n
+.rt  
+On encountering invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+On any implementation specific failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_ENOTSUP\fR\fR
+.ad
+.RS 15n
+.rt  
+On device not supporting operation.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_intr_get_pri()\fR and \fBddi_intr_set_pri()\fR functions can be
+called from kernel non-interrupt context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_intr_alloc\fR(9F), \fBddi_intr_enable\fR(9F),
+\fBmutex_init\fR(9F), \fBrw_init\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The priority returned from \fBddi_intr_get_pri()\fR should be typecast by
+calling the \fBDDI_INTR_PRI\fR macro before passing it onto
+\fBmutex_init\fR(9F).
+.sp
+.LP
+Consumers of these interfaces should verify that the return value is not equal
+to \fBDDI_SUCCESS\fR. Incomplete checking for failure codes could result in
+inconsistent behavior among platforms.

@@ -1,0 +1,176 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aio_waitn 3C "18 Dec 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aio_waitn \- wait for completion of asynchronous I/O operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBaio_waitn\fR(\fBstruct aiocb *\fR\fIlist\fR[], \fBuint_t\fR \fInent\fR,
+     \fBuint_t *\fR\fInwait\fR, \fBconst struct timespec *\fR\fItimeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaio_waitn()\fR function suspends the calling thread until at least the
+number of requests specified by \fInwait\fR have completed, until a signal
+interrupts the function, or if \fItimeout\fR is not \fINULL\fR, until the time
+interval specified by \fItimeout\fR has passed.
+.sp
+.LP
+To effect a poll, the \fItimeout\fR argument should be non-zero, pointing to a
+zero-valued \fBtimespec\fR structure.
+.sp
+.LP
+The \fIlist\fR argument is an array of uninitialized I/O completion block
+pointers to be filled in by the system before \fBaio_waitn()\fR returns. The
+\fInent\fR argument indicates the maximum number of elements that can be placed
+in \fIlist\fR[] and is limited to \fB_AIO_LISTIO_MAX\fR = 4096.
+.sp
+.LP
+The \fInwait\fR argument points to the minimum number of requests
+\fBaio_waitn()\fR should wait for. Upon returning, the content of \fInwait\fR
+is set to the actual number of requests in the \fBaiocb\fR list, which can be
+greater than the initial value specified in \fInwait\fR. The \fBaio_waitn()\fR
+function attempts to return as many requests as possible, up to the number of
+outstanding asynchronous I/Os but less than or equal to the maximum specified
+by the \fInent\fR argument. As soon as the number of outstanding asynchronous
+I/O requests becomes 0, \fBaio_waitn()\fR returns with the current list of
+completed requests.
+.sp
+.LP
+The \fBaiocb\fR structures returned will have been used in initiating an
+asynchronous I/O request from any thread in the process with
+\fBaio_read\fR(3C), \fBaio_write\fR(3C), or \fBlio_listio\fR(3C).
+.sp
+.LP
+If the time interval expires before the expected number of I/O operations
+specified by \fInwait\fR are completed, \fBaio_waitn()\fR returns the number of
+completed requests and the content of the \fInwait\fR pointer is updated with
+that number.
+.sp
+.LP
+If \fBaio_waitn()\fR is interrupted by a signal, \fInwait\fR is set to the
+number of completed requests.
+.sp
+.LP
+The application can determine the status of the completed asynchronous I/O by
+checking the associated error and return status using \fBaio_error\fR(3C) and
+\fBaio_return\fR(3C), respectively.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBaio_waitn()\fR returns 0. Otherwise, it returns
+-1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBaio_waitn()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+There are no outstanding asynchronous I/O requests.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIlist\fR[], \fInwait\fR, or \fItimeout\fR argument points to an address
+outside the address space of the process. The \fBerrno\fR variable is set to
+\fBEFAULT\fR only if this condition is detected by the application process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The execution of \fBaio_waitn()\fR was interrupted by a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fItimeout\fR element \fItv_sec\fR or \fItv_nsec\fR is < 0, \fInent\fR is
+set to 0 or > \fB_AIO_LISTIO_MAX\fR, or \fInwait\fR is either set to 0 or is >
+\fInent\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is currently not enough available memory. The application can try again
+later.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETIME\fR\fR
+.ad
+.RS 10n
+.rt  
+The time interval expired before \fInwait\fR outstanding requests have
+completed.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBaio_waitn()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaio.h\fR(3HEAD), \fBaio_error\fR(3C), \fBaio_read\fR(3C),
+\fBaio_write\fR(3C), \fBlio_listio\fR(3C), \fBaio_return\fR(3C),
+\fBattributes\fR(5), \fBlf64\fR(5)

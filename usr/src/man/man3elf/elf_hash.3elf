@@ -1,0 +1,60 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_hash 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_hash \- compute hash value
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBunsigned long\fR \fBelf_hash\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelf_hash()\fR function computes a hash value, given a null terminated
+string, \fIname\fR. The returned hash value, \fIh\fR, can be used as a bucket
+index, typically after computing \fIh \fRmod x to ensure appropriate bounds.
+.sp
+.LP
+Hash tables may be built on one machine and used on another because
+\fBelf_hash()\fR uses unsigned arithmetic to avoid possible  differences in
+various machines' signed arithmetic. Although \fIname\fR is shown as
+\fBchar*\fR above, \fBelf_hash()\fR treats it as \fBunsigned char*\fR to avoid
+sign extension differences. Using \fBchar*\fR eliminates type conflicts with
+expressions such as \fBelf_hash(\fR\fIname\fR\fB).\fR
+.sp
+.LP
+\fBELF\fR files' symbol hash tables are computed using this function (see
+\fBelf_getdata\fR(3ELF) and \fBelf32_xlatetof\fR(3ELF)). The hash value
+returned is guaranteed not to be the bit pattern of all ones ( \fB~0UL\fR).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_xlatetof\fR(3ELF), \fBelf_getdata\fR(3ELF),
+\fBlibelf\fR(3LIB), \fBattributes\fR(5)

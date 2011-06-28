@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sdp_find_media 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.SH NAME
+sdp_find_media \- find the specified media from the media list
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR...] \fIfile\fR... -\fBlcommputil\fR [ \fIlibrary\fR...]
+#include <sdp.h>
+
+\fBsdp_media_t *\fR\fBsdp_find_media\fR(\fBsdp_media_t *\fR\fImedia\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsdp_find_media()\fR function searches the media list for the media
+specified by \fIname\fR. If the media is found it returns the pointer to the
+media. Otherwise it returns \fINULL\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsdp_find_media()\fR function returns the media (\fBsdp_media_t *\fR) on
+success and \fINULL\fR when the search fails or the mandatory input parameters
+are \fINULL\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn (incomplete) SDP description that contains two media
+sections: audio and video.
+.sp
+.in +2
+.nf
+m=audio 49170 RTP/AVP 0 8
+a=rtpmap:0 PCMU/8000
+a=rtpmap:8 PCMA/8000
+m=video 51372 RTP/AVP 31 32
+a=rtpmap:31 H261/90000
+a=rtpmap:32 MPV/90000
+
+/*
+ * Assuming that above description is parsed using sdp_parse() and that
+ * the parsed structure is in "session" sdp_session_t structure.
+ */
+
+sdp_media_t     *my_media;
+my_media = sdp_find_media(session->s_media, "video");
+
+/*
+ * my_media now points to the structure containg video media section
+ * information
+ */
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcommputil\fR(3LIB), \fBsdp_parse\fR(3COMMPUTIL), \fBattributes\fR(5)

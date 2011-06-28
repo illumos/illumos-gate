@@ -1,0 +1,76 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf32_fsize 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf32_fsize, elf64_fsize \- return the size of an object file type
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBsize_t\fR \fBelf32_fsize\fR(\fBElf_Type\fR \fItype\fR, \fBsize_t\fR \fIcount\fR, \fBunsigned\fR \fIver\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBelf64_fsize\fR(\fBElf_Type\fR \fItype\fR, \fBsize_t\fR \fIcount\fR, \fBunsigned\fR \fIver\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBelf32_fsize()\fR gives the size in bytes of the 32-bit file representation
+of \fIcount\fR data objects with the given \fBtype\fR. The library uses version
+\fBver\fR to calculate the size. See \fBelf\fR(3ELF) and
+\fBelf_version\fR(3ELF).
+.sp
+.LP
+Constant values are available for the sizes of fundamental types:
+.sp
+.in +2
+.nf
+\fBElf_Type	File Size	Memory Size
+ELF_T_ADDR	ELF32_FSZ_ADDR	sizeof(Elf32_Addr)
+ELF_T_BYTE	1	sizeof(unsigned char)
+ELF_T_HALF	ELF32_FSZ_HALF	sizeof(Elf32_Half)
+ELT_T_OFF	ELF32_FSZ_OFF	sizeof(Elf32_Off)
+ELF_T_SWORD	ELF32_FSZ_SWORD	sizeof(Elf32_Sword)
+ELF_T_WORD	ELF32_FSZ_WORD	sizeof(Elf32_Word)\fR
+.fi
+.in -2
+
+.sp
+.LP
+\fBelf32_fsize()\fR returns \fB0\fR if the value of \fBtype\fR or \fBver\fR is
+unknown. See \fBelf32_xlatetof\fR(3ELF) for a list of the \fBtype\fR values.
+.sp
+.LP
+For the 64\(mibit class, replace 32 with 64 as appropriate.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_xlatetof\fR(3ELF), \fBelf_version\fR(3ELF),
+\fBlibelf\fR(3LIB), \fBattributes\fR(5)

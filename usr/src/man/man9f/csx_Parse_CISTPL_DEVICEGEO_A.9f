@@ -1,0 +1,234 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_Parse_CISTPL_DEVICEGEO_A 9F "16 May 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_Parse_CISTPL_DEVICEGEO_A \- parse the Device Geo A tuple
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_Parse_CISTPL_DEVICEGEO_A\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItp\fR,
+     \fBcistpl_devicegeo_t *\fR\fIpt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR \fR
+.ad
+.RS 7n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned by a call
+to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpt\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to a \fBcistpl_devicegeo_t\fR structure which contains the parsed
+Device Geo A tuple information upon return from this function.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function parses the Device Geo A tuple, \fBCISTPL_DEVICEGEO_A,\fR into a
+form usable by \fBPC \fRCard drivers.
+.sp
+.LP
+The \fBCISTPL_DEVICEGEO_A\fR tuple describes the device geometry of attribute
+memory partitions.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBcistpl_devicegeo_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t     info[CISTPL_DEVICEGEO_MAX_PARTITIONS].bus;
+uint32_t     info[CISTPL_DEVICEGEO_MAX_PARTITIONS].ebs;
+uint32_t     info[CISTPL_DEVICEGEO_MAX_PARTITIONS].rbs;
+uint32_t     info[CISTPL_DEVICEGEO_MAX_PARTITIONS].wbs;
+uint32_t     info[CISTPL_DEVICEGEO_MAX_PARTITIONS].part;
+uint32_t     info[CISTPL_DEVICEGEO_MAX_PARTITIONS].hwil;
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfo[CISTPL_DEVICEGEO_MAX_PARTITIONS].bus\fR \fR
+.ad
+.sp .6
+.RS 4n
+This field indicates the card interface width in bytes for the given partition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfo[CISTPL_DEVICEGEO_MAX_PARTITIONS].ebs\fR \fR
+.ad
+.sp .6
+.RS 4n
+This field indicates the minimum erase block size for the given partition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfo[CISTPL_DEVICEGEO_MAX_PARTITIONS].rbs\fR \fR
+.ad
+.sp .6
+.RS 4n
+This field indicates the minimum read block size for the given partition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfo[CISTPL_DEVICEGEO_MAX_PARTITIONS].wbs\fR \fR
+.ad
+.sp .6
+.RS 4n
+This field indicates the minimum write block size for the given partition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfo[CISTPL_DEVICEGEO_MAX_PARTITIONS].part\fR \fR
+.ad
+.sp .6
+.RS 4n
+This field indicates the segment partition subdivisions for the given
+partition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinfo[CISTPL_DEVICEGEO_MAX_PARTITIONS].hwil\fR \fR
+.ad
+.sp .6
+.RS 4n
+This field indicates the hardware interleave for the given partition.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNKNOWN_TUPLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Parser does not know how to parse tuple.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CIS\fR \fR
+.ad
+.RS 28n
+.rt  
+No Card Information Structure (CIS) on \fBPC \fRCard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetNextTuple\fR(9F),
+\fBcsx_GetTupleData\fR(9F), \fBcsx_Parse_CISTPL_DEVICEGEO\fR(9F),
+\fBcsx_RegisterClient\fR(9F), \fBtuple\fR(9S)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

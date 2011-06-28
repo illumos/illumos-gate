@@ -1,0 +1,246 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH queue 9S "10 Jan 2006" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+queue \- STREAMS queue structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI)
+.SH DESCRIPTION
+.sp
+.LP
+A \fBSTREAMS\fR driver or module consists of two \fBqueue\fR structures:
+\fIread\fR for upstream processing and \fIwrite\fR for downstream processing.
+The queue structure is the major building block of a stream.
+.SS "\fBqueue\fR Structure Members"
+.sp
+.LP
+The \fBqueue\fR structure is defined as type \fBqueue_t\fR. The structure can
+be accessed at any time from inside a \fBSTREAMS\fR entry point associated with
+that queue.
+.sp
+.in +2
+.nf
+struct    qinit   *q_qinfo;     /* queue processing procedure */
+struct    msgb    *q_first;     /* first message in queue */
+struct    msgb    *q_last;      /* last message in queue */
+struct    queue   *q_next;      /* next queue in stream */
+void              *q_ptr;       /* module-specific data */
+size_t             q_count;     /* number of bytes on queue */
+uint_t             q_flag;      /* queue state */
+ssize_t            q_minpsz;    /* smallest packet OK on queue */
+ssize_t            q_maxpsz;    /* largest packet OK on queue */
+size_t             q_hiwat;     /* queue high water mark */
+size_t             q_lowat;     /* queue low water mark */
+.fi
+.in -2
+
+.sp
+.LP
+Contstraints and restrictions on the use of \fBq_flag\fR and \fBqueue_t\fR
+fields and the \fBq_next\fR values are detailed in the following sections.
+.SS "\fBq_flag\fR Field"
+.sp
+.LP
+The \fBq_flag\fR field must be used only to check the following flag values.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQFULL\fR\fR
+.ad
+.RS 10n
+.rt  
+Queue is full.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQREADR\fR\fR
+.ad
+.RS 10n
+.rt  
+Queue is used for upstream (read-side) processing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQUSE\fR\fR
+.ad
+.RS 10n
+.rt  
+Queue has been allocated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQENAB\fR\fR
+.ad
+.RS 10n
+.rt  
+Queue has been enabled for service by \fBqenable\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQNOENB\fR\fR
+.ad
+.RS 10n
+.rt  
+Queue will not be scheduled for service by \fBputq\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQWANTR\fR\fR
+.ad
+.RS 10n
+.rt  
+Upstream processing element wants to read from queue.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQWANTW\fR\fR
+.ad
+.RS 10n
+.rt  
+Downstream processing element wants to write to queue.
+.RE
+
+.SS "\fBqueue_t\fR Fields"
+.sp
+.LP
+Aside from \fBq_ptr\fR and \fBq_qinfo\fR, a module or driver must never assume
+that a \fBqueue_t\fR field value will remain unchanged across calls to
+\fBSTREAMS\fR entry points. In addition, many fields can change values inside a
+\fBSTREAMS\fR entry point, especially if the \fBSTREAMS\fR module or driver has
+perimeters that allow parallelism. See \fBmt-streams\fR(9F). Fields that are
+not documented below are private to the \fBSTREAMS\fR framework and must not be
+accessed.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The values of the \fBq_hiwat\fR, \fBq_lowat\fR, \fBq_minpsz\fR, and
+\fBq_maxpsz\fR fields can be changed at the discretion of the module or driver.
+As such, the stability of their values depends on the perimeter configuration
+associated with any routines that modify them.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The values of the \fBq_first\fR, \fBq_last\fR, and \fBq_count\fR fields can
+change whenever \fBputq\fR(9F), \fBputbq\fR(9F), \fBgetq\fR(9F),
+\fBinsq\fR(9F), or \fBrmvq\fR(9F) is used on the queue. As such, the stability
+of their values depends on the perimeter configuration associated with any
+routines that call those \fBSTREAMS\fR functions.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBq_flag\fR field can change at any time.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBq_next\fR field will not change while inside a given \fBSTREAMS\fR entry
+point. Additional restrictions on the use of the \fBq_next\fR value are
+described in the next section.
+.RE
+.sp
+.LP
+A \fBSTREAMS\fR module or driver can assign any value to \fBq_ptr\fR. Typically
+\fBq_ptr\fR is used to point to module-specific per-queue state, allocated in
+\fBopen\fR(9E) and freed in \fBclose\fR(9E). The value or contents of
+\fBq_ptr\fR is never inspected by the \fBSTREAMS\fR framework.
+.sp
+.LP
+The initial values for \fBq_minpsz\fR, \fBq_maxpsz\fR, \fBq_hiwat\fR, and
+\fBq_lowat\fR are set using the \fBmodule_info\fR(9S) structure when
+\fBmod_install\fR(9F) is called. A \fBSTREAMS\fR\ module or driver can
+subsequently change the values of those fields as necessary. The remaining
+visible fields, \fBq_qinfo\fR, \fBq_first\fR, \fBq_last\fR, \fBq_next\fR,
+\fBq_count\fR, and \fBq_flag\fR, must never be modified by a module or driver.
+.sp
+.LP
+The Solaris DDI requires that \fBSTREAMS\fR modules and drivers obey the rules
+described on this page. Those that do not follow the rules can cause data
+corruption or system instability, and might change in behavior across patches
+or upgrades.
+.SS "\fBq_next\fR Restrictions"
+.sp
+.LP
+There are additional restrictions associated with the use of the \fBq_next\fR
+value. In particular, a \fBSTREAMS\fR module or driver:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Must not access the data structure pointed to by \fBq_next\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Must not rely on the value of \fBq_next\fR before calling \fBqprocson\fR(9F) or
+after calling \fBqprocsoff\fR(9F).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Must not pass the value into any \fBSTREAMS\fR framework function other than
+\fBput\fR(9F), \fBcanput\fR(9F), \fBbcanput\fR(9F), \fBputctl\fR(9F),
+\fBputctl1\fR(9F). However, in all cases the "next" version of these functions,
+such as \fBputnext\fR(9F), should be preferred.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Must not use the value to compare against queue pointers from other streams.
+However, checking \fBq_next\fR for NULL can be used to distinguish a module
+from a driver in code shared by both.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(9E), \fBopen\fR(9E), \fBbcanput\fR(9F), \fBcanput\fR(9F),
+\fBgetq\fR(9F), \fBinsq\fR(9F), \fBmod_install\fR(9F), \fBput\fR(9F),
+\fBputbq\fR(9F), \fBputctl\fR(9F), \fBputctl1\fR(9F), \fBputnext\fR(9F),
+\fBputq\fR(9F), \fBqprocsoff\fR(9F), \fBqprocson\fR(9F), \fBrmvq\fR(9F),
+\fBstrqget\fR(9F), \fBstrqset\fR(9F), \fBmodule_info\fR(9S), \fBmsgb\fR(9S),
+\fBqinit\fR(9S), \fBstreamtab\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

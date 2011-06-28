@@ -24,19 +24,15 @@
 # Use is subject to license terms.
 #
 
-PROGS =		jattach jinstall juninstall pinstall prestate poststate \
-		statechange
+PROGS =		jattach jdetach jinstall juninstall pinstall prestate \
+		poststate statechange
 XMLDOCS=	config.xml platform.xml common.ksh
 USERFILES=
-MANIFEST=	joyinit.xml
-SVCMETHOD=	svc-joyinit
 TEMPLATES =	Joyent.xml
 CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.joyent
-
-ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
 
 .KEEP_STATE:
 
@@ -49,8 +45,8 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTMANIFEST) \
-	$(ROOTSVCMETHOD) $(ROOTTEMPLATES) $(ETCUSER)
+install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) \
+	$(ROOTTEMPLATES) $(ETCUSER)
 
 lint:
 

@@ -2815,11 +2815,17 @@ verify_details(int cmd_num, char *argv[])
 	if (verify_handle(cmd_num, handle, argv) != Z_OK)
 		return_code = Z_ERR;
 
-	if (cmd_num == CMD_READY || cmd_num == CMD_BOOT)
-		if (verify_fix_did(handle))
+	if (cmd_num == CMD_READY || cmd_num == CMD_BOOT) {
+		int vcommit = 0, obscommit = 0;
+
+		vcommit = verify_fix_did(handle);
+		obscommit = zonecfg_fix_obsolete(handle);
+
+		if (vcommit || obscommit)
 			if (zonecfg_save(handle) != Z_OK)
 				(void) fprintf(stderr, gettext("Could not save "
-				    "debug ID.\n"));
+				    "updated configuration.\n"));
+	}
 
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)
@@ -5356,7 +5362,7 @@ apply_func(int argc, char *argv[])
 	priv_set_t *privset;
 	zoneid_t zoneid;
 	zone_dochandle_t handle;
-	struct zone_mcaptab mcap;
+	uint64_t mcap;
 	char pool_err[128];
 
 	zoneid = getzoneid();
@@ -5447,18 +5453,11 @@ apply_func(int argc, char *argv[])
 	}
 
 	/*
-	 * If a memory cap is configured, set the cap in the kernel using
-	 * zone_setattr() and make sure the rcapd SMF service is enabled.
+	 * If a memory cap is configured, make sure the rcapd SMF service is
+	 * enabled.
 	 */
-	if (zonecfg_getmcapent(handle, &mcap) == Z_OK) {
-		uint64_t num;
+	if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPHYSMEM, &mcap) == Z_OK) {
 		char smf_err[128];
-
-		num = (uint64_t)strtoll(mcap.zone_physmem_cap, NULL, 10);
-		if (zone_setattr(zoneid, ZONE_ATTR_PHYS_MCAP, &num, 0) == -1) {
-			zerror(gettext("could not set zone memory cap"));
-			res = Z_ERR;
-		}
 
 		if (zonecfg_enable_rcapd(smf_err, sizeof (smf_err)) != Z_OK) {
 			zerror(gettext("enabling system/rcap service failed: "

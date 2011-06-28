@@ -1,0 +1,59 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH geterror 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+geterror \- return \fBI/O\fR error
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/buf.h>
+#include <sys/ddi.h>
+
+
+
+\fBint\fR \fBgeterror\fR(\fBstruct buf *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBbuf\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgeterror()\fR function returns the error number  from the error field of
+the  buffer header structure.
+.SH RETURN VALUES
+.sp
+.LP
+An error number indicating the error condition of the \fBI/O\fR request is
+returned. If the \fBI/O\fR request completes successfully, \fB0\fR is returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBgeterror()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBbuf\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

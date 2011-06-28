@@ -25,6 +25,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/isa_defs.h>
 
@@ -673,7 +677,8 @@ string_unquote(char *s)
 		 * the destination buffer past what we skipped.
 		 */
 		if (p > o) {
-			(void) strncpy(s, o, p - o);
+			/* Using memmove to prevent possible overlap. */
+			(void) memmove(s, o, p - o);
 			s += p - o;
 		}
 
@@ -696,7 +701,7 @@ string_unquote(char *s)
 		 * and convert escape sequences if *p is double-quote.
 		 */
 		if (q > p + 1) {
-			(void) strncpy(s, p + 1, q - p - 1);
+			(void) memmove(s, p + 1, q - p - 1);
 			if (c == '"') {
                                 s[q - p - 1] = '\0';
 				s += stresc2chr(s);
@@ -707,7 +712,7 @@ string_unquote(char *s)
 		p = q + 1; /* Advance p past matching quote */
 	}
 
-	(void) strcpy(s, o);
+	(void) memmove(s, o, strlen(o) + 1);
 }
 
 /*

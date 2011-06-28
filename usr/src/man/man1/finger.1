@@ -1,0 +1,337 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.\"   Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
+.TH finger 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+finger \- display information about local and remote users
+.SH SYNOPSIS
+.LP
+.nf
+\fBfinger\fR [\fB-bfhilmpqsw\fR] [\fIusername\fR]...
+.fi
+
+.LP
+.nf
+\fBfinger\fR [\fB-l\fR] 
+     [\fIusername@hostname\fR 1 [\fI@hostname\fR 2 \fI\&..\fR \fI\&.@hostname\fR n]...]
+.fi
+
+.LP
+.nf
+\fBfinger\fR [\fB-l\fR] [\fI@hostname\fR 1 [\fI@hostname\fR 2 \fI\&..\fR \fI\&.@hostname\fR n]...]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+By default, the \fBfinger\fR command displays in multi-column format the
+following information about each logged-in user:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+user name
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+user's full name
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+terminal name (prepended with a `*\|' (asterisk)  if write-permission is
+denied)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+idle time
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+login time
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+host name, if logged in remotely
+.RE
+.sp
+.LP
+Idle time is in minutes if it is a single integer, in hours and minutes if a
+`:\|' (colon)  is present, or in days and hours if a `d' is present.
+.sp
+.LP
+When one or more \fIusername\fR arguments are given, more detailed information
+is given for each \fIusername\fR specified, whether they are logged in or not.
+\fIusername\fR must be that of a local user, and may be a first or last name,
+or an account name. Information is presented in multi-line format as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user name and the user's full name
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the user's home directory and login shell
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+time the user logged in if currently logged in, or the time the user last
+logged in; and the terminal or host from which the user logged in
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+last time the user received mail, and the last time the user read mail
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the first line of the \fB$HOME/.project\fR file, if it exists
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the contents of the \fB$HOME/.plan\fR file, if it exists
+.RE
+.sp
+.LP
+Note: when the comment (GECOS) field in \fB/etc/passwd\fR includes a comma,
+\fBfinger\fR does not display the information following the comma.
+.sp
+.LP
+If the arguments
+\fIusername@hostname\fR1[\fI@hostname\fR2\fI\|.\|.\|.@hostname\fRn] or
+\fI@hostname\fR1[\fI@hostname\fR2\fI\|.\|.\|.@hostname\fRn] are used, the
+request is sent first to \fBhostname\fRn and forwarded through each
+\fBhostname\fRn-1 to  \fBhostname\fR1. The program uses the \fBfinger user
+information protocol\fR (see RFC 1288) to query that remote host for
+information about the named user (if  \fIusername\fR is specified), or about
+each logged-in user. The information displayed is server dependent.
+.sp
+.LP
+As required by RFC 1288, \fBfinger\fR passes only printable, 7-bit \fBASCII\fR
+data. This behavior may be modified by a system administrator by using the
+\fBPASS\fR option in \fB/etc/default/finger\fR. Specifying \fBPASS=low\fR
+allows all characters less than decimal 32 ASCII. Specifying \fBPASS=high\fR
+allows all characters greater than decimal 126 \fBASCII\fR. \fBPASS=low,high\fR
+or \fBPASS=high,low\fR allows both characters less than 32 and greater than 126
+to pass through.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported, except that the  \fIusername@hostname\fR
+form supports only the \fB-l\fR option:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fR
+.ad
+.RS 7n
+.rt  
+Suppresses printing the user's home directory and shell in a long format
+printout.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fR
+.ad
+.RS 7n
+.rt  
+Suppresses printing the header that is normally printed in a non-long format
+printout.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR \fR
+.ad
+.RS 7n
+.rt  
+Suppresses printing of the \fB\&.project\fR file in a long format printout.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fR
+.ad
+.RS 7n
+.rt  
+Forces "idle" output format, which is similar to short format except that only
+the login name, terminal, login time, and idle time are printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fR
+.ad
+.RS 7n
+.rt  
+Forces long output format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR \fR
+.ad
+.RS 7n
+.rt  
+Matches arguments only on user name (not first or last name).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fR
+.ad
+.RS 7n
+.rt  
+Suppresses printing of the \fB\&.plan\fR file in a long format printout.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR \fR
+.ad
+.RS 7n
+.rt  
+Forces quick output format, which is similar to short format except that only
+the login name, terminal, and login time are printed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fR
+.ad
+.RS 7n
+.rt  
+Forces short output format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR \fR
+.ad
+.RS 7n
+.rt  
+Suppresses printing the full name in a short format printout.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.plan    \fR \fR
+.ad
+.RS 24n
+.rt  
+user's plan
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.project\fR \fR
+.ad
+.RS 24n
+.rt  
+user's projects
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/default/finger\fR \fR
+.ad
+.RS 24n
+.rt  
+\fBfinger\fR options file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 24n
+.rt  
+password file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/lastlog\fR \fR
+.ad
+.RS 24n
+.rt  
+time of last login
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/utmpx\fR \fR
+.ad
+.RS 24n
+.rt  
+accounting
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpasswd\fR(1), \fBwho\fR(1), \fBwhois\fR(1), \fBpasswd\fR(4),
+\fBattributes\fR(5)
+.sp
+.LP
+Zimmerman, D., \fIThe Finger User Information Protocol\fR, RFC 1288, Center for
+Discrete Mathematics and Theoretical Computer Science (DIMACS), Rutgers
+University, December 1991.
+.SH NOTES
+.sp
+.LP
+The \fBfinger user information protocol\fR limits the options that may be used
+with the remote form of this command.

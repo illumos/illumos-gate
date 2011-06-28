@@ -1,0 +1,1348 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH unistd.h 3HEAD "1 Sep 2009" "SunOS 5.11" "Headers"
+.SH NAME
+unistd.h, unistd \- standard symbolic constants and types
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBunistd.h\fR> header defines the symbolic constants and structures which
+are not already defined or declared in some other header. The contents of this
+header  are shown below.
+.SS "Version Test Macros"
+.sp
+.LP
+The following symbolic constants are defined (with fixed values):
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_VERSION\fR\fR
+.ad
+.RS 22n
+.rt  
+Integer value indicating version of the POSIX standard (C language binding).
+See \fBstandards\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_VERSION\fR\fR
+.ad
+.RS 22n
+.rt  
+Integer value indicating version of the POSIX.2 standard (Commands).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_C_VERSION\fR\fR
+.ad
+.RS 22n
+.rt  
+Integer value indicating version of the POSIX.2 standard (C language binding).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_VERSION\fR\fR
+.ad
+.RS 22n
+.rt  
+Integer value indicating version of the XPG to which system conforms.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_XCU_VERSION\fR\fR
+.ad
+.RS 22n
+.rt  
+Integer value indicating the version of the XCU specification to which the
+implementation conforms. If this constant is not defined, use the
+\fBsysconf\fR(3C) function to determine which features are supported. This
+constant is not defined for the SUSv3 environment.
+.RE
+
+.SS "Mandatory Symbolic Constants"
+.sp
+.LP
+The following symbolic constants, if defined in <\fBunistd.h\fR>, have a value
+of -1, 0, or greater, unless otherwise specified below. If these are undefined,
+the \fBfpathconf\fR(2), \fBpathconf\fR(2), or \fBsysconf\fR(3C) functions can
+be used to determine whether the option is provided for a particular invocation
+of the application.
+.sp
+.LP
+If a symbolic constant is defined with the value -1, the option is not
+supported. Headers, data types, and function interfaces required only for the
+option need not be supplied. An application that attempts to use anything
+associated only with the option is considered to be requiring an extension.
+.sp
+.LP
+If a symbolic constant is defined with a value greater than zero, the option is
+always supported when the application is executed. All headers, data types, and
+functions are present and operate as specified.
+.sp
+.LP
+If a symbolic constant is defined with the value zero, all headers, data types,
+and functions are present. The application can check at runtime to see whether
+the option is supported by calling \fBfpathconf()\fR, \fBpathconf()\fR, or
+\fBsysconf()\fR with the indicated \fIname\fR parameter.
+.sp
+.LP
+Unless explicitly specified otherwise, the behavior of functions associated
+with an unsupported option is unspecified, and an application that uses such
+functions without first checking \fBfpathconf()\fR, \fBpathconf()\fR, or
+\fBsysconf()\fR is considered to be requiring an extension.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_ADVISORY_INFO\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Advisory Information option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_ASYNCHRONOUS_IO\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Asynchronous Input and Output option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_BARRIERS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Barriers option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_CLOCK_SELECTION\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Clock Selection option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_CPUTIME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Process CPU-Time Clocks option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_FSYNC\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the File Synchronisation option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_IPV6\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the IPv6 option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_JOB_CONTROL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports job control.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MAPPED_FILES\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Memory Mapped Files option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MEMLOCK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Process Memory Locking option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MEMLOCK_RANGE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Range Memory Locking option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MEMORY_PROTECTION\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Memory Protection option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MESSAGE_PASSING\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Message Passing option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_MONOTONIC_CLOCK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Monotonic Clock option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_PRIORITY_SCHEDULING\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Process Scheduling option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_RAW_SOCKETS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Raw Sockets option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_READER_WRITER_LOCKS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Read-Write Locks option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_REALTIME_SIGNALS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Realtime Signals Extension option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_REGEXP\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Regular Expression Handling option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SAVED_IDS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The exec functions (see \fBexec\fR(2)) save the effective user and group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SEMAPHORES\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Semaphores option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SHARED_MEMORY_OBJECTS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Shared Memory Objects option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SHELL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the POSIX shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SPAWN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Spawn option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SPIN_LOCKS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Spin Locks option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SPORADIC_SERVER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Process Sporadic Server option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SYNCHRONIZED_IO\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Synchronized Input and Output option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_ATTR_STACKADDR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the thread stack address attribute option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_ATTR_STACKSIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the thread stack size attribute option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_CPUTIME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Thread CPU-Time Clocks option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_PROCESS_SHARED\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the process-shared synchronization option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_SAFE_FUNCTIONS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the thread-safe functions option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREAD_SPORADIC_SERVER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Thread Sporadic Server option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_THREADS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the threads option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TIMERS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Timers option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TIMEOUTS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Timeouts option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Trace option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_EVENT_FILTER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Trace Event Filter option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_INHERIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Trace Inherit option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TRACE_LOG\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Trace Log option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_TYPED_MEMORY_OBJECTS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Typed Memory Objects option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_V6_ILP32_OFF32\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with 32-bit
+\fBint\fR, \fBlong\fR, and \fBpointer\fR types and an \fBoff_t\fR type using at
+least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_V6_ILP32_OFFBIG\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with 32-bit
+\fBint\fR, long\fB\fR, and \fBpointer\fR types and an \fBoff_t\fR type using at
+least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_V6_LP64_OFF64\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with 32-bit
+\fBint\fR and 64-bit \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_V6_LPBIG_OFFBIG\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with an \fBint\fR
+type using at least 32 bits and \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR
+types using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_XOPEN_STREAMS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the XSI STREAMS Option Group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_C_BIND\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the C Language Binding option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_C_DEV\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the C Language Development Utilities option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_CHAR_TERM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports at least one terminal type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_LOCALEDEF\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the creation of locales by the \fBlocaledef\fR(1)
+utility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_PBS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Batch Environment Services and Utilities option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_PBS_ACCOUNTING\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Batch Accounting option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_PBS_CHECKPOINT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Batch Checkpoint/Restart option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_PBS_LOCATE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Locate Batch Job Request option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_PBS_MESSAGE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Batch Job Message Request option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_PBS_TRACK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Track Batch Job Request option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_SW_DEV\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Software Development Utilities option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX2_UPE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the User Portability Utilities option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XBS5_ILP32_OFF32\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with 32-bit
+\fBint\fR, \fBlong\fR, \fBpointer\fR and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XBS5_ILP32_OFFBIG\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with 32-bit
+\fBint\fR, \fBlong\fR and \fBpointer\fR types and an \fBoff_t\fR type using at
+least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XBS5_LP64_OFF64\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with 32-bit
+\fBint\fR and 64-bit \fBlong\fR, \fBpointer\fR and \fBoff_t\fR types.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XBS5_LPBIG_OFFBIG\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation provides a C-language compilation environment with an \fBint\fR
+type using at least 32 bits and \fBlong\fR, \fBpointer\fR and \fBoff_t\fR types
+using at least 64 bits.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_ENH_I18N\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Issue 4, Version 2 Enhanced Internationalization
+Feature Group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_LEGACY\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Legacy Feature Group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_REALTIME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the X/Open Realtime Feature Group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_SHM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Implementation supports the Issue 4, Version 2 Shared Memory Feature Group.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_UNIX\fR\fR
+.ad
+.sp .6
+.RS 4n
+X/Open CAE Specification, January 1997, System Interfaces and Headers, Issue 5
+(ISBN: 1-85912-181-0, C606).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_XPG3\fR\fR
+.ad
+.sp .6
+.RS 4n
+X/Open Specification, February 1992, System Interfaces and Headers, Issue 3
+(ISBN: 1-872630-37-5, C212); this specification was formerly X/Open Portability
+Guide, Issue 3, Volume 2, January 1989, XSI System Interface and Headers (ISBN:
+0-13-685843-0, XO/XPG/89/003).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_XOPEN_XPG4\fR\fR
+.ad
+.sp .6
+.RS 4n
+X/Open CAE Specification, July 1992, System Interfaces and Headers, Issue 4
+(ISBN: 1-872630-47-2, C202).
+.RE
+
+.SS "Execution-time Symbolic Constants"
+.sp
+.LP
+If any of the following constants are not defined in the header
+\fB<unistd.h>\fR, the value varies depending on the file to which it is
+applied.
+.sp
+.LP
+If any of the following constants are defined to have value \(mi1 in the header
+\fB<unistd.h>\fR, the implementation will not provide the option on any file;
+if any are defined to have a value other than \(mi1 in the header
+\fB<unistd.h>\fR, the implementation will provide the option on all applicable
+files.
+.sp
+.LP
+All of the following constants, whether defined in \fB<unistd.h>\fR or not, can
+be queried with respect to a specific file using the \fBpathconf()\fR or
+\fBfpathconf()\fR functions.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_ASYNC_IO\fR\fR
+.ad
+.RS 19n
+.rt  
+Asynchronous input or output operations can be performed for the associated
+file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_PRIO_IO\fR\fR
+.ad
+.RS 19n
+.rt  
+Prioritized input or output operations can be performed for the associated
+file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_POSIX_SYNC_IO\fR\fR
+.ad
+.RS 19n
+.rt  
+Synchronized input or output operations can be performed for the associated
+file.
+.RE
+
+.SS "Constants for Functions"
+.sp
+.LP
+The following constant is defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fINULL\fR\fR
+.ad
+.RS 8n
+.rt  
+Null pointer.
+.RE
+
+.sp
+.LP
+The following symbolic constants are defined for the \fBaccess\fR(2) function:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBR_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for read permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBW_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for write permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBX_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for execute (search) permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF_OK\fR\fR
+.ad
+.RS 8n
+.rt  
+Test for existence of file.
+.RE
+
+.sp
+.LP
+The constants \fBF_OK\fR, \fBR_OK\fR, \fBW_OK\fR, and \fBX_OK\fR, and the
+expressions \fBR_OK\||\|W_OK\fR, \fBR_OK\||\|X_OK\fR, and
+\fBR_OK\||\|W_OK\||\|X_OK\fR all have distinct values.
+.sp
+.LP
+The following symbolic constants are defined for the  \fBlockf\fR(3C) function:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF_ULOCK\fR\fR
+.ad
+.RS 11n
+.rt  
+Unlock a previously locked region.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF_LOCK\fR\fR
+.ad
+.RS 11n
+.rt  
+Lock a region for exclusive use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF_TLOCK\fR\fR
+.ad
+.RS 11n
+.rt  
+Test and lock a region for exclusive use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF_TEST\fR\fR
+.ad
+.RS 11n
+.rt  
+Test a region for other processes locks.
+.RE
+
+.sp
+.LP
+The following symbolic constants are defined for the  \fBlseek\fR(2) and
+\fBfcntl\fR(2) functions (they have distinct values):
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEEK_SET\fR\fR
+.ad
+.RS 12n
+.rt  
+Set file offset to \fIoffset\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEEK_CUR\fR\fR
+.ad
+.RS 12n
+.rt  
+Set file offset to current plus \fIoffset\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSEEK_END\fR\fR
+.ad
+.RS 12n
+.rt  
+Set file offset to EOF plus \fIoffset\fR.
+.RE
+
+.sp
+.LP
+The following symbolic constants are defined for the \fBconfstr\fR(3C) function
+for both SPARC and x86:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fB_CS_LFS64_CFLAGS\fR\fB_CS_LFS64_LDFLAGS\fR
+\fB_CS_LFS64_LIBS\fR\fB_CS_LFS64_LINTFLAGS\fR
+\fB_CS_LFS_CFLAGS\fR\fB_CS_LFS_LDFLAGS\fR
+\fB_CS_LFS_LIBS\fR\fB_CS_LFS_LINTFLAGS\fR
+\fB_CS_PATH\fR\fB_CS_POSIX_V6_ILP32_OFF32_CFLAGS\fR
+\fB_CS_POSIX_V6_ILP32_OFF32_LDFLAGS\fR\fB_CS_POSIX_V6_ILP32_OFF32_LIBS\fR
+\fB_CS_POSIX_V6_ILP32_OFF32_LINTFLAGS\fR\fB_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS\fR
+\fB_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS\fR\fB_CS_POSIX_V6_ILP32_OFFBIG_LIBS\fR
+\fB_CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS\fR\fB_CS_POSIX_V6_WIDTH_RESTRICTED_ENV\fR
+\fB_CS_XBS5_ILP32_OFF32_CFLAGS\fR\fB_CS_XBS5_ILP32_OFF32_LDFLAGS\fR
+\fB_CS_XBS5_ILP32_OFF32_LIBS\fR\fB_CS_XBS5_ILP32_OFF32_LINTFLAGS\fR
+\fB_CS_XBS5_ILP32_OFFBIG_CFLAGS\fR\fB_CS_XBS5_ILP32_OFFBIG_LDFLAGS\fR
+\fB_CS_XBS5_ILP32_OFFBIG_LIBS\fR\fB_CS_XBS5_ILP32_OFFBIG_LINTFLAGS\fR
+.TE
+
+.sp
+.LP
+The followwing symbolic constants are defined for the \fBconfstr()\fR function
+for SPARC only:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fB_CS_POSIX_V6_LP64_OFF64_CFLAGS\fR\fB_CS_POSIX_V6_LP64_OFF64_LDFLAGS\fR
+\fB_CS_POSIX_V6_LP64_OFF64_LIBS\fR\fB_CS_POSIX_V6_LP64_OFF64_LINTFLAGS\fR
+\fB_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS\fR\fB_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS\fR
+\fB_CS_POSIX_V6_LPBIG_OFFBIG_LIBS\fR\fB_CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS\fR
+\fB_CS_XBS5_LP64_OFF64_CFLAGS\fR\fB_CS_XBS5_LP64_OFF64_LDFLAGS\fR
+\fB_CS_XBS5_LP64_OFF64_LIBS\fR\fB_CS_XBS5_LP64_OFF64_LINTFLAGS\fR
+\fB_CS_XBS5_LPBIG_OFFBIG_CFLAGS\fR\fB_CS_XBS5_LPBIG_OFFBIG_LDFLAGS\fR
+\fB_CS_XBS5_LPBIG_OFFBIG_LIBS\fR\fB_CS_XBS5_LPBIG_OFFBIG_LINTFLAGS\fR
+.TE
+
+.sp
+.LP
+The following symbolic constants are defined for the \fBsysconf\fR(3C)
+function:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fB_SC_2_C_BIND\fR\fB_SC_2_C_DEV\fR
+\fB_SC_2_C_VERSION\fR\fB_SC_2_FORT_DEV\fR
+\fB_SC_2_FORT_RUN\fR\fB_SC_2_LOCALEDEF\fR
+\fB_SC_2_PBS\fR\fB_SC_2_PBS_ACCOUNTING\fR
+\fB_SC_2_PBS_CHECKPOINT\fR\fB_SC_2_PBS_LOCATE\fR
+\fB_SC_2_PBS_MESSAGE\fR\fB_SC_2_PBS_TRACK\fR
+\fB_SC_2_SW_DEV\fR\fB_SC_2_UPE\fR
+\fB_SC_2_VERSION\fR\fB_SC_ADVISORY_INFO\fR
+\fB_SC_AIO_LISTIO_MAX\fR\fB_SC_AIO_MAX\fR
+\fB_SC_AIO_PRIO_DELTA_MAX\fR\fB_SC_ARG_MAX\fR
+\fB_SC_ASYNCHRONOUS_IO\fR\fB_SC_ATEXIT_MAX\fR
+\fB_SC_AVPHYS_PAGES\fR\fB_SC_BARRIERS\fR
+\fB_SC_BC_BASE_MAX\fR\fB_SC_BC_DIM_MAX\fR
+\fB_SC_BC_SCALE_MAX\fR\fB_SC_BC_STRING_MAX\fR
+\fB_SC_CHILD_MAX\fR\fB_SC_CLK_TCK\fR
+\fB_SC_CLOCK_SELECTION\fR\fB_SC_COLL_WEIGHTS_MAX\fR
+\fB_SC_CPUTIME\fR\fB_SC_DELAYTIMER_MAX\fR
+\fB_SC_EXPR_NEST_MAX\fR\fB_SC_FSYNC\fR
+\fB_SC_GETGR_R_SIZE_MAX\fR\fB_SC_GETPW_R_SIZE_MAX\fR
+\fB_SC_HOST_NAME_MAX\fR\fB_SC_IOV_MAX\fR
+\fB_SC_IPV6\fR\fB_SC_JOB_CONTROL\fR
+\fB_SC_LINE_MAX\fR\fB_SC_LOGIN_NAME_MAX\fR
+\fB_SC_LOGNAME_MAX\fR\fB_SC_MAPPED_FILES\fR
+\fB_SC_MEMLOCK\fR\fB_SC_MEMLOCK_RANGE\fR
+\fB_SC_MEMORY_PROTECTION\fR\fB_SC_MESSAGE_PASSING\fR
+\fB_SC_MONOTONIC_CLOCK\fR\fB_SC_MQ_OPEN_MAX\fR
+\fB_SC_MQ_PRIO_MAX\fR\fB_SC_NGROUPS_MAX\fR
+\fB_SC_NPROCESSORS_CONF\fR\fB_SC_NPROCESSORS_ONLN\fR
+\fB_SC_OPEN_MAX\fR\fB_SC_PAGESIZE\fR
+\fB_SC_PAGE_SIZE\fR\fB_SC_PASS_MAX\fR
+\fB_SC_PHYS_PAGES\fR\fB_SC_PRIORITIZED_IO\fR
+\fB_SC_PRIORITY_SCHEDULING\fR\fB_SC_RAW_SOCKETS\fR
+\fB_SC_READER_WRITER_LOCKS\fR\fB_SC_REALTIME_SIGNALS\fR
+\fB_SC_REGEXP\fR\fB_SC_RE_DUP_MAX\fR
+\fB_SC_RTSIG_MAX\fR\fB_SC_SAVED_IDS\fR
+\fB_SC_SEMAPHORES\fR\fB_SC_SEM_NSEMS_MAX\fR
+\fB_SC_SEM_VALUE_MAX\fR\fB_SC_SHARED_MEMORY_OBJECTS\fR
+\fB_SC_SHELL\fR\fB_SC_SIGQUEUE_MAX\fR
+\fB_SC_SPAWN\fR\fB_SC_SPIN_LOCKS\fR
+\fB_SC_SPORADIC_SERVER\fR\fB_SC_SS_REPL_MAX\fR
+\fB_SC_STREAM_MAX\fR\fB_SC_SYMLOOP_MAX\fR
+\fB_SC_SYNCHRONIZED_IO\fR\fB_SC_THREAD_ATTR_STACKADDR\fR
+\fB_SC_THREAD_ATTR_STACKSIZE\fR\fB_SC_THREAD_CPUTIME\fR
+\fB_SC_THREAD_DESTRUCTOR_ITERATIONS\fR\fB_SC_THREAD_KEYS_MAX\fR
+\fB_SC_THREAD_PRIO_INHERIT\fR\fB_SC_THREAD_PRIO_PROTECT\fR
+\fB_SC_THREAD_PRIORITY_SCHEDULING\fR\fB_SC_THREAD_PROCESS_SHARED\fR
+\fB_SC_THREAD_SPORADIC_SERVER\fR\fB_SC_THREADS\fR
+\fB_SC_THREAD_SAFE_FUNCTIONS\fR\fB_SC_THREAD_STACK_MIN\fR
+\fB_SC_THREAD_THREADS_MAX\fR\fB_SC_TIMEOUTS\fR
+\fB_SC_TIMER_MAX\fR\fB_SC_TIMERS\fR
+\fB_SC_TRACE\fR\fB_SC_TRACE_EVENT_FILTER\fR
+\fB_SC_TRACE_EVENT_NAME_MAX\fR\fB_SC_TRACE_INHERIT\fR
+\fB_SC_TRACE_LOG\fR\fB_SC_TRACE_NAME_MAX\fR
+\fB_SC_TRACE_SYS_MAX\fR\fB_SC_TRACE_USER_EVENT_MAX\fR
+\fB_SC_TTY_NAME_MAX\fR\fB_SC_TYPED_MEMORY_OBJECTS\fR
+\fB_SC_TZNAME_MAX\fR\fB_SC_V6_ILP32_OFF32\fR
+\fB_SC_V6_ILP32_OFFBIG\fR\fB_SC_V6_LP64_OFF64\fR
+\fB_SC_V6_LPBIG_OFFBIG\fR\fB_SC_VERSION\fR
+\fB_SC_XBS5_ILP32_OFF32\fR\fB_SC_XBS5_ILP32_OFFBIG\fR
+\fB_SC_XBS5_LP64_OFF64\fR\fB_SC_XBS5_LPBIG_OFFBIG\fR
+\fB_SC_XOPEN_CRYPT\fR\fB_SC_XOPEN_ENH_I18N\fR
+\fB_SC_XOPEN_SHM\fR\fB_SC_XOPEN_STREAMS\fR
+\fB_SC_XOPEN_UNIX\fR\fB_SC_XOPEN_VERSION\fR
+\fB_SC_XOPEN_XCU_VERSION\fR
+.TE
+
+.sp
+.LP
+The constants \fB_SC_PAGESIZE\fR and \fB_SC_PAGE_SIZE\fR can be defined to have
+the same value.
+.sp
+.LP
+The following symbolic constants are defined for the \fBfpathconf\fR(2)
+function:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fB_PC_2_SYMLINKS\fR\fB_PC_ALLOC_SIZE_MIN\fR
+\fB_PC_ASYNC_IO\fR\fB_PC_CHOWN_RESTRICTED\fR
+\fB_PC_FILESIZEBITS\fR\fB_PC_LINK_MAX\fR
+\fB_PC_MAX_CANON\fR\fB_PC_MAX_INPUT\fR
+\fB_PC_NAME_MAX\fR\fB_PC_NO_TRUNC\fR
+\fB_PC_PATH_MAX\fR\fB_PC_PIPE_BUF\fR
+\fB_PC_PRIO_IO\fR\fB_PC_REC_INCR_XFER_SIZE\fR
+\fB_PC_REC_MAX_XFER_SIZE\fR\fB_PC_REC_MIN_XFER_SIZE\fR
+\fB_PC_REC_XFER_ALIGN\fR\fB_PC_SYMLINK_MAX\fR
+\fB_PC_SYNC_IO\fR\fB_PC_TIMESTAMP_RESOLUTION\fR
+\fB_PC_VDISABLE\fR\fB_PC_XATTR_ENABLED\fR
+\fB_PC_XATTR_EXISTS\fR
+.TE
+
+.sp
+.LP
+The following symbolic constants are defined for file streams:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTDIN_FILENO\fR\fR
+.ad
+.RS 17n
+.rt  
+File number (\fB0\fR) of \fBstdin\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTDOUT_FILENO\fR\fR
+.ad
+.RS 17n
+.rt  
+File number (\fB1\fR) of \fBstout\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTDERR_FILENO\fR\fR
+.ad
+.RS 17n
+.rt  
+File number (\fB2\fR) of \fBstderr\fR.
+.RE
+
+.sp
+.LP
+The following pathnames are defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGF_PATH\fR\fR
+.ad
+.RS 11n
+.rt  
+Pathname of the group file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPF_PATH\fR\fR
+.ad
+.RS 11n
+.rt  
+Pathname of the passwd file.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaccess\fR(2), \fBexec\fR(2), \fBfcntl\fR(2), \fBfpathconf\fR(2),
+\fBlseek\fR(2), \fBconfstr\fR(3C), \fBlockf\fR(3C), \fBsysconf\fR(3C),
+\fBtermios\fR(3C), \fBgroup\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5),
+\fBstandards\fR(5), \fBtermio\fR(7I)

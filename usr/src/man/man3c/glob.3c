@@ -1,0 +1,461 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH glob 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+glob, globfree \- generate path names matching a pattern
+.SH SYNOPSIS
+.LP
+.nf
+#include <glob.h>
+
+\fBint\fR \fBglob\fR(\fBconst char *restrict\fR \fIpattern\fR, \fBint\fR \fIflags\fR,
+     \fBint(*\fR\fIerrfunc\fR)(const char *\fIepath\fR, int \fIeerrno)\fR,
+     \fBglob_t *restrict\fR \fIpglob\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBglobfree\fR(\fBglob_t *\fR\fIpglob\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBglob()\fR function is a path name generator.
+.sp
+.LP
+The \fBglobfree()\fR function frees any memory allocated by \fBglob()\fR
+associated with \fIpglob\fR.
+.SS "\fIpattern\fR Argument"
+.sp
+.LP
+The argument \fIpattern\fR is a pointer to a path name pattern to be expanded.
+The \fBglob()\fR function matches all accessible path names against this
+pattern and develops a list of all path names that match. In order to have
+access to a path name, \fBglob()\fR requires search permission on every
+component of a path except the last, and read permission on each directory of
+any filename component of \fIpattern\fR that contains any of the following
+special characters:
+.sp
+.in +2
+.nf
+*        ?        [
+.fi
+.in -2
+
+.SS "\fIpglob\fR Argument"
+.sp
+.LP
+The structure type \fBglob_t\fR is defined in the header \fB<glob.h>\fR and
+includes at least the following members:
+.sp
+.in +2
+.nf
+size_t   gl_pathc;     /* count of paths matched by */
+                       /* pattern */
+char     **gl_pathv;   /* pointer to list of matched */
+                       /* path names */
+size_t   gl_offs;      /* slots to reserve at beginning */
+                       /* of gl_pathv */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBglob()\fR function stores the number of matched path names into
+\fIpglob\(mi>\fR\fBgl_pathc\fR and a pointer to a list of pointers to path
+names into \fIpglob\(mi>\fR\fBgl_pathv.\fR The path names are in sort order as
+defined by the current setting of the  \fBLC_COLLATE\fR category. The first
+pointer after the last path name is a \fINULL\fR pointer. If the pattern does
+not match any path names, the returned number of matched paths is set to 0, and
+the contents of \fIpglob\(mi>\fR\fBgl_pathv\fR are implementation-dependent.
+.sp
+.LP
+It is the caller's responsibility to create the structure pointed to by
+\fIpglob\fR. The \fBglob()\fR function allocates other space as needed,
+including the memory pointed to by \fBgl_pathv\fR. The \fBglobfree()\fR
+function frees any space associated with \fIpglob\fR from a previous call to
+\fBglob()\fR.
+.SS "\fIflags\fR Argument"
+.sp
+.LP
+The \fIflags\fR argument is used to control the behavior of \fBglob()\fR. The
+value of \fIflags\fR is a bitwise inclusive \fBOR\fR of zero or more of the
+following constants, which are defined in the header <\fBglob.h\fR>:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_APPEND\fR\fR
+.ad
+.RS 17n
+.rt  
+Append path names generated to the ones from a previous call to \fBglob()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_DOOFFS\fR\fR
+.ad
+.RS 17n
+.rt  
+Make use of \fIpglob\(mi>\fR\fBgl_offs\fR\fI\&.\fR If this flag is set,
+\fIpglob\(mi>\fR\fBgl_offs\fR is used to specify how many \fINULL\fR pointers
+to add to the beginning of \fIpglob\(mi>\fR\fBgl_pathv\fR\fI\&.\fR In other
+words, \fIpglob\(mi>\fR\fBgl_pathv\fR will point to
+\fIpglob\(mi>\fR\fBgl_offs\fR \fINULL\fR pointers, followed by
+\fIpglob\(mi>\fR\fBgl_pathc\fR path name pointers, followed by a \fINULL\fR
+pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_ERR\fR\fR
+.ad
+.RS 17n
+.rt  
+Causes \fBglob()\fR to return when it encounters a directory that it cannot
+open or read. Ordinarily, \fBglob()\fR continues to find matches.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_MARK\fR\fR
+.ad
+.RS 17n
+.rt  
+Each path name that is a directory that matches \fIpattern\fR has a slash
+appended.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_NOCHECK\fR\fR
+.ad
+.RS 17n
+.rt  
+If \fIpattern\fR does not match any path name, then \fBglob()\fR returns a list
+consisting of only \fIpattern\fR, and the number of matched path names is 1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_NOESCAPE\fR\fR
+.ad
+.RS 17n
+.rt  
+Disable backslash escaping.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_NOSORT\fR\fR
+.ad
+.RS 17n
+.rt  
+Ordinarily, \fBglob()\fR sorts the matching path names according to the current
+setting of the \fBLC_COLLATE\fR category.  When this flag is used the order of
+path names returned is unspecified.
+.RE
+
+.sp
+.LP
+The \fBGLOB_APPEND\fR flag can be used to append a new set of path names to
+those found in a previous call to \fBglob()\fR. The following rules apply when
+two or more calls to \fBglob()\fR are made with the same value of \fIpglob\fR
+and without intervening calls to \fBglobfree()\fR:
+.RS +4
+.TP
+1.
+The first such call must not set \fBGLOB_APPEND.\fR All subsequent calls
+must set it.
+.RE
+.RS +4
+.TP
+2.
+All the calls must set \fBGLOB_DOOFFS,\fR or all must not set it.
+.RE
+.RS +4
+.TP
+3.
+After the second call, \fIpglob\(mi>\fR\fBgl_pathv\fR points to a list
+containing the following:
+.RS +4
+.TP
+a.
+Zero or more \fINULL\fR pointers, as specified by \fBGLOB_DOOFFS\fR and
+\fIpglob\(mi>\fR\fBgl_offs\fR.
+.RE
+.RS +4
+.TP
+b.
+Pointers to the path names that were in the \fIpglob\(mi>\fR\fBgl_pathv\fR
+list before the call, in the same order as before.
+.RE
+.RS +4
+.TP
+c.
+Pointers to the new path names generated by the second call, in the
+specified order.
+.RE
+.RE
+.RS +4
+.TP
+4.
+The count returned in \fIpglob\(mi>\fR\fBgl_pathc\fR will be the total
+number of path names from the two calls.
+.RE
+.RS +4
+.TP
+5.
+The application can change any of the fields after a call to \fBglob()\fR.
+If it does, it must reset them to the original value before a subsequent call,
+using the same \fIpglob\fR value, to \fBglobfree()\fR or \fBglob()\fR with the
+\fBGLOB_APPEND\fR flag.
+.RE
+.SS "\fIerrfunc\fR and \fIepath\fR Arguments"
+.sp
+.LP
+If, during the search, a directory is encountered that cannot be opened or read
+and \fIerrfunc\fR is not a \fINULL\fR pointer, \fBglob()\fR calls
+\fB(\fR\fI*errfunc\fR\fB)\fR with two arguments:
+.RS +4
+.TP
+1.
+The \fIepath\fR argument is a pointer to the path that failed.
+.RE
+.RS +4
+.TP
+2.
+The \fIeerrno\fR argument is the value of \fIerrno\fR from the failure, as
+set by the \fBopendir\fR(3C), \fBreaddir\fR(3C) or \fBstat\fR(2) functions.
+(Other values may be used to report other errors not explicitly documented for
+those functions.)
+.RE
+.sp
+.LP
+The following constants are defined as error return values for \fBglob()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_ABORTED\fR\fR
+.ad
+.RS 16n
+.rt  
+The scan was stopped because \fBGLOB_ERR\fR was set or
+\fB(\fR\fI*errfunc\fR\fB)\fR returned non-zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOB_NOMATCH\fR\fR
+.ad
+.RS 16n
+.rt  
+The pattern does not match any existing path name, and \fBGLOB_NOCHECK\fR was
+not set in flags.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGLOG_NOSPACE\fR\fR
+.ad
+.RS 16n
+.rt  
+An attempt to allocate memory failed.
+.RE
+
+.sp
+.LP
+If \fB(\fR\fI*errfunc\fR\fB)\fR is called and returns non-zero, or if the
+\fBGLOB_ERR\fR flag is set in \fIflags\fR, \fBglob()\fR stops the scan and
+returns \fBGLOB_ABORTED\fR after setting \fIgl_pathc\fR and \fIgl_pathv\fR in
+\fIpglob\fR to reflect the paths already scanned. If \fBGLOB_ERR\fR is not set
+and either \fIerrfunc\fR is a \fINULL\fR pointer or
+\fB(\fR\fI*errfunc\fR\fB)\fR returns 0, the error is ignored.
+.SH RETURN VALUES
+.sp
+.LP
+The following values are returned by \fBglob()\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion. The argument \fIpglob\(mi>\fR\fBgl_pathc\fR returns the
+number of matched path names and the argument \fIpglob\(mi>\fR\fBgl_pathv\fR
+contains a pointer to a null-terminated list of matched and sorted path names.
+However, if \fIpglob\(mi>\fR\fBgl_pathc\fR is 0, the content of
+\fIpglob\(mi>\fR\fBgl_pathv\fR is undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+An error has occurred. Non-zero constants are defined in <\fBglob.h\fR>. The
+arguments \fIpglob\(mi>\fR\fBgl_pathc\fR and \fIpglob\(mi>\fR\fBgl_pathv\fR are
+still set as defined above.
+.RE
+
+.sp
+.LP
+The \fBglobfree()\fR function returns no value.
+.SH USAGE
+.sp
+.LP
+This function is not provided for the purpose of enabling utilities to perform
+path name expansion on their arguments, as this operation is performed by the
+shell, and utilities are explicitly not expected to redo this. Instead, it is
+provided for applications that need to do path name expansion on strings
+obtained from other sources, such as a pattern typed by a user or read from a
+file.
+.sp
+.LP
+If a utility needs to see if a path name matches a given pattern, it can use
+\fBfnmatch\fR(3C).
+.sp
+.LP
+Note that \fBgl_pathc\fR and \fBgl_pathv\fR have meaning even if \fBglob()\fR
+fails. This allows \fBglob()\fR to report partial results in the event of an
+error. However, if \fBgl_pathc\fR is 0, \fBgl_pathv\fR is unspecified even if
+\fBglob()\fR did not return an error.
+.sp
+.LP
+The \fBGLOB_NOCHECK\fR option could be used when an application wants to expand
+a path name if wildcards are specified, but wants to treat the pattern as just
+a string otherwise.
+.sp
+.LP
+The new path names generated by a subsequent call with \fBGLOB_APPEND\fR are
+not sorted together with the previous path names. This mirrors the way that the
+shell handles path name expansion when multiple expansions are done on a
+command line.
+.sp
+.LP
+Applications that need tilde and parameter expansion should use the
+\fBwordexp\fR(3C) function.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBglob_doofs\fR function.
+.sp
+.LP
+One use of the \fBGLOB_DOOFFS\fR flag is by applications that build an argument
+list for use with the \fBexecv()\fR, \fBexecve()\fR, or \fBexecvp()\fR
+functions (see \fBexec\fR(2)). Suppose, for example, that an application wants
+to do the equivalent of:
+
+.sp
+.in +2
+.nf
+\fBls\fR \fB-l\fR *.c
+.fi
+.in -2
+
+.sp
+.LP
+but for some reason:
+
+.sp
+.in +2
+.nf
+system("ls -l *.c")
+.fi
+.in -2
+
+.sp
+.LP
+is not acceptable. The application could obtain approximately the same result
+using the sequence:
+
+.sp
+.in +2
+.nf
+globbuf.gl_offs = 2;
+glob ("*.c", GLOB_DOOFFS, NULL, &globbuf);
+globbuf.gl_pathv[0] = "ls";
+globbuf.gl_pathv[1] = "-l";
+execvp ("ls", &globbuf.gl_pathv[0]);
+.fi
+.in -2
+
+.sp
+.LP
+Using the same example:
+
+.sp
+.in +2
+.nf
+\fBls\fR \fB-l\fR *.c *.h
+.fi
+.in -2
+
+.sp
+.LP
+could be approximately simulated using \fBGLOB_APPEND\fR as follows:
+
+.sp
+.in +2
+.nf
+\fBglobbuf.gl_offs = 2;
+glob ("*.c", GLOB_DOOFFS, NULL, &globbuf);
+glob ("*.h", GLOB_DOOFFS|GLOB_APPEND, NULL, &globbuf);
+\&.\|.\|.\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexecv\fR(2), \fBstat\fR(2), \fBfnmatch\fR(3C), \fBopendir\fR(3C),
+\fBreaddir\fR(3C), \fBwordexp\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

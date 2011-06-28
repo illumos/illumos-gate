@@ -1,0 +1,501 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kmdb 1 "3 May 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+kmdb \- in situ kernel debugger
+.SH SYNOPSIS
+.SS "Boot-time Loading"
+.sp
+.LP
+SPARC
+.LP
+.nf
+\fBok boot\fR [\fIdevice-specifier\fR] \fB-k\fR [\fB-d\fR] [\fIboot-flags\fR]
+.fi
+
+.LP
+.nf
+\fBok boot\fR [\fIdevice-specifier\fR] kmdb [\fB-d\fR] [\fIboot-flags\fR]
+.fi
+
+.sp
+.LP
+x86
+.LP
+.nf
+\fBkernel$\fR \fB/platform/i86pc/kernel/$ISADIR/unix\fR \fB-k\fR [\fB-d\fR] [\fIboot-flags\fR]
+.fi
+
+.SS "Runtime Loading"
+.LP
+.nf
+\fBmdb\fR \fB-K\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBkmdb\fR is an interactive kernel debugger which implements the user
+interface and functionality of \fBmdb\fR(1) in a live kernel context.
+\fBkmdb\fR provides features that allow for the control of kernel execution and
+for the inspection and modification of live kernel state. \fBkmdb\fR can be
+loaded at the beginning of a boot session or after the system is booted.
+.sp
+.LP
+This man page describes the features and functionality that are unique to
+\fBkmdb\fR or different in \fBkmdb\fR as compared to \fBmdb\fR(1). For more
+information on \fBmdb\fR(1) or further details on the features and
+functionality implemented by \fBkmdb\fR, see the \fBmdb\fR(1) man page and the
+\fISolaris Modular Debugger Guide\fR.
+.SS "Loading and Unloading"
+.sp
+.ne 2
+.mk
+.na
+\fBBoot-time Loading\fR
+.ad
+.RS 21n
+.rt  
+When requested, the kernel runtime linker (\fBkrtld\fR) loads \fBkmdb\fR prior
+to the transfer of control to the kernel. If the \fB-d\fR flag is used, the
+debugger gains control of the system prior to the execution of the initial
+function in the 'unix' object. If \fB-d\fR is not used, \fBkmdb\fR is loaded
+but does not gain control until such time as it is explicitly entered. See the
+Debugger Entry section below. For a list of the boot commands which cause
+\fBkmdb\fR to be loaded at boot, see the SYNOPSIS section above.
+.sp
+Boot-loaded \fBkmdb\fR can be unloaded only by means of a system reboot.
+.sp
+Some features of \fBkmdb\fR rely on the presence of kernel services and are not
+immediately available to boot-loaded \fBkmdb\fR. In particular, the loading and
+unloading of dmods is not available until the module subsystem is initialized.
+Requests are queued until they can be processed. Similarly, translation of
+virtual addresses to physical addresses is not be available until the VM system
+has been initialized. Attempted translations fail until translation facilities
+are available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBRun-time Loading\fR
+.ad
+.RS 21n
+.rt  
+\fBkmdb\fR can also be loaded after the system has booted, using the \fB-K\fR
+flag to \fBmdb\fR(1). When loaded in this fashion, it will immediately gain
+control of the system. Run-time-loaded \fBkmdb\fR can be unloaded using the
+\fB-U\fR flag to \fBmdb\fR(1) or from within the debugger with the \fB-u\fR
+flag to the \fB::quit dcmd\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBTerminal types\fR
+.ad
+.RS 21n
+.rt  
+When loaded, \fBkmdb\fR attempts to determine the proper terminal type in use
+on the system console. If the system being debugged has an attached keyboard
+and local display that are both used for the system console, \fBkmdb\fR uses
+the terminal type appropriate for the machine: 'sun' for SPARC; 'sun-color' for
+x86. When a serial console is in use, boot-loaded \fBkmdb\fR defaults to a
+terminal type 'vt100'. Run-time-loaded \fBkmdb\fR defaults to the terminal type
+requested by \fBmdb\fR(1). \fBmdb\fR(1) requests the terminal type specified by
+the value of the \fBTERM\fR environment variable unless overridden by the
+\fB-T\fR flag. \fB::term\fR can be used to view the current terminal type.
+.RE
+
+.SS "Debugger Entry"
+.sp
+.LP
+Debugger entry can be requested explicitly or implicitly. Implicit entry,
+encountered when breakpoints or other execution control features are used, is
+discussed in the \fBExecution Control\fR section.
+.sp
+.LP
+The primary means for explicit debugger entry is with the keyboard abort
+sequence for systems with local consoles and the BREAK character for those with
+serial consoles. The abort sequence is STOP-A or Shift-Pause for SPARC systems
+with local consoles, and F1-A or Shift-Pause for x86 systems with local
+consoles. See \fBkbd\fR(1) for a discussion of the abort sequence and for
+instructions on disabling it.
+.sp
+.LP
+A second way to request entry into the debugger is with the \fBmdb\fR(1)
+command. Invocations of \fBmdb\fR(1) with the \fB-K\fR flag after the debugger
+is loaded trigger debugger entry.
+.sp
+.LP
+If the kernel panics and \fBkmdb\fR is loaded, by default, the panic routine
+enters \fBkmdb\fR for live debugging. If a dump device is specified, and you
+enter \fB::cont\fR, the debugger exits and a crash dump is performed. To
+prevent the kernel from entering \fBkmdb\fR when panicking, you can set the
+\fBnopanicdebug\fR variable to \fB1\fR. Set the \fBnopanicdebug\fR variable to
+\fB1\fR using \fBkmdb\fR or including the following a line in
+\fB/etc/system\fR:
+.sp
+.in +2
+.nf
+set nopanicdebug = 1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This can be useful if you want to keep \fBkmdb\fR loaded, but always want a
+panic to trigger a crash dump without entering the debugger.
+.SS "Execution Control"
+.sp
+.LP
+For the most part, the execution control facilities provided by \fBkmdb\fR for
+the kernel mirror those provided by the \fBmdb\fR(1) process target.
+Breakpoints (\fB::bp\fR), watchpoints (\fB::wp\fR), \fB::continue\fR, and the
+various flavors of \fB::step\fR can be used.
+.sp
+.LP
+In contrast to the unlimited user process watchpoints supplied by the kernel,
+\fBkmdb\fR is restricted to a set of CPU watchpoints that limit the number,
+size, and type of watchpoints allowed. The \fB::wp\fR command does not allow a
+watchpoint to be created if it is incompatible with the watchpoints supported
+by the hardware.
+.SS "Debugger modules (dmods)"
+.sp
+.LP
+As with \fBmdb\fR(1), \fBkmdb\fR is installed with a number of
+subsystem-specific debugger modules, or dmods. The dmods are loaded and
+unloaded automatically with the loading and unloading of the subsystems that
+they support. The dmods can also be explicitly loaded and unloaded using
+\fB::load\fR and \fB::unload\fR.
+.sp
+.LP
+\fBkmdb\fR uses kernel facilities to load and unload dmods and must resume
+system execution to perform each requested action. When a dmod load or unload
+is complete, the system is stopped and the debugger is automatically
+re-entered. For a dmod load, processing is completed when the load of a
+requested dmod succeeds or fails. Status messages are provided in either case.
+.SS "Processor-specific functionality"
+.sp
+.LP
+Some functionality is specific to an individual processor type. An example of
+such functionality is the branch tracing provided by various x86 processors.
+Access to these processor-specific features is provided with processor-specific
+dcmds that are present only on systems that support them. The availability of
+processor-specific support is indicated in the output of the \fB::status
+dcmd\fR. The debugger relies on the kernel to determine the processor type.
+Even though the debugger might provide support for a given processor type, the
+support is not exposed until the kernel has progressed to the point at which
+processor identification has completed.
+.SS "Kernel Macros"
+.sp
+.LP
+The debugger provides access to a set of macros that are precompiled into the
+debugger. Only the precompiled macros are available . Unlike with \fBmdb\fR(1),
+the \fB$< dcmd\fR may not be used to load macros from arbitrary locations. Use
+the \fB$M\fR command to list the available macros.
+.SS "Built-in dcmds"
+.sp
+.LP
+This section lists dcmds that are unique to \fBkmdb\fR or those with behavior
+that differs in \fBkmdb\fR as compared to \fBmdb\fR(1).
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\fR\fIaddress\fR]\fB::bp [+/-dDestT]\fR [\fB-c\fR \fIcmd\fR] [\fB-n\fR
+\fIcount\fR] \fIsym\fR ...\fR
+.ad
+.br
+.na
+\fB\fIaddress\fR \fB:b [\fR\fIcmd\fR \fB\&...]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set a breakpoint at the specified locations. The \fB::bp\fR dcmd sets a
+breakpoint at each address or symbol specified, including an optional address
+specified by an explicit expression preceding the dcmd, and each string or
+immediate value following the dcmd. The arguments can be symbol names or
+immediate values denoting a particular virtual address of interest.
+.sp
+If a symbol name is specified, the name may refer to a symbol that cannot yet
+be evaluated. It might consist of an object name and function name in a load
+object that has not yet been opened. In such a case, the breakpoint is deferred
+and is not active in the target until an object matching the given name is
+loaded. The breakpoint is automatically enabled when the load object is opened.
+.sp
+The \fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-s\fR, \fB-t\fR, \fB-T\fR, \fB-c\fR, and
+\fB-n\fR options have the same meaning as they do for the \fB::evset\fR dcmd.
+See \fBmdb\fR(1) for a description of \fB::evset\fR. If the \fB:b\fR form of
+the dcmd is used, a breakpoint is set only at the virtual address specified by
+the expression preceding the dcmd. The arguments following the \fB:b\fR dcmd
+are concatenated together to form the callback string. If this string contains
+meta-characters, it must be quoted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB::branches\fR [\fB-v\fR]\fR
+.ad
+.br
+.na
+\fB(x86 only)\fR
+.ad
+.sp .6
+.RS 4n
+Display the last branches taken by the CPU. This dcmd is supported only on x86
+systems, and is available only when processor-specific support is detected and
+enabled. The number and type of branches displayed is dependent on the
+capabilities of the branch tracing facilities provided by the CPU. When the
+\fB-v\fR option is used, the instructions prior to a given branch are
+displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[\fIfunction\fR] \fB::call\fR [\fIarg\fR [\fIarg\fR ...]]\fR
+.ad
+.sp .6
+.RS 4n
+Call the specified function using the specified arguments. The called function
+must be listed as a function in the symbol table for a loaded module. String
+arguments are passed by reference. When the call completes, the return value of
+the function is displayed.
+.sp
+This dcmd must be used with extreme caution. The kernel will not be resumed
+when the call is made. The function being called may not make any assumptions
+regarding the availability of any kernel services, and must not perform
+operations or calls that may block. The user must also beware of any
+side-effects introduced by the called function, as kernel stability might be
+affected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[\fIaddr\fR] \fB::cpuregs\fR [\fB-c\fR \fIcpuid\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Display the current general purpose register set for the specified CPU, in the
+format used by \fB::regs\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[\fIaddr\fR] \fB::cpustack\fR [\fB-c\fR \fIcpuid\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Print a C stack backtrace for the specified CPU. The backtrace displayed is for
+the point at which the specified CPU entered or was stopped by the debugger.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR[,\fIlen\fR] \fB::in\fR [\fB-L\fR \fIlen\fR]\fR
+.ad
+.br
+.na
+\fB(x86 only)\fR
+.ad
+.sp .6
+.RS 4n
+Read \fIlen\fR bytes from the I/O port specified by \fIaddr\fR. The value of
+the \fB-L\fR option, if provided, takes precedence over the value of the repeat
+count. The read length must be 1, 2, or 4 bytes, and the port address must have
+the same alignment as the length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR[,\fIlen\fR] \fB::out\fR [\fB-L\fR \fIlen\fR] \fIvalue\fR\fR
+.ad
+.br
+.na
+\fB(x86 only)\fR
+.ad
+.sp .6
+.RS 4n
+Write value to the len-byte I/O port specified by \fIaddr\fR. The value of the
+\fB-L\fR option, if provided, takes precedence over the value of the repeat
+count. The write length must be 1, 2, or 4 bytes and the port address must have
+the same alignment as the length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB::quit\fR [\fB-u\fR]\fR
+.ad
+.br
+.na
+\fB\fB$q\fR\fR
+.ad
+.sp .6
+.RS 4n
+Causes the debugger to exit. When the \fB-u\fR option is used, the system is
+resumed and the debugger is unloaded. The \fB-u\fR option may not be used if
+the debugger was loaded at boot. When the \fB-u\fR option is not used, SPARC
+systems will exit to the boot PROM \fBok\fR prompt. The \fBgo\fR command can be
+used to re-enter the debugger. On x86 systems, a prompt is displayed that
+requests permission to reboot the machine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB::step [over|out|branch]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Step the target one instruction. The optional \fBover\fR argument is used to
+step over subroutine calls. When the optional \fBout\fR argument is specified,
+the target program continues until control returns from the current function.
+.sp
+The optional \fBbranch\fR argument is available only on x86 systems when
+processor-specific support is detected and enabled. When \fB::step branch\fR is
+specified, the target program continues until the next branching instruction is
+encountered.
+.sp
+On SPARC systems, the \fB::step dcmd\fR may not be used to step 'ta'
+instructions. Similarly, it may not be used on x86 systems to step 'int'
+instructions. If the step results in a trap that cannot be resolved by the
+debugger, a message to that effect is printed and the step will fail.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcpuid::switch\fR\fR
+.ad
+.br
+.na
+\fB\fBcpuid:x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the specified CPU as the representative. Stack traces, general purpose
+register dumps, and similar functionality use the new representative CPU as the
+data source. Full execution control functionality is available on the new
+representative CPU.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB::term\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display the current terminal type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR\fB[,\fR\fIlen\fR]\fB::wp [+/-dDestT]\fR [\fB-rwx\fR] [\fB-pi\fR]
+[\fB-n\fR \fIcount\fR] [\fB-c\fR \fIcmd\fR]\fR
+.ad
+.br
+.na
+\fB\fB\fIaddr\fR[,\fIlen\fR]\fR\fB:a [\fIcmd\fR\fR \fB\&...]\fR\fR
+.ad
+.br
+.na
+\fB\fB\fIaddr\fR[,\fIlen\fR]\fR\fB:p [\fIcmd\fR\fR \fB\&...]\fR\fR
+.ad
+.br
+.na
+\fB\fB\fIaddr\fR[,\fIlen\fR]\fR\fB:w [\fIcmd\fR\fR \fB\&...]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set a watchpoint at the specified address, interpreted by default as a virtual
+address. If the \fB-p\fR option is used, the address is interpreted as a
+physical address. On x86 platforms, watchpoints can be set on I/O ports using
+the \fB-i\fR option. When the \fB-i\fR option is used, the address is
+interpreted as that of an I/O port.
+.sp
+The length in bytes of the watched region can be set by specifying an optional
+repeat count preceding the dcmd. If no length is explicitly set, the default is
+one byte. The \fB::wp\fR dcmd allows the watchpoint to be configured to trigger
+on any combination of read (\fB-r\fR option), write (\fB-w\fR option), or
+execute (\fB-x\fR option) access.
+.sp
+The \fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-s\fR, \fB-t\fR, \fB-T\fR, \fB-c\fR, and
+\fB-n\fR options have the same meaning as they do for the \fB::evset\fR dcmd.
+See \fBmdb\fR(1) for a description of \fB::evset\fR. The \fB:a\fR dcmd sets a
+read access watchpoint at the specified address. The \fB:p\fR dcmd sets an
+execute access watchpoint at the specified address. The \fB:w\fR dcmd sets a
+write access watchpoint at the specified address. The arguments following the
+\fB:a\fR, \fB:p\fR, and \fB:w\fR dcmds are concatenated together to form the
+callback string. If the string contains meta-characters, it must be quoted.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmdb\fR(1), \fBboot\fR(1M), \fBdumpadm\fR(1M), \fBkernel\fR(1M),
+\fBsystem\fR(4), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Modular Debugger Guide\fR
+.SS "SPARC Only"
+.sp
+.LP
+\fBkbd\fR(1)
+.SH NOTES
+.SS "Limitations on Memory Available to the Debugger"
+.sp
+.LP
+The memory region available to the debugger is allocated when the debugger is
+loaded, and is fixed at that point. If dcmds attempt to allocate more memory
+than is available, they will, if possible, be terminated. The debugger will
+attempt to recover gracefully from an out-of-memory situation, but may be
+unable to, and may be forced to terminate the system. This constraint is
+especially acute on 32-bit x86 systems.
+.SS "Performance Impact"
+.sp
+.LP
+System performance will be negatively impacted by the loading of \fBkmdb\fR, as
+the debugger will consume kernel memory and other limited system resources.

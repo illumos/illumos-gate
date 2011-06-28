@@ -1,0 +1,443 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 1995 IEEE.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cond_init 3C "5 Jun 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+cond_init, cond_wait, cond_timedwait, cond_reltimedwait, cond_signal,
+cond_broadcast, cond_destroy \- condition variables
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <thread.h> 
+#include <synch.h> 
+
+\fBint\fR \fBcond_init\fR(\fBcond_t *\fR\fIcvp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcond_wait\fR(\fBcond_t *\fR\fIcvp\fR, \fBmutex_t *\fR\fImp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcond_timedwait\fR(\fBcond_t *\fR\fIcvp\fR, \fBmutex_t *\fR\fImp\fR,
+     \fBtimestruc_t *\fR\fIabstime\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcond_reltimedwait\fR(\fBcond_t *\fR\fIcvp\fR, \fBmutex_t *\fR\fImp\fR,
+     \fBtimestruc_t *\fR\fIreltime\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcond_signal\fR(\fBcond_t *\fR\fIcvp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcond_broadcast\fR(\fBcond_t *\fR\fIcvp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcond_destroy\fR(\fBcond_t *\fR\fIcvp\fR);
+.fi
+
+.SH DESCRIPTION
+.SS "Initialize"
+.sp
+.LP
+Condition variables and mutexes should be global. Condition variables that are
+allocated in writable memory can synchronize threads among processes if they
+are shared by the cooperating processes (see \fBmmap\fR(2)) and are initialized
+for this purpose.
+.sp
+.LP
+The scope of a condition variable is either intra-process or inter-process.
+This is dependent upon whether the argument is passed implicitly or explicitly
+to the initialization of that condition variable. A condition variable does not
+need to be explicitly initialized. A condition variable is initialized with all
+zeros, by default, and its scope is set to within the calling process. For
+inter-process synchronization, a condition variable must be initialized once,
+and only once, before use.
+.sp
+.LP
+A condition variable must not be simultaneously initialized by multiple threads
+or re-initialized while in use by other threads.
+.sp
+.LP
+Attributes of condition variables can be set to the default or customized at
+initialization.
+.sp
+.LP
+The \fBcond_init()\fR function initializes the condition variable pointed to by
+\fIcvp\fR. A condition variable can have several different types of behavior,
+specified by \fItype\fR. No current type uses  \fIarg\fR although a future type
+may specify additional behavior parameters with \fIarg\fR. The \fItype\fR
+argument c take one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSYNC_THREAD\fR\fR
+.ad
+.RS 17n
+.rt  
+The condition variable can synchronize  threads only in this process. This is
+the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSYNC_PROCESS\fR\fR
+.ad
+.RS 17n
+.rt  
+The condition variable can synchronize threads in this process and other
+processes. Only one process should initialize the condition variable. The
+object initialized with this attribute must be allocated in memory shared
+between processes, either in System V shared memory (see \fBshmop\fR(2)) or in
+memory mapped to a file (see \fBmmap\fR(2)). It is illegal to initialize the
+object this way and to not allocate it in such shared memory.
+.RE
+
+.sp
+.LP
+Initializing condition variables can also be accomplished by allocating in
+zeroed memory, in which case, a \fItype\fR of \fBUSYNC_THREAD\fR is assumed.
+.sp
+.LP
+If default condition variable attributes are used, statically allocated
+condition variables can be initialized by the macro \fBDEFAULTCV\fR.
+.sp
+.LP
+Default condition variable initialization (intra-process):
+.sp
+.in +2
+.nf
+cond_t cvp;
+
+cond_init(&cvp, NULL, NULL); /*initialize condition variable 
+                                with default*/
+.fi
+.in -2
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+cond_init(&cvp, USYNC_THREAD, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+cond_t  cond  = DEFAULTCV;
+.fi
+.in -2
+
+.sp
+.LP
+Customized condition variable initialization (inter-process):
+.sp
+.in +2
+.nf
+cond_init(&cvp, USYNC_PROCESS, NULL); /* initialize cv with
+                                        inter-process scope */
+.fi
+.in -2
+
+.SS "Condition Wait"
+.sp
+.LP
+The condition wait interface allows a thread to wait for a condition and
+atomically release the associated mutex that it needs to hold to check the
+condition. The thread waits for another thread to make the condition true and
+that thread's resulting call to signal and wakeup the waiting thread.
+.sp
+.LP
+The \fBcond_wait()\fR function atomically releases the mutex pointed to by
+\fImp\fR and causes the calling thread to block on the condition variable
+pointed to by \fIcvp\fR. The blocked thread may be awakened by
+\fBcond_signal()\fR, \fBcond_broadcast()\fR, or when interrupted by delivery of
+a  \fBUNIX\fR signal or a \fBfork()\fR.
+.sp
+.LP
+The \fBcond_wait()\fR, \fBcond_timedwait()\fR, and \fBcond_reltimedwait()\fR
+functions always return with the mutex locked and owned by the calling thread
+even when returning an error, except when the mutex has the \fBLOCK_ROBUST\fR
+attribute and has been left irrecoverable by the mutex's last owner. The
+\fBcond_wait()\fR, \fBcond_timedwait()\fR, and \fBcond_reltimedwait()\fR
+functions return the appropriate error value if they fail to internally
+reacquire the mutex.
+.SS "Condition Signaling"
+.sp
+.LP
+A condition signal allows a thread to unblock a single thread waiting on the
+condition variable, whereas a condition broadcast allows a thread to unblock
+all threads waiting on the condition variable.
+.sp
+.LP
+The \fBcond_signal()\fR function unblocks one thread that is blocked on the
+condition variable pointed to by \fIcvp\fR.
+.sp
+.LP
+The \fBcond_broadcast()\fR function unblocks all threads that are blocked on
+the condition variable pointed to by \fIcvp\fR.
+.sp
+.LP
+If no threads are blocked on the condition variable, then \fBcond_signal()\fR
+and \fBcond_broadcast()\fR have no effect.
+.sp
+.LP
+The \fBcond_signal()\fR or \fBcond_broadcast()\fR functions can be called by a
+thread whether or not it currently owns the mutex that threads calling
+\fBcond_wait()\fR, \fBcond_timedwait()\fR, or \fBcond_reltimedwait()\fR have
+associated with the condition variable during their waits. If, however,
+predictable scheduling behavior is required, then that mutex should be locked
+by the thread prior to calling \fBcond_signal()\fR or \fBcond_broadcast()\fR.
+.SS "Destroy"
+.sp
+.LP
+The condition destroy functions destroy any state, but not the space,
+associated with the condition variable.
+.sp
+.LP
+The \fBcond_destroy()\fR function destroys any state associated with the
+condition variable pointed to by \fIcvp\fR. The space for storing the condition
+variable is not freed.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return \fB0\fR. Otherwise, a
+non-zero value is returned to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBcond_timedwait()\fR and \fBcond_reltimedwait()\fR functions will fail
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETIME\fR\fR
+.ad
+.RS 9n
+.rt  
+The time specified by \fIabstime\fR or \fIreltime\fR has passed.
+.RE
+
+.sp
+.LP
+The \fBcond_wait()\fR, \fBcond_timedwait()\fR, and \fBcond_reltimedwait()\fR
+functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+Interrupted. The calling thread was awakened by the delivery of a UNIX signal.
+.RE
+
+.sp
+.LP
+If the mutex pointed to by \fImp\fR is a robust mutex (initialized with the
+\fBLOCK_ROBUST\fR attribute), the \fBcond_wait()\fR, \fBcond_timedwait()\fR and
+\fBcond_reltimedwait()\fR functions will, under the specified conditions,
+return the following error values.  For complete information, see the
+description of the \fBmutex_lock()\fR function on the \fBmutex_init\fR(3C)
+manual page.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTRECOVERABLE\fR\fR
+.ad
+.RS 19n
+.rt  
+The mutex was protecting the state that has now been left irrecoverable. The
+mutex has not been acquired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOWNERDEAD\fR\fR
+.ad
+.RS 19n
+.rt  
+The last owner of the mutex died while  holding the mutex, possibly leaving the
+state it was protecting inconsistent. The mutex is now owned by the caller.
+.RE
+
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIcond\fR, \fIattr\fR, \fIcvp\fR, \fIarg\fR, \fIabstime\fR, or \fImutex\fR
+argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Invalid argument. For \fBcond_init()\fR, \fItype\fR is not a recognized type.
+For \fBcond_timedwait()\fR, the number of nanoseconds is greater than or equal
+to 1,000,000,000.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBcond_wait()\fR in a loop to test some condition.
+.sp
+.LP
+The \fBcond_wait()\fR functin is normally used in a loop testing some
+condition, as follows:
+
+.sp
+.in +2
+.nf
+(void) mutex_lock(mp);
+while (cond == FALSE) {
+     (void) cond_wait(cvp, mp);
+}
+(void) mutex_unlock(mp);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUse \fBcond_timedwait()\fR in a loop to test some condition.
+.sp
+.LP
+The \fBcond_timedwait()\fR function is normally used in a loop testing some
+condition.  It uses an absolute timeout value as follows:
+
+.sp
+.in +2
+.nf
+timestruc_t to;
+\&...
+(void) mutex_lock(mp);
+to.tv_sec = time(NULL) + TIMEOUT;
+to.tv_nsec = 0;
+while (cond == FALSE) {
+      err = cond_timedwait(cvp, mp, &to);
+      if (err == ETIME) {
+            /* timeout, do something */
+            break;
+      }
+}
+(void) mutex_unlock(mp);
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRUse \fBcond_reltimedwait()\fR in a loop to test some condition.
+.sp
+.LP
+The \fBcond_reltimedwait()\fR function is normally used in a loop testing in
+some condition. It uses a relative timeout value as follows:
+
+.sp
+.in +2
+.nf
+timestruc_t to;
+\&...
+(void) mutex_lock(mp);
+while (cond == FALSE) {
+     to.tv_sec = TIMEOUT;
+     to.tv_nsec = 0;
+     err = cond_reltimedwait(cvp, mp, &to);
+     if (err == ETIME) {
+          /* timeout, do something */
+          break;
+     }
+}
+(void) mutex_unlock(mp);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfork\fR(2), \fBmmap\fR(2), \fBsetitimer\fR(2), \fBshmop\fR(2),
+\fBmutex_init\fR(3C), \fBsignal\fR(3C), \fBattributes\fR(5),
+\fBcondition\fR(5), \fBmutex\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+If more than one thread is blocked on a condition variable, the order in which
+threads are unblocked is determined by the scheduling policy. When each thread,
+unblocked as a result of a \fBcond_signal()\fR or \fBcond_broadcast()\fR,
+returns from its call to \fBcond_wait()\fR or \fBcond_timedwait()\fR , the
+thread owns the mutex with which it called \fBcond_wait()\fR,
+\fBcond_timedwait()\fR, or \fBcond_reltimedwait()\fR. The thread(s) that are
+unblocked compete for the mutex according to the scheduling policy and as if
+each had called \fBmutex_lock\fR(3C).
+.sp
+.LP
+When \fBcond_wait()\fR returns the value of the condition is indeterminate and
+must be reevaluated.
+.sp
+.LP
+The \fBcond_timedwait()\fR and \fBcond_reltimedwait()\fR functions are similar
+to \fBcond_wait()\fR, except that the calling thread will not wait for the
+condition to become true past the absolute time specified by \fIabstime\fR or
+the relative time specified by \fIreltime\fR. Note that \fBcond_timedwait()\fR
+or \fBcond_reltimedwait()\fR might continue to block as it trys to reacquire
+the mutex pointed to by \fImp\fR, which may be locked by another thread. If
+either \fBcond_timedwait()\fR or \fBcond_reltimedwait()\fR returns because of a
+timeout, it returns the error value \fBETIME\fR.

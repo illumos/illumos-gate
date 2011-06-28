@@ -1,0 +1,101 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_aread 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_aread, ldi_awrite \- Issue an asynchronous read or write request to a
+device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fB\fR\fBint\fR ldi_aread(\fBldi_handle_t\fR \fIlh\fR, \fB struct aio_req *\fR\fIaio_reqp\fR, \fBcred_t *\fR\fIcr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB ldi_awrite\fR(\fBldi_handle_t\fR \fIlh\fR, \fB struct aio_req *\fR\fIaio_reqp\fR, \fBcred_t *\fR\fIcr\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlh\fR \fR
+.ad
+.RS 13n
+.rt  
+Layered handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcr\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a credential structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaio_reqp\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to the \fBaio_req(9S)\fR structure that describes where the data is to
+be stored or obtained from.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldi_awrite()\fR function passes an asynchronous write request to a
+device entry point specified by the layered handle. This operation is supported
+for block and character devices.
+.sp
+.LP
+The \fBldi_aread()\fR function passes an asynchronous read request to a device
+entry point specified by the layered handle. This operation is supported for
+block and character devices.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldi_awrite()\fR and \fBldi_aread()\fR functions return \fB0\fR upon
+success. If a failure occurs before the request is passed on to the device, the
+possible return values are shown below. Otherwise any other error number may be
+returned by the device.
+.sp
+.ne 2
+.mk
+.na
+\fBEINVAL\fR
+.ad
+.RS 11n
+.rt  
+Invalid input parameters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBENOTSUP\fR
+.ad
+.RS 11n
+.rt  
+Operation is not supported for this device.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user context.

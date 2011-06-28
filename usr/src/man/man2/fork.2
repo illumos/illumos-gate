@@ -1,0 +1,535 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1994, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fork 2 "28 Oct 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+fork, fork1, forkall, forkx, forkallx \- create a new process
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <unistd.h>
+
+\fBpid_t\fR \fBfork\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBpid_t\fR \fBfork1\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBpid_t\fR \fBforkall\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+#include <sys/fork.h>
+
+\fBpid_t\fR \fBforkx\fR(\fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBpid_t\fR \fBforkallx\fR(\fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfork()\fR, \fBfork1()\fR, \fBforkall()\fR, \fBforkx()\fR, and
+\fBforkallx()\fR functions create a new process. The address space of the new
+process (child process) is an exact copy of the address space of the calling
+process (parent process). The child process inherits the following attributes
+from the parent process:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+real user ID, real group ID, effective user ID, effective group ID
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+environment
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+open file descriptors
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+close-on-exec flags (see \fBexec\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+signal handling settings (that is, \fBSIG_DFL\fR, \fBSIG_IGN\fR,
+\fBSIG_HOLD\fR, function address)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+supplementary group IDs
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+set-user-ID mode bit
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+set-group-ID mode bit
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+profiling on/off status
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+nice value (see  \fBnice\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+scheduler class (see \fBpriocntl\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+all attached shared memory segments (see \fBshmop\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+process group \fBID\fR -- memory mappings (see \fBmmap\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+session \fBID\fR (see \fBexit\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+current working directory
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+root directory
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+file mode creation mask (see \fBumask\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+resource limits (see  \fBgetrlimit\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+controlling terminal
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+saved user \fBID\fR and group \fBID\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+task ID and project ID
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+processor bindings (see \fBprocessor_bind\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+processor set bindings (see \fBpset_bind\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+process privilege sets (see \fBgetppriv\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+process flags (see \fBgetpflags\fR(2))
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+active contract templates (see \fBcontract\fR(4))
+.RE
+.sp
+.LP
+Scheduling priority and any per-process scheduling parameters that are specific
+to a given scheduling class might or might not be inherited according to the
+policy of that particular class (see \fBpriocntl\fR(2)). The child process
+might or might not be in the same process contract as the parent (see
+\fBprocess\fR(4)). The child process differs from the parent process in the
+following ways:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The child process has a unique process \fBID\fR which does not match any active
+process group \fBID\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The child process has a different parent process \fBID\fR (that is, the process
+\fBID\fR of the parent process).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The child process has its own copy of the parent's file descriptors and
+directory streams. Each of the child's file descriptors shares a common file
+pointer with the corresponding file descriptor of the parent.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each shared memory segment remains attached and the value of \fBshm_nattach\fR
+is incremented by 1.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All \fBsemadj\fR values are cleared (see \fBsemop\fR(2)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Process locks, text locks, data locks, and other memory locks are not inherited
+by the child (see \fBplock\fR(3C) and \fBmemcntl\fR(2)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The child process's \fBtms\fR structure is cleared: \fBtms_utime\fR,
+\fBstime\fR, \fBcutime\fR, and \fBcstime\fR are set to 0 (see \fBtimes\fR(2)).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The child processes resource utilizations are set to 0; see \fBgetrlimit\fR(2).
+The \fBit_value\fR and \fBit_interval\fR values for the \fBITIMER_REAL\fR timer
+are reset to 0; see \fBgetitimer\fR(2).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The set of signals pending for the child process is initialized to the empty
+set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Timers created by \fBtimer_create\fR(3C) are not inherited by the child
+process.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+No asynchronous input or asynchronous output operations are inherited by the
+child.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any preferred hardware address tranlsation sizes (see \fBmemcntl\fR(2)) are
+inherited by the child.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The child process holds no contracts (see \fBcontract\fR(4)).
+.RE
+.sp
+.LP
+Record locks set by the parent process are not inherited by the child process
+(see \fBfcntl\fR(2)).
+.sp
+.LP
+Although any open door descriptors in the parent are shared by the child, only
+the parent will receive a door invocation from clients even if the door
+descriptor is open in the child. If a descriptor is closed in the parent,
+attempts to operate on the door descriptor will fail even if it is still open
+in the child.
+.SS "Threads"
+.sp
+.LP
+A call to \fBforkall()\fR or \fBforkallx()\fR replicates in the child process
+all of the threads (see \fBthr_create\fR(3C) and \fBpthread_create\fR(3C)) in
+the parent process. A call to \fBfork1()\fR or \fBforkx()\fR replicates only
+the calling thread in the child process.
+.sp
+.LP
+A call to \fBfork()\fR is identical to a call to \fBfork1()\fR; only the
+calling thread is replicated in the child process. This is the POSIX-specified
+behavior for \fBfork()\fR.
+.sp
+.LP
+In releases of Solaris prior to Solaris 10, the behavior of \fBfork()\fR
+depended on whether or not the application was linked with the POSIX threads
+library. When linked with \fB-lthread\fR (Solaris Threads) but not linked with
+\fB-lpthread\fR (POSIX Threads), \fBfork()\fR was the same as \fBforkall()\fR.
+When linked with \fB-lpthread\fR, whether or not also linked with
+\fB-lthread\fR, \fBfork()\fR was the same as \fBfork1()\fR.
+.sp
+.LP
+Prior to Solaris 10, either \fB-lthread\fR or \fB-lpthread\fR was required for
+multithreaded applications. This is no longer the case. The standard C library
+provides all threading support for both sets of application programming
+interfaces.  Applications that require replicate-all fork semantics must call
+\fBforkall()\fR or \fBforkallx()\fR.
+.SS "Fork Extensions"
+.sp
+.LP
+The \fBforkx()\fR and \fBforkallx()\fR functions accept a \fIflags\fR argument
+consisting of a bitwise inclusive-OR of zero or more of the following flags,
+which are defined in the header \fB<sys/fork.h>\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFORK_NOSIGCHLD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not post a \fBSIGCHLD\fR signal to the parent process when the child process
+terminates, regardless of the disposition of the \fBSIGCHLD\fR signal in the
+parent. \fBSIGCHLD\fR signals are still possible for job control stop and
+continue actions if the parent has requested them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFORK_WAITPID\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not allow wait-for-multiple-pids by the parent, as in \fBwait()\fR,
+\fBwaitid\fR(\fBP_ALL\fR), or \fBwaitid\fR(\fBP_PGID\fR), to reap the child and
+do not allow the child to be reaped automatically due the disposition of the
+SIGCHLD signal being set to be ignored in the parent.  Only a specific wait for
+the child, as in \fBwaitid\fR(\fBP_PID\fR, \fBpid\fR), is allowed and it is
+required, else when the child exits it will remain a zombie until the parent
+exits.
+.RE
+
+.sp
+.LP
+If the \fIflags\fR argument is 0 \fBforkx()\fR is identical to \fBfork()\fR and
+\fBforkallx()\fR is identical to \fBforkall()\fR.
+.SS "\fBfork()\fR Safety"
+.sp
+.LP
+If a multithreaded application calls \fBfork()\fR, \fBfork1()\fR, or
+\fBforkx()\fR, and the child does more than simply call one of the
+\fBexec\fR(2) functions, there is a possibility of deadlock occurring in the
+child. The application should use \fBpthread_atfork\fR(3C) to ensure safety
+with respect to this deadlock. Should there be any outstanding mutexes
+throughout the process, the application should call \fBpthread_atfork()\fR to
+wait for and acquire those mutexes prior to calling \fBfork()\fR,
+\fBfork1()\fR, or \fBforkx()\fR. See  "MT-Level of Libraries" on the
+\fBattributes\fR(5) manual page.
+.sp
+.LP
+The \fBpthread_atfork()\fR mechanism is used to protect the locks that
+\fBlibc\fR(3LIB) uses to implement interfaces such as \fBmalloc\fR(3C).  All
+interfaces provided by \fBlibc\fR are safe to use in a child process following
+a \fBfork()\fR, except when \fBfork()\fR is executed within a signal handler.
+.sp
+.LP
+The POSIX standard (see \fBstandards\fR(5)) requires fork to be
+Async-Signal-Safe (see \fBattributes\fR(5)). This cannot be made to happen with
+fork handlers in place, because they acquire locks. To be in nominal
+compliance, no fork handlers are called when \fBfork()\fR is executed within a
+signal context.  This leaves the child process in a questionable state with
+respect to its locks, but at least the calling thread will not deadlock itself
+attempting to acquire a lock that it already owns.  In this situation, the
+application should strictly adhere to the advice given in the POSIX
+specification: "To avoid errors, the child process may only execute
+Async-Signal-Safe operations until such time as one of the \fBexec\fR(2)
+functions is called."
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBfork()\fR, \fBfork1()\fR, \fBforkall()\fR,
+\fBforkx()\fR, and \fBforkallx()\fR return \fB0\fR to the child process and
+return the process \fBID\fR of the child process to the parent process.
+Otherwise, \fB(pid_t)\(mi1\fR is returned to the parent process, no child
+process is created, and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBfork()\fR, \fBfork1()\fR, \fBforkall()\fR, \fBforkx()\fR, and
+\fBforkallx()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+A resource control or  limit on the total number of processes, tasks or LWPs
+under execution by a single user, task, project, or zone has been exceeded, or
+the total amount of system memory available is temporarily insufficient to
+duplicate this process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is not enough swap space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_FORK\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.sp
+.LP
+The \fBforkx()\fR and \fBforkallx()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIflags\fR argument is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe.
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+For \fBfork()\fR, see \fBstandards\fR(5).
+.SH SEE ALSO
+.sp
+.LP
+\fBalarm\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfcntl\fR(2),
+\fBgetitimer\fR(2), \fBgetrlimit\fR(2), \fBmemcntl\fR(2), \fBmmap\fR(2),
+\fBnice\fR(2), \fBpriocntl\fR(2), \fBsemop\fR(2), \fBshmop\fR(2),
+\fBtimes\fR(2), \fBumask\fR(2), \fBwaitid\fR(2), \fBdoor_create\fR(3C),
+\fBexit\fR(3C), \fBplock\fR(3C), \fBpthread_atfork\fR(3C),
+\fBpthread_create\fR(3C), \fBsignal\fR(3C), \fBsystem\fR(3C),
+\fBthr_create\fR(3C) \fBtimer_create\fR(3C), \fBwait\fR(3C), \fBcontract\fR(4),
+\fBprocess\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+An application should call \fB_exit()\fR rather than \fBexit\fR(3C) if it
+cannot \fBexecve()\fR, since \fBexit()\fR will flush and close standard I/O
+channels and thereby corrupt the parent process's standard I/O data structures.
+Using \fBexit\fR(3C) will flush buffered data twice. See \fBexit\fR(2).
+.sp
+.LP
+The thread in the child that calls \fBfork()\fR, \fBfork1()\fR, or
+\fBfork1x()\fR must not depend on any resources held by threads that no longer
+exist in the child. In particular, locks held by these threads will not be
+released.
+.sp
+.LP
+In a multithreaded process, \fBforkall()\fR in one thread can cause blocking
+system calls to be interrupted and return with an \fBEINTR\fR error.

@@ -1,0 +1,177 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_recv 3DLPI "22 Aug 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_recv \- receive a data message using DLPI
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_recv\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBvoid *\fR\fIsaddrp\fR,
+     \fBsize_t *\fR \fIsaddrlenp\fR, \fBvoid *\fR\fImsgbuf\fR, \fBsize_t *\fR\fImsglenp\fR,
+     \fBint\fR \fImsec\fR, \fBdlpi_recvinfo_t *\fR\fIrecvp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_recv()\fR function attempts to receive data messages over the
+\fBDLPI\fR link instance associated with the \fBDLPI\fR handle \fIdh\fR. If
+\fIdh\fR is not in the \fBDL_IDLE\fR \fBDLPI\fR state, the attempt fails. The
+caller must ensure that \fImsgbuf\fR is at least \fImsglenp\fR bytes in size.
+Upon success, \fImsgbuf\fR contains the data message received, \fImsglenp\fR
+contains the number of bytes placed in \fImsgbuf\fR.
+.sp
+.LP
+The caller must ensure that \fIsaddrp\fR is at least \fBDLPI_PHYSADDR_MAX\fR
+bytes in size and \fIsaddrlenp\fR must contain the length of \fIsaddrp\fR. Upon
+success, \fIsaddrp\fR contains the address of the source sending the data
+message and \fIsaddrlenp\fR contains the source address length. If the caller
+is not interested in the source address, both \fIsaddrp\fR and \fIsaddrlenp\fR
+can be left as \fINULL\fR. If the source address is not available, \fIsaddrp\fR
+is not filled in and \fIsaddrlenp\fR is set to zero.
+.sp
+.LP
+The \fIdlpi_recvinfo_t\fR is a structure defined in \fB<libdlpi.h>\fR as
+follows:
+.sp
+.in +2
+.nf
+typedef struct {
+        uchar_t         dri_destaddr[DLPI_PHYSADDR_MAX];
+        uchar_t         dri_destaddrlen;
+        dlpi_addrtype_t dri_destaddrtype;
+        size_t          dri_totmsglen;
+} dlpi_recvinfo_t;
+.fi
+.in -2
+
+.sp
+.LP
+Upon success, if \fIrecvp\fR is not set to \fINULL\fR, \fIdri_destaddr\fR
+contains the destination address, \fIdri_destaddrlen\fR contains the
+destination address length, and \fIdri_totmsglen\fR contains the total length
+of the message received. If the destination address is unicast,
+\fIdri_destaddrtype\fR is set to \fBDLPI_ADDRTYPE_UNICAST\fR. Otherwise, it is
+set to \fBDLPI_ADDRTYPE_GROUP\fR.
+.sp
+.LP
+The values of \fImsglenp\fR and \fIdri_totmsglen\fR might vary when a message
+larger than the size of \fImsgbuf\fR is received. In that case, the caller can
+use \fIdri_totmsglen\fR to determine the original total length of the message.
+.sp
+.LP
+If the handle is in raw mode, as described in \fBdlpi_open\fR(3DLPI),
+\fImsgbuf\fR starts with the link-layer header. See \fBdlpi\fR(7P). The values
+of \fIsaddrp\fR, \fIsaddrlenp\fR, and all the members of \fIdlpi_recvinfo_t\fR
+except \fIdri_totmsglen\fR are invalid because the address information is
+already included in the link-layer header returned by \fImsgbuf\fR.
+.sp
+.LP
+If no message is received within \fImsec\fR milliseconds, \fBdlpi_recv()\fR
+returns \fBDLPI_ETIMEDOUT\fR. If \fImsec\fR is \fB0\fR, \fBdlpi_recv()\fR does
+not block. If \fImsec\fR is \fB-1\fR, \fBdlpi_recv()\fR does block until a data
+message is received.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
+\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or an error value listed
+in the following section is returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EBADMSG\fR\fR
+.ad
+.RS 20n
+.rt  
+Bad DLPI message
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 20n
+.rt  
+Invalid \fBDLPI\fR handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINVAL\fR\fR
+.ad
+.RS 20n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ETIMEDOUT\fR\fR
+.ad
+.RS 20n
+.rt  
+\fBDLPI\fR operation timed out
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EUNAVAILSAP\fR\fR
+.ad
+.RS 20n
+.rt  
+Unavailable \fBDLPI\fR \fBSAP\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_FAILURE\fR\fR
+.ad
+.RS 20n
+.rt  
+\fBDLPI\fR operation failed
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi_bind\fR(3DLPI), \fBdlpi_open\fR(3DLPI), \fBlibdlpi\fR(3LIB),
+\fBattributes\fR(5), \fBdlpi\fR(7P)

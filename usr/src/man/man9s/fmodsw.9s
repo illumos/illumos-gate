@@ -1,0 +1,57 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fmodsw 9S "14 Nov 2002" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+fmodsw \- STREAMS module declaration structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/conf.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfmodsw\fR structure contains information for STREAMS modules. All
+STREAMS modules must define a \fBfmodsw\fR structure.
+.sp
+.LP
+\fBf_name\fR must match \fBmi_idname\fR in the \fBmodule_info\fR structure. See
+\fBmodule_info\fR(9S). \fBf_name\fR should also match the module binary name.
+(See WARNINGS.)
+.sp
+.LP
+All modules must set the \fBf_flag\fR to \fBD_MP\fR to indicate that they
+safely allow multiple threads of execution. See \fBmt-streams\fR(9F) for
+additional flags.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+char              f_name[FMNAMESZ + 1];   /* module name */
+struct streamtab  *f_str;                 /* streams information */
+int               f_flag;                 /* flags */
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmt-streams\fR(9F), \fBmodlstrmod\fR(9S), \fBmodule_info\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH WARNINGS
+.sp
+.LP
+If \fBf_name\fR does not match the module binary name, unexpected failures can
+occur.

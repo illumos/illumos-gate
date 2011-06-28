@@ -1,0 +1,115 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nice 2 "1 Apr 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+nice \- change priority of a process
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBnice\fR(\fBint\fR \fIincr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnice()\fR function allows a process to change its priority.  The
+invoking  process must be in a scheduling class that supports the \fBnice()\fR.
+.sp
+.LP
+The \fBnice()\fR function adds the value of  \fIincr\fR to the nice value of
+the calling process. A process's nice value is a non-negative number for which
+a greater positive value results in lower \fBCPU\fR priority.
+.sp
+.LP
+A maximum nice value of (2 * \fBNZERO\fR) \(mi1 and a minimum nice value of 0
+are imposed by the system. \fBNZERO\fR is defined in <\fBlimits.h\fR> with a
+default value of 20. Requests for values above or below these limits result in
+the nice value being set to the corresponding limit. A nice value of 40 is
+treated as 39.
+.sp
+.LP
+Calling the \fBnice()\fR function has no effect on the priority of processes or
+threads with policy \fBSCHED_FIFO\fR or \fBSCHED_RR\fR.
+.sp
+.LP
+Only a process with the {\fBPRIV_PROC_PRIOCNTL\fR} privilege can lower the nice
+value.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBnice()\fR returns the new nice value minus
+\fBNZERO\fR. Otherwise, \(mi1 is returned, the process's \fInice\fR value is
+not changed, and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBnice()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBnice()\fR function is called by a process in a scheduling class other
+than time-sharing or fixed-priority.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIincr\fR argument is negative or greater than 40 and the
+{\fBPRIV_PROC_PRIOCNTL\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBpriocntl\fR(2) function is a more general interface to scheduler
+functions.
+.sp
+.LP
+Since \(mi1 is a permissible return value in a successful situation, an
+application wishing to check for error situations should set \fBerrno\fR to 0,
+then call \fBnice()\fR, and if it returns \fB\(mi1\fR, check to see if
+\fBerrno\fR is non-zero.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnice\fR(1), \fBexec\fR(2), \fBpriocntl\fR(2), \fBgetpriority\fR(3C),
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)

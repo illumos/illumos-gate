@@ -1,0 +1,275 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH strchg 1 "24 Mar 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+strchg, strconf \- change or query stream configuration
+.SH SYNOPSIS
+.LP
+.nf
+\fBstrchg\fR \fB-h\fR \fImodule1\fR [, \fImodule2\fR...]
+.fi
+
+.LP
+.nf
+\fBstrchg\fR \fB-p\fR [\fB-a\fR | \fB-u\fR \fImodule\fR]
+.fi
+
+.LP
+.nf
+\fBstrchg\fR \fB-f\fR \fIfilename\fR
+.fi
+
+.LP
+.nf
+\fBstrconf\fR [\fB-m\fR | \fB-t\fR \fImodule\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These commands are used to alter or query the configuration of the stream
+associated with the user's standard input. The \fBstrchg\fR command pushes
+modules on and/or pops modules off the stream. The \fBstrconf\fR command
+queries the configuration of the stream. Only the super-user or owner of a
+STREAMS device can alter the configuration of that stream.
+.sp
+.LP
+Invoked without any arguments, \fBstrconf\fR prints a list of all the modules
+in the stream as well as the topmost driver. The list is printed with one name
+per line where the first name printed is the topmost module on the stream (if
+one exists) and the last item printed is the name of the driver.
+.SH OPTIONS
+.sp
+.LP
+The following options apply to \fBstrchg\fR and, \fB\fR\fB-h\fR\fB,\fR
+\fB\fR\fB-f\fR\fB,\fR and \fB-p\fR are mutually exclusive.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pop all the modules above the topmost driver off the stream. This option
+requires the \fB-p\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fI filename\fR \fR
+.ad
+.sp .6
+.RS 4n
+Specify a \fIfilename\fR that contains a list of modules representing the
+desired configuration of the stream. Each module name must appear on a separate
+line where the first name represents the topmost module and the last name
+represents the module that should be closest to the driver. \fBstrchg\fR
+determines the current configuration of the stream and pop and push the
+necessary modules in order to end up with the desired configuration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fI module1\fR [\|,\|\fImodule2\fR.\|.\|.\|]\fR
+.ad
+.sp .6
+.RS 4n
+ Mnemonic for pus\fIh\fR, pushes modules onto a stream. It takes as arguments
+the names of one or more pushable streams modules. These modules are pushed in
+order; that is, \fImodule1\fR is pushed first, \fImodule2\fR is pushed second,
+etc.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fR
+.ad
+.sp .6
+.RS 4n
+Mnemonic for po\fIp\fR, pops modules off the stream. With the \fB-p\fR option
+alone, \fBstrchg\fR pops the topmost module from the stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fI module\fR \fR
+.ad
+.sp .6
+.RS 4n
+All modules above, but not including \fImodule\fR are popped off the stream.
+This option requires the \fB-p\fR option.
+.RE
+
+.sp
+.LP
+The following options apply to \fBstrconf\fR and, \fB-m\fR and \fB-t\fR are
+mutually exclusive.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI module\fR \fR
+.ad
+.RS 14n
+.rt  
+Determine if the named \fImodule\fR is present on a stream. If it is,
+\fBstrconf\fR prints the message \fByes\fR and returns zero. If not,
+\fBstrconf\fR prints the message \fBno\fR and returns a non-zero value. The
+\fB-t\fR and \fB-m\fR options are mutually exclusive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fI module\fR \fR
+.ad
+.RS 14n
+.rt  
+Print only the topmost module (if one exists). The \fB-t\fR and \fB-m\fR
+options are mutually exclusive.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBstrchg\fR Command
+.sp
+.LP
+The following command pushes the module \fBldterm\fR on the stream associated
+with the user's standard input:
+
+.sp
+.in +2
+.nf
+example% strchg -h ldterm
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command pops the topmost module from the stream associated with
+\fB/dev/term/24\fR. The user must be the owner of this device or the super
+user.
+
+.sp
+.in +2
+.nf
+example% strchg -p < /dev/term/24
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If the file \fBfileconf\fR contains the following:
+
+.sp
+.in +2
+.nf
+ttcompat
+ldterm
+ptem
+.fi
+.in -2
+
+.sp
+.LP
+then the command
+
+.sp
+.in +2
+.nf
+example% strchg -f fileconf
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+configures the user's standard input stream so that the module \fBptem\fR is
+pushed over the driver, followed by \fBldterm\fR and \fBttcompat\fR closest to
+the stream head.
+
+.sp
+.LP
+The \fBstrconf\fR command with no arguments lists the modules and topmost
+driver on the stream; for a stream that has only the module \fBldterm\fR pushed
+above the \fBzs\fR driver, it would produce the following output:
+
+.sp
+.in +2
+.nf
+ldterm
+zs
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command asks if \fBldterm\fR is on the stream:
+
+.sp
+.in +2
+.nf
+example% strconf -m ldterm
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and produces the following output while returning an exit status of 0:
+
+.sp
+.in +2
+.nf
+yes
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBstreamio\fR(7I)
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBstrchg\fR returns zero on success. It prints an error message and returns
+non-zero status for various error conditions, including usage error, bad module
+name, too many modules to push, failure of an ioctl on the stream, or failure
+to open \fIfilename\fR from the \fB-f\fR option.
+.sp
+.LP
+\fBstrconf\fR returns zero on success (for the \fB-m\fR or \fB-t\fR option,
+"success" means the named or topmost module is present). It returns a non-zero
+status if invoked with the \fB-m\fR or \fB-t\fR option and the module is not
+present. It prints an error message and returns non-zero status for various
+error conditions, including usage error or failure of an \fBioctl\fR on the
+stream.
+.SH NOTES
+.sp
+.LP
+If the user is neither the owner of the stream nor the super-user, the
+\fBstrchg\fR command fails. If the user does not have read permissions on the
+stream and is not the super user, the \fBstrconf\fR command fails.
+.sp
+.LP
+If modules are pushed in the wrong order, one could end up with a stream that
+does not function as expected. For ttys, if the line discipline module is not
+pushed in the correct place, one could have a terminal that does not respond to
+any commands.

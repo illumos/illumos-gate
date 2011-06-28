@@ -1,0 +1,56 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gethrtime 9F " 2 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+gethrtime \- get high resolution time
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/time.h>
+
+
+
+\fBhrtime_t\fR \fBgethrtime\fR(\fB\fR\fIvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgethrtime()\fR function returns the current high-resolution real time.
+Time is expressed as nanoseconds since some arbitrary time in the past; it is
+not correlated in any way to the time of day, and thus is not subject to
+resetting or drifting by way of \fBadjtime\fR(2) or \fBsettimeofday\fR(3C). The
+hi-res timer is ideally suited to performance measurement tasks, where cheap,
+accurate interval timing is required.
+.SH RETURN VALUES
+.sp
+.LP
+\fBgethrtime()\fR always returns the current high-resolution real time. There
+are no error conditions.
+.SH CONTEXT
+.sp
+.LP
+There are no restrictions on the context from which \fBgethrtime()\fR can be
+called.
+.SH SEE ALSO
+.sp
+.LP
+\fBproc\fR(1), \fBgettimeofday\fR(3C), \fBsettimeofday\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Although the units of hi-res time are always the same (nanoseconds), the actual
+resolution is hardware dependent. Hi-res time is guaranteed to be monotonic (it
+does not go backward, it does not periodically wrap) and linear (it does not
+occasionally speed up or slow down for adjustment, as the time of day can), but
+not necessarily unique: two sufficiently proximate calls might return the same
+value.
+.sp
+.LP
+The time base used for this function is the same as that for
+\fBgethrtime\fR(3C). Values returned by both of these functions can be
+interleaved for comparison purposes.

@@ -1,0 +1,102 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_Put8 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_Put8, csx_Put16, csx_Put32, csx_Put64 \- write to device register
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBvoid\fR \fBcsx_Put8\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint32_t\fR \fIoffset\fR, \fBuint8_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcsx_Put16\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint32_t\fR \fIoffset\fR, \fBuint16_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcsx_Put32\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint32_t\fR \fIoffset\fR, \fBuint32_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcsx_Put64\fR(\fBacc_handle_t\fR \fIhandle\fR, \fBuint32_t\fR \fIoffset\fR, \fBuint64_t\fR \fIvalue\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI\fR)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 11n
+.rt  
+The access handle returned from \fBcsx_RequestIO\fR(9F),
+\fBcsx_RequestWindow\fR(9F), or \fBcsx_DupHandle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoffset\fR \fR
+.ad
+.RS 11n
+.rt  
+The offset in bytes from the base of the mapped resource.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvalue\fR \fR
+.ad
+.RS 11n
+.rt  
+The data to be written to the device.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions generate a write of various sizes to the mapped memory or
+device register.
+.sp
+.LP
+The \fBcsx_Put8()\fR, \fBcsx_Put16()\fR, \fBcsx_Put32()\fR, and
+\fBcsx_Put64()\fR functions write 8 bits, 16 bits, 32 bits, and 64 bits of
+data, respectively, to the device address represented by the handle,
+\fIhandle\fR, at an offset in bytes represented by the offset, \fIoffset\fR.
+.sp
+.LP
+Data that consists of more than one byte will automatically be translated to
+maintain a consistent view between the host and the device based on the encoded
+information in the data access handle. The translation may involve byte
+swapping if the host and the device have incompatible endian characteristics.
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user, kernel, or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_DupHandle\fR(9F), \fBcsx_Get8\fR(9F), \fBcsx_GetMappedAddr\fR(9F),
+\fBcsx_RepGet8\fR(9F), \fBcsx_RepPut8\fR(9F), \fBcsx_RequestIO\fR(9F),
+\fBcsx_RequestWindow\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA

@@ -1,0 +1,43 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi-forceattach 9P "18 May 2001" "SunOS 5.11" "Kernel Properties for Drivers"
+.SH NAME
+ddi-forceattach, ddi-no-autodetach \- properties controlling driver
+attach/detach behavior
+.SH DESCRIPTION
+.sp
+.LP
+Solaris device drivers are attached by  \fBdevfsadm\fR(1M) and by the kernel in
+response to \fBopen\fR(2) requests from applications. Drivers not currently in
+use can be detached when the system experiences memory pressure. The
+\fBddi-forceattach\fR and \fBddi-no-autodetach\fR properties can be used to
+customize driver attach/detach behavior.
+.sp
+.LP
+The \fBddi-forceattach\fR is an integer property, to be set globally by means
+of the \fBdriver.conf\fR(4) file. Drivers with this property set to 1 are
+loaded and attached to all possible instances during system startup. The driver
+will not be auto-detached due to system memory pressure.
+.sp
+.LP
+The \fBddi-no-autodetach\fR is an integer property to be set globally by means
+of the \fBdriver.conf\fR(4) file or created dynamically by the driver on a
+per-instance basis with  \fBddi_prop_update_int\fR(9F). When this property is
+set to 1, the kernel will not auto-detach driver due to system memory pressure.
+.sp
+.LP
+Note that \fBddi-forceattach\fR implies \fBddi-no-autodetach\fR. Setting either
+property to a non-integer value or an integer value not equal to 1 produces
+undefined results. These properties do not prevent driver detaching in response
+to reconfiguration requests, such as executing commands \fBcfgadm\fR(1M),
+\fBmodunload\fR(1M), \fBrem_drv\fR(1M), and \fBupdate_drv\fR(1M).
+.SH SEE ALSO
+.sp
+.LP
+\fBdriver.conf\fR(4)
+.sp
+.LP
+\fIWriting Device Drivers\fR

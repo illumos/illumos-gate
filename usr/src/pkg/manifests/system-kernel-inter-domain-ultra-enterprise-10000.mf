@@ -43,12 +43,15 @@ dir path=platform/SUNW,Ultra-Enterprise-10000 group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=idn alias=SUNW,idn
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64)/idn \
     group=sys
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/idn.conf group=sys \
     original_name=SUNWidn:platform/SUNW,Ultra-Enterprise-10000/kernel/drv/idn.conf \
     preserve=true
+file path=usr/share/man/man7d/idn.7d
 legacy pkg=SUNWidn.u arch=$(ARCH).sun4u \
     desc="Inter-Domain Network Modules for Sun Enterprise 10000" \
     name="Inter-Domain Network Modules for Sun Enterprise 10000"

@@ -1,0 +1,161 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getprofattr 3SECDB "31 Mar 2005" "SunOS 5.11" "Security Attributes Database Library Functions"
+.SH NAME
+getprofattr, getprofnam, free_profattr, setprofattr, endprofattr, getproflist,
+free_proflist \- get profile description and attributes
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lsecdb  -lsocket  -lnsl [ \fIlibrary\fR... ]
+#include <prof_attr.h>
+
+\fBprofattr_t *\fR\fBgetprofattr\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBprofattr_t *\fR\fBgetprofnam\fR(\fBconst char *\fR\fI\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfree_profattr\fR(\fBprofattr_t *\fR\fIpd\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsetprofattr\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBendprofattr\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBgetproflist\fR(\fBconst char *\fR\fIprofname\fR, \fBchar **\fR\fIproflist\fR, \fBint *\fR\fIprofcnt\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfree_proflist\fR(\fBchar **\fR\fIproflist\fR, \fBint\fR \fIprofcnt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetprofattr()\fR and \fBgetprofnam()\fR functions each return a
+\fBprof_attr\fR entry. Entries can come from any of the sources specified in
+the \fBnsswitch.conf\fR(4) file.
+.sp
+.LP
+The \fBgetprofattr()\fR function enumerates \fBprof_attr\fR entries. The
+\fBgetprofnam()\fR function searches for a \fBprof_attr\fR entry with a given
+\fIname\fR. Successive calls to these functions return either successive
+\fBprof_attr\fR entries or \fINULL\fR.
+.sp
+.LP
+The internal representation of a \fBprof_attr\fR entry is a \fBprofattr_t\fR
+structure defined in  <\fBprof_attr.h\fR> with the following members:
+.sp
+.in +2
+.nf
+char	 *name;   /* Name of the profile */
+char	 *res1;   /* Reserved for future use */
+char	 *res2;   /* Reserved for future use */
+char	 *desc;   /* Description/Purpose of the profile */
+kva_t *attr;   /* Profile attributes */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfree_profattr()\fR function releases memory allocated by the
+\fBgetprofattr()\fR and \fBgetprofnam()\fR functions.
+.sp
+.LP
+The \fBsetprofattr()\fR function "rewinds" to the beginning of the enumeration
+of \fBprof_attr\fR entries. Calls to \fBgetprofnam()\fR can leave the
+enumeration in an indeterminate state. Therefore,  \fBsetprofattr()\fR should
+be called before the first call to \fBgetprofattr()\fR.
+.sp
+.LP
+The \fBendprofattr()\fR function may be called to indicate that \fBprof_attr\fR
+processing is complete; the system may then close any open \fBprof_attr\fR
+file, deallocate storage, and so forth.
+.sp
+.LP
+The \fBgetproflist()\fR function searches for the list of sub-profiles found in
+the given \fIprofname\fR and allocates memory to store this list in
+\fIproflist\fR. The given \fIprofname\fR will be included in the list of
+sub-profiles. The \fIprofcnt\fR argument indicates the number of items
+currently valid in \fIproflist\fR. Memory allocated by \fBgetproflist()\fR
+should be freed using the \fBfree_proflist()\fR function.
+.sp
+.LP
+The \fBfree_proflist()\fR function frees memory allocated by the
+\fBgetproflist()\fR function.  The \fIprofcnt\fR argument specifies the number
+of items to free from the \fIproflist\fR argument.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetprofattr()\fR function returns a pointer to a \fBprofattr_t\fR if it
+successfully enumerates an entry; otherwise it returns \fINULL\fR, indicating
+the end of the enumeration.
+.sp
+.LP
+The \fBgetprofnam()\fR function returns a pointer to a \fBprofattr_t\fR if it
+successfully locates the requested entry; otherwise it returns \fINULL\fR.
+.SH USAGE
+.sp
+.LP
+Individual attributes in the \fBprof_attr_t\fR structure can be referred to by
+calling the \fBkva_match\fR(3SECDB) function.
+.sp
+.LP
+Because the list of legal keys is likely to expand, any code  must be written
+to ignore unknown key-value pairs without error.
+.sp
+.LP
+The \fBgetprofattr()\fR and \fBgetprofnam()\fR functions both allocate memory
+for the pointers they return. This memory should be deallocated with the
+\fBfree_profattr()\fR function.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/prof_attr\fR\fR
+.ad
+.RS 27n
+.rt  
+profiles and their descriptions
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBauths\fR(1), \fBprofiles\fR(1), \fBgetexecattr\fR(3SECDB),
+\fBgetauthattr\fR(3SECDB), \fBprof_attr\fR(4)

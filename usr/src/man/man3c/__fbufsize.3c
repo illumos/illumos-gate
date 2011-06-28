@@ -1,0 +1,175 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH __fbufsize 3C "5 Feb 1998" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+__fbufsize, __flbf, __fpending, __fpurge, __freadable, __freading,
+__fsetlocking, __fwritable, __fwriting, _flushlbf \- interfaces to stdio FILE
+structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+#include <stdio_ext.h>
+
+\fBsize_t\fR \fB__fbufsiz\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB__flbf\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fB__fpending\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fB__fpurge\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB__freadable\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB__freading\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB__fsetlocking\fR(\fBFILE *\fR\fIstream\fR, \fBint\fR \fItype\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB__fwritable\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB__fwriting\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fB_flushlbf\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide portable access to the members of the \fBstdio\fR(3C)
+\fBFILE\fR structure.
+.sp
+.LP
+The \fB__fbufsize()\fR function returns in bytes the size of the buffer
+currently in use by the given stream.
+.sp
+.LP
+The \fB__flbf()\fR function returns non-zero if the stream is line-buffered.
+.sp
+.LP
+The \fB__fpending\fR function returns in bytes the amount of output pending on
+a stream.
+.sp
+.LP
+The \fB__fpurge()\fR function discards any pending buffered I/O on the stream.
+.sp
+.LP
+The \fB__freadable()\fR function returns non-zero if it is possible to read
+from a stream.
+.sp
+.LP
+The \fB__freading()\fR function returns non-zero if the file is open readonly,
+or if the last operation on the stream was a read operation such as
+\fBfread\fR(3C) or \fBfgetc\fR(3C). Otherwise it returns 0.
+.sp
+.LP
+The \fB__fsetlocking()\fR function allows the type of locking performed by
+\fBstdio\fR on a given stream to be controlled by the programmer.
+.sp
+.LP
+If \fItype\fR is \fBFSETLOCKING_INTERNAL\fR, \fBstdio\fR performs implicit
+locking around every operation on the given stream.  This is the default system
+behavior on that stream.
+.sp
+.LP
+If \fItype\fR is \fBFSETLOCKING_BYCALLER\fR, \fBstdio\fR assumes that the
+caller is responsible for maintaining the integrity of the stream in the face
+of access by multiple threads.  If there is only one thread accessing the
+stream, nothing further needs to be done.  If multiple threads are accessing
+the stream, then the caller can use the \fBflockfile()\fR, \fBfunlockfile()\fR,
+and \fBftrylockfile()\fR functions described on the \fBflockfile\fR(3C) manual
+page to provide the appropriate locking. In both this and the case where
+\fItype\fR is \fBFSETLOCKING_INTERNAL\fR, \fB__fsetlocking()\fR returns the
+previous state of the stream.
+.sp
+.LP
+If \fItype\fR is \fBFSETLOCKING_QUERY\fR, \fB__fsetlocking()\fR returns the
+current state of the stream without changing it.
+.sp
+.LP
+The \fB__fwritable()\fR function returns non-zero if it is possible to write on
+a stream.
+.sp
+.LP
+The \fB__fwriting()\fR function returns non-zero if the file is open write-only
+or append-only, or if the last operation on the stream was a write operation
+such as \fBfwrite\fR(3C) or \fBfputc\fR(3C). Otherwise it returns 0.
+.sp
+.LP
+The \fB_flushlbf()\fR function flushes all line-buffered files.  It is used
+when reading from a line-buffered file.
+.SH USAGE
+.sp
+.LP
+Although the contents of the \fBstdio FILE\fR structure have always been
+private to the \fBstdio\fR implementation, some applications have needed to
+obtain information about a \fBstdio\fR stream that was not accessible through a
+supported interface. These applications have resorted to accessing fields of
+the \fBFILE\fR structure directly, rendering them possibly non-portable to new
+implementations of \fBstdio\fR, or more likely, preventing enhancements to
+\fBstdio\fR that would cause those applications to break.
+.sp
+.LP
+In the 64-bit environment, the \fBFILE\fR structure is opaque.  The functions
+described here are provided as a means of obtaining the information that up to
+now has been retrieved directly from the \fBFILE\fR structure.  Because they
+are based on the needs of existing applications (such as \fBmh\fR and
+\fBemacs\fR), they may be extended as other programs are ported.  Although they
+may still be non-portable to other operating systems, they will be compatible
+from each Solaris release to the next.  Interfaces that are more portable are
+under development.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelT{
+\fB__fsetlocking()\fR is Unsafe; all others are MT-Safe
+T}
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfgetc\fR(3C), \fBflockfile\fR(3C), \fBfputc\fR(3C), \fBfread\fR(3C),
+\fBfwrite\fR(3C), \fBstdio\fR(3C), \fBattributes\fR(5)

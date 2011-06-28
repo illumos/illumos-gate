@@ -1,0 +1,168 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_cno_wait 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_cno_wait \- wait for notification events
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_cno_wait (
+    IN    DAT_CNO_HANDLE    \fIcno_handle\fR,
+    IN    DAT_TIMEOUT       \fItimeout\fR,
+    OUT   DAT_EVD_HANDLE    *\fIevd_handle\fR
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcno_handle\fR\fR
+.ad
+.RS 14n
+.rt  
+Handle for an instance of CNO
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItimeout\fR\fR
+.ad
+.RS 14n
+.rt  
+The duration to wait for a notification. The value \fBDAT_TIMEOUT_INFINITE\fR
+can be used to wait indefinitely.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIevd_handle\fR\fR
+.ad
+.RS 14n
+.rt  
+Handle for an instance of EVD
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_cno_wait()\fR function allows the Consumer to wait for notification
+events from a set of Event Dispatchers all from the same Interface Adapter. The
+Consumer blocks until notified or the timeout period expires.
+.sp
+.LP
+An Event Dispatcher that is disabled or in the "Waited" state does not deliver
+notifications. A uDAPL Consumer waiting directly upon an Event Dispatcher
+preempts the CNO.
+.sp
+.LP
+The consumer can optionally specify a timeout, after which it is unblocked even
+if there are no notification events. On a timeout, \fIevd_handle\fR is
+explicitly set to a null handle.
+.sp
+.LP
+The returned \fIevd_handle\fR is only a hint. Another Consumer can reap the
+Event before this Consumer can get around to checking the Event Dispatcher.
+Additionally, other Event Dispatchers feeding this CNO might have been
+notified. The Consumer is responsible for ensuring that all EVDs feeding this
+CNO are polled regardless of whether they are identified as the immediate cause
+of the CNO unblocking.
+.sp
+.LP
+All the waiters on the CNO, including the OS Wait Proxy Agent if it is
+associated with the CNO, are unblocked with the NULL handle returns for an
+unblocking EVD \fIevd_handle\fR when the IA instance is destroyed or when all
+EVDs the CNO is associated with are freed.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 25n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 25n
+.rt  
+The \fIcno_handle\fR parameter is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_QUEUE_EMPTY\fR\fR
+.ad
+.RS 25n
+.rt  
+The operation timed out without a notification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_PARAMETER\fR\fR
+.ad
+.RS 25n
+.rt  
+One of the parameters was invalid or out of range, a combination of parameters
+was invalid, or the \fItimeout\fR parameter is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INTERRUPTED_CALL\fR\fR
+.ad
+.RS 25n
+.rt  
+The operation was  interrupted by a signal.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.1, 1.2
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdat\fR(3LIB), \fBattributes\fR(5)

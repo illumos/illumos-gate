@@ -1,0 +1,246 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_errmsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_errmsg \- display a SCSI request sense message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBvoid\fR \fBscsi_errmsg\fR(\fBstruct scsi_device *\fR\fIdevp\fR, \fBstruct scsi_pkt *\fR\fIpktp\fR,
+     \fBchar *\fR\fIdrv_name\fR, \fBint\fR \fIseverity\fR, \fBdaddr_t\fR \fIblkno\fR, \fBdaddr_t\fR \fIerr_blkno\fR, 
+     \fBstruct scsi_key_strings *\fR\fIcmdlist\fR, \fBstruct scsi_extended_sense *\fR\fIsensep\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevp\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to the  \fBscsi_device\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpktp\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdrv_name\fR\fR
+.ad
+.RS 13n
+.rt  
+String used by \fBscsi_log\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIseverity\fR\fR
+.ad
+.RS 13n
+.rt  
+Error severity level, maps to severity strings below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIblkno\fR\fR
+.ad
+.RS 13n
+.rt  
+Requested block number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerr_blkno\fR\fR
+.ad
+.RS 13n
+.rt  
+Error block number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmdlist\fR\fR
+.ad
+.RS 13n
+.rt  
+An array of \fBSCSI \fRcommand description strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsensep\fR\fR
+.ad
+.RS 13n
+.rt  
+A pointer to a \fBscsi_extended_sense\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_errmsg()\fR function interprets the request sense information in
+the \fIsensep\fR pointer and generates a standard message that is displayed
+using \fBscsi_log\fR(9F). The first line of the message is always a
+\fBCE_WARN\fR, with the continuation lines being \fBCE_CONT\fR. \fIsensep\fR
+may be \fINULL\fR, in which case no sense key or vendor information is
+displayed.
+.sp
+.LP
+The driver should make the determination as to when to call this function based
+on the severity of the failure and the severity level that the driver wants to
+report.
+.sp
+.LP
+The \fBscsi_device\fR(9S) structure denoted by \fIdevp\fR supplies the
+identification of the device that requested the display. \fIseverity\fR selects
+which string is used in the "Error Level:" reporting, according to the
+following table:
+.sp
+
+.sp
+.TS
+tab();
+cw(2.68i) cw(2.76i) cw(.06i) 
+lw(2.68i) lw(2.76i) lw(.06i) 
+.
+\fBSeverity Value:\fR\fBString:\fR
+\fBSCSI_ERR_ALL\fR\fBAll\fR
+\fBSCSI_ERR_UNKNOWN\fR\fBUnknown\fR
+\fBSCSI_ERR_INFO\fR\fBInformational\fR
+\fBSCSI_ERR_RECOVERE\fR\fBRecovered\fR
+\fBSCSI_ERR_RETRYABL\fR\fBRetryable\fR
+\fBSCSI_ERR_FATAL\fR\fBFatal\fR
+.TE
+
+.sp
+.LP
+\fIblkno\fR is the block number of the original request that generated the
+error. \fIerr_blkno\fR is the block number where the error occurred.
+\fIcmdlist\fR is a mapping table for translating the \fBSCSI \fRcommand code in
+\fIpktp\fR to the actual command string.
+.sp
+.LP
+The \fIcmdlist\fR is described in the structure below:
+.sp
+.in +2
+.nf
+struct scsi_key_strings {
+        int key;
+        char *message;
+};
+.fi
+.in -2
+
+.sp
+.LP
+For a basic \fBSCSI\fR disk, the following list is appropriate:
+.sp
+.in +2
+.nf
+static struct scsi_key_strings scsi_cmds[] = {
+        0x00, "test unit ready",
+        0x01, "rezero/rewind",
+        0x03, "request sense",
+        0x04, "format",
+        0x07, "reassign",
+        0x08, "read",
+        0x0a, "write",
+        0x0b, "seek",
+        0x12, "inquiry",
+        0x15, "mode select",
+        0x16, "reserve",
+        0x17, "release",
+        0x18, "copy",
+        0x1a, "mode sense",
+        0x1b, "start/stop",
+        0x1e, "door lock",
+        0x28, "read(10)",
+        0x2a, "write(10)",
+        0x2f, "verify",
+        0x37, "read defect data",
+        0x3b, "write buffer",
+        -1, NULL
+};
+.fi
+.in -2
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_errmsg()\fR function may be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRGenerating error information.
+.sp
+.LP
+This entry:
+
+.sp
+.in +2
+.nf
+scsi_errmsg(devp, pkt, "sd", SCSI_ERR_INFO, bp->b_blkno, 
+         err_blkno, sd_cmds, rqsense);
+.fi
+.in -2
+
+.sp
+.LP
+Generates:
+
+.sp
+.in +2
+.nf
+\fBWARNING: /sbus@1,f8000000/esp@0,800000/sd@1,0 (sd1):
+Error for Command: read Error Level: Informational
+Requested Block: 23936 Error Block: 23936
+Vendor: QUANTUM Serial Number: 123456
+Sense Key:  Unit Attention
+ASC: 0x29 (reset), ASCQ: 0x0, FRU: 0x0\fR
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcmn_err\fR(9F), \fBscsi_log\fR(9F), \fBscsi_device\fR(9S),
+\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

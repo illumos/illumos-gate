@@ -45,6 +45,7 @@
 #include <pthread.h>
 #include <synch.h>
 #include <spawn.h>
+#include <paths.h>
 #include "stdiom.h"
 #include "mse.h"
 #include "libc.h"
@@ -95,7 +96,7 @@ popen(const char *cmd, const char *mode)
 	int	myside;
 	int	yourside;
 	int	fd;
-	const char *shpath;
+	const char *shpath = _PATH_BSHELL;
 	FILE	*iop;
 	int	stdio;
 	node_t	*curr;
@@ -104,8 +105,6 @@ popen(const char *cmd, const char *mode)
 	posix_spawnattr_t attr;
 	posix_spawn_file_actions_t fact;
 	int	error;
-	static const char *sun_path = "/bin/sh";
-	static const char *xpg4_path = "/usr/xpg4/bin/sh";
 	static const char *shell = "sh";
 	static const char *sh_flg = "-c";
 
@@ -131,7 +130,6 @@ popen(const char *cmd, const char *mode)
 		return (NULL);
 	}
 
-	shpath = __xpg4? xpg4_path : sun_path;
 	if (access(shpath, X_OK))	/* XPG4 Requirement: */
 		shpath = "";		/* force child to fail immediately */
 

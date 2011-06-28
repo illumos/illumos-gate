@@ -1,0 +1,214 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH p_online 2 "11 Jan 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+p_online \- return or change processor operational status
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/processor.h>
+
+\fBint\fR \fBp_online\fR(\fBprocessorid_t\fR \fIprocessorid\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBp_online()\fR function changes or returns the operational status of
+processors. The state of the processor specified by the \fIprocessorid\fR
+argument is changed to the state represented by the \fIflag\fR argument.
+.sp
+.LP
+Legal values for \fIflag\fR are \fBP_STATUS\fR, \fBP_ONLINE\fR,
+\fBP_OFFLINE\fR, \fBP_NOINTR\fR, \fBP_FAULTED\fR, \fBP_SPARE\fR, and
+\fBP_FORCED\fR.
+.sp
+.LP
+When \fIflag\fR is \fBP_STATUS,\fR no processor status change occurs, but the
+current processor status is returned.
+.sp
+.LP
+The \fBP_ONLINE\fR, \fBP_OFFLINE\fR, \fBP_NOINTR\fR, \fBP_FAULTED\fR, and
+\fBP_SPARE\fR values for \fIflag\fR refer to valid processor states. The
+\fBP_OFFLINE\fR, \fBP_SPARE\fR,  and \fBP_FAULTED\fR processor states can be
+combined with the \fBP_FORCED\fR flag.
+.sp
+.LP
+A processor in the \fBP_ONLINE\fR state is allowed to process \fBLWPs\fR
+(lightweight processes) and perform system activities. The processor is also
+interruptible by I/O devices attached to the system.
+.sp
+.LP
+A processor in the \fBP_OFFLINE\fR state is not allowed to process \fBLWPs\fR.
+The processor is as inactive as possible. If the hardware supports such a
+feature, the processor is not interruptible by attached I/O devices.
+.sp
+.LP
+A processor in the \fBP_NOINTR\fR state is allowed to process \fBLWPs\fR, but
+it is not interruptible by attached I/O devices. Typically, interrupts, when
+they occur are routed to other processors in the system. Not all systems
+support putting a processor into the \fBP_NOINTR\fR state. It is not permitted
+to put all the processors of a system into the \fBP_NOINTR\fR state. At least
+one processor must always be available to service system clock interrupts.
+.sp
+.LP
+A processor in the \fBP_SPARE\fR state is not allowed to process LWPs. In many
+respects the \fBP_SPARE\fR state is similiar to the \fBP_OFFLINE\fR state, but
+describes a processor that is available for reactivation by management tools
+without administrator intervention.
+.sp
+.LP
+A processor in the \fBP_FAULTED\fR state is not allowed to process LWPs. In
+many respects the \fBP_FAULTED\fR state is similiar to the \fBP_OFFLINE\fR
+state, but describes a processor that has been diagnosed as faulty. The
+privileged caller can change the state of the processor from \fBP_FAULTED\fR to
+any of the other states, but since the processor might generate additional
+errors, electing to reactivate such a processor should be carefully considered.
+.sp
+.LP
+Forced processor state transition can be requested if a new processor state is
+specified with the bitwise-inclusive OR of the special \fBP_FORCED\fR flag.
+Forcing transition of a processor to the \fBP_OFFLINE\fR, \fBP_SPARE\fR, or
+\fBP_FAULTED\fR state revokes processor bindings for all threads that were
+previously bound to that processor with \fBprocessor_bind\fR(2). There is no
+guarantee that a forced processor state transition always succeeds.
+.sp
+.LP
+Processor numbers are integers, greater than or equal to 0, and are defined by
+the hardware platform.  Processor numbers are not necessarily contiguous, but
+"not too sparse."  Processor numbers should always be printed in decimal.
+.sp
+.LP
+The maximum possible \fIprocessorid\fR value can be determined by calling
+\fBsysconf(_SC_CPUID_MAX)\fR. The list of valid processor numbers can be
+determined by calling \fBp_online()\fR with \fIprocessorid\fR values from 0 to
+the maximum returned by \fBsysconf(_SC_CPUID_MAX)\fR. The \fBEINVAL\fR error is
+returned for invalid processor numbers.  See \fBEXAMPLES\fR below.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, the value returned is the previous state of the
+processor, \fBP_ONLINE\fR, \fBP_OFFLINE\fR, \fBP_NOINTR\fR, \fBP_FAULTED\fR,
+\fBP_SPARE\fR, or \fBP_POWEROFF\fR. Otherwise, \fB\(mi1\fR is returned, the CPU
+state remains unchanged, and  \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBp_online()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIflag\fR was \fBP_OFFLINE\fR or \fBP_SPARE\fR and the specified processor
+is the only on-line processor, there are currently  \fBLWPs\fR bound to the
+processor, or the processor performs some essential function that cannot be
+performed by another processor.
+.sp
+The \fIflag\fR was \fBP_NOINTR\fR and the specified processor is the only
+interruptible processor in the system, or it handles interrupts that cannot be
+handled by another processor.
+.sp
+The specified processor is powered off and cannot be powered on because some
+platform- specific resource is not available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+A non-existent processor \fBID\fR was specified or  \fIflag\fR was invalid.
+.sp
+The caller is in a non-global zone, the pools facility is active, and the
+processor is not a member of the zone's pool's processor set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The specified processor is powered off, and the platform does not support power
+on of individual processors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 11n
+.rt  
+The flag was not \fBP_STATUS\fR and the {\fBPRIV_SYS_RES_CONFIG\fR} privilege
+is not asserted in the effective set of the calling process.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRList the legal processor numbers.
+.sp
+.LP
+The following code sample will list the legal processor numbers:
+
+.sp
+.in +2
+.nf
+#include <sys/unistd.h>
+#include <sys/processor.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+
+int
+main()
+{
+        processorid_t i, cpuid_max;
+        cpuid_max = sysconf(_SC_CPUID_MAX);
+        for (i = 0; i <= cpuid_max; i++) {
+              if (p_online(i, P_STATUS) != -1)
+                        printf("processor %d present\en", i);
+        }
+        return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpooladm\fR(1M), \fBpsradm\fR(1M), \fBpsrinfo\fR(1M), \fBzoneadm\fR(1M),
+\fBprocessor_bind\fR(2), \fBprocessor_info\fR(2), \fBpset_create\fR(2),
+\fBsysconf\fR(3C), \fBattributes\fR(5), \fBprivileges\fR(5)

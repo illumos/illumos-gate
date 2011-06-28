@@ -1,0 +1,56 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_fill 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_fill \- set fill byte
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBvoid\fR \fBelf_fill\fR(\fBint\fR \fIfill\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Alignment constraints for \fBELF\fR files sometimes require the presence of
+``holes.'' For example, if the data for one section are required to begin on an
+eight-byte boundary, but the preceding section is too ``short,'' the library
+must fill the intervening bytes. These bytes are set to the \fIfill\fR
+character. The library uses zero bytes unless the application supplies a value.
+See \fBelf_getdata\fR(3ELF) for more information about these holes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf_flagdata\fR(3ELF), \fBelf_getdata\fR(3ELF),
+\fBelf_update\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+An application can assume control of the object file organization by setting
+the \fBELF_F_LAYOUT\fR bit (see \fBelf_flagdata\fR(3ELF)). When this is done,
+the library does \fInot\fR fill holes.

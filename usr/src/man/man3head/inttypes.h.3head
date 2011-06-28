@@ -1,0 +1,157 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH inttypes.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.SH NAME
+inttypes.h, inttypes \- fixed size integer types
+.SH SYNOPSIS
+.LP
+.nf
+#include <\fBinttypes.h\fR> 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The <\fBinttypes.h\fR> header includes the <\fBstdint.h\fR> header.
+.sp
+.LP
+The <\fBinttypes.h\fR> header includes a definition of the following type:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBimaxdiv_t\fR\fR
+.ad
+.RS 13n
+.rt  
+structure type that is the type of the value returned by the \fBimaxdiv()\fR
+function.
+.RE
+
+.sp
+.LP
+The following macros are defined. Each expands to a character string literal
+containing a conversion specifier, possibly modified by a length modifier,
+suitable for use within the format argument of a formatted input/output
+function when converting the corresponding integer type. These macros have the
+general form of \fBPRI\fR (character string literals for the \fBfprintf()\fR
+and \fBfwprintf()\fR family of functions) or \fBSCN\fR (character string
+literals for the \fBfscanf()\fR and \fBfwscanf()\fR family of functions),
+followed by the conversion specifier, followed by a name corresponding to a
+similar type name in <\fBstdint.h\fR>. In these names, \fIN\fR represents the
+width of the type as described in <\fBstdint.h\fR>. For example,
+\fBPRIdFAST32\fR can be used in a format string to print the value of an
+integer of type \fBint_fast32_t\fR.
+.sp
+.LP
+The \fBfprintf()\fR macros for signed integers are:
+.sp
+.in +2
+.nf
+PRId\fIN\fR  PRIdLEAST\fIN\fR  PRIdFAST\fIN\fR  PRIdMAX  PRIdPTR
+PRIi\fIN\fR  PRIiLEAST\fIN\fR  PRIiFAST\fIN\fR  PRIiMAX  PRIiPTR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfprintf()\fR macros for unsigned integers are:
+.sp
+.in +2
+.nf
+PRIo\fIN\fR   PRIoLEAST\fIN\fR  PRIoFAST\fIN\fR  PRIoMAX  PRIoPTR
+PRIu\fIN\fR   PRIuLEAST\fIN\fR  PRIuFAST\fIN\fR  PRIuMAX  PRIuPTR
+PRIx\fIN\fR   PRIxLEAST\fIN\fR  PRIxFAST\fIN\fR  PRIxMAX  PRIxPTR
+PRIX\fIN\fR   PRIXLEAST\fIN\fR  PRIXFAST\fIN\fR  PRIXMAX  PRIXPTR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfscanf()\fR macros for signed integers are:
+.sp
+.in +2
+.nf
+SCNd\fIN\fR  SCNdLEAST\fIN\fR  SCNdFAST\fIN\fR  SCNdMAX  SCNdPTR
+SCNi\fIN\fR  SCNiLEAST\fIN\fR  SCNiFAST\fIN\fR  SCNiMAX  SCNiPTR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfscanf()\fR macros for unsigned integers are:
+.sp
+.in +2
+.nf
+SCNo\fIN\fR  SCNoLEAST\fIN\fR  SCNoFAST\fIN\fR  SCNoMAX  SCNoPTR
+SCNu\fIN\fR  SCNuLEAST\fIN\fR  SCNuFAST\fIN\fR  SCNuMAX  SCNuPTR
+SCNx\fIN\fR  SCNxLEAST\fIN\fR  SCNxFAST\fIN\fR  SCNxMAX  SCNxPTR
+.fi
+.in -2
+
+.sp
+.LP
+For each type that the implementation provides in <\fBstdint.h\fR>, the
+corresponding \fBfprintf()\fR and  \fBfwprintf()\fR macros must be defined. The
+corresponding \fBfscanf()\fR and \fBfwscanf()\fR macros must be defined as
+well, unless the implementation does not have a suitable modifier for the type.
+.SH USAGE
+.sp
+.LP
+The purpose of <\fBinttypes.h\fR> is to provide a set of integer types whose
+definitions are consistent across machines and independent of operating systems
+and other implementation idiosyncrasies. It defines, with a \fBtypedef\fR,
+integer types of various sizes. Implementations are free to \fBtypedef\fR them
+as ISO C standard integer types or extensions that they support. Consistent use
+of this header greatly increases the portability of applications across
+platforms.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse of Macro
+.sp
+.LP
+The following code uses one of the macros available through <\fBinttypes.h\fR>.
+
+.sp
+.in +2
+.nf
+#include <inttypes.h>
+#include <wchar.h>
+int main(void)
+{
+     uintmax_t i = UINTMAX_MAX; // This type always exists.
+     wprintf("The largest integer value is %020"
+          PRIxMAX, "\en", i);
+     return 0;
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBimaxdiv\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

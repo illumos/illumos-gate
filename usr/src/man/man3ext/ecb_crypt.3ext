@@ -1,0 +1,138 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ecb_crypt 3EXT "3 Mar 2008" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+ecb_crypt, cbc_crypt, des_setparity, DES_FAILED \- fast DES encryption
+.SH SYNOPSIS
+.LP
+.nf
+#include <rpc/des_crypt.h>
+
+\fBint\fR \fBecb_crypt\fR(\fBchar *\fR\fIkey\fR, \fBchar *\fR\fIdata\fR, \fBunsigned\fR \fIdatalen\fR,
+     \fBunsigned\fR \fImode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcbc_crypt\fR(\fBchar *\fR\fIkey\fR, \fBchar *\fR\fIdata\fR, \fBunsigned\fR \fIdatalen\fR,
+     \fBunsigned\fR \fImode\fR, \fBchar *\fR\fIivec\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdes_setparity\fR(\fBchar *\fR\fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBDES_FAILED\fR(\fBint\fR \fIstat\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBecb_crypt()\fR and \fBcbc_crypt()\fR implement the \fBNBS\fR \fBDES\fR (Data
+Encryption Standard). These routines are faster and more general purpose than
+\fBcrypt\fR(3C). They also are able to utilize \fBDES\fR hardware if it is
+available. \fBecb_crypt()\fR encrypts in \fBECB\fR (Electronic Code Book) mode,
+which encrypts blocks of data independently. \fBcbc_crypt()\fR encrypts in
+\fBCBC\fR (Cipher Block Chaining) mode, which chains together successive
+blocks. \fBCBC\fR mode protects against insertions, deletions, and
+substitutions of blocks. Also, regularities in the clear text will not appear
+in the cipher text.
+.sp
+.LP
+The first parameter, \fIkey\fR, is the 8-byte encryption key with parity. To
+set the key's parity, which for \fBDES\fR is in the low bit of each byte, use
+\fBdes_setparity()\fR. The second parameter, \fIdata\fR, contains the data to
+be encrypted or decrypted. The third parameter, \fIdatalen\fR, is the length in
+bytes of \fIdata\fR, which must be a multiple of 8. The fourth parameter,
+\fImode\fR, is formed by \fBOR'ing\fR together the  \fBDES_ENCRYPT\fR or
+\fBDES_DECRYPT\fR to specify the encryption direction and \fBDES_HW\fR or
+\fBDES_SW\fR to specify software or hardware encryption. If \fBDES_HW\fR is
+specified, and there is no hardware, then the encryption is performed in
+software and the routine returns \fBDESERR_NOHWDEVICE.\fR
+.sp
+.LP
+For \fBcbc_crypt()\fR, the parameter \fIivec\fR is the 8-byte initialization
+vector for the chaining.  It is updated to the next initialization vector upon
+successful return.
+.SH RETURN VALUES
+.sp
+.LP
+Given a result status \fIstat\fR, the macro \fBDES_FAILED\fR is false only for
+the first two statuses.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDESERR_NONE\fR\fR
+.ad
+.RS 21n
+.rt  
+No error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDESERR_NOHWDEVICE\fR\fR
+.ad
+.RS 21n
+.rt  
+Encryption succeeded, but done in software instead of the requested hardware.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDESERR_HWERROR\fR\fR
+.ad
+.RS 21n
+.rt  
+An error occurred in the hardware or driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDESERR_BADPARAM\fR\fR
+.ad
+.RS 21n
+.rt  
+Bad parameter to routine.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcrypt\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+When compiling multi-thread applications, the \fB_REENTRANT\fR flag must be
+defined on the compile line.  This flag should only be used in multi-thread
+applications.

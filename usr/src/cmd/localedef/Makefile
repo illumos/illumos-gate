@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 #
 
@@ -140,6 +140,7 @@ UTF_8_LOCALES		= \
 		ja_JP \
 		ka_GE \
 		kk_KZ \
+		km_KH \
 		kn_IN \
 		ko_KR \
 		kok_IN \
@@ -166,6 +167,7 @@ UTF_8_LOCALES		= \
 		sk_SK \
 		sl_SI \
 		sq_AL \
+		sr_BA sr_ME sr_RS \
 		sv_FI sv_SE \
 		ta_IN ta_LK \
 		te_IN \

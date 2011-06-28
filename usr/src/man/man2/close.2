@@ -1,0 +1,270 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved. Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH close 2 "18 Oct 2005" "SunOS 5.11" "System Calls"
+.SH NAME
+close \- close a file descriptor
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBclose\fR(\fBint\fR \fIfildes\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBclose()\fR function deallocates the file descriptor indicated by
+\fIfildes\fR. To deallocate means to make the file descriptor available for
+return by subsequent calls to \fBopen\fR(2) or other functions that allocate
+file descriptors. All outstanding record locks owned by the process on the file
+associated with the file descriptor will be removed (that is, unlocked).
+.sp
+.LP
+If \fBclose()\fR is interrupted by a signal that is to be caught, it will
+return \fB\(mi1\fR with \fBerrno\fR set to \fBEINTR\fR and the state of
+\fIfildes\fR is unspecified. If an I/O error occurred while reading from or
+writing to the file system during \fBclose()\fR, it returns -1, sets
+\fBerrno\fR to \fBEIO\fR, and the state of \fIfildes\fR is unspecified.
+.sp
+.LP
+When all file descriptors associated with a pipe or \fBFIFO\fR special file are
+closed, any data remaining in the pipe or \fBFIFO\fR will be discarded.
+.sp
+.LP
+When all file descriptors associated with an open file description have been
+closed the open file description will be freed.
+.sp
+.LP
+If the link count of the file is 0, when all file descriptors associated with
+the file are closed, the space occupied by the file will be freed and the file
+will no longer be accessible.
+.sp
+.LP
+If a streams-based (see \fBIntro\fR(2)) \fIfildes\fR is closed and the calling
+process was previously registered to receive a \fBSIGPOLL\fR signal (see
+\fBsignal\fR(3C)) for events associated with that stream (see \fBI_SETSIG\fR in
+\fBstreamio\fR(7I)), the calling process will be unregistered for events
+associated with the stream.  The last \fBclose()\fR for a stream causes the
+stream associated with \fIfildes\fR to be dismantled. If \fBO_NONBLOCK\fR and
+\fBO_NDELAY\fR are not set and there have been no signals posted for the
+stream, and if there is data on the module's write queue, \fBclose()\fR waits
+up to 15 seconds (for each module and driver) for any output to drain before
+dismantling the stream. The time delay can be changed via an \fBI_SETCLTIME\fR
+\fBioctl\fR(2) request (see \fBstreamio\fR(7I)). If the \fBO_NONBLOCK\fR or
+\fBO_NDELAY\fR flag is set, or if there are any pending signals, \fBclose()\fR
+does not wait for output to drain, and dismantles the stream immediately.
+.sp
+.LP
+If \fIfildes\fR is associated with one end of a pipe, the last \fBclose()\fR
+causes a hangup to occur on the other end of the pipe.  In addition, if the
+other end of the pipe has been named by \fBfattach\fR(3C), then the last
+\fBclose()\fR forces the named end to be detached by \fBfdetach\fR(3C). If the
+named end has no open file descriptors associated with it and gets detached,
+the stream associated with that end is also dismantled.
+.sp
+.LP
+If \fIfildes\fR refers to the master side of a pseudo-terminal, a \fBSIGHUP\fR
+signal is sent to the session leader, if any, for which the slave side of the
+pseudo-terminal is the controlling terminal. It is unspecified whether closing
+the master side of the pseudo-terminal flushes all queued input and output.
+.sp
+.LP
+If \fIfildes\fR refers to the slave side of a streams-based pseudo-terminal, a
+zero-length message may be sent to the master.
+.sp
+.LP
+When there is an outstanding cancelable asynchronous I/O operation against
+\fIfildes\fR when \fBclose()\fR is called, that I/O operation is canceled. An
+I/O operation that is not canceled completes as if the \fBclose()\fR operation
+had not yet occurred. All operations that are not canceled will complete as if
+the \fBclose()\fR blocked until the operations completed.
+.sp
+.LP
+If a shared memory object or a memory mapped file remains referenced at the
+last close (that is, a process has it mapped), then the entire contents of the
+memory object will persist until the memory object becomes unreferenced. If
+this is the last close of a shared memory object or a memory mapped file and
+the close results in the memory object becoming unreferenced, and the memory
+object has been unlinked, then the memory object will be removed.
+.sp
+.LP
+If \fIfildes\fR refers to a socket, \fBclose()\fR causes the socket to be
+destroyed.  If the socket is connection-mode, and the \fBSO_LINGER\fR option is
+set for the socket with non-zero linger time, and the socket has untransmitted
+data, then \fBclose()\fR will block for up to the current linger interval until
+all data is transmitted.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBclose()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBclose()\fR function was interrupted by a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is on a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 11n
+.rt  
+There was no free space remaining on the device containing the file.
+.RE
+
+.sp
+.LP
+The \fBclose()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 7n
+.rt  
+An I/O error occurred while reading from or writing to the file system.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRReassign a file descriptor.
+.sp
+.LP
+The following example closes the file descriptor associated with standard
+output for the current process, re-assigns standard output to a new file
+descriptor, and closes the original file descriptor to clean up. This example
+assumes that the file descriptor 0, which is the descriptor for standard input,
+is not closed.
+
+.sp
+.in +2
+.nf
+#include <unistd.h>
+\&...
+int pfd;
+\&...
+close(1);
+dup(pfd);
+close(pfd);
+\&...
+.fi
+.in -2
+
+.sp
+.LP
+Incidentally, this is exactly what could be achieved using:
+
+.sp
+.in +2
+.nf
+dup2(pfd, 1);
+close(pfd);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRClose a file descriptor.
+.sp
+.LP
+In the following example, \fBclose()\fR is used to close a file descriptor
+after an unsuccessful attempt is made to associate that file descriptor with a
+stream.
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#define LOCKFILE "/etc/ptmp"
+\&...
+int pfd;
+FILE *fpfd;
+\&...
+if ((fpfd = fdopen (pfd, "w")) == NULL) {
+        close(pfd);
+        unlink(LOCKFILE);
+        exit(1);
+}
+\&...
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+An application that used the \fBstdio\fR function \fBfopen\fR(3C) to open a
+file should use the corresponding \fBfclose\fR(3C) function rather than
+\fBclose()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBexec\fR(2), \fBfcntl\fR(2),
+\fBioctl\fR(2), \fBopen\fR(2) \fBpipe\fR(2), \fBfattach\fR(3C),
+\fBfclose\fR(3C), \fBfdetach\fR(3C), \fBfopen\fR(3C), \fBsignal\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5),
+\fBstreamio\fR(7I)

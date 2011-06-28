@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * References used throughout this code:
@@ -38,15 +38,12 @@
  */
 
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "snoop.h"
-
-/* some macros just for compactness */
-#define	GETLINE get_line(0, 0)
-#define	DECARGS int flags, uchar_t *data, int len, char *extrainfo
 
 /*
  * SMB Format (header)
@@ -55,9 +52,7 @@
 struct smb {
 	uchar_t idf[4]; /*  identifier, contains 0xff, 'SMB'  */
 	uchar_t com;    /*  command code  */
-	uchar_t rcls;   /*  error class  */
-	uchar_t res;
-	uchar_t err[2]; /*  error code  */
+	uchar_t err[4]; /*  NT Status, or error class+code */
 	uchar_t flags;
 	uchar_t flags2[2];
 	uchar_t re[12];
@@ -75,14 +70,19 @@ struct smb {
 };
 
 /* smb flags */
-#define	SERVER_RESPONSE	0x80
+#define	SERVER_RESPONSE		0x80
 
-static void interpret_sesssetupX(DECARGS);
-static void interpret_tconX(DECARGS);
-static void interpret_trans(DECARGS);
-static void interpret_trans2(DECARGS);
-static void interpret_negprot(DECARGS);
-static void interpret_default(DECARGS);
+/* smb flags2 */
+#define	FLAGS2_EXT_SEC		0x0800	/* Extended security */
+#define	FLAGS2_NT_STATUS	0x4000	/* NT status codes */
+#define	FLAGS2_UNICODE		0x8000	/* String are Unicode */
+
+static void interpret_sesssetupX(int, uchar_t *, int, char *, int);
+static void interpret_tconX(int, uchar_t *, int, char *, int);
+static void interpret_trans(int, uchar_t *, int, char *, int);
+static void interpret_trans2(int, uchar_t *, int, char *, int);
+static void interpret_negprot(int, uchar_t *, int, char *, int);
+static void interpret_default(int, uchar_t *, int, char *, int);
 
 /*
  * Trans2 subcommand codes
@@ -101,7 +101,7 @@ static void interpret_default(DECARGS);
 
 struct decode {
 	char *name;
-	void (*func)(DECARGS);
+	void (*func)(int, uchar_t *, int, char *, int);
 	char *callfmt;
 	char *replyfmt;
 };
@@ -120,27 +120,35 @@ static struct decode SMBtable[256] = {
 	{
 		"close", 0,
 		/* [X/Open-SMB, Sec. 7.10] */
-		"WFileID\0lLastModTime\0wByteCount\0\0",
-		"wByteCount\0\0"
+		"WFileID\0"
+		"lLastModTime\0"
+		"dByteCount\0\0",
+		"dByteCount\0\0"
 	},
 
 	{ "flush", 0, 0, 0 },
 	{ "unlink", 0, 0, 0 },
 
 	{
-		"mv", 0,
+		"move", 0,
 		/* [X/Open-SMB, Sec. 7.11] */
-		"wFileAttributes\0wByteCount\0"
-		"r\0UFileName\0r\0UNewPath\0\0",
-		"wByteCount\0\0"
+		"wFileAttributes\0"
+		"dByteCount\0r\0"
+		"UFileName\0r\0"
+		"UNewPath\0\0",
+		"dByteCount\0\0"
 	},
 
 	{
 		"getatr", 0,
 		/* [X/Open-SMB, Sec. 8.4] */
-		"dBytecount\0r\0UFileName\0\0",
-		"wFileAttributes\0lTime\0lSize\0R\0R\0R\0"
-		"R\0R\0wByteCount\0\0"
+		"dBytecount\0r\0"
+		"UFileName\0\0",
+		"wFileAttributes\0"
+		"lTime\0"
+		"lSize\0"
+		"R\0R\0R\0R\0R\0"
+		"dByteCount\0\0"
 	},
 
 	{ "setatr", 0, 0, 0 },
@@ -148,17 +156,26 @@ static struct decode SMBtable[256] = {
 	{
 		"read", 0,
 		/* [X/Open-SMB, Sec. 7.4] */
-		"WFileID\0wI/0 Bytes\0LFileOffset\0"
-		"WBytesLeft\0wByteCount\0\0",
-		"WDataLength\0R\0R\0R\0R\0wByteCount\0\0"
+		"WFileID\0"
+		"wI/0 Bytes\0"
+		"LFileOffset\0"
+		"WBytesLeft\0"
+		"dByteCount\0\0",
+		"WDataLength\0"
+		"R\0R\0R\0R\0"
+		"dByteCount\0\0"
 	},
 
 	{
 		"write", 0,
 		/* [X/Open-SMB, Sec. 7.5] */
-		"WFileID\0wI/0 Bytes\0LFileOffset\0WBytesLeft\0"
-		"wByteCount\0\0",
-		"WDataLength\0wByteCount\0\0"
+		"WFileID\0"
+		"wI/0 Bytes\0"
+		"LFileOffset\0"
+		"WBytesLeft\0"
+		"dByteCount\0\0",
+		"WDataLength\0"
+		"dByteCount\0\0"
 	},
 
 	{ "lock", 0, 0, 0 },
@@ -170,8 +187,9 @@ static struct decode SMBtable[256] = {
 	{
 		"chkpth", 0,
 		/* [X/Open-SMB, Sec. 8.7] */
-		"wByteCount\0r\0UFile\0\0",
-		"wByteCount\0\0"
+		"dByteCount\0r\0"
+		"UFile\0\0",
+		"dByteCount\0\0"
 	},
 
 	{ "exit", 0, 0, 0 },
@@ -187,8 +205,12 @@ static struct decode SMBtable[256] = {
 	{
 		"readbraw", 0,
 		/* [X/Open-SMB, Sec. 10.1] */
-		"WFileID\0LFileOffset\0wMaxCount\0"
-		"wMinCount\0lTimeout\0R\0wByteCount\0\0", 0
+		"WFileID\0"
+		"LFileOffset\0"
+		"wMaxCount\0"
+		"wMinCount\0"
+		"lTimeout\0R\0"
+		"dByteCount\0\0", 0
 	},
 
 	{ "readbmpx", 0, 0, 0 },
@@ -206,9 +228,14 @@ static struct decode SMBtable[256] = {
 	{
 		"lockingX", 0,
 		/* [X/Open-SMB, Sec. 12.2] */
-		"wChainedCommand\0wNextOffset\0WFileID\0"
-		"wLockType\0lOpenTimeout\0"
-		"W#Unlocks\0W#Locks\0wByteCount\0\0", 0
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"WFileID\0"
+		"wLockType\0"
+		"lOpenTimeout\0"
+		"W#Unlocks\0"
+		"W#Locks\0"
+		"dByteCount\0\0", 0
 	},
 
 	{ "trans", interpret_trans, 0, 0 },
@@ -221,20 +248,83 @@ static struct decode SMBtable[256] = {
 	{ "writeclose", 0, 0, 0 },
 
 	{
-		"openX", 0,
 		/* [X/Open-SMB, Sec. 12.1] */
-		"wChainedCommand\0wNextOffset\0wFlags\0"
-		"wMode\0wSearchAttributes\0wFileAttributes\0"
-		"lTime\0wOpenFunction\0lFileSize\0lOpenTimeout\0"
-		"R\0R\0wByteCount\0r\0UFileName\0\0",
-		"wChainedCommand\0wNextOffset\0WFileID\0"
-		"wAttributes\0lTime\0LSize\0wOpenMode\0"
-		"wFileType\0wDeviceState\0wActionTaken\0"
-		"lUniqueFileID\0R\0wBytecount\0\0"
+		"openX", 0,
+		/* call */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"wFlags\0"
+		"wMode\0"
+		"wSearchAttributes\0"
+		"wFileAttributes\0"
+		"lTime\0"
+		"wOpenFunction\0"
+		"lFileSize\0"
+		"lOpenTimeout\0R\0R\0"
+		"dByteCount\0r\0"
+		"UFileName\0\0",
+		/* reply */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"WFileID\0"
+		"wAttributes\0"
+		"lTime\0"
+		"LSize\0"
+		"wOpenMode\0"
+		"wFileType\0"
+		"wDeviceState\0"
+		"wActionTaken\0"
+		"lUniqueFileID\0R\0"
+		"wBytecount\0\0"
 	},
 
-	{ "readX", 0, 0, 0 },
-	{ "writeX", 0, 0, 0 },
+	{
+		/* [CIFS 4.2.4] */
+		"readX", 0,
+		/* call */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"WFileID\0"
+		"LOffset\0"
+		"DMaxCount\0"
+		"dMinCount\0"
+		"dMaxCountHigh\0"
+		"R\0"
+		"wRemaining\0"
+		"lOffsetHigh\0"
+		"dByteCount\0\0",
+		/* reply */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"dRemaining\0R\0R\0"
+		"DCount\0"
+		"dDataOffset\0"
+		"dCountHigh\0"
+		"R\0R\0R\0R\0"
+		"dByteCount\0\0"
+	},
+
+	{
+		/* [CIFS 4.2.5] */
+		"writeX", 0,
+		/* call */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"WFileID\0"
+		"LOffset\0R\0R\0"
+		"wWriteMode\0"
+		"wRemaining\0"
+		"dDataLenHigh\0"
+		"DDataLen\0"
+		"dDataOffset\0"
+		"lOffsetHigh\0\0",
+		/* reply */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"DCount\0"
+		"wRemaining\0"
+		"wCountHigh\0\0"
+	},
 
 	/* 0x30 */
 	{ 0, 0, 0, 0 },
@@ -244,8 +334,9 @@ static struct decode SMBtable[256] = {
 	{
 		"findclose", 0,
 		/* [X/Open-SMB, Sec. 15.4 ] */
-		"WFileID\0wByteCount\0\0",
-		"wByteCount\0\0"
+		"WFileID\0"
+		"dByteCount\0\0",
+		"dByteCount\0\0"
 	},
 	{ 0, 0, 0, 0 },
 	{ 0, 0, 0, 0 },
@@ -318,16 +409,18 @@ static struct decode SMBtable[256] = {
 	{
 		"tdis", 0,
 		/* [X/Open-SMB, Sec. 6.3] */
-		"wByteCount\0\0",
-		"wByteCount\0\0"
+		"dByteCount\0\0",
+		"dByteCount\0\0"
 	},
 	{ "negprot", interpret_negprot, 0, 0 },
 	{ "sesssetupX", interpret_sesssetupX, 0, 0 },
 	{
 		"uloggoffX", 0,
 		/* [X/Open-SMB, Sec. 15.5] */
-		"wChainedCommand\0wNextOffset\0\0",
-		"wChainedCommnad\0wNextOffset\0\0" },
+		"wChainedCommand\0"
+		"wNextOffset\0\0",
+		"wChainedCommnad\0"
+		"wNextOffset\0\0" },
 	{ "tconX", interpret_tconX, 0, 0 },
 	{ 0, 0, 0, 0 },
 	{ 0, 0, 0, 0 },
@@ -381,26 +474,40 @@ static struct decode SMBtable[256] = {
 	 * Command codes 0xa0 to 0xa7 are from
 	 * [CIFS/1.0, Sec. 5.1]
 	 */
-	{ " NT_Trans", 0, 0, 0 },
-	{ " NT_Trans2", 0, 0, 0 },
+	{ "_NT_Trans", 0, 0, 0 },
+	{ "_NT_Trans2", 0, 0, 0 },
 	{
-		" NT_CreateX", 0,
 		/* [CIFS/1.0, Sec. 4.2.1] */
-		"wChainedCommand\0wNextOffset\0r\0"
-		"wNameLength\0lCreateFlags\0lRootDirFID\0"
-		"lDesiredAccess\0R\0R\0R\0R\0"
-		"lNTFileAttributes\0lFileShareAccess\0"
-		"R\0R\0lCreateOption\0lImpersonationLevel\0"
-		"bSecurityFlags\0wByteCount\0r\0"
+		"_NT_CreateX", 0,
+		/* Call */
+		"wChainedCommand\0"
+		"wNextOffset\0r\0"
+		"dNameLength\0"
+		"lCreateFlags\0"
+		"lRootDirFID\0"
+		"lDesiredAccess\0"
+		"lAllocSizeLow\0"
+		"lAllocSizeHigh\0"
+		"lNTFileAttributes\0"
+		"lShareAccess\0"
+		"lOpenDisposition\0"
+		"lCreateOption\0"
+		"lImpersonationLevel\0"
+		"bSecurityFlags\0"
+		"dByteCount\0r\0"
 		"UFileName\0\0",
-		"wChainedCommand\0wNextOffset\0"
-		"bOplockLevel\0WFileID\0lCreateAction\0\0"
+		/* Reply */
+		"wChainedCommand\0"
+		"wNextOffset\0"
+		"bOplockLevel\0"
+		"WFileID\0"
+		"lCreateAction\0\0"
 	},
 	{ 0, 0, 0, 0 },
 	{
-		" NT_Cancel", 0,
+		"_NT_Cancel", 0,
 		/* [CIFS/1.0, Sec. 4.1.8] */
-		"wByteCount\0", 0
+		"dByteCount\0", 0
 	},
 	{ 0, 0, 0, 0 },
 	{ 0, 0, 0, 0 },
@@ -505,14 +612,55 @@ static struct decode SMBtable[256] = {
 	{ 0, 0, 0, 0 }
 };
 
-/* Helpers to get short and int values in Intel order. */
-static ushort_t
+/* Helpers to get values in Intel order (often mis-aligned). */
+static uint16_t
 get2(uchar_t *p) {
 	return (p[0] + (p[1]<<8));
 }
-static uint_t
+static uint32_t
 get4(uchar_t *p) {
 	return (p[0] + (p[1]<<8) + (p[2]<<16) + (p[3]<<24));
+}
+static uint64_t
+get8(uchar_t *p) {
+	return (get4(p) | ((uint64_t)get4(p+4) << 32));
+}
+
+/*
+ * Support displaying NT times.
+ * Number of seconds between 1970 and 1601 year
+ * (134774 days)
+ */
+static const uint64_t DIFF1970TO1601 = 11644473600ULL;
+static const uint32_t TEN_MIL = 10000000UL;
+static char *
+format_nttime(uint64_t nt_time)
+{
+	uint64_t nt_sec;	/* seconds */
+	uint64_t nt_tus;	/* tenths of uSec. */
+	uint32_t ux_nsec;
+	int64_t ux_sec;
+
+	/* Optimize time zero. */
+	if (nt_time == 0) {
+		ux_sec = 0;
+		ux_nsec = 0;
+		goto out;
+	}
+
+	nt_sec = nt_time / TEN_MIL;
+	nt_tus = nt_time % TEN_MIL;
+
+	if (nt_sec <= DIFF1970TO1601) {
+		ux_sec = 0;
+		ux_nsec = 0;
+		goto out;
+	}
+	ux_sec = nt_sec - DIFF1970TO1601;
+	ux_nsec = nt_tus * 100;
+
+out:
+	return (format_time(ux_sec, ux_nsec));
 }
 
 /*
@@ -523,20 +671,17 @@ void
 interpret_smb(int flags, uchar_t *data, int len)
 {
 	struct smb *smb;
-	char *call_reply_detail, *call_reply_sum;
 	struct decode *decoder;
-	char xtra[300];
-	char *line;
+	char xtra[MAXLINE];
+	ushort_t smb_flags2;
+	void (*func)(int, uchar_t *, int, char *, int);
+
+	if (len < sizeof (struct smb))
+		return;
 
 	smb = (struct smb *)data;
 	decoder = &SMBtable[smb->com & 255];
-	if (smb->flags & SERVER_RESPONSE) {
-		call_reply_detail = "SERVER RESPONSE";
-		call_reply_sum = "R";
-	} else {
-		call_reply_detail =	"CLIENT REQUEST";
-		call_reply_sum = "C";
-	}
+	smb_flags2 = get2(smb->flags2);
 	xtra[0] = '\0';
 
 	/*
@@ -546,83 +691,94 @@ interpret_smb(int flags, uchar_t *data, int len)
 	if (flags & F_DTAIL) {
 		show_header("SMB:  ", "SMB Header", len);
 		show_space();
-		sprintf(GETLINE, "%s", call_reply_detail);
 
-		(void) sprintf(GETLINE, "Command code = 0x%x",
-				smb->com);
+		if (smb->flags & SERVER_RESPONSE)
+			show_line("SERVER RESPONSE");
+		else
+			show_line("CLIENT REQUEST");
+
 		if (decoder->name)
-			(void) sprintf(GETLINE,
-				"Command name =  SMB%s", decoder->name);
+			show_printf("Command code = 0x%x (SMB%s)",
+			    smb->com, decoder->name);
+		else
+			show_printf("Command code = 0x%x", smb->com);
 
-		show_space();
-		sprintf(GETLINE, "SMB Status:");
-
-		/* Error classes [X/Open-SMB, Sec. 5.6] */
-		switch (smb->rcls) {
-		case 0x00:
-			sprintf(GETLINE,
-				"   - Error class = No error");
-			break;
-		case 0x01:
-			sprintf(GETLINE,
-				"   - Error class = Operating System");
-			break;
-		case 0x02:
-			sprintf(GETLINE,
-				"   - Error class = LMX server");
-			break;
-		case 0x03:
-			sprintf(GETLINE,
-				"   - Error class = Hardware");
-			break;
-		case 0xff:
-		default:
-			sprintf(GETLINE,
-				"   - Error class = Incorrect format.");
-			break;
+		/*
+		 * NT status or error class/code
+		 * [X/Open-SMB, Sec. 5.6]
+		 */
+		if (smb_flags2 & FLAGS2_NT_STATUS) {
+			show_printf("NT Status = %x", get4(smb->err));
+		} else {
+			/* Error classes [X/Open-SMB, Sec. 5.6] */
+			show_printf("Error class/code = %d/%d",
+			    smb->err[0], get2(&smb->err[2]));
 		}
 
-		if (smb->err[0] != 0x00) {
-			sprintf(GETLINE,
-				"   - Error code = %x", smb->err[0]);
-		} else
-			sprintf(GETLINE, "   - Error code = No error");
-
-		show_space();
-
-		sprintf(GETLINE, "Header:");
-		sprintf(GETLINE, "   - Tree ID      (TID) = 0x%.4x",
-			get2(smb->tid));
-		sprintf(GETLINE, "   - Process ID   (PID) = 0x%.4x",
-			get2(smb->pid));
-		sprintf(GETLINE, "   - User ID      (UID) = 0x%.4x",
-			get2(smb->uid));
-		sprintf(GETLINE, "   - Multiplex ID (MID) = 0x%.4x",
-			get2(smb->mid));
-		sprintf(GETLINE, "   - Flags summary = 0x%.2x",
-					smb->flags);
-		sprintf(GETLINE, "   - Flags2 summary = 0x%.4x",
-					get2(smb->flags2));
+		show_printf("Flags summary = 0x%.2x", smb->flags);
+		show_printf("Flags2 summary = 0x%.4x", smb_flags2);
+		show_printf("Tree ID  (TID) = 0x%.4x", get2(smb->tid));
+		show_printf("Proc. ID (PID) = 0x%.4x", get2(smb->pid));
+		show_printf("User ID  (UID) = 0x%.4x", get2(smb->uid));
+		show_printf("Mux. ID  (MID) = 0x%.4x", get2(smb->mid));
 		show_space();
 	}
 
-	if (decoder->func)
-		(decoder->func)(flags, (uchar_t *)data, len, xtra);
-	else
-		interpret_default(flags, (uchar_t *)data, len, xtra);
+	if ((func = decoder->func) == NULL)
+		func = interpret_default;
+	(*func)(flags, (uchar_t *)data, len, xtra, sizeof (xtra));
 
 	if (flags & F_SUM) {
-		line = get_sum_line();
-		if (decoder->name)
-			sprintf(line,
-			"SMB %s Code=0x%x Name=SMB%s %sError=%x ",
-			call_reply_sum, smb->com, decoder->name, xtra,
-			smb->err[0]);
+		char *p;
+		int sz, tl;
 
-		else sprintf(line, "SMB %s Code=0x%x Error=%x ",
-					call_reply_sum, smb->com, smb->err[0]);
+		/* Will advance p and decr. sz */
+		p = get_sum_line();
+		sz = MAXLINE;
 
-		line += strlen(line);
+		/* Call or Reply */
+		if (smb->flags & SERVER_RESPONSE)
+			tl = snprintf(p, sz, "SMB R");
+		else
+			tl = snprintf(p, sz, "SMB C");
+		p += tl;
+		sz -= tl;
+
+		/* The name, if known, else the cmd code */
+		if (decoder->name) {
+			tl = snprintf(p, sz, " Cmd=SMB%s", decoder->name);
+		} else {
+			tl = snprintf(p, sz, " Cmd=0x%02X", smb->com);
+		}
+		p += tl;
+		sz -= tl;
+
+		/*
+		 * The "extra" (cmd-specific summary).
+		 * If non-null, has leading blank.
+		 */
+		if (xtra[0] != '\0') {
+			tl = snprintf(p, sz, "%s", xtra);
+			p += tl;
+			sz -= tl;
+		}
+
+		/*
+		 * NT status or error class/code
+		 * [X/Open-SMB, Sec. 5.6]
+		 *
+		 * Only show for response, not call.
+		 */
+		if (smb->flags & SERVER_RESPONSE) {
+			if (smb_flags2 & FLAGS2_NT_STATUS) {
+				uint_t status = get4(smb->err);
+				snprintf(p, sz, " Status=0x%x", status);
+			} else {
+				uchar_t errcl = smb->err[0];
+				ushort_t code = get2(&smb->err[2]);
+				snprintf(p, sz, " Error=%d/%d", errcl, code);
+			}
+		}
 	}
 
 	if (flags & F_DTAIL)
@@ -636,14 +792,13 @@ output_bytes(uchar_t *data, int bytecount)
 	char buff[80];
 	char word[10];
 
-	buff[0] = word[0] = '\0';
-	sprintf(GETLINE, "Byte values (in hex):");
+	(void) strlcpy(buff, "  ", sizeof (buff));
 	for (i = 0; i < bytecount; i++) {
-		sprintf(word, "%.2x ", data[i]);
-		strcat(buff, word);
+		snprintf(word, sizeof (word), "%.2x ", data[i]);
+		(void) strlcat(buff, word, sizeof (buff));
 		if ((i+1)%16 == 0 || i == (bytecount-1)) {
-			sprintf(GETLINE, "%s", buff);
-			strcpy(buff, "");
+			show_line(buff);
+			(void) strlcpy(buff, "  ", sizeof (buff));
 		}
 	}
 }
@@ -675,30 +830,58 @@ unicode2ascii(char *outstr, int outlen, uchar_t *instr, int inlen)
 }
 
 /*
+ * Convenience macro to copy a string from the data,
+ * either in UCS-2 or ASCII as indicated by UCS.
+ * OBUF must be an array type (see sizeof) and
+ * DP must be an L-value (this increments it).
+ */
+#define	GET_STRING(OBUF, DP, UCS)				\
+{								\
+	int _len, _sz = sizeof (OBUF);				\
+	if (UCS) {						\
+		if (((uintptr_t)DP) & 1)			\
+			DP++;					\
+		_len = unicode2ascii(OBUF, _sz, DP, 2 * _sz);	\
+		DP += 2 * (_len + 1);				\
+	} else {						\
+		_len = strlcpy(OBUF, (char *)DP, _sz);		\
+		DP += (_len + 1);				\
+	}							\
+}
+
+/*
  * TRANS2 information levels
  * [X/Open-SMB, Sec. 16.1.6]
  */
 static void
-get_info_level(char *outstr, int value)
+get_info_level(char *outstr, int outsz, int value)
 {
 
 	switch (value) {
 	case 1:
-		sprintf(outstr, "Standard"); break;
+		snprintf(outstr, outsz, "Standard");
+		break;
 	case 2:
-		sprintf(outstr, "Query EA Size"); break;
+		snprintf(outstr, outsz, "Query EA Size");
+		break;
 	case 3:
-		sprintf(outstr, "Query EAS from List"); break;
+		snprintf(outstr, outsz, "Query EAS from List");
+		break;
 	case 0x101:
-		sprintf(outstr, "Directory Info"); break;
+		snprintf(outstr, outsz, "Directory Info");
+		break;
 	case 0x102:
-		sprintf(outstr, "Full Directory Info"); break;
+		snprintf(outstr, outsz, "Full Directory Info");
+		break;
 	case 0x103:
-		sprintf(outstr, "Names Info"); break;
+		snprintf(outstr, outsz, "Names Info");
+		break;
 	case 0x104:
-		sprintf(outstr, "Both Directory Info"); break;
+		snprintf(outstr, outsz, "Both Directory Info");
+		break;
 	default:
-		sprintf(outstr, "Unknown"); break;
+		snprintf(outstr, outsz, "Unknown");
+		break;
 	}
 }
 
@@ -708,27 +891,26 @@ get_info_level(char *outstr, int value)
  */
 /* ARGSUSED */
 static void
-output_trans2_querypath(int flags, uchar_t *data, char *xtra)
+output_trans2_querypath(int flags, uchar_t *data, char *xtra, int xsz)
 {
 	int length;
 	char filename[256];
 
 	if (flags & F_SUM) {
-		length = sprintf(xtra, "QueryPathInfo ");
+		length = snprintf(xtra, xsz, " QueryPathInfo");
 		xtra += length;
+		xsz -= length;
 		data += 6;
 		(void) unicode2ascii(filename, 256, data, 512);
-		sprintf(xtra, "File=%s ", filename);
+		snprintf(xtra, xsz, " File=%s", filename);
 	}
 
 	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "FunctionName = QueryPathInfo");
-		sprintf(GETLINE, "InfoLevel = 0x%.4x",
-			get2(data));
+		show_line("FunctionName = QueryPathInfo");
+		show_printf("InfoLevel = 0x%.4x", get2(data));
 		data += 6;
 		(void) unicode2ascii(filename, 256, data, 512);
-		sprintf(GETLINE, "FileName = %s",
-			filename);
+		show_printf("FileName = %s", filename);
 	}
 }
 
@@ -738,23 +920,22 @@ output_trans2_querypath(int flags, uchar_t *data, char *xtra)
  */
 /* ARGSUSED */
 static void
-output_trans2_queryfile(int flags, uchar_t *data, char *xtra)
+output_trans2_queryfile(int flags, uchar_t *data, char *xtra, int xsz)
 {
 	int length;
 
 	if (flags & F_SUM) {
-		length = sprintf(xtra, "QueryFileInfo ");
+		length = snprintf(xtra, xsz, " QueryFileInfo");
 		xtra += length;
-		sprintf(xtra, "FileID=0x%x ", get2(data));
+		xsz -= length;
+		snprintf(xtra, xsz, " FileID=0x%x", get2(data));
 	}
 
 	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "FunctionName = QueryFileInfo");
-		sprintf(GETLINE, "FileID = 0x%.4x",
-			get2(data));
+		show_line("FunctionName = QueryFileInfo");
+		show_printf("FileID = 0x%.4x", get2(data));
 		data += 2;
-		sprintf(GETLINE, "InfoLevel = 0x%.4x",
-			get2(data));
+		show_printf("InfoLevel = 0x%.4x", get2(data));
 	}
 }
 
@@ -764,23 +945,22 @@ output_trans2_queryfile(int flags, uchar_t *data, char *xtra)
  */
 /* ARGSUSED */
 static void
-output_trans2_setfile(int flags, uchar_t *data, char *xtra)
+output_trans2_setfile(int flags, uchar_t *data, char *xtra, int xsz)
 {
 	int length;
 
 	if (flags & F_SUM) {
-		length = sprintf(xtra, "SetFileInfo ");
+		length = snprintf(xtra, xsz, " SetFileInfo");
 		xtra += length;
-		sprintf(xtra, "FileID=0x%x ", get2(data));
+		xsz -= length;
+		snprintf(xtra, xsz, " FileID=0x%x", get2(data));
 	}
 
 	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "FunctionName = SetFileInfo");
-		sprintf(GETLINE, "FileID = 0x%.4x",
-			get2(data));
+		show_line("FunctionName = SetFileInfo");
+		show_printf("FileID = 0x%.4x", get2(data));
 		data += 2;
-		sprintf(GETLINE, "InfoLevel = 0x%.4x",
-			get2(data));
+		show_printf("InfoLevel = 0x%.4x", get2(data));
 	}
 }
 
@@ -790,38 +970,34 @@ output_trans2_setfile(int flags, uchar_t *data, char *xtra)
  */
 /* ARGSUSED */
 static void
-output_trans2_findfirst(int flags, uchar_t *data, char *xtra)
+output_trans2_findfirst(int flags, uchar_t *data, char *xtra, int xsz)
 {
 	int length;
 	char filename[256];
 	char infolevel[100];
 
 	if (flags & F_SUM) {
-		length = sprintf(xtra, "Findfirst ");
+		length = snprintf(xtra, xsz, " Findfirst");
 		xtra += length;
+		xsz -= length;
 		data += 12;
 		(void) unicode2ascii(filename, 256, data, 512);
-		sprintf(xtra, "File=%s ", filename);
+		snprintf(xtra, xsz, " File=%s", filename);
 	}
 
 	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "FunctionName = Findfirst");
-		sprintf(GETLINE, "SearchAttributes = 0x%.4x",
-			get2(data));
+		show_line("FunctionName = Findfirst");
+		show_printf("SearchAttributes = 0x%.4x", get2(data));
 		data += 2;
-		sprintf(GETLINE, "FindCount = 0x%.4x",
-			get2(data));
+		show_printf("FindCount = 0x%.4x", get2(data));
 		data += 2;
-		sprintf(GETLINE, "FindFlags = 0x%.4x",
-			get2(data));
+		show_printf("FindFlags = 0x%.4x", get2(data));
 		data += 2;
-		get_info_level(infolevel, get2(data));
-		sprintf(GETLINE, "InfoLevel = %s",
-			infolevel);
+		get_info_level(infolevel, sizeof (infolevel), get2(data));
+		show_printf("InfoLevel = %s", infolevel);
 		data += 6;
 		(void) unicode2ascii(filename, 256, data, 512);
-		sprintf(GETLINE, "FileName = %s",
-			filename);
+		show_printf("FileName = %s", filename);
 	}
 }
 
@@ -832,41 +1008,36 @@ output_trans2_findfirst(int flags, uchar_t *data, char *xtra)
  */
 /* ARGSUSED */
 static void
-output_trans2_findnext(int flags, uchar_t *data, char *xtra)
+output_trans2_findnext(int flags, uchar_t *data, char *xtra, int xsz)
 {
 	int length;
 	char filename[256];
 	char infolevel[100];
 
 	if (flags & F_SUM) {
-		length = sprintf(xtra, "Findnext ");
+		length = snprintf(xtra, xsz, " Findnext");
 		xtra += length;
+		xsz -= length;
 		data += 12;
 		(void) unicode2ascii(filename, 256, data, 512);
-		sprintf(xtra, "File=%s ", filename);
+		snprintf(xtra, xsz, " File=%s", filename);
 	}
 
 	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "FunctionName = Findnext");
-		sprintf(GETLINE, "FileID = 0x%.4x",
-			get2(data));
+		show_line("FunctionName = Findnext");
+		show_printf("FileID = 0x%.4x", get2(data));
 		data += 2;
-		sprintf(GETLINE, "FindCount = 0x%.4x",
-			get2(data));
+		show_printf("FindCount = 0x%.4x", get2(data));
 		data += 2;
-		get_info_level(infolevel, get2(data));
-		sprintf(GETLINE, "InfoLevel = %s",
-			infolevel);
+		get_info_level(infolevel, sizeof (infolevel), get2(data));
+		show_printf("InfoLevel = %s", infolevel);
 		data += 2;
-		sprintf(GETLINE, "FindKey = 0x%.8x",
-			get4(data));
+		show_printf("FindKey = 0x%.8x", get4(data));
 		data += 4;
-		sprintf(GETLINE, "FindFlags = 0x%.4x",
-			get2(data));
+		show_printf("FindFlags = 0x%.4x", get2(data));
 		data += 2;
 		(void) unicode2ascii(filename, 256, data, 512);
-		sprintf(GETLINE, "FileName = %s",
-			filename);
+		show_printf("FileName = %s", filename);
 	}
 }
 
@@ -876,27 +1047,26 @@ output_trans2_findnext(int flags, uchar_t *data, char *xtra)
  */
 /* ARGSUSED */
 static void
-interpret_negprot(int flags, uchar_t *data, int len, char *xtra)
+interpret_negprot(int flags, uchar_t *data, int len, char *xtra, int xsz)
 {
-	int length;
+	int i, last, length;
 	int bytecount;
-	char dialect[256];
+	int key_len;
+	int wordcount;
+	char tbuf[256];
 	struct smb *smbdata;
 	uchar_t *protodata;
+	uchar_t *byte0;
+	uint64_t nttime;
+	uint32_t caps;
+	ushort_t smb_flags2;
 
 	smbdata  = (struct smb *)data;
+	smb_flags2 = get2(smbdata->flags2);
 	protodata = (uchar_t *)data + sizeof (struct smb);
-	protodata++;			/* skip wordcount */
+	wordcount = *protodata++;
 
-	if (smbdata->flags & SERVER_RESPONSE) {
-		if (flags & F_SUM) {
-			sprintf(xtra, "Dialect#=%d ", protodata[0]);
-		}
-		if (flags & F_DTAIL) {
-			sprintf(GETLINE, "Protocol Index = %d",
-					protodata[0]);
-		}
-	} else {
+	if ((smbdata->flags & SERVER_RESPONSE) == 0) {
 		/*
 		 * request packet:
 		 * short bytecount;
@@ -904,29 +1074,102 @@ interpret_negprot(int flags, uchar_t *data, int len, char *xtra)
 		 */
 		bytecount = get2(protodata);
 		protodata += 2;
-		if (flags & F_SUM) {
-			while (bytecount > 1) {
-				length = snprintf(dialect, sizeof (dialect),
-				    "%s", (char *)protodata+1);
-				protodata += (length+2);
-				if (protodata >= data+len)
-					break;
-				bytecount -= (length+2);
+		byte0 = protodata;
+
+		if (flags & F_DTAIL)
+			show_printf("ByteCount = %d", bytecount);
+		if (bytecount > len)
+			bytecount = len;
+
+		/* Walk the list of dialects. */
+		i = last = 0;
+		tbuf[0] = '\0';
+		while (protodata < (byte0 + bytecount - 2)) {
+			if (*protodata++ != 2)	/* format code */
+				break;
+			length = strlcpy(tbuf, (char *)protodata,
+			    sizeof (tbuf));
+			protodata += (length + 1);
+			if (flags & F_DTAIL) {
+				show_printf("Dialect[%d] = %s",
+				    i, tbuf);
 			}
-			sprintf(xtra, "LastDialect=%s ", dialect);
+			last = i++;
 		}
-		if (flags & F_DTAIL) {
-			sprintf(GETLINE, "ByteCount = %d", bytecount);
-			while (bytecount > 1) {
-				length = snprintf(dialect, sizeof (dialect),
-				    "%s", (char *)protodata+1);
-				sprintf(GETLINE, "Dialect String = %s",
-				    dialect);
-				protodata += (length+2);
-				if (protodata >= data+len)
-					break;
-				bytecount -= (length+2);
+		if (flags & F_SUM) {
+			/*
+			 * Just print the last dialect, which is
+			 * normally the interesting one.
+			 */
+			snprintf(xtra, xsz, " Dialect[%d]=%s", last, tbuf);
+		}
+	} else {
+		/* Parse reply */
+		if (flags & F_SUM) {
+			snprintf(xtra, xsz, " Dialect#=%d", protodata[0]);
+		}
+		if ((flags & F_DTAIL) == 0)
+			return;
+		if (wordcount < 13)
+			return;
+		show_printf("WordCount = %d", wordcount);
+		show_printf("Dialect Index = %d", protodata[0]);
+		protodata += 2;
+		show_printf("Security Mode = 0x%x", protodata[0]);
+		protodata++;
+		show_printf("MaxMPXRequests = %d", get2(protodata));
+		protodata += 2;
+		show_printf("MaxVCs = %d", get2(protodata));
+		protodata += 2;
+		show_printf("MaxBufferSize = %d", get4(protodata));
+		protodata += 4;
+		show_printf("MaxRawBuffer = %d", get4(protodata));
+		protodata += 4;
+		show_printf("SessionKey = 0x%.8x", get4(protodata));
+		protodata += 4;
+
+		caps = get4(protodata);
+		protodata += 4;
+		show_printf("Capabilities = 0x%.8x", caps);
+
+		/* Server Time */
+		nttime = get8(protodata);
+		protodata += 8;
+		show_printf("Server Time = %s", format_nttime(nttime));
+
+		show_printf("Server TZ = %d", get2(protodata));
+		protodata += 2;
+
+		key_len = *protodata++;
+		show_printf("KeyLength = %d", key_len);
+		bytecount = get2(protodata);
+		protodata += 2;
+		show_printf("ByteCount = %d", bytecount);
+
+		if (smb_flags2 & FLAGS2_EXT_SEC) {
+			show_printf("Server GUID (16)");
+			output_bytes(protodata, 16);
+			protodata += 16;
+			show_printf("Security Blob (SPNEGO)");
+			output_bytes(protodata, bytecount - 16);
+		} else {
+			show_printf("NTLM Challenge: (%d)", key_len);
+			output_bytes(protodata, key_len);
+			protodata += key_len;
+			/*
+			 * Get Unicode from capabilities here,
+			 * as flags2 typically doesn't have it.
+			 * Also, this one is NOT aligned!
+			 */
+			tbuf[0] = '\0';
+			if (caps & 4) {
+				(void) unicode2ascii(tbuf, sizeof (tbuf),
+				    protodata, 2 * sizeof (tbuf));
+			} else {
+				(void) strlcpy(tbuf, (char *)protodata,
+				    sizeof (tbuf));
 			}
+			show_printf("Server Domain = %s", tbuf);
 		}
 	}
 }
@@ -935,7 +1178,7 @@ interpret_negprot(int flags, uchar_t *data, int len, char *xtra)
  * LAN Manager remote admin function names.
  * [X/Open-SMB, Appendix B.8]
  */
-static const char *apinames[] = {
+static const char *apiname_table[] = {
 	"RNetShareEnum",
 	"RNetShareGetInfo",
 	"NetShareSetInfo",
@@ -1042,9 +1285,55 @@ static const char *apinames[] = {
 	"DosPrintQPurge",
 	"NetServerEnum2"
 };
-static const int apimax = (
-	sizeof (apinames) /
-	sizeof (apinames[0]));
+static const int apinum_max = (
+	sizeof (apiname_table) /
+	sizeof (apiname_table[0]));
+
+static const char *
+pipeapi_name(int code)
+{
+	char *name;
+
+	switch (code) {
+	case 0x01:
+		name = "SetNmPipeState";
+		break;
+	case 0x11:
+		name = "RawReadNmPipe";
+		break;
+	case 0x21:
+		name = "QueryNmPipeState";
+		break;
+	case 0x22:
+		name = "QueryNmPipeInfo";
+		break;
+	case 0x23:
+		name = "PeekNmPipe";
+		break;
+	case 0x26:
+		name = "XactNmPipe";
+		break;
+	case 0x31:
+		name = "RawWriteNmPipe";
+		break;
+	case 0x36:
+		name = "ReadNmPipe";
+		break;
+	case 0x37:
+		name = "WriteNmPipe";
+		break;
+	case 0x53:
+		name = "WaitNmPipe";
+		break;
+	case 0x54:
+		name = "CallNmPipe";
+		break;
+	default:
+		name = "?";
+		break;
+	}
+	return (name);
+}
 
 /*
  * Interpret a "trans" SMB
@@ -1054,7 +1343,7 @@ static const int apimax = (
  */
 /* ARGSUSED */
 static void
-interpret_trans(int flags, uchar_t *data, int len, char *xtra)
+interpret_trans(int flags, uchar_t *data, int len, char *xtra, int xsz)
 {
 	struct smb *smb;
 	uchar_t *vwv; /* word parameters */
@@ -1070,10 +1359,17 @@ interpret_trans(int flags, uchar_t *data, int len, char *xtra)
 	int apinum;
 	int isunicode;
 	char filename[256];
+	const char *apiname;
+	const char *subcname;
+	ushort_t smb_flags2;
 
-	smb  = (struct smb *)data;
+	smb = (struct smb *)data;
+	smb_flags2 = get2(smb->flags2);
 	vwv = (uchar_t *)data + sizeof (struct smb);
 	wordcount = *vwv++;
+
+	/* Is the pathname in unicode? */
+	isunicode = smb_flags2 & FLAGS2_UNICODE;
 
 	byteparms = vwv + (2 * wordcount);
 	bytecount = get2(byteparms);
@@ -1083,10 +1379,8 @@ interpret_trans(int flags, uchar_t *data, int len, char *xtra)
 	 * Print the lengths before we (potentially) bail out
 	 * due to lack of data (so the user knows why we did).
 	 */
-	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "WordCount = %d", wordcount);
-		sprintf(GETLINE, "ByteCount = %d", bytecount);
-	}
+	if (flags & F_DTAIL)
+		show_printf("WordCount = %d", wordcount);
 
 	/* Get length and location of params and setup data. */
 	if (!(smb->flags & SERVER_RESPONSE)) {
@@ -1106,72 +1400,93 @@ interpret_trans(int flags, uchar_t *data, int len, char *xtra)
 		setupcount = *(vwv + (2 *  9));
 		setupdata  =   vwv + (2 * 10);
 	}
-	if (setupcount > 0)
-		subcode = get2(setupdata);
-	else
-		subcode = -1; /* invalid */
 
 	/* The parameters are offset from the SMB header. */
 	params = data + paramoffset;
-	if (parambytes > 0)
-		apinum = params[0];
-	else
-		apinum = -1; /* invalid */
 
-	/* Is the pathname in unicode? */
-	isunicode = smb->flags2[1] & 0x80;
-
-	if (flags & F_DTAIL && !(smb->flags & SERVER_RESPONSE)) {
+	if ((smb->flags & SERVER_RESPONSE) == 0) {
 		/* This is a CALL. */
+
+		if (setupcount > 0)
+			subcode = get2(setupdata);
+		else
+			subcode = -1; /* invalid */
+		subcname = pipeapi_name(subcode);
+
+		if (parambytes > 0)
+			apinum = params[0];
+		else
+			apinum = -1; /* invalid */
+		if (0 <= apinum && apinum < apinum_max)
+			apiname = apiname_table[apinum];
+		else
+			apiname = "?";
+
+		if (flags & F_SUM) {
+			int tl;
+			/* Only get one or the other */
+			if (*subcname != '?') {
+				tl = snprintf(xtra, xsz,
+				    " Func=%s", subcname);
+				xtra += tl;
+				xsz -= tl;
+			}
+			if (*apiname != '?')
+				snprintf(xtra, xsz,
+				    " Func=%s", apiname);
+			return;
+		}
+		if ((flags & F_DTAIL) == 0)
+			return;
+
 		/* print the word parameters */
-		sprintf(GETLINE, "TotalParamBytes = %d", get2(vwv));
-		sprintf(GETLINE, "TotalDataBytes = %d", get2(vwv+2));
-		sprintf(GETLINE, "MaxParamBytes = %d", get2(vwv+4));
-		sprintf(GETLINE, "MaxDataBytes = %d", get2(vwv+6));
-		sprintf(GETLINE, "MaxSetupWords = %d", vwv[8]);
-		sprintf(GETLINE, "TransFlags = 0x%.4x", get2(vwv+10));
-		sprintf(GETLINE, "Timeout = 0x%.8x", get4(vwv+12));
+		show_printf("TotalParamBytes = %d", get2(vwv));
+		show_printf("TotalDataBytes = %d", get2(vwv+2));
+		show_printf("MaxParamBytes = %d", get2(vwv+4));
+		show_printf("MaxDataBytes = %d", get2(vwv+6));
+		show_printf("MaxSetupWords = %d", vwv[8]);
+		show_printf("TransFlags = 0x%.4x", get2(vwv+10));
+		show_printf("Timeout = 0x%.8x", get4(vwv+12));
 		/* skip Reserved2 */
-		sprintf(GETLINE, "ParamBytes = 0x%.4x", parambytes);
-		sprintf(GETLINE, "ParamOffset = 0x%.4x", paramoffset);
-		sprintf(GETLINE, "DataBytes = 0x%.4x", get2(vwv+22));
-		sprintf(GETLINE, "DataOffset = 0x%.4x", get2(vwv+24));
-		sprintf(GETLINE, "SetupWords = %d", setupcount);
+		show_printf("ParamBytes = %d", parambytes);
+		show_printf("ParamOffset = %d", paramoffset);
+		show_printf("DataBytes = %d", get2(vwv+22));
+		show_printf("DataOffset = %d", get2(vwv+24));
+		show_printf("SetupWords = %d", setupcount);
+		show_printf("ByteCount = %d", bytecount);
 
 		/* That finishes the VWV, now the misc. stuff. */
-		if (subcode >= 0)
-			sprintf(GETLINE, "Setup[0] = %d", subcode);
-		if (apinum >= 0)
-			sprintf(GETLINE, "APIcode = %d", apinum);
-		if (0 <= apinum && apinum < apimax)
-			sprintf(GETLINE, "APIname = %s", apinames[apinum]);
+		if (setupcount > 0)
+			show_printf("NmPipeFunc = 0x%x (%s)",
+			    subcode, subcname);
+		if (parambytes > 0)
+			show_printf("RAP_Func = %d (%s)",
+			    apinum, apiname);
 
 		/* Finally, print the byte parameters. */
-		if (isunicode) {
-			byteparms += 1;  /* alignment padding */
-			(void) unicode2ascii(
-				filename, 256, byteparms, bytecount);
-		} else {
-			strlcpy(filename, (char *)byteparms, sizeof (filename));
-		}
-		sprintf(GETLINE, "FileName = %s", filename);
-	}
-
-	if (flags & F_DTAIL && smb->flags & SERVER_RESPONSE) {
+		GET_STRING(filename, byteparms, isunicode);
+		show_printf("FileName = %s", filename);
+	} else {
 		/* This is a REPLY. */
+		if (flags & F_SUM)
+			return;
+		if ((flags & F_DTAIL) == 0)
+			return;
 		/* print the word parameters */
-		sprintf(GETLINE, "TotalParamBytes = %d", get2(vwv));
-		sprintf(GETLINE, "TotalDataBytes = %d", get2(vwv+2));
+		show_printf("TotalParamBytes = %d", get2(vwv));
+		show_printf("TotalDataBytes = %d", get2(vwv+2));
 		/* skip Reserved */
-		sprintf(GETLINE, "ParamBytes = 0x%.4x", parambytes);
-		sprintf(GETLINE, "ParamOffset = 0x%.4x", paramoffset);
-		sprintf(GETLINE, "ParamDispl. = 0x%.4x", get2(vwv+10));
-		sprintf(GETLINE, "DataBytes = 0x%.4x", get2(vwv+12));
-		sprintf(GETLINE, "DataOffset = 0x%.4x", get2(vwv+14));
-		sprintf(GETLINE, "DataDispl. = 0x%.4x", get2(vwv+16));
-		sprintf(GETLINE, "SetupWords = %d", setupcount);
+		show_printf("ParamBytes = 0x%.4x", parambytes);
+		show_printf("ParamOffset = 0x%.4x", paramoffset);
+		show_printf("ParamDispl. = 0x%.4x", get2(vwv+10));
+		show_printf("DataBytes = 0x%.4x", get2(vwv+12));
+		show_printf("DataOffset = 0x%.4x", get2(vwv+14));
+		show_printf("DataDispl. = 0x%.4x", get2(vwv+16));
+		show_printf("SetupWords = %d", setupcount);
+		show_printf("ByteCount = %d", bytecount);
 
-		output_bytes(byteparms, bytecount);
+		show_printf("ParamVec (%d)", parambytes);
+		output_bytes(params, parambytes);
 	}
 }
 
@@ -1181,86 +1496,100 @@ interpret_trans(int flags, uchar_t *data, int len, char *xtra)
  */
 /* ARGSUSED */
 static void
-interpret_tconX(int flags, uchar_t *data, int len, char *xtra)
+interpret_tconX(int flags, uchar_t *data, int len, char *xtra, int xsz)
 {
 	int length;
+	int isunicode;
 	int bytecount;
-	int passwordlength;
 	int wordcount;
-	char tempstring[256];
+	int andxcmd;
+	int andxoffset;
+	int tconflags;
+	int pw_len;
+	char path[256];
+	char tbuf[256];
+	char svc[8];
 	struct smb *smbdata;
 	uchar_t *tcondata;
+	ushort_t smb_flags2;
 
-	smbdata  = (struct smb *)data;
+	smbdata = (struct smb *)data;
+	smb_flags2 = get2(smbdata->flags2);
 	tcondata = (uchar_t *)data + sizeof (struct smb);
 	wordcount = *tcondata++;
 
-	if (flags & F_SUM && !(smbdata->flags & SERVER_RESPONSE)) {
-		tcondata += 6;
-		passwordlength = get2(tcondata);
-		tcondata = tcondata + 4 + passwordlength;
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)tcondata);
-		sprintf(xtra, "Share=%s ", tempstring);
-	}
+	isunicode = smb_flags2 & FLAGS2_UNICODE;
 
-	if (flags & F_SUM && smbdata->flags & SERVER_RESPONSE) {
-		tcondata += 8;
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)tcondata);
-		sprintf(xtra, "Type=%s ", tempstring);
-	}
-
-	if (flags & F_DTAIL && !(smbdata->flags & SERVER_RESPONSE)) {
-		sprintf(GETLINE, "WordCount = %d", wordcount);
-		sprintf(GETLINE, "ChainedCommand = 0x%.2x",
-			tcondata[0]);
+	if ((smbdata->flags & SERVER_RESPONSE) == 0) {
+		/* Request */
+		if (wordcount < 4)
+			return;
+		andxcmd = get2(tcondata);
 		tcondata += 2;
-		sprintf(GETLINE, "NextOffset = 0x%.4x",
-			get2(tcondata));
+		andxoffset = get2(tcondata);
 		tcondata += 2;
-		sprintf(GETLINE, "DisconnectFlag = 0x%.4x",
-			get2(tcondata));
+		tconflags = get2(tcondata);
 		tcondata += 2;
-		passwordlength = get2(tcondata);
-		sprintf(GETLINE, "PasswordLength = 0x%.4x",
-			passwordlength);
+		pw_len = get2(tcondata);
 		tcondata += 2;
 		bytecount = get2(tcondata);
-		sprintf(GETLINE, "ByteCount = %d", bytecount);
-		tcondata = tcondata + 2 + passwordlength;
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)tcondata);
-		tcondata += (length+1);
-		sprintf(GETLINE, "FileName = %s", tempstring);
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)tcondata);
-		tcondata += (length+1);
-		sprintf(GETLINE, "ServiceName = %s", tempstring);
-	}
+		tcondata += 2;
 
-	if (flags & F_DTAIL && smbdata->flags & SERVER_RESPONSE) {
-		sprintf(GETLINE, "WordCount = %d", wordcount);
-		sprintf(GETLINE, "ChainedCommand = 0x%.2x",
-			tcondata[0]);
+		/* skip password */
+		if (pw_len > len)
+			pw_len = len;
+		tcondata += pw_len;
+
+		GET_STRING(path, tcondata, isunicode);
+		(void) strlcpy(svc, (char *)tcondata, sizeof (svc));
+
+		if (flags & F_SUM) {
+			snprintf(xtra, xsz, " Share=%s", path);
+			return;
+		}
+
+		if ((flags & F_DTAIL) == 0)
+			return;
+
+		show_printf("WordCount = %d", wordcount);
+		show_printf("ChainedCommand = 0x%.2x", andxcmd);
+		show_printf("NextOffset = 0x%.4x", andxoffset);
+		show_printf("TconFlags = 0x%.4x", tconflags);
+		show_printf("PasswordLength = 0x%.4x", pw_len);
+		show_printf("ByteCount = %d", bytecount);
+		show_printf("SharePath = %s", path);
+		show_printf("ServiceType = %s", svc);
+	} else {
+		/* response */
+		if (wordcount < 3)
+			return;
+		andxcmd = get2(tcondata);
 		tcondata += 2;
-		sprintf(GETLINE, "NextOffset = 0x%.4x",
-			get2(tcondata));
+		andxoffset = get2(tcondata);
 		tcondata += 2;
-		sprintf(GETLINE, "OptionalSupport = 0x%.4x",
-			get2(tcondata));
+		tconflags = get2(tcondata);
 		tcondata += 2;
 		bytecount = get2(tcondata);
-		sprintf(GETLINE, "ByteCount = %d", bytecount);
 		tcondata += 2;
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)tcondata);
-		tcondata += (length+1);
-		sprintf(GETLINE, "ServiceName = %s", tempstring);
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)tcondata);
-		tcondata += (length+1);
-		sprintf(GETLINE, "NativeFS = %s", tempstring);
+
+		length = strlcpy(svc, (char *)tcondata, sizeof (svc));
+		tcondata += (length + 1);
+
+		if (flags & F_SUM) {
+			snprintf(xtra, xsz, " Type=%s", svc);
+			return;
+		}
+		if ((flags & F_DTAIL) == 0)
+			return;
+
+		show_printf("WordCount = %d", wordcount);
+		show_printf("ChainedCommand = 0x%.2x", andxcmd);
+		show_printf("NextOffset = 0x%.4x", andxoffset);
+		show_printf("OptionalSupport = 0x%.4x", tconflags);
+		show_printf("ByteCount = %d", bytecount);
+		show_printf("ServiceType = %s", svc);
+		GET_STRING(tbuf, tcondata, isunicode);
+		show_printf("NativeFS = %s", tbuf);
 	}
 }
 
@@ -1270,155 +1599,200 @@ interpret_tconX(int flags, uchar_t *data, int len, char *xtra)
  */
 /* ARGSUSED */
 static void
-interpret_sesssetupX(int flags, uchar_t *data, int len, char *xtra)
+interpret_sesssetupX(int flags, uchar_t *data, int len, char *xtra, int xsz)
 {
-	int length;
 	int bytecount;
-	int passwordlength;
+	int lm_pw_len;
+	int ext_security;
+	int sec_blob_len;
 	int isunicode;
-	int upasswordlength;
+	int nt_pw_len;
 	int wordcount;
 	int cap;
-	char tempstring[256];
+	char tbuf[256];
 	struct smb *smbdata;
 	uchar_t *setupdata;
+	ushort_t smb_flags2;
 
 	smbdata  = (struct smb *)data;
+	smb_flags2 = get2(smbdata->flags2);
 	setupdata = (uchar_t *)data + sizeof (struct smb);
 	wordcount = *setupdata++;
 
-	isunicode = smbdata->flags2[1] & 0x80;
+	isunicode = smb_flags2 & FLAGS2_UNICODE;
+	ext_security = smb_flags2 & FLAGS2_EXT_SEC;
 
-	if (flags & F_SUM && !(smbdata->flags & SERVER_RESPONSE)) {
-		if (wordcount != 13)
-			return;
-		setupdata += 14;
-		passwordlength = get2(setupdata);
-		setupdata += 2;
-		upasswordlength = get2(setupdata);
-		setupdata += 6;
-		cap = get4(setupdata);
-		setupdata = setupdata + 6 + passwordlength + upasswordlength;
-		if (isunicode) {
-			setupdata += 1;
-			(void) unicode2ascii(tempstring, 256, setupdata, 256);
-			sprintf(xtra, "Username=%s ", tempstring);
-		} else {
-			length = snprintf(tempstring, sizeof (tempstring), "%s",
-			    (char *)setupdata);
-			sprintf(xtra, "Username=%s ", tempstring);
-		}
-	}
-
-	if (flags & F_DTAIL && !(smbdata->flags & SERVER_RESPONSE)) {
-		if (wordcount != 13)
-			return;
-		sprintf(GETLINE, "ChainedCommand = 0x%.2x",
-			setupdata[0]);
-		setupdata += 2;
-		sprintf(GETLINE, "NextOffset = 0x%.4x",
-			get2(setupdata));
-		setupdata += 2;
-		sprintf(GETLINE, "MaxBufferSize = 0x%.4x",
-			get2(setupdata));
-		setupdata += 2;
-		sprintf(GETLINE, "MaxMPXRequests = %d",
-			get2(setupdata));
-		setupdata += 2;
-		sprintf(GETLINE, "VCNumber = %d",
-			get2(setupdata));
-		setupdata += 2;
-		sprintf(GETLINE, "SessionKey = %d",
-			get4(setupdata));
-		setupdata += 4;
-		passwordlength = get2(setupdata);
-		sprintf(GETLINE, "PasswordLength = 0x%.4x",
-			passwordlength);
-		setupdata += 2;
-		upasswordlength = get2(setupdata);
-		sprintf(GETLINE, "UnicodePasswordLength = 0x%.4x",
-			upasswordlength);
-		setupdata += 6;
-		cap = get4(setupdata);
-		sprintf(GETLINE, "Capabilities = 0x%0.8x", cap);
-		setupdata += 4;
-		bytecount = get2(setupdata);
-		sprintf(GETLINE, "ByteCount = %d", bytecount);
-		setupdata = setupdata + 2 + passwordlength + upasswordlength;
-		if (isunicode) {
-			setupdata++;
-			length = 2*unicode2ascii(
-				tempstring, 256, setupdata, 256);
-			if (length == 2) {
-				sprintf(GETLINE,
-						"AccountName = %s", tempstring);
-				sprintf(GETLINE,
-						"DomainName = %s", tempstring);
-				setupdata += 3;
-			} else {
-				setupdata += length;
-				sprintf(GETLINE,
-						"AccountName = %s", tempstring);
-				length = 2*unicode2ascii(
-					tempstring, 256, setupdata, 256);
-				setupdata += length;
-				sprintf(GETLINE,
-						"DomainName = %s", tempstring);
+	if ((smbdata->flags & SERVER_RESPONSE) == 0) {
+		/* request summary */
+		if (flags & F_SUM) {
+			if (ext_security) {
+				/* No decoder for SPNEGO */
+				snprintf(xtra, xsz, " (SPNEGO)");
+				return;
 			}
-			length = 2*unicode2ascii(
-				tempstring, 256, setupdata, 256);
-			setupdata += (length+2);
-			sprintf(GETLINE,
-					"NativeOS = %s", tempstring);
-			length = 2*unicode2ascii(
-				tempstring, 256, setupdata, 256);
-			sprintf(GETLINE,
-					"NativeLanman = %s", tempstring);
-		} else {
-			length = snprintf(tempstring, sizeof (tempstring), "%s",
-			    (char *)setupdata);
-			setupdata += (length+1);
-			sprintf(GETLINE, "AccountName = %s", tempstring);
-			length = snprintf(tempstring, sizeof (tempstring), "%s",
-			    (char *)setupdata);
-			setupdata += (length+1);
-			sprintf(GETLINE, "DomainName = %s", tempstring);
-			length = snprintf(tempstring, sizeof (tempstring), "%s",
-			    (char *)setupdata);
-			setupdata += (length+1);
-			sprintf(GETLINE, "NativeOS = %s", tempstring);
-			snprintf(tempstring, sizeof (tempstring), "%s",
-			    (char *)setupdata);
-			sprintf(GETLINE, "NativeLanman = %s", tempstring);
-		}
-	}
+			if (wordcount != 13)
+				return;
+			setupdata += 14;
+			lm_pw_len = get2(setupdata);
+			setupdata += 2;
+			nt_pw_len = get2(setupdata);
+			setupdata += 6;
+			cap = get4(setupdata);
+			setupdata += 6 + lm_pw_len + nt_pw_len;
 
-	if (flags & F_DTAIL && smbdata->flags & SERVER_RESPONSE) {
-		if (wordcount != 3)
+			GET_STRING(tbuf, setupdata, isunicode);
+			snprintf(xtra, xsz, " Username=%s", tbuf);
+		}
+
+		if ((flags & F_DTAIL) == 0)
 			return;
-		sprintf(GETLINE, "ChainedCommand = 0x%.2x",
-			setupdata[0]);
+
+		/* request detail */
+		show_printf("WordCount = %d", wordcount);
+		if (wordcount < 7)
+			return;
+		/* words 0 - 6 */
+		show_printf("ChainedCommand = 0x%.2x", setupdata[0]);
 		setupdata += 2;
-		sprintf(GETLINE, "NextOffset = 0x%.4x",
-			get2(setupdata));
+		show_printf("NextOffset = 0x%.4x", get2(setupdata));
 		setupdata += 2;
-		sprintf(GETLINE, "SetupAction = 0x%.4x",
-			get2(setupdata));
+		show_printf("MaxBufferSize = %d", get2(setupdata));
 		setupdata += 2;
+		show_printf("MaxMPXRequests = %d", get2(setupdata));
+		setupdata += 2;
+		show_printf("VCNumber = %d", get2(setupdata));
+		setupdata += 2;
+		show_printf("SessionKey = 0x%.8x", get4(setupdata));
+		setupdata += 4;
+
+		if (ext_security) {
+			if (wordcount != 12)
+				return;
+			/* word 7 */
+			sec_blob_len = get2(setupdata);
+			setupdata += 2;
+			show_printf("Sec. blob len = %d", sec_blob_len);
+			/* words 8, 9 (reserved) */
+			setupdata += 4;
+		} else {
+			if (wordcount != 13)
+				return;
+			/* word 7 */
+			lm_pw_len = get2(setupdata);
+			setupdata += 2;
+			show_printf("LM_Hash_Len = %d", lm_pw_len);
+			/* word 8 */
+			nt_pw_len = get2(setupdata);
+			setupdata += 2;
+			show_printf("NT_Hash_Len = %d", nt_pw_len);
+			/* words 9, 10 (reserved) */
+			setupdata += 4;
+		}
+
+		cap = get4(setupdata);
+		show_printf("Capabilities = 0x%.8x", cap);
+		setupdata += 4;
+
 		bytecount = get2(setupdata);
-		sprintf(GETLINE, "ByteCount = %d", bytecount);
 		setupdata += 2;
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)setupdata);
-		setupdata += (length+1);
-		sprintf(GETLINE, "NativeOS = %s", tempstring);
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)setupdata);
-		setupdata += (length+1);
-		sprintf(GETLINE, "NativeLanman = %s", tempstring);
-		length = snprintf(tempstring, sizeof (tempstring), "%s",
-		    (char *)setupdata);
-		sprintf(GETLINE, "DomainName = %s", tempstring);
+		show_printf("ByteCount = %d", bytecount);
+
+		if (ext_security) {
+			/* No decoder for SPNEGO.  Just dump hex. */
+			show_printf("Security blob: (SPNEGO)");
+			output_bytes(setupdata, sec_blob_len);
+			setupdata += sec_blob_len;
+		} else {
+			/* Dump password hashes */
+			if (lm_pw_len > 0) {
+				show_printf("LM Hash (%d bytes)", lm_pw_len);
+				output_bytes(setupdata, lm_pw_len);
+				setupdata += lm_pw_len;
+			}
+			if (nt_pw_len > 0) {
+				show_printf("NT Hash (%d bytes)", nt_pw_len);
+				output_bytes(setupdata, nt_pw_len);
+				setupdata += nt_pw_len;
+			}
+
+			/* User */
+			GET_STRING(tbuf, setupdata, isunicode);
+			show_printf("AccountName = %s", tbuf);
+
+			/* Domain */
+			GET_STRING(tbuf, setupdata, isunicode);
+			show_printf("DomainName = %s", tbuf);
+		}
+
+		/*
+		 * Remainder is the same for etc. sec. or not
+		 * Native OS, Native LanMan
+		 */
+		GET_STRING(tbuf, setupdata, isunicode);
+		show_printf("NativeOS = %s", tbuf);
+
+		GET_STRING(tbuf, setupdata, isunicode);
+		show_printf("NativeLanman = %s", tbuf);
+	} else {
+		/* response summary */
+		if (flags & F_SUM) {
+			if (ext_security) {
+				/* No decoder for SPNEGO */
+				snprintf(xtra, xsz, " (SPNEGO)");
+			}
+			return;
+		}
+
+		if ((flags & F_DTAIL) == 0)
+			return;
+
+		/* response detail */
+		show_printf("WordCount = %d", wordcount);
+		if (wordcount < 3)
+			return;
+
+		show_printf("ChainedCommand = 0x%.2x", setupdata[0]);
+		setupdata += 2;
+		show_printf("NextOffset = 0x%.4x", get2(setupdata));
+		setupdata += 2;
+		show_printf("SetupAction = 0x%.4x", get2(setupdata));
+		setupdata += 2;
+
+		if (ext_security) {
+			if (wordcount != 4)
+				return;
+			sec_blob_len = get2(setupdata);
+			setupdata += 2;
+			show_printf("Sec. blob len = %d", sec_blob_len);
+		} else {
+			if (wordcount != 3)
+				return;
+		}
+
+		bytecount = get2(setupdata);
+		setupdata += 2;
+		show_printf("ByteCount = %d", bytecount);
+
+		if (ext_security) {
+			/* No decoder for SPNEGO.  Just dump hex. */
+			show_line("Security blob: (SPNEGO)");
+			output_bytes(setupdata, sec_blob_len);
+			setupdata += sec_blob_len;
+		}
+
+		/*
+		 * Native OS, Native LanMan
+		 */
+		GET_STRING(tbuf, setupdata, isunicode);
+		show_printf("NativeOS = %s", tbuf);
+
+		GET_STRING(tbuf, setupdata, isunicode);
+		show_printf("NativeLanman = %s", tbuf);
+
+		if (ext_security == 0) {
+			GET_STRING(tbuf, setupdata, isunicode);
+			show_printf("DomainName = %s", tbuf);
+		}
 	}
 }
 
@@ -1430,7 +1804,7 @@ interpret_sesssetupX(int flags, uchar_t *data, int len, char *xtra)
  */
 /* ARGSUSED */
 static void
-interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
+interpret_trans2(int flags, uchar_t *data, int len, char *xtra, int xsz)
 {
 	struct smb *smb;
 	uchar_t *vwv; /* word parameters */
@@ -1458,8 +1832,8 @@ interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
 	 * due to lack of data (so the user knows why we did).
 	 */
 	if (flags & F_DTAIL) {
-		sprintf(GETLINE, "WordCount = %d", wordcount);
-		sprintf(GETLINE, "ByteCount = %d", bytecount);
+		show_printf("WordCount = %d", wordcount);
+		show_printf("ByteCount = %d", bytecount);
 	}
 
 	/* Get length and location of params and setup data. */
@@ -1491,22 +1865,22 @@ interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
 	if (flags & F_DTAIL && !(smb->flags & SERVER_RESPONSE)) {
 		/* This is a CALL. */
 		/* print the word parameters */
-		sprintf(GETLINE, "TotalParamBytes = %d", get2(vwv));
-		sprintf(GETLINE, "TotalDataBytes = %d", get2(vwv+2));
-		sprintf(GETLINE, "MaxParamBytes = %d", get2(vwv+4));
-		sprintf(GETLINE, "MaxDataBytes = %d", get2(vwv+6));
-		sprintf(GETLINE, "MaxSetupWords = %d", vwv[8]);
-		sprintf(GETLINE, "TransFlags = 0x%.4x", get2(vwv+10));
-		sprintf(GETLINE, "Timeout = 0x%.8x", get4(vwv+12));
+		show_printf("TotalParamBytes = %d", get2(vwv));
+		show_printf("TotalDataBytes = %d", get2(vwv+2));
+		show_printf("MaxParamBytes = %d", get2(vwv+4));
+		show_printf("MaxDataBytes = %d", get2(vwv+6));
+		show_printf("MaxSetupWords = %d", vwv[8]);
+		show_printf("TransFlags = 0x%.4x", get2(vwv+10));
+		show_printf("Timeout = 0x%.8x", get4(vwv+12));
 		/* skip Reserved2 */
-		sprintf(GETLINE, "ParamBytes = 0x%.4x", parambytes);
-		sprintf(GETLINE, "ParamOffset = 0x%.4x", paramoffset);
-		sprintf(GETLINE, "DataBytes = 0x%.4x", get2(vwv+22));
-		sprintf(GETLINE, "DataOffset = 0x%.4x", get2(vwv+24));
-		sprintf(GETLINE, "SetupWords = %d", setupcount);
+		show_printf("ParamBytes = 0x%.4x", parambytes);
+		show_printf("ParamOffset = 0x%.4x", paramoffset);
+		show_printf("DataBytes = 0x%.4x", get2(vwv+22));
+		show_printf("DataOffset = 0x%.4x", get2(vwv+24));
+		show_printf("SetupWords = %d", setupcount);
 
 		/* That finishes the VWV, now the misc. stuff. */
-		sprintf(GETLINE, "FunctionCode = %d", subcode);
+		show_printf("FunctionCode = %d", subcode);
 	}
 
 	if (!(smb->flags & SERVER_RESPONSE)) {
@@ -1516,25 +1890,25 @@ interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
 			name = "Open";
 			goto name_only;
 		case TRANS2_FIND_FIRST:
-			output_trans2_findfirst(flags, params, xtra);
+			output_trans2_findfirst(flags, params, xtra, xsz);
 			break;
 		case TRANS2_FIND_NEXT2:
-			output_trans2_findnext(flags, params, xtra);
+			output_trans2_findnext(flags, params, xtra, xsz);
 			break;
 		case TRANS2_QUERY_FS_INFORMATION:
 			name = "QueryFSInfo";
 			goto name_only;
 		case TRANS2_QUERY_PATH_INFORMATION:
-			output_trans2_querypath(flags, params, xtra);
+			output_trans2_querypath(flags, params, xtra, xsz);
 			break;
 		case TRANS2_SET_PATH_INFORMATION:
 			name = "SetPathInfo";
 			goto name_only;
 		case TRANS2_QUERY_FILE_INFORMATION:
-			output_trans2_queryfile(flags, params, xtra);
+			output_trans2_queryfile(flags, params, xtra, xsz);
 			break;
 		case TRANS2_SET_FILE_INFORMATION:
-			output_trans2_setfile(flags, params, xtra);
+			output_trans2_setfile(flags, params, xtra, xsz);
 			break;
 		case TRANS2_CREATE_DIRECTORY:
 			name = "CreateDir";
@@ -1545,9 +1919,9 @@ interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
 			/* fall through */
 		name_only:
 			if (flags & F_SUM)
-				sprintf(xtra, "%s ", name);
+				snprintf(xtra, xsz, " %s", name);
 			if (flags & F_DTAIL)
-				sprintf(GETLINE, "FunctionName = %s", name);
+				show_printf("FunctionName = %s", name);
 			break;
 		}
 	}
@@ -1555,16 +1929,16 @@ interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
 	if (flags & F_DTAIL && smb->flags & SERVER_RESPONSE) {
 		/* This is a REPLY. */
 		/* print the word parameters */
-		sprintf(GETLINE, "TotalParamBytes = %d", get2(vwv));
-		sprintf(GETLINE, "TotalDataBytes = %d",  get2(vwv+2));
+		show_printf("TotalParamBytes = %d", get2(vwv));
+		show_printf("TotalDataBytes = %d",  get2(vwv+2));
 		/* skip Reserved */
-		sprintf(GETLINE, "ParamBytes = 0x%.4x", parambytes);
-		sprintf(GETLINE, "ParamOffset = 0x%.4x", paramoffset);
-		sprintf(GETLINE, "ParamDispl. = 0x%.4x", get2(vwv+10));
-		sprintf(GETLINE, "DataBytes = 0x%.4x", get2(vwv+12));
-		sprintf(GETLINE, "DataOffset = 0x%.4x", get2(vwv+14));
-		sprintf(GETLINE, "DataDispl. = 0x%.4x", get2(vwv+16));
-		sprintf(GETLINE, "SetupWords = %d", setupcount);
+		show_printf("ParamBytes = 0x%.4x", parambytes);
+		show_printf("ParamOffset = 0x%.4x", paramoffset);
+		show_printf("ParamDispl. = 0x%.4x", get2(vwv+10));
+		show_printf("DataBytes = 0x%.4x", get2(vwv+12));
+		show_printf("DataOffset = 0x%.4x", get2(vwv+14));
+		show_printf("DataDispl. = 0x%.4x", get2(vwv+16));
+		show_printf("SetupWords = %d", setupcount);
 
 		output_bytes(byteparms, bytecount);
 	}
@@ -1572,29 +1946,36 @@ interpret_trans2(int flags, uchar_t *data, int len, char *xtra)
 
 
 static void
-interpret_default(int flags, uchar_t *data, int len, char *xtra)
+interpret_default(int flags, uchar_t *data, int len, char *xtra, int xsz)
 {
 	int slength;
-	int i;
+	int i, tl;
+	int isunicode;
 	int printit;
 	int wordcount;
+	int outsz;
 	char *outstr;
-	char *prfmt;
 	char *format;
 	char valuetype;
 	char word[10];
 	char *label;
-	char tempstring[256];
+	char tempstr[256];
 	uchar_t *comdata, *limit;
 	char buff[80];
 	struct smb *smbdata;
 	struct decode *decoder;
+	uchar_t bval;
+	ushort_t wval;
+	ushort_t smb_flags2;
+	uint_t lval;
 
 	smbdata  = (struct smb *)data;
+	smb_flags2 = get2(smbdata->flags2);
 	comdata = (uchar_t *)data + sizeof (struct smb);
 	wordcount = *comdata++;
 	limit = data + len;
 
+	isunicode = smb_flags2 & FLAGS2_UNICODE;
 	decoder = &SMBtable[smbdata->com & 255];
 
 	if (smbdata->flags & SERVER_RESPONSE)
@@ -1603,87 +1984,150 @@ interpret_default(int flags, uchar_t *data, int len, char *xtra)
 		format = decoder->callfmt;
 
 	if (!format || strlen(format) == 0) {
-		if (wordcount == 0 || flags & F_SUM)
+		if (flags & F_SUM)
 			return;
-		sprintf(GETLINE, "WordCount = %d", wordcount);
-		sprintf(GETLINE, "Word values (in hex):");
+		show_printf("WordCount = %d", wordcount);
+		if (wordcount == 0)
+			return;
+		show_line("Word values (in hex):");
+		buff[0] = '\0';
 		for (i = 0; i < wordcount; i++) {
-			sprintf(word, "%.4x ", get2(comdata));
+			snprintf(word, sizeof (word), "%.4x ", get2(comdata));
 			comdata += 2;
 			if (comdata >= limit)
 				wordcount = i+1; /* terminate */
-			strcat(buff, word);
+			(void) strlcat(buff, word, sizeof (buff));
 			if (((i+1) & 7) == 0 || i == (wordcount-1)) {
-				sprintf(GETLINE, "%s", buff);
+				show_line(buff);
 				strcpy(buff, "");
 			}
 		}
 		return;
 	}
 
+	if (flags & F_DTAIL)
+		show_printf("WordCount = %d", wordcount);
+
+	outstr = xtra;
+	outsz = xsz;
 
 	valuetype = format[0];
 	while (valuetype != '\0') {
 		if (comdata >= limit)
 			break;
-		if ((flags & F_DTAIL) && valuetype != 'r' && valuetype != 'R')
-			outstr = GETLINE;
-		else
-			outstr = xtra + strlen(xtra);
 		label = format+1;
 		printit = (flags & F_DTAIL) || (valuetype <= 'Z');
 
 		switch (valuetype) {
 		case 'W':
 		case 'w':
-			prfmt = (flags & F_DTAIL) ? "%s = 0x%.4x" : "%s=0x%x ";
-			if (printit)
-				sprintf(outstr, prfmt, label, get2(comdata));
+			wval = get2(comdata);
 			comdata += 2;
+			if (!printit)
+				break;
+			if (flags & F_DTAIL)
+				show_printf(
+				    "%s = 0x%.4x", label, wval);
+			else {
+				tl = snprintf(outstr, outsz,
+				    " %s=0x%x", label, wval);
+				outstr += tl;
+				outsz -= tl;
+			}
 			break;
+
 		case 'D':
 		case 'd':
-			prfmt = (flags & F_DTAIL) ? "%s = %d" : "%s=%d ";
-			if (printit)
-				sprintf(outstr, prfmt, label, get2(comdata));
+			wval = get2(comdata);
 			comdata += 2;
+			if (!printit)
+				break;
+			if (flags & F_DTAIL)
+				show_printf(
+				    "%s = %d", label, wval);
+			else {
+				tl = snprintf(outstr, outsz,
+				    " %s=%d", label, wval);
+				outstr += tl;
+				outsz -= tl;
+			}
 			break;
+
 		case 'L':
 		case 'l':
-			prfmt = (flags & F_DTAIL) ? "%s = 0x%.8x" : "%s=0x%x ";
-			if (printit)
-				sprintf(outstr, prfmt, label, get4(comdata));
+			lval = get4(comdata);
 			comdata += 4;
+			if (!printit)
+				break;
+			if (flags & F_DTAIL)
+				show_printf(
+				    "%s = 0x%.8x", label, lval);
+			else {
+				tl = snprintf(outstr, outsz,
+				    " %s=0x%x", label, lval);
+				outstr += tl;
+				outsz -= tl;
+			}
 			break;
+
 		case 'B':
 		case 'b':
-			prfmt = (flags & F_DTAIL) ? "%s = 0x%.2x" : "%s=0x%x ";
-			if (printit)
-				sprintf(outstr, prfmt, label, comdata[0]);
+			bval = comdata[0];
 			comdata += 1;
+			if (!printit)
+				break;
+			if (flags & F_DTAIL)
+				show_printf(
+				    "%s = 0x%.2x", label, bval);
+			else {
+				tl = snprintf(outstr, outsz,
+				    " %s=0x%x", label, bval);
+				outstr += tl;
+				outsz -= tl;
+			}
 			break;
+
 		case 'r':
 			comdata++;
 			break;
+
 		case 'R':
 			comdata += 2;
 			break;
+
 		case 'U':
 		case 'u':
-			prfmt = (flags & F_DTAIL) ? "%s = %s" : "%s=%s ";
-			slength = unicode2ascii(tempstring, 256, comdata, 256);
-			if (printit)
-				sprintf(outstr, prfmt, label, tempstring);
-			comdata +=  (slength*2 + 1);
+			/* Unicode or ASCII string. */
+			GET_STRING(tempstr, comdata, isunicode);
+			if (!printit)
+				break;
+			if (flags & F_DTAIL)
+				show_printf(
+				    "%s = %s", label, tempstr);
+			else {
+				tl = snprintf(outstr, outsz,
+				    " %s=%s", label, tempstr);
+				outstr += tl;
+				outsz -= tl;
+			}
 			break;
+
 		case 'S':
 		case 's':
-			prfmt = (flags & F_DTAIL) ? "%s = %s" : "%s=%s ";
-			slength = snprintf(tempstring, sizeof (tempstring),
-			    "%s", (char *)comdata);
-			if (printit)
-				sprintf(outstr, prfmt, label, tempstring);
+			slength = strlcpy(tempstr, (char *)comdata,
+			    sizeof (tempstr));
 			comdata += (slength+1);
+			if (!printit)
+				break;
+			if (flags & F_DTAIL)
+				show_printf(
+				    "%s = %s", label, tempstr);
+			else {
+				tl = snprintf(outstr, outsz,
+				    " %s=%s", label, tempstr);
+				outstr += tl;
+				outsz -= tl;
+			}
 			break;
 		}
 		format += (strlen(format) + 1);

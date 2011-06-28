@@ -1,0 +1,244 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2007 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pkginfo 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+pkginfo \- display software package information
+.SH SYNOPSIS
+.LP
+.nf
+\fBpkginfo\fR [\fB-q\fR | \fB-x\fR | \fB-l\fR] [\fB-p\fR | \fB-i\fR] [\fB-r\fR] [\fB-a\fR \fIarch\fR] 
+     [\fB-v\fR \fIversion\fR] [\fB-c\fR \fIcategory\fR]... [\fIpkginst\fR]...
+.fi
+
+.LP
+.nf
+\fBpkginfo\fR [\fB-d\fR \fIdevice\fR] [\fB-R\fR \fIroot_path\fR] [\fB-q\fR | \fB-x\fR | \fB-l\fR] [\fB-a\fR \fIarch\fR] 
+     [\fB-v\fR \fIversion\fR] [\fB-c\fR \fIcategory\fR]... [\fIpkginst\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpkginfo\fR displays information about software packages that are installed
+on the system (with the first synopsis)  or that reside on a particular device
+or directory (with the second synopsis).
+.sp
+.LP
+Without options, \fBpkginfo\fR lists the primary category, package instance,
+and the names of all completely installed and partially installed packages. It
+displays one line for each package selected.
+.SH OPTIONS
+.sp
+.LP
+The \fB-p\fR and \fB-i\fR options are meaningless if used in conjunction with
+the \fB-d\fR option.
+.sp
+.LP
+The options \fB-q\fR, \fB-x\fR, and \fB-l\fR are mutually exclusive.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIarch\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the architecture of the package as \fBarch\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR \fIcategory\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display packages that match  \fIcategory\fR. Categories are defined with the
+\fBCATEGORY\fR parameter in the \fBpkginfo\fR(4) file. If more than one
+category is supplied, the  package needs to match only one category in the
+list. The match is not case specific.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdevice\fR\fR
+.ad
+.sp .6
+.RS 4n
+Defines a device, \fIdevice\fR, on which the software resides. \fIdevice\fR can
+be an absolute directory pathname or the identifiers for tape, floppy disk,
+removable disk, and so forth. The special token  \fBspool\fR may be used to
+indicate the default installation spool directory (\fB/var/spool/pkg\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display information for fully installed packages only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify long format, which includes all available information about the
+designated package(s).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display information for partially installed packages only.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not list any information. Used from a program to check  whether or not a
+package has been installed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the installation base for relocatable packages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR \fIroot_path\fR\fR
+.ad
+.sp .6
+.RS 4n
+Defines the full path name of a directory to use as the \fIroot_path\fR. All
+files, including package system information files, are relocated to a directory
+tree starting in the specified \fIroot_path\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR \fIversion\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the version of the package as \fIversion\fR. The version is defined
+with the \fBVERSION\fR parameter in the \fBpkginfo\fR(4) file. All compatible
+versions can be requested by preceding the version name with a tilde
+(\fB\(ap\fR). Multiple white spaces are replaced with a single white space
+during version comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Designate an extracted listing of package information. The listing contains the
+package abbreviation, package name, package architecture (if available) and
+package version (if available).
+.RE
+
+.SH OPERANDS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkginst\fR\fR
+.ad
+.sp .6
+.RS 4n
+A package designation by its instance. An instance can be the package
+abbreviation or a specific instance (for example, \fBinst.1\fR or
+\fBinst.2\fR). All instances of a package can be requested by \fBinst.*\fR. The
+asterisk character (\fB*\fR) is a special character to some shells and may need
+to be escaped. In the C-Shell, "\fB*\fR" must be surrounded by single quotes
+(\fB\&'\fR) or preceded by a backslash (\e).
+.RE
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.sp .6
+.RS 4n
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/pkg\fR\fR
+.ad
+.sp .6
+.RS 4n
+default installation spool directory
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpkgtrans\fR(1), \fBpkgadd\fR(1M), \fBpkgask\fR(1M), \fBpkgchk\fR(1M),
+\fBpkgrm\fR(1M), \fBpkginfo\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.sp
+.LP
+\fIApplication Packaging Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+Package commands are \fBlargefile\fR(5)-aware. They handle files larger than 2
+GB in the same way they handle smaller files. In their current implementations,
+\fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other package commands can process a
+datastream of  up to 4 GB.

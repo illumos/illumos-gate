@@ -1,0 +1,388 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_begin 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_begin, elf_end, elf_memory, elf_next, elf_rand \- process ELF object files
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf *\fR\fBelf_begin\fR(\fBint\fR \fIfildes\fR, \fBElf_Cmd\fR \fIcmd\fR, \fBElf *\fR\fIref\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBelf_end\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf *\fR\fBelf_memory\fR(\fBchar *\fR\fIimage\fR, \fBsize_t\fR \fIsz\fR);
+.fi
+
+.LP
+.nf
+\fBElf_Cmd\fR \fBelf_next\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBelf_rand\fR(\fBElf *\fR\fIelf\fR, \fBsize_t\fR \fIoffset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelf_begin()\fR, \fBelf_end()\fR, \fBelf_memory()\fR, \fBelf_next()\fR,
+and \fBelf_rand()\fR functions work together to process Executable and Linking
+Format (ELF) object files, either individually or as members of archives. After
+obtaining an \fBELF\fR descriptor from \fBelf_begin()\fR or \fBelf_memory()\fR,
+the program can read an existing file, update an existing file, or create a new
+file. The \fIfildes\fR argument is an open file descriptor that
+\fBelf_begin()\fR uses for reading or writing. The \fIelf\fR argument is an
+\fBELF\fR descriptor previously returned from \fBelf_begin()\fR. The initial
+file offset (see \fBlseek\fR(2)) is unconstrained, and the resulting file
+offset is undefined.
+.sp
+.LP
+The \fIcmd\fR argument can take the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_NULL\fR\fR
+.ad
+.RS 15n
+.rt  
+When a program sets \fIcmd\fR to this value, \fBelf_begin()\fR returns a null
+pointer, without opening a new descriptor. \fIref\fR is ignored for this
+command. See the examples below for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_READ\fR\fR
+.ad
+.RS 15n
+.rt  
+When a program wants to examine the contents of an existing file, it should set
+\fIcmd\fR to this value. Depending on the value of \fIref\fR, this command
+examines archive members or entire files. Three cases can occur.
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIref\fR is a null pointer, \fBelf_begin()\fR allocates a new \fBELF\fR
+descriptor and prepares to process the entire file. If the file being read is
+an archive, \fBelf_begin()\fR also prepares the resulting descriptor to examine
+the initial archive member on the next call to \fBelf_begin()\fR, as if the
+program had used \fB elf_next()\fR or \fBelf_rand()\fR to ``move'' to the
+initial member.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIref\fR is a non-null descriptor associated with an archive file,
+\fBelf_begin()\fR lets a program obtain a separate \fBELF\fR descriptor
+associated with an individual member. The program should have used
+\fBelf_next()\fR or \fBelf_rand()\fR to position \fIref\fR appropriately
+(except for the initial member, which \fBelf_begin()\fR prepares; see the
+example below). In this case, \fIfildes\fR should be the same file descriptor
+used for the parent archive.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIref\fR is a non-null \fBELF\fR descriptor that is not an archive,
+\fBelf_begin()\fR increments the number of activations for the descriptor and
+returns \fIref\fR, without allocating a new descriptor and without changing the
+descriptor's read/write permissions. To terminate the descriptor for \fIref\fR,
+the program must call \fBelf_end()\fR once for each activation. See the
+examples below for more information.
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_RDWR\fR\fR
+.ad
+.RS 15n
+.rt  
+This command duplicates the actions of \fBELF_C_READ\fR and additionally allows
+the program to update the file image (see \fBelf_update\fR(3ELF)). Using
+\fBELF_C_READ\fR gives a read-only view of the file, while \fBELF_C_RDWR\fR
+lets the program read \fIand\fR write the file. \fBELF_C_RDWR\fR is not valid
+for archive members. If  \fIref\fR is non-null, it must have been created with
+the \fBELF_C_RDWR\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELF_C_WRITE\fR\fR
+.ad
+.RS 15n
+.rt  
+If the program wants to ignore previous file contents, presumably to create a
+new file, it should set \fIcmd\fR to this value. \fIref\fR is ignored for this
+command.
+.RE
+
+.sp
+.LP
+The \fBelf_begin()\fR function operates on all files (including files with zero
+bytes), providing it can allocate memory for its internal structures and read
+any necessary information from the file. Programs reading object files can call
+\fBelf_kind\fR(3ELF) or \fBelf32_getehdr\fR(3ELF) to determine the file type
+(only object files have an \fBELF\fR header). If the file is an archive with no
+more members to process, or an error occurs, \fBelf_begin()\fR returns a null
+pointer. Otherwise, the return value is a non-null \fBELF\fR descriptor.
+.sp
+.LP
+Before the first call to \fBelf_begin()\fR, a program must call
+\fBelf_version()\fR to coordinate versions.
+.sp
+.LP
+The \fBelf_end()\fR function is used to terminate an \fBELF\fR descriptor,
+\fIelf\fR, and to deallocate data associated with the descriptor. Until the
+program terminates a descriptor, the data remain allocated. A null pointer is
+allowed as an argument, to simplify error handling. If the program wants to
+write data associated with the \fBELF\fR descriptor to the file, it must use
+\fBelf_update()\fR before calling \fBelf_end()\fR.
+.sp
+.LP
+Calling \fBelf_end()\fR removes one activation and returns the remaining
+activation count. The library does not terminate the descriptor until the
+activation count reaches \fB0\fR. Consequently, a \fB0\fR return value
+indicates the \fBELF\fR descriptor is no longer valid.
+.sp
+.LP
+The \fBelf_memory()\fR function returns a pointer to an \fBELF\fR descriptor.
+The \fBELF\fR image has read operations enabled ( \fBELF_C_READ\fR). The
+\fIimage\fR argument is a pointer to an image of the Elf file mapped into
+memory. The \fIsz\fR argument is the size of the \fBELF\fR image. An \fBELF\fR
+image that is mapped in with \fBelf_memory()\fR can be read and modified, but
+the \fBELF\fR image size cannot be changed.
+.sp
+.LP
+The \fBelf_next()\fR function provides sequential access to the next archive
+member. Having an \fBELF\fR descriptor, \fIelf\fR, associated with an archive
+member, \fBelf_next()\fR prepares the containing archive to access the
+following member when the program calls \fBelf_begin()\fR. After successfully
+positioning an archive for the next member, \fBelf_next()\fR returns the value
+\fBELF_C_READ\fR. Otherwise, the open file was not an archive, \fIelf\fR was
+\fINULL\fR, or an error occurred, and the return value is \fBELF_C_NULL\fR. In
+either case, the return value can be passed as an argument to
+\fBelf_begin()\fR, specifying the appropriate action.
+.sp
+.LP
+The \fBelf_rand()\fR function provides random archive processing, preparing
+\fIelf\fR to access an arbitrary archive member. The \fIelf\fR argument must be
+a descriptor for the archive itself, not a member within the archive. The
+\fIoffset\fR argument specifies the byte offset from the beginning of the
+archive to the archive header of the desired member. See
+\fBelf_getarsym\fR(3ELF) for more information about archive member offsets.
+When \fBelf_rand()\fR works, it returns \fIoffset\fR. Otherwise, it returns
+\fB0\fR, because an error occurred, \fIelf\fR was \fI NULL\fR, or the file was
+not an archive (no archive member can have a zero offset). A program can mix
+random and sequential archive processing.
+.SS "System Services"
+.sp
+.LP
+When processing a file, the library decides when to read or write the file,
+depending on the program's requests. Normally, the library assumes the file
+descriptor remains usable for the life of the \fBELF\fR descriptor. If,
+however, a program must process many files simultaneously and the underlying
+operating system limits the number of open files, the program can use
+\fBelf_cntl()\fR to let it reuse file descriptors. After calling
+\fBelf_cntl()\fR with appropriate arguments, the program can close the file
+descriptor without interfering with the library.
+.sp
+.LP
+All data associated with an \fBELF\fR descriptor remain allocated until
+\fBelf_end()\fR terminates the descriptor's last activation. After the
+descriptors have been terminated, the storage is released; attempting to
+reference such data gives undefined behavior. Consequently, a program that
+deals with multiple input (or output) files must keep the \fBELF\fR descriptors
+active until it finishes with them.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample program of calling the \fBelf_begin()\fR function.
+.sp
+.LP
+A prototype for reading a file appears on the next page. If the file is a
+simple object file, the program executes the loop one time, receiving a null
+descriptor in the second iteration. In this case, both \fBelf\fR and \fBarf\fR
+will have the same value, the activation count will be \fB2\fR, and the program
+calls \fBelf_end()\fR twice to terminate the descriptor. If the file is an
+archive, the loop processes each archive member in turn, ignoring those that
+are not object files.
+
+.sp
+.in +2
+.nf
+\fBif (elf_version(EV_CURRENT) == EV_NONE)
+{
+	/* library out of date */
+	/* recover from error */
+}
+cmd = ELF_C_READ;
+arf = elf_begin(fildes, cmd, (Elf *)0);
+while ((elf = elf_begin(fildes, cmd, arf)) != 0)
+{
+	if ((ehdr = elf32_getehdr(elf)) != 0)
+	{
+		/* process the file \|.\|.\|. */
+	}
+	cmd = elf_next(elf);
+	elf_end(elf);
+}
+elf_end(arf);\fR
+.fi
+.in -2
+
+.sp
+.LP
+Alternatively, the next example illustrates random archive processing. After
+identifying the file as an archive, the program repeatedly processes archive
+members of interest. For clarity, this example omits error checking and ignores
+simple object files. Additionally, this fragment preserves the \fBELF\fR
+descriptors for all archive members, because it does not call \fBelf_end()\fR
+to terminate them.
+
+.sp
+.in +2
+.nf
+\fBelf_version(EV_CURRENT);
+arf = elf_begin(fildes, ELF_C_READ, (Elf *)0);
+if (elf_kind(arf) != ELF_K_AR)
+{
+	/* not an archive */
+}
+/* initial processing */
+/* set offset = \|.\|.\|. for desired member header */
+while (elf_rand(arf, offset) == offset)
+{
+	if ((elf = elf_begin(fildes, ELF_C_READ, arf)) == 0)
+		break;
+	if ((ehdr = elf32_getehdr(elf)) != 0)
+	{
+		/* process archive member \|.\|.\|. */
+	}
+	/* set offset = \|.\|.\|. for desired member header */
+}\fR
+.fi
+.in -2
+
+.sp
+.LP
+An archive starts with a ``magic string'' that has \fBSARMAG\fR bytes; the
+initial archive member follows immediately. An application could thus provide
+the following function to rewind an archive (the function returns \fB\(mi1\fR
+for errors and \fB0\fR otherwise).
+
+.sp
+.in +2
+.nf
+\fB#include <ar.h>
+#include <libelf.h>
+int
+rewindelf(Elf *elf)
+{
+     if (elf_rand(elf, (size_t)SARMAG) == SARMAG)
+          return 0;
+     return \(mi1;
+}\fR
+.fi
+.in -2
+
+.sp
+.LP
+The following outline shows how one might create a new \fBELF\fR file. This
+example is simplified to show the overall flow.
+
+.sp
+.in +2
+.nf
+\fBelf_version(EV_CURRENT);
+fildes = open("path/name", O_RDWR|O_TRUNC|O_CREAT, 0666);
+if ((elf = elf_begin(fildes, ELF_C_WRITE, (Elf *)0)) == 0)
+	return;
+ehdr = elf32_newehdr(elf);
+phdr = elf32_newphdr(elf, count);
+scn = elf_newscn(elf);
+shdr = elf32_getshdr(scn);
+data = elf_newdata(scn);
+elf_update(elf, ELF_C_WRITE);
+elf_end(elf);\fR
+.fi
+.in -2
+
+.sp
+.LP
+Finally, the following outline shows how one might update an existing \fBELF\fR
+file. Again, this example is simplified to show the overall flow.
+
+.sp
+.in +2
+.nf
+\fBelf_version(EV_CURRENT);
+fildes = open("path/name", O_RDWR);
+elf = elf_begin(fildes, ELF_C_RDWR, (Elf *)0);
+/* add new or delete old information */
+\|.\|.\|.
+/* ensure that the memory image of the file is complete */
+elf_update(elf, ELF_C_NULL);
+elf_update(elf, ELF_C_WRITE);   /* update file */
+elf_end(elf);\fR
+.fi
+.in -2
+
+.sp
+.LP
+Notice that both file creation examples open the file with write \fIand\fR read
+permissions. On systems that support \fBmmap\fR(2), the library uses it to
+enhance performance, and \fBmmap\fR(2) requires a readable file descriptor.
+Although the library can use a write-only file descriptor, the application will
+not obtain the performance advantages of \fBmmap\fR(2).
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcreat\fR(2), \fBlseek\fR(2), \fBmmap\fR(2), \fBopen\fR(2),
+\fBar.h\fR(3HEAD), \fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF),
+\fBelf_cntl\fR(3ELF), \fBelf_getarhdr\fR(3ELF), \fBelf_getarsym\fR(3ELF),
+\fBelf_getbase\fR(3ELF), \fBelf_getdata\fR(3ELF), \fBelf_getscn\fR(3ELF),
+\fBelf_kind\fR(3ELF), \fBelf_rawfile\fR(3ELF), \fBelf_update\fR(3ELF),
+\fBelf_version\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)

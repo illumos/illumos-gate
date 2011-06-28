@@ -1,0 +1,450 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved 
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rlogin 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+rlogin \- remote login
+.SH SYNOPSIS
+.LP
+.nf
+\fBrlogin\fR [\fB-8EL\fR] [\fB-e\fIc\fR\fR ] [\fB-A\fR] [\fB-K\fR] [\fB-x\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR] 
+     [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIhostname\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrlogin\fR utility establishes a remote login session from your terminal
+to the remote machine named \fIhostname\fR. The user can choose to kerberize
+the rlogin session using Kerberos V5 and also protect the data being
+transferred.
+.sp
+.LP
+Hostnames are listed in the \fIhosts\fR database, which can be contained in the
+\fB/etc/hosts\fR file, the Network Information Service (\fBNIS\fR) \fBhosts\fR
+map, the Internet domain name server, or a combination of these. Each host has
+one official name (the first name in the database entry), and optionally one or
+more nicknames. Either official hostnames or nicknames can be specified in
+\fIhostname\fR.
+.sp
+.LP
+The user can opt for a secure rlogin session which uses Kerberos V5 for
+authentication. Encryption of the session data is also possible. The rlogin
+session can be kerberized using any of the following Kerberos specific options:
+\fB-A\fR, \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or \fB-F\fR, and \fB-k\fR
+\fIrealm\fR. Some of these options (\fB-A\fR, \fB-x\fR, \fB-PN\fR or \fB-PO\fR,
+and \fB-f\fR or \fB-F\fR) can also be specified in the \fB[appdefaults]\fR
+section of \fBkrb5.conf\fR(4). The usage of these options and the expected
+behavior is discussed in the OPTIONS section below. If Kerberos authentication
+is used, authorization to the account is controlled through rules in
+\fBkrb5_auth_rules\fR(5). If this authorization fails, fallback to normal
+\fBrlogin\fR using \fBrhosts\fR occurs only if the \fB-PO\fR option is used
+explicitly on the command line or is specified in \fBkrb5.conf\fR(4). Also
+notice that the \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or \fB-F\fR, and
+\fB-k\fR \fIrealm\fR options are just supersets of the \fB-A\fR option.
+.sp
+.LP
+The remote terminal type is the same as your local terminal type, as given in
+your environment \fBTERM\fR variable. The terminal or window size is also
+copied to the remote system if the server supports the option. Changes in size
+are reflected as well. All echoing takes place at the remote site, so that
+(except for delays) the remote login is transparent. Flow control using
+Control-S and Control-Q and flushing of input and output on interrupts are
+handled properly.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-8\fR\fR
+.ad
+.RS 15n
+.rt  
+Passes eight-bit data across the net instead of seven-bit data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 15n
+.rt  
+Forces the remote machine to ask for a password by sending a null local
+username.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.RS 15n
+.rt  
+Explicitly enables Kerberos authentication and trusts the \fB\&.k5login\fR file
+for access-control. If the authorization check by \fBin.rlogind\fR(1M) on the
+server-side succeeds and if the \fB\&.k5login\fR file permits access, the user
+is allowed to login without supplying a password.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fIc\fR\fR
+.ad
+.RS 15n
+.rt  
+Specifies a different escape character, \fIc\fR, for the line used to
+disconnect from the remote host.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.RS 15n
+.rt  
+Stops any character from being recognized as an escape character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 15n
+.rt  
+Forwards a copy of the local credentials (Kerberos Ticket Granting Ticket) to
+the remote system. This is a non-forwardable ticket granting ticket. You must
+forward a ticket granting ticket if you need to authenticate yourself to other
+Kerberized network services on the remote host. An example is if your home
+directory on the remote host is \fBNFS\fR mounted via Kerberos V5. If your
+local credentials are not forwarded in this case, you can not access your home
+directory. This option is mutually exclusive with the \fB-F\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 15n
+.rt  
+Forwards a forwardable copy of the local credentials (Kerberos Ticket Granting
+Ticket) to the remote system. The \fB-F\fR option provides a superset of the
+functionality offered by the \fB-f\fR option. For example, with the \fB-f\fR
+option, after you connected to the remote host, any attempt to invoke
+\fB/usr/bin/ftp\fR, \fB/usr/bin/telnet\fR, \fB/usr/bin/rlogin\fR, or
+\fB/usr/bin/rsh\fR with the \fB-f\fR or \fB-F\fR options would fail. Thus, you
+would be unable to push your single network sign on trust beyond one system.
+This option is mutually exclusive with the \fB-f\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIrealm\fR\fR
+.ad
+.RS 15n
+.rt  
+Causes \fBrlogin\fR to obtain tickets for the remote host in \fIrealm\fR
+instead of the remote host's realm as determined by \fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-K\fR\fR
+.ad
+.RS 15n
+.rt  
+This option explicitly disables Kerberos authentication. It can be used to
+override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fIusername\fR\fR
+.ad
+.RS 15n
+.rt  
+Specifies a different \fIusername\fR for the remote login. If you do not use
+this option, the remote username used is the same as your local username.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 15n
+.rt  
+Allows the rlogin session to be run in "\fBlitout\fR" mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-PN\fR\fR
+.ad
+.br
+.na
+\fB\fB-PO\fR\fR
+.ad
+.RS 15n
+.rt  
+Explicitly requests the new (\fB-PN\fR) or old (\fB-PO\fR) version of the
+Kerberos `\fBrcmd\fR' protocol. The new protocol avoids many security problems
+prevalant in the old one and is considered much more secure, but is not
+interoperable with older (MIT/SEAM) servers. The new protocol is used by
+default, unless explicitly specified using these options or by using
+\fBkrb5.conf\fR(4). If Kerberos authorization fails when using the old
+`\fBrcmd\fR' protocol, there is fallback to regular, non-kerberized
+\fBrlogin\fR. This is not the case when the new, more secure `\fBrcmd\fR'
+protocol is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 15n
+.rt  
+Turns on \fBDES\fR encryption for all data passed through the rlogin session.
+This reduces response time and increases \fBCPU\fR utilization.
+.RE
+
+.SS "Escape Sequences"
+.sp
+.LP
+Lines that you type which start with the tilde character (\fB~\fR) are "escape
+sequences." The escape character can be changed using the \fB-e\fR option.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~.\fR\fR
+.ad
+.RS 10n
+.rt  
+Disconnects from the remote host. This is not the same as a logout, because the
+local host breaks the connection with no warning to the remote end.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~susp\fR\fR
+.ad
+.RS 10n
+.rt  
+Suspends the login session, but only if you are using a shell with Job Control.
+\fBsusp\fR is your "suspend" character, usually Control-Z. See \fBtty\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~dsusp\fR\fR
+.ad
+.RS 10n
+.rt  
+Suspends the input half of the login, but output is still able to be seen (only
+if you are using a shell with Job Control). \fBdsusp\fR is your "deferred
+suspend" character, usually Control-Y. See \fBtty\fR(1).
+.RE
+
+.SH OPERANDS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhostname\fR\fR
+.ad
+.RS 12n
+.rt  
+The remote machine on which \fIrlogin\fR establishes the remote login session.
+.RE
+
+.SH USAGE
+.sp
+.LP
+For the kerberized rlogin session, each user can have a private authorization
+list in a file, \fB\&.k5login\fR, in his home directory. Each line in this file
+should contain a Kerberos principal name of the form
+\fIprincipal\fR/\fIinstance@realm\fR. If there is a \fB~/.k5login\fR file,
+access is granted to the account if and only if the originating user is
+authenticated to one of the principals named in the \fB~/.k5login\fR file.
+Otherwise, the originating user is granted access to the account if and only if
+the authenticated principal name of the user can be mapped to the local account
+name using the \fIauthenticated-principal-name\fR \(-> \fIlocal-user-name\fR
+mapping rules. The \fB\&.k5login\fR file (for access control) comes into play
+only when Kerberos authentication is being done.
+.sp
+.LP
+For the non-secure rlogin session, each remote machine can have a file named
+\fB/etc/hosts.equiv\fR containing a list of trusted host names with which it
+shares user names. Users with the same user name on both the local and remote
+machine can \fBrlogin\fR from the machines listed in the remote machine's
+\fB/etc/hosts.equiv\fR file without supplying a password. Individual users
+camayn set up a similar private equivalence list with the file \fB\&.rhosts\fR
+in their home directories. Each line in this file contains two names, that is,
+a host name and a user name, separated by a space. An entry in a remote user's
+\fB\&.rhosts\fR file permits the user named \fIusername\fR who is logged into
+\fIhostname\fR to log in to the remote machine as the remote user without
+supplying a password. If the name of the local host is not found in the
+\fB/etc/hosts.equiv\fR file on the remote machine, and the local user name and
+host name are not found in the remote user's .\fBrhosts\fR file, then the
+remote machine prompts for a password. Host names listed in the
+\fB/etc/hosts.equiv\fR and \fB\&.rhosts\fR files must be the official host
+names listed in the \fBhosts\fR database. Nicknames can not be used in either
+of these files.
+.sp
+.LP
+For security reasons, the \fB\&.rhosts\fR file must be owned by either the
+remote user or by root.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 23n
+.rt  
+Contains information about users' accounts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/hosts/*\fR\fR
+.ad
+.RS 23n
+.rt  
+For \fIhostname\fR version of the command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/hosts.equiv\fR\fR
+.ad
+.RS 23n
+.rt  
+List of trusted hostnames with shared user names.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nologin\fR\fR
+.ad
+.RS 23n
+.rt  
+Message displayed to users attempting to login during machine shutdown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.rhosts\fR\fR
+.ad
+.RS 23n
+.rt  
+Private list of trusted hostname/username combinations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.k5login\fR\fR
+.ad
+.RS 23n
+.rt  
+File containing Kerberos principals that are allowed access.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/krb5/krb5.conf\fR\fR
+.ad
+.RS 23n
+.rt  
+Kerberos configuration file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/hosts\fR\fR
+.ad
+.RS 23n
+.rt  
+Hosts database.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrsh\fR(1), \fBstty\fR(1), \fBtty\fR(1), \fBin.rlogind\fR(1M),
+\fBhosts\fR(4),\fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4), \fBnologin\fR(4),
+\fBattributes\fR(5), \fBkrb5_auth_rules\fR(5)
+.SH DIAGNOSTICS
+.sp
+.LP
+The following message indicates that the machine is in the process of being
+shutdown and logins have been disabled:
+.sp
+.in +2
+.nf
+NO LOGINS: System going down in \fIN\fR \fBminutes\fR
+.fi
+.in -2
+.sp
+
+.SH NOTES
+.sp
+.LP
+When a system is listed in \fBhosts.equiv\fR, its security must be as good as
+local security. One insecure system listed in \fBhosts.equiv\fR can compromise
+the security of the entire system.
+.sp
+.LP
+The Network Information Service (\fBNIS\fR) was formerly known as Sun Yellow
+Pages (\fBYP\fR.) The functionality of the two remains the same. Only the name
+has changed.
+.sp
+.LP
+This implementation can only use the \fBTCP\fR network service.

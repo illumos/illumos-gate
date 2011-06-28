@@ -39,7 +39,6 @@ SHFILES= \
 	flg.flp \
 	genoffsets \
 	hgsetup \
-	mkclosed \
 	nightly \
 	onu \
 	protocmp.terse \

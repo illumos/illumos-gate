@@ -1,0 +1,157 @@
+'\" te
+.\" Copyright (c) 2007 Sun Microsystems, Inc. - All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH shift 1 "20 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+shift \- shell built-in function to traverse either a shell's argument list or
+a list of field-separated words
+.SH SYNOPSIS
+.SS "sh"
+.LP
+.nf
+\fBshift\fR [\fIn\fR]
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBshift\fR [\fIvariable\fR]
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fB*shift\fR [\fIn\fR]
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fB+shift\fR [\fIn\fR]
+.fi
+
+.SH DESCRIPTION
+.SS "sh"
+.sp
+.LP
+The positional parameters from \fB$\fR\fIn\fR\fB+1\fR .\|.\|. are renamed
+\fB$1\fR .\|.\|. . If \fIn\fR is not specified, it is assumed to be 1.
+.SS "csh"
+.sp
+.LP
+The components of \fIargv\fR, or \fIvariable\fR, if supplied, are shifted to
+the left, discarding the first component. It is an error for the variable not
+to be set or to have a null value.
+.SS "ksh"
+.sp
+.LP
+The positional parameters from \fB$\fR\fIn\fR\fB+1\fR
+\fB$\fR\fIn\fR\fB+1 .\|.\|.\fR are renamed \fB$1 .\|.\|.\fR, default \fIn\fR is 1. The parameter
+\fIn\fR can be any arithmetic expression that evaluates to a non-negative
+number less than or equal to \fB$#\fR.
+.sp
+.LP
+On this manual page, \fBksh\fR(1) commands that are preceded by one or two *
+(asterisks) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+\fBI/O\fR redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Words, following a command preceded by ** that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and word
+splitting and file name generation are not performed.
+.RE
+.SS "ksh93"
+.sp
+.LP
+\fBshift\fR is a shell special built-in that shifts the positional parameters
+to the left by the number of places defined by \fIn\fR, or \fB1\fR if \fIn\fR
+is omitted. The number of positional parameters remaining is reduced by the
+number of places that are shifted.
+.sp
+.LP
+If \fIn\fR is specified, it is evaluated as an arithmetic expression to
+determine the number of places to shift. It is an error to shift more than the
+number of positional parameters or a negative number of places.
+.sp
+.LP
+The following exit values are returned by \fBshift\fR in \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion. The positional parameters were successfully shifted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.LP
+On this manual page, \fBksh93\fR(1) commands that are preceded by one or two
+\fB+\fR are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+\fBI/O\fR redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+They are not valid function names.
+.RE
+.RS +4
+.TP
+5.
+Words, following a command preceded by \fB++\fR that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and
+field splitting and file name generation are not performed.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1), \fBattributes\fR(5)

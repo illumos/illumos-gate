@@ -1,0 +1,738 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lari 1 "28 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+lari \- link analysis of runtime interfaces
+.SH SYNOPSIS
+.LP
+.nf
+\fBlari\fR [\fB-bCDsVv\fR] [\fB-a\fR | \fB-i\fR | \fB-o\fR] \fIfile\fR | \fIdirectory\fR...
+.fi
+
+.LP
+.nf
+\fBlari\fR [\fB-CDosv\fR] [\fB-m\fR [\fB-d\fR \fImapdir\fR]] \fIfile\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlari\fR utility analyzes the interface requirements of dynamic \fBELF\fR
+objects. Two basic modes of operation are available. The first mode displays
+runtime interface information. The second mode generates interface definitions.
+.sp
+.LP
+Dynamic objects offer symbolic definitions that represent the interface that
+the object provides for external consumers. At runtime, bindings are
+established from the symbolic references of one object to the symbolic
+definitions of another object. \fBlari\fR analyzes both the interface
+definitions and runtime bindings of the specified objects.
+.sp
+.LP
+When displaying runtime interface information, \fBlari\fR can analyze a number
+of files and/or directories. \fBlari\fR analyzes each \fIfile\fR that is
+specified on the command line. \fBlari\fR recursively descends into each
+\fIdirectory\fR that is specified on the command line, processing each file
+that is found.
+.sp
+.LP
+When generating interface definitions, \fBlari\fR can only process a single
+\fIfile\fR specified on the command line.
+.sp
+.LP
+Without the \fB-D\fR option, \fBlari\fR processes files as dynamic \fBELF\fR
+objects by using \fBldd\fR(1). This processing uses the following options:
+.sp
+.in +2
+.nf
+\fB-r\fR and \fB-e\fR \fBLD_DEBUG=files,bindings,detail\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+These options provide information on all bindings that are established as part
+of loading the object. Notice that by using \fBldd\fR, the specified object is
+not executed, and hence no user controlled loading of objects, by
+\fBdlopen\fR(3C) for example, occurs. To capture all binding information from
+an executing process, the following environment variables can be passed
+directly to the runtime linker, \fBld.so.1\fR(1):
+.sp
+.in +2
+.nf
+\fBLD_DEBUG=files,bindings,detail LD_DEBUG_OUTPUT=lari.dbg \ 
+LD_BIND_NOW=yes\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The resulting debug output, \fBlari.dbg.\fIpid\fR\fR, can be processed by
+\fBlari\fR using the \fB-D\fR option. \fBNote:\fR \fBlari\fR attempts to
+analyze each object that has been processed using the path name defined in the
+debug output. Each object must therefore be accessible to \fBlari\fR for a
+complete, accurate analysis to be provided. The debug output file must be
+generated in the \fBC\fR locale.
+.sp
+.LP
+When displaying interface information, \fBlari\fR analyzes the interfaces of
+the processed dynamic objects and, by default, displays any interesting
+information. See \fBInteresting Information\fR under EXTENDED DESCRIPTION. The
+information that is displayed is also suitable for piping to other tools. This
+capability can aid developers in analyzing process bindings or debugging
+complex binding scenarios.
+.sp
+.LP
+The generation of interface definitions by \fBlari\fR can be used to refine the
+interface requirements of the dynamic objects that are processed. When creating
+a dynamic object, you should define an explicit, versioned interface. This
+definition controls the symbol definitions that are available to external
+users. In addition, this definition frequently reduces the overall runtime
+execution cost of the object. Interface definitions can be assigned to an
+object during its creation by the link-editor using the \fB-M\fR option and the
+associated \fImapfile\fR directives. See the \fILinker and Libraries Guide\fR
+for more details on using \fImapfiles\fR to version objects. An initial version
+of these \fImapfiles\fR can be created by \fBlari\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 13n
+.rt  
+Displays all interface information for the objects analyzed. \fBNote:\fR The
+output from this option can be substantial, but is often useful for piping to
+other analysis tools.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 13n
+.rt  
+Limits the interface information to those symbols that have been explicitly
+bound to. \fBNote:\fR Symbols defined as protected might have been bound to
+from within the defining object. This binding is satisfied at link-edit time
+and is therefore not visible to the runtime environment. Protected symbols are
+displayed with this option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 13n
+.rt  
+Demangles C++ symbol names. This option is useful for augmenting runtime
+interface information. When generating interface definitions, demangled names
+are added to the \fImapfiles\fR as comments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fImapdir\fR\fR
+.ad
+.RS 13n
+.rt  
+Defines the directory, \fImapdir\fR, in which \fImapfiles\fR are created. By
+default, the current working directory is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 13n
+.rt  
+Interprets any input \fIfiles\fR as debugging information rather than as
+dynamic objects.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 13n
+.rt  
+Displays interesting interface binding information. This mode is the default if
+no other output controlling option is supplied. See \fBInteresting
+Information\fR under EXTENDED DESCRIPTION.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 13n
+.rt  
+Creates \fImapfiles\fR for each dynamic object that is processed. These
+\fImapfiles\fR reflect the interface requirements of each object as required by
+the input file being processed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 13n
+.rt  
+Limits the interface information to those symbols that are deemed an overhead.
+When creating \fImapfiles\fR, any overhead symbols are itemized as local
+symbols. See \fBOverhead Information\fR under EXTENDED DESCRIPTION.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+Saves the bindings information produced from \fBldd\fR(1) for further analysis.
+See FILES.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 13n
+.rt  
+Appends interesting symbol visibilities. Symbols that are defined as
+\fBsingleton\fR or are defined \fBprotected\fR are identified with this option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 13n
+.rt  
+Ignores any objects that are already versioned. Versioned objects have had
+their interfaces defined, but can contribute to the interface information
+displayed. For example, a versioned shared object might reveal overhead symbols
+for a particular process. Shared objects are frequently designed for use by
+multiple processes, and thus the interfaces these objects provide can extend
+beyond the requirements of any one process. The \fB-v\fR option therefore, can
+reduce noise when displaying interface information.
+.RE
+
+.sp
+.LP
+The runtime interface information produced from \fBlari\fR has the following
+format:
+.sp
+.in +2
+.nf
+[information]: \fIsymbol-name\fR [demangled-name]: \fIobject-name\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each line describes the interface symbol, \fBsymbol-name\fR, together with the
+object, \fBobject-name\fR, in which the symbol is defined. If the symbol
+represents a function, the symbol name is followed by \fB()\fR. If the symbol
+represents a data object, the symbol name is followed by the symbols size,
+enclosed within \fB[]\fR. If the \fB-C\fR option is used, the symbol name is
+accompanied by the symbols demangled name, \fBdemangled-name\fR. The
+information field provides one or more of the following tokens that describe
+the symbol's use:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcnt\fR:\fIbnd\fR\fR
+.ad
+.RS 11n
+.rt  
+Two decimal values indicate the symbol count, \fBcnt\fR, and the number of
+bindings to this object, \fBbnd\fR. The symbol count is the number of
+occurrences of this symbol definition that have been found in the objects that
+are analyzed. A count that is greater than \fB1\fR indicates multiple instances
+of a symbol definition. The number of bindings indicate the number of objects
+that have been bound to this symbol definition by the runtime linker.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition has been bound to from an external object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBS\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition has been bound to from the same object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBD\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition has been directly bound to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBI\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition provides for an interposer.  An object that explicitly
+identifies itself as an interposor defines all global symbols as interposers.
+See the \fB-z\fR \fBinterpose\fR option of \fBld\fR(1), and the
+\fBLD_PRELOAD\fR variable of \fBld.so.1\fR(1). Individual symbols within a
+dynamic executable can be defined as interposers by using the \fBINTERPOSE\fR
+\fBmapfile\fR directive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBC\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition is the reference data of a copy-relocation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBF\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition resides in a filtee.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol is defined as protected. This symbol might have an internal binding
+from the object in which the symbol is declared. Any internal bindings with
+this attribute can not be interposed upon by another symbol definition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition is the address of a procedure linkage table entry within
+a dynamic executable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol lookup originated from a user request, for example,
+\fBdlsym\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBR\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition is acting as a filter, and provides for redirection to a
+filtee.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBr\fR\fR
+.ad
+.RS 11n
+.rt  
+A binding to this symbol was rejected at some point during a symbol search. A
+rejection can occur when a direct binding request finds a symbol that has been
+tagged to prevent direct binding. In this scenario, the symbol search is
+repeated using a default search model. The binding can still resolve to the
+original, rejected symbol. A rejection can also occur when a non-default symbol
+search finds a symbol identified as a \fBsingleton\fR. Again, the symbol search
+is repeated using a default search model.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBN\fR\fR
+.ad
+.RS 11n
+.rt  
+This symbol definition explicitly prohibits directly binding to the definition.
+.RE
+
+.sp
+.LP
+See the \fILinker and Libraries Guide\fR for more details of these symbol
+classifications.
+.SH EXTENDED DESCRIPTION
+.SS "Interesting Information"
+.sp
+.LP
+By default, or specifically using the \fB-i\fR option, \fBlari\fR filters any
+runtime interface information to present interesting events. This filtering is
+carried out mainly to reduce the amount of information that can be generated
+from large applications. In addition, this information is intended to be the
+focus in debugging complex binding scenarios, and often highlights problem
+areas. However, classifying what information is interesting for any particular
+application is an inexact science. You are still free to use the \fB-a\fR
+option and to search the binding information for events that are unique to the
+application being investigated.
+.sp
+.LP
+When an interesting symbol definition is discovered, all other definitions of
+the same symbol are output.
+.sp
+.LP
+The focus of interesting interface information is the existence of multiple
+definitions of a symbol. In this case, one symbol typically interposes on one
+or more other symbol definitions. This interposition is seen when the binding
+count, \fBbnd\fR, of one definition is non-zero, while the binding count of all
+other definitions is zero. Interposition that results from the compilation
+environment, or the linking environment, is not characterized as interesting.
+Examples of these interposition occurrences include copy relocations
+(\fB[C]\fR) and the binding to procedure linkage addresses (\fB[A]\fR).
+.sp
+.LP
+Interposition is often desirable. The intent is to overload, or replace, the
+symbolic definition from a shared object. Interpositioning objects can be
+explicitly tagged (\fB[I]\fR), using the \fB-z interpose\fR option of
+\fBld\fR(1). These objects can safely interpose on symbols, no matter what
+order the objects are loaded in a process. However, be cautious when
+non-explicit interposition is employed, as this interposition is a consequence
+of the load-order of the objects that make up the process.
+.sp
+.LP
+User-created, multiply-defined symbols are output from \fBlari\fR as
+interesting. In this example, two definitions of \fBinterpose1()\fR exist, but
+only the definition in \fBmain\fR is referenced:
+.sp
+.in +2
+.nf
+[2:1E]: interpose1(): ./main
+[2:0]: interpose1(): ./libA.so
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Interposition can also be an undesirable and surprising event, caused by an
+unexpected symbol name clash. A symptom of this interposition might be that a
+function is never called although you know a reference to the function exists.
+This scenario can be identified as a multiply defined symbol, as covered in the
+previous example. However, a more surprising scenario is often encountered when
+an object both defines and references a specific symbol.
+.sp
+.LP
+An example of this scenario is if two dynamic objects define and reference the
+same function, \fBinterpose2()\fR. Any reference to this symbol binds to the
+first dynamic object loaded with the process. In this case, the definition of
+\fBinterpose2()\fR in object \fBlibA.so\fR interposes on, and hides, the
+definition of \fBinterpose2()\fR in object \fBlibB.so\fR. The output from
+\fBlari\fR might be:
+.sp
+.in +2
+.nf
+[2:2ES]: interpose2(): ./libA.so
+[2:0]: interpose2(): ./libB.so
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Multiply defined symbols can also be bound to separately. Separate bindings can
+be the case when direct bindings are in effect (\fB[D]\fR), or because a symbol
+has protected visibility (\fB[P]\fR). Although separate bindings can be
+explicitly established, instances can exist that are unexpected and surprising.
+Directly bound symbols, and symbols with protected visibility, are output as
+interesting information.
+.SS "Overhead Information"
+.sp
+.LP
+When using the \fB-o\fR option, \fBlari\fR displays symbol definitions that
+might be considered overhead.
+.sp
+.LP
+Global symbols that are not referenced are considered an overhead. The symbol
+information that is provided within the object unnecessarily adds to the size
+of the object's text segment. In addition, the symbol information can increase
+the processing required to search for other symbolic references within the
+object at runtime.
+.sp
+.LP
+Global symbols that are only referenced from the same object have the same
+characteristics. The runtime search for a symbolic reference, that results in
+binding to the same object that made the reference, is an additional overhead.
+.sp
+.LP
+Both of these symbol definitions are candidates for reduction to local scope by
+defining the object's interface. Interface definitions can be assigned to a
+file during its creation by the link-editor using the \fB-M\fR option and the
+associated \fImapfile\fR directives. See the \fILinker and Libraries Guide\fR
+for more details on \fImapfiles\fR. Use \fBlari\fR with the \fB-m\fR option to
+create initial versions of these \fImapfiles\fR.
+.sp
+.LP
+If \fBlari\fR is used to generate \fImapfiles\fR, versioned shared objects will
+have \fImapfiles\fR created indicating that their overhead symbols should be
+reduced to locals. This model allows \fBlari\fR to generate \fImapfiles\fR for
+comparison with existing interface definitions. Use the \fB-v\fR option to
+ignore versioned shared objects when creating \fImapfiles\fR.
+.sp
+.LP
+Copy-relocations are also viewed as an overhead and generally should be
+avoided. The size of the copied data is a definition of its interface. This
+definition restricts the ability to change the data size in newer versions of
+the shared object in which the data is defined. This restriction, plus the cost
+of processing a copy relocation, can be avoided by referencing data using a
+functional interface. The output from \fBlari\fR for a copy relocation might
+be:
+.sp
+.in +2
+.nf
+[2:1EC]: __iob[0x140]: ./main
+[2:0]: __iob[0x140]: ./libA.so.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Notice that a number of small copy relocations, such as \fB__iob\fR used in the
+previous example, exist because of historic programming interactions with
+system libraries.
+.sp
+.LP
+Another example of overhead information is the binding of a dynamic object to
+the procedure linkage table entry of a dynamic executable. If a dynamic
+executable references an external function, a procedure linkage table entry is
+created. This structure allows the reference binding to be deferred until the
+function call is actually made. If a dynamic object takes the address of the
+same referenced function, the dynamic object binds to the dynamic executables
+procedure linkage table entry. An example of this type of event reveals the
+following:
+.sp
+.in +2
+.nf
+[2:1EA]: foo(): ./main
+[2:1E]: foo(): ./libA.so
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A small number of bindings of this type are typically not cause for concern.
+However, a large number of these bindings, perhaps from a jump-table
+programming technique, can contribute to start up overhead. Address relocation
+bindings of this type require relocation processing at application start up,
+rather than the deferred relocation processing used when calling functions
+directly. Use of this address also requires an indirection at runtime.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAnalyzing a case of multiple bindings
+.sp
+.LP
+The following example shows the analysis of a process in which multiple symbol
+definitions exist. The shared objects \fBlibX.so\fR and \fBlibY.so\fR both call
+the function \fBinterpose()\fR. This function exists in both the application
+\fBmain\fR, and the shared object \fBlibA.so\fR. Because of interposition, both
+references bind to the definition of \fBinterpose()\fR in \fBmain\fR.
+
+.sp
+.LP
+The shared objects \fBlibX.so\fR and \fBlibY.so\fR also both call the function
+\fBfoo()\fR. This function exists in the application \fBmain\fR, and the shared
+objects \fBlibA.so\fR, \fBlibX.so\fR, and \fBlibY.so\fR. Because both
+\fBlibX.so\fR and \fBlibY.so\fR were built with direct bindings enabled, each
+object binds to its own definition.
+
+.sp
+.in +2
+.nf
+example% \fBlari ./main\fR
+[3:0]: foo(): ./libA.so
+[3:1SD]: foo(): ./libX.so
+[3:1SD]: foo(): ./libY.so
+[2:0]: interpose(): ./libA.so
+[2:2EP]: interpose(): ./main
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To analyze binding information more thoroughly, the bindings data can be saved
+for further inspection. For example, the previous output indicates that the
+function \fBinterpose()\fR was called from two objects external to \fBmain\fR.
+Inspection of the binding output reveals where the references to this function
+originated.
+
+.sp
+.in +2
+.nf
+example% \fBlari -s ./main\fR
+lari: ./main: bindings information saved as: /usr/tmp/lari.dbg.main
+\&.....
+example% \fBfgrep foo /usr/tmp/lari.dbg.main\fR
+binding file=./libX.so to file=./main: symbol `interpose'
+binding file=./libY.so to file=./main: symbol `interpose'
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBNote:\fR The bindings output is typically more extensive than shown here, as
+the output is accompanied with process identifier, address and other bindings
+information.
+
+.LP
+\fBExample 2 \fRGenerating an interface definition
+.sp
+.LP
+The following example creates interface definitions for an application and its
+dependency, while ignoring any versioned system libraries. The application
+\fBmain\fR makes reference to the interfaces \fBone()\fR, \fBtwo()\fR, and
+\fBthree()\fR in \fBfoo.so\fR:
+
+.sp
+.in +2
+.nf
+example% \fBlari -omv ./main\fR
+example% \fBcat mapfile-foo.so\fR
+#
+# Interface Definition mapfile for:
+#       Dynamic Object: ./foo.so
+#       Process:        ./main
+#
+
+foo.so {
+        global:
+                one;
+                three;
+                two;
+        local:
+                _one;
+                _three;
+                _two;
+                *;
+};
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$TMPDIR/lari.dbg.\fIfile\fR\fR\fR
+.ad
+.RS 25n
+.rt  
+Binding output produced by \fBldd\fR(1).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The human readable output is Uncommitted. The options are Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBld\fR(1), \fBldd\fR(1), \fBld.so.1\fR(1), \fBdlopen\fR(3C), \fBdlsym\fR(3C),
+\fBattributes\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR

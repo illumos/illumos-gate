@@ -1,0 +1,1019 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserve
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ex "1has" "15 Jun 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+ex \- text editor
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] [\fB-t\fR \fItag\fR] 
+     [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfile\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] 
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+     [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfile\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] 
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+     [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfile\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBex\fR utility is the root of a family of editors: \fBex\fR and \fBvi\fR.
+\fBex\fR is a superset of \fBed\fR(1), with the most notable extension being a
+display editing facility. Display based editing is the focus of \fBvi\fR.
+.sp
+.LP
+If you have a \fBCRT\fR terminal, you can wish to use a display based editor;
+in this case see \fBvi\fR(1), which is a command which focuses on the
+display-editing portion of \fBex\fR.
+.sp
+.LP
+If you have used \fBed\fR you find that, in addition to having all of the
+\fBed\fR commands available, \fBex\fR has a number of additional features
+useful on \fBCRT\fR terminals. Intelligent terminals and high speed terminals
+are very pleasant to use with \fBvi\fR. Generally, the \fBex\fR editor uses far
+more of the capabilities of terminals than \fBed\fR does, and uses the terminal
+capability data base (see \fBterminfo\fR(4)) and the type of the terminal you
+are using from the environment variable \fBTERM\fR to determine how to drive
+your terminal efficiently. The editor makes use of features such as insert and
+delete character and line in its \fBvisual\fR command (which can be abbreviated
+\fBvi\fR) and which is the central mode of editing when using the \fBvi\fR
+command.
+.sp
+.LP
+The \fBex\fR utility contains a number of features for easily viewing the text
+of the file. The \fBz\fR command gives easy access to windows of text. Typing
+\fB^D\fR (CTRL-D) causes the editor to scroll a half-window of text and is more
+useful for quickly stepping through a file than just typing return. Of course,
+the screen-oriented \fBvisual\fR mode gives constant access to editing context.
+.sp
+.LP
+The \fBex\fR utility gives you help when you make mistakes. The \fBundo\fR
+(\fBu\fR) command allows you to reverse any single change which goes astray.
+\fBex\fR gives you a lot of feedback, normally printing changed lines, and
+indicates when more than a few lines are affected by a command so that it is
+easy to detect when a command has affected more lines than it should have.
+.sp
+.LP
+The editor also normally prevents overwriting existing files, unless you edited
+them, so that you do not accidentally overwrite a file other than the one you
+are editing. If the system (or editor) crashes, or you accidentally hang up the
+telephone, you can use the editor \fBrecover\fR command (or \fB-r\fR\fI file\fR
+option) to retrieve your work. This gets you back to within a few lines of
+where you left off.
+.sp
+.LP
+The \fBex\fR utility has several features for dealing with more than one file
+at a time. You can give it a list of files on the command line and use the
+\fBnext\fR (\fBn\fR) command to deal with each in turn. The \fBnext\fR command
+can also be given a list of file names, or a pattern as used by the shell to
+specify a new set of files to be dealt with. In general, file names in the
+editor can be formed with full shell metasyntax. The metacharacter `%' is also
+available in forming file names and is replaced by the name of the current
+file.
+.sp
+.LP
+The editor has a group of buffers whose names are the ASCII lower-case letters
+(\fBa\fR-\fBz\fR). You can place text in these named buffers where it is
+available to be inserted elsewhere in the file. The contents of these buffers
+remain available when you begin editing a new file using the \fBedit\fR
+(\fBe\fR) command.
+.sp
+.LP
+There is a command \fB&\fR in \fBex\fR which repeats the last \fBsubstitute\fR
+command. In addition, there is a confirmed substitute command. You give a range
+of substitutions to be done and the editor interactively asks whether each
+substitution is desired.
+.sp
+.LP
+It is possible to ignore the case of letters in searches and substitutions.
+\fBex\fR also allows regular expressions which match words to be constructed.
+This is convenient, for example, in searching for the word ``edit'' if your
+document also contains the word ``editor.''
+.sp
+.LP
+\fBex\fR has a set of options which you can set to tailor it to your liking.
+One option which is very useful is the \fBautoindent\fR option that allows the
+editor to supply leading white space to align text automatically. You can then
+use \fB^D\fR as a backtab and space or tab to move forward to align new code
+easily.
+.sp
+.LP
+Miscellaneous useful features include an intelligent \fBjoin\fR (\fBj\fR)
+command that supplies white space between joined lines automatically, commands
+\fB<\fR and \fB>\fR which shift groups of lines, and the ability to filter
+portions of the buffer through commands such as \fBsort\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR | \fB-s\fR\fR
+.ad
+.RS 25n
+.rt  
+Suppresses all interactive user feedback. This is useful when processing editor
+scripts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 25n
+.rt  
+Sets up for editing \fBLISP\fR programs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 25n
+.rt  
+Lists the name of all files saved as the result of an editor or system crash.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 25n
+.rt  
+\fBReadonly\fR mode. The \fBreadonly\fR flag is set, preventing accidental
+overwriting of the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fIfile\fR\fR
+.ad
+.RS 25n
+.rt  
+Edits \fIfile\fR after an editor or system crash. (Recovers the version of
+\fIfile\fR that was in the buffer when the crash occurred.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR \fItag\fR\fR
+.ad
+.RS 25n
+.rt  
+Edits the file containing the \fItag\fR and positions the editor at its
+definition. It is an error to specify more than one \fB-t\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 25n
+.rt  
+Starts up in display editing state, using \fBvi\fR. You can achieve the same
+effect by typing the \fBvi\fR command itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 25n
+.rt  
+Verbose. When \fBex\fR commands are read by means of standard input, the input
+is echoed to standard error. This can be useful when processing \fBex\fR
+commands within shell scripts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 25n
+.rt  
+Encryption option. Simulates the \fBX\fR command and prompts the user for a
+key. This key is used to encrypt and decrypt text using the algorithm of the
+\fBcrypt\fR command. The \fBX\fR command makes an educated guess to determine
+whether text read in is encrypted or not. The temporary buffer file is
+encrypted also, using a transformed version of the key typed in for the
+\fB-x\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fIn\fR\fR
+.ad
+.RS 25n
+.rt  
+Sets the default window size to \fIn\fR. This is useful when using the editor
+over a slow speed line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 25n
+.rt  
+Encryption option. Same as the \fB-x\fR option, except that \fB-C\fR simulates
+the \fBC\fR command. The \fBC\fR command is like the \fBX\fR command, except
+that all text read in is assumed to have been encrypted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIcommand\fR | \fB-c\fR\fI command\fR\fR
+.ad
+.RS 25n
+.rt  
+Begins editing by executing the specified editor \fIcommand\fR (usually a
+search or positioning command).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+If both the \fB-t\fR\fI tag\fR and the \fB-c\fR\fI command\fR options are
+given, the \fB-t\fR\fI tag\fR is processed first. That is, the file containing
+the tag is selected by \fB-t\fR and then the command is executed.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of a file to be edited.
+.RE
+
+.SH USAGE
+.sp
+.LP
+This section defines the \fBex\fR states, commands, initializing options, and
+scanning pattern formations.
+.SS "ex States"
+.sp
+.ne 2
+.mk
+.na
+\fBCommand\fR
+.ad
+.RS 11n
+.rt  
+Normal and initial state. Input prompted for by "\fB:\fR". The line kill
+character cancels a partial command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBInsert\fR
+.ad
+.RS 11n
+.rt  
+Entered by \fBa\fR, \fBi\fR, or \fBc\fR. Arbitrary text can be entered. Insert
+state normally is terminated by a line having only "\fB\&.\fR" on it, or,
+abnormally, with an interrupt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBVisual\fR
+.ad
+.RS 11n
+.rt  
+Entered by typing \fBvi\fR. Terminated by typing \fBQ\fR or ^\e (Control-\e).
+.RE
+
+.SS "ex Command Names and Abbreviations"
+.sp
+.in +2
+.nf
+Command    Abbrevi-   Command    Abbrevi-    Command    Abbrevi-
+Name       ation      Name       ation       Name       ation
+
+abbrev     ab         map                    set        se
+
+append     a          mark       ma          shell      sh
+
+args       ar         move       m           source     so
+
+change     c          next       n           substitute s
+
+copy       co         number     nu          unabbrev   unab
+
+delete     d          preserve   pre         undo       u
+
+edit       e          print      p           unmap      unm
+
+file       f          put        pu          version    ve
+
+global     g          quit       q           visual     vi
+
+insert     i          read       r           write     
+ w
+
+join       j          recover    rec         xit        x
+
+list       l          rewind     rew         yank       ya
+.fi
+.in -2
+.sp
+
+.SS "Join Command Arguments"
+.sp
+.in +2
+.nf
+Join     [\fIrange\fR] j[\fIoin\fR][!] [\fIcount\fR] [\fIflags\fR]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If count is specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+If no address is specified, the\fB join\fR command behaves as if \fI2addr\fR
+were the current line and the current line plus \fIcount\fR (\fB\&.,. +\fR\fI
+count\fR). If one address is specified, the \fBjoin\fR command behaves as if
+\fI2addr\fR were the specified address and the specified address plus
+\fIcount\fR ( \fIaddr\fR\fB,\fR \fIaddr\fR \fB+\fR \fIcount\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg4/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+If no address is specified, the \fBjoin\fR command behaves as if \fI2addr
+\fRwere the current line and the current line plus \fIcount \fR\fB-1\fR
+(\fB\&.,. +\fR \fIcount\fR \fB-1\fR). If one address is specified, the
+\fBjoin\fR command behaves as if \fI2addr\fR were the specified address and the
+specified address plus \fIcount\fR \fB-1\fR ( \fIaddr\fR\fB,\fR \fIaddr\fR
+\fB+\fR \fIcount\fR \fB-1\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/ex\fR, \fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+If two or more addresses are specified, the \fBjoin\fR command behaves as if an
+additional address, equal to the last address plus \fIcount\fR \fB-1\fR
+(\fIaddr1\fR\fB, ...,\fR \fIlastaddr\fR\fB,\fR \fIlastaddr\fR + \fIcount\fR
+\fB-1\fR), was specified.  If this results in a second address greater than the
+last line of the edit buffer, it is corrected to be equal to the last line of
+the edit buffer.
+.RE
+
+.sp
+.LP
+If no count is specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/ex\fR, \fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+If no address is specified, the \fBjoin\fR command behaves as if \fI2addr\fR
+were the current line and the next line (\fB\&.,. +1\fR). If one address is
+specified, the \fBjoin\fR command behaves as if \fI2addr\fR were the specified
+address and the next line ( \fIaddr\fR\fB,\fR \fIaddr\fR \fB+1\fR).
+.RE
+
+.SS "Additional ex Command Arguments"
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the following \fBex\fR commands, if \fIcount\fR is specified, it is
+equivalent to specifying an additional address to the command. The additional
+address is equal to the last address specified to the command (either
+explicitly or by default) plus \fIcount\fR\fB-1\fR. If this results in an
+address greater than the last line of the edit buffer, it is corrected to equal
+the last line of the edit buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg4/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the following \fBex\fR commands, if both a count and a range are specified
+for a command that uses them, the number of lines affected is taken from the
+count value rather than the range. The starting line for the command is taken
+to be the first line addressed by the range.
+.RE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(1.38i) lw(4.13i) 
+lw(1.38i) lw(4.13i) 
+.
+Abbreviateab[brev] word rhs
+Append[line]a[ppend][!]
+Argumentsar[gs]
+Change[range] c[hange][!] [count]
+Change DirectoryT{
+chd[ir][!] [directory]; cd[!] [directory]
+T}
+CopyT{
+[range] co[py] line [flags]; [range] t line [flags]
+T}
+DeleteT{
+[range] d[elete] [buffer] [count] [flags]
+T}
+EditT{
+e[dit][!] [+line][file]; ex[!] [+line] [file]
+T}
+Filef[ile] [file]
+GlobalT{
+[range] g[lobal] /pattern/ [commands]; [range] v /pattern/ [commands]
+T}
+Insert[line] i[nsert][!]
+List[range] l[ist] [count] [flags]
+Mapmap[!] [x rhs]
+Mark[line] ma[rk] x; [line] k x
+Move[range] m[ove] line
+Nextn[ext][!] [file ...]
+Open[line] o[pen] /pattern/ [flags]
+Preservepre[serve]
+Put[line] pu[t] [buffer]
+Quitq[uit][!]
+Read[line] r[ead][!] [file]
+Recoverrec[over] file
+Rewindrew[ind][!]
+SetT{
+se[t] [option[=[value]]...] [nooption...] [option?...] [all]
+T}
+Shellsh[ell]
+Sourceso[urce] file
+Suspendsu[spend][!]; st[op][!]
+Tagta[g][!] tagstring
+Unabbreviateuna[bbrev] word
+Undou[ndo]
+Unmapunm[ap][!] x
+Visual[line] v[isual] [type] [count] [flags]
+WriteT{
+[range] w[rite][!] [>>] [file]; [range] w[rite][!] [file]; [range] wq[!] [>>] [file]
+T}
+Write and Exit[range] x[it][!] [file]
+Yank[range] ya[nk] [buffer] [count]
+Adjust Window[line] z [type] [count] [flags]
+Escape! command [range]! command
+ScrollEOF
+Write Line Number[line] = [flags]
+Execute@ buffer; * buffer
+.TE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/bin/ex\fR, \fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the following \fBex\fR commands, if \fIcount\fR is specified, it is
+equivalent to specifying an additional address to the command. The additional
+address is equal to the last address specified to the command (either
+explicitly or by default) plus \fIcount\fR\fB-1\fR. If this results in an
+address greater than the last line of the edit buffer, it is corrected to equal
+the last line of the edit buffer.
+.RE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(1.38i) lw(4.13i) 
+lw(1.38i) lw(4.13i) 
+.
+NumberT{
+[range] nu[mber] [count] [flags]; [range] |                        # [count] [flags] 
+T}
+Print[range] p[rint] [count] [flags]
+SubstituteT{
+[range] s[ubstitute] [/pattern/repl/[options] [count] [flags]]
+T}
+Shift Left[range] < [count] [flags]
+Shift Right[range] > [count] [flags]
+ResubstituteT{
+[range] & [options] [count] [flags]; [range] s[ubstitute] [options] [count] [flags]; [range] ~ [options] [count [flags]
+T}
+.TE
+
+.SS "ex Commands"
+.sp
+
+.sp
+.TS
+tab();
+lw(1.1i) lw(4.4i) 
+lw(1.1i) lw(4.4i) 
+.
+\fBC\fRforced encryption
+\fBX\fRheuristic encryption
+\fB&\fRresubst
+\fBCR\fRprint next
+\fB>\fRrshift
+\fB<\fRlshift
+\fB^D\fRscroll
+\fBz\fRwindow
+\fB!\fRshell escape
+.TE
+
+.SS "ex Command Addresses"
+.sp
+
+.sp
+.TS
+tab();
+lw(1.1i) lw(4.4i) 
+lw(1.1i) lw(4.4i) 
+.
+\fIn\fRline \fIn\fR
+\fB\&.\fRcurrent
+\fB$\fRlast
+\fB+\fRnext
+\fB-\fRprevious
+\fB+\fR\fIn\fR\fIn\fR forward
+\fB%\fR1,$
+\fB/\fR\fIpat\fRnext with \fIpat\fR
+\fB?\fR\fIpat\fRprevious with \fIpat\fR
+\fIx\fR\fB-\fR\fIn\fR\fIn\fR before \fIx\fR
+\fIx\fR\fB,\fR\fIy\fR\fIx\fR through \fIy\fR
+\fB\&'\fR\fIx\fRmarked with \fIx\fR
+\fB"\fRprevious context
+.TE
+
+.SS "Initializing Options"
+.sp
+
+.sp
+.TS
+tab();
+lw(1.38i) lw(4.13i) 
+lw(1.38i) lw(4.13i) 
+.
+\fBEXINIT\fRplace \fBset\fR's here in environment variable
+\fB$HOME/.exrc\fReditor initialization file
+\fB\&./.exrc\fReditor initialization file
+\fBset\fR \fIx\fRenable option \fIx\fR
+\fBset\fR \fBno\fR\fIx\fRdisable option \fIx\fR
+\fBset\fR \fIx\fR=\fIval\fRgive value \fIval\fR to option \fIx\fR
+\fBset\fRshow changed options
+\fBset\fR \fBall\fRshow all options
+\fBset\fR \fIx\fR\fB?\fRshow value of option \fIx\fR
+.TE
+
+.SS "Useful Options and Abbreviations"
+.sp
+
+.sp
+.TS
+tab();
+lw(.92i) lw(.92i) lw(3.67i) 
+lw(.92i) lw(.92i) lw(3.67i) 
+.
+autoindent\fBai\fRsupply indent
+autowrite\fBaw\fRwrite before changing files
+directoryT{
+pathname of directory for temporary work files
+T}
+exrc\fBex\fRT{
+allow \fBvi\fR/\fBex\fR to read the \fB\&.exrc\fR in the current directory. This option is set in the \fBEXINIT\fR shell variable or in the \fB\&.exrc\fR file in the \fB$\fR\fBHOME\fRdirectory.
+T}
+ignorecase\fBic\fRignore case of letters in scanning
+listprint \fB^I\fR for tab, $ at end
+magictreat \fB\&. [ *\fR special in patterns
+modelinesT{
+first five lines and last five lines executed as \fBvi\fR/\fBex\fR commands if they are of the form \fBex:\fR\fBcommand\fR\fB:\fR or \fBvi:\fR\fBcommand\fR\fB:\fR
+T}
+number\fBnu\fRnumber lines
+paragraphs\fBpara\fRmacro names that start paragraphs
+redrawsimulate smart terminal
+reportT{
+informs you if the number of lines modified by the last command is greater than the value of the \fBreport\fR variable
+T}
+scrollcommand mode lines
+sections\fBsect\fRmacro names that start sections
+shiftwidth\fBsw\fRfor \fB< >\fR, and input \fB^D\fR
+showmatch\fBsm\fRto \fB)\fR and \fB}\fR as typed
+showmode\fBsmd\fRshow insert mode in \fB vi\fR
+slowopen\fBslow\fRstop updates during insert
+termT{
+specifies to \fBvi\fR the type of terminal being used (the default is the value of the environment variable \fBTERM\fR)
+T}
+windowvisual mode lines
+wrapmargin\fBwm\fRautomatic line splitting
+wrapscan\fBws\fRT{
+search around end (or beginning) of buffer
+T}
+.TE
+
+.SS "Scanning Pattern Formation"
+.sp
+
+.sp
+.TS
+tab();
+lw(1.1i) lw(4.4i) 
+lw(1.1i) lw(4.4i) 
+.
+\fB^\fRbeginning of line
+\fB$\fRend of line
+\fB\&.\fRany character
+\fB\e<\fRbeginning of word
+\fB\e>\fRend of word
+\fB[\fR\fIstr\fR\fB]\fRany character in \fIstr\fR
+\fB[^\fR\fIstr\fR\fB]\fRany character not in \fIstr\fR
+\fB[\fR\fIxy\fR\fB]\fRany character between \fIx\fR and \fIy\fR
+\fB*\fRany number of preceding characters
+.TE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBex\fR: \fBHOME\fR, \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBNLSPATH\fR, \fBPATH\fR,
+\fBSHELL\fR, and \fBTERM\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCOLUMNS\fR\fR
+.ad
+.RS 11n
+.rt  
+Override the system-selected horizontal screen size.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXINIT\fR\fR
+.ad
+.RS 11n
+.rt  
+Determine a list of \fBex\fR commands that are executed on editor start-up,
+before reading the first file. The list can contain multiple commands by
+separating them using a vertical-line (\fB|\fR) character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLINES\fR\fR
+.ad
+.RS 11n
+.rt  
+Override the system-selected vertical screen size, used as the number of lines
+in a screenful and the vertical screen size in visual mode.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/tmp/Ex\fInnnnn\fR\fR\fR
+.ad
+.RS 29n
+.rt  
+editor temporary
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/tmp/Rx\fInnnnn\fR\fR\fR
+.ad
+.RS 29n
+.rt  
+named buffer temporary
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/expreserve\fR\fR
+.ad
+.RS 29n
+.rt  
+preserve command
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/exrecover\fR\fR
+.ad
+.RS 29n
+.rt  
+recover command
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/exstrings\fR\fR
+.ad
+.RS 29n
+.rt  
+error messages
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/terminfo/*\fR\fR
+.ad
+.RS 29n
+.rt  
+describes capabilities of terminals
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/preserve/login\fR\fR
+.ad
+.RS 29n
+.rt  
+preservation directory (where \fBlogin\fR is the user's login)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.exrc\fR\fR
+.ad
+.RS 29n
+.rt  
+editor startup file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\&./.exrc\fR\fR
+.ad
+.RS 29n
+.rt  
+editor startup file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/ex"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+CSIEnabled
+.TE
+
+.SS "\fB/usr/xpg4/bin/ex\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SS "\fB/usr/xpg6/bin/ex\fR"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBed\fR(1), \fBedit\fR(1), \fBgrep\fR(1), \fBsed\fR(1), \fBsort\fR(1),
+\fBvi\fR(1), \fBcurses\fR(3CURSES), \fBterm\fR(4), \fBterminfo\fR(4),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fISolaris Advanced User\&'s Guide\fR
+.SH AUTHOR
+.sp
+.LP
+The \fBvi\fR and \fBex\fR utilities are based on software developed by The
+University of California, Berkeley California, Computer Science Division,
+Department of Electrical Engineering and Computer Science.
+.SH NOTES
+.sp
+.LP
+Several options, although they continue to be supported, have been replaced in
+the documentation by options that follow the Command Syntax Standard (see
+\fBIntro\fR(1)). The \fB\(mi\fR option has been replaced by \fB-s\fR, a
+\fB-r\fR option that is not followed with an option-argument has been replaced
+by \fB-L\fR, and \fB+\fR\fBcommand\fR has been replaced by \fB-c\fR
+\fBcommand\fR.
+.sp
+.LP
+The message \fBfile too large to recover with \fR\fB-r\fR\fB option\fR, which
+is seen when a file is loaded, indicates that the file can be edited and saved
+successfully, but if the editing session is lost, recovery of the file with the
+\fB-r\fR option is not possible.
+.sp
+.LP
+The \fBz\fR command prints the number of logical rather than physical lines.
+More than a screen full of output can result if long lines are present.
+.sp
+.LP
+File input/output errors do not print a name if the command line \fB-s\fR
+option is used.
+.sp
+.LP
+The editing environment defaults to certain configuration options. When an
+editing session is initiated, \fBex\fR attempts to read the \fBEXINIT\fR
+environment variable. If it exists, the editor uses the values defined in
+\fBEXINIT\fR, otherwise the values set in \fB$HOME/.exrc\fR are used. If
+\fB$HOME/.exrc\fR does not exist, the default values are used.
+.sp
+.LP
+To use a copy of \fB\&.exrc\fR located in the current directory other than
+\fB$HOME\fR, set the \fIexrc\fR option in \fBEXINIT\fR or \fB$HOME/.exrc\fR.
+Options set in \fBEXINIT\fR can be turned off in a local \fB\&.exrc\fR only if
+\fIexrc\fR is set in \fBEXINIT\fR or \fB$HOME/.exrc\fR. In order to be used,
+\fI\&.exrc\fR in \fB$HOME\fR or the current directory must fulfill these
+conditions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+It must exist.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+It must be owned by the same userid as the real userid of the process, or the
+process has appropriate privileges.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+It is not writable by anyone other than the owner.
+.RE
+.sp
+.LP
+There is no easy way to do a single scan ignoring case.
+.sp
+.LP
+The editor does not warn if text is placed in named buffers and not used before
+exiting the editor.
+.sp
+.LP
+Null characters are discarded in input files and cannot appear in resultant
+files.

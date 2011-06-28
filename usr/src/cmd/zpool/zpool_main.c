@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -214,7 +215,7 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tiostat [-v] [-T d|u] [pool] ... [interval "
 		    "[count]]\n"));
 	case HELP_LIST:
-		return (gettext("\tlist [-H] [-o property[,...]] "
+		return (gettext("\tlist [-Hp] [-o property[,...]] "
 		    "[-T d|u] [pool] ... [interval [count]]\n"));
 	case HELP_OFFLINE:
 		return (gettext("\toffline [-t] <pool> <device> ...\n"));
@@ -235,7 +236,7 @@ get_usage(zpool_help_t idx) {
 		    "\tupgrade -v\n"
 		    "\tupgrade [-V version] <-a | pool ...>\n"));
 	case HELP_GET:
-		return (gettext("\tget <\"all\" | property[,...]> "
+		return (gettext("\tget [-p] <\"all\" | property[,...]> "
 		    "<pool> ...\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> <pool> \n"));
@@ -2078,16 +2079,46 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 		return;
 
 	for (c = 0; c < children; c++) {
-		uint64_t ishole = B_FALSE;
+		uint64_t ishole = B_FALSE, islog = B_FALSE;
 
-		if (nvlist_lookup_uint64(newchild[c],
-		    ZPOOL_CONFIG_IS_HOLE, &ishole) == 0 && ishole)
+		(void) nvlist_lookup_uint64(newchild[c], ZPOOL_CONFIG_IS_HOLE,
+		    &ishole);
+
+		(void) nvlist_lookup_uint64(newchild[c], ZPOOL_CONFIG_IS_LOG,
+		    &islog);
+
+		if (ishole || islog)
 			continue;
 
 		vname = zpool_vdev_name(g_zfs, zhp, newchild[c], B_FALSE);
 		print_vdev_stats(zhp, vname, oldnv ? oldchild[c] : NULL,
 		    newchild[c], cb, depth + 2);
 		free(vname);
+	}
+
+	/*
+	 * Log device section
+	 */
+
+	if (num_logs(newnv) > 0) {
+		(void) printf("%-*s      -      -      -      -      -      "
+		    "-\n", cb->cb_namewidth, "logs");
+
+		for (c = 0; c < children; c++) {
+			uint64_t islog = B_FALSE;
+			(void) nvlist_lookup_uint64(newchild[c],
+			    ZPOOL_CONFIG_IS_LOG, &islog);
+
+			if (islog) {
+				vname = zpool_vdev_name(g_zfs, zhp, newchild[c],
+				    B_FALSE);
+				print_vdev_stats(zhp, vname, oldnv ?
+				    oldchild[c] : NULL, newchild[c],
+				    cb, depth + 2);
+				free(vname);
+			}
+		}
+
 	}
 
 	/*
@@ -2410,6 +2441,7 @@ zpool_do_iostat(int argc, char **argv)
 typedef struct list_cbdata {
 	boolean_t	cb_scripted;
 	boolean_t	cb_first;
+	boolean_t	cb_literal;
 	zprop_list_t	*cb_proplist;
 } list_cbdata_t;
 
@@ -2451,7 +2483,8 @@ print_header(zprop_list_t *pl)
  * to the described layout.
  */
 static void
-print_pool(zpool_handle_t *zhp, zprop_list_t *pl, int scripted)
+print_pool(zpool_handle_t *zhp, zprop_list_t *pl, int scripted,
+    boolean_t literal)
 {
 	boolean_t first = B_TRUE;
 	char property[ZPOOL_MAXPROPLEN];
@@ -2472,7 +2505,7 @@ print_pool(zpool_handle_t *zhp, zprop_list_t *pl, int scripted)
 		right_justify = B_FALSE;
 		if (pl->pl_prop != ZPROP_INVAL) {
 			if (zpool_get_prop(zhp, pl->pl_prop, property,
-			    sizeof (property), NULL) != 0)
+			    sizeof (property), NULL, literal) != 0)
 				propstr = "-";
 			else
 				propstr = property;
@@ -2514,18 +2547,19 @@ list_callback(zpool_handle_t *zhp, void *data)
 		cbp->cb_first = B_FALSE;
 	}
 
-	print_pool(zhp, cbp->cb_proplist, cbp->cb_scripted);
+	print_pool(zhp, cbp->cb_proplist, cbp->cb_scripted, cbp->cb_literal);
 
 	return (0);
 }
 
 /*
- * zpool list [-H] [-o prop[,prop]*] [-T d|u] [pool] ... [interval [count]]
+ * zpool list [-Hp] [-o prop[,prop]*] [-T d|u] [pool] ... [interval [count]]
  *
  *	-H	Scripted mode.  Don't display headers, and separate properties
  *		by a single tab.
  *	-o	List of properties to display.  Defaults to
  *		"name,size,allocated,free,capacity,health,altroot"
+ *	-p	Display values in parsable (literal) format.
  *	-T	Display a timestamp in date(1) or Unix format
  *
  * List all pools in the system, whether or not they're healthy.  Output space
@@ -2543,13 +2577,16 @@ zpool_do_list(int argc, char **argv)
 	unsigned long interval = 0, count = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":Ho:T:")) != -1) {
+	while ((c = getopt(argc, argv, ":Hpo:T:")) != -1) {
 		switch (c) {
 		case 'H':
 			cb.cb_scripted = B_TRUE;
 			break;
 		case 'o':
 			props = optarg;
+			break;
+		case 'p':
+			cb.cb_literal = B_TRUE;
 			break;
 		case 'T':
 			get_timestamp_arg(*optarg);
@@ -4256,7 +4293,7 @@ get_callback(zpool_handle_t *zhp, void *data)
 			continue;
 
 		if (zpool_get_prop(zhp, pl->pl_prop,
-		    value, sizeof (value), &srctype) != 0)
+		    value, sizeof (value), &srctype, cbp->cb_literal) != 0)
 			continue;
 
 		zprop_print_one_property(zpool_get_name(zhp), cbp,
@@ -4272,8 +4309,25 @@ zpool_do_get(int argc, char **argv)
 	zprop_get_cbdata_t cb = { 0 };
 	zprop_list_t fake_name = { 0 };
 	int ret;
+	char c;
 
-	if (argc < 3)
+	/* check options */
+	while ((c = getopt(argc, argv, ":p")) != -1) {
+		switch (c) {
+		case 'p':
+			cb.cb_literal = B_TRUE;
+			break;
+		case '?':
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(B_FALSE);
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc < 2)
 		usage(B_FALSE);
 
 	cb.cb_first = B_TRUE;
@@ -4284,7 +4338,7 @@ zpool_do_get(int argc, char **argv)
 	cb.cb_columns[3] = GET_COL_SOURCE;
 	cb.cb_type = ZFS_TYPE_POOL;
 
-	if (zprop_get_list(g_zfs, argv[1],  &cb.cb_proplist,
+	if (zprop_get_list(g_zfs, argv[0],  &cb.cb_proplist,
 	    ZFS_TYPE_POOL) != 0)
 		usage(B_FALSE);
 
@@ -4295,7 +4349,7 @@ zpool_do_get(int argc, char **argv)
 		cb.cb_proplist = &fake_name;
 	}
 
-	ret = for_each_pool(argc - 2, argv + 2, B_TRUE, &cb.cb_proplist,
+	ret = for_each_pool(argc - 1, argv + 1, B_TRUE, &cb.cb_proplist,
 	    get_callback, &cb);
 
 	if (cb.cb_proplist == &fake_name)

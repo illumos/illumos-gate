@@ -1,0 +1,41 @@
+'\" te
+.\"  Copyright (c) 1994 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uptime 1 "18 Mar 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+uptime \- show how long the system has been up
+.SH SYNOPSIS
+.LP
+.nf
+\fBuptime\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuptime\fR command prints the current time, the length of time the system
+has been up, and the average number of jobs in the run queue over the last 1, 5
+and 15 minutes. It is, essentially,  the first line of a \fBw\fR(1) command.
+.SH EXAMPLES
+.sp
+.LP
+Below is an example of the output \fBuptime\fR provides:
+.sp
+.in +2
+.nf
+\fBexample% uptime
+10:47am  up 27 day(s), 50 mins,  1 user,  load average: 0.18, 0.26, 0.20\fR
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBw\fR(1), \fBwho\fR(1), \fBwhodo\fR(1M), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBwho\fR \fB-b\fR gives the time the system was last booted.

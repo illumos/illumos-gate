@@ -1,0 +1,256 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sigaction 2 "23 Mar 2005" "SunOS 5.11" "System Calls"
+.SH NAME
+sigaction \- detailed signal management
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBint\fR \fBsigaction\fR(\fBint\fR \fIsig\fR, \fBconst struct sigaction *restrict\fR \fIact\fR,
+     \fBstruct sigaction *restrict\fR \fIoact\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsigaction()\fR function allows the calling process to examine or specify
+the action to be taken on delivery of a specific signal. See
+\fBsignal.h\fR(3HEAD) for an explanation of general signal concepts.
+.sp
+.LP
+The \fIsig\fR argument specifies the signal and can be assigned any of the
+signals specified in \fBsignal.h\fR(3HEAD) except  \fBSIGKILL\fR and
+\fBSIGSTOP\fR.
+.sp
+.LP
+If the argument \fIact\fR is not \fINULL\fR, it points to a structure
+specifying the new action to be taken when delivering \fIsig\fR. If the
+argument \fIoact\fR is not \fINULL\fR, it points to a structure where the
+action previously associated with \fIsig\fR is to be stored on return from
+\fBsigaction()\fR.
+.sp
+.LP
+The \fBsigaction\fR structure includes the following members:
+.sp
+.in +2
+.nf
+void      (*sa_handler)(\|);
+void      (*sa_sigaction)(int, siginfo_t *, void *);
+sigset_t  sa_mask;
+int       sa_flags;
+.fi
+.in -2
+
+.sp
+.LP
+The storage occupied by \fBsa_handler\fR and \fBsa_sigaction\fR may overlap,
+and a standard-conforming application (see \fBstandards\fR(5)) must not use
+both simultaneously.
+.sp
+.LP
+The \fBsa_handler\fR member identifies the action to be associated with the
+specified signal, if the  \fBSA_SIGINFO\fR flag (see below) is cleared in the
+\fBsa_flags\fR field of the sigaction structure. It may take any of the values
+specified in \fBsignal.h\fR(3HEAD) or that of a user specified signal handler.
+If the  \fBSA_SIGINFO\fR flag is set in the \fBsa_flags\fR field, the
+\fBsa_sigaction\fR field specifies a signal-catching function.
+.sp
+.LP
+The \fBsa_mask\fR member specifies a set of signals to be blocked while the
+signal handler is active. On entry to the signal handler, that set of signals
+is added to the set of signals already being blocked when the signal is
+delivered. In addition, the signal that caused the handler to be executed will
+also be blocked, unless the  \fBSA_NODEFER\fR flag has been specified.
+\fBSIGSTOP\fR and  \fBSIGKILL\fR cannot be blocked (the system silently
+enforces this restriction).
+.sp
+.LP
+The \fBsa_flags\fR member specifies a set of flags used to modify the delivery
+of the signal. It is formed by a logical \fBOR\fR of any of the following
+values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_ONSTACK\fR\fR
+.ad
+.RS 16n
+.rt  
+If set and the signal is caught, and if the thread that is chosen to processes
+a delivered signal has an alternate signal stack declared with
+\fBsigaltstack\fR(2), then it will process the signal on that stack. Otherwise,
+the signal is delivered on the thread's normal stack.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_RESETHAND\fR\fR
+.ad
+.RS 16n
+.rt  
+If set and the signal is caught, the disposition of the signal is reset to
+\fBSIG_DFL\fR and the signal will not be blocked on entry to the signal handler
+(\fBSIGILL\fR, \fBSIGTRAP\fR, and \fBSIGPWR\fR cannot be  automatically reset
+when delivered; the system silently enforces this restriction).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_NODEFER\fR\fR
+.ad
+.RS 16n
+.rt  
+If set and the signal is caught, the signal will not be automatically blocked
+by the kernel while it is being caught.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_RESTART\fR\fR
+.ad
+.RS 16n
+.rt  
+If set and the signal is caught, functions that are interrupted by the
+execution of this signal's handler are transparently restarted by the system,
+namely \fBfcntl\fR(2), \fBioctl\fR(2), \fBwait\fR(3C), \fBwaitid\fR(2), and the
+following functions on slow devices like terminals: \fBgetmsg()\fR and
+\fBgetpmsg()\fR (see \fBgetmsg\fR(2));  \fBputmsg()\fR and \fBputpmsg()\fR (see
+\fBputmsg\fR(2)); \fBpread()\fR, \fBread()\fR, and \fBreadv()\fR (see
+\fBread\fR(2)); \fBpwrite()\fR, \fBwrite()\fR, and \fBwritev()\fR (see
+\fBwrite\fR(2)); \fBrecv()\fR, \fBrecvfrom()\fR, and \fBrecvmsg()\fR (see
+\fBrecv\fR(3SOCKET)); and \fBsend()\fR, \fBsendto()\fR, and \fBsendmsg()\fR
+(see \fBsend\fR(3SOCKET)). Otherwise, the function returns an \fBEINTR\fR
+error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_SIGINFO\fR\fR
+.ad
+.RS 16n
+.rt  
+If cleared and the signal is caught, \fIsig\fR is passed as the only argument
+to the signal-catching function. If set and the signal is caught,  two
+additional arguments are passed to the signal-catching function.  If the second
+argument is not equal to \fINULL\fR, it points to a \fBsiginfo_t\fR structure
+containing the reason why the signal was generated (see
+\fBsiginfo.h\fR(3HEAD)); the third argument points to a \fBucontext_t\fR
+structure containing the receiving process's context when the signal was
+delivered (see \fBucontext.h\fR(3HEAD)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_NOCLDWAIT\fR\fR
+.ad
+.RS 16n
+.rt  
+If set and \fIsig\fR equals  \fBSIGCHLD\fR, the system will not create zombie
+processes when children of the calling process exit. If the calling process
+subsequently issues a \fBwait\fR(3C), it blocks until all of the calling
+process's child processes terminate, and then returns \fB\(mi1\fR with
+\fBerrno\fR set to \fBECHILD\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSA_NOCLDSTOP\fR\fR
+.ad
+.RS 16n
+.rt  
+If set and \fIsig\fR equals \fBSIGCHLD\fR, \fBSIGCHLD\fR will not be sent to
+the calling process when its child processes stop or continue.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned, \fBerrno\fR is set to indicate the error, and no new signal handler
+is installed.
+.SH ERRORS
+.sp
+.LP
+The \fBsigaction()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fIsig\fR argument is not a valid signal number or is equal to
+\fBSIGKILL\fR or \fBSIGSTOP\fR. In addition, if in a multithreaded process, it
+is equal to \fBSIGWAITING\fR, \fBSIGCANCEL\fR, or \fBSIGLWP\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(1), \fBIntro\fR(2), \fBexit\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2),
+\fBioctl\fR(2), \fBkill\fR(2), \fBpause\fR(2), \fBputmsg\fR(2), \fBread\fR(2),
+\fBsigaltstack\fR(2), \fBsigprocmask\fR(2), \fBsigsend\fR(2),
+\fBsigsuspend\fR(2), \fBwaitid\fR(2), \fBwrite\fR(2), \fBrecv\fR(3SOCKET),
+\fBsend\fR(3SOCKET), \fBsiginfo.h\fR(3HEAD), \fBsignal\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBsigsetops\fR(3C), \fBucontext.h\fR(3HEAD),
+\fBwait\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The handler routine can be declared:
+.sp
+.in +2
+.nf
+void handler (int \fIsig\fR, siginfo_t *\fIsip\fR, ucontext_t *\fIucp\fR);
+.fi
+.in -2
+
+.sp
+.LP
+The \fIsig\fR argument is the signal number. The \fIsip\fR argument is a
+pointer (to space on the stack) to a \fBsiginfo_t\fR structure, which provides
+additional detail about the delivery of the signal. The \fIucp\fR argument is a
+pointer (again to space on the stack) to a \fBucontext_t\fR structure (defined
+in <\fBsys/ucontext.h\fR>) which contains the context from before the signal.
+It is not recommended that \fIucp\fR be used by the handler to restore the
+context from before the signal delivery.

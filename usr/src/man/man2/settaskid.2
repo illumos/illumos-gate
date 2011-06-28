@@ -1,0 +1,129 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH settaskid 2 "10 Apr 2007" "SunOS 5.11" "System Calls"
+.SH NAME
+settaskid, gettaskid, getprojid \- set or get task or project IDs
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/task.h>
+#include <unistd.h>
+
+\fBtaskid_t\fR \fBsettaskid\fR(\fBprojid_t\fR \fIproject\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBtaskid_t\fR \fBgettaskid\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/task.h>
+#include <unistd.h>
+#include <project.h>
+
+\fBprojid_t\fR \fBgetprojid\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsettaskid()\fR function makes a request of the system to assign a new
+task \fBID\fR to the calling process, changing the associated project \fBID\fR
+to that specified. The calling process must have sufficient privileges to
+perform this operation. The \fIflags\fR argument should be either
+\fBTASK_NORMAL\fR for a regular task, or \fBTASK_FINAL\fR, which disallows
+subsequent \fBsettaskid()\fR calls by the created task.
+.sp
+.LP
+The \fBgettaskid()\fR function returns the task \fBID\fR of the calling
+process.
+.sp
+.LP
+The \fBgetprojid()\fR function returns the project \fBID\fR of the calling
+process.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the appropriate task or
+project \fBID\fR. Otherwise, \(mi1 is returned and \fBerrno\fR is set to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsettaskid()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The invoking task was created with the \fBTASK_FINAL\fR flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+A resource control limiting the number of tasks or LWPs in the current project
+or zone has been exceeded.
+.sp
+A resource control on the given project would be exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The given project \fBID\fR is not within the valid project \fBID\fR range.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The {\fBPRIV_PROC_TASKID\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsetsid\fR(2), \fBproject\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5)

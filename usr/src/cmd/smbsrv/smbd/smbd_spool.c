@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -168,9 +169,9 @@ smbd_spool_monitor(void *arg)
 		} else {
 			if (errno == ECANCELED)
 				break;
-
+			if ((errno != EINTR) && (errno != EAGAIN))
+				error_retry_cnt--;
 			(void) sleep(SMB_SPOOL_WAIT);
-			error_retry_cnt--;
 		}
 	}
 

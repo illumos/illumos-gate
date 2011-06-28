@@ -64,6 +64,9 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 driver name=rdc devlink=type=ddi_pseudo;name=rdc\t\D perms="* 0666 root sys" \
     privs=sys_config privs=sys_devices
 file path=etc/init.d/rdc mode=0744
@@ -89,6 +92,11 @@ $(i386_ONLY)file path=usr/kernel/drv/rdcstub group=sys
 file path=usr/lib/librdc.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/rdc.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/rdc.so group=sys mode=0555
+file path=usr/share/man/man1m/sndradm.1m
+file path=usr/share/man/man1m/sndrd.1m
+file path=usr/share/man/man1m/sndrsyncd.1m
+file path=usr/share/man/man4/rdc.cf.4
+file path=usr/share/man/man4/sndr.4
 hardlink path=lib/svc/method/svc-rdc target=../../../etc/init.d/rdc
 hardlink path=lib/svc/method/svc-rdcsyncd target=../../../etc/init.d/rdcfinish
 hardlink path=usr/kernel/misc/$(ARCH64)/rdcsrv \

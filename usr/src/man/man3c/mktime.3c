@@ -1,0 +1,187 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mktime 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+mktime \- converts a tm structure to a calendar time
+.SH SYNOPSIS
+.LP
+.nf
+#include <time.h>
+
+\fBtime_t\fR \fBmktime\fR(\fBstruct tm *\fR\fItimeptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmktime()\fR function converts the time represented by the \fBtm\fR
+structure pointed to by \fItimeptr\fR into a calendar time  (the number of
+seconds since 00:00:00 UTC, January 1, 1970).
+.sp
+.LP
+The \fBtm\fR structure contains the following members:
+.sp
+.in +2
+.nf
+int  tm_sec;     /* seconds after the minute [0, 60]  */
+int  tm_min;     /* minutes after the hour [0, 59] */
+int  tm_hour;    /* hour since midnight [0, 23] */
+int  tm_mday;    /* day of the month [1, 31] */
+int  tm_mon;     /* months since January [0, 11] */
+int  tm_year;    /* years since 1900 */
+int  tm_wday;    /* days since Sunday [0, 6] */
+int  tm_yday;    /* days since January 1 [0, 365] */
+int  tm_isdst;   /* flag for daylight savings time */
+.fi
+.in -2
+
+.sp
+.LP
+In addition to computing the calendar time, \fBmktime()\fR normalizes the
+supplied \fBtm\fR structure. The original values of the \fBtm_wday\fR and
+\fBtm_yday\fR components of the structure are ignored, and the original values
+of the other components are not restricted to the ranges indicated in the
+definition of the structure. On successful completion, the values of the
+\fBtm_wday\fR and \fBtm_yday\fR components are set appropriately, and the other
+components are set to represent the specified calendar time, but with their
+values forced to be within the appropriate ranges. The final value of
+\fBtm_mday\fR is not set until \fBtm_mon\fR and \fBtm_year\fR are determined.
+.sp
+.LP
+The \fBtm_year\fR member must be for year 1901 or later. Calendar times before
+20:45:52 UTC, December 13, 1901 or after 03:14:07 UTC,  January 19, 2038 cannot
+be represented. Portable applications should not try to create dates before
+00:00:00 UTC, January 1, 1970 or after 00:00:00 UTC, January 1, 2038.
+.sp
+.LP
+The original values of the components may be either greater than or less than
+the specified range. For example, a \fBtm_hour\fR of \(mi1 means 1 hour before
+midnight, \fBtm_mday\fR of 0 means the day preceding the current month, and
+\fBtm_mon\fR of \(mi2 means 2 months before January of \fBtm_year\fR.
+.sp
+.LP
+If \fBtm_isdst\fR is positive, the original values are assumed to be in the
+alternate timezone. If it turns out that the alternate timezone is not valid
+for the computed calendar time, then the components are adjusted to the main
+timezone. Likewise, if \fBtm_isdst\fR is zero, the original values are assumed
+to be in the main timezone and are converted to the alternate timezone if the
+main timezone is not valid. If  \fBtm_isdst\fR is negative, \fBmktime()\fR
+attempts to determine whether the alternate timezone is in effect for the
+specified time.
+.sp
+.LP
+Local timezone information is used as if \fBmktime()\fR had called
+\fBtzset()\fR. See \fBctime\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+If the calendar time can be represented in an object of type \fBtime_t\fR,
+\fBmktime()\fR returns the specified calendar time without changing
+\fBerrno\fR. If the calendar time cannot be represented, the function returns
+the value (\fBtime_t\fR)\(mi1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBmktime()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The date represented by the input \fBtm\fR struct cannot be represented in a
+\fBtime_t\fR.  Note that the \fBerrno\fR setting may change if future revisions
+to the standards specify a different value.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The  \fBmktime()\fR function is MT-Safe in multithreaded applications, as long
+as no user-defined function directly modifies one of the following variables:
+\fBtimezone\fR, \fBaltzone\fR, \fBdaylight\fR, and \fBtzname\fR. See
+\fBctime\fR(3C).
+.sp
+.LP
+Note that \(mi1 can be a valid return value for the time that is one second
+before the Epoch.  The user should clear \fBerrno\fR before calling
+\fBmktime()\fR. If \fBmktime()\fR then returns \(mi1, the user should check
+\fBerrno\fR to determine whether or not an error actually occurred.
+.sp
+.LP
+The  \fBmktime()\fR function assumes Gregorian dates. Times before the adoption
+of the Gregorian calendar will not match historial records.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample code using \fBmktime()\fR.
+.sp
+.LP
+What day of the week is July 4, 2001?
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <time.h>
+static char *const wday[\|] = {
+        "Sunday", "Monday", "Tuesday", "Wednesday",
+        "Thursday", "Friday", "Saturday", "-unknown-"
+};
+struct tm time_str;
+/*\|.\|.\|.*/
+time_str.tm_year	= 2001 - 1900;
+time_str.tm_mon = 7 - 1;
+time_str.tm_mday = 4;
+time_str.tm_hour = 0;
+time_str.tm_min = 0;
+time_str.tm_sec = 1;
+time_str.tm_isdst = \(mi1;
+if (mktime(&time_str)== \(mi1)
+        time_str.tm_wday=7;
+printf("%s\en", wday[time_str.tm_wday]);
+.fi
+.in -2
+
+.SH BUGS
+.sp
+.LP
+The \fBzoneinfo\fR timezone data files do not transition past Tue Jan 19
+03:14:07 2038 UTC.  Therefore for 64-bit applications using \fBzoneinfo\fR
+timezones, calculations beyond this date may not use the correct offset from
+standard time, and could return incorrect values. This affects the 64-bit
+version of \fBmktime()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBctime\fR(3C), \fBgetenv\fR(3C), \fBTIMEZONE\fR(4), \fBattributes\fR(5),
+\fBstandards\fR(5)

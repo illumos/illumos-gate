@@ -1,0 +1,478 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Right Reserved. 
+.\" Portions Copyright 1994-2008 The FreeBSD Project. All rights reserved. 
+.\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+.\" disclaimer. 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. THIS SOFTWARE IS PROVIDED BY THE FREEBSD PROJECT ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE FREEBSD PROJECT OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+.\" OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.TH smbutil 1 "24 Jun 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+smbutil \- Solaris CIFS client utility
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/smbutil crypt\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil login [-c] [[\fIdomain\fR/]\fIuser\fR]\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil login [-c] [\fIuser\fR[@\fIdomain\fR]]\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil logout [[\fIdomain\fR/]\fIuser\fR]\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil logout [\fIuser\fR[@\fIdomain\fR]]\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil logout -a\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil logoutall\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil lookup \fIname\fR\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil status \fIserver\fR\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil view [-A | -U \fIuser\fR] //[\fIdomain\fR;][\fIuser\fR[:\fIpassword\fR]@]\fIserver\fR\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil [\fB-?dv\fR]\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsmbutil\fR command controls the Solaris CIFS client and issues various
+commands.
+.SS "Subcommands"
+.sp
+.LP
+The \fBsmbutil\fR command supports the following subcommands:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcrypt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Creates a hash of a password. This subcommand prompts for a password and writes
+the hash to standard output. This hash value is suitable for use as a value for
+the \fBpassword\fR property in the \fB$HOME/.nsmbrc\fR file.
+.sp
+The hashed password begins with two dollar signs (\fB$$\fR). If you assign this
+hashed password to the \fBpassword\fR property in your \fB$HOME/.nsmbrc\fR, be
+sure that you escape the special characters in the password.
+.sp
+If you plan to store hashed passwords in your \fB$HOME/.nsmbrc\fR file, ensure
+that the file permissions are set so that only the owner can read or write the
+file (\fB400\fR or \fB600\fR), or the passwords are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogin [-c] [ [[\fIdomain\fR/]\fIuser\fR] | [\fIuser\fR[@\fIdomain\fR]
+]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies persistent password information to be used for a CIFS server user
+account. When you specify this information, mounts can be done without a
+password prompt in non-Kerberos configurations. Kerberos sites should use
+Kerberos automatically, not prompt for a password. If a default domain is
+available in SMF or \fBnsmbrc\fR(4), the domain can be omitted. If a user name
+is not specified, the Solaris user account name is used.
+.sp
+Use the \fB-c\fR to check whether a persistent password is set for the
+specified user.
+.sp
+Passwords can also be stored for a specific server by using a server name in
+place of the domain name. This capability is useful with servers that are
+configured for "workgroup mode."
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogout [ [[\fIdomain\fR/]\fIuser\fR] | [\fIuser\fR[@\fIdomain\fR] ]\fR\fR
+.ad
+.sp .6
+.RS 4n
+Erases the persistent passwords for the user running the command.
+.sp
+The user name and domain name portions of the name are optional. If these names
+are not specified, the user name and domain name values are taken from the
+properties set in your environment. See the \fBnsmbrc\fR(4) manual page.
+.sp
+If you stored your password for a specific server, specify the server name in
+place of the domain name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogout -a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Erases all of the persistent passwords that are stored for the user who is
+running the command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlogoutall\fR\fR
+.ad
+.sp .6
+.RS 4n
+Erases all the persistent passwords that are stored by all users running the
+\fBsmbutil login\fR command.
+.sp
+This command must be run as superuser.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlookup \fIname\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Resolves the specified \fIname\fR to an IP address.
+.sp
+This subcommand is only supported if an NBNS/WINS name server is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstatus \fIserver\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Resolves the specified server to the NetBIOS domain and system name.
+\fIserver\fR can be an IP address or a DNS name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBview [-A | -U \fIuser\fR]
+//[\fIdomain\fR;][\fIuser\fR[:\fIpassword\fR]@]\fIserver\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the resources available to \fIuser\fR on the specified \fIserver\fR.
+.sp
+You can specify the \fB-A\fR option to view the resources as an anonymous user
+or the \fB-U\fR \fIuser\fR option to view the resources as the specified user.
+These options are mutually exclusive.
+.sp
+If the resource includes a domain, you must escape the semicolon that appears
+after the domain name to prevent it from being interpreted by the command
+shell. For instance, surround the entire resource name with single quotes:
+\fBsmbutil view '//SALES;george@RSERVER'\fR.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following global options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 13n
+.rt  
+Produces debugging output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 13n
+.rt  
+Produces verbose output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-?\fR\fR
+.ad
+.RS 13n
+.rt  
+Prints a short help message.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCreating a Password Hash for the \fB$HOME/.nsmbrc\fR File
+.sp
+.LP
+The following example shows how to use the \fBsmbutil crypt\fR command to
+create a hash of the password you specify. Then, you can use the hash as the
+value for the \fB$HOME/.nsmbrc\fR file.
+
+.sp
+.LP
+Be sure to escape the two dollar-sign prefix of the hashed password if you
+store it as a value of the \fBpassword\fR property.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil crypt\fR
+Password:
+$$178465324253e0c07
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following \fB$HOME/.nsmbrc\fR file fragment shows how the password hash
+value is set:
+
+.sp
+.in +2
+.nf
+[RSERVER:george]
+charsets=koi8-r:cp866
+password='$$178465324253e0c07'
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRStoring a Password for a CIFS Server
+.sp
+.LP
+The following example shows how to use the \fBsmbutil login\fR command to store
+the \fBroot@example\fR user's password.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil login root@example\fR
+Password:
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRErasing the Stored Password
+.sp
+.LP
+The following example shows how to use the \fBsmbutil logout\fR command to
+remove the \fBroot@example\fR user's password.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil logout root@example\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRViewing Available Shares
+.sp
+.LP
+The following example shows how to use the \fBsmbutil view\fR command to see
+the available shares for user \fBroot\fR on server \fBexample\fR.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil view //root@example\fR
+Password:
+Share        Type       Comment
+-------------------------------
+netlogon     disk       Network Logon Service
+ipc$         IPC        IPC Service (Samba Server)
+tmp          disk       Temporary file space
+public       disk       Public Stuff
+root         disk       Home Directories
+
+5 shares listed from 5 available
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRViewing Available Shares as an Anonymous User
+.sp
+.LP
+The following example shows how to use the \fBsmbutil view\fR command to
+anonymously view the available shares on the \fBexample\fR server.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil view -A //example\fR
+Share        Type       Comment
+-------------------------------
+netlogon     disk       Network Logon Service
+ipc$         IPC        IPC Service (Samba Server)
+tmp          disk       Temporary file space
+public       disk       Public Stuff
+ethereal     disk       /export/ethereal
+myshare      disk       Jan's stuff
+
+6 shares listed from 6 available
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRObtaining the IP Address From a Server Name
+.sp
+.LP
+The following example shows how to use the \fBsmbutil lookup\fR command to
+obtain the IP address of the \fBexample\fR server.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil lookup example\fR
+Got response from 192.168.168.210
+IP address of example: 192.168.168.210
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRObtaining the NetBIOS Domain and System Name Using the Server
+Name
+.sp
+.LP
+The following example shows how to use the \fBsmbutil status\fR command to
+obtain the NetBIOS domain and system name of the \fBexample\fR server. The
+server name, \fBexample\fR, is specified on the command line.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil status example\fR
+Domain: WORKGROUP
+Server: EXAMPLE
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRObtaining the NetBIOS Domain and System Name Using the IP
+Address
+.sp
+.LP
+The following example shows how to use the \fBsmbutil status\fR command to
+obtain the NetBIOS domain and system name of the \fBexample\fR server. The IP
+address, \fB192.168.168.210\fR, is specified on the command line.
+
+.sp
+.in +2
+.nf
+$ \fBsmbutil status 192.168.168.210\fR
+Domain: WORKGROUP
+Server: EXAMPLE
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.nsmbrc\fR\fR
+.ad
+.sp .6
+.RS 4n
+User-settable mount point configuration file to store the description for each
+connection.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The output is Uncommitted. The rest of the interface is Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBmount_smbfs\fR(1M), \fBnsmbrc\fR(4), \fBattributes\fR(5), \fBsmbfs\fR(7FS)
+.SH AUTHORS
+.sp
+.LP
+This manual page contains material originally authored by Boris Popov,
+\fBbp@butya.kz\fR, \fBbp@FreeBSD.org\fR.
+.SH NOTES
+.sp
+.LP
+The Solaris CIFS client always attempts to use \fBgethostbyname()\fR to resolve
+host names. If the host name cannot be resolved, the CIFS client uses NetBIOS
+name resolution (NBNS). By default, the Solaris CIFS client permits the use of
+NBNS to enable Solaris CIFS clients in Windows environments to work without
+additional configuration.
+.sp
+.LP
+Since NBNS has been exploited in the past, you might want to disable it. To
+disable NBNS, set the \fBnbns-enabled\fR service management facility property
+to \fBfalse\fR. By default, \fBnbns-enabled\fR is set to \fBtrue\fR.

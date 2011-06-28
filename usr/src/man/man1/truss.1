@@ -1,0 +1,698 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH truss 1 "31 Jul 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+truss \- trace system calls and signals
+.SH SYNOPSIS
+.LP
+.nf
+\fBtruss\fR [\fB-fcaeildDE\fR] [\fB-\fR [tTvx] [!] \fIsyscall\fR ,...] 
+     [\fB-\fR [sS] [!] \fIsignal\fR ,...] [\fB-\fR [mM] [!] \fIfault\fR ,...] 
+     [\fB-\fR [rw] [!] \fIfd\fR ,...] 
+     [\fB-\fR [uU] [!] \fIlib\fR ,... : [:] [!] \fIfunc\fR ,...] 
+     [\fB-o\fR \fIoutfile\fR] \fIcommand\fR | \fB-p\fR \fIpid\fR[\fI/lwps\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtruss\fR utility executes the specified command and produces a trace of
+the system calls it performs, the signals it receives, and the machine faults
+it incurs. Each line of the trace output reports either the fault or signal
+name or the system call name with its arguments and return value(s). System
+call arguments are displayed symbolically when possible using defines from
+relevant system headers. For any path name pointer argument, the pointed-to
+string is displayed. Error returns are reported using the error code names
+described in \fBIntro\fR(3). If, in the case of an error, the kernel reports a
+missing privilege, a privilege name as described in \fBprivileges\fR(5) is
+reported in square brackets (\fB[ ]\fR) after the error code name.
+.sp
+.LP
+Optionally (see the \fB-u\fR option), \fBtruss\fR also produce an entry/exit
+trace of user-level function calls executed by the traced process, indented to
+indicate nesting.
+.SH OPTIONS
+.sp
+.LP
+For those options that take a list argument, the name \fBall\fR can be used as
+a shorthand to specify all possible members of the list. If the list begins
+with a \fB!\fR, the meaning of the option is negated (for example, exclude
+rather than trace). Multiple occurrences of the same option can be specified.
+For the same name in a list, subsequent options (those to the right) override
+previous ones (those to the left).
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.sp .6
+.RS 4n
+Shows the argument strings that are passed in each \fBexec()\fR system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Counts traced system calls, faults, and signals rather than displaying the
+trace line-by-line. A summary report is produced after the traced command
+terminates or when \fBtruss\fR is interrupted. If \fB-f\fR is also specified,
+the counts include all traced system calls, faults, and signals for child
+processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.sp .6
+.RS 4n
+Includes a time stamp on each line of trace output. The time stamp appears as a
+field containing \fIseconds\fR\|.\|\fIfraction\fR at the start of the line.
+This represents a time in seconds relative to the beginning of the trace. The
+first line of the trace output shows the base time from which the individual
+time stamps are measured, both as seconds since the epoch (see \fBtime\fR(2))
+and as a date string (see \fBctime\fR(3C) and \fBdate\fR(1)). The times that
+are reported are the times that the event in question occurred. For all system
+calls, the event is the completion of the system call, not the start of the
+system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Includes a time delta on each line of trace output. The value appears as a
+field containing \fIseconds\fR\|.\|\fIfraction\fR and represents the elapsed
+time for the \fBLWP\fR that incurred the event since the last reported event
+incurred by that \fBLWP.\fR Specifically, for system calls, this is not the
+time spent within the system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.sp .6
+.RS 4n
+Shows the environment strings that are passed in each \fBexec()\fR system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+Includes a time delta on each line of trace output. The value appears as a
+field containing \fIseconds\fR\fB\&.\fR\fIfraction\fR and represents the
+difference in time elapsed between the beginning and end of a system call.
+.sp
+In contrast to  the \fB-D\fR option, this is the amount of time spent within
+the system call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.sp .6
+.RS 4n
+Follows all children created by \fBfork()\fR or \fBvfork()\fR and includes
+their signals, faults, and system calls in the trace output. Normally, only the
+first-level command or process is traced. When \fB-f\fR is specified, the
+process-id is included with each line of trace output to indicate which process
+executed the system call or received the signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.sp .6
+.RS 4n
+Does not display interruptible sleeping system calls. Certain system calls,
+such as \fBopen()\fR and \fBread()\fR on terminal devices or pipes, can sleep
+for indefinite periods and are interruptible. Normally, \fBtruss\fR reports
+such sleeping system calls if they remain asleep for more than one second. The
+system call is reported again a second time when it completes. The \fB-i\fR
+option causes such system calls to be reported only once, when they complete.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+Includes the id of the responsible lightweight process (\fILWP\fR) with each
+line of trace output. If \fB-f\fR is also specified, both the process-id and
+the LWP-id are included.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR [\fB!\fR]\fIfault\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Machine faults to trace or exclude. Those faults specified in the
+comma-separated list are traced. Faults can be specified by name or number (see
+\fB<sys/fault.h>\fR). If the list begins with a \fB!\fR, the specified faults
+are excluded from the trace output. Default is \fB-mall\fR \fB-m\fR
+\fB!fltpage\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR [\fB!\fR]\fIfault\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Machine faults that stop the process. The specified faults are added to the set
+specified by \fB-m\fR. If one of the specified faults is incurred, \fBtruss\fR
+leaves the process stopped and abandoned (see the \fB-T\fR option). Default is
+\fB\fR\fB-M\fR\fB!all\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIoutfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+File to be used for the trace output. By default, the output goes to standard
+error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Interprets the \fIcommand\fR arguments to \fBtruss\fR as a list of process-ids
+for existing processes (see \fBps\fR(1)) rather than as a command to be
+executed. \fBtruss\fR takes control of each process and begins tracing it
+provided that the userid and groupid of the process match those of the user or
+that the user is a privileged user. Users can trace only selected threads by
+appending \fB/\fR\fIthread-id\fR to the process-id. Mutiple threads can be
+selected using the \fB-\fR and \fB,\fR delimiters. For example \fB/1,2,7-9\fR
+traces threads \fB1\fR, \fB2\fR, \fB7\fR, \fB8\fR, and \fB9\fR. Processes can
+also be specified by their names in the \fB/proc\fR directory, for example,
+\fB/proc/12345\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR [\fB!\fR]\fIfd\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Shows the full contents of the \fBI/O\fR buffer for each \fBread()\fR on any of
+the specified file descriptors. The output is formatted 32 bytes per line and
+shows each byte as an \fBASCII\fR character (preceded by one blank) or as a
+2-character C language escape sequence for control characters such as
+horizontal tab (\|\e\|t) and newline (\|\e\|n). If \fBASCII\fR interpretation
+is not possible, the byte is shown in 2-character hexadecimal representation.
+(The first 12 bytes of the \fBI/O\fR buffer for each traced \fBprint >read()\fR
+are shown even in the absence of \fB-r\fR.) Default is
+\fB\fR\fB-r\fR\fB!all\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR [\fB!\fR]\fIsignal\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Signals to trace or exclude. Those signals specified in the comma-separated
+list are traced. The trace output reports the receipt of each specified signal,
+even if the signal is being ignored (not blocked). (Blocked signals are not
+received until they are unblocked.) Signals can be specified by name or number
+(see \fB<sys/signal.h>\fR). If the list begins with a \fB!\fR, the specified
+signals are excluded from the trace output. Default is \fB-sall\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR [\fB!\fR]\fIsignal\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Signals that stop the process. The specified signals are added to the set
+specified by \fB-s\fR. If one of the specified signals is received, \fBtruss\fR
+leaves the process stopped and abandoned (see the \fB-T\fR option). Default is
+\fB\fR\fB-S\fR\fB!all\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR [\fB!\fR]\fIsyscall\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+System calls to trace or exclude. Those system calls specified in the
+comma-separated list are traced. If the list begins with a \fB!\fR, the
+specified system calls are excluded from the trace output. Default is
+\fB-tall\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR [\fB!\fR]\fIsyscall\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Specifies system calls that stop the process. The specified system calls are
+added to the set specified by \fB-t\fR. If one of the specified system calls is
+encountered, \fBtruss\fR leaves the process stopped and abandoned. That is,
+\fBtruss\fR releases the process and exits but leaves the process in the
+stopped state at completion of the system call in question. A debugger or other
+process inspection tool (see \fBproc\fR(1)) can then be applied to the stopped
+process. \fBtruss\fR can be reapplied to the stopped process with the same or
+different options to continue tracing. Default is \fB\fR\fB-T\fR\fB!all\fR.
+.sp
+A process left stopped in this manner cannot be restarted by the application of
+\fBkill\fR \fB-CONT\fR because it is stopped on an event of interest via
+\fB/proc\fR, not by the default action of a stopping signal (see
+\fBsignal.h\fR(3HEAD)). The \fBprun\fR(1) command described in \fBproc\fR(1)
+can be used to set the stopped process running again.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR
+[\fB!\fR]\fIlib\fR,...\fB:\fR[\fB:\fR][\fB!\fR]\fIfunc\fR,\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+User-level function call tracing. \fIlib\fR,\|.\|.\|. is a comma-separated list
+of dynamic library names, excluding the ``\fB\&.so.\fR\fIn\fR'' suffix.
+\fIfunc\fR,\|.\|.\|. is a comma-separated list of function names. In both cases
+the names can include name-matching metacharacters \fB*\fR,\fB?\fR,\fB[]\fR
+with the same meanings as those of \fBsh\fR(1) but as applied to the
+library/function name spaces, not to files. An empty library or function list
+defaults to \fB*\fR, trace all libraries or functions in a library. A leading
+\fB!\fR on either list specifies an exclusion list, names of libraries or
+functions not to be traced. Excluding a library excludes all functions in that
+library; any function list following a library exclusion list is ignored.
+.sp
+A single \fB:\fR separating the library list from the function list means to
+trace calls into the libraries from outside the libraries, but omit calls made
+to functions in a library from other functions in the same library. A double
+\fB:\|:\fR means to trace all calls, regardless of origin.
+.sp
+Library patterns do not match either the executable file or the dynamic linker
+unless there is an exact match (\fBl*\fR does not match \fBld.so.1\fR). To
+trace functions in either of these objects, the names must be specified
+exactly, as in:
+.sp
+.in +2
+.nf
+\fBtruss -u a.out -u ld ...\fR
+.fi
+.in -2
+.sp
+
+\fBa.out\fR is the literal name to be used for this purpose; it does not stand
+for the name of the executable file. Tracing \fBa.out\fR function calls implies
+all calls (default is \fB::\fR).
+.sp
+Multiple \fB-u\fR options can be specified and they are honored left-to-right.
+The id of the thread that performed the function call is included in the trace
+output for the call. \fBtruss\fR searches the dynamic symbol table in each
+library to find function names and also searches the standard symbol table if
+it has not been stripped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-U\fR
+[\fB!\fR]\fIlib\fR,\|.\|.\|.\|\fB:\fR[\fB:\fR][\fB!\fR]\fIfunc\fR,\|.\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+User-level function calls that stop the process. The specified functions are
+added to the set specified by \fB-u\fR. If one of the specified functions is
+called, \fBtruss\fR leaves the process stopped and abandoned (see the \fB-T\fR
+option).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR [\fB!\fR]\fIsyscall\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Verbose. Displays the contents of any structures passed by address to the
+specified system calls (if traced by \fB-t\fR). Input values as well as values
+returned by the operating system are shown. For any field used as both input
+and output, only the output value is shown. Default is
+\fB\fR\fB-v\fR\fB!all\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR [\fB!\fR]\fIfd\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Shows the contents of the I/O buffer for each \fBwrite()\fR on any of the
+specified file descriptors (see the \fB-r\fR option). Default is
+\fB\fR\fB-w\fR\fB!all\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR [\fB!\fR]\fIsyscall\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+Displays the arguments to the specified system calls (if traced by \fB-t\fR) in
+raw form, usually hexadecimal, rather than symbolically. This is for unredeemed
+hackers who must see the raw bits to be happy. Default is
+\fB\fR\fB-x\fR\fB!all\fR.
+.RE
+
+.sp
+.LP
+See \fIman pages section 2: System Calls\fR for system call names accepted by
+the \fB-t\fR, \fB-T\fR, \fB-v\fR, and \fB-x\fR options. System call numbers are
+also accepted.
+.sp
+.LP
+If \fBtruss\fR is used to initiate and trace a specified command and if the
+\fB-o\fR option is used or if standard error is redirected to a non-terminal
+file, then \fBtruss\fR runs with hangup, interrupt, and quit signals ignored.
+This facilitates tracing of interactive programs that catch interrupt and quit
+signals from the terminal.
+.sp
+.LP
+If the trace output remains directed to the terminal, or if existing processes
+are traced (the \fB-p\fR option), then \fBtruss\fR responds to hangup,
+interrupt, and quit signals by releasing all traced processes and exiting. This
+enables the user to terminate excessive trace output and to release
+previously-existing processes. Released processes continue normally, as though
+they had never been touched.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTracing a Command
+.sp
+.LP
+The following example produces a trace of the \fBfind\fR(1) command on the
+terminal:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss find . -print >find.out\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRTracing Common System Calls
+.sp
+.LP
+The following example shows only a trace of the open, close, read, and write
+system calls:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -t open,close,read,write find . -print >find.out\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRTracing a Shell Script
+.sp
+.LP
+The following example produces a trace of the \fBspell\fR(1) command on the
+file \fBtruss.out\fR:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -f -o truss.out spell \fIdocument\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBspell\fR is a shell script, so the \fB-f\fR flag is needed to trace not only
+the shell but also the processes created by the shell. (The spell script runs a
+pipeline of eight processes.)
+
+.LP
+\fBExample 4 \fRAbbreviating Output
+.sp
+.LP
+The following example abreviates output:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss nroff -mm \fIdocument\fR >nroff.out\fR 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+because 97% of the output reports \fBlseek()\fR, \fBread()\fR, and
+\fBwrite()\fR system calls. To abbreviate it:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -t !lseek,read,write nroff -mm \fIdocument\fR >nroff.out\fR 
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRTracing Library Calls From Outside the C Library
+.sp
+.LP
+The following example traces all user-level calls made to any function in the C
+library from outside the C library:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -u libc ...\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRTracing library calls from within the C library
+.sp
+.LP
+The following example includes calls made to functions in the C library from
+within the C library itself:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -u libc:: ...\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRTracing Library Calls Other Than the C Library
+.sp
+.LP
+The following example traces all user-level calls made to any library other
+than the C library:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -u '*' -u !libc ...\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRTracing \fBprintf\fR and \fBscanf\fR Function Calls
+.sp
+.LP
+The following example traces all user-level calls to functions in the printf
+and scanf family contained in the C library:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -u 'libc:*printf,*scanf' ...\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 9 \fRTracing Every User-level Function Call
+.sp
+.LP
+The following example traces every user-level function call from anywhere to
+anywhere:
+
+.sp
+.in +2
+.nf
+example$ \fBtruss -u a.out -u ld:: -u :: ...\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 10 \fRTracing a System Call Verbosely
+.sp
+.LP
+The following example verbosely traces the system call activity of process #1,
+\fBinit\fR(1M) (if you are a privileged user):
+
+.sp
+.in +2
+.nf
+example# \fBtruss -p -v all 1\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Interrupting \fBtruss\fR returns \fBinit\fR to normal operation.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/*\fR\fR
+.ad
+.RS 11n
+.rt  
+Process files
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdate\fR(1), \fBfind\fR(1), \fBproc\fR(1), \fBps\fR(1), \fBsh\fR(1),
+\fBspell\fR(1), \fBinit\fR(1M), \fBIntro\fR(3), \fBexec\fR(2), \fBfork\fR(2),
+\fBlseek\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBtime\fR(2), \fBvfork\fR(2),
+\fBwrite\fR(2), \fBctime\fR(3C), \fBsignal.h\fR(3HEAD), \fBproc\fR(4),
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBthreads\fR(5)
+.sp
+.LP
+\fIman pages section 2: System Calls\fR
+.SH NOTES
+.sp
+.LP
+Some of the system calls described in \fIman pages section 2: System Calls\fR
+differ from the actual operating system interfaces. Do not be surprised by
+minor deviations of the trace output from the descriptions in that document.
+.sp
+.LP
+Every machine fault (except a page fault) results in the posting of a signal to
+the \fBLWP\fR that incurred the fault. A report of a received signal
+immediately follows each report of a machine fault (except a page fault) unless
+that signal is being blocked.
+.sp
+.LP
+The operating system enforces certain security restrictions on the tracing of
+processes. In particular, any command whose object file (\fBa.out\fR) cannot be
+read by a user cannot be traced by that user; set-uid and set-gid commands can
+be traced only by a privileged user. Unless it is run by a privileged user,
+\fBtruss\fR loses control of any process that performs an \fBexec()\fR of a
+set-id or unreadable object file; such processes continue normally, though
+independently of \fBtruss\fR, from the point of the \fBexec()\fR.
+.sp
+.LP
+To avoid collisions with other controlling processes, \fBtruss\fR does not
+trace a process that it detects is being controlled by another process via the
+\fB/proc\fR interface. This allows \fBtruss\fR to be applied to
+\fBproc\fR(4)-based debuggers as well as to another instance of itself.
+.sp
+.LP
+The trace output contains tab characters under the assumption that standard tab
+stops are set (every eight positions).
+.sp
+.LP
+The trace output for multiple processes or for a multithreaded process (one
+that contains more than one \fBLWP)\fR is not produced in strict time order.
+For example, a \fBread()\fR on a pipe can be reported before the corresponding
+\fBwrite()\fR. For any one \fBLWP\fR (a traditional process contains only one),
+the output is strictly time-ordered.
+.sp
+.LP
+When tracing more than one process, \fBtruss\fR runs as one controlling process
+for each process being traced. For the example of the \fBspell\fR command shown
+above, \fBspell\fR itself uses 9 process slots, one for the shell and 8 for the
+8-member pipeline, while \fBtruss\fR adds another 9 processes, for a total of
+18.
+.sp
+.LP
+Not all possible structures passed in all possible system calls are displayed
+under the \fB-v\fR option.

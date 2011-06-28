@@ -1,0 +1,142 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH attroff 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+attroff, attron, attrset, wattroff, wattron, wattrset \- change foreground
+window attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBattroff\fR(\fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattron\fR(\fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattrset\fR(\fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattroff\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattron\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIattrs\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattrset\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIattrs\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBattroff()\fR and \fBattron()\fR functions unset and set,  respectively,
+the specified window attributes of \fBstdscr\fR.  These functions only affect
+the attributes specified; attributes that existed before the call are retained.
+The \fBwattroff()\fR and \fBwattron()\fR functions unset or set the  specified
+attributes for window \fIwin\fR.
+.sp
+.LP
+The \fBattrset()\fR and \fBwattrset()\fR functions change the specified  window
+renditions of \fBstdscr\fR and \fIwin\fR to new values;  the old values are not
+retained.
+.sp
+.LP
+The attributes that can be used are specified in the  \fBAttributes, Color
+Pairs, and Renditions\fR section of the  \fBcurses\fR(3XCURSES) man page.
+.sp
+.LP
+Here is an example that prints some text using the current window rendition,
+adds underlining, changes the attributes, prints more text, then changes the
+attributes back.
+.sp
+.in +2
+.nf
+printw("This word is");
+attron(A_UNDERLINE);
+printw("underlined.");
+attroff(A_NORMAL);
+printw("This is back to normal text.\en");
+refresh(\|);
+.fi
+.in -2
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattrs\fR\fR
+.ad
+.RS 9n
+.rt  
+are the foreground window attributes to be set or unset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the window in which attribute changes are to be made.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+These functions always return \fBOK\fR or 1.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH USAGE
+.sp
+.LP
+All of these functions may be macros.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddch\fR(3XCURSES), \fBaddnstr\fR(3XCURSES), \fBattr_get\fR(3XCURSES),
+\fBbkgdset\fR(3XCURSES), \fBcurses\fR(3XCURSES), \fBinit_color\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBstart_color\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

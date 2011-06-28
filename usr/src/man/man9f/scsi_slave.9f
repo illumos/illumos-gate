@@ -1,0 +1,199 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_slave 9F "27 Sep 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_slave \- utility for SCSI target drivers to establish the presence of a
+target
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+
+
+\fBint\fR \fBscsi_slave\fR(\fBstruct scsi_device *\fR\fIdevp\fR, \fBint\fR \fB(*\fRcallback\fB)(void)\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+The \fBscsi_slave()\fR function is obsolete. This function has been replaced by
+\fBscsi_probe\fR(9F).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevp\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBscsi_device\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR \fR
+.ad
+.RS 13n
+.rt  
+Pointer to a callback function, \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBscsi_slave()\fR checks for the presence of a \fBSCSI\fR device. Target
+drivers may use this function in their \fBprobe\fR(9E) routines.
+\fBscsi_slave()\fR determines if the device is present by using a Test Unit
+Ready command followed by an Inquiry command. If \fBscsi_slave()\fR is
+successful, it will fill in the \fBscsi_inquiry\fR structure, which is the
+\fBsd_inq\fR member of the \fBscsi_device\fR(9S) structure, and return
+\fBSCSI_PROBE_EXISTS\fR. This information can be used to determine if the
+target driver has probed the correct SCSI device type. \fIcallback\fR indicates
+what the allocator routines should do when \fBDMA \fRresources are not
+available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR \fR
+.ad
+.RS 16n
+.rt  
+Do not wait for resources. Return a \fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR \fR
+.ad
+.RS 16n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBOther Values\fR
+.ad
+.RS 16n
+.rt  
+\fIcallback\fR points to a function which is called when resources may have
+become available. \fIcallback\fR \fBmust\fR return either \fB0\fR (indicating
+that it attempted to allocate resources but again failed to do so), in which
+case it is put back on a list to be called again later, or \fB1\fR indicating
+either success in allocating resources or indicating that it no longer cares
+for a retry.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBscsi_slave()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSIPROBE_NOMEM\fR \fR
+.ad
+.RS 22n
+.rt  
+No space available for structures.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSIPROBE_EXISTS\fR \fR
+.ad
+.RS 22n
+.rt  
+Device exists and inquiry data is valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSIPROBE_NONCCS\fR \fR
+.ad
+.RS 22n
+.rt  
+Device exists but inquiry data is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSIPROBE_FAILURE\fR \fR
+.ad
+.RS 22n
+.rt  
+Polled command failure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSCSIPROBE_NORESP\fR \fR
+.ad
+.RS 22n
+.rt  
+No response to \fBTEST UNIT READY\fR.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBscsi_slave()\fR is normally called from the target driver's \fBprobe\fR(9E)
+or \fBattach\fR(9E) routine. In any case, this routine should not be called
+from interrupt context, because it can sleep waiting for memory to be
+allocated.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBattach\fR(9E), \fBprobe\fR(9E),
+\fBddi_iopb_alloc\fR(9F), \fBmakecom\fR(9F), \fBscsi_dmaget\fR(9F),
+\fBscsi_ifgetcap\fR(9F), \fBscsi_pktalloc\fR(9F), \fBscsi_poll\fR(9F),
+\fBscsi_probe\fR(9F), \fBscsi_device\fR(9S)
+.sp
+.LP
+ \fIANSI Small Computer System Interface-2 (SCSI-2)\fR
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The \fBscsi_slave()\fR function is obsolete and will be discontinued in a
+future release. This function has been replaced by \fBscsi_probe\fR(9F).

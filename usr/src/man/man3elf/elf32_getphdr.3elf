@@ -1,0 +1,123 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf32_getphdr 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf32_getphdr, elf32_newphdr, elf64_getphdr, elf64_newphdr \- retrieve
+class-dependent program header table
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf32_Phdr *\fR\fBelf32_getphdr\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf32_Phdr *\fR\fBelf32_newphdr\fR(\fBElf *\fR\fIelf\fR, \fBsize_t\fR \fIcount\fR);
+.fi
+
+.LP
+.nf
+\fBElf64_Phdr *\fR\fBelf64_getphdr\fR(\fBElf *\fR\fIelf\fR);
+.fi
+
+.LP
+.nf
+\fBElf64_Phdr *\fR\fBelf64_newphdr\fR(\fBElf *\fR\fIelf\fR, \fBsize_t\fR \fIcount\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For a 32-bit class file, \fBelf32_getphdr()\fR returns a pointer to the program
+execution header table, if one is available for the \fBELF\fR descriptor
+\fIelf\fR.
+.sp
+.LP
+\fBelf32_newphdr()\fR allocates a new table with \fIcount\fR entries,
+regardless of whether one existed previously, and sets the \fBELF_F_DIRTY\fR
+bit for the table. See \fBelf_flagdata\fR(3ELF). Specifying a zero \fIcount\fR
+deletes an existing table. Note this behavior differs from that of
+\fBelf32_newehdr()\fR allowing a program to replace or delete the program
+header table, changing its size if necessary.  See \fBelf32_getehdr\fR(3ELF).
+.sp
+.LP
+If no program header table exists, the file is not a 32-bit class file, an
+error occurs, or \fIelf\fR is \fINULL,\fR both functions return a null pointer.
+Additionally, \fBelf32_newphdr()\fR returns a null pointer if \fIcount\fR is
+\fB0\fR.
+.sp
+.LP
+The table is an array of \fBElf32_Phdr\fR structures, each of which includes
+the following members:
+.sp
+.in +2
+.nf
+\fBElf32_Word	p_type;
+Elf32_Off	p_offset;
+Elf32_Addr	p_vaddr;
+Elf32_Addr	p_paddr;
+Elf32_Word	p_filesz;
+Elf32_Word	p_memsz;
+Elf32_Word	p_flags;
+Elf32_Word	p_align;\fR
+.fi
+.in -2
+
+.sp
+.LP
+The  \fBElf64_Phdr\fR structures include the following members:
+.sp
+.in +2
+.nf
+\fBElf64_Word	p_type;
+Elf64_Word	p_flags;
+Elf64_Off	p_offset;
+Elf64_Addr	p_vaddr;
+Elf64_Addr	p_paddr;
+Elf64_Xword	p_filesz;
+Elf64_Xword	p_memsz;
+Elf64_Xword	p_align;\fR
+.fi
+.in -2
+
+.sp
+.LP
+For the 64\(mibit class, replace 32 with 64 as appropriate.
+.sp
+.LP
+The \fBELF\fR header's \fBe_phnum\fR member tells how many entries the program
+header table has. See \fBelf32_getehdr\fR(3ELF). A program may inspect this
+value to determine the size of an existing table; \fBelf32_newphdr()\fR
+automatically sets the member's value to \fIcount\fR. If the program is
+building a new file, it is responsible for creating the file's \fBELF\fR header
+before creating the program header table.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF), \fBelf_begin\fR(3ELF),
+\fBelf_flagdata\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)

@@ -24,7 +24,10 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
 
 XGETTEXT=xgettext
 MSGDIR=$1
@@ -88,23 +91,18 @@ done
 #
 # Change Directory
 #
-	cd ../i18n
-	rm -f messages.po regerror_msg.po
+	cd ../locale
+	rm -f messages.po regerror.po
 
-#
-# regerror_msg.h
-#
-
-sed "s/_MSG/gettext/" regerror_msg.h > regerror_msg.i
-${XGETTEXT} regerror_msg.i
-cat messages.po | sed "/^domain/d" > regerror_msg.po
-rm -f regerror_msg.i messages.po
+	${XGETTEXT} -a regerror.c
+	cat messages.po | sed "/^domain/d" > regerror.po
+	rm -f regerror.i messages.po
 	
 #
 # Copy .po file
 #
-	cp regerror_msg.po ${MSGDIR}
+	cp regerror.po ${MSGDIR}
 
 # And remove it		
 
-	rm -f regerror_msg.po
+	rm -f regerror.po

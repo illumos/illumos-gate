@@ -1,0 +1,347 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH door_call 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+door_call \- invoke the function associated with a door descriptor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+#include <door.h>
+
+\fBint\fR \fBdoor_call\fR(\fBint\fR \fId\fR, \fBdoor_arg_t *\fR\fIparams\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdoor_call()\fR function invokes the function associated with the door
+descriptor  \fId\fR, and passes the arguments (if any) specified in
+\fIparams\fR. All of the \fIparams\fR members are treated as in/out  parameters
+during a door invocation and may be updated  upon returning from a door call.
+Passing \fINULL\fR for \fIparams\fR indicates there  are no arguments to be
+passed and no results expected.
+.sp
+.LP
+Arguments are specified using the  \fBdata_ptr\fR and \fBdesc_ptr\fR members of
+\fIparams\fR. The size of the argument data in bytes is passed in
+\fBdata_size\fR and the number of argument descriptors is passed in
+\fBdesc_num\fR.
+.sp
+.LP
+Results from the door invocation are placed in the buffer, \fBrbuf\fR. See
+\fBdoor_return\fR(3C). The \fBdata_ptr\fR and  \fBdesc_ptr\fR members of
+\fIparams\fR are updated to reflect the location of the results within the
+\fBrbuf\fR buffer. The size of the data results and number of descriptors
+returned are updated in the \fBdata_size\fR and \fBdesc_num\fR members. It is
+acceptable to use the same buffer for  input argument data and results, so
+\fBdoor_call()\fR may be called with \fBdata_ptr\fR and \fBdesc_ptr\fR pointing
+to the buffer \fBrbuf\fR.
+.sp
+.LP
+If the results of a door invocation exceed the size of the buffer specified by
+\fBrsize\fR, the system automatically allocates  a new buffer in the caller's
+address space  and updates the \fBrbuf\fR and \fBrsize\fR members to reflect
+this location. In this case, the caller is  responsible for reclaiming this
+area using \fBmunmap(rbuf, rsize)\fR when the buffer is no longer required.
+See \fBmunmap\fR(2).
+.sp
+.LP
+Descriptors passed in a \fBdoor_desc_t\fR structure are identified by the
+\fBd_attributes\fR member. The client marks the \fBd_attributes\fR member with
+the type of object being passed by logically OR-ing the value of object type.
+Currently, the only object type that can be passed or returned is a file
+descriptor, denoted by the  \fBDOOR_DESCRIPTOR\fR attribute. Additionally, the
+\fBDOOR_RELEASE\fR attribute can be set, causing  the descriptor to be closed
+in the caller's address space after it is passed to the target. The descriptor
+will be  closed even if \fBdoor_call()\fR returns an error, unless that error
+is \fBEFAULT\fR or \fBEBADF\fR.
+.sp
+.LP
+The \fBdoor_desc_t\fR structure includes the following members:
+.sp
+.in +2
+.nf
+typedef struct {
+         door_attr_t d_attributes;   /* Describes the parameter */
+         union {
+                 struct {
+                         int d_descriptor;   /* Descriptor */
+                         door_id_t d_id;    /* Unique door id */
+                         } d_desc;
+                 } d_data;
+         } door_desc_t;
+.fi
+.in -2
+
+.sp
+.LP
+When file descriptors are passed or returned,  a new descriptor is created in
+the target address space and the \fBd_descriptor\fR member in the target
+argument is updated to reflect the new descriptor. In addition, the system
+passes a system-wide unique number associated with each door in the
+\fBdoor_id\fR member and marks the \fBd_attributes\fR member with other
+attributes associated with a door including the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_LOCAL\fR\fR
+.ad
+.RS 20n
+.rt  
+The door received was created  by this process using \fBdoor_create()\fR. See
+\fBdoor_create\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_PRIVATE\fR\fR
+.ad
+.RS 20n
+.rt  
+The door received has a private pool of server threads associated with the
+door.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_UNREF\fR\fR
+.ad
+.RS 20n
+.rt  
+The door received is expecting an unreferenced notification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_UNREF_MULTI\fR\fR
+.ad
+.RS 20n
+.rt  
+Similar to \fBDOOR_UNREF\fR,  except multiple unreferenced notifications may be
+delivered for the same door.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_REFUSE_DESC\fR\fR
+.ad
+.RS 20n
+.rt  
+This door does not accept argument descriptors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_NO_CANCEL\fR\fR
+.ad
+.RS 20n
+.rt  
+This door does not cancel the server thread upon client abort.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDOOR_REVOKED\fR\fR
+.ad
+.RS 20n
+.rt  
+The door received has been revoked by the server.
+.RE
+
+.sp
+.LP
+The \fBdoor_call()\fR function is not a restartable system call. It returns
+\fBEINTR\fR if a signal was caught and handled by this thread. If the door
+invocation is not idempotent the caller should mask any signals that may be
+generated during a \fBdoor_call()\fR operation. If the client aborts in the
+middle of a \fBdoor_call()\fR and the door was not created with the
+\fBDOOR_NO_CANCEL\fR flag, the server thread is notified using the POSIX (see
+\fBstandards\fR(5)) thread cancellation mechanism. See \fBcancellation\fR(5).
+.sp
+.LP
+The descriptor returned from \fBdoor_create()\fR is marked as close on
+\fBexec(FD_CLOEXEC)\fR. Information about a door is available for all clients
+of a door using \fBdoor_info()\fR. Applications concerned with security should
+not place secure information in door data that is accessible by
+\fBdoor_info()\fR. In particular, secure data should not be stored in the data
+item \fIcookie\fR. See  \fBdoor_info\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The  \fBdoor_call()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 13n
+.rt  
+Arguments were too big for server thread stack.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 13n
+.rt  
+Server was out of available resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 13n
+.rt  
+Invalid door descriptor was passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 13n
+.rt  
+Argument pointers pointed outside the allocated address space.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 13n
+.rt  
+A signal was caught in the client, the client called \fBfork\fR(2), or the
+server exited during invocation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 13n
+.rt  
+Bad arguments were passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 13n
+.rt  
+The client or server has too many open descriptors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENFILE\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIdesc_num\fR argument is larger than the door's \fBDOOR_PARAM_DESC_MAX\fR
+parameter (see \fBdoor_getparam\fR(3C)), and the door does not have the
+\fBDOOR_REFUSE_DESC\fR set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOBUFS\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIdata_size\fR argument is larger than the door's
+\fBDOOR_PARAM_DATA_MAX\fR parameter, or smaller than the door's
+\fBDOOR_PARAM_DATA_MIN\fR parameter (see \fBdoor_getparam\fR(3C)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 13n
+.rt  
+The \fIdesc_num\fR argument is non-zero and the door has the
+\fBDOOR_REFUSE_DESC\fR flag set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+System could not create overflow area in caller for results.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityStable
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmunmap\fR(2), \fBdoor_create\fR(3C), \fBdoor_getparam\fR(3C),
+\fBdoor_info\fR(3C), \fBdoor_return\fR(3C), \fBlibdoor\fR(3LIB),
+\fBattributes\fR(5), \fBcancellation\fR(5), \fBstandards\fR(5)

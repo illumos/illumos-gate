@@ -1,0 +1,227 @@
+'\" te
+.\" Copyright (c) 2009 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bioclone 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+bioclone \- clone another buffer
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h> 
+
+\fBstruct buf *\fR\fBbioclone\fR(\fBstruct buf\fR \fI*bp\fR, \fBoff_t\fR \fIoff\fR, \fBsize_t\fR \fIlen\fR, \fBdev_t\fR \fIdev\fR, 
+     \fBdaddr_t\fR \fIblkno\fR, \fBint (\fR\fI*iodone\fR) (struct buf \fI*\fR), \fBstruct buf\fR \fI*bp_mem\fR, 
+     \fBint\fR \fIsleepflag\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to the \fBbuf\fR(9S) structure describing the original \fBI/O\fR
+request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoff\fR\fR
+.ad
+.RS 13n
+.rt  
+Offset within original \fBI/O\fR request where new \fBI/O\fR request should
+start.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 13n
+.rt  
+Length of the \fBI/O \fRrequest.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR\fR
+.ad
+.RS 13n
+.rt  
+Device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIblkno\fR\fR
+.ad
+.RS 13n
+.rt  
+Block number on device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIiodone\fR\fR
+.ad
+.RS 13n
+.rt  
+Specific \fBbiodone\fR(9F) routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp_mem\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a buffer structure to be filled in or \fBNULL. \fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsleepflag\fR\fR
+.ad
+.RS 13n
+.rt  
+Determines whether caller can sleep for memory. Possible flags are
+\fBKM_SLEEP\fR to allow sleeping until memory is available, or \fBKM_NOSLEEP\fR
+to return \fINULL\fR immediately if memory is not available.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbioclone()\fR function returns an initialized buffer to perform
+\fBI/O\fR to a portion of another buffer. The new buffer will be set up to
+perform \fBI/O\fR to the range within the original \fBI/O\fR request specified
+by the parameters \fIoff\fR and \fIlen\fR. An offset \fB0\fR starts the new
+\fBI/O\fR request at the same address as the original request. \fIoff\fR +
+\fIlen\fR must not exceed \fIb_bcount,\fR the length of the original request.
+The device number \fIdev\fR specifies the device to which the buffer is to
+perform \fBI/O\fR. \fIblkno\fR is the block number on device. It will be
+assigned to the \fIb_blkno\fR field of the cloned buffer structure.
+\fIiodone\fR lets the driver identify a specific \fBbiodone\fR(9F) routine to
+be called by the driver when the \fBI/O\fR is complete. \fIbp_mem\fR determines
+from where the space for the buffer should be allocated. If \fIbp_mem\fR is
+\fBNULL\fR, \fBbioclone()\fR will allocate a new buffer using
+\fBgetrbuf\fR(9F). If \fIsleepflag\fR is set to \fBKM_SLEEP\fR, the driver may
+sleep until space is freed up. If \fIsleepflag\fR is set to \fBKM_NOSLEEP\fR,
+the driver will not sleep. In either case, a pointer to the allocated space is
+returned or \fINULL\fR to indicate that no space was available. After the
+transfer is completed, the buffer has to be freed using \fBfreerbuf\fR(9F). If
+\fIbp_mem\fR is not \fINULL\fR, it will be used as the space for the buffer
+structure. The driver has to ensure that \fIbp_mem\fR is initialized properly
+either using \fBgetrbuf\fR(9F) or \fBbioinit\fR(9F).
+.sp
+.LP
+If the original buffer is mapped into the kernel virtual address space using
+\fBbp_mapin\fR(9F) before calling \fBbioclone()\fR, a clone buffer will share
+the kernel mapping of the original buffer. An additional \fBbp_mapin()\fR to
+get a kernel mapping for the clone buffer is not necessary.
+.sp
+.LP
+The driver has to ensure that the original buffer is not freed while any of the
+clone buffers is still performing \fBI/O\fR. The \fBbiodone()\fR function has
+to be called on all clone buffers \fBbefore\fR it is called on the original
+buffer.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBbioclone()\fR function returns a pointer to the initialized buffer
+header, or \fBNULL\fR if no space is available.
+.SH CONTEXT
+.sp
+.LP
+The \fBbioclone()\fR function can be called from user, interrup, or interrupt
+context. Drivers must not allow \fBbioclone()\fR to sleep if called from an
+interrupt routine.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBbioclone()\fR for Disk Striping
+.sp
+.LP
+A device driver can use \fBbioclone()\fR for disk striping. For each disk in
+the stripe, a clone buffer is created which performs \fBI/O\fR to a portion of
+the original buffer.
+
+.sp
+.in +2
+.nf
+static int
+stripe_strategy(struct buf *bp)
+{
+       ...
+       bp_orig = bp;
+       bp_1 = bioclone(bp_orig, 0, size_1, dev_1, blkno_1,
+                       stripe_done, NULL, KM_SLEEP);
+       fragment++;
+       ...
+       bp_n = bioclone(bp_orig, offset_n, size_n, dev_n,
+                     blkno_n, stripe_done, NULL, KM_SLEEP);
+       fragment++;
+       /* submit bp_1 ... bp_n to device */
+       xxstrategy(bp_x);
+       return (0);
+}
+
+static uint_t
+xxintr(caddr_t arg)
+{
+       ...
+       /* 
+       * get bp of completed subrequest. biodone(9F) will
+       * call stripe_done()
+       */
+       biodone(bp);
+       return (0);
+}
+
+static int
+stripe_done(struct buf *bp)
+{
+       ...
+       freerbuf(bp);
+       fragment--;
+       if (fragment == 0) {
+               /* get bp_orig */
+               biodone(bp_orig);
+       }
+       return (0);
+}
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbiodone\fR(9F), \fBbp_mapin\fR(9F), \fBfreerbuf\fR(9F), \fBgetrbuf\fR(9F),
+\fBbuf\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

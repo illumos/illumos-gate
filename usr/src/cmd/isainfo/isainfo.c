@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/systeminfo.h>
@@ -161,13 +163,13 @@ report_hwcap(int d, const char *isa)
 		int linecnt = 0;
 
 		for (p = strtok(buffer, " "); p; p = strtok(NULL, " ")) {
-			if (linecnt == 0)
-				linecnt = printf("\t");
-			linecnt += printf("%s ", p);
-			if (linecnt > 68) {
+			if (linecnt + strlen(p) > 68) {
 				(void) printf("\n");
 				linecnt = 0;
 			}
+			if (linecnt == 0)
+				linecnt = printf("\t");
+			linecnt += printf("%s ", p);
 		}
 		if (linecnt != 0)
 			(void) printf("\n");

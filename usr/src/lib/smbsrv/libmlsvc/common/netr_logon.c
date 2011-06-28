@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -155,7 +156,9 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 
-	if (!smb_domain_getinfo(&di)) {
+	/* Avoid interfering with DC discovery. */
+	if (smb_ddiscover_wait() != 0 ||
+	    !smb_domain_getinfo(&di)) {
 		netr_invalidate_chain();
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 	}

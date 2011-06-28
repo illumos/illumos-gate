@@ -39,6 +39,7 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/smedia
 dir path=usr/lib/smedia/$(ARCH64)
+dir path=usr/share/man/man1m
 file path=lib/svc/manifest/network/rpc/smserver.xml group=sys mode=0444
 file path=usr/lib/$(ARCH64)/libsmedia.so.1
 file path=usr/lib/$(ARCH64)/llib-lsmedia.ln
@@ -54,6 +55,7 @@ file path=usr/lib/smedia/sm_blkdev.so.1 mode=0555
 file path=usr/lib/smedia/sm_fd.so.1 mode=0555
 file path=usr/lib/smedia/sm_pcata.so.1 mode=0555
 file path=usr/lib/smedia/sm_scsi.so.1 mode=0555
+file path=usr/share/man/man1m/rpc.smserverd.1m
 legacy pkg=SUNWsmedia desc="Storage media management library" \
     name="Storage media management library"
 legacy pkg=SUNWsmediar desc="Storage media management library (Root)" \

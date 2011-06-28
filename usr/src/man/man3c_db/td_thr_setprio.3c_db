@@ -1,0 +1,57 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH td_thr_setprio 3C_DB "1 Apr 2008" "SunOS 5.11" "Threads Debugging Library Functions"
+.SH NAME
+td_thr_setprio \- set the priority of a thread
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
+#include <proc_service.h>
+#include <thread_db.h>
+
+\fBtd_err_e\fR \fBtd_thr_setprio\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR,
+     \fBconst int\fR \fInew_prio\fR;);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtd_thr_setprio()\fR function is obsolete. It always fails and returns
+\fBTD_NOCAPAB\fR.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_NOCAPAB\fR\fR
+.ad
+.RS 14n
+.rt  
+Capability not available.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBthr_setprio\fR(3C), \fBattributes\fR(5)

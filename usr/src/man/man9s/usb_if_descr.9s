@@ -1,0 +1,131 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH usb_if_descr 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+usb_if_descr \- USB interface descriptor
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/usb/usba.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusb_if_descr_t\fR interface descriptor defines attributes of an
+interface. A configuration contains one or more interfaces. An interface
+contains one or more endpoints.
+.sp
+.LP
+Please refer to Section \fI9.6.5\fR of the \fIUSB 2.0\fR specification. The
+\fIUSB 2.0\fR specification is available at \fIwww.usb.org\fR.
+.sp
+.LP
+One or more configuration descriptors are retrieved from a USB device during
+device enumeration. They can be accessed via \fBusb_get_dev_data\fR(9F).
+.sp
+.LP
+A  interface descriptor has the following fields:
+.sp
+.in +2
+.nf
+uint8_t     bLength                 Size of this descriptor
+                                    in bytes.
+
+uint8_t     bDescriptorType         Set to USB_DESCR_TYPE_IF.
+
+uint8_t     bInterfaceNumber        Interface number (0-based).
+
+uint8_t     bAlternateSetting       Alternate setting number for
+                                    this interface and its
+                                    endpoints (0-based).
+
+uint8_t     bNumEndpoints           Number of endpoints,
+                                    excluding endpoint 0.
+
+uint8_t     bInterfaceClass         Interface Class code
+                                    (see below).
+
+uint8_t     bInterfaceSubClass      Sub class code. (See USB 2.0
+                                    specification of applicable
+                                    interface class for information.)
+
+uint8_t     bInterfaceProtocol      Protocol code.  (See USB 2.0
+                                    specification of applicable
+                                    interface class for information.)
+
+uint8_t     iInterface              Index of optional string
+                                    describing this interface
+                                    Valid if > 0. Pass to
+                                    usb_get_string_descr(9F) to
+                                    retrieve string.
+
+USB 2.0 specification interface descriptor bInterfaceClass field
+values are as follows:
+
+        USB_CLASS_APP           Application-specific interface class
+
+        USB_CLASS_AUDIO         Audio interface class
+
+        USB_CLASS_CCID          Chip/Smartcard interface class
+
+        USB_CLASS_CDC_CTRL      CDC control interface class
+
+        USB_CLASS_CDC_DATA      CDC data interface class
+
+        USB_CLASS_SECURITY      Content security interface class
+
+        USB_CLASS_DIAG          Diagnostic interface class
+
+        USB_CLASS_HID           HID interface class
+
+        USB_CLASS_HUB           HUB interface class
+
+        USB_CLASS_MASS_STORAGE  Mass storage interface class
+
+        USB_CLASS_PHYSICAL      Physical interface class
+
+        USB_CLASS_PRINTER       Printer interface class
+
+        USB_CLASS_VENDOR_SPEC   Vendor-specific interface class
+
+        USB_CLASS_WIRELESS      Wireless interface class
+
+        
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI-based systems
+_
+Interface stabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBusb_get_alt_if\fR(9F), \fBusb_get_cfg\fR(9F),
+\fBusb_get_dev_data\fR(9F), \fBusb_get_string_descr\fR(9F),
+\fBusb_parse_data\fR(9F), \fBusb_cfg_descr\fR(9S), \fBusb_ctrl_request\fR(9S),
+\fBusb_dev_descr\fR(9S), \fBusb_dev_qlf_descr\fR(9S), \fBusb_ep_descr\fR(9S),
+\fBusb_other_speed_cfg_descr\fR(9S), \fBusb_string_descr\fR(9S)

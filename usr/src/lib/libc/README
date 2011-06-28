@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 The Solaris Process Model Unification project:
 	PSARC/2002/117 Solaris Process Model Unification
@@ -184,21 +182,6 @@ In a DEBUG build of libc:
 many of these rules are enforced by ASSERT() statements scattered about
 in the libc sources.  This is the default mode for building libc when
 a DEBUG nightly build is performed.
-
------
-
-Some i18n code cannot be distributed as open source.  To enable the rest of
-libc to be distributed as open source, those i18n files now live in a
-separate libc_i18n directory.  Those source files are position-independently
-compiled and are archived into the libc_i18n.a library.  The libc_i18n.a
-archive library is installed into the $(ROOTFS_LIBDIR) and
-$(ROOTFS_LIBDIR64) directories.  During link phase, libc.so.1 links with
-libc_i18n.a in the proto area.  Therefore, the build of the libc_i18n tree
-needs to be done before the build of the libc tree.  Also the compilation
-conditions such as the setting of CFLAGS and CPPFLAGS for the libc_i18n
-stuff need to be compatible with the ones for the libc stuff.  Whenever
-changes that affect the compilation conditions of libc occur, the changes
-should be propagated to libc_i18n.
 
 -----
 

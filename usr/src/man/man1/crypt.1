@@ -1,0 +1,81 @@
+'\" te
+.\"  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH crypt 1 "8 Mar 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+crypt \- encode or decode a file
+.SH SYNOPSIS
+.LP
+.nf
+\fBcrypt\fR [\fIpassword\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcrypt\fR utility encrypts and decrypts the contents of a file.
+\fBcrypt\fR reads from the standard input and writes on the standard output.
+The \fIpassword\fR is a key that selects a particular transformation. If no
+\fIpassword\fR is given, \fBcrypt\fR demands a key from the terminal and turns
+off printing while the key is being typed in. \fBcrypt\fR encrypts and decrypts
+with the same key:
+.sp
+.in +2
+.nf
+example% \fBcrypt key < clear.file > encrypted.file\fR
+example% \fBcrypt key < encrypted.file | pr\fR 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+prints the contents of \fBclear.file\fR.
+.sp
+.LP
+Files encrypted by \fBcrypt\fR are compatible with those treated by the editors
+\fBed\fR(1), \fBex\fR(1), and \fBvi\fR(1) in encryption mode.
+.sp
+.LP
+The security of encrypted files depends on three factors:  the fundamental
+method must be hard to solve; direct search of the key space must be
+infeasible; "sneak paths" by which keys or cleartext can become visible must be
+minimized.
+.sp
+.LP
+\fBcrypt\fR implements a one-rotor machine designed along the lines of the
+German Enigma, but with a 256-element rotor.  Methods of attack on such
+machines are widely known, thus \fBcrypt\fR provides minimal security.
+.sp
+.LP
+The transformation of a key into the internal settings of the machine is
+deliberately designed to be expensive, that is, to take a substantial fraction
+of a second to compute.  However, if keys are restricted to (say) three
+lower-case letters, then encrypted files can be read by expending only a
+substantial fraction of five minutes of machine time.
+.sp
+.LP
+Since the key is an argument to the \fBcrypt\fR command, it is potentially
+visible to users executing \fBps\fR(1) or a derivative command. To minimize
+this possibility, \fBcrypt\fR takes care to destroy any record of the key
+immediately upon entry. No doubt the choice of keys and key security are the
+most vulnerable aspect of \fBcrypt\fR.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/tty\fR\fR
+.ad
+.RS 12n
+.rt  
+for typed key
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdes\fR(1), \fBed\fR(1), \fBex\fR(1), \fBps\fR(1), \fBvi\fR(1),
+\fBattributes\fR(5)

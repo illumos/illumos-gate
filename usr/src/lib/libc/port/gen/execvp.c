@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	execlp(name, arg,...,0)	(like execl, but does path search)
  *	execvp(name, argv)	(like execv, but does path search)
@@ -46,6 +44,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <paths.h>
 
 static const char *execat(const char *, const char *, char *);
 
@@ -114,10 +113,6 @@ execvp(const char *name, char *const *argv)
 	const char *cp;
 	unsigned etxtbsy = 1;
 	int eacces = 0;
-	char *shpath;
-	static const char *sun_path = "/bin/sh";
-	static const char *xpg4_path = "/usr/xpg4/bin/sh";
-	static const char *shell = "sh";
 
 	if (*name == '\0') {
 		errno = ENOENT;
@@ -137,8 +132,8 @@ execvp(const char *name, char *const *argv)
 			if (__xpg4 == 0) {	/* not XPG4 */
 				pathstr = "/usr/sbin:/usr/ccs/bin:/usr/bin";
 			} else {		/* XPG4 (CSPATH + /usr/sbin) */
-		pathstr = "/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:"
-		    "/opt/SUNWspro/bin:/usr/sbin";
+				pathstr = "/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:"
+				    "/opt/SUNWspro/bin:/usr/sbin";
 			}
 		} else {
 			if (__xpg4 == 0) {	/* not XPG4 */
@@ -172,12 +167,7 @@ execvp(const char *name, char *const *argv)
 		(void) execv(fname, argv);
 		switch (errno) {
 		case ENOEXEC:
-			if (__xpg4 == 0) {	/* not XPG4 */
-				shpath = (char *)sun_path;
-			} else {		/* XPG4 */
-				shpath = (char *)xpg4_path;
-			}
-			newargs[0] = (char *)shell;
+			newargs[0] = "sh";
 			newargs[1] = fname;
 			for (i = 1; (newargs[i + 1] = argv[i]) != NULL; ++i) {
 				if (i >= 254) {
@@ -185,7 +175,7 @@ execvp(const char *name, char *const *argv)
 					return (-1);
 				}
 			}
-			(void) execv((const char *)shpath, newargs);
+			(void) execv(_PATH_BSHELL, newargs);
 			return (-1);
 		case ETXTBSY:
 			if (++etxtbsy > 5)

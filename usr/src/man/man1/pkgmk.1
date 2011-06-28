@@ -1,0 +1,312 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pkgmk 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+pkgmk \- produce an installable package
+.SH SYNOPSIS
+.LP
+.nf
+\fBpkgmk\fR [\fB-o\fR] [\fB-a\fR \fIarch\fR] [\fB-b\fR \fIbase_src_dir\fR] [\fB-d\fR \fIdevice\fR] 
+     [\fB-f\fR \fIprototype\fR] [\fB-l\fR \fIlimit\fR] [\fB-p\fR \fIpstamp\fR] [\fB-r\fR \fIroot_path\fR] 
+     [\fB-v\fR \fIversion\fR] [\fIvariable=value\fR]... [\fIpkginst\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpkgmk\fR utility produces an installable package to be used as input to
+the \fBpkgadd\fR(1M) command. The package contents is in directory structure
+format.
+.sp
+.LP
+The command uses the package \fBprototype\fR(4) file as input and creates a
+\fBpkgmap\fR(4) file. The contents for each entry in the \fBprototype\fR file
+is copied to the appropriate output location. Information concerning the
+contents (checksum, file size, modification date) is computed and stored in the
+\fBpkgmap\fR file, along with attribute information specified in the
+\fBprototype\fR file.
+.sp
+.LP
+\fBpkgmk\fR searches for the files listed in the \fBprototype\fR(4) file as
+described in the following conditions. \fBNote:\fR If a prototype file contains
+the explicit location of the file to include in the package, then the following
+search explanations do not apply.
+.RS +4
+.TP
+1.
+If neither \fB-b\fR nor \fB-r\fR options are specified, the file name
+component of each file path listed in the \fBprototype\fR(4) file is expected
+to be found in the same directory as the \fBprototype\fR(4) file
+.RE
+.RS +4
+.TP
+2.
+If \fB-b\fR is specified as a relative path (without a leading "\fB/\fR"),
+then \fIbase_src_dir\fR is prepended to the relative file paths from the
+\fBprototype\fR(4) file. The resulting path is searched for in the
+\fIroot_path\fR directories. If a \fIroot_path\fR is not specified, it defaults
+to "\fB/\fR".
+.RE
+.RS +4
+.TP
+3.
+If \fB-b\fR is specified as an absolute path (with a leading "\fB/\fR"),
+then \fIbase_src_dir\fR is prepended to the relative paths from the
+\fBprototype\fR(4) file and the result is the location of the file.
+\fIroot_path\fR is \fBnot\fR searched.
+.RE
+.RS +4
+.TP
+4.
+If \fB-r\fR is specified, then full file paths are used from the
+\fBprototype\fR(4) file. Relative paths have \fIbase_src_dir\fR prepended. If
+\fIbase_src_dir\fR is not specified, it defaults to \fB""\fR. The resulting
+path is searched for in each directory of the \fIroot_path\fR.
+.RE
+.sp
+.LP
+If you created your prototype file using \fB"pkgproto a/relative/path"\fRor
+\fB"pkgproto a/relative/path=install/path"\fR, you should use the \fB-r\fR
+\fIroot_path\fR option to specify the location of \fBa/relative/path\fR so that
+\fBpkgmk\fR can correctly locate your source files.
+.sp
+.LP
+Package commands, including \fBpkgmk\fR, are \fBlargefile\fR(5)-aware. They
+handle files larger than 2 GB in the same way they handle smaller files. In
+their current implementations, \fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other
+package commands can process a datastream of  up to 4 GB.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR \fIarch\fR\fR
+.ad
+.RS 19n
+.rt  
+Overrides the architecture information provided in the \fBpkginfo\fR(4) file
+with \fIarch\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIbase_src_dir\fR\fR
+.ad
+.RS 19n
+.rt  
+Prepends the indicated \fIbase_src_dir\fR to locate relocatable objects on the
+source machine. Use this option to search for all objects in the prototype
+file. \fBpkgmk\fR expects to find the objects in /\fIbase_src_dir\fR or to
+locate the objects by use of the \fB-b\fR and \fB-r\fR options, respectively.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdevice\fR\fR
+.ad
+.RS 19n
+.rt  
+Creates the package on \fIdevice\fR. \fIdevice\fR can be an absolute directory
+pathname or the identifiers for a floppy disk or removable disk (for example,
+\fB/dev/diskette\fR). The default device is the installation spool directory
+(\fB/var/spool/pkg\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIprototype\fR\fR
+.ad
+.RS 19n
+.rt  
+Uses the file \fIprototype\fR as input to the command. The default
+\fIprototype\fR filename is [\fBPp\fR]\fBrototype\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fIlimit\fR\fR
+.ad
+.RS 19n
+.rt  
+Specifies the maximum size in 512 byte blocks of the output device as
+\fBlimit\fR. By default, if the output file is a directory or a mountable
+device, \fBpkgmk\fR employs the \fBdf\fR(1M) command to dynamically calculate
+the amount of available space on the output device. This option is useful in
+conjunction with \fBpkgtrans\fR(1) to create a package with a datastream
+format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 19n
+.rt  
+Overwrites the same instance; package instance is overwritten if it already
+exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpstamp\fR\fR
+.ad
+.RS 19n
+.rt  
+Overrides the production stamp definition in the \fBpkginfo\fR(4) file with
+\fIpstamp\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR \fIroot_path\fR\fR
+.ad
+.RS 19n
+.rt  
+Uses the indicated \fIroot_path\fR with the source pathname appended to locate
+objects on the source machine, using a comma (\fB,\fR) as the separator for the
+path elements. If this option is specified, look for the full destination path
+in each of the directories specified. If neither \fB-b\fR nor \fB-r\fR is
+specified, look for the leaf filename in the current directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR \fIversion\fR\fR
+.ad
+.RS 19n
+.rt  
+Overrides the version information provided in the \fBpkginfo\fR(4) file with
+\fIversion\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvariable=value\fR\fR
+.ad
+.RS 19n
+.rt  
+Places the indicated variable in the packaging environment. (See
+\fBprototype\fR(4) for definitions of variable specifications.)
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkginst\fR\fR
+.ad
+.RS 11n
+.rt  
+A package designation by its instance. An instance can be the package
+abbreviation or a specific instance (for example, \fBinst.1\fR or
+\fBinst.2\fR). All instances of a package can be requested by \fBinst.*\fR. The
+asterisk character (\fB*\fR) is a special character to some shells and might
+need to be escaped. In the C-Shell, \fB*\fR must be surrounded by single quotes
+(\fB\&'\fR) or preceded by a backslash (\e).
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpkgparam\fR(1), \fBpkgproto\fR(1), \fBpkgtrans\fR(1), \fBuname\fR(1),
+\fBdf\fR(1M), \fBpkgadd\fR(1M), \fBpkginfo\fR(4), \fBpkgmap\fR(4),
+\fBprototype\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.sp
+.LP
+\fIApplication Packaging Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+Architecture information is provided on the command line with the \fB-a\fR
+option or in the \fBprototype\fR(4) file. If no architecture information is
+supplied, \fBpkgmk\fR uses the output of \fBuname\fR \fB-m\fR (see
+\fBuname\fR(1)).
+.sp
+.LP
+Version information is provided on the command line with the \fB-v\fR option or
+in the \fBpkginfo\fR(4) file. If no version information is supplied, a default
+based on the current date is provided.
+.sp
+.LP
+Command line definitions for both architecture and version override the
+\fBprototype\fR(4) definitions.
+.sp
+.LP
+\fBpkgmk\fR fails if one of the following invalid combinations of zone-related
+parameters is used:
+.RS +4
+.TP
+1.
+Both \fBSUNW_PKG_ALLZONES\fR and \fBSUNW_PKG_THISZONE\fR are set to
+\fBTRUE\fR.
+.RE
+.RS +4
+.TP
+2.
+\fBSUNW_PKG_HOLLOW\fR is set to \fBTRUE\fR and \fBSUNW_PKG_ALLZONES\fR is
+set to \fBFALSE\fR.
+.RE
+.RS +4
+.TP
+3.
+The package contains a request script and \fBSUNW_PKG_THISZONE\fR set to
+\fBTRUE\fR.
+.RE
+.sp
+.LP
+For additional information regarding these parameters, see \fBpkginfo\fR(4).

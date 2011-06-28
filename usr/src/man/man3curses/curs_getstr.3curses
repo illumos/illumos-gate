@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_getstr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_getstr, getstr, wgetstr, mvgetstr, mvwgetstr, wgetnstr \- get character
+strings from curses terminal keyboard
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBgetstr\fR(\fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwgetstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvgetstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwgetstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwgetnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The effect of \fBgetstr()\fR is as though a series of calls to \fBgetch()\fR
+were made, until a newline or carriage return is received. The resulting value
+is placed in the area pointed to by the character pointer \fIstr\fR.
+\fBwgetnstr()\fR reads at most \fIn\fR characters, thus preventing a possible
+overflow of the input buffer. The user's erase and kill characters are
+interpreted, as well as any special keys (such as function keys, HOME key, and
+CLEAR key.)
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_getch\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBgetstr()\fR, \fBmvgetstr()\fR, and \fBmvwgetstr()\fR may be
+macros.

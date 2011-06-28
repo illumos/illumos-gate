@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -42,38 +42,41 @@
 #include <regex.h>
 
 #include "utils.h"
+#include "../gen/_libc_gettext.h"
+
+#define	RERR(x, msg)	{ x, #x, msg }
 
 static struct rerr {
 	int code;
 	char *name;
 	char *explain;
 } rerrs[] = {
-	{REG_NOMATCH,	"REG_NOMATCH",	"regexec() failed to match"},
-	{REG_BADPAT,	"REG_BADPAT",	"invalid regular expression"},
-	{REG_ECOLLATE,	"REG_ECOLLATE",	"invalid collating element"},
-	{REG_ECTYPE,	"REG_ECTYPE",	"invalid character class"},
-	{REG_EESCAPE,	"REG_EESCAPE",	"trailing backslash (\\)"},
-	{REG_ESUBREG,	"REG_ESUBREG",	"invalid backreference number"},
-	{REG_EBRACK,	"REG_EBRACK",	"brackets ([ ]) not balanced"},
-	{REG_EPAREN,	"REG_EPAREN",	"parentheses not balanced"},
-	{REG_EBRACE,	"REG_EBRACE",	"braces not balanced"},
-	{REG_BADBR,	"REG_BADBR",	"invalid repetition count(s)"},
-	{REG_ERANGE,	"REG_ERANGE",	"invalid character range"},
-	{REG_ESPACE,	"REG_ESPACE",	"out of memory"},
-	{REG_BADRPT,	"REG_BADRPT",	"repetition-operator operand invalid"},
+	RERR(REG_NOMATCH,	"regexec() failed to match"),
+	RERR(REG_BADPAT,	"invalid regular expression"),
+	RERR(REG_ECOLLATE,	"invalid collating element"),
+	RERR(REG_ECTYPE,	"invalid character class"),
+	RERR(REG_EESCAPE,	"trailing backslash (\\)"),
+	RERR(REG_ESUBREG,	"invalid backreference number"),
+	RERR(REG_EBRACK,	"brackets ([ ]) not balanced"),
+	RERR(REG_EPAREN,	"parentheses not balanced"),
+	RERR(REG_EBRACE,	"braces not balanced"),
+	RERR(REG_BADBR,		"invalid repetition count(s)"),
+	RERR(REG_ERANGE,	"invalid character range"),
+	RERR(REG_ESPACE,	"out of memory"),
+	RERR(REG_BADRPT,	"repetition-operator operand invalid"),
 #ifdef	REG_EMPTY
-	{REG_EMPTY,	"REG_EMPTY",	"empty (sub)expression"},
+	RERR(REG_EMPTY,		"empty (sub)expression"),
 #endif
-	{REG_EFATAL,	"REG_EFATAL",	"\"can't happen\" -- you found a bug"},
+	RERR(REG_EFATAL,	"fatal internal error"),
 #ifdef	REG_INVARG
-	{REG_INVARG,	"REG_INVARG",	"invalid argument to regex routine"},
+	RERR(REG_INVARG,	"invalid argument to regex routine"),
 #endif
-	{REG_ECHAR,	"REG_ECHAR",	"illegal byte sequence"},
-	{REG_ENOSYS,	"REG_ENOSYS",	"function not supported"},
-	{REG_STACK,	"REG_STACK",	"backtrack stack overflow"},
-	{REG_ENSUB,	"REG_ENSUB",	"more than 9 \\( \\) pairs"},
-	{REG_ENEWLINE,	"REG_ENEWLINE",	"\n found before end of pattern"},
-	{0,		"",		"*** unknown regexp error code ***"}
+	RERR(REG_ECHAR,		"illegal byte sequence"),
+	RERR(REG_ENOSYS,	"function not supported"),
+	RERR(REG_STACK,		"backtrack stack overflow"),
+	RERR(REG_ENSUB,		"more than 9 \\( \\) pairs"),
+	RERR(REG_ENEWLINE,	"\n found before end of pattern"),
+	{0,	"",		"*** unknown regexp error code ***"}
 };
 
 
@@ -93,7 +96,7 @@ regerror(int errcode, const regex_t *_RESTRICT_KYWD preg,
 		if (r->code == errcode)
 			break;
 
-	s = r->explain;
+	s = _libc_gettext(r->explain);
 
 	len = strlen(s) + 1;
 	if (errbuf_size > 0) {

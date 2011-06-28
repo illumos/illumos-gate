@@ -1,0 +1,151 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH clock_nanosleep 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+clock_nanosleep \- high resolution sleep with specifiable clock
+.SH SYNOPSIS
+.LP
+.nf
+#include <time.h>
+
+\fBint\fR \fBclock_nanosleep\fR(\fBclockid_t\fR \fIclock_id\fR, \fBint\fR \fIflags\fR,
+     \fBconst struct timespec *\fR\fIrqtp\fR, \fBstruct timespec *\fR\fIrmtp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+If the flag \fBTIMER_ABSTIME\fR is not set in the \fIflags\fR argument, the
+\fBclock_nanosleep()\fR function causes the current thread to be suspended from
+execution until either the time interval specified by the \fIrqtp\fR argument
+has elapsed, or a signal is delivered to the calling thread and its action is
+to invoke a signal-catching function, or the process is terminated. The clock
+used to measure the time is the clock specified by \fIclock_id\fR.
+.sp
+.LP
+If the flag \fBTIMER_ABSTIME\fR is set in the \fIflags\fR argument, the
+\fBclock_nanosleep()\fR function causes the current thread to be suspended from
+execution until either the time value of the clock specified by \fIclock_id\fR
+reaches the absolute time specified by the \fIrqtp\fR argument, or a signal is
+delivered to the calling thread and its action is to invoke a signal-catching
+function, or the process is terminated. If, at the time of the call, the time
+value specified by \fIrqtp\fR is less than or equal to the time value of the
+specified clock, then \fBclock_nanosleep()\fR returns immediately and the
+calling process is not suspended.
+.sp
+.LP
+The suspension time caused by this function can be longer than requested
+because the argument value is rounded up to an integer multiple of the sleep
+resolution, or because of the scheduling of other activity by the system. But,
+except for the case of being interrupted by a signal, the suspension time for
+the relative \fBclock_nanosleep()\fR function (that is, with the
+\fBTIMER_ABSTIME\fR flag not set) will not be less than the time interval
+specified by rqtp, as measured by the corresponding clock. The suspension for
+the absolute \fBclock_nanosleep()\fR function (that is, with the
+\fBTIMER_ABSTIME\fR flag set) will be in effect at least until the value of the
+corresponding clock reaches the absolute time specified by \fIrqtp\fR, except
+for the case of being interrupted by a signal.
+.sp
+.LP
+The use of the \fBclock_nanosleep()\fR function has no effect on the action or
+blockage of any signal.
+.sp
+.LP
+The \fBclock_nanosleep()\fR function fails if the \fIclock_id\fR argument
+refers to the CPU-time clock of the calling thread. It is unspecified if
+\fIclock_id\fR values of other CPU-time clocks are allowed.
+.SH RETURN VALUES
+.sp
+.LP
+If the \fBclock_nanosleep()\fR function returns because the requested time has
+elapsed, its return value is 0.
+.sp
+.LP
+If the \fBclock_nanosleep()\fR function returns because it has been interrupted
+by a signal, it returns the corresponding error value. For the relative
+\fBclock_nanosleep()\fR function, if the \fIrmtp\fR argument is non-null, the
+timespec structure referenced by it is updated to contain the amount of time
+remaining in the interval (the requested time minus the time actually slept).
+If the \fIrmtp\fR argument is NULL, the remaining time is not returned. The
+absolute \fBclock_nanosleep()\fR function has no effect on the structure
+referenced by \fIrmtp\fR.
+.sp
+.LP
+If \fBclock_nanosleep()\fR fails, it shall return the corresponding error
+value.
+.SH ERRORS
+.sp
+.LP
+The \fBclock_nanosleep()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBclock_nanosleep()\fR function was interrupted by a signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIrqtp\fR argument specified a nanosecond value less than zero or greater
+than or equal to 1,000 million; or the TIMER_ABSTIME flag was specified in
+\fIflags\fR and the \fIrqtp\fR argument is outside the range for the clock
+specified by \fIclock_id\fR; or the \fIclock_id\fR argument does not specify a
+known clock, or specifies the CPU-time clock of the calling thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIclock_id\fR argument specifies a clock for which \fBclock_nanosleep()\fR
+is not supported, such as a CPU-time clock.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclock_getres\fR(3C), \fBnanosleep\fR(3C), \fBpthread_cond_timedwait\fR(3C),
+\fBsleep\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,135 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_initscr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_initscr, initscr, newterm, endwin, isendwin, set_term, delscreen \- curses
+screen initialization and manipulation routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBWINDOW *\fR\fBinitscr\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBendwin\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBisendwin\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBSCREEN *\fR\fBnewterm\fR(\fBchar *\fR\fItype\fR, \fBFILE *\fR\fIoutfd\fR, \fBFILE *\fR\fIinfd\fR);
+.fi
+
+.LP
+.nf
+\fBSCREEN *\fR\fBset_term\fR(\fBSCREEN *\fR\fInew\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdelscreen\fR(\fBSCREEN *\fR \fIsp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBinitscr()\fR is almost always the first routine that should be called (the
+exceptions are \fBslk_init()\fR, \fBfilter()\fR, \fBripoffline()\fR,
+\fBuse_env()\fR and, for multiple-terminal applications, \fBnewterm()\fR.) This
+determines the terminal type and initializes all \fBcurses\fR data structures.
+\fBinitscr()\fR also causes the first call to \fBrefresh()\fR to clear the
+screen. If errors occur, \fBinitscr()\fR writes an appropriate error message to
+standard error and exits; otherwise, a pointer is returned to \fBstdscr()\fR.
+If the program needs an indication of error conditions, \fBnewterm()\fR should
+be used instead of \fB initscr()\fR; \fBinitscr()\fR should only be called once
+per application.
+.sp
+.LP
+A program that outputs to more than one terminal should use the \fBnewterm()\fR
+routine for each terminal instead of \fBinitscr()\fR. A program that needs an
+indication of error conditions, so it can continue to run in a line-oriented
+mode if the terminal cannot support a screen-oriented program, would also use
+this routine. The routine  \fBnewterm()\fR should be called once for each
+terminal. It returns a variable of type \fBSCREEN\fR \fB*\fR which should be
+saved as a reference to that terminal. The arguments are the \fItype\fR of the
+terminal to be used in place of $\fBTERM\fR, a file pointer for output to the
+terminal, and another file pointer for input from the terminal (if \fItype\fR
+is \fINULL\fR, $\fBTERM\fR will be used).  The program must also call
+\fBendwin()\fR for each terminal being used before exiting from curses. If
+\fBnewterm()\fR is called more than once for the same terminal, the first
+terminal referred to must be the last one for which \fBendwin()\fR is called.
+.sp
+.LP
+A program should always call \fBendwin()\fR before exiting or escaping from
+\fBcurses\fR mode temporarily. This routine restores tty modes, moves the
+cursor to the lower left-hand corner of the screen and resets the terminal into
+the proper non-visual mode. Calling \fBrefresh()\fR or \fBdoupdate()\fR after a
+temporary escape causes the program to resume visual mode.
+.sp
+.LP
+The \fBisendwin()\fR routine returns \fBTRUE\fR if \fBendwin()\fR has been
+called without any subsequent calls to \fBwrefresh()\fR, and \fBFALSE\fR
+otherwise.
+.sp
+.LP
+The \fBset_term()\fR routine is used to switch between different terminals. The
+screen reference \fBnew\fR becomes the new current terminal. The previous
+terminal is returned by the routine. This is the only routine which manipulates
+\fBSCREEN\fR pointers; all other routines affect only the current terminal.
+.sp
+.LP
+The \fBdelscreen()\fR routine frees storage associated with the \fBSCREEN\fR
+data structure.  The \fBendwin()\fR routine does not do this, so
+\fBdelscreen()\fR should be called after \fBendwin()\fR if a particular
+\fBSCREEN\fR is no longer needed.
+.SH RETURN VALUES
+.sp
+.LP
+\fBendwin()\fR returns the integer \fBERR\fR upon failure and \fBOK\fR upon
+successful completion.
+.sp
+.LP
+Routines that return pointers always return \fINULL\fR on error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_kernel\fR(3CURSES), \fBcurs_refresh\fR(3CURSES),
+\fBcurs_slk\fR(3CURSES), \fBcurs_util\fR(3CURSES), \fBcurses\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that \fBinitscr()\fR and \fBnewterm()\fR may be macros.

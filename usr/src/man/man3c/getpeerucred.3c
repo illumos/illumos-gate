@@ -1,0 +1,161 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getpeerucred 3C "26 May 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getpeerucred \- get connected socket or stream peer's credentials
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucred.h>
+
+\fBint\fR \fBgetpeerucred\fR(\fBint\fR \fIfd\fR, \fBucred_t **\fR\fIucred\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetpeerucred()\fR function returns the credentials of the peer endpoint
+of a connection-oriented socket (\fBSOCK_STREAM\fR) or stream \fIfd\fR at the
+time the endpoint was created or the connection was established.  A process
+that initiates a connection retrieves the credentials of its peer at the time
+the peer's endpoint was created. A process that listens for connections
+retrieves the credentials of the peer at the time the peer initiated the
+connection.
+.sp
+.LP
+When successful, \fBgetpeerucred()\fR stores the pointer to a freshly allocated
+\fBucred_t\fR in the memory location pointed to by the \fIucred\fR argument if
+that memory location contains the null pointer. If the memory location is
+non-null, it will reuse the existing \fBucred_t\fR.
+.sp
+.LP
+When \fIucred\fR is no longer needed, a credential allocated by
+\fBgetpeerucred()\fR should be freed with \fBucred_free\fR(3C).
+.sp
+.LP
+It is possible that all fields of the \fBucred_t\fR are not available to all
+peer endpoints and all callers.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBgetpeerucred()\fR returns 0. Otherwise, it
+returns \(mi1 and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetpeerucred()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 12n
+.rt  
+There is not enough memory available to allocate sufficient memory to hold the
+user credential. The application can try again later.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 12n
+.rt  
+The \fIfd\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 12n
+.rt  
+The pointer location pointed to by the \fBucred_t **\fR argument points to an
+invalid, non-null address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 12n
+.rt  
+The socket is connected but the peer credentials are unknown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 12n
+.rt  
+The physical limits of the system are exceeded by the memory allocation needed
+to hold the user credential.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTCONN\fR\fR
+.ad
+.RS 12n
+.rt  
+The socket or stream is not connected or the stream's peer is unknown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 12n
+.rt  
+This operation is not supported on this file descriptor.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdoor_ucred\fR(3C), \fBucred_get\fR(3C), \fBattributes\fR(5),
+\fBconnld\fR(7M)
+.SH NOTES
+.sp
+.LP
+The system currently supports both sides of connection endpoints for local
+\fBAF_UNIX\fR, \fBAF_INET\fR, and \fBAF_INET6\fR sockets, \fB/dev/tcp\fR,
+\fB/dev/ticots\fR, and \fB/dev/ticotsord\fR XTI/TLI connections, and pipe file
+descriptors sent using \fBI_SENDFD\fR as a result of the open of a named pipe
+with the "connld" module pushed.

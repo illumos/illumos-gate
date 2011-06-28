@@ -1,0 +1,127 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH copyb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+copyb \- copy a message block
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBcopyb\fR(\fBmblk_t *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to the message block from which data is copied.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcopyb()\fR function allocates a new message block, and copies into it
+the data from the block that \fIbp\fR denotes. The new block will be at least
+as large as the block being copied. \fBcopyb()\fR uses the \fBb_rptr\fR and
+\fBb_wptr\fR members of \fIbp\fR to determine how many bytes to copy.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, \fBcopyb()\fR returns a pointer to the newly allocated message
+block containing the copied data. Otherwise, it returns a \fINULL\fR pointer.
+.SH CONTEXT
+.sp
+.LP
+The \fBcopyb()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing copyb
+.sp
+.LP
+For each message in the list, test to see if the downstream queue is full with
+the \fBcanputnext\fR(9F) function (line 21). If it is not full, use \fBcopyb\fR
+to copy a header message block, and \fBdupmsg\fR(9F) to duplicate the data to
+be retransmitted. If either operation fails, reschedule a timeout at the next
+valid interval.
+
+.sp
+.LP
+Update the new header block with the correct destination address (line 34),
+link the message to it (line 35), and send it downstream (line 36). At the end
+of the list, reschedule this routine.
+
+.sp
+.in +2
+.nf
+ 1  struct retrans {
+ 2        mblk_t             *r_mp;
+ 3        int                r_address;
+ 4        queue_t            *r_outq;
+ 5        struct retrans     *r_next;
+ 6  };
+ 7  
+ 8  struct protoheader {
+       \&.\|.\|.
+ 9     int                    h_address;
+       \&.\|.\|.
+10  };
+11
+12  mblk_t *header;
+13
+14  void
+15  retransmit(struct retrans *ret)
+16  {
+17       mblk_t *bp, *mp;
+18       struct protoheader *php;
+19
+20       while (ret) {
+21         if (!canputnext(ret->r_outq)) {   /* no room */
+22                ret = ret->r_next;
+23                continue;
+24         }
+25         bp = copyb(header);               /* copy header msg. block */
+26         if (bp == NULL)
+27               break;
+28         mp = dupmsg(ret->r_mp);           /* duplicate data */
+29         if (mp == NULL) {                 /* if unsuccessful */
+30              freeb(bp);                   /* free the block */
+31              break;
+32         }
+33         php = (struct protoheader *)bp->b_rptr;
+34         php->h_address = ret->r_address;   /* new header */
+35         bp->bp_cont = mp;                  /* link the message */
+36         putnext(ret->r_outq, bp);          /* send downstream */
+37         ret = ret->r_next;
+38       }
+39       /* reschedule */
+40       (void) timeout(retransmit, (caddr_t)ret, RETRANS_TIME);
+41  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBallocb\fR(9F), \fBcanputnext\fR(9F), \fBdupmsg\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

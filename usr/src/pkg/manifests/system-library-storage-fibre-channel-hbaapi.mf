@@ -36,10 +36,13 @@ dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
+dir path=usr/share/man
+dir path=usr/share/man/man4
 file path=etc/hba.conf original_name=SUNWcfcl:etc/hba.conf preserve=true
 file path=usr/include/hbaapi.h
 file path=usr/lib/$(ARCH64)/libHBAAPI.so.1
 file path=usr/lib/libHBAAPI.so.1
+file path=usr/share/man/man4/hba.conf.4
 legacy pkg=SUNWcfcl \
     desc="Common Fibre Channel HBA API Library based on the T11 FC-MI specification" \
     name="Common Fibre Channel HBA API Library (Usr)"

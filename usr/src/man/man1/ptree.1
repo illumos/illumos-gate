@@ -1,0 +1,182 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptree 1 "11 Oct 2005" "SunOS 5.11" "User Commands"
+.SH NAME
+ptree \- print process trees
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/ptree\fR [\fB-a\fR] [\fB-c\fR] [\fB-z\fR \fIzone\fR] [\fIpid\fR | \fIuser\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBptree\fR utility prints the process trees containing the specified
+\fIpid\fRs or \fIuser\fRs, with child processes indented from their respective
+parent processes. An argument of all digits is taken to be a process-ID,
+otherwise it is assumed to be a user login name. The default is all processes.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 11n
+.rt  
+All. Print all processes, including children of process 0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 11n
+.rt  
+Contracts. Print process contract memberships in addition to parent-child
+relationships. See \fBprocess\fR(4). This option implies the \fB-a\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-z\fR \fIzone\fR\fR
+.ad
+.RS 11n
+.rt  
+Zones. Print only processes in the specified \fIzone\fR. Each zone \fBID\fR can
+be specified as either a zone name or a numerical zone \fBID\fR.
+.sp
+This option is only useful when executed in the global zone.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 8n
+.rt  
+Process-id or a list of process-ids. \fBptree\fR also accepts
+\fB/proc/\fR\fInnn\fR as a process-id, so the shell expansion \fB/proc/*\fR can
+be used to specify all processes in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser\fR\fR
+.ad
+.RS 8n
+.rt  
+Username or list of usernames. Processes whose effective user IDs match those
+given are displayed.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing ptree
+.sp
+.LP
+The following example prints the process tree (including children of process 0)
+for processes which match the command name \fBssh\fR:
+
+.sp
+.in +2
+.nf
+$ ptree -a `pgrep ssh`
+        1     /sbin/init
+          100909 /usr/lib/ssh/sshd
+            569150 /usr/lib/ssh/sshd
+              569157 /usr/lib/ssh/sshd
+                569159 -ksh
+                  569171 bash
+                    569173 /bin/ksh
+                      569193 bash
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error has occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/*\fR\fR
+.ad
+.RS 11n
+.rt  
+process files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The human readable output is Unstable. The options are Evolving.
+.SH SEE ALSO
+.sp
+.LP
+\fBgcore\fR(1), \fBldd\fR(1), \fBpargs\fR(1), \fBpgrep\fR(1), \fBpkill\fR(1),
+\fBplimit\fR(1), \fBpmap\fR(1), \fBpreap\fR(1), \fBproc\fR(1), \fBps\fR(1),
+\fBppgsz\fR(1), \fBpwd\fR(1), \fBrlogin\fR(1), \fBtime\fR(1), \fBtruss\fR(1),
+\fBwait\fR(1), \fBfcntl\fR(2), \fBfstat\fR(2), \fBsetuid\fR(2),
+\fBdlopen\fR(3C), \fBsignal.h\fR(3HEAD), \fBcore\fR(4), \fBproc\fR(4),
+\fBprocess\fR(4), \fBattributes\fR(5), \fBzones\fR(5)

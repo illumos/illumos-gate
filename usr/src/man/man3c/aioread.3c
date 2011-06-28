@@ -1,0 +1,207 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aioread 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aioread, aiowrite \- read or write asynchronous I/O operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/asynch.h>
+
+\fBint\fR \fBaioread\fR(\fBint\fR \fIfildes\fR, \fBchar *\fR\fIbufp\fR, \fBint\fR \fIbufs\fR, \fBoff_t\fR \fIoffset\fR,
+     \fBint\fR \fIwhence\fR, \fBaio_result_t *\fR\fIresultp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBaiowrite\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIbufp\fR, \fBint\fR \fIbufs\fR, \fBoff_t\fR \fIoffset\fR,
+     \fBint\fR \fIwhence\fR, \fBaio_result_t *\fR\fIresultp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaioread()\fR function initiates one asynchronous \fBread\fR(2) and
+returns control to the calling program. The read continues concurrently with
+other activity of the process. An attempt is made to read \fIbufs\fR bytes of
+data from the object referenced by the descriptor \fIfildes\fR into the buffer
+pointed to by \fIbufp\fR.
+.sp
+.LP
+The \fBaiowrite()\fR function initiates one asynchronous \fBwrite\fR(2) and
+returns control to the calling program. The write continues concurrently with
+other activity of the process. An attempt is made to write \fIbufs\fR bytes of
+data from the buffer pointed to by \fIbufp\fR to the object referenced by the
+descriptor \fIfildes\fR.
+.sp
+.LP
+On objects capable of seeking, the I/O operation starts at the position
+specified by \fIwhence\fR and \fIoffset\fR. These parameters have the same
+meaning as the corresponding parameters to the \fBllseek\fR(2) function. On
+objects not capable of seeking the I/O operation always start from the current
+position and the parameters \fBwhence\fR and \fIoffset\fR are ignored. The seek
+pointer for objects capable of seeking is not updated by \fBaioread()\fR or
+\fBaiowrite()\fR. Sequential asynchronous operations on these devices must be
+managed by the application using the \fIwhence\fR and \fIoffset\fR parameters.
+.sp
+.LP
+The result of the asynchronous operation is stored in the structure pointed to
+by \fIresultp\fR:
+.sp
+.in +2
+.nf
+int aio_return;          /* return value of read() or write() */
+int aio_errno;          /* value of errno for read() or write() */
+.fi
+.in -2
+
+.sp
+.LP
+Upon completion of the operation both \fBaio_return\fR and \fBaio_errno\fR are
+set to reflect the result of the operation. Since \fBAIO_INPROGRESS\fR is not a
+value used by the system, the client can detect a change in state by
+initializing \fBaio_return\fR to this value.
+.sp
+.LP
+The application-supplied buffer \fIbufp\fR should not be referenced by the
+application until after the operation has completed. While the operation is in
+progress, this buffer is in use by the operating system.
+.sp
+.LP
+Notification of the completion of an asynchronous I/O  operation can be
+obtained synchronously through the  \fBaiowait\fR(3C) function, or
+asynchronously by installing a signal handler for the \fBSIGIO\fR signal.
+Asynchronous notification is accomplished by sending the process a \fBSIGIO\fR
+signal. If a signal handler is not installed for the \fBSIGIO\fR signal,
+asynchronous notification is disabled. The delivery of this instance of the
+\fBSIGIO\fR signal is reliable in that a signal delivered while the handler is
+executing is not lost. If the client ensures that \fBaiowait()\fR returns
+nothing (using a polling timeout) before returning from the signal handler, no
+asynchronous I/O notifications are lost. The \fBaiowait()\fR function is the
+only way to dequeue an asynchronous notification. The \fBSIGIO\fR signal can
+have several meanings simultaneously. For example, it can signify that a
+descriptor generated \fBSIGIO\fR and an asynchronous operation completed.
+Further, issuing an asynchronous request successfully guarantees that space
+exists to queue the completion notification.
+.sp
+.LP
+The \fBclose\fR(2), \fBexit\fR(2) and \fBexecve\fR(2)) functions block until
+all pending asynchronous I/O operations can be canceled by the system.
+.sp
+.LP
+It is an error to use the same result buffer in more than one outstanding
+request. These structures can be reused only after the system has completed the
+operation.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fBaioread()\fR and \fBaiowrite()\fR return
+\fB0\fR. Upon failure, \fBaioread()\fR and \fBaiowrite()\fR return \fB\(mi1\fR
+and set \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBaioread()\fR and \fBaiowrite()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The number of asynchronous requests that the system can handle at any one time
+has been exceeded
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor open for reading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+At least one of \fIbufp\fR or \fIresultp\fR points to an address outside the
+address space of the requesting process. This condition is reported only if
+detected by the application process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIresultp\fR argument is currently being used by an outstanding
+asynchronous request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIoffset\fR argument is not a valid offset for this file system type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Memory resources are unavailable to initiate request.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBaioread()\fR and \fBaiowrite()\fR functions have transitional interfaces
+for 64-bit file offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBexecve\fR(2), \fBexit\fR(2), \fBllseek\fR(2),
+\fBlseek\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
+\fBaiocancel\fR(3C), \fBaiowait\fR(3C), \fBsigvec\fR(3UCB),
+\fBattributes\fR(5), \fBlf64\fR(5)

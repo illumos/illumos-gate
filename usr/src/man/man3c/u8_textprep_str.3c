@@ -1,0 +1,424 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH u8_textprep_str 3C "18 Sep 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+u8_textprep_str \- string-based UTF-8 text preparation function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/u8_textprep.h>
+
+\fBsize_t\fR \fBu8_textprep_str\fR(\fBchar *\fR\fIinarray\fR, \fBsize_t *\fR\fIinlen\fR,
+     \fBchar *\fR\fIoutarray\fR, \fBsize_t *\fR\fIoutlen\fR, \fBint\fR \fIflag\fR,
+     \fBsize_t\fR \fIunicode_version\fR, \fBint *\fR\fIerrnum\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinarray\fR\fR
+.ad
+.RS 20n
+.rt  
+A pointer to a byte array containing a sequence of UTF-8 character bytes to be
+prepared.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinlen\fR\fR
+.ad
+.RS 20n
+.rt  
+As input argument, the number of bytes to be prepared in \fIinarray\fR. As
+output argument, the number of bytes in \fIinarray\fR still not consumed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutarray\fR\fR
+.ad
+.RS 20n
+.rt  
+A pointer to a byte array where prepared UTF-8 character bytes can be saved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoutlen\fR\fR
+.ad
+.RS 20n
+.rt  
+As input argument, the number of available bytes at \fIoutarray\fR where
+prepared character bytes can be saved.  As output argument, after the
+conversion, the number of bytes still available at \fIoutarray\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 20n
+.rt  
+The possible preparation options constructed by a bitwise-inclusive-OR of the
+following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_IGNORE_NULL\fR\fR
+.ad
+.sp .6
+.RS 4n
+Normally \fBu8_textprep_str()\fR stops the preparation if it encounters null
+byte even if the current \fIinlen\fR is pointing to a value bigger than zero.
+.sp
+With this option, null byte does not stop the preparation and the preparation
+continues until \fIinlen\fR specified amount of \fIinarray\fR bytes are all
+consumed for preparation or an error happened.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_IGNORE_INVALID\fR\fR
+.ad
+.sp .6
+.RS 4n
+Normally \fBu8_textprep_str()\fR stops the preparation if it encounters illegal
+or incomplete characters with corresponding \fIerrnum\fR values.
+.sp
+When this option is set, \fBu8_textprep_str()\fR does not stop the preparation
+and instead treats such characters as no need to do any preparation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_TOUPPER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Map lowercase characters to uppercase characters if applicable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_TOLOWER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Map uppercase characters to lowercase characters if applicable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_NFD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply Unicode Normalization Form D.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_NFC\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply Unicode Normalization Form C.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_NFKD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply Unicode Normalization Form KD.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_TEXTPREP_NFKC\fR\fR
+.ad
+.sp .6
+.RS 4n
+Apply Unicode Normalization Form KC.
+.RE
+
+Only one case folding option is allowed. Only one Unicode Normalization option
+is allowed.
+.sp
+When a case folding option and a Unicode Normalization option are specified
+together, UTF-8 text preparation is done by doing case folding first and then
+Unicode Normalization.
+.sp
+If no option is specified, no processing occurs except the simple copying of
+bytes from input to output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIunicode_version\fR\fR
+.ad
+.RS 20n
+.rt  
+The version of Unicode data that should be used during UTF-8 text preparation.
+The following values are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_UNICODE_320\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use Unicode 3.2.0 data during comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_UNICODE_500\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use Unicode 5.0.0 data during comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_UNICODE_LATEST\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the latest Unicode version data available which is Unicode 5.0.0 currently.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrnum\fR\fR
+.ad
+.RS 20n
+.rt  
+The error value when preparation is not completed or fails. The following
+values are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 10n
+.rt  
+Text preparation stopped due to lack of space in the output array.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+Specified option values are conflicting and cannot be supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+Text preparation stopped due to an input byte that does not belong to UTF-8.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Text preparation stopped due to an incomplete UTF-8 character at the end of the
+input array.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified Unicode version value is not a supported version.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBu8_textprep_str()\fR function prepares the sequence of UTF-8 characters
+in the array specified by \fIinarray\fR into a sequence of corresponding UTF-8
+characters prepared in the array specified by \fIoutarray\fR. The \fIinarray\fR
+argument points to a character byte array to the first character in the input
+array and \fIinlen\fR indicates the number of bytes to the end of the array to
+be converted. The \fIoutarray\fR argument points to a character byte array to
+the first available byte in the output array and \fIoutlen\fR indicates the
+number of the available bytes to the end of the array. Unless \fIflag\fR is
+\fBU8_TEXTPREP_IGNORE_NULL\fR, \fBu8_textprep_str()\fR normally stops when it
+encounters a null byte from the input array regardless of the current
+\fIinlen\fR value.
+.sp
+.LP
+If \fIflag\fR is \fBU8_TEXTPREP_IGNORE_INVALID\fR and a sequence of input bytes
+does not form a valid UTF-8 character, preparation stops after the previous
+successfully prepared character. If \fIflag\fR is
+\fBU8_TEXTPREP_IGNORE_INVALID\fR and the input array ends with an incomplete
+UTF-8 character, preparation stops after the previous successfully prepared
+bytes. If the output array is not large enough to hold the entire prepared
+text, preparation stops just prior to the input bytes that would cause the
+output array to overflow. The value pointed to by \fIinlen\fR is decremented to
+reflect the number of bytes still not prepared in the input array. The value
+pointed to by \fIoutlen\fR is decremented to reflect the number of bytes still
+available in the output array.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBu8_textprep_str()\fR function updates the values pointed to by
+\fIinlen\fR and \fIoutlen\fR arguments to reflect the extent of the
+preparation. When \fBU8_TEXTPREP_IGNORE_INVALID\fR is specified,
+\fBu8_textprep_str()\fR returns the number of illegal or incomplete characters
+found during the text preparation. When \fBU8_TEXTPREP_IGNORE_INVALID\fR is not
+specified and the text preparation is entirely successful, the function returns
+0. If the entire string in the input array is prepared, the value pointed to by
+\fIinlen\fR will be 0. If the text preparation is stopped due to any conditions
+mentioned above, the value pointed to by \fIinlen\fR will be non-zero and
+\fIerrnum\fR is set to indicate the error. If such and any other error occurs,
+\fBu8_textprep_str()\fR returns (\fBsize_t\fR)-1 and sets \fIerrnum\fR to
+indicate the error.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSimple UTF-8 text preparation
+.sp
+.in +2
+.nf
+#include <sys/u8_textprep.h>
+\&.
+\&.
+\&.
+size_t ret;
+char ib[MAXPATHLEN];
+char ob[MAXPATHLEN];
+size_t il, ol;
+int err;
+\&.
+\&.
+\&.
+/*
+ * We got a UTF-8 pathname from somewhere.
+ *
+ * Calculate the length of input string including the terminating
+ * NULL byte and prepare other arguments.
+ */
+(void) strlcpy(ib, pathname, MAXPATHLEN);
+il = strlen(ib) + 1;
+ol = MAXPATHLEN;
+
+/*
+ * Do toupper case folding, apply Unicode Normalization Form D,
+ * ignore NULL byte, and ignore any illegal/incomplete characters.
+ */
+ret = u8_textprep_str(ib, &il, ob, &ol,
+    (U8_TEXTPREP_IGNORE_NULL|U8_TEXTPREP_IGNORE_INVALID|
+    U8_TEXTPREP_TOUPPER|U8_TEXTPREP_NFD), U8_UNICODE_LATEST, &err);
+if (ret == (size_t)-1) {
+    if (err == E2BIG)
+        return (-1);
+    if (err == EBADF)
+        return (-2);
+    if (err == ERANGE)
+        return (-3);
+    return (-4);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBu8_strcmp\fR(3C), \fBu8_validate\fR(3C), \fBattributes\fR(5),
+\fBu8_strcmp\fR(9F), \fBu8_textprep_str\fR(9F), \fBu8_validate\fR(9F)
+.sp
+.LP
+The Unicode Standard (http://www.unicode.org)
+.SH NOTES
+.sp
+.LP
+After the text preparation, the number of prepared UTF-8 characters and the
+total number bytes may decrease or increase when you compare the numbers with
+the input buffer.
+.sp
+.LP
+Case conversions are performed using Unicode data of the corresponding version.
+There are no locale-specific case conversions that can be performed.

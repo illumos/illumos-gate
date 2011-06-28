@@ -1,0 +1,411 @@
+'\" te
+.\" Copyright 1989 AT&T. Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mount 2 "26 Feb 2004" "SunOS 5.11" "System Calls"
+.SH NAME
+mount \- mount a file system
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/mount.h>
+#include <sys/mntent.h>
+
+\fBint\fR \fBmount\fR(\fBconst char *\fR\fIspec\fR, \fBconst char *\fR\fIdir\fR, \fBint\fR \fImflag\fR,
+     \fBchar *\fR\fIfstype\fR, \fBchar *\fR\fIdataptr\fR,\fBint\fR \fIdatalen\fR, \fBchar *\fR\fIoptptr\fR,
+     \fBint\fR \fIoptlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmount()\fR function requests that a removable file system contained on
+the block special file identified by \fIspec\fR be mounted on the directory
+identified by \fIdir\fR. The \fIspec\fR and \fIdir\fR arguments are pointers to
+path names.
+.sp
+.LP
+After a successful call to \fBmount()\fR, all references to the file \fIdir\fR
+refer to the root directory on the mounted file system. The mounted file system
+is inserted into the kernel list of all mounted file systems. This list can be
+examined through the mounted file system table (see \fBmnttab\fR(4)).
+.sp
+.LP
+The \fIfstype\fR argument is the file system type name. Standard file system
+names are defined with the prefix \fBMNTTYPE_\fR in <\fBsys/mntent.h\fR>. If
+neither \fBMS_DATA\fR nor \fBMS_OPTIONSTR\fR is set in \fImflag\fR, then
+\fIfstype\fR is ignored and the type of the root file system is assumed.
+.sp
+.LP
+The \fIdataptr\fR argument is 0 if no file system-specific data is to be
+passed; otherwise it points to an area of size \fIdatalen\fR that contains the
+file system-specific data for this mount and the \fBMS_DATA\fR flag should be
+set.
+.sp
+.LP
+If the \fBMS_OPTIONSTR\fR flag is set, then \fIoptptr\fR points to a buffer
+containing the list of options to be used for this mount. The \fIoptlen\fR
+argument specifies the length of the buffer. On completion of the \fBmount()\fR
+call, the options in effect for the mounted file system are returned in this
+buffer. If \fBMS_OPTIONSTR\fR is not specified, then the options for this mount
+will not appear in the mounted file systems table.
+.sp
+.LP
+If the caller does not have all privileges available in the current zone, the
+\fBnosuid\fR option is automatically set on the mount point. The \fBrestrict\fR
+option is automatically added for \fBautofs\fR mounts.
+.sp
+.LP
+If the caller is not in the global zone, the \fBnodevices\fR option is
+automatically set.
+.sp
+.LP
+The \fImflag\fR argument is constructed by a bitwise-inclusive-OR of flags from
+the following list, defined in <\fBsys/mount.h\fR>.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_DATA\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIdataptr\fR and \fIdatalen\fR arguments describe a block of file
+system-specific binary data at address \fIdataptr\fR of length \fIdatalen\fR.
+This is interpreted by file system-specific code within the operating system
+and its format depends on the file system type. If a particular file system
+type does not require this data, \fIdataptr\fR and \fIdatalen\fR should both be
+0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_GLOBAL\fR\fR
+.ad
+.RS 16n
+.rt  
+Mount a file system globally if the system is configured and booted as part of
+a cluster (see \fBclinfo\fR(1M)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_NOSUID\fR\fR
+.ad
+.RS 16n
+.rt  
+Prevent programs that are marked set-user-\fBID\fR or set-group-\fBID\fR from
+executing (see \fBchmod\fR(1)). It also causes \fBopen\fR(2) to return
+\fBENXIO\fR when attempting to open block or character special files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_OPTIONSTR\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIoptptr\fR and \fIoptlen\fR arguments describe a character buffer at
+address \fIoptptr\fR of size \fIoptlen\fR. When calling \fBmount()\fR, the
+character buffer should contain a null-terminated string of options to be
+passed to the file system-specific code within the operating system. On a
+successful return, the file system-specific code will return the list of
+options recognized. Unrecognized options are ignored. The format of the string
+is a list of option names separated by commas. Options that have values (rather
+than binary options such as \fBsuid\fR or \fBnosuid\fR), are separated by
+"\fB=\fR" such as \fBdev=2c4046c\fR. Standard option names are defined in
+<\fBsys/mntent.h\fR>. Only strings defined in the "C" locale are supported. The
+maximum length option string that can be passed to or returned from a
+\fBmount()\fR call is defined by the \fBMAX_MNTOPT_STR\fR constant. The buffer
+should be long enough to contain more options than were passed in, as the state
+of any default options that were not passed in the input option string may also
+be returned in the recognized options list that is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_OVERLAY\fR\fR
+.ad
+.RS 16n
+.rt  
+Allow the file system to be mounted over an existing file system mounted on
+\fIdir\fR, making the underlying file system inaccessible. If a mount is
+attempted on a pre-existing mount point without setting this flag, the mount
+will fail.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_RDONLY\fR\fR
+.ad
+.RS 16n
+.rt  
+Mount the file system for reading only. This flag should also be specified for
+file systems that are incapable of writing (for example, CDROM). Without this
+flag, writing is permitted according to individual file accessibility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMS_REMOUNT\fR\fR
+.ad
+.RS 16n
+.rt  
+Remount a read-only file system as read-write.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBmount()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 16n
+.rt  
+The permission bits of the mount point do not permit read/write access or
+search permission is denied on a component of the path prefix.
+.sp
+The calling process is not the owner of the mountpoint.
+.sp
+The mountpoint is not a regular file or a directory and the caller does not
+have all privileges available in a its zone.
+.sp
+The special device device does not permit read access in the case of read-only
+mounts or read-write access in the case of read/write mounts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIdir\fR argument is currently mounted on, is someone's current working
+directory, or is otherwise busy; or the device associated with \fIspec\fR is
+currently mounted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIspec\fR, \fIdir\fR, \fIfstype\fR, \fIdataptr\fR, or \fIoptptr\fR
+argument points outside the allocated address space of the process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The super block has an invalid magic number, the \fIfstype\fR is invalid, or
+\fIdir\fR is not an absolute path.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELOOP\fR\fR
+.ad
+.RS 16n
+.rt  
+Too many symbolic links were encountered in translating \fIspec\fR or
+\fIdir\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the \fIpath\fR argument exceeds \fIPATH_MAX\fR, or the length of
+a \fIpath\fR component exceeds \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
+effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 16n
+.rt  
+None of the named files exists or is a null pathname.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIpath\fR argument points to a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 16n
+.rt  
+The file system state in the super-block is not \fBFsOKAY\fR and \fImflag\fR
+requests write permission.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTBLK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIspec\fR argument is not a block special device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTDIR\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIdir\fR argument is not a directory, or a component of a path prefix is
+not a directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 16n
+.rt  
+A global mount is attempted (the \fBMS_GLOBAL\fR flag is set in \fImflag\fR) on
+a machine which is not booted as a cluster; a local mount is attempted and
+\fIdir\fR is within a globally mounted file system; or a remount was attempted
+on a file system that does not support remounting.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 16n
+.rt  
+The device associated with \fIspec\fR does not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 16n
+.rt  
+The length of the option string to be returned in the \fIoptptr\fR argument
+exceeds the size of the buffer specified by \fIoptlen\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 16n
+.rt  
+The {\fBPRIV_SYS_MOUNT\fR} privilege is not asserted in the effective set of
+the calling process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEREMOTE\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIspec\fR argument is remote and cannot be mounted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIspec\fR argument is write protected and \fImflag\fR requests write
+permission.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBmount()\fR function can be invoked only by processes with appropriate
+privileges.
+.SH SEE ALSO
+.sp
+.LP
+\fBmount\fR(1M), \fBumount\fR(2), \fBmnttab\fR(4)
+.SH NOTES
+.sp
+.LP
+\fBMS_OPTIONSTR\fR-type option strings should be used.
+.sp
+.LP
+Some flag bits set file system options that can also be passed in an option
+string. Options are first set from the option string with the last setting of
+an option in the string determining the value to be set by the option string.
+Any options controlled by flags are then applied, overriding any value set by
+the option string.

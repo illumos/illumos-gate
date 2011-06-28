@@ -1,0 +1,134 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH size 9P "23 Janl2008" "SunOS 5.11" "Kernel Properties for Drivers"
+.SH NAME
+size, Nblock, blksize, device-nblocks, device-blksize \- device size properties
+.SH DESCRIPTION
+.sp
+.LP
+A driver can communicate size information to the system by the values
+associated with following properties. Size information falls into two
+categories: device size associated with a \fBdev_info_t\fR node, and minor node
+size associated with a \fBddi_create_minor_node\fR(9F) \fBdev_t\fR (partition).
+.sp
+.LP
+device size property names:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevice-nblocks\fR\fR
+.ad
+.RS 18n
+.rt  
+An \fBint64_t\fR property representing device size in
+\fBdevice-blksize\fRblocks.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdevice-blksize\fR\fR
+.ad
+.RS 18n
+.rt  
+An integer property representing the size in bytes of a block. If defined, the
+value must be a power of two. If not defined, \fBDEV_BSIZE\fR is implied.
+.RE
+
+.sp
+.LP
+minor size property names:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSize\fR\fR
+.ad
+.RS 11n
+.rt  
+An \fBint64_t\fR property representing the size in bytes of a character minor
+device (\fBS_IFCHR\fR \fBspec_type\fR in ddi_create_minor_node).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNblocks\fR\fR
+.ad
+.RS 11n
+.rt  
+An \fBint64_t\fR property representing the number blocks, in
+\fBdevice-blksize\fR units, of a block minor device (\fBS_IFBLK\fR
+\fBspec_type\fR in ddi_create_minor_node).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBblksize\fR\fR
+.ad
+.RS 11n
+.rt  
+An integer property representing the size in bytes of a block. If defined, the
+value must be a power of two. If not defined, \fBDEV_BSIZE\fR is implied.
+.RE
+
+.sp
+.LP
+A driver that implements both block and character minor device nodes should
+support both "Size" and "Nblocks". Typically, the following is true: Size =
+\fBNblocks\fR * \fBblksize\fR.
+.sp
+.LP
+A driver where all ddi_create_minor_node(9F) calls for a given instance are
+associated with the same physical block device should implement
+"\fBdevice-nblocks\fR". If the device has a fixed block size with a value other
+than \fBDEV_BSIZE\fR then "\fBdevice-blksize\fR" should be implemented.
+.sp
+.LP
+The driver is responsible for ensuring that property values are updated when
+device, media, or partition sizes change. For each represented item, if its
+size is know to be zero, the property value should be zero. If its size is
+unknown, the property should not be defined.
+.sp
+.LP
+A driver may choose to implement size properties within its prop_op(9E)
+implementation. This reduces system memory since no space is used to store the
+properties.
+.sp
+.LP
+The DDI property interfaces deal in signed numbers. All Size(9P) values should
+be considered unsigned. It is the responsibility of the code dealing with the
+property value to ensure that an unsigned interpretation occurs.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+attach(9E), detach(9E), prop_op(9E), ddi_create_minor_node(9F),
+inquiry-vendor-id(9P)
+.sp
+.LP
+\fIWriting Device Drivers\fR

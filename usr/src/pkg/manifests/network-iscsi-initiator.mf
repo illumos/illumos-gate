@@ -44,6 +44,9 @@ dir path=lib/svc/manifest/network/iscsi group=sys \
 dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man7d
 driver name=iscsi class=scsi-self-identify perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/iscsi group=sys
 $(i386_ONLY)file path=kernel/drv/iscsi group=sys
@@ -55,6 +58,8 @@ file path=lib/svc/method/iscsi-initiator mode=0555 \
     variant.opensolaris.zone=global
 file path=lib/svc/method/iscsid mode=0555 variant.opensolaris.zone=global
 file path=usr/sbin/iscsiadm mode=0555
+file path=usr/share/man/man1m/iscsiadm.1m
+file path=usr/share/man/man7d/iscsi.7d
 legacy pkg=SUNWiscsir desc="Sun iSCSI Device Driver" \
     name="Sun iSCSI Device Driver (root)"
 legacy pkg=SUNWiscsiu desc="Sun iSCSI Management Utilities" \

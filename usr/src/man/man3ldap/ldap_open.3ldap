@@ -1,0 +1,129 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_open 3LDAP "15 Jan 2004" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_open, ldap_init \- initialize an LDAP session
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... -lldap [ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBLDAP *\fR\fBldap_open\fR(\fBconst char *\fR\fIhost\fR, \fBint\fR \fIport\fR);
+.fi
+
+.LP
+.nf
+\fBLDAP *\fR\fBldap_init\fR(\fBconst char *\fR\fIhost\fR, \fBint\fR \fIport\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBldap_open()\fR function initializes an LDAP session and also opens a
+connection to an LDAP server before it returns to the caller. Unlike
+\fBldap_open()\fR, \fBldap_init()\fR does not open a connection to the LDAP
+server until an operation, such as a search request, is performed.
+.sp
+.LP
+The \fBldap_open()\fR function is deprecated and should no longer be used. Call
+\fBldap_init()\fR instead.
+.sp
+.LP
+A list of LDAP hostnames or an IPv4 or IPv6 address can be specified with the
+\fBldap_open()\fR and \fBldap_init()\fR functions. The hostname can include a
+port number, separated from the hostname by a colon (\fB:\fR). A port number
+included as part of the hostname takes precedence over the \fIport\fR
+parameter. The \fBldap_open()\fR and \fBldap_init()\fR functions attempt
+connections with LDAP hosts in the order listed and return the first successful
+connection.
+.SH PARAMETERS
+.sp
+.LP
+These functions support the following parameters.
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhost\fR\fR
+.ad
+.RS 8n
+.rt  
+The hostname, IPv4 or IPv6 address of the host that runs the LDAP server. A
+space-separated list of hostnames can also be used for this parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIport\fR\fR
+.ad
+.RS 8n
+.rt  
+TCP port number of a connection. Supply the constant \fBLDAP_PORT\fR to obtain
+the default LDAP port of 389. If a host includes a port number, the default
+parameter is ignored.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBldap_open()\fR and \fBldap_init()\fR functions return a handle to an
+LDAP session that contains a pointer to an opaque structure. The structure must
+be passed to subsequent calls for the session. If a session cannot be
+initialized, the functions return \fINULL\fR and \fBerrno\fR should be set
+appropriately.
+.sp
+.LP
+Various aspects of this opaque structure can be read or written to control the
+session-wide parameters. Use the \fBldap_get_option\fR(3LDAP) to access the
+current option values and the \fBldap_set_option\fR(3LDAP) to set values for
+these options.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSpecifying IPv4 and IPv6 Addresses
+.sp
+.LP
+LDAP sessions can be initialized with hostnames, IPv4 or IPv6 addresses, such
+as those shown in the following examples.
+
+.sp
+.in +2
+.nf
+ldap_init("hosta:636 hostb", 389)
+ldap_init("192.168.82.110:389", 389)
+ldap_init("[fec0::114:a00:20ff:ab3d:83ed]", 389)
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBerrno\fR(3C), \fBldap\fR(3LDAP), \fBldap_bind\fR(3LDAP),
+\fBldap_get_option\fR(3LDAP), \fBldap_set_option\fR(3LDAP), \fBattributes\fR(5)

@@ -1,0 +1,211 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volmgt_acquire 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+volmgt_acquire \- reserve removable media device
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lvolmgt\fR [ \fIlibrary\fR ... ]
+#include <sys/types.h>
+
+#include <volmgt.h>
+
+
+
+\fBint\fR \fBvolmgt_acquire\fR(\fBchar *\fR\fIdev\fR, \fBchar *\fR\fIid\fR, \fBint\fR \fIovr\fR, \fBchar **\fR\fIerr\fR, \fBpid_t *\fR\fIpidp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+The  \fBvolmgt_acquire()\fR routine reserves the removable media device
+specified as  \fIdev\fR. \fBvolmgt_acquire()\fR operates in two different
+modes, depending on whether or not volume management is running.
+.sp
+.LP
+If  volume management  \fIis\fR running, \fBvolmgt_acquire()\fR attempts to
+reserve the removable media device specified as \fIdev\fR. Specify \fIdev\fR as
+\fIeither\fR a symbolic device name (for example,  \fBfloppy0\fR) or a physical
+device pathname (for example, \fB/dsk/unnamed_floppy\fR).
+.sp
+.LP
+If  volume management  \fIis\fR \fInot\fR running, \fBvolmgt_acquire()\fR
+requires callers to specify a physical device pathname for  \fIdev\fR.
+Specifying  \fIdev\fR as a symbolic  device name is  \fInot\fR acceptable. In
+this mode,  \fBvolmgt_acquire()\fR relies entirely on the major and minor
+numbers of the device to determine whether or not the device is reserved.
+.sp
+.LP
+If  \fIdev\fR is free,  \fBvolmgt_acquire()\fR updates the internal device
+reservation database with the caller's process id  (\fIpid\fR) and the
+specified \fBid\fR string.
+.sp
+.LP
+If  \fIdev\fR is reserved  by another process, the reservation attempt fails
+and  \fBvolmgt_acquire(\|):\fR
+.RS +4
+.TP
+.ie t \(bu
+.el o
+sets \fBerrno\fR to \fBEBUSY\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+fills the caller's \fBid\fR value in the array pointed to by \fIerr\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+fills in the  \fIpid\fR to which the pointer  \fIpidp\fR points with the
+\fIpid\fR of the process which holds the reservation,   if the supplied
+\fIpidp\fR is non-zero
+.RE
+.sp
+.LP
+If the override  \fIovr\fR is non-zero, the call overrides the device
+reservation.
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH ERRORS
+.sp
+.LP
+The  \fBvolmgt_acquire()\fR routine fails if one or more of the following are
+true:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+One of the specified arguments is invalid or missing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+\fIdev\fR is already reserved by another process (and \fIovr\fR was not set to
+a non-zero value)
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBvolmgt_acquire()\fR
+.sp
+.LP
+In the following example, volume management is running and the first floppy
+drive is reserved, accessed and released.
+
+.sp
+.in +2
+.nf
+#include <volmgt.h>
+char *errp;
+if (!volmgt_acquire("floppy0", "FileMgr", 0, NULL,
+    &errp, NULL)) {
+        /* handle error case */
+        .\|.\|.
+}
+/* floppy acquired - now access it */
+if (!volmgt_release("floppy0")) {
+        /* handle error case */
+        \|.\|.\|.
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRUsing  \fBvolmgt_acquire()\fR To Override A Lock On Another
+Process
+.sp
+.LP
+The following example shows how callers can override a  lock on another process
+using  \fBvolmgt_acquire()\fR.
+
+.sp
+.in +2
+.nf
+char *errp, buf[20];
+int override = 0;
+pid_t pid;
+if (!volmgt_acquire("floppy0", "FileMgr", 0, &errp,
+    &pid)) {
+      if (errno == EBUSY) {
+             (void) printf("override %s (pid=%ld)?\en",
+                errp, pid); {
+             (void) fgets(buf, 20, stdin);
+             if (buf[0] == 'y') {
+                   override++;
+             }
+       } else {
+             /* handle other errors */
+             .\|.\|.
+       }
+}
+if (override) {
+      if (!volmgt_acquire("floppy0", "FileMgr", 1,
+          &errp, NULL)) {
+             /* really give up this time! */
+             \|.\|.\|.
+      }
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfree\fR(3C), \fBmalloc\fR(3C), \fBvolmgt_release\fR(3VOLMGT),
+\fBattributes\fR(5), \fBhal\fR(5)
+.SH NOTES
+.sp
+.LP
+When returning a string through  \fIerr\fR, \fBvolmgt_acquire()\fR allocates a
+memory area using  \fBmalloc\fR(3C). Use \fBfree\fR(3C) to release the memory
+area  when no longer needed.
+.sp
+.LP
+The \fIovr\fR argument is intended to allow callers to override the current
+device reservation. It is assumed that the calling application has determined
+that the current reservation can safely be cleared. See  \fBEXAMPLES.\fR

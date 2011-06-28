@@ -1,0 +1,203 @@
+'\" te
+.\"  All Rights Reserved  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH td_ta_sync_iter 3C_DB "19 Jun 2001" "SunOS 5.11" "Threads Debugging Library Functions"
+.SH NAME
+td_ta_sync_iter, td_ta_thr_iter, td_ta_tsd_iter \- iterator functions on
+process handles from libc_db
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
+#include <proc_service.h>
+#include <thread_db.h>
+
+\fBtypedef int\fR \fBtd_sync_iter_f\fR(\fBconst td_synchandle_t *\fR\fIsh_p\fR, \fBvoid *\fR\fIcbdata_p\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBtd_thr_iter_f\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBvoid *\fR\fIcbdata_p\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef int\fR \fBtd_key_iter_f\fR(\fBthread_key_t\fR \fIkey\fR, \fBvoid (*\fR\fIdestructor\fR)(), \fBvoid *\fR\fIcbdata_p\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_sync_iter\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_sync_iter_f *\fR\fIcb\fR,
+     \fBvoid *\fR\fIcbdata_p\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_thr_iter\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_thr_iter_f *\fR\fIcb\fR,
+     \fBvoid *\fR\fIcbdata_p\fR, \fBtd_thr_state_e\fR \fIstate\fR, \fBint\fR \fIti_pri\fR, \fBsigset_t *\fR\fIti_sigmask_p\fR,
+     \fBunsigned\fR \fIti_user_flags\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_tsd_iter\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_key_iter_f *\fR\fIcb\fR,
+     \fBvoid *\fR\fIcbdata_p\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtd_ta_sync_iter()\fR, \fBtd_ta_thr_iter()\fR, and \fBtd_ta_tsd_iter()\fR
+functions are iterator functions that when given a target process handle as an
+argument, return sets of handles for objects associated with the target
+process. The method is to call back a client-provided function once for each
+associated object, passing back a handle as well as the client-provided pointer
+\fIcb_data_p\fR. This enables a client to easily build a linked list of the
+associated objects. If the client-provided function returns non-zero, the
+iteration terminates, even if there are members remaining in the set of
+associated objects.
+.sp
+.LP
+The \fBtd_ta_sync_iter()\fR function returns handles of synchronization objects
+(mutexes, readers-writer locks, semaphores, and condition variables) associated
+with a process.  Some synchronization objects might not be known to
+\fBlibc_db\fR and will not be returned. If the process has initialized the
+synchronization object (by calling \fBmutex_init\fR(3C), for example) or a
+thread in the process has called a synchronization primitive
+(\fBmutex_lock()\fR, for example) using this object after
+\fBtd_ta_new\fR(3C_DB) was called to attach to the process and
+\fBtd_ta_sync_tracking_enable()\fR was called to enable synchronization object
+tracking, then a handle for the synchronization object will be passed to the
+callback function. See \fBtd_sync_get_info\fR(3C_DB) for operations that can be
+performed on synchronization object handles.
+.sp
+.LP
+The \fBtd_ta_thr_iter()\fR function returns handles for threads that are part
+of the target process. For  \fBtd_ta_thr_iter()\fR, the caller specifies
+several criteria to select a subset of threads for which the callback function
+should be called.  Any of these selection criteria may be wild-carded. If all
+of them are wild-carded, then handles for all threads in the process will be
+returned.
+.sp
+.LP
+The selection parameters and corresponding wild-card values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstate (TD_THR_ANY_STATE\fR):\fR
+.ad
+.sp .6
+.RS 4n
+Select only threads whose state matches \fBstate\fR. See
+\fBtd_thr_get_info\fR(3C_DB) for a list of thread states.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBti_pri (TD_THR_LOWEST_PRIORITY\fR):\fR
+.ad
+.sp .6
+.RS 4n
+Select only threads for which the priority is at least \fBti_pri\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBti_sigmask_p (TD_SIGNO_MASK\fR):\fR
+.ad
+.sp .6
+.RS 4n
+Select only threads whose signal mask exactly matches *\fIti_sigmask_p\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBti_user_flags (TD_THR_ANY_USER_FLAGS\fR):\fR
+.ad
+.sp .6
+.RS 4n
+Select only threads whose user flags (specified at thread creation time)
+exactly match \fIti_user_flags\fR.
+.RE
+
+.sp
+.LP
+The \fBtd_ta_tsd_iter()\fR function returns the thread-specific data keys in
+use by the current process.  Thread-specific data for a particular thread and
+key can be obtained by calling \fBtd_thr_tsd\fR(3C_DB).
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_OK\fR\fR
+.ad
+.RS 12n
+.rt  
+The call completed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_BADTA\fR\fR
+.ad
+.RS 12n
+.rt  
+An invalid process handle was passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_DBERR\fR\fR
+.ad
+.RS 12n
+.rt  
+A call to one of the imported interface routines failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_ERR\fR\fR
+.ad
+.RS 12n
+.rt  
+The call did not complete successfully.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBmutex_init\fR(3C), \fBtd_sync_get_info\fR(3C_DB),
+\fBtd_thr_get_info\fR(3C_DB), \fBtd_thr_tsd\fR(3C_DB), \fBattributes\fR(5)

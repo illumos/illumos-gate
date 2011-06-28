@@ -1,0 +1,159 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1994, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mkmsgs 1 "26 Jul 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+mkmsgs \- create message files for use by gettxt
+.SH SYNOPSIS
+.LP
+.nf
+\fBmkmsgs\fR [\fB-o\fR] [\fB-i\fR \fIlocale\fR] \fIinputstrings\fR \fImsgfile\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmkmsgs\fR utility is used to create a file of text strings that can be
+accessed using the text retrieval tools (see \fBgettxt\fR(1), \fBsrchtxt\fR(1),
+\fBexstr\fR(1), and \fBgettxt\fR(3C)). It will take as input a file of text
+strings for a particular geographic locale (see \fBsetlocale\fR(3C)) and create
+a file of text strings in a format that can be retrieved by both
+\fBgettxt\fR(1) and \fBgettxt\fR(3C). By using the \fB-i\fR option, you can
+install the created file under the
+\fB/usr/lib/\fIlocale\fR/\fR\fIlocale\fR/\fBLC_MESSAGES\fR  directory
+(\fBlocale\fR corresponds to the language in which the text strings are
+written).
+.sp
+.LP
+\fIinputstrings\fR is the name of the file that contains the original text
+strings. \fImsgfile\fR is the name of the output file where \fBmkmsgs\fR writes
+the strings in a format that is readable by \fBgettxt\fR(1) and
+\fBgettxt\fR(3C). The name of \fImsgfile\fR can be up to 14 characters in
+length, but may not contain either \e\fB0\fR (null) or the \fBASCII\fR code for
+\fB/\fR (slash) or \fB:\fR (colon).
+.sp
+.LP
+The input file contains a set of text strings for the particular geographic
+locale. Text strings are separated by a newline character. Nongraphic
+characters must be represented as alphabetic escape sequences. Messages are
+transformed and copied sequentially from \fIinputstrings\fR to \fImsgfile\fR.
+To generate an empty message in \fImsgfile\fR, leave an empty line at the
+correct place in \fIinputstrings\fR.
+.sp
+.LP
+Strings can be changed simply by editing the file \fIinputstrings\fR. New
+strings must be added only at the end of the file; then a new \fImsgfile\fR
+file must be created and installed in the correct place. If this procedure is
+not followed, the retrieval function will retrieve the wrong string and
+software compatibility will be broken.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fR
+.ad
+.RS 14n
+.rt  
+Overwrite \fImsgfile\fR, if it exists.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fI locale\fR \fR
+.ad
+.RS 14n
+.rt  
+Install \fImsgfile\fR in the
+\fB/usr/lib/\fIlocale\fR/\fR\fIlocale\fR/\fBLC_MESSAGES\fR  directory. Only
+someone who is super user or a member of group \fBbin\fR can create or
+overwrite files in this directory. Directories under
+\fB/usr/lib/\fIlocale\fR\fR will be created if they do not exist.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBmkmsgs\fR command.
+.sp
+.LP
+The following example shows an input message source file \fBC.str\fR:
+
+.sp
+.in +2
+.nf
+File %s:\et cannot be opened\en
+%s: Bad directory\en
+	.
+	.
+	.
+write error\en
+	.
+	.
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUsing Input Strings From \fBC.str\fR to Create Text Strings in
+a File
+.sp
+.LP
+The following command uses the input strings from \fBC.str\fR to create text
+strings in the appropriate format in the file \fB\fR\fBUX\fR in the current
+directory:
+
+.sp
+.in +2
+.nf
+example% mkmsgs C.str UX
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing Input Strings From \fBFR.str\fR to Create Text Strings in
+a File
+.sp
+.LP
+The following command uses the input strings from \fBFR.str\fR to create text
+strings in the appropriate format in the file \fBUX\fR in the directory
+/usr/lib/locale/fr/\fBLC_MESSAGES\fR:
+
+.sp
+.in +2
+.nf
+example% mkmsgs -i fr FR.str UX
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+These text strings would be accessed if you had set the environment variable
+\fBLC_MESSAGES\fR=fr and then invoked one of the text retrieval tools listed at
+the beginning of the \fBDESCRIPTION\fR section.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fR\fBlocale\fR\fB/\fR\fBLC_MESSAGES\fR\fB/*  \fR\fR
+.ad
+.sp .6
+.RS 4n
+message files created by \fBmkmsgs\fR
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexstr\fR(1), \fBgettxt\fR(1), \fBsrchtxt\fR(1), \fBgettxt\fR(3C),
+\fBsetlocale\fR(3C), \fBattributes\fR(5)

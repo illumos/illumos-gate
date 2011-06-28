@@ -1,0 +1,121 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_reset 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_reset \- reset a SCSI bus or target
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR \fBscsi_reset\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIlevel\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to the \fBscsi_address\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlevel\fR\fR
+.ad
+.RS 9n
+.rt  
+The level of reset required.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_reset()\fR function asks the host adapter driver to reset the
+\fBSCSI \fRbus or a \fBSCSI \fRtarget as specified by \fIlevel\fR. If
+\fIlevel\fR equals \fBRESET_ALL\fR, the \fBSCSI\fR bus is reset. If it equals
+\fBRESET_TARGET\fR, \fIap\fR is used to determine the target to be reset. If it
+equals \fBRESET_LUN\fR, \fIap\fR is used to determine the logical unit to be
+reset.
+.sp
+.LP
+When given the \fBRESET_LUN\fR level, \fBscsi_reset()\fR can return failure if
+the \fBLOGICAL UNIT RESET\fR message is not supported by the target device, or
+if the underlying HBA driver does not implement the ability to issue a
+\fBLOGICAL UNIT RESET\fR message.
+.sp
+.LP
+Note that, at the point when \fBscsi_reset()\fR resets the logical unit (case
+\fBRESET_LUN\fR), or the target (case \fBRESET_TARGET\fR), or the bus (case
+\fBRESET_ALL\fR), there might be one or more command packets outstanding. That
+is, packets have been passed to \fBscsi_transport()\fR, and queued or possibly
+transported, but the commands have not been completed and the target completion
+routine has not been called for those packets.
+.sp
+.LP
+The successful call to \fBscsi_reset()\fR has the side effect that any such
+commands currently outstanding are aborted, at which point the packets are
+marked with \fBpkt_reason\fR set to \fBCMD_RESET\fR, and the appropriate bit --
+either \fBSTAT_BUS_RESET\fR or \fBSTAT_DEV_RESET\fR -- is set in
+\fBpkt_statistics\fR. Once thus appropriately marked, the aborted command
+packets are passed to the target driver command completion routine.
+.sp
+.LP
+Also note that, at the moment that a thread executing \fBscsi_reset()\fR
+actually resets the target or the bus, it is possible that a second thread may
+have already called \fBscsi_transport()\fR, but not yet queued or transported
+its command. In this case the HBA will not yet have received the second
+thread's packet and this packet will not be aborted.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_reset()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Upon success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Upon failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_reset()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_reset\fR(9E), \fBtran_reset_notify\fR(9E), \fBscsi_abort\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

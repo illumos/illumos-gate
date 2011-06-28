@@ -1,0 +1,135 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH menu_win 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+menu_win, set_menu_win, set_menu_sub, menu_sub, scale_menu \- menus window and
+subwindow association routines
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lmenu\fR \fB -lcurses \fR [ \fIlibrary\fR... ]
+#include <menu.h>
+
+\fBint\fR \fBset_menu_win\fR(\fBMENU *\fR\fImenu\fR, \fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBmenu_win\fR(\fBMENU *\fR\fImenu\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBset_menu_sub\fR(\fBMENU *\fR\fImenu\fR, \fBWINDOW *\fR\fIsub\fR);
+.fi
+
+.LP
+.nf
+\fBWINDOW *\fR\fBmenu_sub\fR(\fBMENU *\fR\fImenu\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscale_window\fR(\fBMENU *\fR\fImenu\fR, \fBint *\fR\fIrows\fR, \fBint *\fR\fIcols\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBset_menu_win()\fR sets the window of \fImenu\fR to \fIwin\fR.
+\fBmenu_win()\fR returns a pointer to the window of
+\fImenu\fR.\fBset_menu_sub()\fR sets the subwindow of \fImenu\fR to \fIsub\fR.
+\fBmenu_sub()\fR returns a pointer to the subwindow of
+\fImenu\fR.\fBscale_window()\fR returns the minimum window size necessary for
+the subwindow of \fImenu\fR. \fIrows\fR and \fIcols\fR are pointers to the
+locations used to return the values.
+.SH RETURN VALUES
+.sp
+.LP
+Routines that return pointers always return \fINULL\fR on error. Routines that
+return an integer return one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fBE_OK\fR
+.ad
+.RS 19n
+.rt  
+The routine returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_SYSTEM_ERROR\fR
+.ad
+.RS 19n
+.rt  
+System error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_BAD_ARGUMENT\fR
+.ad
+.RS 19n
+.rt  
+An incorrect argument was passed to the routine.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_POSTED\fR
+.ad
+.RS 19n
+.rt  
+The menu is already posted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBE_NOT_CONNECTED\fR
+.ad
+.RS 19n
+.rt  
+No items are connected to the menu.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header \fB<menu.h>\fR automatically includes the headers  \fB<eti.h>\fR and
+\fB<curses.h>\fR\&.

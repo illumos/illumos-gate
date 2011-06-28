@@ -1,0 +1,109 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sigsuspend 2 "24 Jun 2001" "SunOS 5.11" "System Calls"
+.SH NAME
+sigsuspend \- install a signal mask and suspend caller until signal
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBint\fR \fBsigsuspend\fR(\fBconst sigset_t *\fR\fIset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsigsuspend()\fR function replaces the caller's signal mask with the set
+of signals pointed to by the \fIset\fR argument and  suspends the caller until
+delivery of a signal whose action is either to execute a signal catching
+function or to terminate the process. If the \fIset\fR argument points to an
+invalid address, the behavior is undefined and \fBerrno\fR may be set to
+\fBEFAULT\fR.
+.sp
+.LP
+If the action is to terminate the process, \fBsigsuspend()\fR does not return.
+If the action is to execute a signal catching function, \fBsigsuspend()\fR
+returns after the signal catching function returns. On return, the signal mask
+is restored to the set that existed before the  call to \fBsigsuspend()\fR.
+.sp
+.LP
+It is not possible to block signals that cannot be ignored (see
+\fBsignal.h\fR(3HEAD)). This restriction is silently imposed by the system.
+.SH RETURN VALUES
+.sp
+.LP
+Since \fBsigsuspend()\fR suspends the caller's execution indefinitely, there is
+no successful completion return value. On failure, it returns \fB\(mi1\fR and
+sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsigsuspend()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+A signal was caught by the caller and control was returned from the signal
+catching function.
+.RE
+
+.sp
+.LP
+The \fBsigsuspend()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIset\fR argument points to an illegal address.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsigaction\fR(2), \fBsigprocmask\fR(2), \fBsigwait\fR(2), \fBsignal\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBsigsetops\fR(3C), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+If the caller specifies more than one unblocked signal in the mask to
+\fBsigsuspend()\fR, more than one signal might be processed before the call to
+\fBsigsuspend()\fR returns.
+.sp
+.LP
+While the caller is executing the signal handler that interrupted its call to
+\fBsigsuspend()\fR, its signal mask is the one passed to \fBsigsuspend()\fR,
+modified as usual by the signal mask specification in the signal's
+\fBsigaction\fR(2) parameters.  The caller's signal mask is not restored to its
+previous value until the caller returns from all the signal handlers that
+interrupted \fBsigsuspend()\fR.

@@ -1,0 +1,59 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH module_info 9S "26 Nov 2002" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+module_info \- STREAMS driver identification and limit value structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH DESCRIPTION
+.sp
+.LP
+When a module or driver is declared, several identification and limit values
+can be set. These values are stored in the \fBmodule_info\fR structure.
+.sp
+.LP
+The \fBmodule_info\fR structure is intended to be read-only. However, the flow
+control limits (\fBmi_hiwat\fR and \fBmi_lowat\fR) and the packet size limits
+(\fBmi_minpsz\fR and \fBmi_maxpsz\fR) are copied to the \fBQUEUE\fR structure,
+where they can be modified.
+.sp
+.LP
+For a driver, \fBmi_idname\fR must match the name of the driver binary file.
+For a module, \fBmi_idname\fR must match the fname field of the \fBfmodsw\fR
+structure. See \fBfmodsw\fR(9S) for details.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+ushort_t      mi_idnum;      /* module ID number */
+char          *mi_idname;    /* module name */
+ssize_t       mi_minpsz;     /* minimum packet size */
+ssize_t       mi_maxpsz;     /* maximum packet size */
+size_t        mi_hiwat;      /* high water mark */
+size_t        mi_lowat;      /* low water mark */
+.fi
+.in -2
+
+.sp
+.LP
+The constant \fBFMNAMESZ\fR, limiting the length of a module's name, is set to
+eight in this release.
+.SH SEE ALSO
+.sp
+.LP
+\fBfmodsw\fR(9S), \fBqueue\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

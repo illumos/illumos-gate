@@ -1,0 +1,354 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stdio 3C "18 May 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+stdio \- standard buffered input/output package
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+.fi
+
+.LP
+.nf
+\fBextern FILE *\fR\fIstdin\fR\fB;\fR
+.fi
+
+.LP
+.nf
+\fBextern FILE *\fR\fIstdout\fR\fB;\fR
+.fi
+
+.LP
+.nf
+\fBextern FILE *\fR\fIstderr\fR\fB;\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The standard I/O functions described in section 3C of this manual constitute an
+efficient, user-level \fBI/O\fR buffering scheme. The in-line macros
+\fBgetc()\fR and \fBputc()\fR handle characters quickly. The macros
+\fBgetchar\fR(3C) and \fBputchar\fR(3C), and the higher-level routines
+\fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfprintf\fR(3C), \fBfputc\fR(3C),
+\fBfputs\fR(3C), \fBfread\fR(3C), \fBfscanf\fR(3C), \fBfwrite\fR(3C),
+\fBgets\fR(3C), \fBgetw\fR(3C), \fBprintf\fR(3C), \fBputs\fR(3C),
+\fBputw\fR(3C), and \fBscanf\fR(3C) all use or act as if they use \fBgetc()\fR
+and \fBputc()\fR; they can be freely intermixed.
+.sp
+.LP
+A file with associated buffering is called a \fIstream\fR (see \fBIntro\fR(3))
+and is declared to be a pointer to a defined type \fBFILE\fR. The
+\fBfopen\fR(3C) function creates certain descriptive data for a stream and
+returns a pointer to designate the stream in all further transactions.
+Normally, there are three open streams with constant pointers declared in the
+\fB<stdio.h>\fR header and associated with the standard open files:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstdin\fR\fR
+.ad
+.RS 10n
+.rt  
+standard input file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstdout\fR\fR
+.ad
+.RS 10n
+.rt  
+standard output file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstderr\fR\fR
+.ad
+.RS 10n
+.rt  
+standard error file
+.RE
+
+.sp
+.LP
+The following symbolic values in <\fBunistd.h\fR> define the file descriptors
+that will be associated with the C-language \fBstdin\fR, \fBstdout\fR and
+\fBstderr\fR when the application is started:
+.sp
+
+.sp
+.TS
+tab();
+lw(1.38i) lw(1.65i) lw(.31i) lw(2.17i) 
+lw(1.38i) lw(1.65i) lw(.31i) lw(2.17i) 
+.
+\fBSTDIN_FILENO\fRStandard input value0\fBstdin\fR
+\fBSTDOUT_FILENO\fRStandard output value1\fBstdout\fR
+\fBSTDERR_FILENO\fRStandard error value2\fBstderr\fR
+.TE
+
+.sp
+.LP
+The constant \fINULL\fR designates a null pointer.
+.sp
+.LP
+The integer-constant \fBEOF\fR is returned upon end-of-file or error by most
+integer functions that deal with streams (see the individual descriptions for
+details).
+.sp
+.LP
+The integer constant \fBBUFSIZ\fR specifies the size of the buffers used by the
+particular implementation.
+.sp
+.LP
+The integer constant \fBFILENAME_MAX\fR specifies the number of bytes needed to
+hold the longest pathname of a file allowed by the implementation.  If the
+system does not impose a maximum limit, this value is the recommended size for
+a buffer intended to hold a file's pathname.
+.sp
+.LP
+The integer constant \fBFOPEN_MAX\fR specifies the minimum number of files that
+the implementation guarantees can be open simultaneously. Note that no more
+than 255 files may be opened using \fBfopen()\fR, and only file descriptors 0
+through 255 can be used in a stream.
+.sp
+.LP
+The functions and constants mentioned in the entries of section 3S of this
+manual are declared in that header and need no further declaration. The
+constants and the following "functions" are implemented as macros
+(redeclaration of these names is perilous): \fBgetc()\fR, \fBgetchar()\fR,
+\fBputc()\fR, \fBputchar()\fR, \fBferror\fR(3C), \fBfeof\fR(3C),
+\fBclearerr\fR(3C), and \fBfileno\fR(3C). There are also function versions of
+\fBgetc()\fR, \fBgetchar()\fR, \fBputc()\fR, \fBputchar()\fR, \fBferror()\fR,
+\fBfeof()\fR, \fBclearerr()\fR, and \fBfileno()\fR.
+.sp
+.LP
+Output streams, with the exception of the standard error stream \fBstderr\fR,
+are by default buffered if the output refers to a file and line-buffered if the
+output refers to a terminal. The standard error output stream \fBstderr\fR is
+by default unbuffered, but use of \fBfreopen()\fR (see \fBfopen\fR(3C)) will
+cause it to become buffered or line-buffered. When an output stream is
+unbuffered, information is queued for writing on the destination file or
+terminal as soon as written; when it is buffered, many characters are saved up
+and written as a block. When it is line-buffered, each line of output is queued
+for writing on the destination terminal as soon as the line is completed (that
+is, as soon as a new-line character is written or terminal input is requested).
+The \fBsetbuf()\fR or \fBsetvbuf()\fR functions (both described on the
+\fBsetbuf\fR(3C) manual page) may be used to change the stream's buffering
+strategy.
+.SS "Interactions of Other FILE-Type C Functions"
+.sp
+.LP
+A single open file description can be accessed both through streams and through
+file descriptors.  Either a file descriptor or a stream will be called a
+\fIhandle\fR on the open file description to which it refers; an open file
+description may have several handles.
+.sp
+.LP
+Handles can be created or destroyed by user action without affecting the
+underlying open file description.  Some of the ways to create them include
+\fBfcntl\fR(2), \fBdup\fR(2), \fBfdopen\fR(3C), \fBfileno\fR(3C) and
+\fBfork\fR(2) (which duplicates existing ones into new processes). They can be
+destroyed by at least \fBfclose\fR(3C) and \fBclose\fR(2), and by the
+\fBexec\fR functions (see \fBexec\fR(2)), which close some file descriptors and
+destroy streams.
+.sp
+.LP
+A file descriptor that is never used in an operation and could affect the file
+offset (for example \fBread\fR(2), \fBwrite\fR(2), or \fBlseek\fR(2)) is not
+considered a handle in this discussion, but could give rise to one (as a
+consequence of  \fBfdopen()\fR, \fBdup()\fR, or \fBfork()\fR, for example).
+This exception does include the file descriptor underlying a stream, whether
+created with  \fBfopen()\fR or \fBfdopen()\fR, as long as it is not used
+directly by the application to affect the file offset.  (The \fBread()\fR and
+\fBwrite()\fR functions implicitly affect the file offset;  \fBlseek()\fR
+explicitly affects it.)
+.sp
+.LP
+If two or more handles are used, and any one of them is a stream, their actions
+shall be coordinated as described below.  If this is not done, the result is
+undefined.
+.sp
+.LP
+A handle that is a stream is considered to be closed when either an
+\fBfclose()\fR or \fBfreopen\fR(3C) is executed on it (the result of
+\fBfreopen()\fR is a new stream for this discussion, which cannot be a handle
+on the same open file description as its previous value) or when the process
+owning that stream terminates the \fBexit\fR(2) or \fBabort\fR(3C). A file
+descriptor is closed by \fBclose()\fR, \fB_exit()\fR (see \fBexit\fR(2)), or by
+one of the \fBexec\fR functions when \fBFD_CLOEXEC\fR is set on that file
+descriptor.
+.sp
+.LP
+For a handle to become the active handle, the actions below must be performed
+between the last other user of the first handle (the current active handle) and
+the first other user of the second handle (the future active handle). The
+second handle then becomes the active handle. All activity by the application
+affecting the file offset on the first handle shall be suspended until it again
+becomes the active handle. (If a stream function has as an underlying function
+that affects the file offset, the stream function will be considered to affect
+the file offset.  The underlying functions are described below.)
+.sp
+.LP
+The handles need not be in the same process for these rules to apply. Note that
+after a \fBfork()\fR, two handles exist where one existed before.  The
+application shall assure that, if both handles will ever be accessed, that they
+will both be in a state where the other could become the active handle first.
+The application shall prepare for a \fBfork()\fR exactly as if it were a change
+of active handle.  (If the only action performed by one of the processes is one
+of the \fBexec\fR functions or \fB_exit()\fR, the handle is never accessed in
+that process.)
+.RS +4
+.TP
+1.
+For the first handle, the first applicable condition below shall apply.
+After the actions required below are taken, the handle may be closed if it is
+still open.
+.RS +4
+.TP
+a.
+If it is a file descriptor, no action is required.
+.RE
+.RS +4
+.TP
+b.
+If the only further action to be performed on any handle to this open file
+description is to close it, no action need be taken.
+.RE
+.RS +4
+.TP
+c.
+If it is a stream that is unbuffered, no action need be taken.
+.RE
+.RS +4
+.TP
+d.
+If it is a stream that is line-buffered and the last character written to
+the stream was a newline (that is, as if a \fBputc('\en')\fR was the most
+recent operation on that stream), no action need be taken.
+.RE
+.RS +4
+.TP
+e.
+If it is a stream that is open for writing or append (but not also open for
+reading), either an \fBfflush\fR(3C) shall occur or the stream shall be closed.
+.RE
+.RS +4
+.TP
+f.
+If the stream is open for reading and it is at the end of the file (
+\fBfeof\fR(3C) is true), no action need be taken.
+.RE
+.RS +4
+.TP
+g.
+If the stream is open with a mode that allows reading and the underlying
+open file description refers to a device that is capable of seeking, either an
+\fBfflush()\fR shall occur or the stream shall be closed.
+.RE
+.RS +4
+.TP
+h.
+Otherwise, the result is undefined.
+.RE
+.RE
+.RS +4
+.TP
+2.
+For the second handle: if any previous active handle has called a function
+that explicitly changed the file offset, except as required above for the first
+handle, the application shall perform an \fBlseek()\fR or an \fBfseek\fR(3C)
+(as appropriate to the type of the handle) to an appropriate location.
+.RE
+.RS +4
+.TP
+3.
+If the active handle ceases to be accessible before the requirements on the
+first handle above have been met, the state of the open file description
+becomes undefined.  This might occur, for example, during a  \fBfork()\fR or an
+\fB_exit()\fR.
+.RE
+.RS +4
+.TP
+4.
+The \fBexec\fR functions shall be considered to make inaccessible all
+streams that are open at the time they are called, independent of what streams
+or file descriptors may be available to the new process image.
+.RE
+.RS +4
+.TP
+5.
+Implementation shall assure that an application, even one consisting of
+several processes, shall yield correct results (no data is lost or duplicated
+when writing, all data is written in order, except as requested by seeks) when
+the rules above are followed, regardless of the sequence of handles used.  If
+the rules above are not followed, the result is unspecified. When these rules
+are followed, it is implementation defined whether, and under what conditions,
+all input is seen exactly once.
+.RE
+.SS "Use of stdio in Multithreaded Applications"
+.sp
+.LP
+All the \fBstdio\fR functions are safe unless they have the \fB_unlocked\fR
+suffix.  Each \fBFILE\fR pointer has its own lock to guarantee that only one
+thread can access it. In the case that output needs to be synchronized, the
+lock for the \fBFILE\fR pointer can be acquired before performing a series of
+\fBstdio\fR operations.  For example:
+.sp
+.in +2
+.nf
+FILE iop;
+flockfile(iop);
+fprintf(iop, "hello ");
+fprintf(iop, "world);
+fputc(iop, 'a');
+funlockfile(iop);
+.fi
+.in -2
+
+.sp
+.LP
+will print everything out together, blocking other threads that might want to
+write to the same file between calls to \fBfprintf()\fR.
+.sp
+.LP
+An unlocked interface is available in case performace is an issue.  For
+example:
+.sp
+.in +2
+.nf
+flockfile(iop);
+while (!feof(iop)) {
+        *c++ = getc_unlocked(iop);
+}
+funlockfile(iop);
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Invalid stream pointers usually cause grave disorder, possibly including
+program termination. Individual function descriptions describe the possible
+error conditions.
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBlseek\fR(2), \fBopen\fR(2), \fBpipe\fR(2), \fBread\fR(2),
+\fBwrite\fR(2), \fBctermid\fR(3C), \fBcuserid\fR(3C), \fBfclose\fR(3C),
+\fBferror\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C), \fBfseek\fR(3C),
+\fBflockfile\fR(3C), \fBgetc\fR(3C), \fBgets\fR(3C), \fBpopen\fR(3C),
+\fBprintf\fR(3C), \fBputc\fR(3C), \fBputs\fR(3C), \fBscanf\fR(3C),
+\fBsetbuf\fR(3C), \fBsystem\fR(3C), \fBtmpfile\fR(3C), \fBtmpnam\fR(3C),
+\fBungetc\fR(3C)

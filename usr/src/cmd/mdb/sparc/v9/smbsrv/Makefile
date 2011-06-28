@@ -21,8 +21,8 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = smbsrv.so
 MDBTGT = kvm
@@ -32,4 +32,10 @@ MODSRCS = smbsrv.c
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
+
+ROOTKMOD = $(ROOT)/usr/kernel/kmdb$(MACHMODDIR)
+
 include ../../../Makefile.module
+
+$(ROOTKMOD):
+	$(INS.dir)

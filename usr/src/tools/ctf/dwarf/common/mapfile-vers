@@ -1,0 +1,199 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2011, Richard Lowe.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate_1.1 {
+    global:
+        dwarf_add_AT_comp_dir;
+        dwarf_add_AT_const_value_signedint;
+        dwarf_add_AT_const_value_string;
+        dwarf_add_AT_const_value_unsignedint;
+        dwarf_add_AT_flag;
+        dwarf_add_AT_location_expr;
+        dwarf_add_AT_name;
+        dwarf_add_AT_producer;
+        dwarf_add_AT_reference;
+        dwarf_add_AT_signed_const;
+        dwarf_add_AT_string;
+        dwarf_add_AT_targ_address;
+        dwarf_add_AT_targ_address_b;
+        dwarf_add_AT_unsigned_const;
+        dwarf_add_arange;
+        dwarf_add_arange_b;
+        dwarf_add_die_to_debug;
+        dwarf_add_directory_decl;
+        dwarf_add_expr_addr;
+        dwarf_add_expr_addr_b;
+        dwarf_add_expr_gen;
+        dwarf_add_fde_inst;
+        dwarf_add_file_decl;
+        dwarf_add_frame_cie;
+        dwarf_add_frame_fde;
+        dwarf_add_frame_fde_b;
+        dwarf_add_frame_info;
+        dwarf_add_frame_info_b;
+        dwarf_add_funcname;
+        dwarf_add_line_entry;
+        dwarf_add_pubname;
+        dwarf_add_typename;
+        dwarf_add_varname;
+        dwarf_add_weakname;
+        dwarf_arrayorder;
+        dwarf_attr;
+        dwarf_attr_offset;
+        dwarf_attrlist;
+        dwarf_bitoffset;
+        dwarf_bitsize;
+        dwarf_bytesize;
+        dwarf_child;
+        dwarf_dealloc;
+        dwarf_def_macro;
+        dwarf_die_CU_offset;
+        dwarf_die_link;
+        dwarf_diename;
+        dwarf_dieoffset;
+        dwarf_elf_init;
+        dwarf_end_macro_file;
+        dwarf_errmsg;
+        dwarf_errno;
+        dwarf_expand_frame_instructions;
+        dwarf_expr_current_offset;
+        dwarf_expr_into_block;
+        dwarf_fde_cfa_offset;
+        dwarf_find_macro_value_start;
+        dwarf_finish;
+        dwarf_formaddr;
+        dwarf_formblock;
+        dwarf_formflag;
+        dwarf_formref;
+        dwarf_formsdata;
+        dwarf_formstring;
+        dwarf_formudata;
+        dwarf_func_cu_offset;
+        dwarf_func_die_offset;
+        dwarf_func_name_offsets;
+        dwarf_funcname;
+        dwarf_get_abbrev;
+        dwarf_get_abbrev_children_flag;
+        dwarf_get_abbrev_code;
+        dwarf_get_abbrev_entry;
+        dwarf_get_abbrev_tag;
+        dwarf_get_address_size;
+        dwarf_get_arange;
+        dwarf_get_arange_cu_header_offset;
+        dwarf_get_arange_info;
+        dwarf_get_aranges;
+        dwarf_get_cie_info;
+        dwarf_get_cie_of_fde;
+        dwarf_get_cu_die_offset;
+        dwarf_get_cu_die_offset_given_cu_header_offset;
+        dwarf_get_elf;
+        dwarf_get_fde_at_pc;
+        dwarf_get_fde_exception_info;
+        dwarf_get_fde_for_die;
+        dwarf_get_fde_info_for_all_regs;
+        dwarf_get_fde_info_for_reg;
+        dwarf_get_fde_instr_bytes;
+        dwarf_get_fde_list;
+        dwarf_get_fde_list_eh;
+        dwarf_get_fde_n;
+        dwarf_get_fde_range;
+        dwarf_get_funcs;
+        dwarf_get_globals;
+        dwarf_get_loclist_entry;
+        dwarf_get_macro_details;
+        dwarf_get_relocation_info;
+        dwarf_get_relocation_info_count;
+        dwarf_get_section_bytes;
+        dwarf_get_str;
+        dwarf_get_types;
+        dwarf_get_vars;
+        dwarf_get_weaks;
+        dwarf_global_cu_offset;
+        dwarf_global_die_offset;
+        dwarf_global_formref;
+        dwarf_global_name_offsets;
+        dwarf_globname;
+        dwarf_hasattr;
+        dwarf_hasform;
+        dwarf_highpc;
+        dwarf_init;
+        dwarf_lineaddr;
+        dwarf_linebeginstatement;
+        dwarf_lineblock;
+        dwarf_lineendsequence;
+        dwarf_lineno;
+        dwarf_lineoff;
+        dwarf_linesrc;
+        dwarf_lne_end_sequence;
+        dwarf_lne_set_address;
+        dwarf_loclist;
+        dwarf_loclist_n;
+        dwarf_lowpc;
+        dwarf_new_die;
+        dwarf_new_expr;
+        dwarf_new_fde;
+        dwarf_next_cu_header;
+        dwarf_nextglob;
+        dwarf_offdie;
+        dwarf_p_dealloc;
+        dwarf_print_memory_stats;
+        dwarf_producer_finish;
+        dwarf_producer_init;
+        dwarf_producer_init_b;
+        dwarf_reset_section_bytes;
+        dwarf_set_stringcheck;
+        dwarf_siblingof;
+        dwarf_srcfiles;
+        dwarf_srclang;
+        dwarf_srclines;
+        dwarf_start_macro_file;
+        dwarf_tag;
+        dwarf_transform_to_disk_form;
+        dwarf_type_cu_offset;
+        dwarf_type_die_offset;
+        dwarf_type_name_offsets;
+        dwarf_typename;
+        dwarf_undef_macro;
+        dwarf_var_cu_offset;
+        dwarf_var_die_offset;
+        dwarf_var_name_offsets;
+        dwarf_varname;
+        dwarf_vendor_ext;
+        dwarf_weak_cu_offset;
+        dwarf_weak_die_offset;
+        dwarf_weak_name_offsets;
+        dwarf_weakname;
+        dwarf_whatattr;
+        dwarf_whatform;
+        dwarf_whatform_direct;
+    local:
+	*;
+};

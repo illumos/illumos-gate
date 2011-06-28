@@ -1,0 +1,102 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH picl_get_frutree_parent 3PICL "5 Feb 2004" "SunOS 5.11" "PICL Library Functions"
+.SH NAME
+picl_get_frutree_parent \- get frutree parent node for a given device node
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpicl\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <picl.h>
+
+\fBint\fR \fBpicl_get_frutree_parent\fR(\fBpicl_nodehdl_t\fR \fIdevh\fR,
+     \fBpicl_nodehdl_t *\fR\fIfrutreeh\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The devices under the \fB/platform\fR subtree of the PICLTREE are linked to
+their FRU containers represented in the \fB/frutree\fR using PICL reference
+properties. The \fBpicl_get_frutree_parent()\fR function returns the handle of
+the node in the \fB/frutree\fR subtree that is the FRU parent or container of
+the the device specified by the node handle, \fIdevh\fR. The handle is returned
+in the \fIfrutreeh\fR argument.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, 0 is returned. Otherwise a non-negative integer is
+returned to indicate an error.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 22n
+.rt  
+General system failure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDHANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+Invalid handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_PROPNOTFOUND\fR\fR
+.ad
+.RS 22n
+.rt  
+Property not found
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_STALEHANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+Stale handle
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpicl_get_propinfo\fR(3PICL), \fBpicl_get_propval\fR(3PICL),
+\fBpicl_get_propval_by_name\fR(3PICL), \fBpicl_get_prop_by_name\fR(3PICL),
+\fBattributes\fR(5)

@@ -1,0 +1,146 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_searchprefs 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_searchprefs, ldap_init_searchprefs, ldap_init_searchprefs_buf,
+ldap_free_searchprefs, ldap_first_searchobj, ldap_next_searchobj \- LDAP search
+preference configuration routeines
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+# include <lber.h>
+# include <ldap.h>
+
+\fBint\fR \fBldap_init_searchprefs\fR(\fBchar\fR \fI**file\fR,
+     \fBstruct ldap_searchobj\fR \fI***solistp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBldap_init_searchprefs_buf\fR(\fBchar\fR \fI**buf\fR, \fBunsigned\fR \fIlonglen\fR,
+     \fBstruct ldap_searchobj\fR \fI**solistp\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_searchobj\fR \fB**ldap_free_searchprefs\fR
+     (\fBstruct ldap_searchobj\fR \fI**solist\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_searchobj\fR \fB**ldap_first_searchobj\fR
+     (\fBstruct ldap_seachobj\fR \fI**solist\fR);
+.fi
+
+.LP
+.nf
+\fBstruct ldap_searchobj\fR \fB**ldap_next_searchobj\fR
+     (\fBstruct ldap_seachobj\fR \fI**solist\fR, \fBstruct ldap_seachobj\fR \fI**so\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide a standard way to access LDAP search preference
+configuration data.  LDAP search preference configurations are typically used
+by LDAP client programs to specify which attributes a user may search by,
+labels for the attributes, and LDAP filters and scopes associated with those
+searches.  Client software presents these choices to a user, who can then
+specify the type of search to be performed.
+.sp
+.LP
+\fBldap_init_searchprefs()\fR reads a sequence of search preference
+configurations from a valid LDAP  searchpref configuration file. See
+\fBldapsearchprefs.conf\fR(4). Upon success, \fB0\fR is returned and
+\fIsolistp\fR is set to point to a list of search preference data structures.
+.sp
+.LP
+\fBldap_init_searchprefs_buf()\fR reads a sequence of search preference
+configurations from \fIbuf\fR, whose size is \fIbuflen.\fR \fIbuf\fR should
+point to the data in the format defined for an LDAP search preference
+configuration file. See  \fBldapsearchprefs.conf\fR(4). Upon success, \fB0\fR
+is returned and \fIsolistp\fR is set to point to a list of search preference
+data structures.
+.sp
+.LP
+\fBldap_free_searchprefs()\fR disposes of the data structures allocated by
+\fBldap_init_searchprefs()\fR.
+.sp
+.LP
+\fBldap_first_searchpref()\fR returns the first search preference data
+structure in the list \fIsolist.\fR The \fIsolist\fR is typically obtained by
+calling \fBldap_init_searchprefs()\fR.
+.sp
+.LP
+\fBldap_next_searchpref()\fR returns the search preference after \fIso\fR in
+the template list \fIsolist.\fR A NULL pointer is returned if \fIso\fR is the
+last entry in the list.
+.SH ERRORS
+.sp
+.LP
+\fBldap_init_search_prefs()\fR and \fBldap_init_search_prefs_bufs()\fR return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_SEARCHPREF_ERR_VERSION\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fI**buf\fR points to data that is newer than can be handled.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLDAP_SEARCHPREF_ERR_MEM\fR\fR
+.ad
+.sp .6
+.RS 4n
+Memory allocation problem.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldapsearchprefs.conf\fR(4), \fBattributes\fR(5)
+.sp
+.LP
+Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access
+Protocol", OSI-DS-26, April 1992.
+.sp
+.LP
+Howes, T., Hardcastle-Kille, S., Yeong, W., and Robbins, C., "Lightweight
+Directory Access Protocol", OSI-DS-26, April 1992.
+.sp
+.LP
+Hardcastle-Kille, S., "A String Representation of Distinguished Names",
+OSI-DS-23, April 1992.
+.sp
+.LP
+Information Processing - Open Systems Interconnection - The Directory,
+International Organization for Standardization.  International Standard 9594,
+(1988).

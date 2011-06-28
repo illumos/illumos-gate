@@ -1,0 +1,120 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH basename 1 "18 Mar 1997" "SunOS 5.11" "User Commands"
+.SH NAME
+basename, dirname \- deliver portions of path names
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/basename\fR \fIstring\fR [\fIsuffix\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/basename\fR \fIstring\fR [\fIsuffix\fR]
+.fi
+
+.LP
+.nf
+\fBdirname\fR \fIstring\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbasename\fR utility deletes any prefix ending in \fB/\fR and the
+\fIsuffix\fR (if present in \fIstring\fR) from \fIstring\fR, and prints the
+result on the standard output. It is normally used inside substitution marks
+(\fB`\|`\fR) within shell procedures.
+.SS "/usr/bin"
+.sp
+.LP
+The \fIsuffix\fR is a pattern defined on the \fBexpr\fR(1) manual page.
+.SS "/usr/xpg4/bin"
+.sp
+.LP
+The \fIsuffix\fR is a string with no special significance attached to  any of
+the characters it contains.
+.sp
+.LP
+The \fBdirname\fR utility delivers all but the last level of the path name in
+\fIstring\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSetting environment variables
+.sp
+.LP
+The following example, invoked with the argument \fB/home/sms/personal/mail\fR
+sets the environment variable \fBNAME\fR to the file named \fBmail\fR and the
+environment variable \fBMYMAILPATH\fR to the string  \fB/home/sms/personal\fR:
+
+.sp
+.in +2
+.nf
+example% \fBNAME=`basename \|$HOME/personal/mail`\fR
+example% \fBMYMAILPATH=`dirname \|$HOME/personal/mail`\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRCompiling a file and moving the output
+.sp
+.LP
+This shell procedure, invoked with the argument \fB/usr/src/bin/cat.c\fR,
+compiles the named file and moves the output to \fBcat\fR in the current
+directory:
+
+.sp
+.in +2
+.nf
+example% \fBcc $1\fR
+example% \fBmv a.out `basename $1 .c`\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect  the execution of \fBbasename\fR and \fBdirname\fR: \fBLANG\fR,
+\fBLC_ALL\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexpr\fR(1), \fBbasename\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBstandards\fR(5)

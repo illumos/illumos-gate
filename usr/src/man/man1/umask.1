@@ -1,0 +1,396 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH umask 1 "17 Sep 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+umask \- get or set the file mode creation mask
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/umask\fR [\fB-S\fR] [\fImask\fR]
+.fi
+
+.SS "sh"
+.LP
+.nf
+\fBumask\fR [\fIooo\fR]
+.fi
+
+.SS "csh"
+.LP
+.nf
+\fBumask\fR [\fIooo\fR]
+.fi
+
+.SS "ksh"
+.LP
+.nf
+\fBumask\fR [\fB-S\fR] [\fImask\fR]
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBumask\fR [\fB-S\fR] [\fImask\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBumask\fR utility sets the file mode creation mask of the current shell
+execution environment to the value specified by the \fImask\fR operand. This
+mask affects the initial value of the file permission bits of subsequently
+created files. If \fBumask\fR is called in a subshell or separate utility
+execution environment, such as one of the following:
+.sp
+.in +2
+.nf
+(umask 002) 
+nohup umask ... 
+find . -exec umask ...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+it does not affect the file mode creation mask of the caller's environment. For
+this reason, the \fB/usr/bin/umask\fR utility cannot be used to change the
+umask in an ongoing session. Its usefulness is limited to checking the caller's
+umask. To change the umask of an ongoing session you must use one of the shell
+builtins.
+.sp
+.LP
+If the \fImask\fR operand is not specified, the \fBumask\fR utility writes the
+value of the invoking process's file mode creation mask to standard output.
+.SS "sh"
+.sp
+.LP
+The user file-creation mode mask is set to \fIooo\fR. The three octal digits
+refer to read/write/execute permissions for owner, group, and other,
+respectively (see \fBchmod\fR(1), \fBchmod\fR(2), and \fBumask\fR(2)). The
+value of each specified digit is subtracted from the corresponding ``digit''
+specified by the system for the creation of a file (see \fBcreat\fR(2)). For
+example, \fBumask\fR \fB022\fR removes write permission for group and other.
+Files (and directories) normally created with mode \fB777\fR become mode
+\fB755\fR. Files (and directories) created with mode \fB666\fR become mode
+\fB644\fR).
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIooo\fR is omitted, the current value of the mask is printed.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBumask\fR is recognized and executed by the shell.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBumask\fR can be included in the user's \fB\&.profile\fR (see
+\fBprofile\fR(4)) and invoked at login to automatically set the user's
+permissions on files or directories created.
+.RE
+.SS "csh"
+.sp
+.LP
+See the description above for the Bourne shell (\fBsh\fR)\fBumask\fR built-in.
+.SS "ksh"
+.sp
+.LP
+The user file-creation mask is set to \fImask\fR. \fImask\fR can either be an
+octal number or a symbolic value as described in \fBchmod\fR(1). If a symbolic
+value is given, the new \fBumask\fR value is the complement of the result of
+applying \fImask\fR to the complement of the previous umask value. If
+\fImask\fR is omitted, the current value of the mask is printed.
+.SS "ksh93"
+.sp
+.LP
+\fBumask\fR sets the file creation mask of the current shell execution
+environment to the value specified by the \fBmask\fI\fR\fR operand. This mask
+affects the file permission bits of subsequently created files. \fImask\fR can
+either be an octal number or a symbolic value as described in chmod(1). If a
+symbolic value is specified, the new file creation mask is the complement of
+the result of applying \fImask\fR to the complement of the current file
+creation mask. If \fImask\fR is not specified, \fBumask\fR writes the value of
+the file creation mask for the current process to standard output.
+.SH OPTIONS
+.SS "ksh"
+.sp
+.LP
+The following option is supported for \fB/usr/bin/umask\fR and \fBumask\fR in
+\fBksh\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 6n
+.rt  
+Produces symbolic output.
+.RE
+
+.sp
+.LP
+The default output style is unspecified, but will be recognized on a subsequent
+invocation of \fBumask\fR on the same system as a \fImask\fR operand to restore
+the previous file mode creation mask.
+.SS "ksh93"
+.sp
+.LP
+The following option is supported in \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 6n
+.rt  
+Causes the file creation mask to be written or treated as a symbolic value
+rather than an octal number.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fImask\fR\fR
+.ad
+.RS 8n
+.rt  
+A string specifying the new file mode creation mask. The string is treated in
+the same way as the \fImode\fR operand described in the \fBchmod\fR(1) manual
+page.
+.sp
+For a \fIsymbolic_mode\fR value, the new value of the file mode creation mask
+is the logical complement of the file permission bits portion of the file mode
+specified by the \fIsymbolic_mode\fR string.
+.sp
+In a \fIsymbolic_mode\fR value, the permissions \fIop\fR characters \fB+\fR and
+\fB\(mi\fR are interpreted relative to the current file mode creation mask.
+\fB+\fR causes the bits for the indicated permissions to be cleared in the
+mask. \fB\(mi\fR causes the bits of the indicated permissions to be set in the
+mask.
+.sp
+The interpretation of \fImode\fR values that specify file mode bits other than
+the file permission bits is unspecified.
+.sp
+The file mode creation mask is set to the resulting numeric value.
+.sp
+The default output of a prior invocation of \fBumask\fR on the same system with
+no operand will also be recognized as a \fImask\fR operand. The use of an
+operand obtained in this way is not obsolescent, even if it is an octal number.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+When the \fImask\fR operand is not specified, the \fBumask\fR utility will
+write a message to standard output that can later be used as a \fBumask\fR
+\fImask\fR operand.
+.sp
+.LP
+If \fB-S\fR is specified, the message will be in the following format:
+.sp
+.in +2
+.nf
+"u=%s,g=%s,o=%s\en", \fIowner permissions\fR, \fIgroup permissions\fR, \e
+                        \fIother permissions\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where the three values will be combinations of letters from the set
+\fB{\fRr\fB,\fR \fBw\fR, \fBx\fR}. The presence of a letter will indicate that
+the corresponding bit is clear in the file mode creation mask.
+.sp
+.LP
+If a \fImask\fR operand is specified, there will be no output written to
+standard output.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBumask\fR Command
+.sp
+.LP
+The examples in this section refer to the \fB/usr/bin/umask\fR utility and the
+\fBksh umask\fR builtin.
+
+.sp
+.LP
+Either of the commands:
+
+.sp
+.in +2
+.nf
+\fBumask a=rx,ug+w
+umask 002\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+sets the mode mask so that subsequently created files have their \fBS_IWOTH\fR
+bit cleared.
+
+.sp
+.LP
+After setting the mode mask with either of the above commands, the \fBumask\fR
+command can be used to write the current value of the mode mask:
+
+.sp
+.in +2
+.nf
+example$ \fBumask\fR
+0002
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The output format is unspecified, but historical implementations use the
+obsolescent octal integer mode format.
+
+.sp
+.in +2
+.nf
+example$ \fBumask -S\fR
+u=rwx,g=rwx,o=rx
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Either of these outputs can be used as the mask operand to a subsequent
+invocation of the \fBumask\fR utility.
+
+.sp
+.LP
+Assuming the mode mask is set as above, the command:
+
+.sp
+.in +2
+.nf
+\fBumask g-w\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+sets the mode mask so that subsequently created files have their \fBS_IWGRP\fR
+and \fBS_IWOTH\fR bits cleared.
+
+.sp
+.LP
+The command:
+
+.sp
+.in +2
+.nf
+\fBumask --w\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+sets the mode mask so that subsequently created files have all their write bits
+cleared. Notice that \fImask\fR operands \fBr\fR, \fBw\fR, \fBx\fR, or anything
+beginning with a hyphen (\fB\(mi\fR), must be preceded by \fB-\fR to keep it
+from being interpreted as an option.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBumask\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_COLLATE\fR\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+The file mode creation mask was successfully changed, or no \fImask\fR operand
+was supplied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/umask, csh, ksh, sh"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityExternal
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1),
+\fBchmod\fR(2), \fBcreat\fR(2), \fBumask\fR(2), \fBprofile\fR(4),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH killpg 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+killpg \- send signal to a process group
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBint\fR \fBkillpg\fR(\fBpid_t\fR \fIpgrp\fR, \fBint\fR \fIsig\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkillpg()\fR function sends the signal \fIsig\fR to the process group
+\fIpgrp\fR. See \fBsignal.h\fR(3HEAD) for a list of signals.
+.sp
+.LP
+The real or effective user \fBID\fR of the sending process must match the real
+or saved set-user \fBID\fR of the receiving process, unless the effective user
+\fBID\fR of the sending process is the privileged user. A single exception is
+the signal \fBSIGCONT\fR, which may always be sent to any descendant of the
+current process.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBkillpg()\fR function will fail and no signal will be sent if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsig\fR argument is not a valid signal number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The effective user \fBID\fR of the sending process is not privileged user, and
+neither its real nor effective user \fBID\fR matches the real or saved set-user
+\fBID\fR of one or more of the target processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 10n
+.rt  
+No processes were found in the specified process group.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(2), \fBsetpgrp\fR(2), \fBsigaction\fR(2), \fBsignal.h\fR(3HEAD),
+\fBattributes\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,291 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH spell 1 "23 " "SunOS 5.11" "User Commands"
+.SH NAME
+spell, hashmake, spellin, hashcheck \- report spelling errors
+.SH SYNOPSIS
+.LP
+.nf
+\fBspell\fR [\fB-bilvx\fR] [+ \fIlocal_file\fR] [\fIfile\fR] ...
+.fi
+
+.LP
+.nf
+\fB/usr/lib/spell/hashmake\fR 
+.fi
+
+.LP
+.nf
+\fB/usr/lib/spell/spellin\fR \fIn\fR
+.fi
+
+.LP
+.nf
+\fB/usr/lib/spell/hashcheck\fR \fIspelling_list\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBspell\fR command collects words from the named \fBfile\fRs and looks
+them up in a spelling list. Words that neither occur among nor are derivable
+(by applying certain inflections, prefixes, or suffixes) from words in the
+spelling list are written to the standard output.
+.sp
+.LP
+If there are no \fBfile\fR arguments, words to check are collected from the
+standard input. \fBspell\fR ignores most \fBtroff\fR(1), \fBtbl\fR(1), and
+\fBeqn\fR(1) constructs. Copies of all output words are accumulated in the
+history file (\fBspellhist\fR), and a \fBstop\fR list filters out misspellings
+(for example, \fBtheir=thy\(miy+ier\fR) that would otherwise pass.
+.sp
+.LP
+By default, \fBspell\fR (like \fBderoff\fR(1)) follows chains of included files
+(\fB\&.so\fR and \fB\&.nx\fR \fBtroff\fR(1) requests), unless the names of such
+included files begin with \fB/usr/lib\fR.
+.sp
+.LP
+The standard spelling list is based on many sources, and while more haphazard
+than an ordinary dictionary, is also more effective in respect to proper names
+and popular technical words. Coverage of the specialized vocabularies of
+biology, medicine and chemistry is light.
+.sp
+.LP
+Three programs help maintain and check the hash lists used by \fBspell\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhashmake\fR\fR
+.ad
+.RS 13n
+.rt  
+Reads a list of words from the standard input and writes the corresponding
+nine-digit hash code on the standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBspellin\fR\fR
+.ad
+.RS 13n
+.rt  
+Reads \fIn\fR hash codes from the standard input and writes a compressed
+spelling list on the standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhashcheck\fR\fR
+.ad
+.RS 13n
+.rt  
+Reads a compressed \fIspelling_list\fR and recreates the nine-digit hash codes
+for all the words in it. It writes these codes on the standard output.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 15n
+.rt  
+Check British spelling. Besides preferring \fBcentre\fR,  \fBcolour\fR,
+\fBprogramme\fR, \fBspeciality\fR, \fBtravelled\fR, and so forth, this option
+insists upon \fI\(miise\fR in words like \fBstandardise\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 15n
+.rt  
+Cause  \fBderoff\fR(1) to ignore \fB\&.so\fR and \fB\&.nx\fR commands.  If
+\fBderoff\fR(1) is not present on the system, then this  option is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 15n
+.rt  
+Follow the chains of \fIall\fR included files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 15n
+.rt  
+Print all words not literally in the spelling list, as well as plausible
+derivations from the  words in the spelling list.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 15n
+.rt  
+Print every plausible stem, one per line, with \fB=\fR preceding each word.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB+\fR\fIlocal_file\fR\fR
+.ad
+.RS 15n
+.rt  
+Specify a set of words that are correct spellings (in addition to \fBspell\fR's
+own spelling list) for each job. \fIlocal_file\fR is the name of a
+user-provided file that contains a sorted list of words, one per line. Words
+found in \fIlocal_file\fR are removed from \fBspell\fR's output. Use
+\fBsort\fR(1) to order \fIlocal_file\fR in ASCII collating sequence. If this
+ordering is not followed, some entries in \fIlocal_file\fR might be ignored.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of a text file to check for spelling errors. If no files are named,
+words are collected from the standard input.
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBspell\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBD_SPELL=/usr/lib/spell/hlist[ab]\fR\fR
+.ad
+.sp .6
+.RS 4n
+hashed spelling lists, American & British
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBS_SPELL=/usr/lib/spell/hstop\fR\fR
+.ad
+.sp .6
+.RS 4n
+hashed stop list
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBH_SPELL=/var/adm/spellhist\fR\fR
+.ad
+.sp .6
+.RS 4n
+history file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/dict/words\fR\fR
+.ad
+.sp .6
+.RS 4n
+master dictionary
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBderoff\fR(1), \fBeqn\fR(1), \fBsort\fR(1), \fBtbl\fR(1), \fBtroff\fR(1),
+\fBattributes\fR(5), \fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBspell\fR works only on English words defined in the U.S. \fBASCII\fR
+codeset.
+.sp
+.LP
+Because copies of all output are accumulated in the \fBspellhist\fR file,
+\fBspellhist\fR might grow quite large and require purging.
+.SH BUGS
+.sp
+.LP
+The spelling list's coverage is uneven. New installations might wish to monitor
+the output for several months to gather local additions.
+.sp
+.LP
+British spelling was done by an American.

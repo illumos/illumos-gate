@@ -43,6 +43,8 @@ $(i386_ONLY)dir path=kernel/drv group=sys
 $(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
 $(i386_ONLY)dir path=kernel/misc group=sys
 $(i386_ONLY)dir path=kernel/misc/$(ARCH64) group=sys
+$(i386_ONLY)dir path=usr/share/man
+$(i386_ONLY)dir path=usr/share/man/man7d
 $(i386_ONLY)driver name=sdhost perms="* 0644 root root" \
     alias=pciclass,080500 \
     alias=pciclass,080501
@@ -50,6 +52,9 @@ $(i386_ONLY)file path=kernel/drv/$(ARCH64)/sdhost group=sys
 $(i386_ONLY)file path=kernel/drv/sdhost group=sys
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/sda group=sys mode=0755
+$(i386_ONLY)file path=usr/share/man/man7d/sda.7d
+$(i386_ONLY)file path=usr/share/man/man7d/sdcard.7d
+$(i386_ONLY)file path=usr/share/man/man7d/sdhost.7d
 $(i386_ONLY)legacy pkg=SUNWsdcard desc="SD/MMC Drivers" name="SD/MMC Drivers"
 $(i386_ONLY)license cr_Sun license=cr_Sun
 $(i386_ONLY)license lic_CDDL license=lic_CDDL

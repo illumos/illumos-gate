@@ -1,0 +1,529 @@
+'\" te
+.\"  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH td_ta_event_addr 3C_DB "19 Oct 1998" "SunOS 5.11" "Threads Debugging Library Functions"
+.SH NAME
+td_ta_event_addr, td_thr_event_enable, td_ta_set_event, td_thr_set_event,
+td_ta_clear_event, td_thr_clear_event, td_ta_event_getmsg, td_thr_event_getmsg,
+td_event_emptyset, td_event_fillset, td_event_addset, td_event_delset,
+td_eventismember, td_eventisempty \- thread events in libc_db
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR...  -lc_db  [ \fIlibrary\fR... ]
+#include <proc_service.h>
+#include <thread_db.h>
+
+\fBtd_err_e\fR \fBtd_ta_event_addr\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBu_long event,td_notify_t *\fR\fInotify_p\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_thr_event_enable\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBint\fR \fIon_off\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_thr_set_event\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBtd_thr_events_t *\fR\fIevents\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_set_event\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_thr_events_t *\fR\fIevents\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_thr_clear_event\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBtd_thr_events_t *\fR\fIevents\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_clear_event\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_thr_events_t *\fR\fIevents\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_thr_event_getmsg\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBtd_event_msg_t *\fR\fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBtd_err_e\fR \fBtd_ta_event_getmsg\fR(\fBconst td_thragent_t *\fR\fIta_p\fR, \fBtd_event_msg_t *\fR\fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtd_event_emptyset\fR(\fBtd_thr_events_t\fR  *);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtd_event_fillset\fR(\fBtd_thr_events_t\fR *);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtd_event_addset\fR(\fBtd_thr_events_t\fR \fI*\fR, \fBtd_thr_events_e\fR\fI n\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtd_event_delset\fR(\fBtd_thr_events_t\fR \fI*\fR, \fBtd_thr_events_e\fR\fI n\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtd_eventismember\fR(\fBtd_thr_events_t\fR \fI*\fR, \fBtd_thr_events_e\fR\fI n\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBtd_eventisempty\fR(\fBtd_thr_events_t\fR\fI*\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions comprise the thread event facility for \fBlibc_db\fR(3LIB).
+This facility allows the controlling process to be notified when certain
+thread-related events occur in a target process and to retrieve information
+associated with these events.  An event consists of an event type, and
+optionally, some  associated event data, depending on the event type. See the
+section  titled "Event Set Manipulation Macros" that follows.
+.sp
+.LP
+The event type  and the associated event data, if any, constitute an "event
+message."   "Reporting an event" means delivering  an event message to the
+controlling process by way of \fBlibc_db\fR.
+.sp
+.LP
+Several flags can control event reporting, both a per-thread and per event
+basis. Event reporting may further be enabled  or disabled for a thread. There
+is not only a per-thread event mask that specifies which  event types should be
+reported for that thread, but there is also  a global event mask that applies
+to all threads.
+.sp
+.LP
+An event is reported, if and only if, the executing thread has event reporting
+enabled, and either the event type is enabled in the executing thread's event
+mask, or the event type is enabled in the global event mask.
+.sp
+.LP
+Each thread has associated with it an event buffer in which it stores the most
+recent event message it has generated, the type of the most recent event that
+it reported, and, depending on the event type, some additional information
+related to that event.  See the section titled  "Event Set Manipulation Macros"
+for a description of the  \fBtd_thr_events_e\fR and \fBtd_event_msg_t\fR types
+and a list of the event types and the values reported with them. The thread
+handle, type \fBtd_thrhandle_t\fR, the event type, and the possible value,
+together constitute an event message. Each thread's event buffer holds at most
+one event message.
+.sp
+.LP
+Each event type has an event reporting address associated with it.  A thread
+reports an event by writing the event message into the thread's event buffer
+and having control reach the event reporting address for that event type.
+.sp
+.LP
+Typically, the controlling process sets a breakpoint at the event reporting
+address for one or more event types. When the breakpoint is hit, the
+controlling process knows that an event of the corresponding type has occurred.
+.sp
+.LP
+The event types, and the additional information, if any, reported with each
+event, are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_READY\fR\fR
+.ad
+.RS 18n
+.rt  
+The thread became ready to execute.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_SLEEP\fR\fR
+.ad
+.RS 18n
+.rt  
+The thread has blocked on a synchronization object.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_SWITCHTO\fR\fR
+.ad
+.RS 18n
+.rt  
+A runnable thread is being assigned to  \fBLWP.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_SWITCHFROM\fR\fR
+.ad
+.RS 18n
+.rt  
+A running thread is being removed from its  \fBLWP.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_LOCK_TRY\fR\fR
+.ad
+.RS 18n
+.rt  
+A thread is trying to get an unavailable lock.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_CATCHSIG\fR\fR
+.ad
+.RS 18n
+.rt  
+A signal was posted to a thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_IDLE\fR\fR
+.ad
+.RS 18n
+.rt  
+An \fBLWP\fR is becoming idle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_CREATE\fR\fR
+.ad
+.RS 18n
+.rt  
+A thread is being created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_DEATH\fR\fR
+.ad
+.RS 18n
+.rt  
+A thread has terminated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_PREEMPT\fR\fR
+.ad
+.RS 18n
+.rt  
+A thread is being preempted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_PRI_INHERIT\fR\fR
+.ad
+.RS 18n
+.rt  
+A thread is inheriting an elevated priority from another thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_REAP\fR\fR
+.ad
+.RS 18n
+.rt  
+A thread is being reaped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_CONCURRENCY\fR\fR
+.ad
+.RS 18n
+.rt  
+The number of \fBLWPs\fR is changing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_TIMEOUT\fR\fR
+.ad
+.RS 18n
+.rt  
+A condition-variable timed wait expired.
+.RE
+
+.sp
+.LP
+The \fBtd_ta_event_addr()\fR function returns in *\fInotify_p\fR the event
+reporting address associated with event type \fBevent\fR. The controlling
+process may then set a breakpoint at that address.  If a thread hits that
+breakpoint, it reports an event of type  \fBevent\fR.
+.sp
+.LP
+The \fBtd_thr_event_enable()\fR function enables or disables event reporting
+for thread \fIth_p\fR. If a thread has event reporting disabled, it will not
+report any events. Threads are started with event reporting disabled.  Event
+reporting is enabled if  \fBon_off\fR is non-zero; otherwise, it is disabled.
+To determine whether or not event reporting is enabled  on a thread, call
+\fBtd_thr_getinfo()\fR for the thread and examine the \fBti_traceme\fR member
+of the \fBtd_thrinfo_t\fR structure it returns.
+.sp
+.LP
+The \fBtd_thr_set_event()\fR and \fBtd_thr_clear_event()\fR functions set and
+clear, respectively, a set of event types in the event mask associated with the
+thread \fIth_p\fR. To inspect a thread's event mask, call
+\fBtd_thr_getinfo()\fR for the thread and examine the \fBti_events\fR member of
+the \fBtd_thrinfo_t\fR structure it returns.
+.sp
+.LP
+The \fBtd_ta_set_event()\fR and \fBtd_ta_clear_event()\fR functions identical
+to \fBtd_thr_set_event()\fR and \fBtd_thr_clear_event()\fR, respectively,
+except that the target process's global event mask is  modified. There is no
+provision for inspecting the value of a  target process's global event mask.
+.sp
+.LP
+The \fBtd_thr_event_getmsg()\fR function returns in *\fImsg\fR the event
+message associated with thread *\fIth_p\fR. Reading a thread's event message
+consumes the message, emptying the thread's event buffer.  As noted above, each
+thread's event buffer holds at most one event message; if a thread reports a
+second event before the first event message has been read, the second event
+message overwrites the first.
+.sp
+.LP
+The \fBtd_ta_event_getmsg()\fR function is identical to
+\fBtd_thr_event_getmsg()\fR, except that it is passed a process handle rather
+than a thread handle. It selects some thread that has an event message buffered
+and returns that thread's message.  The thread selected is undefined, except
+that as long as at least one thread has an event message buffered, it returns
+an event message from some such thread.
+.SS "Event Set Manipulation Macros"
+.sp
+.LP
+Several macros are provided for manipulating event sets of type
+\fBtd_thr_events_t\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtd_event_emptyset\fR \fR
+.ad
+.RS 22n
+.rt  
+Sets its argument to the \fINULL\fR event set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtd_event_fillset\fR\fR
+.ad
+.RS 22n
+.rt  
+Sets its argument to the set of all events.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtd_event_addset\fR\fR
+.ad
+.RS 22n
+.rt  
+Adds a specific event type to an event set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtd_event_delset\fR\fR
+.ad
+.RS 22n
+.rt  
+Deletes a specific event type from an event set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtd_eventismember\fR\fR
+.ad
+.RS 22n
+.rt  
+Tests whether a specific event type is a member of an event set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtd_eventisempty\fR\fR
+.ad
+.RS 22n
+.rt  
+Tests whether an event set is the \fINULL\fR set.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The following values may be returned for all thread event routines:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_OK\fR\fR
+.ad
+.RS 12n
+.rt  
+The call returned successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_BADTH\fR\fR
+.ad
+.RS 12n
+.rt  
+An invalid thread handle was passed in.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_BADTA\fR\fR
+.ad
+.RS 12n
+.rt  
+An invalid internal process handle was passed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_BADPH\fR\fR
+.ad
+.RS 12n
+.rt  
+There is a \fINULL\fR external process handle associated with this internal
+process handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_DBERR\fR\fR
+.ad
+.RS 12n
+.rt  
+A call to one of the imported interface routines failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_NOMSG\fR\fR
+.ad
+.RS 12n
+.rt  
+No event message was available to return to \fBtd_thr_event_getmsg()\fR or
+\fBtd_ta_event_getmsg()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_ERR\fR\fR
+.ad
+.RS 12n
+.rt  
+Some other parameter error occurred, or a  \fBlibc_db()\fR internal error
+occurred.
+.RE
+
+.sp
+.LP
+The following value can be returned for \fBtd_thr_event_enable()\fR,
+\fBtd_thr_set_event()\fR, and \fBtd_thr_clear_event()\fR only:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTD_NOCAPAB\fR \fR
+.ad
+.RS 15n
+.rt  
+Because the agent thread in the target process has not completed
+initialization, this operation cannot be performed. The operation can be
+performed after the target process has been allowed to make some forward
+progress.  See \fBlibc_db\fR(3LIB).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibc_db\fR(3LIB), \fBattributes\fR(5)

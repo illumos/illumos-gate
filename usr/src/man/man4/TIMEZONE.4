@@ -1,0 +1,73 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TIMEZONE 4 "26 Jun 2003" "SunOS 5.11" "File Formats"
+.SH NAME
+TIMEZONE \- set default system time zone and locale
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/TIMEZONE\fR 
+\fB/etc/default/init\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This file sets the time zone environment variable \fBTZ\fR, and the
+locale-related environment variables \fBLANG\fR, \fBLC_COLLATE\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_MONETARY\fR, \fBLC_NUMERIC\fR, and
+\fBLC_TIME\fR.
+.sp
+.LP
+\fB/etc/TIMEZONE\fR is a symbolic link to \fB/etc/default/init\fR.
+.sp
+.LP
+The number of environment variables that can be set from
+\fB/etc/default/init\fR is limited to 20.
+.sp
+.LP
+The format of the file is:
+.sp
+.in +2
+.nf
+\fIVAR\fR\fB=\fR\fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIVAR\fR is a timezone environment variable and \fIvalue\fR is the value
+assigned to the variable. \fIvalue\fR can be enclosed in double quotes (") or
+single quotes (\&'). The double or single quotes cannot be part of the value.
+.SH SEE ALSO
+.sp
+.LP
+\fBinit\fR(1M), \fBrtc\fR(1M), \fBctime\fR(3C), \fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+When changing the \fBTZ\fR setting on x86 systems, you must make a
+corresponding change to the \fB/etc/rtc_config\fR file to account for the new
+timezone setting. This can be accomplished by executing the following commands,
+followed by a reboot, to make the changes take effect:
+.sp
+.in +2
+.nf
+# rtc \fB-z\fR \fIzone-name\fR
+# rtc \fB-c\fR
+ 
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fIzone-name\fR is the same name as the \fBTZ\fR variable setting.
+.sp
+.LP
+See \fBrtc\fR(1M) for information on the \fBrtc\fR command.

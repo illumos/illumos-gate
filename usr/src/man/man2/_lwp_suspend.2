@@ -1,0 +1,79 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH _lwp_suspend 2 "13 Aug 2001" "SunOS 5.11" "System Calls"
+.SH NAME
+_lwp_suspend, _lwp_continue \- continue or suspend LWP execution
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/lwp.h>
+
+\fBint\fR \fB_lwp_suspend\fR(\fBlwpid_t\fR \fItarget_lwp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB_lwp_continue\fR(\fBlwpid_t\fR \fItarget_lwp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB_lwp_suspend()\fR function immediately suspends the execution of the LWP
+specified by \fItarget_lwp\fR. On successful return from \fB_lwp_suspend()\fR,
+\fItarget_lwp\fR is no longer executing. Once a thread is suspended, subsequent
+calls to \fB_lwp_suspend()\fR have no affect.
+.sp
+.LP
+The \fB_lwp_continue()\fR function resumes the execution of a suspended LWP.
+Once a suspended LWP is continued, subsequent calls to \fB_lwp_continue()\fR
+have no effect.
+.sp
+.LP
+A suspended LWP will not be awakened by a signal. The signal stays pending
+until the execution of the LWP is resumed by \fB_lwp_continue()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. A non-zero value indicates an
+error.
+.SH ERRORS
+.sp
+.LP
+If the following condition occurs, \fB_lwp_suspend()\fR and
+\fB_lwp_continue()\fR fail and return the corresponding value:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fItarget_lwpid\fR argument cannot be found in the current process.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)

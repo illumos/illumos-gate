@@ -1,0 +1,174 @@
+'\" te
+.\"  Copyright (c) 1994 Sun Microsystems, Inc. - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NOTE 3EXT "31 Dec 1996" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+NOTE, _NOTE \- annotate source code with info for tools
+.SH SYNOPSIS
+.LP
+.nf
+#include <note.h>
+
+
+
+\fB\fR\fBNOTE\fR(\fB\fR\fINoteInfo\fR);
+.fi
+
+.LP
+.nf
+or
+#include<sys/note.h>
+
+
+
+\fB\fR\fB_NOTE\fR(\fB\fR\fINoteInfo\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These macros are used to embed information for tools in program source. A use
+of one of these macros is called an "annotation". A tool may define a set of
+such annotations which can then be used to provide the tool with information
+that would otherwise be unavailable from the source code.
+.sp
+.LP
+Annotations should, in general, provide documentation useful to the human
+reader. If information is of no use to a human trying to understand the code
+but is necessary for proper operation of a tool, use another mechanism for
+conveying that information to the tool (one which does not involve adding to
+the source code), so as not to detract from the readability of the source. The
+following is an example of an annotation which provides information of use to a
+tool and to the human reader (in this case, which data are protected by a
+particular lock, an annotation defined by the static lock analysis tool
+\fBlock_lint\fR).
+.sp
+.in +2
+.nf
+NOTE(MUTEX_PROTECTS_DATA(foo_lock, \fBfoo_list\fR \fBFoo))\fR
+.fi
+.in -2
+
+.sp
+.LP
+Such annotations do not represent executable code; they are neither statements
+nor declarations.  They should not be followed by a semicolon. If a compiler or
+tool that analyzes C source does not understand this annotation scheme, then
+the tool will ignore the annotations. (For such tools,
+\fBNOTE(\fR\fIx\fR\fB)\fR expands to nothing.)
+.sp
+.LP
+Annotations may only be placed at particular places in the source.  These
+places are where the following C constructs would be allowed:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a top-level declaration (that is, a declaration not within a function or other
+construct)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a declaration or statement within a block (including the block which defines a
+function)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a member of a \fBstruct\fR or \fBunion\fR.
+.RE
+.sp
+.LP
+Annotations are not allowed in any other place.  For example, the following are
+illegal:
+.sp
+.in +2
+.nf
+x = y + NOTE(...) z ;
+typedef NOTE(...) unsigned int uint ;
+.fi
+.in -2
+
+.sp
+.LP
+While \fBNOTE\fR and \fB_NOTE\fR may be used in the places described above, a
+particular type of annotation may only be allowed in a subset of those places.
+For example, a particular annotation may not be allowed inside a \fBstruct\fR
+or \fBunion\fR definition.
+.SS "NOTE vs _NOTE"
+.sp
+.LP
+Ordinarily, \fBNOTE\fR should be used rather than \fB_NOTE\fR, since use of
+\fB_NOTE\fR technically makes a program non-portable. However, it may be
+inconvenient to use \fBNOTE\fR for this purpose in existing code if \fBNOTE\fR
+is already heavily used for another purpose.  In this case one should use a
+different macro and write a header file similar to \fB/usr/include/note.h\fR
+which maps that macro to \fB_NOTE\fR in the same manner.  For example, the
+following makes \fBFOO\fR such a macro:
+.sp
+.in +2
+.nf
+#ifndef _FOO_H
+#define _FOO_H
+#define FOO _NOTE
+#include <sys/note.h>
+#endif
+.fi
+.in -2
+
+.sp
+.LP
+Public header files which span projects should use \fB_NOTE\fR rather than
+\fBNOTE\fR, since \fBNOTE\fR may already be used by a program which needs to
+include such a header file.
+.SS "\fINoteInfo\fR\fB Argument\fR"
+.sp
+.LP
+The actual \fINoteInfo\fR used in an annotation should be specified by a tool
+that deals with program source (see the documentation for the tool to determine
+which annotations, if any, it understands).
+.sp
+.LP
+\fINoteInfo\fR must have one of the following forms:
+.sp
+.in +2
+.nf
+\fINoteName
+NoteName\fR(\fIArgs\fR) 
+.fi
+.in -2
+
+.sp
+.LP
+where \fINoteName\fR is simply an identifier which indicates the type of
+annotation, and \fIArgs\fR is something defined by the tool that specifies the
+particular \fINoteName.\fR The general restrictions on \fIArgs\fR are that it
+be compatible with an ANSI C tokenizer and that unquoted parentheses be
+balanced (so that the end of the annotation can be determined without intimate
+knowledge of any particular annotation).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnote\fR(4), \fBattributes\fR(5)

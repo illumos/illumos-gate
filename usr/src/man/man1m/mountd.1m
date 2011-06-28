@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mountd 1M "27 Apr 2005" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+mountd \- server for NFS mount requests and NFS access checks
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/nfs/mountd\fR [\fB-v\fR] [\fB-r\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBmountd\fR is an \fBRPC\fR server that answers requests for \fBNFS\fR access
+information and file system mount requests. It reads the file
+\fB/etc/dfs/sharetab\fR to determine which file systems are available for
+mounting by which remote machines. See \fBsharetab\fR(4). \fBnfsd\fR running on
+the local server will contact \fBmountd\fR the first time an \fBNFS\fR client
+tries to access the file system to determine whether the client should get
+read-write, read-only, or no access. This access can be dependent on the
+security mode used in the remoted procedure call from the client. See
+\fBshare_nfs\fR(1M).
+.sp
+.LP
+The command also provides information as to what file systems are mounted by
+which clients. This information can be printed using the \fBshowmount\fR(1M)
+command.
+.sp
+.LP
+The \fBmountd\fR daemon is automatically invoked by \fBshare\fR(1M).
+.sp
+.LP
+Only super user can run the \fBmountd\fR daemon.
+.SH OPTIONS
+.sp
+.LP
+The options shown below are supported for NVSv2/v3 clients. They are not
+supported for Solaris NFSv4 clients.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+Reject mount requests from clients. Clients that have file systems mounted will
+not be affected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+Run the command in verbose mode. Each time \fBmountd\fR determines what access
+a client should get, it will log the result to the console, as well as how it
+got that result.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/dfs/sharetab\fR\fR
+.ad
+.RS 21n
+.rt  
+shared file system table
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnfsd\fR(1M), \fBshare\fR(1M), \fBshare_nfs\fR(1M), \fBshowmount\fR(1M),
+\fBnfs\fR(4), \fBsharetab\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Since \fBmountd\fR must be running for \fBnfsd\fR to function properly,
+\fBmountd\fR is automatically started by the \fBsvc:/network/nfs/server\fR
+service. See \fBnfs\fR(4).
+.sp
+.LP
+Some routines that compare hostnames use case-sensitive string comparisons;
+some do not. If an incoming request fails, verify that the case of the hostname
+in the file to be parsed matches the case of the hostname called for, and
+attempt the request again.

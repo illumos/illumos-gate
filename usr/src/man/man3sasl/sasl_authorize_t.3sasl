@@ -1,0 +1,167 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sasl_authorize_t 3SASL "27 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.SH NAME
+sasl_authorize_t \- the SASL authorization callback
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
+#include <sasl/sasl.h>
+
+\fBint\fR \fBsasl_authorize_t\fR(\fBsasl_conn_t *\fR\fIconn\fR, \fBconst char *\fR\fIrequested_user\fR,
+     \fBunsigned\fR \fIalen\fR, \fBconst char*\fR \fIauth_identity\fR, \fBunsigned\fR \fIrlen\fR,
+     \fBconst char *\fR\fIdef_realm\fR, \fBunsigned\fR \fIurlen\fR, \fBstruct propctx *\fR\fIpropctx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBsasl_authorize_t()\fR is a typedef function prototype that defines the
+interface associated with the \fBSASL_CB_PROXY_POLICY\fR callback.
+.sp
+.LP
+Use the \fBsasl_authorize_t()\fR interface to check whether the authorized user
+\fIauth_identity\fR can act as the user \fIrequested_user\fR. For example, the
+user \fBroot\fR may want to authenticate with \fBroot\fR's credentials but as
+the user \fBtmartin\fR, with all of \fBtmartin\fR's rights, not \fBroot\fR's. A
+server application should be very careful when it determines which users may
+proxy as other users.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconn\fR\fR
+.ad
+.RS 18n
+.rt  
+The SASL connection context.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrequested_user\fR\fR
+.ad
+.RS 18n
+.rt  
+The identity or username to authorize. \fIrequested_user\fR is null-terminated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrlen\fR\fR
+.ad
+.RS 18n
+.rt  
+The length of \fIrequested_user\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIauth_identity\fR\fR
+.ad
+.RS 18n
+.rt  
+The identity associated with the secret. \fIauth_identity\fR is
+null-terminated.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIalen\fR\fR
+.ad
+.RS 18n
+.rt  
+The length of \fIauth_identity\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdefault_realm\fR\fR
+.ad
+.RS 18n
+.rt  
+The default user realm as passed to \fBsasl_server_new\fR(3SASL).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIulren\fR\fR
+.ad
+.RS 18n
+.rt  
+The length of the default realm
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpropctx\fR\fR
+.ad
+.RS 18n
+.rt  
+Auxiliary properties
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Like other SASL callback functions, \fBsasl_authorize_t()\fR returns an integer
+that corresponds to a SASL error code. See <\fBsasl.h\fR> for a complete list
+of SASL error codes.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSASL_OK\fR\fR
+.ad
+.RS 11n
+.rt  
+The call to \fBsasl_authorize_t()\fR was successful.
+.RE
+
+.sp
+.LP
+See \fBsasl_errors\fR(3SASL) for information on SASL error codes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsasl_errors\fR(3SASL), \fBsasl_server_new\fR(3SASL), \fBattributes\fR(5)

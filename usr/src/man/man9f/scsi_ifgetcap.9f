@@ -1,0 +1,494 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_ifgetcap 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_ifgetcap, scsi_ifsetcap \- get/set SCSI transport capability
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBint\fR \fBscsi_ifgetcap\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBchar *\fR\fIcap\fR, \fBint\fR \fIwhom\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscsi_ifsetcap\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBchar *\fR\fIcap\fR, \fBint\fR \fIvalue\fR, 
+     \fBint\fR \fIwhom\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to the \fBscsi_address\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcap\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to the string capability identifier.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIvalue\fR\fR
+.ad
+.RS 9n
+.rt  
+Defines the new state of the capability.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwhom\fR\fR
+.ad
+.RS 9n
+.rt  
+Determines if all targets or only the specified target is affected.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_ifsetcap()\fR function is used by target drivers to set the
+capabilities of the host adapter driver. The \fIcap\fR pointer is a name-value
+pair identified by a null-terminated character string and the integer value of
+the \fIcap\fR. The current value of the capability can be retrieved with the
+\fBscsi_ifgetcap()\fR function. If the \fIwhom\fR value is \fB0\fR, all target
+drivers are affected. Otherwise, the \fBscsi_address\fR structure pointed to by
+\fIap\fR is the only target that is affected.
+.sp
+.LP
+The driver should confirm that \fBscsi_ifsetcap()\fR and \fBscsi_ifsetcap()\fR
+functions are called with a \fIcap\fR that points to a capability which is
+supported by the device.
+.sp
+.LP
+The following capabilities have been defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdma-max\fR\fR
+.ad
+.RS 24n
+.rt  
+Maximum \fBdma\fR transfer size that is supported by the host adapter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdma-max-arch\fR\fR
+.ad
+.RS 24n
+.rt  
+Maximum \fBdma\fR transfer size that is supported by system. Takes the host
+adapter and system architecture into account. This is useful for target drivers
+which do not support partial \fBDMA\fRs on systems which do not have an
+\fBIOMMU\fR. In this case, the \fBDMA\fR can also be limited by the host
+adapters "scatter/gather" list constraints.
+.sp
+The "\fBdma-max-arch\fR" capability can not be set. It is implemented with this
+command and does not rely on a \fBtran_getcap\fR(9E) response from the HBA.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBmsg-out\fR\fR
+.ad
+.RS 24n
+.rt  
+Message out capability that is supported by the host adapter: \fB0\fR disables,
+\fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdisconnect\fR\fR
+.ad
+.RS 24n
+.rt  
+Disconnect capability that is supported by the host adapter: \fB0\fR disables,
+\fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsynchronous\fR\fR
+.ad
+.RS 24n
+.rt  
+Synchronous data transfer capability that is supported by the host adapter:
+\fB0\fR disables, \fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwide-xfer\fR\fR
+.ad
+.RS 24n
+.rt  
+Wide transfer capability that is supported by the host adapter: \fB0\fR
+disables, \fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBparity\fR\fR
+.ad
+.RS 24n
+.rt  
+Parity checking capability that is supported by host adapter: \fB0\fR disables,
+\fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinitiator-id\fR\fR
+.ad
+.RS 24n
+.rt  
+Host bus address that is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuntagged-qing\fR\fR
+.ad
+.RS 24n
+.rt  
+Host adapter capability that supports internal queueing of commands without
+tagged queueing: \fB0\fR disables, \fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtagged-qing\fR\fR
+.ad
+.RS 24n
+.rt  
+Host adapter capability that supports queuing: \fB0\fR disables, \fB1\fR
+enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBauto-rqsense\fR\fR
+.ad
+.RS 24n
+.rt  
+Host adapter capability that supports auto request sense on check conditions:
+\fB0\fR disables, \fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsector-size\fR\fR
+.ad
+.RS 24n
+.rt  
+Capability that is set by the target driver to inform the \fBHBA\fR of the
+granularity, in bytes, of the \fBDMA\fR breakup. The \fBHBA\fR \fBDMA\fR limit
+structure is set to reflect the byte total of this setting. See
+\fBddi_dma_lim_sparc\fR(9S) or \fBddi_dma_lim_x86\fR(9S). The \fBsector-size\fR
+should be set to the size of the physical disk sector. The capability defaults
+to 512 bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtotal-sectors\fR\fR
+.ad
+.RS 24n
+.rt  
+Capability that is set by the target driver to inform the \fBHBA\fR of the
+total number of sectors on the device returned by the \fBSCSI\fR \fBget
+capacity\fR command. This capability must be set before the target driver
+``gets'' the \fBgeometry\fR capability.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgeometry\fR\fR
+.ad
+.RS 24n
+.rt  
+Capability that returns the \fBHBA\fR geometry of a target disk. The target
+driver sets the \fBtotal-sectors\fR capability before ``getting'' the geometry
+capability. The geometry is returned as a 32-bit value. The upper 16 bits
+represent the number of heads per cylinder. The lower 16 bits represent the
+number of sectors per track. The geometry capability cannot be ``set''.
+.sp
+If geometry is not relevant or appropriate for the target disk,
+\fBscsi_ifgetcap()\fR can return \fB-1\fR to indicate that the geometry is not
+defined. For example, if the \fBHBA\fR BIOS supports Logical Block Addressing
+for the target disk, \fBscsi_ifgetcap()\fR returns \fB-1\fR. Attempts to
+retreive the "virtual geometry" from the target driver, such as the
+\fBDKIOCG_VIRTGEOM\fR ioctl, will fail. See \fBdkio\fR(7I) for more information
+about \fBDKIOCG_VIRTGEOM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreset-notification\fR\fR
+.ad
+.RS 24n
+.rt  
+Host adapter capability that supports bus reset notification: \fB0\fR disables,
+\fB1\fR enables. See \fBscsi_reset_notify\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlinked-cmds\fR\fR
+.ad
+.RS 24n
+.rt  
+Host adapter capability that supports linked commands: \fB0\fR disables,
+\fB1\fR enables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBqfull-retries\fR\fR
+.ad
+.RS 24n
+.rt  
+Capability that enables or disables \fBQUEUE\fR \fBFULL\fR handling. If
+\fB0\fR, the \fBHBA\fR will not retry a command when a \fBQUEUE\fR \fBFULL\fR
+status is returned. If the value is greater than \fB0\fR, the \fBHBA\fR driver
+retries the command a specified number of times at an interval determined by
+the \fBqfull-retry-interval\fR. The range for \fBqfull-retries\fR is
+\fB0-255\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBqfull-retry-interval\fR\fR
+.ad
+.RS 24n
+.rt  
+Capability that sets the retry interval in milliseconds (\fBms\fR) for commands
+completed with a \fBQUEUE\fR \fBFULL\fR status. The range for
+\fBqfull-retry-intervals\fR is \fB0-1000\fR \fBms\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlun-reset\fR\fR
+.ad
+.RS 24n
+.rt  
+Capability that is created with a value of zero by \fBHBA\fR drivers that
+support the \fBRESET_LUN\fR flag in the \fBtran_reset\fR(9E) function. If it
+exists, the \fBlun-reset\fR value can be set to \fB1\fR by target drivers to
+allow the use of \fBLOGICAL UNIT RESET\fR on a specific target instance. If
+\fBlun-reset\fR does not exist or has a value of zero, \fBscsi_reset\fR(9F) is
+prevented from passing the \fBRESET_LUN\fR flag to \fBtran_reset()\fR function
+of the \fBHBA\fR driver. If \fBlun-reset\fR exists and has a value of \fB1\fR,
+the \fBtran_reset()\fR function of the \fBHBA\fR driver can be called with the
+\fBRESET_LUN\fR flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBinterconnect-type\fR
+.ad
+.RS 24n
+.rt  
+Capability held in the \fBtran_interconnect_type\fR element of struct
+\fBscsi_hba_tran\fR that indicates the \fBHBA\fR transport interconnect type .
+The integer value of the interconnect type of the transport is defined in the
+\fBservices.h\fR header file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBmax-cdb-length\fR
+.ad
+.RS 24n
+.rt  
+Host adapter capability of the maximum supported \fBCDB\fR (Command Descriptor
+Block) length. The target driver asks for the capability at attach time. If the
+\fBHBA\fR driver supports the capability, the maximum length of the \fBCDB\fR
+is returned in bytes. The target driver can then use that value to determine
+which \fBCDB\fR is used for the \fBHBA\fR.
+.sp
+If the \fBHBA\fR driver does not support the \fBmax-cdb-length\fR capability,
+the default value of the target driver is used for the \fBCDB\fR determination.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_ifsetcap()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 9n
+.rt  
+If the capability was successfully set to the new value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 9n
+.rt  
+If the capability is not variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi1\fR\fR
+.ad
+.RS 9n
+.rt  
+If the capability was not defined, or setting the capability to a new value
+failed.
+.RE
+
+.sp
+.LP
+The \fBscsi_ifgetcap()\fR function returns the current value of a capability,
+or:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi1\fR\fR
+.ad
+.RS 9n
+.rt  
+If the capability was not defined.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBscsi_ifgetcap()\fR
+.sp
+.in +2
+.nf
+if (scsi_ifgetcap(&sd->sd_address, "auto-rqsense", 1) == 1) {
+   un->un_arq_enabled = 1;
+} else {
+   un->un_arq_enabled =
+       ((scsi_ifsetcap(&sd->sd_address, "auto-rqsense", 1, 1) == 1) ?
+             1 : 0);
+}
+
+if (scsi_ifsetcap(&devp->sd_address, "tagged-qing", 1, 1) == 1) {
+	  un->un_dp->options |= SD_QUEUEING;
+	  un->un_throttle = MAX_THROTTLE;
+} else if (scsi_ifgetcap(&devp->sd_address, "untagged-qing", 0) == 1) {
+	  un->un_dp->options |= SD_QUEUEING;
+	  un->un_throttle = 3;
+} else {
+	  un->un_dp->options &= ~SD_QUEUEING;
+	  un->un_throttle = 1;
+}
+.fi
+.in -2
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtran_reset\fR(9E), \fBscsi_hba_lookup_capstr\fR(9F), \fBscsi_reset\fR(9F),
+\fBscsi_reset_notify\fR(9F), \fBddi_dma_lim_sparc\fR(9S),
+\fBddi_dma_lim_x86\fR(9S), \fBscsi_address\fR(9S), \fBscsi_arq_status\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

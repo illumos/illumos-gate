@@ -1,0 +1,183 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_color 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_color, start_color, init_pair, init_color, has_colors, can_change_color,
+color_content, pair_content \- curses color manipulation functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBstart_color\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinit_pair\fR(\fBshort\fR \fIpair\fR, \fBshort\fR \fIfg\fR, \fBshort\fR \fIbg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinit_color\fR(\fBshort\fR \fIcolor\fR, \fBshort\fR \fIred\fR, \fBshort\fR \fIgreen\fR, \fBshort\fR \fIblue\fR);
+.fi
+
+.LP
+.nf
+\fBbool\fR \fBhas_colors\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBbool\fR \fBcan_change_color\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcolor_content\fR(\fBshort\fR \fIcolor\fR, \fBshort *\fR\fIredp\fR, \fBshort *\fR\fIgreenp\fR, \fBshort *\fR\fIbluep\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpair_content\fR(\fBshort\fR \fIpair\fR, \fBshort *\fR\fIfgp\fR, \fBshort *\fR\fIbgp\fR);
+.fi
+
+.SH DESCRIPTION
+.SS "Overview"
+.sp
+.LP
+\fBcurses\fR provides routines  that manipulate color on color alphanumeric
+terminals. To use these routines \fBstart_color()\fR must be called, usually
+right after \fBinitscr()\fR. See \fBcurs_initscr\fR(3CURSES). Colors are always
+used in pairs (referred to as color-pairs). A color-pair consists of a
+foreground color (for characters) and a background color (for the field on
+which the characters are displayed). A programmer initializes a color-pair with
+the routine \fBinit_pair\fR. After it has been initialized,
+\fBCOLOR_PAIR(\fR\fIn\fR\fB),\fR a macro defined in \fB<curses.h>\fR, can be
+used in the same ways other video attributes can be used. If a terminal is
+capable of redefining colors, the programmer can use the routine
+\fBinit_color()\fR to change the definition of a color. The routines
+\fBhas_colors()\fR and \fBcan_change_color()\fR return \fBTRUE\fR or
+\fBFALSE\fR, depending on whether the terminal has color capabilities and
+whether the programmer can change the colors. The routine \fBcolor_content()\fR
+allows a programmer to identify the amounts of red, green, and blue components
+in an initialized color. The routine \fBpair_content()\fR allows a programmer
+to find out how a given color-pair is currently defined.
+.SS "Routine Descriptions"
+.sp
+.LP
+The \fBstart_color()\fR routine requires no arguments. It must be called if the
+programmer wants to use colors, and before any other color manipulation routine
+is called. It is good practice to call this routine right after
+\fBinitscr()\fR. \fBstart_color()\fR initializes eight basic colors (black,
+red, green, yellow, blue, magenta, cyan, and white), and two global variables,
+\fBCOLORS\fR and \fBCOLOR_PAIRS\fR (respectively defining the maximum number of
+colors and color-pairs the terminal can support). It also restores the colors
+on the terminal to the values they had when the terminal was just turned on.
+.sp
+.LP
+The \fBinit_pair()\fR routine changes the definition of a color-pair. It takes
+three arguments: the number of the color-pair to be changed, the foreground
+color number, and the background color number. The value of the first argument
+must be between \fB1\fR and \fBCOLOR_PAIRS\fR\(mi1. The value of the second and
+third arguments must be between 0 and \fBCOLORS\fR. If the color-pair was
+previously initialized, the screen is refreshed and all occurrences of that
+color-pair is changed to the new definition.
+.sp
+.LP
+The \fBinit_color()\fR routine changes the definition of a color. It takes four
+arguments: the number of the color to be changed followed by three \fBRGB\fR
+values (for the amounts of red, green, and blue components). The value of the
+first argument must be between \fB0\fR and \fBCOLORS\fR. (See the section
+\fBColors\fR for the default color index.) Each of the last three arguments
+must be a value between 0 and 1000. When \fBinit_color()\fR is used, all
+occurrences of that color on the screen immediately change to the new
+definition.
+.sp
+.LP
+The \fBhas_colors()\fR routine requires no arguments. It returns \fBTRUE\fR if
+the terminal can manipulate colors; otherwise, it returns \fBFALSE\fR. This
+routine facilitates writing terminal-independent programs. For example, a
+programmer can use it to decide whether to use color or some other video
+attribute.
+.sp
+.LP
+The \fBcan_change_color()\fR routine requires no arguments. It returns
+\fBTRUE\fR if the terminal supports colors and can change their definitions;
+other, it returns \fBFALSE\fR. This routine facilitates writing
+terminal-independent programs.
+.sp
+.LP
+The \fBcolor_content()\fR routine gives users a way to find the intensity of
+the red, green, and blue (RGB) components in a color. It requires four
+arguments: the color number, and three addresses of \fBshort\fRs for storing
+the information about the amounts of red, green, and blue components in the
+given color. The value of the first argument must be between 0 and
+\fBCOLORS\fR. The values that are stored at the addresses pointed to by the
+last three arguments are between 0 (no component) and 1000 (maximum amount of
+component).
+.sp
+.LP
+The \fBpair_content()\fR routine allows users to find out what colors a given
+color-pair consists of. It requires three arguments: the color-pair number, and
+two addresses of \fBshort\fRs for storing the foreground and the background
+color numbers. The value of the first argument must be between 1 and
+\fBCOLOR_PAIRS\fR\(mi1. The values that are stored at the addresses pointed to
+by the second and third arguments are between 0 and \fBCOLORS\fR.
+.SS "Colors"
+.sp
+.LP
+In \fB<curses.h>\fR the following macros are defined. These are the default
+colors. \fBcurses\fR also assumes that \fBCOLOR_BLACK\fR is the default
+background color for all terminals.
+.sp
+.in +2
+.nf
+\fBCOLOR_BLACK
+COLOR_RED
+COLOR_GREEN
+COLOR_YELLOW
+COLOR_BLUE
+COLOR_MAGENTA
+COLOR_CYAN
+COLOR_WHITE\fR
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+All routines that return an integer return \fBERR\fR upon failure and \fBOK\fR
+upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_attr\fR(3CURSES), \fBcurs_initscr\fR(3CURSES), \fBcurses\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.

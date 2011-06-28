@@ -1,0 +1,274 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH locale 1 "20 Dec 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+locale \- get locale-specific information
+.SH SYNOPSIS
+.LP
+.nf
+\fBlocale\fR [\fB-a\fR | \fB-m\fR]
+.fi
+
+.LP
+.nf
+\fBlocale\fR [\fB-ck\fR] \fIname\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlocale\fR utility writes information about the current locale
+environment, or all public locales, to the standard output. For the purposes of
+this section, a \fIpublic locale\fR is one provided by the implementation that
+is accessible to the application.
+.sp
+.LP
+When \fBlocale\fR is invoked without any arguments, it summarizes the current
+locale environment for each locale category as determined by the settings of
+the environment variables.
+.sp
+.LP
+When invoked with operands, it writes values that have been assigned to the
+keywords in the locale categories, as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Specifying a keyword name selects the named keyword and the category containing
+that keyword.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Specifying a category name selects the named category and all keywords in that
+category.
+.RE
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Writes information about all available public locales. The available locales
+include \fBPOSIX\fR, representing the POSIX locale.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+.rt  
+Writes the names of selected locale categories. The \fB-c\fR option increases
+readability when more than one category is selected (for example, via more than
+one keyword name or via a category name). It is valid both with and without the
+\fB-k\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 6n
+.rt  
+Writes the names and values of selected keywords. The implementation may omit
+values for some keywords; see OPERANDS.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+Writes names of available charmaps; see  \fBlocaledef\fR(1).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 8n
+.rt  
+The name of a locale category, the name of a keyword in a locale category, or
+the reserved name \fBcharmap\fR. The named category or keyword will be selected
+for output. If a single \fIname\fR represents both a locale category name and a
+keyword name in the current locale, the results are unspecified; otherwise,
+both category and keyword names can be specified as \fIname\fR operands, in any
+sequence.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExamples of the locale utility
+.sp
+.LP
+In the following examples, the assumption is that locale environment variables
+are set as follows:
+
+.sp
+.in +2
+.nf
+LANG=locale_x LC_COLLATE=locale_y
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The command \fBlocale\fR would result in the following output:
+
+.sp
+.in +2
+.nf
+LANG=locale_x
+LC_CTYPE="locale_x"
+LC_NUMERIC="locale_x"
+LC_TIME="locale_x"
+LC_COLLATE=locale_y
+LC_MONETARY="locale_x"
+LC_MESSAGES="locale_x"
+LC_ALL=
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The command
+
+.sp
+.in +2
+.nf
+\fBLC_ALL=POSIX locale -ck decimal_point\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would produce:
+
+.sp
+.in +2
+.nf
+LC_NUMERIC
+decimal_point="."
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command shows an application of \fBlocale\fR to determine whether
+a user-supplied response is affirmative:
+
+.sp
+.in +2
+.nf
+\fBif printf "%s\en" "$response" | /usr/xpg4/bin/grep -Eq\e
+        "$(locale yesexpr)"
+then
+    affirmative processing goes here
+else
+    non-affirmative processing goes here
+fi\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for the descriptions of  \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.LP
+The \fBLANG\fR, \fBLC_*\fR, and \fBNLSPATH\fR environment variables must
+specify the current locale environment to be written out. These environment
+variables will be used if the \fB-a\fR option is not specified.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All the requested information was found and output successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlocaledef\fR(1), \fBattributes\fR(5), \fBcharmap\fR(5), \fBenviron\fR(5),
+\fBlocale\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+If \fBLC_CTYPE\fR or keywords in the category \fBLC_CTYPE\fR are specified,
+only the values in the range \fB0x00\fR-\fB0x7f\fR are written out.
+.sp
+.LP
+If \fBLC_COLLATE\fR or keywords in the category \fBLC_COLLATE\fR are specified,
+no actual values are written out.

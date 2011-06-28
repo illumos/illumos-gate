@@ -1,0 +1,510 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rsh 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+rsh, remsh, remote_shell \- remote shell
+.SH SYNOPSIS
+.LP
+.nf
+\fBrsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR] 
+     [\fB-k\fR \fIrealm\fR] \fIhostname\fR \fIcommand\fR
+.fi
+
+.LP
+.nf
+\fBrsh\fR \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] 
+     [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIcommand\fR
+.fi
+
+.LP
+.nf
+\fBremsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR] 
+     [\fB-k\fR \fIrealm\fR] \fIhostname\fR \fIcommand\fR
+.fi
+
+.LP
+.nf
+\fBremsh\fR \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] 
+     [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIcommand\fR
+.fi
+
+.LP
+.nf
+ \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] 
+     [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIcommand\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBrsh\fR utility connects to the specified \fIhostname\fR and executes the
+specified \fIcommand\fR. \fBrsh\fR copies its standard input to the remote
+command, the standard output of the remote command to its standard output, and
+the standard error of the remote command to its standard error. Interrupt,
+quit, and terminate signals are propagated to the remote command. \fBrsh\fR
+normally terminates when the remote command does.
+.sp
+.LP
+The user can opt for a secure session of \fBrsh\fR which uses Kerberos V5 for
+authentication. Encryption of the network session traffic is also possible. The
+\fBrsh\fR session can be kerberized using any of the following Kerberos
+specific options: \fB-a\fR, \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or
+\fB-F\fR, and \fB-k\fR \fIrealm\fR. Some of these options (\fB-a\fR, \fB-x\fR,
+\fB-PN\fR or \fB-PO\fR, and \fB-f\fR or \fB-F\fR) can also be specified in the
+\fB[appdefaults]\fR section of \fBkrb5.conf\fR(4). The usage of these options
+and the expected behavior is discussed in the OPTIONS section below. If
+Kerberos authentication is used, authorization to the account is controlled by
+rules in \fBkrb5_auth_rules\fR(5). If this authorization fails, fallback to
+normal \fBrsh\fR using \fBrhosts\fR occurs only if the \fB-PO\fR option is used
+explicitly on the command line or is specified in \fBkrb5.conf\fR(4). Also, the
+\fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or \fB-F\fR, and \fB-k\fR
+\fIrealm\fR options are just supersets of the \fB-a\fR option.
+.sp
+.LP
+If you omit \fIcommand\fR, instead of executing a single command, \fBrsh\fR
+logs you in on the remote host using \fBrlogin\fR(1).
+.sp
+.LP
+\fBrsh\fR does not return the exit status code of \fIcommand\fR.
+.sp
+.LP
+Shell metacharacters which are not quoted are interpreted on the local machine,
+while quoted metacharacters are interpreted on the remote machine. See
+EXAMPLES.
+.sp
+.LP
+If there is no locale setting in the initialization file of the login shell
+(\fB\&.cshrc\fR, . . .) for a particular user, \fBrsh\fR always executes the
+command in the "C" locale instead of using the default locale of the remote
+machine.
+.sp
+.LP
+The command is sent unencrypted to the remote system. All subsequent network
+session traffic is encrypted. See \fB-x\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 15n
+.rt  
+Explicitly enable Kerberos authentication and trusts the \fB\&.k5login\fR file
+for access-control. If the authorization check by \fBin.rshd\fR(1M) on the
+server-side succeeds and if the \fB\&.k5login\fR file permits access, the user
+is allowed to carry out the command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 15n
+.rt  
+Forward a copy of the local credentials (Kerberos Ticket Granting Ticket) to
+the remote system. This is a non-forwardable ticket granting ticket. Forward a
+ticket granting ticket if you need to authenticate yourself to other Kerberized
+network services on the remote host. An example would be if your home directory
+on the remote host is \fBNFS\fR mounted by way of Kerberos V5. If your local
+credentials are not forwarded in this case, you cannot access your home
+directory. This option is mutually exclusive with the \fB-F\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 15n
+.rt  
+Forward a forwardable copy of the local credentials (Kerberos Ticket Granting
+Ticket) to the remote system. The \fB-F\fR option provides a superset of the
+functionality offered by the \fB-f\fR option. For example, with the \fB-f\fR
+option, if, after you connected to the remote host, your remote command
+attempted to invoke \fB/usr/bin/ftp\fR, \fB/usr/bin/telnet\fR,
+\fB/usr/bin/rlogin\fR, or \fB/usr/bin/rsh\fR, with the \fB-f\fR or \fB-F\fR
+options, the attempt would fail. Thus, you would be unable to push your single
+network sign on trust beyond one system. This option is mutually exclusive with
+the \fB-f\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR \fIrealm\fR\fR
+.ad
+.RS 15n
+.rt  
+Causes \fBrsh\fR to obtain tickets for the remote host in \fIrealm\fR instead
+of the remote host's realm as determined by \fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-K\fR\fR
+.ad
+.RS 15n
+.rt  
+This option explicitly disables Kerberos authentication. It can be used to
+override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-l\fR \fIusername\fR\fR
+.ad
+.RS 15n
+.rt  
+Uses \fIusername\fR as the remote username instead of your local username. In
+the absence of this option, the remote username is the same as your local
+username.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 15n
+.rt  
+Redirect the input of \fBrsh\fR to \fB/dev/null\fR. You sometimes need this
+option to avoid unfortunate interactions between \fBrsh\fR and the shell which
+invokes it. For example, if you are running \fBrsh\fR and invoke a \fBrsh\fR in
+the background without redirecting its input away from the terminal, it blocks
+even if no reads are posted by the remote command. The \fB-n\fR option prevents
+this.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-PO\fR\fR
+.ad
+.br
+.na
+\fB\fB-PN\fR\fR
+.ad
+.RS 15n
+.rt  
+Explicitly request new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
+"\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalant
+in the old one and is regarded much more secure, but is not interoperable with
+older (MIT/SEAM) servers. The new protocol is used by default, unless
+explicitly specified using these options or through \fBkrb5.conf\fR(4). If
+Kerberos authorization fails when using the old "\fBrcmd\fR" protocol, there is
+fallback to regular, non-kerberized \fBrsh\fR. This is not the case when the
+new, more secure "\fBrcmd\fR" protocol is used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 15n
+.rt  
+Cause the network session traffic to be encrypted. See \fBDESCRIPTION\fR.
+.RE
+
+.sp
+.LP
+The type of remote shell (\fBsh\fR, \fBrsh\fR, or other) is determined by the
+user's entry in the file \fB/etc/passwd\fR on the remote system.
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcommand\fR\fR
+.ad
+.RS 11n
+.rt  
+The command to be executed on the specified \fIhostname\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBrsh\fR and
+\fBremsh\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
+bytes).
+.sp
+.LP
+The \fBrsh\fR and \fBremsh\fR commands are IPv6-enabled. See \fBip6\fR(7P).
+\fBIPv6\fR is not currently supported with Kerberos V5 authentication.
+.sp
+.LP
+Hostnames are given in the \fIhosts\fR database, which can be contained in the
+\fB/etc/hosts\fR file, the Internet domain name database, or both. Each host
+has one official name (the first name in the database entry) and optionally one
+or more nicknames. Official hostnames or nicknames can be given as
+\fIhostname\fR.
+.sp
+.LP
+If the name of the file from which \fBrsh\fR is executed is anything other than
+\fBrsh\fR, \fBrsh\fR takes this name as its \fIhostname\fR argument. This
+allows you to create a symbolic link to \fBrsh\fR in the name of a host which,
+when executed, invokes a remote shell on that host. By creating a directory and
+populating it with symbolic links in the names of commonly used hosts, then
+including the directory in your shell's search path, you can run \fBrsh\fR by
+typing \fIhostname\fR to your shell.
+.sp
+.LP
+If \fBrsh\fR is invoked with the basename \fBremsh\fR, \fBrsh\fR checks for the
+existence of the file \fB/usr/bin/remsh\fR. If this file exists, \fBrsh\fR
+behaves as if \fBremsh\fR is an alias for \fBrsh\fR. If \fB/usr/bin/remsh\fR
+does not exist, \fBrsh\fR behaves as if \fBremsh\fR is a host name.
+.sp
+.LP
+For the kerberized \fBrsh\fR session, each user can have a private
+authorization list in a file \fB\&.k5login\fR in their home directory. Each
+line in this file should contain a Kerberos principal name of the form
+\fIprincipal\fR/\fIinstance\fR@\fIrealm\fR. If there is a \fB~/.k5login\fR
+file, then access is granted to the account if and only if the originater user
+is authenticated to one of the principals named in the \fB~/.k5login\fR file.
+Otherwise, the originating user is granted access to the account if and only if
+the authenticated principal name of the user can be mapped to the local account
+name using the \fIauthenticated-principal-name\fR \(-> \fIlocal-user-name\fR
+mapping rules. The \fB\&.k5login\fR file (for access control) comes into play
+only when Kerberos authentication is being done.
+.sp
+.LP
+For the non-secure \fBrsh\fR session, each remote machine can have a file named
+\fB/etc/hosts.equiv\fR containing a list of trusted hostnames with which it
+shares usernames. Users with the same username on both the local and remote
+machine can run \fBrsh\fR from the machines listed in the remote machine's
+\fB/etc/hosts.equiv\fR file. Individual users can set up a similar private
+equivalence list with the file .rhosts in their home directories. Each line in
+this file contains two names: a hostname and a username separated by a space.
+The entry permits the user named username who is logged into hostname to use
+rsh to access the remote machine as the remote user. If the name of the local
+host is not found in the \fB/etc/hosts.equiv\fR file on the remote machine, and
+the local username and hostname are not found in the remote user's
+\fB\&.rhosts\fR file, then the access is denied. The hostnames listed in the
+\fB/etc/hosts.equiv\fR and \fB\&.rhosts\fR files must be the official hostnames
+listed in the \fBhosts\fR database; nicknames can not be used in either of
+these files.
+.sp
+.LP
+You cannot log in using \fBrsh\fR as a trusted user from a trusted hostname if
+the trusted user account is locked.
+.sp
+.LP
+\fBrsh\fR does not prompt for a password if access is denied on the remote
+machine unless the \fIcommand\fR argument is omitted.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing rsh to Append Files
+.sp
+.LP
+The following command appends the remote file \fBlizard.file\fR from the
+machine called \fBlizard\fR to the file called \fBexample.file\fR on the
+machine called \fBexample\fR:
+
+.sp
+.in +2
+.nf
+example% \fBrsh lizard cat lizard.file >> example.file\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command appends the file \fBlizard.file\fR on the machine called
+\fBlizard\fR to the file \fBlizard.file2\fR which also resides on the machine
+called \fBlizard\fR:
+
+.sp
+.in +2
+.nf
+example% \fBrsh lizard cat lizard.file ">>" lizard.file2\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/hosts\fR\fR
+.ad
+.RS 23n
+.rt  
+Internet host table
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/hosts.equiv\fR\fR
+.ad
+.RS 23n
+.rt  
+Trusted remote hosts and users
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 23n
+.rt  
+System password file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.k5login\fR\fR
+.ad
+.RS 23n
+.rt  
+File containing Kerberos principals that are allowed access
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/krb5/krb5.conf\fR\fR
+.ad
+.RS 23n
+.rt  
+Kerberos configuration file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBon\fR(1), \fBrlogin\fR(1), \fBssh\fR(1), \fBtelnet\fR(1), \fBvi\fR(1),
+\fBin.rshd\fR(1M), \fBhosts\fR(4), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4),
+\fBattributes\fR(5), \fBkrb5_auth_rules\fR(5), \fBlargefile\fR(5),
+\fBip6\fR(7P)
+.SH NOTES
+.sp
+.LP
+When a system is listed in \fBhosts.equiv\fR, its security must be as good as
+local security. One insecure system listed in \fBhosts.equiv\fR can compromise
+the security of the entire system.
+.sp
+.LP
+You cannot run an interactive command (such as \fBvi\fR(1)). Use \fBrlogin\fR
+if you wish to do this.
+.sp
+.LP
+Stop signals stop the local \fBrsh\fR process only. This is arguably wrong, but
+currently hard to fix for reasons too complicated to explain here.
+.sp
+.LP
+The current local environment is not passed to the remote shell.
+.sp
+.LP
+Sometimes the \fB-n\fR option is needed for reasons that are less than obvious.
+For example, the command:
+.sp
+.in +2
+.nf
+example% \fBrsh somehost dd if=/dev/nrmt0 bs=20b | tar xvpBf \(mi\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+puts your shell into a strange state. Evidently, the \fBtar\fR process
+terminates before the \fBrsh\fR process. The \fBrsh\fR command then tries to
+write into the ``broken pipe'' and, instead of terminating neatly, proceeds to
+compete with your shell for its standard input. Invoking \fBrsh\fR with the
+\fB-n\fR option avoids such incidents.
+.sp
+.LP
+This bug occurs only when \fBrsh\fR is at the beginning of a pipeline and is
+not reading standard input. Do not use the \fB-n\fR option if \fBrsh\fR
+actually needs to read standard input. For example:
+.sp
+.in +2
+.nf
+example% \fBtar cf \(mi . | rsh sundial dd of=/dev/rmt0 obs=20b\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+does not produce the bug. If you were to use the \fB-n\fR option in a case like
+this, \fBrsh\fR would incorrectly read from \fB/dev/null\fR instead of from the
+pipe.
+.sp
+.LP
+For most purposes, \fBssh\fR(1) is preferred over \fBrsh\fR.

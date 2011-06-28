@@ -1,0 +1,147 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH bkgd 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+bkgd, bkgdset, getbkgd, wbkgd, wbkgdset \- set or get the background character
+(and rendition) of window
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBbkgd\fR(\fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBbkgdset\fR(\fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBchtype\fR \fBgetbkgd\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwbkgd\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIch\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBwbkgdset\fR(\fBWINDOW *\fR\fIwin\fR, \fBchtype\fR \fIch\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbkgdset()\fR and \fBwbkgdset()\fR functions turn off the previous
+background attributes, logical OR the requested attributes into the window
+rendition, and set the background property of the current or specified window
+based on the information in \fIch\fR. If \fIch\fR refers to a multi-column
+character, the results are undefined.
+.sp
+.LP
+The \fBbkgd()\fR and \fBwbkgd()\fR functions turn off the previous background
+attributes, logical OR the requested attributes into the window rendition, and
+set the background property of the current or specified window and then apply
+this setting to every character position in that window:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The rendition of every character on the screen is changed to the new window
+rendition.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Wherever the former background character appears, it is changed to the new
+background character.
+.RE
+.sp
+.LP
+The \fBgetbkgd()\fR function extracts the specified window's background
+character and rendition.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the background character to be set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to the window in which the background character is to  be set.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBbkgd()\fR and \fBwbkgd()\fR functions return
+\fBOK\fR. Otherwise, they return \fBERR\fR.
+.sp
+.LP
+The \fBbkgdset()\fR and \fBwbkgdset()\fR functions do not return a value.
+.sp
+.LP
+Upon successful completion, the \fBgetbkgd()\fR function returns the specified
+window's background character and rendition. Otherwise, it returns
+\fB(chtype)\fR\fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+These functions are only guaranteed to operate reliably on character sets in
+which each character fits into a single byte, whose attributes can be expressed
+using only constants with the A_ prefix.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaddch\fR(3XCURSES), \fBaddchstr\fR(3XCURSES), \fBattroff\fR(3XCURSES),
+\fBbkgrnd\fR(3XCURSES), \fBclear\fR(3XCURSES), \fBclrtoeol\fR(3XCURSES),
+\fBclrtobot\fR(3XCURSES), \fBerase\fR(3XCURSES), \fBinch\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBmvprintw\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

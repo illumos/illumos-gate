@@ -1,0 +1,88 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\"  Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH WR 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+WR, wr \- get pointer to the write queue for this module or driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+
+\fBqueue_t *\fR\fBWR\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the \fIread\fR queue whose \fIwrite\fR queue is to be returned.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBWR()\fR function accepts a \fIread\fR queue pointer as an argument and
+returns a pointer to the \fIwrite\fR queue of the same module.
+.sp
+.LP
+CAUTION: Make sure the argument to this function is a pointer to a \fIread\fR
+queue. \fBWR()\fR will not check for queue type, and a system panic could
+result if the pointer is not to a \fIread\fR queue.
+.SH RETURN VALUES
+.sp
+.LP
+The pointer to the \fIwrite\fR queue.
+.SH CONTEXT
+.sp
+.LP
+The \fBWR()\fR function can be called from user, interrupt, or kernel context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBWR()\fR
+.sp
+.LP
+In a STREAMS \fBclose\fR(9E) routine, the driver or module is passed a pointer
+to the \fIread\fR queue. These usually are set to the address of the
+module-specific data structure for the minor device.
+
+.sp
+.in +2
+.nf
+ 
+1   xxxclose(q, flag)
+2       queue_t *q;
+3       int flag;
+4   {
+5	         q->q_ptr = NULL;
+6         WR(q)->q_ptr = NULL;
+	         . . .
+7   }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(9E), \fBOTHERQ\fR(9F), \fBRD\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -1,0 +1,370 @@
+'\" te
+.\"  Copyright (c) 2008 Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH psradm 1M "25 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+psradm \- change processor operational status
+.SH SYNOPSIS
+.LP
+.nf
+\fBpsradm\fR \fB-f\fR | \fB-i\fR | \fB-n\fR | \fB-s\fR [\fB-v\fR] [\fB-F\fR] \fIprocessor_id\fR
+.fi
+
+.LP
+.nf
+\fBpsradm\fR \fB-a\fR \fB-f\fR | \fB-i\fR | \fB-n\fR | \fB-s\fR [\fB-v\fR] [\fB-F\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpsradm\fR utility changes the operational status of processors. The
+legal states for the processor are \fBon-line\fR, \fBoff-line\fR, \fBspare\fR,
+\fBfaulted\fR, and \fBno-intr\fR.
+.sp
+.LP
+An \fBon-line\fR processor processes \fBLWPs\fR (lightweight processes) and can
+be interrupted by I/O devices in the system.
+.sp
+.LP
+An \fBoff-line\fR processor does not process any \fBLWPs.\fR Usually, an
+\fBoff-line\fR processor is not interruptible by I/O devices in the system. On
+some processors or under certain conditions, it might not be possible to
+disable interrupts for an \fBoff-line\fR processor. Thus, the actual effect of
+being \fBoff-line\fR might vary from machine to machine.
+.sp
+.LP
+A spare processor does not process any LWPs. A spare processor can be brought
+\fBon-line\fR, \fBoff-line\fR or to \fBno-intr\fR by a privileged user of the
+system or by the kernel in response to changes in the system state.
+.sp
+.LP
+A faulted processor is identified by the kernel, which monitors the behavior of
+processors over time. A privileged user can set the state of a faulted
+processor to be \fBon-line\fR, \fBoff-line\fR, \fBspare\fR or \fBno-intr\fR,
+but must use the force option to do so.
+.sp
+.LP
+A \fBno-intr\fR processor processes \fBLWPs\fR but is not interruptible by I/O
+devices.
+.sp
+.LP
+A processor can not be taken \fBoff-line\fR or made \fBspare\fR if there are
+LWPs that are bound to the processor unless the additional \fB-F\fR option is
+used. The \fB-F\fR option removes processor bindings of such LWPs before
+changing the processor's operational status. On some architectures, it might
+not be possible to take certain processors \fBoff-line\fR or \fBspare\fR if,
+for example, the system depends on some resource provided by the processor.
+.sp
+.LP
+At least one processor in the system must be able to process \fBLWPs.\fR At
+least one processor must also be able to be interrupted. Since an
+\fBoff-line\fR or \fBspare\fR processor can be interruptible, it is possible to
+have an operational system with one processor \fBno-intr\fR and all other
+processors \fBoff-line\fR or \fBspare\fR but with one or more accepting
+interrupts.
+.sp
+.LP
+If any of the specified processors are powered off, \fBpsradm\fR might power on
+one or more processors.
+.sp
+.LP
+Only users with the \fBPRIV_SYS_RES_CONFIG\fR privilege can use the
+\fBpsradm\fR utility.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Perform the action on all processors, or as many as possible.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Take the specified processors \fBoff-line\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+.rt  
+Force the transition to the additional specified state. Required if one or more
+of the specified processors was in the faulted state. Set the specified
+processors to faulted, if no other transition option was specified. Forced
+transitions can only be made to \fBfaulted\fR, \fBspare\fR, or \fBoff-line\fR
+states. Administrators are encouraged to use the \fB-Q\fR option for
+\fBpbind\fR(1M) to find out which threads will be affected by forced a
+processor state transition.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Set the specified processors \fBno-intr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Bring the specified processors \fBon-line\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Make the specified processors spare.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+Output a message giving the results of each attempted operation.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprocessor_id\fR\fR
+.ad
+.RS 16n
+.rt  
+The processor \fBID\fR of the processor to be set \fBon-line\fR or
+\fBoff-line\fR, \fBspare\fR, or \fBno-intr\fR.
+.sp
+Specify \fIprocessor_id\fR as an individual processor number (for example,
+\fB3\fR), multiple processor numbers separated by spaces (for example, \fB1 2
+3\fR), or a range of processor numbers (for example, \fB1-4\fR). It is also
+possible to combine ranges and (individual or multiple) \fIprocessor_id\fRs
+(for example, \fB1-3 5 7-8 9\fR).
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSetting Processors to \fBoff-line\fR
+.sp
+.LP
+The following example sets processors 2 and 3 \fBoff-line\fR:
+
+.sp
+.in +2
+.nf
+% psradm \fB-f\fR 2 3
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting Processors to no-intr
+.sp
+.LP
+The following example sets processors 1 and 2 \fBno-intr\fR:
+
+.sp
+.in +2
+.nf
+% psradm \fB-i\fR 1 2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSetting Processors to \fBspare\fR
+.sp
+.LP
+The following example sets processors 1 and 2 spare, even if either of the
+processors was in the faulted state:
+
+.sp
+.in +2
+.nf
+% psradm -F -s 1 2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSetting All Processors \fBon-line\fR
+.sp
+.in +2
+.nf
+% psradm \fB-a\fR \fB-n\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRForcing Processors to \fBoff-line\fR
+.sp
+.LP
+The following example sets processors 1 and 2 offline, and revokes the
+processor bindings from the processes bound to them:
+
+.sp
+.in +2
+.nf
+% psradm \fB-F\fR \fB-f\fR 1 2
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/wtmpx\fR\fR
+.ad
+.RS 14n
+.rt  
+Records logging processor status changes
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpbind\fR(1M), \fBpsrinfo\fR(1M), \fBpsrset\fR(1M), \fBp_online\fR(2),
+\fBprocessor_bind\fR(2), \fBattributes\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsradm: processor 4: Invalid argument\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified processor does not exist in the configuration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsradm: processor 3: Device busy\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified processor could not be taken \fBoff-line\fR because it either has
+LWPs bound to it, is the last \fBon-line\fR processor in the system, or is
+needed by the system because it provides some essential service.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsradm: processor 3: Device busy\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified processor could not be set \fBno-intr\fR because it is the last
+interruptible processor in the system, or or it is the only processor in the
+system that can service interrupts needed by the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsradm: processor 3: Device busy\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified processor is powered off, and it cannot be powered on because
+some platform-specific resource is unavailable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsradm: processor 0: Not owner\fR\fR
+.ad
+.sp .6
+.RS 4n
+The user does not have permission to change processor status.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsradm: processor 2: Operation not supported\fR\fR
+.ad
+.sp .6
+.RS 4n
+The specified processor is powered off, and the platform does not support power
+on of individual processors.
+.RE
+

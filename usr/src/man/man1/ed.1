@@ -1,0 +1,1336 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2003, Sun Microsystems, Inc.  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ed 1 "10 Dec 2003" "SunOS 5.11" "User Commands"
+.SH NAME
+ed, red \- text editor
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/ed\fR [\fB-s\fR | \fB-\fR] [\fB-p\fR \fIstring\fR] [\fB-x\fR] [\fB-C\fR] [\fIfile\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/ed\fR [\fB-s\fR | \fB-\fR] [\fB-p\fR \fIstring\fR] [\fB-x\fR] [\fB-C\fR] [\fIfile\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/ed\fR [\fB-s\fR | \fB-\fR] [\fB-p\fR \fIstring\fR] [\fB-x\fR] [\fB-C\fR] [\fIfile\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/bin/red\fR [\fB-s\fR | \fB-\fR] [\fB-p\fR \fIstring\fR] [\fB-x\fR] [\fB-C\fR] [\fIfile\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBed\fR utility is the standard text editor. If \fIfile\fR is specified,
+\fBed\fR simulates an \fBe\fR command (see below) on the named file. That is,
+the file is read into \fBed\fR's buffer so that it can be edited.
+.sp
+.LP
+The \fBed\fR utility operates on a copy of the file it is editing. Changes made
+to the copy have no effect on the file until a \fBw\fR (write) command is
+given. The copy of the text being edited resides in a temporary file called the
+\fIbuffer\fR. There is only one buffer.
+.sp
+.LP
+The \fBred\fR utility is a restricted version of \fBed\fR. It will only allow
+editing of files in the current directory. \fBred\fR prohibits executing shell
+commands via \fB!\fR\fIshell command\fR. Attempts to bypass these restrictions
+result in an error message (\fIrestricted shell\fR).
+.sp
+.LP
+Both \fBed\fR and \fBred\fR support the \fBfspec\fR(4) formatting capability.
+The default terminal mode is either \fBstty\fR \fB-tabs\fR or \fBstty tab3\fR,
+where tab stops are set at eight columns (see \fBstty\fR(1)). If, however, the
+first line of \fIfile\fR contains a format specification, that specification
+will override the default mode. For example, tab stops would be set at 5, 10,
+and 15, and a maximum line length of 72 would be imposed if the first line of
+\fIfile\fR contains
+.sp
+.in +2
+.nf
+\fB<:t5,10,15 s72:>\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Commands to \fBed\fR have a simple and regular structure: zero, one, or two
+\fIaddresses\fR followed by a single-character \fIcommand\fR, possibly followed
+by parameters to that command. These addresses specify one or more lines in the
+buffer. Every command that requires addresses has default addresses, so that
+the addresses can very often be omitted.
+.sp
+.LP
+In general, only one command may appear on a line. Certain commands allow the
+input of text. This text is placed in the appropriate place in the buffer.
+While \fBed\fR is accepting text, it is said to be in \fIinput mode\fR. In this
+mode, \fBno\fR commands are recognized; all input is merely collected. Leave
+input mode by typing a period (\fB\&.\fR) at the beginning of a line, followed
+immediately by a carriage return.
+.sp
+.LP
+If \fBed\fR executes commands with arguments, it uses the default shell
+\fB/usr/bin/sh\fR (see \fBsh\fR(1)).
+.SS "Regular Expressions"
+.sp
+.LP
+The \fBed\fR utility supports a limited form of \fIregular expression\fR
+notation. Regular expressions are used in addresses to specify lines and in
+some commands (for example, \fBs\fR) to specify portions of a line that are to
+be substituted. To understand addressing in \fBed\fR, it is necessary to know
+that at any time there is a \fIcurrent line\fR. Generally speaking, the current
+line is the last line affected by a command. The exact effect on the current
+line is discussed under the description of each command.
+.sp
+.LP
+Internationalized Basic Regular Expressions are used for all system-supplied
+locales. See \fBregex\fR(5).
+.SS "ed Commands"
+.sp
+.LP
+Commands may require zero, one, or two addresses. Commands that require no
+addresses regard the presence of an address as an error. Commands that accept
+one or two addresses assume default addresses when an insufficient number of
+addresses is given; if more addresses are given than such a command requires,
+the last one(s) are used.
+.sp
+.LP
+Typically, addresses are separated from each other by a comma (\fB,\fR). They
+may also be separated by a semicolon (\fB;\fR). In the latter case, the first
+address is calculated, the current line (\fB\&.\fR) is set to that value, and
+then the second address is calculated. This feature can be used to determine
+the starting line for forward and backward searches (see Rules 5 and 6, above).
+The second address of any two-address sequence must correspond to a line in the
+buffer that follows the line corresponding to the first address.
+.sp
+.LP
+For \fB/usr/xpg6/gbin/ed\fR, the address can be omitted on either side of the
+comma or semicolon separator, in which case the resulting address pairs are as
+follows:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+SpecifiedResulting
+_
+,1 , $
+_
+, addr1 , addr
+_
+addr ,addr , addr
+_
+;1 ; $
+_
+; addr1 ; addr
+_
+addr ;addr ; addr
+.TE
+
+.sp
+.LP
+Any <\fIblank\fR>s included between addresses, address separators, or address
+offsets are ignored.
+.sp
+.LP
+In the following list of \fBed\fR commands, the parentheses shown prior to the
+command are \fInot\fR part of the address. Rather, the parentheses show the
+default address(es) for the command.
+.sp
+.LP
+Each address component can be preceded by zero or more blank characters. The
+command letter can be preceded by zero or more blank characters. If a suffix
+letter (\fBl\fR, \fBn\fR, or \fBp\fR) is given, it must immediately follow the
+command.
+.sp
+.LP
+The \fBe\fR, \fBE\fR, \fBf\fR, \fBr\fR, and \fBw\fR commands take an optional
+\fIfile\fR parameter, separated from the command letter by one or more blank
+characters.
+.sp
+.LP
+If changes have been made in the buffer since the last \fBw\fR command that
+wrote the entire buffer, \fBed\fR warns the user if an attempt is made to
+destroy the editor buffer via the \fBe\fR or \fBq\fR commands. The \fBed\fR
+utility writes the string:
+.sp
+.in +2
+.nf
+"?\en"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+(followed by an explanatory message if \fIhelp mode\fR has been enabled via the
+\fBH\fR command) to standard output and continues in command mode with the
+current line number unchanged. If the \fBe\fR or \fBq\fR command is repeated
+with no intervening command, \fBed\fR takes effect.
+.sp
+.LP
+If an end-of-file is detected on standard input when a command is expected, the
+\fBed\fR utility acts as if a \fBq\fR command had been entered.
+.sp
+.LP
+It is generally illegal for more than one command to appear on a line. However,
+any command (except \fBe\fR, \fBf\fR, \fBr\fR, or \fBw\fR) may be suffixed by
+\fBl\fR, \fBn\fR, or \fBp\fR in which case the current line is either listed,
+numbered or written, respectively, as discussed below under the \fBl\fR,
+\fBn\fR, and \fBp\fR commands.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.)a\fR\fR
+.ad
+.br
+.na
+\fB<\fItext\fR> \fR
+.ad
+.br
+.na
+\fB\fB\&.\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBa\fRppend command accepts zero or more lines of text and appends it
+after the addressed line in the buffer. The current line (\fB\&.\fR) is left at
+the last inserted line, or, if there were none, at the addressed line. Address
+0 is legal for this command: it causes the ``appended'' text to be placed at
+the beginning of the buffer. The maximum number of characters that may be
+entered from a terminal is 256 per line (including the new-line character).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)c\fR\fR
+.ad
+.br
+.na
+\fB<\fItext\fR>\fR
+.ad
+.br
+.na
+\fB\fB\&.\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBc\fRhange command deletes the addressed lines from the buffer, then
+accepts zero or more lines of text that replaces these lines in the buffer. The
+current line (\fB\&.\fR) is left at the last line input, or, if there were
+none, at the first line that was not deleted. If the lines deleted were
+originally at the end of the buffer, the current line number will be set to the
+address of the new last line. If no lines remain in the buffer, the current
+line number will be set to 0.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg4/bin/ed\fR\fR
+.ad
+.RS 20n
+.rt  
+Address 0 is not legal for this command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg6/bin/ed\fR\fR
+.ad
+.RS 20n
+.rt  
+Address 0 is valid for this command. It is interpreted as if the address 1 were
+specified.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBC\fR\fR
+.ad
+.RS 11n
+.rt  
+Same as the \fBX\fR command, described later, except that \fBed\fR assumes all
+text read in for the \fBe\fR and \fBr\fR commands is encrypted unless a null
+key is typed in.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)d\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBd\fRelete command deletes the addressed lines from the buffer. The line
+after the last line deleted becomes the current line. If the lines deleted were
+originally at the end of the buffer, the new last line becomes the current
+line. If no lines remain in the buffer, the current line number will be set to
+0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR \fIfile\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBe\fRdit command deletes the entire contents of the buffer and then reads
+the contents of \fIfile\fR into the buffer. The current line (\fB\&.\fR) is set
+to the last line of the buffer. If \fIfile\fR is not given, the currently
+remembered file name, if any, is used (see the \fBf\fR command). The number of
+bytes read will be written to standard output, unless the \fB-s\fR option was
+specified, in the following format:
+.sp
+\fB"%d\en"\fR <\fInumber of bytes read\fR>
+.sp
+\fIfile\fR is remembered for possible use as a default file name in subsequent
+\fBe\fR, \fBE\fR, \fBr\fR, and \fBw\fR commands. If \fIfile\fR is replaced by
+\fB!\fR, the rest of the line is taken to be a shell ( \fBsh\fR(1)) command
+whose output is to be read. Such a shell command is \fInot\fR remembered as the
+current file name.  See also DIAGNOSTICS below. All marks are discarded upon
+the completion of a successful \fBe\fR command. If the buffer has changed since
+the last time the entire buffer was written, the user is warned, as described
+previously.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE\fR \fIfile\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBE\fRdit command is like \fBe\fR, except that the editor does not check
+to see if any changes have been made to the buffer since the last \fBw\fR
+command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBf\fR \fIfile\fR\fR
+.ad
+.RS 11n
+.rt  
+If \fIfile\fR is given, the \fBf\fR command changes the currently remembered
+path name to \fIfile\fR. Whether the name is changed or not, the \fBf\fR
+command then writes the (possibly new) currently remembered path name to the
+standard output in the following format:
+.sp
+\fB"%s\en"\fR\fIpathname\fR
+.sp
+The current line number is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(1,$)g/\fR\fIRE\fR\fB/\fR\fIcommand list\fR\fR
+.ad
+.RS 26n
+.rt  
+In the \fBg\fRlobal command, the first step is to mark every line that matches
+the given \fIRE\fR. Then, for every such line, the given \fIcommand list\fR is
+executed with the current line (\fB\&.\fR) initially set to that line. When the
+\fBg\fR command completes, the current line number has the value assigned by
+the last command in the command list. If there were no matching lines, the
+current line number is not changed. A single command or the first of a list of
+commands appears on the same line as the global command. All lines of a
+multi-line list except the last line must be ended with a backslash
+(\fB\e\fR\|); \fBa\fR, \fBi\fR, and \fBc\fR commands and associated input are
+permitted. The \fB\&.\fR terminating input mode may be omitted if it would be
+the last line of the \fIcommand list\fR. An empty \fIcommand list\fR is
+equivalent to the \fBp\fR command. The \fBg\fR, \fBG\fR, \fBv\fR, \fBV\fR, and
+\fB!\fR commands are \fInot\fR permitted in the \fIcommand list\fR. See also
+the NOTES and the last paragraph before FILES below. Any character other than
+space or newline can be used instead of a slash to delimit the \fIRE\fR. Within
+the \fIRE\fR, the \fIRE\fR delimiter itself can be used as a literal character
+if it is preceded by a backslash.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(1,$)G/\fR\fIRE\fR\fB/\fR\fR
+.ad
+.RS 26n
+.rt  
+In the interactive \fBG\fRlobal command, the first step is to mark every line
+that matches the given \fIRE\fR. Then, for every such line, that line is
+written to standard output, the current line (\fB\&.\fR) is changed to that
+line, and any \fIone\fR command (other than one of the \fBa\fR, \fBc\fR,
+\fBi\fR, \fBg\fR, \fBG\fR, \fBv\fR, and \fBV\fR commands) may be input and is
+executed. After the execution of that command, the next marked line is written,
+and so on. A new-line acts as a null command. An \fB&\fR causes the
+re-execution of the most recent non-null command executed within the current
+invocation of \fBG\fR. \fBNote:\fR  The commands input as part of the execution
+of the \fBG\fR command may address and affect \fBany\fR lines in the buffer.
+The final value of the current line number is the value set by the last command
+successfully executed. (Notice that the last command successfully executed is
+the \fBG\fR command itself if a command fails or the null command is
+specified.) If there were no matching lines, the current line number is not
+changed. The \fBG\fR command can be terminated by a \fBSIGINT\fR signal. The
+\fBG\fR command can be terminated by an interrupt signal (ASCII DEL or BREAK).
+Any character other than space or newline can be used instead of a slash to
+delimit the \fIRE\fR. Within the \fIRE\fR, the \fIRE\fR delimiter itself can be
+used as a literal character if it is preceded by a backslash.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBhelp\fR command gives a short error message that explains the reason for
+the most recent \fB?\fR diagnostic. The current line number is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBH\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBHelp\fR command causes \fBed\fR to enter a mode in which error messages
+are written for all subsequent \fB?\fR diagnostics. It also explains the
+previous \fB?\fR if there was one. The \fBH\fR command alternately turns this
+mode on and off; it is initially off. The current line number is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)i\fR\fR
+.ad
+.br
+.na
+\fB<\fItext\fR>\fR
+.ad
+.br
+.na
+\fB\fB\&.\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBinsert\fR command accepts zero or more lines of text and inserts it
+before the addressed line in the buffer. The current line (\fB\&.\fR) is left
+at the last inserted line, or, if there were none, at the addressed line. This
+command differs from the \fBa\fR command only in the placement of the input
+text. The maximum number of characters that may be entered from a terminal is
+256 per line (including the new-line character).
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg4/bin/ed\fR\fR
+.ad
+.RS 20n
+.rt  
+Address 0 is not legal for this command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/xpg6/bin/ed\fR\fR
+.ad
+.RS 20n
+.rt  
+Address 0 is valid for this command. It is interpreted as if the address 1 were
+specified.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.+1)j\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBj\fRoin command joins contiguous lines by removing the appropriate
+new-line characters. If exactly one address is given, this command does
+nothing. If lines are joined, the current line number is set to the address of
+the joined line. Otherwise, the current line number is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.)k\fR\fIx\fR\fR
+.ad
+.RS 26n
+.rt  
+The mar\fBk\fR command marks the addressed line with name \fIx\fR, which must
+be an ASCII lower-case letter (\fBa\fR\fB-\fR\fBz\fR). The address \fI a\'x\fR
+then addresses this line. The current line (\fB\&.\fR) is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)l\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBl\fR command writes to standard output the addressed lines in a visually
+unambiguous form. The characters ( \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR,
+\fB\er\fR, \fB\et\fR, \fB\ev\fR) are written as the corresponding escape
+sequence. The \fB\en\fR in that table is not applicable. Non-printable
+characters not in the table are written as one three-digit octal number (with a
+preceding backslash character) for each byte in the character, with the most
+significant byte first.
+.sp
+Long lines are folded, with the point of folding indicated by writing
+backslash/newline character. The length at which folding occurs is unspecified,
+but should be appropriate for the output device. The end of each line is marked
+with a \fB$\fR. When using the \fB/usr/xpg6/bin/ed\fR command, the end of each
+line is marked with a \fB$\fR due to folding, and \fB$\fR characters within the
+text are written with a preceding backslash. An \fBl\fR command can be appended
+to any other command other than \fBe\fR, \fBE\fR, \fBf\fR, \fBq\fR, \fBQ\fR,
+\fBr\fR, \fBw\fR, or \fB!\fR. The current line number is set to the address of
+the last line written.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)m\fR\fIa\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBm\fRove command repositions the addressed line(s) after the line
+addressed by \fIa\fR. Address 0 is legal for \fIa\fR and causes the addressed
+line(s) to be moved to the beginning of the file. It is an error if address
+\fIa\fR falls within the range of moved lines. The current line (\fB\&.\fR) is
+left at the last line moved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)n\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBn\fRumber command writes the addressed lines, preceding each line by its
+line number and a tab character. The current line (\fB\&.\fR) is left at the
+last line written. The \fBn\fR command may be appended to any command other
+than \fBe\fR, \fBE\fR, \fBf\fR, \fBq\fR, \fBQ\fR, \fBr\fR, \fBw\fR, or \fB!\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)p\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBp\fRrint command writes the addressed lines to standard output. The
+current line (\fB\&.\fR) is left at the last line written. The \fBp\fR command
+may be appended to any command other than \fBe\fR, \fBE\fR, \fBf\fR, \fBq\fR,
+\fBQ\fR, \fBr\fR, \fBw\fR, or \fB!\fR. For example, \fBdp\fR deletes the
+current line and writes the new current line.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBP\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBP\fR command causes \fBed\fR to prompt with an asterisk (\fB*\fR) (or
+\fIstring\fR, if \fB-p\fR is specified) for all subsequent commands. The
+\fBP\fR command alternatively turns this mode on and off; it is initially on if
+the \fB-p\fR option is specified, otherwise off. The current line is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBq\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBq\fRuit command causes \fBed\fR to exit. If the buffer has changed since
+the last time the entire buffer was written, the user is warned. See
+DIAGNOSTICS.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQ\fR\fR
+.ad
+.RS 26n
+.rt  
+The editor exits without checking if changes have been made in the buffer since
+the last \fBw\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB($)r\fR \fIfile\fR\fR
+.ad
+.RS 26n
+.rt  
+The \fBr\fRead command reads the contents of \fIfile\fR into the buffer. If
+\fIfile\fR is not given, the currently remembered file name, if any, is used
+(see the \fBe\fR and \fBf\fR commands). The currently remembered file name is
+\fBnot\fR changed unless \fIfile\fR is the very first file name mentioned since
+\fBed\fR was invoked. Address 0 is legal for \fBr\fR and causes the file to be
+read in at the beginning of the buffer. If the read is successful and the
+\fB-s\fR option was not specified, the number of characters read is written to
+standard output in the following format:
+.sp
+.in +2
+.nf
+\fB%d\en\fR, <\fInumber of bytes read\fR>
+.fi
+.in -2
+.sp
+
+The current line (\fB\&.\fR) is set to the last line read. If \fIfile\fR is
+replaced by \fB!\fR, the rest of the line is taken to be a shell command (see
+\fBsh\fR(1)) whose output is to be read. For example, \fB$r !ls\fR appends the
+current directory to the end of the file being edited. Such a shell command is
+\fBnot\fR remembered as the current file name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)s/\fR\fIRE\fR\fB/\fR\fIreplacement\fR\fB/\fR\fR
+.ad
+.br
+.na
+\fB\fB(.,.)s/\fR\fIRE\fR\fB/\fR\fIreplacement\fR\fB/\fR\fIcount\fR,
+\fIcount\fR=[\fB1-2047\fR]\fR
+.ad
+.br
+.na
+\fB\fB(.,.)s/\fR\fIRE\fR\fB/\fR\fIreplacement\fR\fB/g\fR\fR
+.ad
+.br
+.na
+\fB\fB(.,.)s/\fR\fIRE\fR\fB/\fR\fIreplacement\fR\fB/l\fR\fR
+.ad
+.br
+.na
+\fB\fB(.,.)s/\fR\fIRE\fR\fB/\fR\fIreplacement\fR\fB/n\fR\fR
+.ad
+.br
+.na
+\fB\fB(.,.)s/\fR\fIRE\fR\fB/\fR\fIreplacement\fR\fB/p\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBs\fRubstitute command searches each addressed line for an occurrence of
+the specified \fIRE\fR. Zero or more substitution commands can be specified. In
+each line in which a match is found, all (non-overlapped) matched strings are
+replaced by the \fIreplacement\fR if the global replacement indicator \fBg\fR
+appears after the command. If the global indicator does not appear, only the
+first occurrence of the matched string is replaced. If a number \fIcount\fR
+appears after the command, only the \fIcount\fR-th occurrence of the matched
+string on each addressed line is replaced. It is an error if the substitution
+fails on \fBall\fR addressed lines. Any character other than space or new-line
+may be used instead of the slash (\fB/\fR) to delimit the \fIRE\fR and the
+\fIreplacement\fR. The current line (\fB\&.\fR) is left at the last line on
+which a substitution occurred. Within the \fIRE\fR, the \fIRE\fR delimiter
+itself can be used as a literal character if it is preceded by a backslash. See
+also the last paragraph before FILES below.
+.sp
+An ampersand (\fB&\fR) appearing in the \fIreplacement\fR is replaced by the
+string matching the \fIRE\fR on the current line. The special meaning of
+\fB&\fR in this context may be suppressed by preceding it by \fB\e\fR\|. As a
+more general feature, the characters \fB\e\fR\fIn\fR, where \fIn\fR is a digit,
+are replaced by the text matched by the \fIn\fR-th regular subexpression of the
+specified \fIRE\fR enclosed between \fB\e(\fR and \fB\e)\fR\&. When nested
+parenthesized subexpressions are present, \fIn\fR is determined by counting
+occurrences of \fB\e(\fR starting from the left. When the character \fB%\fR is
+the only character in the \fIreplacement\fR, the \fIreplacement\fR used in the
+most recent substitute command is used as the \fIreplacement\fR in the current
+substitute command. If there was no previous substitute command, the use of
+\fB%\fR in this manner is an error. The \fB%\fR loses its special meaning when
+it is in a replacement string of more than one character or is preceded by a
+\fB\e\fR\|. For each backslash (\e) encountered in scanning \fIreplacement\fR
+from beginning to end, the following character loses its special meaning (if
+any). It is unspecified what special meaning is given to any character other
+than \fB&\fR, \fB\e\fR, \fB%\fR, or digits.
+.sp
+A line may be split by substituting a new-line character into it. The new-line
+in the \fIreplacement\fR must be escaped by preceding it by \fB\e\fR\&. Such
+substitution cannot be done as part of a \fBg\fR or \fBv\fR command list. The
+current line number is set to the address of the last line on which a
+substitution is performed. If no substitution is performed, the current line
+number is unchanged. If a line is split, a substitution is considered to have
+been performed on each of the new lines for the purpose of determining the new
+current line number. A substitution is considered to have been performed even
+if the replacement string is identical to the string that it replaces.
+.sp
+The substitute command supports the following indicators:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 9n
+.rt  
+Substitute for the \fIcount\fRth occurrence only of the \fIRE\fR found on each
+addressed line. \fIcount\fR must be between \fB1\fR-\fB2047\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 9n
+.rt  
+Globally substitute for all non-overlapping instances of the \fIRE\fR rather
+than just the first one. If both \fBg\fR and \fIcount\fR are specified, the
+results are unspecified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR\fR
+.ad
+.RS 9n
+.rt  
+Write to standard output the final line in which a substitution was made. The
+line is written in the format specified for the \fBl\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 9n
+.rt  
+Write to standard output the final line in which a substitution was made. The
+line is written in the format specified for the \fBn\fR command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 9n
+.rt  
+Write to standard output the final line in which a substitution was made. The
+line will be written in the format specified for the \fBp\fR command.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.,.)t\fR\fIa\fR\fR
+.ad
+.sp .6
+.RS 4n
+This command acts just like the \fBm\fR command, except that a \fIcopy\fR of
+the addressed lines is placed after address \fBa\fR (which may be 0). The
+current line (\fB\&.\fR) is left at the last line copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBu\fRndo command nullifies the effect of the most recent command that
+modified anything in the buffer, namely the most recent \fBa\fR, \fBc\fR,
+\fBd\fR, \fBg\fR, \fBi\fR, \fBj\fR, \fBm\fR, \fBr\fR, \fBs\fR, \fBt\fR,
+\fBu\fR, \fBv\fR, \fBG\fR, or \fBV\fR command. All changes made to the buffer
+by a \fBg\fR, \fBG\fR, \fBv\fR, or \fBV\fR global command is undone as a single
+change.If no changes were made by the global command (such as with \fBg/\fR
+\fIRE\fR\fB/p\fR), the \fBu\fR command has no effect. The current line number
+is set to the value it had  immediately before the  command being undone
+started.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(1,$)v/\fR\fIRE\fR\fB/\fR\fIcommand list\fR\fR
+.ad
+.sp .6
+.RS 4n
+This command is the same as the global command \fBg\fR, except that the lines
+marked during the first step are those that do \fBnot\fR match the \fIRE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(1,$)V/\fR\fIRE\fR\fB/\fR\fR
+.ad
+.sp .6
+.RS 4n
+This command is the same as the interactive global command \fBG\fR, except that
+the lines that are marked during the first step are those that do \fBnot\fR
+match the \fIRE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(1,$)w\fR \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBw\fRrite command writes the addressed lines into \fIfile\fR. If
+\fIfile\fR does not exist, it is created with mode \fB666\fR (readable and
+writable by everyone), unless your file creation mask dictates otherwise. See
+the description of the \fBumask\fR special command on \fBsh\fR(1). The
+currently remembered file name is \fBnot\fR changed unless \fIfile\fR is the
+very first file name mentioned since \fBed\fR was invoked. If no file name is
+given, the currently remembered file name, if any, is used (see the \fBe\fR and
+\fBf\fR commands). The current line (\fB\&.\fR) is unchanged. If the command is
+successful, the number of characters written is printed, unless the \fB-s\fR
+option is specified in the following format:
+.sp
+.in +2
+.nf
+\fB"%d\en",\fR<\fInumber of bytes written\fR>
+.fi
+.in -2
+.sp
+
+If \fIfile\fR is replaced by \fB!\fR, the rest of the line is taken to be a
+shell (see \fBsh\fR(1)) command whose standard input is the addressed lines.
+Such a shell command is \fInot\fR remembered as the current path name. This
+usage of the write command with \fB!\fR is to be considered as a ``last \fBw\fR
+command that wrote the entire buffer''.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(1,$)W\fR \fIfile\fR\fR
+.ad
+.RS 19n
+.rt  
+This command is the same as the \fBw\fRrite command above, except that it
+appends the addressed lines to the end of \fIfile\fR if it exists. If
+\fIfile\fR does not exist, it is created as described above for the \fBw\fR
+command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBX\fR\fR
+.ad
+.RS 19n
+.rt  
+An educated guess is made to determine whether text read for the \fBe\fR and
+\fBr\fR commands is encrypted. A null key turns off encryption. Subsequent
+\fBe\fR, \fBr\fR, and \fBw\fR commands will use this key to encrypt or decrypt
+the text. An explicitly empty key turns off encryption. Also, see the \fB-x\fR
+option of \fBed\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB($)=\fR\fR
+.ad
+.RS 19n
+.rt  
+The line number of the addressed line is written to standard output in the
+following format:
+.sp
+.in +2
+.nf
+\fB"%d\en"\fR<\fIline number\fR>
+.fi
+.in -2
+.sp
+
+The current line number is unchanged by this command.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fIshell command\fR\fR
+.ad
+.RS 19n
+.rt  
+The remainder of the line after the \fB!\fR is sent to the UNIX system shell
+(see \fBsh\fR(1)) to be interpreted as a command. Within the text of that
+command, the unescaped character \fB%\fR is replaced with the remembered file
+name. If a \fB!\fR appears as the first character of the shell command, it is
+replaced with the text of the previous shell command. Thus, \fB!!\fR repeats
+the last shell command. If any replacements of \fB%\fR or \fB!\fR are
+performed, the modified line is written to the standard output before
+\fIcommand\fR is executed. The \fB!\fR command will write:
+.sp
+\fB"!\en"\fR
+.sp
+to standard output upon completion, unless the \fB-s\fR option is specified.
+The current line number is unchanged.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB(.+1)\fR<new-line>\fR
+.ad
+.RS 19n
+.rt  
+An address alone on a line causes the addressed line to be written. A new-line
+alone is equivalent to \fB\&.+1p\fR. It is useful for stepping forward through
+the buffer. The current line number will be set to the address of the written
+line.
+.RE
+
+.sp
+.LP
+If an interrupt signal (ASCII DEL or BREAK) is sent, \fBed\fR writes a
+"\fB?\en\fR" and returns to \fBits\fR command level.
+.sp
+.LP
+The \fBed\fR utility takes the standard action for all signals with the
+following exceptions:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGINT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBed\fR utility interrupts its current activity, writes the string
+"\fB?\en\fR" to standard output, and returns to command mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIGHUP\fR\fR
+.ad
+.RS 10n
+.rt  
+If the buffer is not empty and has changed since the last write, the \fBed\fR
+utility attempts to write a copy of the buffer in a file. First, the file named
+\fBed.hup\fR in the current directory is used. If that fails, the file named
+\fBed.hup\fR in the directory named by the \fBHOME\fR environment variable is
+used. In any case, the \fBed\fR utility exits without returning to command
+mode.
+.RE
+
+.sp
+.LP
+Some size limitations are in effect: 512 characters in a line, 256 characters
+in a global command list, and 255 characters in the path name of a file
+(counting slashes). The limit on the number of lines depends on the amount of
+user memory. Each line takes 1 word.
+.sp
+.LP
+When reading a file, \fBed\fR discards \fBASCII\fR and \fBNUL\fR characters.
+.sp
+.LP
+If a file is not terminated by a new-line character, \fBed\fR adds one and puts
+out a message explaining what it did.
+.sp
+.LP
+If the closing delimiter of an \fBRE\fR or of a replacement string (for
+example, \fB/\fR) would be the last character before a new-line, that delimiter
+may be omitted, in which case the addressed line is written. The following
+pairs of commands are equivalent:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs/s1/s2\fR\fR
+.ad
+.RS 11n
+.rt  
+\fBs/s1/s2/p\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg/s1\fR\fR
+.ad
+.RS 11n
+.rt  
+\fBg/s1/p\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?s1\fR\fR
+.ad
+.RS 11n
+.rt  
+\fB?s1?\fR
+.RE
+
+.sp
+.LP
+If an invalid command is entered, \fBed\fR writes the string:
+.sp
+.LP
+\fB"?\en"\fR
+.sp
+.LP
+(followed by an explanatory message if \fIhelp mode\fR has been enabled by the
+\fBH\fR command) to standard output and continues in command mode with the
+current line number unchanged.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 13n
+.rt  
+Encryption option. The same as the \fB-x\fR option, except that \fBed\fR
+simulates a \fBC\fR command. The \fBC\fR command is like the \fBX\fR command,
+except that all text read in is assumed to have been encrypted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-p\fR\fIstring\fR \fR
+.ad
+.RS 13n
+.rt  
+Allows the user to specify a prompt string. By default, there is no prompt
+string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR |  \fB-;\fR\fR
+.ad
+.RS 13n
+.rt  
+Suppresses the writing of character counts by \fBe\fR, \fBr\fR, and \fBw\fR
+commands, of diagnostics from \fBe\fR and \fBq\fR commands, and of the \fB!\fR
+prompt after a \fB!\fR\fIshell command\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 13n
+.rt  
+Encryption option. When \fB-x\fR is used, \fBed\fR simulates an \fBX\fR command
+and prompts the user for a key. The \fBX\fR command makes an educated guess to
+determine whether text read in is encrypted or not. The temporary buffer file
+is encrypted also, using a transformed version of the key typed in for the
+\fB-x\fR option. See NOTES.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+If \fIfile\fR is specified, \fBed\fR simulates an \fBe\fR command on the file
+named by the path name \fIfile\fR before accepting commands from the standard
+input.
+.RE
+
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBed\fR and
+\fBred\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
+bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBed\fR: \fBHOME\fR, \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_COLLATE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion without any file or command errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$TMPDIR\fR\fR
+.ad
+.RS 12n
+.rt  
+If this environment variable is not \fINULL\fR, its value is used in place of
+\fB/var/tmp\fR as the directory name for the temporary work file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/tmp\fR\fR
+.ad
+.RS 12n
+.rt  
+If \fB/var/tmp\fR exists, it is used as the directory name for the temporary
+work file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/tmp\fR\fR
+.ad
+.RS 12n
+.rt  
+If the environment variable \fBTMPDIR\fR does not exist or is \fINULL,\fR and
+if \fB/var/tmp\fR does not exist, then \fB/tmp\fR is used as the directory name
+for the temporary work file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBed.hup\fR\fR
+.ad
+.RS 12n
+.rt  
+Work is saved here if the terminal is hung up.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/ed, /usr/bin/red"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SS "/usr/xpg4/bin/ed"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SS "/usr/xpg6/bin/ed"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbfs\fR(1), \fBedit\fR(1), \fBex\fR(1), \fBgrep\fR(1), \fBksh\fR(1),
+\fBsed\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBumask\fR(1), \fBvi\fR(1),
+\fBfspec\fR(4), \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5),
+\fBregex\fR(5), \fBstandards\fR(5)
+.SH DIAGNOSTICS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.RS 9n
+.rt  
+for command errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fIfile\fR\fR
+.ad
+.RS 9n
+.rt  
+for an inaccessible file. Use the \fBh\fRelp and \fBH\fRelp commands for
+detailed explanations.
+.RE
+
+.sp
+.LP
+If changes have been made in the buffer since the last \fBw\fR command that
+wrote the entire buffer, \fBed\fR warns the user if an attempt is made to
+destroy \fBed\fR's buffer via the \fBe\fR or \fBq\fR commands. It writes
+\fB?\fR and allows one to continue editing. A second \fBe\fR or \fBq\fR command
+at this point will take effect. The \fB-s\fR command-line option inhibits this
+feature.
+.SH NOTES
+.sp
+.LP
+The \fB-\fR option, although it continues to be supported, has been replaced in
+the documentation by the \fB-s\fR option that follows the \fBCommand Syntax
+Standard\fR (see \fBIntro\fR(1)).
+.sp
+.LP
+A \fB!\fR command cannot be subject to a \fBg\fR or a \fBv\fR command.
+.sp
+.LP
+The \fB!\fR command and the \fB!\fR escape from the \fBe\fR, \fBr\fR, and
+\fBw\fR commands cannot be used if the editor is invoked from a restricted
+shell (see \fBsh\fR(1)).
+.sp
+.LP
+The sequence \fB\en\fR in an \fBRE\fR does not match a new-line character.
+.sp
+.LP
+If the editor input is coming from a command file (for example, \fBed\fR
+\fIfile\fR \fB<\fR \fIed_cmd_file\fR), the editor exits at the first failure.
+.sp
+.LP
+Loading an alternate \fBmalloc()\fR library using the environment variable
+\fBLD_PRELOAD\fR can cause problems for \fB/usr/bin/ed\fR.

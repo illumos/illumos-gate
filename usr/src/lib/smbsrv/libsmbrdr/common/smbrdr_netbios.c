@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -62,6 +63,8 @@
 #define	NB_READ_MSG_ERR_OVERFLOW		-2
 #define	NB_READ_MSG_ERR_UNDERFLOW		-3
 #define	NB_RCV_MSG_ERR_INVTYPE			-4
+
+int smbrdr_default_timeout = 45; /* sec. */
 
 /*
  * Semaphore object used to serialize access through NetBIOS exchange.
@@ -329,7 +332,9 @@ nb_read_msg(int fd, unsigned char *buf, unsigned max_buf,
 
 	FD_ZERO(&readfds);
 	FD_SET(fd, &readfds);
-	tval.tv_sec = (timeout == 0) ? 45 : timeout;
+	if (timeout == 0)
+		timeout = smbrdr_default_timeout;
+	tval.tv_sec = timeout;
 	tval.tv_usec = 0;
 
 	if ((rc = select(fd + 1, &readfds, 0, 0, &tval)) <= 0) {

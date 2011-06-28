@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Joyent, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -1947,8 +1948,8 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			}
 
 			if ((zpool_get_prop(zhp->zpool_hdl,
-			    ZPOOL_PROP_ALTROOT, buf, MAXPATHLEN, NULL)) ||
-			    (strcmp(root, "-") == 0))
+			    ZPOOL_PROP_ALTROOT, buf, MAXPATHLEN, NULL,
+			    B_FALSE)) || (strcmp(root, "-") == 0))
 				root[0] = '\0';
 			/*
 			 * Special case an alternate root of '/'. This will

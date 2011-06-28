@@ -1,0 +1,1406 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Intro 3 "1 Apr 2009" "SunOS 5.11" "Introduction to Library Functions"
+.SH NAME
+Intro, intro \- introduction to functions and libraries
+.SH DESCRIPTION
+.sp
+.LP
+This section describes functions found in various Solaris libraries, other than
+those functions described in Section 2 of this manual that directly invoke UNIX
+system primitives. Function declarations can be obtained from the
+\fB#include\fR files indicated on each page. Pages are grouped by library and
+are identified by the library name (or an abbreviation of the library name)
+after the section number. Collections of related libraries are grouped into
+volumes as described below. The first volume contains pages describing the
+contents of each shared library and each header used by the functions, macros,
+and external variables described in the remaining volumes.
+.SS "Library Interfaces and Headers"
+.sp
+.LP
+This volume describes the contents of each shared library and each header used
+by functions, macros, and external variables described in the remaining
+volumes.
+.sp
+.ne 2
+.mk
+.na
+\fB(3LIB)\fR
+.ad
+.sp .6
+.RS 4n
+The libraries described in this section are implemented as shared objects.
+.sp
+Descriptions of shared objects can include a definition of the global symbols
+that define the shared objects' public interface, for example \fBSUNW_1.1\fR.
+Other interfaces can exist within the shared object, for example
+\fBSUNWprivate.1.1\fR. The public interface provides a stable, committed set of
+symbols for application development. The private interfaces are for internal
+use only, and could change at any time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3LIBUCB)\fR
+.ad
+.sp .6
+.RS 4n
+The SunOS/BSD Compatibility libraries described in this section are implemented
+as a shared object. See (3LIB) above.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3HEAD)\fR
+.ad
+.sp .6
+.RS 4n
+The headers described in this section are used by functions, macros, and
+external variables. Headers contain function prototypes, definitions of
+symbolic constants, common structures, preprocessor macros, and defined types.
+Each function described in the remaining five volumes specifies the headers
+that an application must include in order to use that function. In most cases
+only one header is required. These headers are present on an application
+development system; they do have to be present on the target execution system.
+.RE
+
+.SS "Basic Library Functions"
+.sp
+.LP
+The functions described in this volume are the core C library functions that
+are basic to application development.
+.sp
+.ne 2
+.mk
+.na
+\fB(3C)\fR
+.ad
+.sp .6
+.RS 4n
+These functions, together with those of Section 2, constitute the standard C
+library, \fBlibc\fR, which is automatically linked by the C compilation system.
+The standard C library is implemented as a shared object, \fBlibc.so\fR. See
+\fBlibc\fR(3LIB) and the "C Compilation System" chapter of the \fIANSI C
+Programmer's Guide\fR for a discussion. Some functions behave differently in
+standard-conforming environments. This behavior is noted on the individual
+manual pages. See \fBstandards\fR(5).
+.sp
+The \fBlibpthread\fR and \fBlibthread\fR libraries are filter libraries on
+\fBlibc\fR that are used for building multithreaded applications:
+\fBlibpthread\fR implements the POSIX (see \fBstandards\fR(5)) threads
+interface, whereas \fBlibthread\fR implements the Solaris threads interface.
+See \fBMULTITHREADED APPLICATIONS\fR, below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3C_DB)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the threads debugging library, \fBlibc_db\fR. This
+library is implemented as a shared object, \fBlibc_db.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lc_db\fR on the
+\fBcc\fR command line to link with this library. See \fBlibc_db\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3MALLOC)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the various memory allocation libraries:
+\fBlibmalloc\fR, \fBlibbsdmalloc\fR, \fBlibmapmalloc\fR, \fBlibmtmalloc\fR, and
+\fBlibumem\fR. Each of these libraries is implemented as a shared object
+(\fBlibmalloc.so\fR, \fBlibbsdmalloc.so\fR, \fBlibmapmalloc.so\fR,
+\fBlibmtmalloc.so\fR, and \fBlibumem.so\fR). These libraries are not
+automatically linked by the C compilation system. Specify \fB-lmalloc\fR,
+\fB-lbsdmalloc\fR, \fB-lmapmalloc\fR, \fB-lmtmalloc\fR, and \fB-lumem\fR to
+link with, respectively, \fBlibmalloc\fR, \fBlibbsdmalloc\fR,
+\fBlibmapmalloc\fR, \fBlibmtmalloc\fR, and \fBlibumem\fR. See
+\fBlibmalloc\fR(3LIB), \fBlibbsdmalloc\fR(3LIB), \fBlibmapmalloc\fR(3LIB),
+\fBlibmtmalloc\fR(3LIB), and \fBlibumem\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3UCB)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the source compatibility (with BSD functions)
+library. It is implemented as a shared object, \fBlibucb.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lucb\fR on the
+\fBcc\fR command line to link with this library, which is located in the
+\fB/usr/ucb\fR subdirectory. Headers for this library are located within
+\fB/usr/ucbinclude\fR. See \fBlibucb\fR(3LIBUCB).
+.RE
+
+.SS "Networking Library Functions"
+.sp
+.LP
+The functions described in this volume comprise the various networking
+libraries.
+.sp
+.ne 2
+.mk
+.na
+\fB(3COMMPUTIL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the communication protocol parser utilities library,
+\fBlibcommputil\fR. This library is implemented as a shared object,
+\fBlibcommputil.so\fR, but it is not automatically linked by the C compilation
+system. Specify \fB-lcommputil\fR on the \fBcc\fR command line to link with
+this library. See \fBlibcommputil\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3DLPI)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the data link provider interface library,
+\fBlibdlpi\fR. This library is implemented as a shared object,
+\fBlibdlpi.so\fR, but it is not automatically linked by the C compilation
+system. Specify \fB-ldlpi\fR on the \fBcc\fR command line to link with this
+library. See \fBlibdlpi\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3DNS_SD)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the DNS service discovery library, \fBlibdns_sd\fR.
+This library is implemented as a shared object, \fBlibdns_sd.so\fR, but it is
+not automatically linked by the C compilation system. Specify \fB-ldns_sd\fR on
+the \fBcc\fR command line to link with this library. See \fBlibdns_sd\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3GSS)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the generic security services library. This library
+is implemented as a shared object, \fBlibgss.so\fR, but it is not automatically
+linked by the C compilation system. Specify \fB-lgss\fR on the \fBcc\fR command
+line to link with this library. See \fBlibgss\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3LDAP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the lightweight directory access protocol library,
+\fBlibldap\fR. This library is implemented as a shared object,
+\fBlibldap.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lldap\fR on the \fBcc\fR command line to link with this library.
+See \fBldap\fR(3LDAP).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3NSL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the network service library, \fBlibnsl\fR. This
+library is implemented as a shared object, \fBlibnsl.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lnsl\fR on the
+\fBcc\fR command line to link with this library. See \fBlibnsl\fR(3LIB).
+.sp
+Many base networking functions are also available in the X/Open networking
+interfaces library, \fBlibxnet\fR. See section (3XNET) below for more
+information on the \fBlibxnet\fR interfaces.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3RESOLV)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the resolver library, \fBlibresolv\fR. This library
+is implemented as a shared object, \fBlibresolv.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lresolv\fR on the \fBcc\fR
+command line to link with this library. See \fBlibresolv\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3RPC)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the remote procedure call libraries, \fBlibrpcsvc\fR
+and \fBlibrpcsoc\fR. The latter is provided for compatibility only; new
+applications should not link to it. Both libraries are implemented as shared
+objects, \fBlibrpcsvc.so\fR and \fBlibrpcsoc.so\fR, respectively. Neither
+library is automatically linked by the C compilation system. Specify
+\fB-lrpcsvc\fR or \fB-lrpcsoc\fR on the \fBcc\fR command line to link with
+these libraries. See \fBlibrpcsvc\fR(3LIB) and \fBlibrpcsoc\fR(3LIBUCB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SASL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the simple authentication and security layer
+library, \fBlibsasl\fR. This library is implemented as a shared object,
+\fBlibsasl.so\fR, but it is not automatically linked by the C compilation
+system. Specify \fB-lsasl\fR on the \fBcc\fR command line to link with this
+library. See \fBlibsasl\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SIP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the session initiation protocol library,
+\fBlibsip\fR. This library is implemented as a shared object, \fBlibsip.so\fR,
+but it is not automatically linked by the C compilation system. Specify
+\fB-lsip\fR on the \fBcc\fR command line to link with this library. See
+\fBlibsip\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SLP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the service location protocol library, \fBlibslp\fR.
+This library is implemented as a shared object, \fBlibslp.so\fR, but it is not
+automatically linked by the C compilation system. Specify \fB-lslp\fR on the
+\fBcc\fR command line to link with this library. See \fBlibslp\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SOCKET)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the sockets library, \fBlibsocket\fR. This library
+is implemented as a shared object, \fBlibsocket.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lsocket\fR on the \fBcc\fR
+command line to link with this library. See \fBlibsocket\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3XNET)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute X/Open networking interfaces which comply with the
+X/Open CAE Specification, Networking Services, Issue 4 (September, 1994). This
+library is implemented as a shared object, \fBlibxnet.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lxnet\fR on the
+\fBcc\fR command line to link with this library. See \fBlibxnet\fR(3LIB) and
+\fBstandards\fR(5) for compilation information.
+.RE
+
+.sp
+.LP
+Under all circumstances, the use of the Sockets API is recommended over the XTI
+and TLI APIs. If portability to other XPGV4v2 (see \fBstandards\fR(5)) systems
+is a requirement, the application must use the \fBlibxnet\fR interfaces. If
+portability is not required, the sockets interfaces in \fBlibsocket\fR and
+\fBlibnsl\fR are recommended over those in \fBlibxnet\fR. Between the XTI and
+TLI APIs, the \fBXTI\fR interfaces (available with \fBlibxnet\fR) are
+recommended over the \fBTLI\fR interfaces (available with \fBlibnsl\fR).
+.SS "Curses Library Functions"
+.sp
+.LP
+The functions described in this volume comprise the libraries that provide
+graphics and character screen updating capabilities.
+.sp
+.ne 2
+.mk
+.na
+\fB(3CURSES)\fR
+.ad
+.sp .6
+.RS 4n
+The functions constitute the following libraries:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlibcurses\fR\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the curses library, \fBlibcurses\fR. This library is
+implemented as a shared object, \fBlibcurses.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lcurses\fR on the \fBcc\fR
+command line to link with this library. See \fBlibcurses\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlibform\fR\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the forms library, \fBlibform\fR. This library is
+implemented as a shared object, \fBlibform.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lform\fR on the \fBcc\fR
+command line to link with this library. See \fBlibform\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlibmenu\fR\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the menus library, \fBlibmenu\fR. This library is
+implemented as a shared object, \fBlibmenu.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lmenu\fR on the \fBcc\fR
+command line to link with this library. See \fBlibmenu\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlibpanel\fR\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the panels library, \fBlibpanel\fR. This library is
+implemented as a shared object, \fBlibpanel.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lpanel\fR on the \fBcc\fR
+command line to link with this library. See \fBlibpanel\fR(3LIB).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3PLOT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the grapnics library, \fBlibplot\fR. This library is
+implemented as a shared object, \fBlibplot.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lplot\fR on the \fBcc\fR
+command line to link with this library. See \fBlibplot\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3XCURSES)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the X/Open curses library, located in
+\fB/usr/xpg4/lib/libcurses.so\fR. This library provides a set of
+internationalized functions and macros for creating and modifying input and
+output to a terminal screen. Included in this library are functions for
+creating windows, highlighting text, writing to the screen, reading from user
+input, and moving the cursor. X/Open Curses is designed to optimize screen
+update activities. The X/Open Curses library conforms fully with Issue 4 of the
+X/Open Extended Curses specification. See \fBlibcurses\fR(3XCURSES).
+.RE
+
+.SS "Extended Library Functions, Vol. 1"
+.sp
+.LP
+The functions described in this volume comprise the following specialized
+libraries:
+.sp
+.ne 2
+.mk
+.na
+\fB(3BSM)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Solaris auditing library, \fBlibbsm\fR. This
+library is implemented as a shared object, \fBlibbsm.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lbsm\fR on the
+\fBcc\fR command line to link with this library. See \fBlibbsm\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3CFGADM)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the configuration administration library,
+\fBlibcfgadm\fR. This library is implemented as a shared object,
+\fBlibcfgadm.so\fR, but is not automatically linked by the C compilation
+system. Specify \fB-lcfgadm\fR on the \fBcc\fR command line to link with this
+library. See \fBlibcfgadm\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3CONTRACT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the contract management library, \fBlibcontract\fR.
+This library is implemented as a shared object, \fBlibcontract.so\fR, but is
+not automatically linked by the C compilation system. Specify \fB-lcontract\fR
+on the \fBcc\fR command line to link with this library. See
+\fBlibcontract\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3CPC)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the CPU performance counter library, \fBlibcpc\fR,
+and the process context library, \fBlibpctx\fR. These libraries are implemented
+as shared objects, \fBlibcpc.so\fR and \fBlibpctx.so\fR, respectively, but are
+not automatically linked by the C compilation system. Specify \fB-lcpc\fR or
+\fB-lpctx\fR on the \fBcc\fR command line to link with these libraries. See
+\fBlibcpc\fR(3LIB) and \fBlibpctx\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3DAT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the direct access transport library, \fBlibdat\fR.
+This library is implemented as a shared object, \fBlibdat.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-ldat\fR on the
+\fBcc\fR command line to link with this library. See \fBlibdat\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3DEVID)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the device \fBID\fR library, \fBlibdevid\fR. This
+library is implemented as a shared object, \fBlibdevid.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-ldevid\fR on the
+\fBcc\fR command line to link with this library. See \fBlibdevid\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3DEVINFO)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the device information library, \fBlibdevinfo\fR.
+This library is implemented as a shared object, \fBlibdevinfo.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-ldevinfo\fR on
+the \fBcc\fR command line to link with this library. See
+\fBlibdevinfo\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3ELF)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the ELF access library, \fBlibelf\fR, (Extensible
+Linking Format). This library provides the interface for the creation and
+analyses of "elf" files; executables, objects, and shared objects. \fBlibelf\fR
+is implemented as a shared object, \fBlibelf.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lelf\fR on the \fBcc\fR command
+line to link with this library. See \fBlibelf\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3EXACCT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the extended accounting access library,
+\fBlibexacct\fR, and the project database access library, \fBlibproject\fR.
+These libraries are implemented as shared objects, \fBlibexacct.so\fR and
+\fBlibproject.so\fR, respectively, but are not automatically linked by the C
+compilation system. Specify \fB-lexacct\fR or \fB-lproject\fR on the \fBcc\fR
+command line to link with these libraries. See \fBlibexacct\fR(3LIB) and
+\fBlibproject\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3FCOE)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Fibre  Channel  over Ethernet port management
+library. This library is implemented as a shared object, \fBlibfcoe.so\fR, but
+is not automatically linked by the C compilation system. Specify \fB-lfcoe\fR
+on the \fBcc\fR command line to link with this library. See
+\fBlibfcoe\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3FSTYP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the file system type identification library. This
+library is implemented as a shared object, \fBlibfstyp.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lfstyp\fR on the
+\fBcc\fR command line to link with this library. See \fBlibfstyp\fR(3LIB).
+.RE
+
+.SS "Extended Library Functions, Vol. 2"
+.sp
+.LP
+The functions described in this volume comprise the following specialized
+libraries:
+.sp
+.ne 2
+.mk
+.na
+\fB(3GEN)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the string pattern-matching and pathname
+manipulation library, \fBlibgen\fR. This library is implemented as a shared
+object, \fBlibgen.so\fR, but is not automatically linked by the C compilation
+system. Specify \fB-lgen\fR on the \fBcc\fR command line to link with this
+library. See \fBlibgen\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3HBAAPI)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the common fibre channel HBA information library,
+\fBlibhbaapi\fR. This library is implemented as a shared object,
+\fBlibhbaapi.so\fR, but is not automatically linked by the C compilation
+system. Specify \fB-lhbaapi\fR on the \fBcc\fR command line to link with this
+library. See \fBlibhbaapi\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3ISCSIT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the iSCSI Management library, \fBlibiscsit\fR. This
+library is implemented as a shared object, \fBlibiscsit.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-liscsit\fR on the
+\fBcc\fR command line to link with this library. See \fBlibiscsit\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3KSTAT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the kernel statistics library, which is implemented
+as a shared object, \fBlibkstat.so\fR, but is not automatically linked by the C
+compilation system. Specify \fB-lkstat\fR on the \fBcc\fR command line to link
+with this library. See \fBlibkstat\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3KVM)\fR
+.ad
+.sp .6
+.RS 4n
+These functions allow access to the kernel's virtual memory library, which is
+implemented as a shared object, \fBlibkvm.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lkvm\fR on the \fBcc\fR command
+line to link with this library. See \fBlibkvm\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3LAYOUT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the layout service library, which is implemented as
+a shared object, \fBliblayout.so\fR, but is not automatically linked by the C
+compilation system. Specify \fB-llayout\fR on the \fBcc\fR command line to link
+with this library. See \fBliblayout\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3LGRP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the locality group library, which is implemented as
+a shared object, \fBliblgrp.so\fR, but is not automatically linked by the C
+compilation system. Specify \fB-llgrp\fR on the \fBcc\fR command line to link
+with this library. See \fBliblgrp\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3M)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the mathematical library, \fBlibm\fR. This library
+is implemented as a shared object, \fBlibm.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lm\fR on the \fBcc\fR command
+line to link with this library. See \fBlibm\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3MAIL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the user mailbox management library, \fBlibmail\fR.
+This library is implemented as a shared object, \fBlibmail.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lmail\fR on the
+\fBcc\fR command line to link with this library. See \fBlibmail\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3MP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the integer mathematical library, \fBlibmp\fR. This
+library is implemented as a shared object, \fBlibmp.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lmp\fR on the
+\fBcc\fR command line to link with this library. See \fBlibmp\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3MPAPI)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Common Mulitipath Management library,
+\fBlibMPAPI\fR. This library is implemented as a shared object,
+\fBlibMPAPI.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lMPAPI\fR on the \fBcc\fR command line to link with this library.
+See \fBlibMPAPI\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3MVEC)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the vector mathematical library, \fBlibmvec\fR. This
+library is implemented as a shared object, \fBlibmvec.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lmvec\fR on the
+\fBcc\fR command line to link with this library. See \fBlibmvec\fR(3LIB).
+.RE
+
+.SS "Extended Library Functions, Vol. 3"
+.sp
+.LP
+The functions described in this volume comprise the following specialized
+libraries:
+.sp
+.ne 2
+.mk
+.na
+\fB(3NVPAIR)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the name-value pair library, \fBlibnvpair\fR. This
+library is implemented as a shared object, \fBlibnvpair.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lnvpair\fR on the
+\fBcc\fR command line to link with this library. See \fBlibnvpair\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3PAM)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the pluggable uuthentication module library,
+\fBlibpam\fR. This library is implemented as a shared object, \fBlibpam.so\fR,
+but is not automatically linked by the C compilation system. Specify
+\fB-lpam\fR on the \fBcc\fR command line to link with this library. See
+\fBlibpam\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3PAPI)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Free Standards Group Open Printing API (PAPI)
+library, \fBlibpapi\fR. This library is implemented as a shared object,
+\fBlibpapi.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lpapi\fR on the \fBcc\fR command line to link with this library.
+See \fBlibpapi\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3PICL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the PICL library, \fBlibpicl\fR. This library is
+implemented as a shared object, \fBlibpicl.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lpicl\fR on the \fBcc\fR
+command line to link with this library. See \fBlibpicl\fR(3LIB) and
+\fBlibpicl\fR(3PICL).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3PICLTREE)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the PICL plug-in library, \fBlibpicltree\fR. This
+library is implemented as a shared object, \fBlibpicltree.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lpicltree\fR on
+the \fBcc\fR command line to link with this library. See
+\fBlibpicltree\fR(3LIB) and \fBlibpicltree\fR(3PICLTREE).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3POOL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the pool configuration manipulation library,
+\fBlibpool\fR. This library is implemented as a shared object,
+\fBlibpool.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lpool\fR on the \fBcc\fR command line to link with this library.
+See \fBlibpool\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3PROJECT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the project database access library,
+\fBlibproject\fR. This library is implemented as a shared object,
+\fBlibproject.so\fR, but is not automatically linked by the C compilation
+system. Specify \fB-lproject\fR on the \fBcc\fR command line to link with this
+library. See \fBlibproject\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3RSM)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the remote shared memory library, \fBlibrsm\fR. This
+library is implemented as a shared object, \fBlibrsm.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lrsm\fR on the
+\fBcc\fR command line to link with this library. See \fBlibrsm\fR(3LIB).
+.RE
+
+.SS "Extended Library Functions, Vol. 4"
+.sp
+.LP
+The functions described in this volume comprise the following specialized
+libraries:
+.sp
+.ne 2
+.mk
+.na
+\fB(3SCF)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the object-caching memory allocation library,
+\fBlibscf\fR. This library is implemented as a shared object, \fBlibscf.so\fR,
+but is not automatically linked by the C compilation system. Specify
+\fB-lscf\fR on the \fBcc\fR command line to link with this library. See
+\fBlibscf\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SEC)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the file access control library, \fBlibsec\fR. This
+library is implemented as a shared object, \fBlibsec.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lsec\fR on the
+\fBcc\fR command line to link with this library. See \fBlibsec\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SECDB)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the security attributes database library,
+\fBlibsecdb\fR. This library is implemented as a shared object,
+\fBlibsecdb.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lsecdb\fR on the \fBcc\fR command line to link with this library.
+See \fBlibsecdb\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SMARTCARD)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the smartcard library, \fBlibsmartcard\fR. This
+library is implemented as a shared object, \fBlibsmartcard.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lsmartcard\fR on
+the \fBcc\fR command line to link with this library. See
+\fBlibsmartcard\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SNMP)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the SNMP libraries, \fBlibssagent\fR and
+\fBlibssasnmp\fR. These libraries are implemented as shared objects,
+\fBlibssagent.so\fR and \fBlibssasnmp.so\fR, respectively, but are not
+automatically linked by the C compilation system. Specify \fB-lssagent\fR or
+\fB-lssasnmp\fR on the \fBcc\fR command line to link with these libraries. See
+\fBlibssagent\fR(3LIB) and \fBlibssasnmp\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3STMF)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the SCSI Target Mode Framework library,
+\fBlibstmf\fR. This library is implemented as a shared object,
+\fBlibstmf.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lstmf\fR on the \fBcc\fR command line to link with this library.
+See \fBlibstmf\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3SYSEVENT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the system event library, \fBlibsysevent\fR. This
+library is implemented as a shared object, \fBlibsysevent.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lsysevent\fR on
+the \fBcc\fR command line to link with this library. See
+\fBlibsysevent\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3TECLA)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the interactive command-line input library,
+\fBlibtecla\fR. This library is implemented as a shared object,
+\fBlibtecla.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-ltecla\fR on the \fBcc\fR command line to link with this library.
+See \fBlibtecla\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3TNF)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the TNF libraries, \fBlibtnf\fR, \fBlibtnfctl\fR,
+and \fBlibtnfprobe\fR. These libraries are implemented as shared objects,
+\fBlibtnf.so\fR, \fBlibtnfctl.so\fR, and \fBlibtnfprobe.so\fR, respectively,
+but are not automatically linked by the C compilation system. Specify
+\fB-ltnf\fR, \fB-ltnfctl\fR, or \fB-ltnfprobe\fR on the \fBcc\fR command line
+to link with these libraries. See \fBlibtnfctl\fR(3TNF) and
+\fBlibtnfctl\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3TSOL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Trusted Extensions library, \fBlibtsol\fR, and
+the Trusted Extensions network library, \fBlibtsnet\fR. These libraries are
+implemented as shared objects, \fBlibtsol.so\fR and \fBlibtsnet.so\fR, but are
+not automatically linked by the C compilation system. Specify \fB-ltsol\fR or
+\fB-ltsnet\fR on the \fBcc\fR command line to link with these libraries. See
+\fBlibtsol\fR(3LIB) and \fBlibtsnet\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3UUID)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the universally unique identifier library,
+\fBlibuuid\fR. This library is implemented as a shared object,
+\fBlibuuid.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-luuid\fR on the \fBcc\fR command line to link with this library.
+See \fBlibuuid\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3VOLMGT)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the volume management library, \fBlibvolmgt\fR. This
+library is implemented as a shared object, \fBlibvolmgt.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lvolmgt\fR on the
+\fBcc\fR command line to link with this library. See \fBlibvolmgt\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3WSREG)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the product install registry library,
+\fBlibwsreg\fR. This library is implemented as a shared object,
+\fBlibwsreg.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lwsreg\fR on the \fBcc\fR command line to link with this library.
+See \fBlibwsreg\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3XTSOL)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Trusted Extensions to the X windows library,
+\fBlibXtsol\fR. This library is implemented as a shared object,
+\fBlibXtsol.so\fR, but is not automatically linked by the C compilation system.
+Specify \fB-lX11\fR and then \fB-lXtsol\fR on the \fBcc\fR command line to link
+with this library. See \fBlibXtsol\fR(3LIB).
+.RE
+
+.SS "Multimedia Library Functions"
+.sp
+.ne 2
+.mk
+.na
+\fB(3MLIB)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the mediaLib library, \fBlibmlib\fR. This library is
+implemented as a shared object, \fBlibmlib.so\fR, but is not automatically
+linked by the C compilation system. Specify \fB-lmlib\fR on the \fBcc\fR
+command line to link with this library. See \fBlibmlib\fR(3LIB).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(3MMS)\fR
+.ad
+.sp .6
+.RS 4n
+These functions constitute the Media Management System library, \fBlibmms\fR.
+This library is implemented as a shared object, \fBlibmms.so\fR, but is not
+automatically linked by the C compilation system. Specify \fB-lmms\fR on the
+\fBcc\fR command line to link with this library. See \fBlibmms\fR(3LIB).
+.RE
+
+.SH DEFINITIONS
+.sp
+.LP
+A character is any bit pattern able to fit into a byte on the machine. In some
+international languages, however, a "character" might require more than one
+byte, and is represented in multi-bytes.
+.sp
+.LP
+The null character is a character with value 0, conventionally represented in
+the C language as \fB\e\|0\fR\&. A character array is a sequence of characters.
+A null-terminated character array (a \fIstring\fR) is a sequence of characters,
+the last of which is the null character. The null string is a character array
+containing only the terminating null character. A null pointer is the value
+that is obtained by casting \fB0\fR into a pointer. C guarantees that this
+value will not match that of any legitimate pointer, so many functions that
+return pointers return \fINULL\fR to indicate an error. The macro \fINULL\fR is
+defined in <\fBstdio.h\fR>. Types of the form \fBsize_t\fR are defined in the
+appropriate headers.
+.SH MULTITHREADED APPLICATIONS
+.sp
+.LP
+Both POSIX threads and Solaris threads can be used within the same application.
+Their implementations are completely compatible with each other; however, only
+POSIX threads guarantee portability to other POSIX-conforming environments.
+.sp
+.LP
+The \fBlibpthread\fR(3LIB) and \fBlibthread\fR(3LIB) libraries are implemented
+as filters on \fBlibc\fR(3LIB).
+.sp
+.LP
+When compiling a multithreaded application, the \fB-mt\fR option must be
+specified on the command line.
+.sp
+.LP
+There is no need for a multithreaded application to link with \fB-lthread\fR.
+An application must link with \fB-lpthread\fR only when POSIX semantics for
+\fBfork\fR(2) are desired. When an application is linked with \fB-lpthread\fR,
+a call to \fBfork()\fR assumes the behavior \fBfork1\fR(2) rather than the
+default behavior that forks all threads.
+.sp
+.LP
+When compiling a POSIX-conforming application, either the \fB_POSIX_C_SOURCE\fR
+or \fB_POSIX_PTHREAD_SEMANTICS\fR option must be specified on the command line.
+For POSIX.1c-conforming applications, define the \fB_POSIX_C_SOURCE\fR flag to
+be >= 199506L:
+.sp
+.in +2
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_C_SOURCE=199506L\fR \fB-lpthread\fR
+.fi
+.in -2
+
+.sp
+.LP
+For POSIX behavior with the Solaris \fBfork()\fR and \fBfork1()\fR distinction,
+compile as follows:
+.sp
+.in +2
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR
+.fi
+.in -2
+
+.sp
+.LP
+For Solaris threads behavior, compile as follows:
+.sp
+.in +2
+.nf
+\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR...
+.fi
+.in -2
+
+.sp
+.LP
+Unsafe interfaces should be called only from the main thread to ensure the
+application's safety.
+.sp
+.LP
+MT-Safe interfaces are denoted in the \fBATTRIBUTES\fR section of the functions
+and libraries manual pages (see \fBattributes\fR(5)). If a manual page does not
+state explicitly that an interface is MT-Safe, the user should assume that the
+interface is unsafe.
+.SH REALTIME APPLICATIONS
+.sp
+.LP
+The environment variable \fBLD_BIND_NOW\fR must be set to a non-null value to
+enable early binding. Refer to the "When Relocations are Processed" chapter in
+\fILinker and Libraries Guide\fR for additional information.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fIINCDIR\fR\fR
+.ad
+.RS 15n
+.rt  
+usually \fB/usr/include\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fILIBDIR\fR\fR
+.ad
+.RS 15n
+.rt  
+usually either \fB/lib\fR or \fB/usr/lib\fR (32-bit) or either \fB/lib/64\fR or
+\fB/usr/lib/64\fR (64-bit)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fILIBDIR\fR\fB/*.so\fR\fR
+.ad
+.RS 15n
+.rt  
+shared libraries
+.RE
+
+.SH ACKNOWLEDGMENTS
+.sp
+.LP
+Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
+reproduce portions of its copyrighted documentation. Original documentation
+from The Open Group can be obtained online at
+http://www.opengroup.org/bookstore/\&.
+.sp
+.LP
+The Institute of Electrical and Electronics Engineers and The Open Group, have
+given us permission to reprint portions of their documentation.
+.sp
+.LP
+In the following statement, the phrase ``this text'' refers to portions of the
+system documentation.
+.sp
+.LP
+Portions of this text are reprinted and reproduced in electronic form in the
+SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
+Information Technology -- Portable Operating System Interface (POSIX), The Open
+Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of
+Electrical and Electronics Engineers, Inc and The Open Group.  In the event of
+any discrepancy between these versions and the original IEEE and The Open Group
+Standard, the original IEEE and The Open Group Standard is the referee
+document.  The original Standard can be obtained online at
+http://www.opengroup.org/unix/online.html\&.
+.sp
+.LP
+This notice shall appear on any product containing this material.
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBld\fR(1), \fBfork\fR(2), \fBstdio\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.sp
+.LP
+\fILinker and Libraries Guide\fR
+.sp
+.LP
+\fIPerformance Profiling Tools\fR
+.sp
+.LP
+\fIANSI C Programmer's Guide\fR
+.SH DIAGNOSTICS
+.sp
+.LP
+For functions that return floating-point values, error handling varies
+according to compilation mode. Under the \fB-Xt\fR (default) option to
+\fBcc\fR, these functions return the conventional values \fB0\fR,
+\fB\(+-HUGE\fR, or \fBNaN\fR when the function is undefined for the given
+arguments or when the value is not representable. In the \fB-Xa\fR and
+\fB-Xc\fR compilation modes, \fB\(+-HUGE_VAL\fR is returned instead of
+\fB\(+-HUGE\fR\&. (\fBHUGE_VAL\fR and \fBHUGE\fR are defined in \fBmath.h\fR to
+be infinity and the largest-magnitude single-precision number, respectively.)
+.SH NOTES
+.sp
+.LP
+None of the functions, external variables, or macros should be redefined in the
+user's programs. Any other name can be redefined without affecting the behavior
+of other library functions, but such redefinition might conflict with a
+declaration in an included header.
+.sp
+.LP
+The headers in \fIINCDIR\fR provide function prototypes (function declarations
+including the types of arguments) for most of the functions listed in this
+manual. Function prototypes allow the compiler to check for correct usage of
+these functions in the user's program. The \fBlint\fR program checker can also
+be used and will report discrepancies even if the headers are not included with
+\fB#include\fR statements. Definitions for Sections 2 and 3C are checked
+automatically. Other definitions can be included by using the \fB-l\fR option
+to \fBlint\fR. (For example, \fB-lm\fR includes definitions for \fBlibm\fR.)
+Use of \fBlint\fR is highly recommended. See the \fBlint\fR chapter in
+\fIPerformance Profiling Tools\fR
+.sp
+.LP
+Users should carefully note the difference between STREAMS and \fIstream\fR.
+STREAMS is a set of kernel mechanisms that support the development of network
+services and data communication drivers. It is composed of utility routines,
+kernel facilities, and a set of data structures. A \fIstream\fR is a file with
+its associated buffering. It is declared to be a pointer to a type \fBFILE\fR
+defined in \fB<stdio.h>\fR.
+.sp
+.LP
+In detailed definitions of components, it is sometimes necessary to refer to
+symbolic names that are implementation-specific, but which are not necessarily
+expected to be accessible to an application program. Many of these symbolic
+names describe boundary conditions and system limits.
+.sp
+.LP
+In this section, for readability, these implementation-specific values are
+given symbolic names. These names always appear enclosed in curly brackets to
+distinguish them from symbolic names of other implementation-specific constants
+that are accessible to application programs by headers. These names are not
+necessarily accessible to an application program through a header, although
+they can be defined in the documentation for a particular system.
+.sp
+.LP
+In general, a portable application program should not refer to these symbolic
+names in its code. For example, an application program would not be expected to
+test the length of an argument list given to a routine to determine if it was
+greater than {\fBARG_MAX\fR}.

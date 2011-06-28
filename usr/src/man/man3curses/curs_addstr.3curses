@@ -1,0 +1,98 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_addstr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_addstr, addstr, addnstr, waddstr, waddnstr, mvaddstr, mvaddnstr,
+mvwaddstr, mvwaddnstr \- add a string of characters to a curses window and
+advance cursor
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR ... ]
+#include <curses.h>
+
+\fBint\fR \fBaddstr\fR(\fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBaddnstr\fR(\fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwaddstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwaddnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvaddstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvaddnstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwaddstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwaddnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+All of these routines write all the characters of the null terminated character
+string \fIstr\fR on the given window. It is similar to calling \fBwaddch()\fR
+once for each character in the string. The four routines with \fIn\fR as the
+last argument write at most \fIn\fR characters. If \fIn\fR is negative, then
+the entire string will be added.
+.SH RETURN VALUES
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurs_addch\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header <\fBcurses.h\fR> automatically includes the headers <\fBstdio.h\fR>
+and <\fBunctrl.h\fR>.
+.sp
+.LP
+Note that all routines except \fBwaddstr()\fR and \fBwaddnstr()\fR may not be
+macros.

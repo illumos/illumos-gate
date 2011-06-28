@@ -1,0 +1,493 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH STRUCT_DECL 9F "20 May 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+STRUCT_DECL, SIZEOF_PTR, SIZEOF_STRUCT, STRUCT_BUF, STRUCT_FADDR, STRUCT_FGET,
+STRUCT_FGETP, STRUCT_FSET, STRUCT_FSETP, STRUCT_HANDLE, STRUCT_INIT,
+STRUCT_SIZE, STRUCT_SET_HANDLE \- 32-bit application data access macros
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fB\fR\fBSTRUCT_DECL\fR(\fB\fR\fIstructname\fR, \fB\fR \fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBSTRUCT_HANDLE\fR(\fB\fR\fIstructname\fR, \fB\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSTRUCT_INIT\fR(\fB\fR\fIhandle\fR, \fBmodel_t\fR \fIumodel\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBSTRUCT_SET_HANDLE\fR(\fB\fR\fIhandle\fR, \fBmodel_t\fR \fIumodel\fR, \fBvoid\fR \fI*addr\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBSTRUCT_FGET\fR(\fB\fR\fIhandle\fR, \fB\fR\fIfield\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBSTRUCT_FGETP\fR(\fB\fR\fIhandle\fR, \fB\fR\fIfield\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBSTRUCT_FSET\fR(\fB\fR\fIhandle\fR, \fB\fR\fIfield\fR, \fB\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBSTRUCT_FSETP\fR(\fB\fR\fIhandle\fR, \fB\fR\fIfield\fR, \fB\fR\fIval\fR);
+.fi
+
+.LP
+.nf
+\fB<typeof field> *\fR\fBSTRUCT_FADDR\fR(\fB\fR\fIhandle\fR, \fB\fR\fIfield\fR);
+.fi
+
+.LP
+.nf
+\fBstruct structname *\fR\fBSTRUCT_BUF\fR(\fB\fR\fIhandle\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBSIZEOF_STRUCT\fR(\fB\fR\fIstructname\fR, \fB\fR\fIumodel\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBSIZEOF_PTR\fR(\fB\fR\fIumodel\fR);
+.fi
+
+.LP
+.nf
+\fBsize_t\fR \fBSTRUCT_SIZE\fR(\fB\fR\fIhandle\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.LP
+The macros take the following parameters:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstructname\fR\fR
+.ad
+.RS 14n
+.rt  
+The structure name that appears \fBafter\fR the \fBC\fR keyword struct of the
+native form.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIumodel\fR\fR
+.ad
+.RS 14n
+.rt  
+ A bit field that contains either the \fBILP32\fR model bit
+(\fBDATAMODEL_ILP32\fR), or the \fBLP64\fR model bit (\fBDATAMODEL_LP64\fR). In
+an \fBioctl\fR(9E), these bits are present in the flag parameter. In a
+\fBdevmap\fR(9E), the bits are present in the model parameter \fBmmap\fR(9E).
+The \fBddi_mmap_get_model\fR(9F) can be called to get the data model of the
+current thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 14n
+.rt  
+The variable name used to refer to a particular instance of a structure which
+is handled by these macros.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfield\fR\fR
+.ad
+.RS 14n
+.rt  
+The field name within the structure that can contain substructures. If the
+structures contain substructures, unions, or arrays, the \fIfield\fR can be
+whatever complex expression would naturally follow the first . or ->.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The above macros allow a device driver to access data consumed from a 32-bit
+application regardless whether the driver was compiled to the ILP32 or LP64
+data model. These macros effectively hide the difference between the data model
+of the user application and the driver.
+.sp
+.LP
+The macros can be broken up into two main categories described in the following
+sections.
+.SS "Declaration and Initialization Macros"
+.sp
+.LP
+The macros \fBSTRUCT_DECL()\fR and \fBSTRUCT_HANDLE()\fR declare structure
+handles on the stack, whereas the macros \fBSTRUCT_INIT()\fR and
+\fBSTRUCT_SET_HANDLE()\fR initialize the structure handles to point to an
+instance of the native form structure.
+.sp
+.LP
+The macros \fBSTRUCT_HANDLE()\fR and \fBSTRUCT_SET_HANDLE()\fR are used to
+declare and initialize a structure handle to an existing data structure, for
+example, ioctls within a STREAMS module.
+.sp
+.LP
+The macros \fBSTRUCT_DECL()\fR and \fBSTRUCT_INIT()\fR, on the other hand, are
+used in modules which declare and initialize a structure handle to a data
+structure allocated by \fBSTRUCT_DECL()\fR, that is, any standard character or
+block device driver \fBioctl\fR(9E) routine that needs to copy in data from a
+user-mode program.
+.sp
+.ne 2
+.mk
+.na
+\fBSTRUCT_DECL(structname, handle)\fR
+.ad
+.sp .6
+.RS 4n
+Declares a structure handle for a struct and allocates an instance of its
+native form on the stack. It is assumed that the native form is larger than or
+equal to the ILP32 form. \fIhandle\fR is a variable name and is declared as a
+variable by this macro.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvoid STRUCT_INIT(handle, model_t umodel)\fR
+.ad
+.sp .6
+.RS 4n
+Initializes \fIhandle\fR to point to the instance allocated by
+\fBSTRUCT_DECL()\fR. It also sets data model for \fIhandle\fR to \fIumodel\fR
+and it must be called before any access is made through the macros that operate
+on these structures. When used in an \fBioctl\fR(9E) routine, \fIumodel\fR is
+the flag parameter. In a \fBdevmap\fR(9E) routine, \fIumodel\fR is the model
+parameter. In a \fBmmap\fR(9E) routine, \fIumodel\fR is the return value of
+\fBddi_mmap_get_model\fR(9F). This macro is intended only for handles created
+with \fBSTRUCT_DECL()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTRUCT_HANDLE(structname, handle)\fR
+.ad
+.sp .6
+.RS 4n
+Declares a structure handle \fIhandle\fR but, unlike \fBSTRUCT_DECL()\fR, it
+does not allocate an instance of "struct".
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBvoid STRUCT_SET_HANDLE(handle, model_t umodel, void *addr)\fR
+.ad
+.sp .6
+.RS 4n
+Initializes handle to point to the native form instance at \fIaddr\fR. It also
+sets the data model for \fIhandle\fR to \fIumodel\fR. This is intended for
+handles created with \fBSTRUCT_HANDLE()\fR. Fields cannot be referenced via the
+\fIhandle\fR until this macro has been invoked. Typically, \fIaddr\fR is the
+address of the native form structure containing the user-mode programs data.
+When used in an \fBioctl\fR(9E), \fIumodel\fR is the flag parameter. In a
+\fBdevmap\fR(9E) routine, \fIumodel\fR is the model parameter. In an
+\fBmmap\fR(9E) routine, \fIumodel\fR is the return value of
+\fBddi_mmap_get_model\fR(9F).
+.RE
+
+.SS "Operation Macros"
+.sp
+.ne 2
+.mk
+.na
+\fBsize_t STRUCT_SIZE(handle)\fR
+.ad
+.sp .6
+.RS 4n
+Returns size of the structure referred to by \fIhandle\fR, depending on the
+data model associated with \fIhandle\fR. If the data model stored by
+\fBSTRUCT_INIT()\fR or \fBSTRUCT_SET_HANDLE()\fR is \fBDATAMODEL_ILP32\fR, the
+size of the \fBILP32\fR form is returned. Otherwise, the size of the native
+form is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTRUCT_FGET(handle, field)\fR
+.ad
+.sp .6
+.RS 4n
+Returns the contents of \fIfield\fR in the structure described by \fIhandle\fR
+according to the data model associated with \fIhandle\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTRUCT_FGETP(handle, field)\fR
+.ad
+.sp .6
+.RS 4n
+This is the same as \fBSTRUCT_FGET()\fR except that the \fIfield\fR in question
+is a pointer of some kind. This macro casts caddr32_t to a (void *) when it is
+accessed. Failure to use this macro for a pointer leads to compiler warnings or
+failures.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTRUCT_FSET(handle, field, val)\fR
+.ad
+.sp .6
+.RS 4n
+Assigns \fIval\fR to the (non-pointer) in the structure described by
+\fIhandle\fR. It should not be used within another expression, but only as a
+statement.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBSTRUCT_FSETP(handle, field, val)\fR
+.ad
+.sp .6
+.RS 4n
+This is the equivalent of STRUCT_FGETP() for STRUCT_FGET(), with the same
+exceptions. Like STRUCT_FSET, STRUCT_FSETP should not be used within another
+expression, but only as a statement.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBstruct structname *STRUCT_BUF(handle)\fR
+.ad
+.sp .6
+.RS 4n
+Returns a pointer to the native mode instance of the structure described by
+\fIhandle\fR.
+.RE
+
+.SS "Macros Not Using Handles"
+.sp
+.ne 2
+.mk
+.na
+\fBsize_t SIZEOF_STRUCT(structname, umodel)\fR
+.ad
+.sp .6
+.RS 4n
+Returns size of \fIstructname\fR based on \fIumodel\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBsize_t SIZEOF_PTR(umodel)\fR
+.ad
+.sp .6
+.RS 4n
+Returns the size of a pointer based on \fIumodel\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCopying a Structure
+.sp
+.LP
+The following example uses an \fBioctl\fR(9E) on a regular character device
+that copies a data structure that looks like this into the kernel:
+
+.sp
+.in +2
+.nf
+struct opdata {
+    size_t  size;
+    uint_t  flag;
+};
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRDefining a Structure
+.sp
+.LP
+This data structure definition describes what the \fBioctl\fR(9E) would look
+like in a 32-bit application using fixed width types.
+
+.sp
+.in +2
+.nf
+#if defined(_MULTI_DATAMODEL)
+struct opdata32 {
+    size32_t    size;
+    uint32_t    flag;
+};
+#endif
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRUsing \fBSTRUCT_DECL()\fR and \fBSTRUCT_INIT()\fR
+.sp
+.LP
+Note: This example uses the \fBSTRUCT_DECL()\fR and \fBSTRUCT_INIT()\fR macros
+to declare and initialize the structure handle.
+
+.sp
+.in +2
+.nf
+int
+xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *cr, int *rval_p);
+{
+    STRUCT_DECL(opdata, op);
+
+    if (cmd != OPONE)
+        return (ENOTTY);
+
+    STRUCT_INIT(op, mode);
+
+    if (copyin((void *)data,
+        STRUCT_BUF(op), STRUCT_SIZE(op)))
+        return (EFAULT);
+
+    if (STRUCT_FGET(op, flag) != FACTIVE ||
+        STRUCT_FGET(op, size) > sizeof (device_state))
+        return (EINVAL);
+    xxdowork(device_state, STRUCT_FGET(op, size));
+    return (0);
+}
+.fi
+.in -2
+
+.sp
+.LP
+This piece of code is an excerpt from a STREAMS module that handles
+\fBioctl\fR(9E) data (M_IOCDATA) messages and uses the data structure defined
+above. This code has been written to run in the ILP32 environment only.
+
+.LP
+\fBExample 4 \fRUsing \fBSTRUCT_HANDLE()\fR and \fBSTRUCT_SET_HANDLE()\fR
+.sp
+.LP
+The next example illustrates the use of the \fBSTRUCT_HANDLE()\fR and
+\fBSTRUCT_SET_HANDLE()\fR macros which declare and initialize the structure
+handle to point to an already existing instance of the structure.
+
+.sp
+.LP
+The above code example can be converted to run in the LP64 environment using
+the \fBSTRUCT_HANDLE()\fR and \fBSTRUCT_SET_HANDLE()\fR as follows:
+
+.sp
+.in +2
+.nf
+struct strbuf {
+int maxlen;     /* no. of bytes in buffer */
+int len;        /* no. of bytes returned */
+caddr_t buf;        /* pointer to data */
+};
+.fi
+.in -2
+
+.sp
+.in +2
+.nf
+static void
+wput_iocdata(queue_t *q, mblk_t *msgp)
+{
+        struct copyresp *cp = (struct copyresp *)msgp->b_rptr;
+        STRUCT_HANDLE(strbuf, sb);
+
+        if (msgp->b_cont->b_cont != NULL) {
+                msgp->b_cont = msgpullup(msgp->b_cont, -1);
+                if (msgp->b_cont == NULL) {
+                        miocnak(q, msgp, 0, ENOSR);
+                        return;
+                }
+        }
+        STRUCT_SET_HANDLE(sb, cp->cp_flag, (void *)msgp->b_cont->b_rptr);
+        if (STRUCT_FGET(sb, maxlen) < (int)sizeof (ipa_t)) {
+                miocnak(q, msgp, 0, ENOSR);
+                return;
+        }
+        ...
+        miocack(q, msgp, 0, 0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdevmap\fR(9E), \fBioctl\fR(9E), \fBmmap\fR(9E),\fBddi_mmap_get_model\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

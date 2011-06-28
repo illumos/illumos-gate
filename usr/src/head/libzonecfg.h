@@ -154,6 +154,7 @@ extern "C" {
 #define	ALIAS_MAXSEMIDS		"max-sem-ids"
 #define	ALIAS_MAXLOCKEDMEM	"locked"
 #define	ALIAS_MAXSWAP		"swap"
+#define	ALIAS_MAXPHYSMEM	"physical"
 #define	ALIAS_SHARES		"cpu-shares"
 #define	ALIAS_CPUCAP		"cpu-cap"
 #define	ALIAS_MAXPROCS		"max-processes"
@@ -243,10 +244,6 @@ struct zone_psettab {
 	char	zone_ncpu_min[MAXNAMELEN];
 	char	zone_ncpu_max[MAXNAMELEN];
 	char	zone_importance[MAXNAMELEN];
-};
-
-struct zone_mcaptab {
-	char	zone_physmem_cap[MAXNAMELEN];
 };
 
 struct zone_pkgtab {
@@ -444,13 +441,6 @@ extern	int	zonecfg_modify_pset(zone_dochandle_t, struct zone_psettab *);
 extern	int	zonecfg_lookup_pset(zone_dochandle_t, struct zone_psettab *);
 
 /*
- * mem-cap configuration.
- */
-extern	int	zonecfg_delete_mcap(zone_dochandle_t);
-extern	int	zonecfg_modify_mcap(zone_dochandle_t, struct zone_mcaptab *);
-extern	int	zonecfg_lookup_mcap(zone_dochandle_t, struct zone_mcaptab *);
-
-/*
  * Temporary pool support functions.
  */
 extern	int	zonecfg_destroy_tmp_pool(char *, char *, int);
@@ -507,7 +497,6 @@ extern	int	zonecfg_setdsent(zone_dochandle_t);
 extern	int	zonecfg_getdsent(zone_dochandle_t, struct zone_dstab *);
 extern	int	zonecfg_enddsent(zone_dochandle_t);
 extern	int	zonecfg_getpsetent(zone_dochandle_t, struct zone_psettab *);
-extern	int	zonecfg_getmcapent(zone_dochandle_t, struct zone_mcaptab *);
 extern	int	zonecfg_getpkgdata(zone_dochandle_t, uu_avl_pool_t *,
     uu_avl_t *);
 extern	int	zonecfg_setdevperment(zone_dochandle_t);
@@ -541,6 +530,7 @@ extern	char	*zone_state_str(zone_state_t);
 extern	int	zonecfg_get_name_by_uuid(const uuid_t, char *, size_t);
 extern	int	zonecfg_get_uuid(const char *, uuid_t);
 extern	int	zonecfg_default_brand(char *, size_t);
+extern	int	zonecfg_fix_obsolete(zone_dochandle_t);
 
 /*
  * Iterator for configured zones.

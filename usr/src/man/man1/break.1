@@ -1,0 +1,180 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH break 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+break, continue \- shell built-in functions to escape from or advance within a
+controlling while, for, foreach, or until loop
+.SH SYNOPSIS
+.SS "\fBsh\fR"
+.LP
+.nf
+\fBbreak\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fBcontinue\fR [\fIn\fR]
+.fi
+
+.SS "\fBcsh\fR"
+.LP
+.nf
+\fBbreak\fR 
+.fi
+
+.LP
+.nf
+\fBcontinue\fR 
+.fi
+
+.SS "\fBksh\fR"
+.LP
+.nf
+\fB*break\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fB*continue\fR [\fIn\fR]
+.fi
+
+.SS "\fBksh93\fR"
+.LP
+.nf
+\fB+break\fR [\fIn\fR]
+.fi
+
+.LP
+.nf
+\fB+continue\fR [\fIn\fR]
+.fi
+
+.SH DESCRIPTION
+.SS "\fBsh\fR"
+.sp
+.LP
+The \fBbreak\fR utility exits from the enclosing \fBfor\fR or \fBwhile\fR loop,
+if any. If \fIn\fR is specified, break \fIn\fR levels.
+.sp
+.LP
+The \fBcontinue\fR utility resumes the next iteration of the enclosing
+\fBfor\fR or \fBwhile\fR loop. If \fIn\fR is specified, resume at the
+\fIn\fR-th enclosing loop.
+.SS "\fBcsh\fR"
+.sp
+.LP
+The \fBbreak\fR utility resumes execution after the \fBend\fR of the nearest
+enclosing \fBforeach\fR or \fBwhile\fR loop. The remaining commands on the
+current line are executed. This allows multilevel breaks to be written as a
+list of \fBbreak\fR commands, all on one line.
+.sp
+.LP
+The \fBcontinue\fR utility continues execution of the next iteration of the
+nearest enclosing \fBwhile\fR or \fBforeach\fR loop.
+.SS "\fBksh\fR"
+.sp
+.LP
+The \fBbreak\fR utility exits from the enclosed \fBfor\fR, \fBwhile\fR,
+\fBuntil\fR, or \fBselect\fR loop, if any. If \fIn\fR is specified, then
+\fBbreak\fR \fIn\fR levels. If \fIn\fR is greater than the number of enclosing
+loops, the outermost enclosing loop shall be exited.
+.sp
+.LP
+The \fBcontinue\fR utility resumes the next iteration of the enclosed
+\fBfor\fR, \fBwhile\fR, \fBuntil\fR, or \fBselect\fR loop. If \fIn\fR is
+specified then resume at the \fIn\fR-th enclosed loop. If \fIn\fR is greater
+than the number of enclosing loops, the outermost enclosing loop shall be used.
+.sp
+.LP
+On this manual page, \fBksh\fR(1) commands that are preceded by one or two *
+(asterisks) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+\fBI/O\fR redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Words that follow a command preceded by \fB**\fR that are in the format of a
+variable assignment are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign, and
+also that word splitting and file name generation are not performed.
+.RE
+.SS "\fBksh93\fR"
+.sp
+.LP
+\fBbreak\fR is a shell special built-in that exits the smallest enclosing
+\fBfor\fR, \fBselect\fR, \fBwhile\fR, or \fBuntil\fR loop. It also exits the
+\fIn\fRth enclosing loop if \fIn\fR is specified. Execution continues at the
+command following the loop or loops.
+.sp
+.LP
+If \fIn\fR is specified, it must be a positive integer \fB\(>=1\fR\&. If
+\fIn\fR is larger than the number of enclosing loops, the last enclosing loop
+is exited.
+.sp
+.LP
+\fBcontinue\fR is a shell special built-in that continues execution at the top
+of the smallest enclosing \fBfor\fR, \fBselect\fR, \fBwhile\fR, or \fBuntil\fR
+loop, if any; or of the top of the \fIn\fRth enclosing loop if n is specified.
+.sp
+.LP
+If \fIn\fR is specified, it must be a positive integer \fB\(>=1\fR\&. If
+\fIn\fR is larger than the number of enclosing loops, the last enclosing loop
+is used.
+.sp
+.LP
+On this manual page, \fBksh93\fR(1) commands that are preceded by one or two
+\fB+\fR symbols are special built-in commands and are treated the following
+ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+I/O redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Built-in commands are not valid function names.
+.RE
+.RS +4
+.TP
+5.
+Words following a command preceded by \fB++\fR that are in the format of a
+variable assignment are expanded with rules as a variable assignment. This
+means that tilde substitution is performed after the \fB=\fR sign and field
+splitting and file name generation are not performed.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBexit\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1),
+\fBattributes\fR(5)

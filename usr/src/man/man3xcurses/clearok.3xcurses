@@ -1,0 +1,185 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH clearok 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+clearok, idlok, leaveok, scrollok, setscrreg, wsetscrreg \- terminal output
+control functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBclearok\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBidlok\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBleaveok\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBscrollok\fR(\fBWINDOW *\fR\fIwin\fR, \fBbool\fR \fIbf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetscrreg\fR(\fBint\fR \fItop\fR, \fBint\fR \fIbot\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwsetscrreg\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fItop\fR, \fBint\fR \fIbot\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions set options that deal with the output within Curses functions.
+.sp
+.LP
+The \fBclearok()\fR function assigns the value of \fIbf\fR to an internal flag
+in the specified window that governs clearing of the screen during a refresh.
+If, during a refresh operation on the specified window, the flag in
+\fIcurscr\fR is \fBTRUE\fR or the flag in the specified window is \fBTRUE\fR,
+\fBclearok()\fR clears the screen, redraws it in its entirety, and sets the
+flag to \fBFALSE\fR in \fIcurscr\fR and in the specified window. The initial
+state is unspecified
+.sp
+.LP
+The \fBidlok()\fR function specifies whether the implementation may use the
+hardware insert-line, delete-line, and scroll features of terminals so
+equipped. If \fIbf\fR is \fBTRUE\fR, use of these features is enabled. If
+\fIbf\fR is \fBFALSE\fR, use of these features is disabled and lines are
+instead redrawn as required. The initial state is \fBFALSE\fR.
+.sp
+.LP
+The \fBleaveok()\fR function controls the cursor position after a refresh
+operation. If \fIbf\fR is \fBTRUE\fR, refresh operations on the specified
+window may leave the terminal's cursor at an arbitrary position. If \fIbf\fR is
+\fBFALSE\fR, then at the end of any refresh operation, the terminal's cursor is
+positioned at the cursor position contained in the specified window. The
+initial state is \fBFALSE\fR.
+.sp
+.LP
+The \fBscrollok()\fR function controls the use of scrolling.If \fIbf\fR is
+\fBTRUE\fR, then scrolling is enabled for the specified window. If \fIbf\fR is
+\fBFALSE\fR, scrolling is disabled for the specified window. The initial state
+is \fBFALSE\fR.
+.sp
+.LP
+The \fBsetscrreg()\fR and \fBwsetscrreg()\fR functions define a software
+scrolling region in the current or specified window. The \fItop\fR and
+\fIbottom\fR arguments are the line numbers of the first and last line defining
+the scrolling region. (Line 0 is the top line of the window.) If this option
+and \fBscrollok()\fR are enabled, an attempt to move off the last line of the
+margin causes all lines in the scrolling region to scroll one line in the
+direction of the first line. Only characters in the window are scrolled. If a
+software scrolling region is set and \fBscrollok()\fR is not enabled, an
+attempt to move off the last line of the margin does not reposition any lines
+in the scrolling region.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to a window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbf\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a Boolean expression.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItop\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the top line of the scrolling region (top of the window is line 0).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbot\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the bottom line of the scrolling region (top of the window is line 0).
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBsetscrreg()\fR and \fBwsetscrreg()\fR
+functions return \fBOK\fR. Otherwise, they return \fBERR\fR.
+.sp
+.LP
+The other functions always return \fBOK\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH  USAGE
+.sp
+.LP
+ The only reason to enable the \fBidlok()\fR feature is to use scrolling to
+achieve the visual effect of motion of a partial window, such as for a screen
+editor. In other cases, the feature can be visually annoying.
+.sp
+.LP
+The \fBleaveok()\fR option provides greater efficiency for applications that do
+not use the cursor.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbkgdset\fR(3XCURSES), \fBclear\fR(3XCURSES), \fBdoupdate\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBscrl\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

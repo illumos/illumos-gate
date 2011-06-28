@@ -1,0 +1,215 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stmfModifyLu 3STMF "8 May 2009" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.SH NAME
+stmfModifyLu, stmfModifyLuByFname \- modify a logical uni
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lstmf [ \fIlibrary\fR... ]
+#include <libstmf.h>
+
+\fBint\fR \fBstmfModifyLu\fR(\fBstmfGuid *\fR\fIluGuid\fR, \fBuint32_t\fR \fIprop\fR, \fBconst char *\fR\fIpropVal\fR)
+.fi
+
+.LP
+.nf
+\fBint\fR \fBstmfModifyLu\fR(\fBuint16_t\fR \fIdType\fR, \fBconst char *\fR\fIfname\fR, \fBuint32_t\fR \fIprop\fR,
+     \fBconst char *\fR\fIpropVal\fR)
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIluGuid\fR\fR
+.ad
+.RS 11n
+.rt  
+The guid of logical unit to modify.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfname\fR\fR
+.ad
+.RS 11n
+.rt  
+The filename of logical unit to modify.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdType\fR\fR
+.ad
+.RS 11n
+.rt  
+Type of logical unit. See \fBstmfCreateLuResource\fR(3STMF).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprop\fR\fR
+.ad
+.RS 11n
+.rt  
+A property type value. See DESCRIPTION for valid values.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpropVal\fR\fR
+.ad
+.RS 11n
+.rt  
+A property value.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstmfModifyLu()\fR and \fBstmfModifyLuByFname()\fR functions modify the
+properties of a logical unit device.
+.sp
+.LP
+Valid properties for modify \fBSTMF_DISK\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_LU_PROP_ALIAS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Up to 255 characters representing a user defined name for the device.
+.sp
+Default: Set to file name of backing store.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_LU_PROP_SIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Numeric value with optional suffix (for example, 100G, 1T) to specify unit of
+size.
+.sp
+Default: Size of device specified in the \fBSTMF_LU_PROP_DATA_FILENAME\fR
+property value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_LU_PROP_WRITE_CACHE_DISABLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write back cache disable. When specified as "true" or "false", specifies write
+back cache disable behavior.
+.sp
+Default: Writeback cache setting of the backing store device specified by
+\fBSTMF_LU_PROP_DATA_FILENAME\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_LU_PROP_WRITE_PROTECT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write protect bit. When specified as "true" or "false", specifies whether the
+device behaves as a write protected device.
+.sp
+Default: "false"
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The following values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_STATUS_SUCCESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+The API call was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_INVALID_ARG\fR\fR
+.ad
+.sp .6
+.RS 4n
+Either \fIprop\fR or \fIpropVal\fR is unrecognized.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_INVALID_PROPSIZE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The size of \fIpropVal\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSTMF_ERROR_NO_PROP\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value of \fIprop\fR is unknown for this resource type.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibstmf\fR(3LIB), \fBstmfCreateLuResource\fR(3STMF), \fBattributes\fR(5)

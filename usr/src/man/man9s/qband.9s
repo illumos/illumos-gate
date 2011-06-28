@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH qband 9S "14 Nov 1996" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+qband \- STREAMS queue flow control information structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI)
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBqband\fR structure contains flow control information for each priority
+band in a queue.
+.sp
+.LP
+The \fBqband\fR structure is defined as type \fBqband_t\fR.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+struct        qband*qb_next;     /* next band's info */
+size_t        qb_count           /* number of bytes in band */
+struct msgb   *qb_first;         /* start of band's data */
+struct msgb   *qb_last;          /* end of band's data */
+size_t        qb_hiwat;          /* band's high water mark */
+size_t        qb_lowat;          /* band's low water mark */
+uint_t        qb_flag;           /* see below */
+.fi
+.in -2
+
+.sp
+.LP
+Valid flags are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQB_FULL\fR \fR
+.ad
+.RS 13n
+.rt  
+Band is considered full.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBQB_WANTW\fR \fR
+.ad
+.RS 13n
+.rt  
+Someone wants to write to band.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstrqget\fR(9F), \fBstrqset\fR(9F), \fBmsgb\fR(9S), \fBqueue\fR(9S)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH NOTES
+.sp
+.LP
+All access to this structure should be through \fBstrqget\fR(9F) and
+\fBstrqset\fR(9F). It is logically part of the \fBqueue\fR(9S) and its layout
+and partitioning with respect to that structure might change in future
+releases. If portability is a concern, do not declare or store instances of or
+references to this structure.

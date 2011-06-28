@@ -1,0 +1,606 @@
+'\" te
+.\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH prctl 1 "25 Aug 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+prctl \- get or set the resource controls of running processes, tasks, and
+projects
+.SH SYNOPSIS
+.LP
+.nf
+\fBprctl\fR [\fB-P\fR] [\fB-t\fR [basic | privileged | system]] 
+     [\fB-n\fR \fIname\fR [\fB-srx\fR] [\fB-v\fR \fIvalue\fR] [\fB-e\fR | \fB-d\fR \fIaction\fR] [\fB-p\fR \fIpid\fR]] 
+     [\fB-i\fR \fIidtype\fR] \fIid\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBprctl\fR utility allows the examination and modification of the resource
+controls associated with an active process, task, or project on the system. It
+allows access to the  basic and privileged limits and the  current  usage  on
+the     specified entity.
+.sp
+.LP
+See \fBresource_controls\fR(5) for a description of the resource controls
+supported in the current release of the Solaris operating system.
+.SH OPTIONS
+.sp
+.LP
+If none of the \fB-s\fR, \fB-r\fR, \fB-x\fR, \fB-v\fR, \fB-d\fR, or \fB-e\fR
+options are specified, the invocation is considered a get operation. Otherwise,
+it is considered a modify operation.
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR | \fB-e\fR \fIaction\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disables (\fB-d\fR) or enables (\fB-e\fR) the specified \fIaction\fR on the
+resource control value specified by \fB-v\fR, \fB-t\fR, and \fB-p\fR. If any of
+the \fB-v\fR, \fB-t\fR, or \fB-p\fR options are unspecified, they match any
+value, privilege, or recipient pid. For example, specifying only \fB-v\fR
+modifies the first resource control with matching value, matching any privilege
+and recipient pid. If no matching resource control value is found, a new value
+is added as if \fB-s\fR were specified.
+.sp
+\fBActions:\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fBall\fR\fR
+.ad
+.RS 17n
+.rt  
+This action is only available with \fB-d\fR. It disables all actions. This
+fails on resource control values that have the \fBdeny\fR global flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdeny\fR\fR
+.ad
+.RS 17n
+.rt  
+Indicates that the resource control attempts to deny granting the resource to
+the process, task, project, or zone on a request for resources in excess of the
+resource control value. \fBdeny\fR actions can not be enabled if the resource
+control has the \fBno-deny\fR global flag. \fBdeny\fR actions can not be
+disabled if the resource control has the \fBdeny\fR global flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsignal\fR\fR
+.ad
+.RS 17n
+.rt  
+This action is only available with \fB-d\fR. It deactivates the \fBsignal\fR
+action.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsignal\fR=\fIsignum\fR\fR
+.ad
+.RS 17n
+.rt  
+In the \fBsignal=\fR\fIsignum\fR action, \fIsignum\fR is a signal number (or
+string representation of a signal). Setting a \fBsignal\fR action on a resource
+control with the \fBno-local-action\fR global flag fails. A limited set of
+signals can be sent. See \fBNOTES\fR for additional details.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR \fIidtype\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the type of the id operands. Valid \fIidtype\fRs are \fBprocess\fR,
+\fBtask\fR, \fBproject\fR, or \fBzone\fR. Also allowed are \fBpid\fR,
+\fBtaskid\fR, \fBprojid\fR, and \fBzoneid\fR. The default id type, if the
+\fB-i\fR option is omitted, is \fBprocess\fR.
+.sp
+For a modify operation, the entity to which id operands are members is the
+target entity. For instance, setting a project resource control on an \fB-i\fR
+\fBprocess\fR sets the resource control on the project to which each given
+process argument is a member.
+.sp
+For a get operation, the resource controls are listed for all entities to which
+the id operands are members. For example, \fB-i\fR \fBtask\fR \fItaskid\fR
+lists the task, project, and zone resource controls for the task, and for the
+project and zone to which that task is a member.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR \fIname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the name of the resource control to get or set. If the \fIname\fR is
+unspecified, all resource controls are retrieved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpid\fR\fR
+.ad
+.sp .6
+.RS 4n
+When manipulating (using \fB-s\fR, \fB-r\fR, \fB-x\fR, \fB-d\fR, or \fB-e\fR) a
+basic task project, or zone resource control values, a recipient \fIpid\fR can
+be specified using \fB-p\fR. When setting a new basic resource control or
+controls on a task, project, or zone, the \fB-p\fR option is required if the
+\fB-i\fR \fIidtype\fR option argument is not \fBprocess\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display resource control values in space delimited format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Replaces the first resource control value (matching with the \fB-t\fR
+\fBprivilege\fR) with the new value specified through the \fB-v\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set a new resource control value.
+.sp
+This option requires the \fB-v\fR option.
+.sp
+If you do not specify the \fB-t\fR option, basic privilege is used. If you want
+to set a basic task, process, or zone rctl, \fB-p\fR is required. If \fB-e\fR
+or \fB-d\fR are also specified, the action on the new \fBrctl\fR is set as
+well.
+.sp
+For compatibility with prior releases, this option is implied if \fB-v\fR is
+specified, without any of \fB-e\fR, \fB-d\fR, \fB-r\fR, or \fB-x\fR.
+.sp
+See \fBresource_controls\fR(5) for a description of unit modifiers and scaling
+factors you can use to express large values when setting a resource control
+value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR [ \fBbasic\fR | \fBprivileged\fR | \fBsystem\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies which resource control type to set. Unless the "lowerable" flag is
+set for a resource control, only invocations by users (or setuid programs) who
+have privileges equivalent to those of root can modify privileged resource
+controls. See \fBrctlblk_set_value\fR(3C) for a description of the
+\fBRCTL_GLOBAL_LOWERABLE\fR flag. If the type is not specified, \fBbasic\fR is
+assumed. For a get operation, the values of all resource control types,
+including \fBsystem\fR, are displayed if no type is specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR \fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the value for the resource control for a set operation. If no
+\fIvalue\fR is specified, then the modification (deletion, action enabling or
+disabling) is carried out on the lowest-valued resource control with the given
+type.
+.sp
+See \fBresource_controls\fR(5) for a description of unit modifiers and scaling
+factors you can use to express large values when setting a resource control
+value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the specified resource control value. If the delete option is not
+provided, the default operation of \fBprctl\fR is to modify a resource control
+value of matching value and privilege, or insert a new value with the given
+privilege. The matching criteria are discussed more fully in \fBsetrctl\fR(2).
+.RE
+
+.sp
+.LP
+If none of the \fB-d\fR, \fB-e\fR, \fB-v\fR, or \fB-x\fR options is specified,
+the invocation is considered a get operation.
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIid\fR\fR
+.ad
+.RS 6n
+.rt  
+The \fBID\fR of the entity (\fBprocess\fR, \fBtask\fR, \fBproject\fR, or
+\fBzone\fR) to interrogate. If the invoking user's credentials are unprivileged
+and the entity being interrogated possesses different credentials, the
+operation fails. If no \fIid\fR is specified, an error message is returned.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRDisplaying Current Resource Control Settings
+.sp
+.LP
+The following example displays current resource control settings for a task to
+which the current shell belongs:
+
+.sp
+.in +2
+.nf
+ example$ ps -o taskid -p $$
+TASKID
+8
+example$ prctl -i task 8
+136150: /bin/ksh
+NAME    PRIVILEGE       VALUE    FLAG   ACTION             RECIPIENT
+task.max-cpu-time
+        usage            8s
+        system          18.4Es    inf   none                -
+task.max-lwps
+        usage              39
+        system          2.15G     max   deny                -
+project.max-contracts
+        privileged      10.0K       -   deny                -
+project.max-locked-memory
+        usage               0B
+        privileged       508MB      -   deny                -
+project.max-port-ids
+        privileged      8.19K       -   deny                -
+project.max-shm-memory
+        privileged       508MB      -   deny                -
+project.max-shm-ids
+        privileged        128       -   deny                -
+project.max-msg-ids
+        privileged        128       -   deny                -
+project.max-sem-ids
+        privileged        128       -   deny                -
+project.max-crypto-memory
+         usage            0B
+privileged       508MB      -   deny                -
+project.max-tasks
+        usage               2
+        system          2.15G     max   deny                -
+project.max-lwps
+         usage             39
+        system          2.15G     max   deny                -
+project.cpu-shares
+        usage               1
+        privileged          1       -   none                -
+zone.max-shm-memory
+        system          16.0EB    max   deny                -
+zone.max-shm-ids
+        system          16.8M     max   deny                -
+zone.max-sem-ids
+        system          16.8M     max   deny                -
+zone.max-msg-ids
+        system          16.8M     max   deny                -
+zone.max-lwps
+        system          2.15G     max   deny                -
+zone.cpu-shares
+        privileged          1       -   none                -
+zone.max-locked-memory
+        usage               0B
+        privileged       508MB      -   deny                -
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDisplaying, Replacing, and Verifying the Value of a Specific
+Control
+.sp
+.LP
+The following examples displays, replaces, and verifies the value of a specific
+control on an existing project:
+
+.sp
+.in +2
+.nf
+example# prctl -n project.cpu-shares -i project group.staff
+project: 10: group.staff
+NAME    PRIVILEGE       VALUE    FLAG   ACTION               RECIPIENT
+project.cpu-shares
+        usage               1
+        privileged          1       -   none                         -
+        system          65.5K     max   none                         -
+
+example# prctl -n project.cpu-shares -v 10 -r -i project group.staff
+example# prctl -n project.cpu-shares -i project group.staff
+project: 10: group.staff
+NAME    PRIVILEGE       VALUE    FLAG   ACTION               RECIPIENT
+project.cpu-shares
+        usage              10
+        privileged         10       -   none                         -
+        system          65.5K     max   none                         -
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRAdjusting Resources
+.sp
+.LP
+The following example uses the \fBproject.max-locked-memory\fR resource.
+
+.sp
+.LP
+First, use \fBid\fR \fB-p\fR to find out which project the current shell is a
+member of:
+
+.sp
+.in +2
+.nf
+/home/garfield> id -p
+          uid=77880(garfield) gid=10(staff) projid=10(group.staff)
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Using the target project, identify the resource limit value before the change:
+
+.sp
+.in +2
+.nf
+/home/garfield> prctl -n project.max-locked-memory -i project \e
+                      group.staff
+	project 10: group.staff
+	project.max-locked-memory
+            privileged         256MB       -    deny                  -
+      	    system            16.0EB     max    deny                  -
+
+current limit is 256 Megabytes.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Next, adjust the \fBproject.max-locked-memory\fR limit to 300 Megabytes for the
+target project:
+
+.sp
+.in +2
+.nf
+# prctl -n project.max-locked-memory -v 300M -r -i project group.staff
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The resource limit value after the change shows a new value of 300 Megabytes:
+
+.sp
+.in +2
+.nf
+# prctl -n project.max-locked-memory -i project group.staff
+	project 10:group.staff
+	project.max-locked-memory
+	    usage              200MG
+     privileged         300MB       -    deny                           -
+	   system            16.0EB     max    deny                           -
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRModifying CPU Caps for a Project
+.sp
+.LP
+The \fBprctl\fR command can use the \fBproject.cpu-cap\fR resource control (see
+\fBresource_controls\fR(5)) to set and modify CPU caps for a project. (The same
+resource control can be used in the \fB/etc/project\fR file. See
+\fBproject\fR(4)) The following command modifies the CPU cap to limit
+\fBuser.smith\fR  to three CPUs:
+
+.sp
+.in +2
+.nf
+# \fBprctl -r -t privileged -n project.cpu-cap -v 300 -i project user.smith\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBprctl\fR \fB-r\fR option, used above, is used to dynamically change a
+CPU cap for a project or zone. For example, the following command will change
+the cap set in the preceding command to 80 percent:
+
+.sp
+.in +2
+.nf
+# \fBprctl -r -t privileged -n project.cpu-cap -v 80 -i project user.smith\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+To remove a CPU cap, enter:
+
+.sp
+.in +2
+.nf
+# \fBprctl -x -n project.cpu-cap $$\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRModifying CPU Caps for a Zone
+.sp
+.LP
+The \fBprctl\fR command can use the \fBzone.cpu-cap\fR resource control (see
+\fBresource_controls\fR(5)) to set and modify CPU caps for a zone. (The same
+resource control can be manipulated using the \fBzonecfg\fR(1M) command.) The
+following command modifies the CPU cap to limit the global zone to 80 percent
+of a CPU:
+
+.sp
+.in +2
+.nf
+# \fBprctl -t privileged -n zone.cpu-cap -v 80 -i zone global\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The cap can be lowered to 50% using:
+
+.sp
+.in +2
+.nf
+# \fBprctl -r -t privileged -n zone.cpu-cap -v 50 -i zone global\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Fatal error encountered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid command line options were specified.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/pid/*\fR\fR
+.ad
+.RS 15n
+.rt  
+Process information and control files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The command-line syntax is Committed. The human-readable output is Uncommitted.
+The parseable output is Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBrctladm\fR(1M), \fBzonecfg\fR(1M), \fBsetrctl\fR(2),
+\fBrctlblk_get_local_action\fR(3C), \fBproject\fR(4), \fBattributes\fR(5),
+\fBresource_controls\fR(5)
+.SH NOTES
+.sp
+.LP
+The valid signals that can be set on a resource control block allowing local
+actions are \fBSIGABRT\fR, \fBSIGXRES\fR, \fBSIGHUP\fR, \fBSIGSTOP\fR,
+\fBSIGTERM\fR, and \fBSIGKILL\fR. Additionally, CPU time related controls can
+issue the \fBSIGXCPU\fR signal, and file size related controls can send the
+\fBSIGXFSZ\fR signal.

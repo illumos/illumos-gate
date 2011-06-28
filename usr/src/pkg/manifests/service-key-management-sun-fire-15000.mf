@@ -50,12 +50,14 @@ dir path=usr group=sys
 dir path=usr/platform group=sys
 dir path=usr/platform/sun4u group=sys
 dir path=usr/platform/sun4u/lib
+dir path=usr/share/man/man1m
 driver name=sckmdrv perms="* 0600 root sys"
 file path=lib/svc/manifest/platform/sun4u/sckmd.xml group=sys mode=0444
 file path=lib/svc/method/svc-sckmd mode=0555
 file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/sckmdrv group=sys
 file path=platform/SUNW,Sun-Fire-15000/kernel/drv/sckmdrv.conf group=sys
 file path=usr/platform/sun4u/lib/sckmd group=sys mode=0755
+file path=usr/share/man/man1m/sckmd.1m
 legacy pkg=SUNWsckm.u arch=$(ARCH).sun4u \
     desc="Key Management Modules for Sun Fire 15000" \
     name="Key Management Modules for Sun Fire 15000"

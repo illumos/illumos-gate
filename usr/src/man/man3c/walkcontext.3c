@@ -1,0 +1,245 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH walkcontext 3C "10 Apr 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+walkcontext, addrtosymstr, printstack, backtrace, backtrace_symbols,
+backtrace_symbols_fd \- walk stack pointed to by ucontext
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucontext.h>
+
+\fBint\fR \fBwalkcontext\fR(\fBconst ucontext_t *\fR\fIuptr\fR,
+     \fBint (*\fR\fIoperate_func\fR)(uintptr_t, int, void *), \fBvoid *\fR\fIusrarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBaddrtosymstr\fR(\fBuintptr_t\fR \fIaddr\fR, \fBchar *\fR\fIbuffer\fR, \fBint\fR \fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBprintstack\fR(\fBint\fR \fIfd\fR);
+.fi
+
+.LP
+.nf
+#include <execinfo.h>
+
+\fBint\fR \fBbacktrace\fR(\fBvoid **\fR\fIbuffer\fR, \fBint\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBchar **\fR\fBbacktrace_symbols\fR(\fBvoid *const *\fR\fIbuffer\fR, \fBint\fR \fIsize\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBbacktrace_symbols_fd\fR(\fBvoid *const *\fR\fIbuffer\fR, \fBint\fR \fIsize\fR, \fBint\fR \fIfd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwalkcontext()\fR function walks the call stack pointed to by \fIuptr\fR,
+which can be obtained by a call to \fBgetcontext\fR(2) or from a signal handler
+installed with the \fBSA_SIGINFO\fR flag.  The \fBwalkcontext()\fR function
+calls the user-supplied function \fIoperate_func\fR for each routine found on
+the call stack and each signal handler invoked. The user function is passed
+three arguments: the PC at which the call or signal occurred, the signal number
+that occurred at this PC (0 if no signal occurred), and the third argument
+passed to \fBwalkcontext()\fR. If the user function returns a non-zero value,
+\fBwalkcontext()\fR returns without completing the callstack walk.
+.sp
+.LP
+The \fBaddrtosymstr()\fR function attempts to convert a PC into a symbolic
+representation of the form
+.sp
+.in +2
+.nf
+\fIobjname\fR'\fIfuncname\fR+0x\fIoffset\fR[0xPC]
+.fi
+.in -2
+
+.sp
+.LP
+where \fIobjname\fR is the module in which the PC is located, \fIfuncname\fR is
+the name of the function, and \fIoffset\fR is the offset from the beginning of
+the function. The \fIobjname\fR, \fIfuncname\fR, and \fIoffset\fR values are
+obtained from \fBdladdr\fR(3C) and might not always be present. The resulting
+string is written to the user-supplied buffer. Should the length of the string
+be larger than the user-supplied buffer, only the portion of the string that
+will fit is written and null-terminated.
+.sp
+.LP
+The \fBprintstack()\fR function uses \fBwalkcontext()\fR to print a symbolic
+stack trace to the specified file descriptor. This is useful for reporting
+errors from signal handlers. The \fBprintstack()\fR function uses
+\fBdladdr1()\fR (see \fBdladdr\fR(3C)) to obtain symbolic symbol names. As a
+result, only global symbols are reported as symbol names by \fBprintstack()\fR.
+.sp
+.LP
+The \fBbacktrace()\fR function uses \fBwalkcontext()\fR to generate a stack's
+program counter values for the calling thread and place these values into the
+array specified by the buffer argument. The \fIsize\fR argument specifies the
+maximum number of program counters that will be recorded.  This function is
+provided for compatibility with the GNU \fBlibc\fR used on Linux systems,
+\fBglibc\fR.
+.sp
+.LP
+The \fBbacktrace_symbols()\fR function translates the numerical program counter
+values previously recorded by a call to \fBbacktrace()\fR in the \fIbuffer\fR
+argument, and converts, where possible, each PC to a string indicating the
+module, function and offset of each call site. The number of symbols present in
+the array must be passed in with the \fIsize\fR argument.
+.sp
+.LP
+The set of strings is returned in an array obtained from a call to
+\fBmalloc\fR(3C). It is the responsibility of the caller to pass the returned
+pointer to \fBfree()\fR.  The individual strings must not be freed.  Since
+\fBmalloc()\fR is used to obtain the needed space, this function is MT-Safe
+rather than Async-Signal-Safe and cannot be used reliably from a signal
+handler.  This function is provided for \fBglibc\fR compatibility.
+.sp
+.LP
+The \fBbacktrace_symbols_fd()\fR function translates the numerical program
+counter values previously recorded by a call to \fBbacktrace()\fR in the buffer
+argument, and converts, where possible, each PC to a string indicating the
+module, function, and offset of each call site. These strings are written to
+the file descriptor specified in the \fIfd\fR argument. This function is
+provided for \fBglibc\fR compatibility.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBwalkcontext()\fR and \fBprintstack()\fR return
+0.  If \fBwalkcontext()\fR cannot read the stack or the stack trace appears
+corrupted, both functions return -1.
+.sp
+.LP
+The \fBaddrtosymstr()\fR function returns the number of characters necessary to
+hold the entire string representation of the passed in address, irrespective of
+the size of the user-supplied buffer.
+.sp
+.LP
+The \fBbacktrace()\fR function returns the number of stack frames captured.
+.sp
+.LP
+The \fBbacktrace_symbols()\fR function returns a pointer to an array containing
+string representations of the calling sequence.
+.SH ERRORS
+.sp
+.LP
+No error values are defined.
+.SH USAGE
+.sp
+.LP
+The \fBwalkcontext()\fR function is typically used to obtain information about
+the call stack for error reporting, performance analysis, or diagnostic
+purposes. Many library functions are not Async-Signal-Safe and should not be
+used from a signal handler. If \fBwalkcontext()\fR is to be called from a
+signal handler, careful programming is required.  In particular,
+\fBstdio\fR(3C) and \fBmalloc\fR(3C) cannot be used.
+.sp
+.LP
+The \fBwalkstack()\fR, \fBaddrtosymstr()\fR, \fBprintstack()\fR,
+\fBbacktrace()\fR, and \fBbacktrace_symbols_fd()\fR functions are
+Async-Signal-Safe and can be called  from  a  signal  handler.  The string
+representation generated by \fBaddrtosymstr()\fR and displayed by
+\fBprintstack()\fR, \fBbacktrace_symbols()\fR and \fBbacktrace_symbols_fd()\fR
+is unstable and will change depending on the information available in the
+modules that comprise the stack trace.
+.sp
+.LP
+Tail-call optimizations on SPARC eliminate stack frames that would otherwise be
+present.  For example, if the code is of the form
+.sp
+.in +2
+.nf
+#include <stdio.h>
+
+main()
+{
+        bar();
+        exit(0);
+}
+
+bar()
+{
+        int a;
+        a = foo(fileno(stdout));
+        return (a);
+}
+
+foo(int file)
+{
+        printstack(file);
+}
+.fi
+.in -2
+
+.sp
+.LP
+compiling without optimization will yield a stack trace of the form
+.sp
+.in +2
+.nf
+/tmp/q:foo+0x8
+/tmp/q:bar+0x14
+/tmp/q:main+0x4
+/tmp/q:_start+0xb8
+.fi
+.in -2
+
+.sp
+.LP
+whereas with higher levels of optimization the output is
+.sp
+.in +2
+.nf
+/tmp/q:main+0x10
+/tmp/q:_start+0xb8
+.fi
+.in -2
+
+.sp
+.LP
+since both the call to \fBfoo()\fR in main and the call to \fBbar()\fR in
+\fBfoo()\fR are handled as tail calls that perform a return or restore in the
+delay slot. For further information, see \fIThe SPARC Architecture Manual\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelSee below.
+.TE
+
+.sp
+.LP
+The \fBbacktrace_symbols()\fR function is MT-Safe. The remaining functions are
+Async-Signal-Safe.
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBgetcontext\fR(2), \fBsigaction\fR(2), \fBdladdr\fR(3C),
+\fBsiginfo.h\fR(3HEAD), \fBattributes\fR(5)
+.sp
+.LP
+Weaver, David L. and Tom Germond, eds. \fIThe SPARC Architecture Manual\fR,
+Version 9. Santa Clara: Prentice Hall, 2000.

@@ -1,0 +1,111 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_inswstr 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_inswstr, inswstr, insnwstr, winswstr, winsnwstr, mvinswstr, mvinsnwstr,
+mvwinswstr, mvwinsnwstr \- insert wchar_t string before character under the
+cursor in a curses window
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR .. ]
+#include <curses.h>
+
+\fBint\fR \fBinswstr\fR(\fBwchar_t *\fR\fIwstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinsnwstr\fR(\fBwchar_t *\fR\fIwstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwinswstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBwchar_t *\fR\fIwstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwinsnwstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBwchar_t *\fR\fIwstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvinswstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBwchar_t *\fR\fIwstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvinsnwstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBwchar_t *\fR\fIwstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwinswstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBwchar_t *\fR\fIwstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwinsnwstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBwchar_t *\fR\fIwstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines insert a  \fBwchar_t\fR character string (as many  \fBwchar_t\fR
+characters as will fit on the line) before the character under the cursor. All
+characters to the right of the cursor are moved to the right, with the
+possibility of the rightmost characters on the line being lost. The cursor
+position does not change (after moving to \fIy\fR, \fIx\fR, if specified).
+(This does not imply use of the hardware insert character feature.) The four
+routines with \fIn\fR as the last argument insert at most  \fIn\fR
+\fBwchar_t\fR characters. If \fIn\fR<=0, then the entire string is inserted.
+.sp
+.LP
+If a character in  \fIwstr\fR is a tab, newline, carriage return, or backspace,
+the cursor is moved appropriately within the window. A newline also does a
+\fBclrtoeol\fR(3CURSES) before moving. Tabs are considered to be at every
+eighth column. If a character in  \fIwstr\fR is another control character, it
+is drawn in the \fB^\fR\fIX\fR notation. Calling \fBwinwch\fR(3CURSES) after
+adding a control character (and moving to it, if necessary) does not return the
+control character, but instead returns the representation of the control
+character.
+.SH RETURN VALUE
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclrtoeol\fR(3CURSES), \fBcurses\fR(3CURSES), \fBwinwch\fR(3CURSES),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header file <\fBcurses.h\fR> automatically includes the header files
+<\fBstdio.h\fR>, <\fBunctrl.h\fR> and <\fBwidec.h\fR>.
+.sp
+.LP
+Note that all but  \fBwinsnwstr()\fR may be macros.

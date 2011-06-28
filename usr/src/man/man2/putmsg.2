@@ -1,0 +1,290 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH putmsg 2 "1 Nov 2003" "SunOS 5.11" "System Calls"
+.SH NAME
+putmsg, putpmsg \- send a message on a stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <stropts.h>
+
+\fBint\fR \fBputmsg\fR(\fBint\fR \fIfildes\fR, \fBconst struct strbuf *\fR\fIctlptr\fR,
+     \fBconst struct strbuf *\fR\fIdataptr\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBputpmsg\fR(\fBint\fR \fIfildes\fR, \fBconst struct strbuf *\fR\fIctlptr\fR,
+     \fBconst struct strbuf *\fR\fIdataptr\fR,\fBint\fR \fIband\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBputmsg()\fR function creates a message  from user-specified buffer(s)
+and sends the message to a streams file. The message may contain either a data
+part, a control part, or both. The data and control parts to be sent are
+distinguished by placement in separate  buffers, as described below. The
+semantics of each part is defined by the streams module that receives  the
+message.
+.sp
+.LP
+The \fBputpmsg()\fR function does the same thing as \fBputmsg()\fR, but
+provides the user the ability to send messages in different priority bands.
+Except where noted, all information pertaining to \fBputmsg()\fR also pertains
+to \fBputpmsg()\fR.
+.sp
+.LP
+The \fIfildes\fR argument specifies a file descriptor referencing an open
+stream. The \fIctlptr\fR and \fIdataptr\fR arguments each point to a
+\fBstrbuf\fR structure, which contains the following members:
+.sp
+.in +2
+.nf
+int      maxlen;     /* not used here */
+int      len;        /* length of data */
+void     *buf;       /* ptr to buffer */
+.fi
+.in -2
+
+.sp
+.LP
+The \fIctlptr\fR argument points to the structure describing the control part,
+if any, to be included in the message. The \fBbuf\fR member in the \fBstrbuf\fR
+structure points to the buffer where the control information resides, and the
+\fBlen\fR member indicates the number of bytes to be sent. The \fBmaxlen\fR
+member is not used in \fBputmsg()\fR (see \fBgetmsg\fR(2)). In a similar
+manner, \fIdataptr\fR specifies the data, if any, to be included in  the
+message.  The \fIflags\fR argument indicates what type of message should be
+sent and is described later.
+.sp
+.LP
+To send the data part of a message, \fIdataptr\fR must not be \fINULL\fR, and
+the \fBlen\fR member of \fIdataptr\fR must have a value of 0 or greater. To
+send the control part of a message, the corresponding values must be set for
+\fIctlptr\fR. No data (control) part is sent if either \fIdataptr\fR
+(\fIctlptr\fR) is  \fINULL\fR or the \fBlen\fR member of \fIdataptr\fR
+(\fIctlptr\fR) is negative.
+.sp
+.LP
+For \fBputmsg()\fR, if a control part is specified, and \fIflags\fR is set to
+\fBRS_HIPRI\fR, a high priority message is sent. If no control part is
+specified, and \fIflags\fR is set to \fBRS_HIPRI\fR, \fBputmsg()\fR fails and
+sets \fBerrno\fR to \fBEINVAL\fR. If \fIflags\fR is set to 0, a normal
+(non-priority) message is sent. If no control part and no data part are
+specified, and \fIflags\fR is set to 0,  no message is sent, and 0 is returned.
+.sp
+.LP
+The stream head guarantees that the control part of a message generated by
+\fBputmsg()\fR is at least 64 bytes in length.
+.sp
+.LP
+For \fBputpmsg()\fR, the flags are different.  The \fIflags\fR argument is a
+bitmask with the following mutually-exclusive flags defined: \fBMSG_HIPRI\fR
+and \fBMSG_BAND\fR. If \fIflags\fR is set to 0, \fBputpmsg()\fR fails and sets
+\fBerrno\fR to \fBEINVAL\fR. If a control part is specified and \fIflags\fR is
+set to \fBMSG_HIPRI\fR and \fIband\fR is set to 0, a high-priority message is
+sent. If \fIflags\fR is set to \fBMSG_HIPRI\fR and either no control part is
+specified or \fIband\fR is set to a non-zero value, \fBputpmsg()\fR fails and
+sets \fBerrno\fR to \fBEINVAL\fR. If flags is set to \fBMSG_BAND\fR, then a
+message is sent in the priority band specified by \fIband\fR. If a control part
+and data part are not specified and \fIflags\fR is set to \fBMSG_BAND\fR, no
+message is sent and 0 is returned.
+.sp
+.LP
+Normally, \fBputmsg()\fR will block if the stream write queue is full  due to
+internal flow control conditions. For high-priority messages,  \fBputmsg()\fR
+does not block on this condition. For other messages,  \fBputmsg()\fR does not
+block when the write queue is full and  \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is
+set. Instead, it fails and sets  \fBerrno\fR to \fBEAGAIN\fR.
+.sp
+.LP
+The \fBputmsg()\fR or \fBputpmsg()\fR function also blocks, unless prevented by
+lack of internal resources, waiting  for the availability of message blocks in
+the stream, regardless of priority  or whether \fBO_NDELAY\fR or
+\fBO_NONBLOCK\fR has been specified. No partial message is sent.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBputmsg()\fR and \fBputpmsg()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 16n
+.rt  
+A non-priority message was specified, the \fBO_NDELAY\fR or \fBO_NONBLOCK\fR
+flag is  set and the stream write queue is full due to internal flow control
+conditions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor open for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIctlptr\fR or \fIdataptr\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+A signal was caught during the execution of the \fBputmsg()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+An undefined value was specified in \fIflags\fR; \fIflags\fR is set to
+\fBRS_HIPRI\fR and no control part was supplied; or the stream referenced by
+\fIfildes\fR is linked below a multiplexor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 16n
+.rt  
+Buffers could not be allocated for the message that was to be created due to
+insufficient streams memory resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSTR\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIfildes\fR argument is not associated with a stream.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 16n
+.rt  
+A hangup condition was generated downstream for the specified stream, or the
+other end of the pipe is closed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR or \fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIfildes\fR argument refers to a streams-based pipe and the other end of
+the pipe is closed.  A \fBSIGPIPE\fR signal is generated for the calling
+thread. This error condition occurs only with SUS-conforming applications. See
+\fBstandards\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 16n
+.rt  
+The size of the data part of the message does not fall within the range
+specified by the maximum and minimum packet sizes of the topmost stream module.
+This value is also returned if the control part of the message is larger than
+the maximum configured size of the control part of a message, or if the data
+part of a message is larger than the maximum configured size of the data part
+of a message.
+.RE
+
+.sp
+.LP
+In addition, \fBputmsg()\fR and \fBputpmsg()\fR will fail if the stream head
+had processed an asynchronous error before the call.  In this case, the value
+of \fBerrno\fR does not reflect the result of \fBputmsg()\fR or \fBputpmsg()\fR
+but reflects the prior error.
+.sp
+.LP
+The \fBputpmsg()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIflags\fR argument is set to \fBMSG_HIPRI\fR and \fIband\fR is non-zero.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBgetmsg\fR(2), \fBpoll\fR(2), \fBread\fR(2), \fBwrite\fR(2),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

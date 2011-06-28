@@ -383,6 +383,7 @@ save_vminfo(HV *self, kstat_t *kp, int strip_str)
 	SAVE_UINT64(self, vminfop, swap_alloc);
 	SAVE_UINT64(self, vminfop, swap_avail);
 	SAVE_UINT64(self, vminfop, swap_free);
+	SAVE_UINT64(self, vminfop, updates);
 }
 
 /*

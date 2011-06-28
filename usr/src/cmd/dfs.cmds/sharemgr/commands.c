@@ -534,6 +534,10 @@ enable_group(sa_group_t group, char *updateproto, int notify, char *proto)
 {
 	sa_share_t share;
 
+	/* If the protocol isn't enabled for this group skip it */
+	if (!has_protocol(group, proto))
+		return;
+
 	for (share = sa_get_share(group, NULL);
 	    share != NULL;
 	    share = sa_get_next_share(share)) {

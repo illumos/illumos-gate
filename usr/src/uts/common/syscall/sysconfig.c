@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -158,8 +159,8 @@ sysconfig(int which)
 		 * even though rcapd can be used on the global zone too.
 		 */
 		if (!INGLOBALZONE(curproc) &&
-		    curproc->p_zone->zone_phys_mcap != 0)
-			return (MIN(btop(curproc->p_zone->zone_phys_mcap),
+		    curproc->p_zone->zone_phys_mem_ctl != UINT64_MAX)
+			return (MIN(btop(curproc->p_zone->zone_phys_mem_ctl),
 			    physinstalled));
 
 		return (physinstalled);
@@ -172,12 +173,12 @@ sysconfig(int which)
 		 * though rcapd can be used on the global zone too.
 		 */
 		if (!INGLOBALZONE(curproc) &&
-		    curproc->p_zone->zone_phys_mcap != 0) {
+		    curproc->p_zone->zone_phys_mem_ctl != UINT64_MAX) {
 			pgcnt_t cap, rss, free;
 			vmusage_t in_use;
 			size_t cnt = 1;
 
-			cap = btop(curproc->p_zone->zone_phys_mcap);
+			cap = btop(curproc->p_zone->zone_phys_mem_ctl);
 			if (cap > physinstalled)
 				return (freemem);
 

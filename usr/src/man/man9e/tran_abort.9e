@@ -1,0 +1,116 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_abort 9E "17 Aug 2005" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_abort \- abort a SCSI command
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+
+
+\fB int prefix\fR\fBtran_abort\fR(\fBstruct scsi_address *\fR\fIap\fR, 
+     \fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a \fBscsi_address\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_abort()\fR vector in the \fBscsi_hba_tran\fR(9S) structure must be
+initialized during the HBA driver's \fBattach\fR(9E) to point to an HBA entry
+point to be called when a target driver calls \fBscsi_abort\fR(9F).
+.sp
+.LP
+\fBtran_abort()\fR should attempt to abort the command \fIpkt\fR that has been
+transported to the HBA.  If \fIpkt\fR is \fBNULL\fR, the HBA driver should
+attempt to abort all outstanding packets for the target/logical unit addressed
+by \fIap\fR.
+.sp
+.LP
+Depending on the state of a particular command in the transport layer, the HBA
+driver may not be able to abort the command.
+.sp
+.LP
+While the abort is taking place, packets issued to the transported layer may or
+may not be aborted.
+.sp
+.LP
+For each packet successfully aborted, \fBtran_abort()\fR must set the
+\fBpkt_reason\fR to \fBCMD_ABORTED\fR, and \fBpkt_statistics\fR must be
+\fBOR'ed\fR with \fBSTAT_ABORTED\fR .
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_abort()\fR must return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 6n
+.rt  
+upon success or partial success.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 6n
+.rt  
+upon failure.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBtran_abort()\fR function can be called from user or interrupt context.
+This requirement comes from \fBscsi_abort()\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBscsi_abort\fR(9F), \fBscsi_hba_attach\fR(9F),
+\fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+If \fBpkt_reason\fR already indicates that an earlier error had occurred,
+\fBtran_abort()\fR should not overwrite \fBpkt_reason\fR with
+\fBCMD_ABORTED\fR.

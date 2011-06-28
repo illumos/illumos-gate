@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Joyent Inc.
  */
 
 /*
@@ -148,8 +149,8 @@ method_rate_critical(restarter_inst_t *inst)
 		 * critical_failure_period is expressed
 		 * in seconds but tracked in ns
 		 */
-		critical_failure_period = (hrtime_t) scf_fr * NANOSEC;
-		critical_failure_count = (uint_t) scf_st;
+		critical_failure_period = (hrtime_t)scf_fr * NANOSEC;
+		critical_failure_count = (uint_t)scf_st;
 	}
 	if (inst->ri_start_index < critical_failure_count)
 		return (0);

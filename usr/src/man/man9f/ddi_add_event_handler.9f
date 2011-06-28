@@ -1,0 +1,204 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_add_event_handler 9F "62 Nov 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_add_event_handler \- add an NDI event service callback handler
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/dditypes.h>
+#include <sys/sunddi.h>
+
+\fBint\fR \fBddi_add_event_handler\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_eventcookie_t\fR \fIcookie\fR,
+     \fBvoid (*\fR\fIhandler\fR)(dev_info_t *, ddi_eventcookie_t, void *, void *),
+     \fBvoid *\fR\fIarg\fR, \fBddi_registration_id_t *\fR\fIid\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdev_info_t *\fR\fIdip\fR\fR
+.ad
+.sp .6
+.RS 4n
+Device node registering the callback.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBddi_eventcookie_t\fR \fIcookie\fR\fR
+.ad
+.sp .6
+.RS 4n
+Cookie returned from call to \fBddi_get_eventcookie\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvoid (*\fR\fIhandler\fR\fB)(dev_info_t *, ddi_eventcookie_t, void *, void
+*)\fR\fR
+.ad
+.sp .6
+.RS 4n
+Callback handler responsible for handling an NDI event service notification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvoid *\fR\fIarg\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pointer to opaque data supplied by the caller. Typically, this would be a
+pointer to the driver's \fBsoftstate\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBddi_registration_id_t *\fR\fIid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pointer to registration ID where a unique registration id will be returned.
+Registration ID must be saved and used when calling
+\fBddi_remove_event_handler\fR(9F) to unregister a callback.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_add_event_handler()\fR function adds a callback handler to be
+invoked in the face of the event specifed by \fIcookie\fR. The process of
+adding a callback handler is also known as subscribing to an event. Upon
+successful subscription, the handler will be invoked by the system when the
+event occurs. The handler can be unregistered by using
+\fBddi_remove_event_handler\fR(9F).
+.sp
+.LP
+An instance of a driver can register multiple handlers for an event or a single
+handler for multiple events. Callback order is not defined and should assumed
+to be random.
+.sp
+.LP
+The routine handler will be invoked with the following arguments:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdev_info_t *\fR\fIdip\fR\fR
+.ad
+.RS 28n
+.rt  
+Device node requesting the notification.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBddi_eventcookie_t\fR \fIcookie\fR\fR
+.ad
+.RS 28n
+.rt  
+Structure describing event that occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvoid *\fR\fIarg\fR\fR
+.ad
+.RS 28n
+.rt  
+Opaque data pointer provided, by the driver, during callback registration.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBvoid *\fR\fIimpl_data\fR\fR
+.ad
+.RS 28n
+.rt  
+Pointer to event specific data defined by the framework which invokes the
+callback function.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+Callback handler registered successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+Failed to register callback handler. Possible reasons include lack of resources
+or a bad cookie.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_add_event_handler()\fR and \fBhandler()\fR function can be called
+from user and kernel contexts only.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBddi_get_eventcookie\fR(9F),
+\fBddi_remove_event_handler\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Drivers must remove all registered callback handlers for a device instance by
+calling \fBddi_remove_event_handler\fR(9F) before detach completes.

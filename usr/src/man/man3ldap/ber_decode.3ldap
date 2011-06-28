@@ -1,0 +1,521 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ber_decode 3LDAP "15 May 2009" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ber_decode, ber_alloc_t, ber_free, ber_bvdup, ber_init, ber_flatten,
+ber_get_next, ber_skip_tag, ber_peek_tag, ber_scanf, ber_get_int,
+ber_get_stringa, ber_get_stringal, ber_get_stringb, ber_get_null,
+ber_get_boolean, ber_get_bitstring, ber_first_element, ber_next_element,
+ber_bvfree, ber_bvecfree \- Basic Encoding Rules library decoding functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+
+\fBBerElement *\fR\fBber_alloc_t\fR(\fBint\fR \fIoptions\fR);
+.fi
+
+.LP
+.nf
+\fBstruct berval *\fR\fBber_bvdup\fR(\fBconst struct berval *\fR\fIbv\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBber_free\fR(\fBBerElement *\fR\fIber\fR, \fBint\fR \fIfreebuf\fR);
+.fi
+
+.LP
+.nf
+\fBBerElement *\fR\fBber_init\fR(\fBconst struct berval *\fR\fIbv\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBber_flatten\fR(\fBBerElement *\fR\fIber\fR, \fBstruct berval **\fR\fIbvPtr\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR\fBber_get_next\fR(\fBSockbuf *\fR\fIsb\fR, \fBber_len_t *\fR\fIlen\fR, \fBBerElement *\fR\fIber\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_skip_tag\fR(\fBBerElement *\fR\fIber\fR, \fBber_len_t *\fR\fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_peek_tag\fR(\fBBerElement *\fR\fIber\fR, \fBber_len_t *\fR\fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_int\fR(\fBBerElement *\fR\fIber\fR, \fBber_int_t *\fR\fInum\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_stringb\fR(\fBBerElement *\fR\fIber\fR, \fBchar *\fR\fIbuf\fR,
+     \fBber_len_t *\fR\fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_stringa\fR(\fBBerElement *\fR\fIber\fR, \fBchar **\fR\fIbuf\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_stringal\fR(\fBBerElement *\fR\fIber\fR, \fBstruct berval **\fR\fIbv\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_null\fR(\fBBerElement *\fR\fIber\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_boolean\fR(\fBBerElement *\fR\fIber\fR, \fBint *\fR\fIboolval\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_get_bitstringa\fR(\fBBerElement *\fR\fIber\fR, \fBchar **\fR\fIbuf\fR,
+     \fBber_len_t *\fR\fIlen\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_first_element\fR(\fBBerElement *\fR\fIber\fR, \fBber_len_t *\fR\fIlen\fR,
+     \fBchar **\fR\fIlast\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_next_element\fR(\fBBerElement *\fR\fIber\fR, \fBber_len_t *\fR\fIlen\fR,
+     \fBchar *\fR\fIlast\fR);
+.fi
+
+.LP
+.nf
+\fBber_tag_t\fR \fBber_scanf\fR(\fBBerElement *\fR\fIber\fR, \fBconst char *\fR\fIfmt\fR [, arg...]);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBber_bvfree\fR(\fBstruct berval *\fR\fIbv\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBber_bvecfree\fR(\fBstruct berval **\fR\fIbvec\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide a subfunction interface to a simplified implementation
+of the Basic Encoding Rules of ASN.1.  The version of BER these functions
+support is the one defined for the LDAP protocol.  The encoding rules are the
+same as BER, except that  only definite form lengths are used, and bitstrings
+and octet strings are always encoded in primitive form.  In addition, these
+lightweight BER functions restrict tags and class to fit in a single octet
+(this means the actual tag must be less than 31). When a "tag"is specified in
+the descriptions below, it refers to the tag, class, and primitive or
+constructed bit in the first octet of the encoding.  This man page describes
+the decoding functions in the lber library.  See  \fBber_encode\fR(3LDAP) for
+details on the corresponding encoding functions.
+.sp
+.LP
+Normally, the only functions that need be called by an application are
+\fBber_get_next()\fR to get the next BER element and  \fBber_scanf()\fR to do
+the actual decoding.  In some cases,  \fBber_peek_tag()\fR may also need to be
+called in normal usage. The other functions are provided for those applications
+that need more control than  \fBber_scanf()\fR provides. In general, these
+functions return the tag of the element decoded, or \fB\(mi1\fR if an error
+occurred.
+.sp
+.LP
+The  \fBber_get_next()\fR function is used to read the next BER element from
+the given \fBSockbuf\fR, \fIsb\fR.  A \fBSockbuf\fR consists of the descriptor
+(usually socket, but a file descriptor works just as well) from which to read,
+and a \fBBerElement\fR structure used to maintain a buffer.  On the first call,
+the \fIsb_ber\fR struct should be zeroed.  It strips off and returns the
+leading tag byte, strips off and returns the length of the entire element in
+\fIlen\fR, and sets up \fIber\fR for subsequent calls to  \fBber_scanf()\fR,
+and all to decode the element.
+.sp
+.LP
+The \fBber_peek_tag()\fR function returns the tag of the next element to be
+parsed in the \fBBerElement\fR argument. The length of this element is stored
+in the *\fIlenPtr\fR argument. \fBLBER_DEFAULT\fR is returned if there is no
+further data to be read. The decoding position within the \fIber\fR argument is
+unchanged by this call; that is, the fact that \fBber_peek_tag()\fR has been
+called does not affect future use of \fIber\fR.
+.sp
+.LP
+The \fBber_skip_tag()\fR function is similar to \fBber_peek_tag()\fR, except
+that the state pointer in the \fBBerElement\fR argument is advanced past the
+first tag and length, and is pointed to the value part of the next element.
+This function should only be used with constructed types and situations when a
+BER encoding is used as the value of an OCTET STRING.  The length of the value
+is stored in *\fIlenPtr\fR.
+.sp
+.LP
+The  \fBber_scanf()\fR function is used to decode a BER element in much the
+same way that  \fBscanf\fR(3C) works.  It reads from \fIber\fR, a pointer to a
+\fBBerElement\fR such as returned by \fBber_get_next()\fR, interprets the bytes
+according to the format string \fBfmt\fR, and stores the results in its
+additional arguments.  The format string contains conversion specifications
+which are used to direct the interpretation of the BER element.  The format
+string can contain the following characters.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR\fR
+.ad
+.RS 5n
+.rt  
+Octet string.  A char ** should be supplied.  Memory is allocated, filled with
+the contents of the octet string, null-terminated, and returned in the
+parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.RS 5n
+.rt  
+Octet string.  A char * buffer should be supplied, followed by a pointer to an
+integer initialized to the size of the buffer.  Upon return, the
+null-terminated octet string is put into the buffer, and the integer is set to
+the actual size of the octet string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBO\fR\fR
+.ad
+.RS 5n
+.rt  
+Octet string.  A struct ber_val ** should be supplied, which upon return points
+to a memory allocated struct berval containing the octet string and its length.
+\fBber_bvfree()\fR can be called to free the allocated memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBb\fR\fR
+.ad
+.RS 5n
+.rt  
+Boolean.  A pointer to an integer should be supplied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fR\fR
+.ad
+.RS 5n
+.rt  
+Integer.  A pointer to an integer should be supplied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBB\fR\fR
+.ad
+.RS 5n
+.rt  
+Bitstring.  A char ** should be supplied which will point to the  memory
+allocated bits, followed by an unsigned long *, which will point to the length
+(in bits) of the bitstring returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 5n
+.rt  
+Null.  No parameter is required.  The element is simply skipped if it is
+recognized.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBv\fR\fR
+.ad
+.RS 5n
+.rt  
+Sequence of octet strings.  A char *** should be supplied, which upon return
+points to a memory allocated null-terminated array of char *'s containing the
+octet strings.   \fINULL\fR is returned if the sequence is empty.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBV\fR\fR
+.ad
+.RS 5n
+.rt  
+Sequence of octet strings with lengths. A struct berval *** should be supplied,
+which upon return points to a memory allocated, null-terminated array of struct
+berval *'s containing the octet strings and their lengths. \fINULL\fR is
+returned if the sequence is empty.   \fBber_bvecfree()\fR can be called to free
+the allocated memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.RS 5n
+.rt  
+Skip element.  The next element is skipped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB{\fR\fR
+.ad
+.RS 5n
+.rt  
+Begin sequence.  No parameter is required.  The initial sequence tag and length
+are skipped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB}\fR\fR
+.ad
+.RS 5n
+.rt  
+End sequence.  No parameter is required and no action is taken.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\fR\fR
+.ad
+.RS 5n
+.rt  
+Begin set.  No parameter is required.  The initial set tag and length are
+skipped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB]\fR\fR
+.ad
+.RS 5n
+.rt  
+End set.  No parameter is required and no action is taken.
+.RE
+
+.sp
+.LP
+The \fBber_get_int()\fR function tries to interpret the next element as an
+integer, returning the result in \fInum\fR. The tag of whatever it finds is
+returned on success, \fB-1\fR on failure.
+.sp
+.LP
+The \fBber_get_stringb()\fR function is used to read an octet string into a
+pre-allocated buffer. The \fIlen\fR parameter should be initialized to the size
+of the buffer, and will contain the length of the octet string read upon
+return.  The buffer should be big enough to take the octet string value plus a
+terminating \fINULL\fR byte.
+.sp
+.LP
+The \fBber_get_stringa()\fR function is used to allocate memory space into
+which an octet string is read.
+.sp
+.LP
+The \fBber_get_stringal()\fR function is used to allocate memory space into
+which an octet string and its length are read.  It takes a \fBstruct berval
+**\fR, and returns the result in this parameter.
+.sp
+.LP
+The \fBber_get_null()\fR function is used to read a \fINULL\fR element.  It
+returns the tag of the element it skips over.
+.sp
+.LP
+The \fBber_get_boolean()\fR function is used to read a boolean value. It is
+called the same way that \fBber_get_int()\fR is called.
+.sp
+.LP
+The \fBber_get_bitstringa()\fR function is used to read a bitstring value. It
+takes a \fBchar **\fR which will hold the allocated memory bits, followed by an
+\fBunsigned long *\fR, which will point to the length (in bits) of the
+bitstring returned.
+.sp
+.LP
+The \fBber_first_element()\fR function is used to return the tag and length of
+the first element in a set or sequence. It also returns in \fIlast\fR a magic
+cookie parameter that should be passed to subsequent calls to
+\fBber_next_element()\fR, which returns similar information.
+.sp
+.LP
+The \fBber_alloc_t()\fR function constructs and returns \fBBerElement\fR. A
+null pointer  is returned on error. The options field contains a bitwise-OR of
+options which are to be used when generating the encoding of this
+\fBBerElement\fR. One option is defined and must always be supplied:
+.sp
+.in +2
+.nf
+#define LBER_USE_DER 0x01
+.fi
+.in -2
+
+.sp
+.LP
+When this option is present, lengths will always be encoded in the minimum
+number of octets. Note that this option does not cause values of sets and
+sequences to be rearranged in tag and byte order, so these functions are not
+suitable for generating DER output as defined in  X.509 and X.680
+.sp
+.LP
+The \fBber_init\fR function constructs a \fBBerElement\fR and returns a new
+\fBBerElement\fR containing a copy of the data in the \fIbv\fR argument. The
+\fBber_init\fR function returns the null pointer on error.
+.sp
+.LP
+The \fBber_free()\fR function frees a \fBBerElement\fR which is returned from
+the API calls \fBber_alloc_t()\fR or \fBber_init()\fR. Each \fBBerElement\fR
+must be freed by the caller. The second argument \fIfreebuf\fR should always be
+set to 1 to ensure that the internal buffer used by the BER functions is freed
+as well as the \fBBerElement\fR container itself.
+.sp
+.LP
+The \fBber_bvdup()\fR function returns a copy of a \fIberval\fR. The
+\fIbv_val\fR field in the returned \fIberval\fR points to a different area of
+memory as the \fIbv_val\fR field in the argument \fIberval\fR. The null pointer
+is returned on  error (that is, is out of memory).
+.sp
+.LP
+The \fBber_flatten()\fR function allocates a \fBstruct  berval\fR whose
+contents are BER encoding taken from the  \fIber\fR argument. The \fIbvPtr\fR
+pointer points to the returned \fIberval\fR, which must be freed using
+\fBber_bvfree()\fR. This  function returns \fB0\fR on success and  \fB\(mi1\fR
+on error.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAssume the variable \fIber\fR contains a lightweight BER
+encoding of the following ASN.1 object:
+.sp
+.in +2
+.nf
+      AlmostASearchRequest := SEQUENCE {
+          baseObject      DistinguishedName,
+          scope           ENUMERATED {
+              baseObject    (0),
+              singleLevel   (1),
+              wholeSubtree  (2)
+          },
+          derefAliases    ENUMERATED {
+              neverDerefaliases   (0),
+              derefInSearching    (1),
+              derefFindingBaseObj (2),
+              alwaysDerefAliases  (3N)
+          },
+          sizelimit       INTEGER (0 .. 65535),
+          timelimit       INTEGER (0 .. 65535),
+          attrsOnly       BOOLEAN,
+          attributes      SEQUENCE OF AttributeType
+      }
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRThe element can be decoded using \fBber_scanf()\fR as follows.
+.sp
+.in +2
+.nf
+      int    scope, ali, size, time, attrsonly;
+      char   *dn, **attrs;
+      if ( ber_scanf( ber, "{aiiiib{v}}", &dn, &scope, &ali,
+          &size, &time, &attrsonly, &attrs ) == -1 )
+              /* error */
+      else
+              /* success */
+.fi
+.in -2
+
+.SH ERRORS
+.sp
+.LP
+If an error occurs during decoding, generally these functions return
+\fB\(mi1\fR\&.
+.SH NOTES
+.sp
+.LP
+The return values for all of these functions are declared in the \fB<lber.h>\fR
+header.  Some functions may allocate memory which must be freed by the calling
+application.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBber_encode\fR(3LDAP), \fBattributes\fR(5)
+.sp
+.LP
+Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access
+Protocol", OSI-DS-26, April 1992.
+.sp
+.LP
+Information Processing - Open Systems Interconnection - Model and Notation -
+Service Definition - Specification of Basic Encoding Rules for Abstract Syntax
+Notation One, International Organization for Standardization, International
+Standard 8825.

@@ -1,0 +1,563 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_bind_curlwp 3CPC "05 Mar 2007" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_bind_curlwp, cpc_bind_pctx, cpc_bind_cpu, cpc_unbind, cpc_request_preset,
+cpc_set_restart \- bind request sets to hardware counters
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libcpc.h>
+
+\fBint\fR \fBcpc_bind_curlwp\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR, \fBuint_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_bind_pctx\fR(\fBcpc_t *\fR\fIcpc\fR, \fBpctx_t *\fR\fIpctx\fR, \fBid_t\fR \fIid\fR, \fBcpc_set_t *\fR\fIset\fR,
+     \fBuint_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_bind_cpu\fR(\fBcpc_t *\fR\fIcpc\fR, \fBprocessorid_t\fR \fIid\fR, \fBcpc_set_t *\fR\fIset\fR,
+     \fBuint_t\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_unbind\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_request_preset\fR(\fBcpc_t *\fR\fIcpc\fR, \fBint\fR \fIindex\fR, \fBuint64_t\fR \fIpreset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcpc_set_restart\fR(\fBcpc_t *\fR\fIcpc\fR, \fBcpc_set_t *\fR\fIset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions program the processor's hardware counters according to the
+requests contained in the \fIset\fR argument. If these functions are
+successful, then upon return the physical counters will have been assigned to
+count events on behalf of each request in the set, and each counter will be
+enabled as configured.
+.sp
+.LP
+The \fBcpc_bind_curlwp()\fR function binds the set to the calling \fBLWP\fR. If
+successful, a performance counter context is associated with the \fBLWP\fR that
+allows the system to virtualize the hardware counters to that specific
+\fBLWP\fR.
+.sp
+.LP
+By default, the system binds the set to the current \fBLWP\fR only. If the
+\fBCPC_BIND_LWP_INHERIT\fR flag is present in the \fIflags\fR argument,
+however, any subsequent \fBLWP\fRs created by the current \fBLWP\fR will
+inherit a copy of the request set. The newly created \fBLWP\fR will have its
+virtualized 64-bit counters initialized to the preset values specified in
+\fIset\fR, and the counters will be enabled and begin counting events on behalf
+of the new \fBLWP\fR. This automatic inheritance behavior can be useful when
+dealing with multithreaded programs to determine aggregate statistics for the
+program as a whole.
+.sp
+.LP
+If the \fBCPC_BIND_LWP_INHERIT\fR flag is specified and any of the requests in
+the set have the \fBCPC_OVF_NOTIFY_EMT\fR flag set, the process will
+immediately dispatch a \fBSIGEMT\fR signal to the freshly created \fBLWP\fR so
+that it can preset its counters appropriately on the new \fBLWP\fR. This
+initialization condition can be detected using \fBcpc_set_sample\fR(3CPC) and
+looking at the counter value for any requests with \fBCPC_OVF_NOTIFY_EMT\fR
+set. The value of any such counters will be \fBUINT64_MAX\fR.
+.sp
+.LP
+The \fBcpc_bind_pctx()\fR function binds the set to the \fBLWP\fR specified by
+the \fIpctx\fR-\fIid\fR pair, where \fIpctx\fR refers to a handle returned from
+\fBlibpctx\fR and \fIid\fR is the ID of the desired \fBLWP\fR in the target
+process. If successful, a performance counter context is associated with the
+specified \fBLWP\fR and the system virtualizes the hardware counters to that
+specific \fBLWP\fR. The \fIflags\fR argument is reserved for future use and
+must always be \fB0\fR.
+.sp
+.LP
+The \fBcpc_bind_cpu()\fR function binds the set to the specified CPU and
+measures events occurring on that CPU regardless of which \fBLWP\fR is running.
+Only one such binding can be active on the specified CPU at a time. As long as
+any application has bound a set to a CPU, per-\fBLWP\fR counters are
+unavailable and any attempt to use either \fBcpc_bind_curlwp()\fR or
+\fBcpc_bind_pctx()\fR returns \fBEAGAIN\fR. The first invocation of
+\fBcpc_bind_cpu()\fR invalidates all currently bound per-\fBLWP\fR counter
+sets, and any attempt to sample an invalidated set returns \fBEAGAIN\fR. To
+bind to a CPU, the library binds the calling \fBLWP\fR to the measured CPU with
+\fBprocessor_bind\fR(2). The application must not change its processor binding
+until after it has unbound the set with \fBcpc_unbind()\fR. The \fIflags\fR
+argument is reserved for future use and must always be \fB0\fR.
+.sp
+.LP
+The \fBcpc_request_preset()\fR function updates the preset and current value
+stored in the indexed request within the currently bound set, thereby changing
+the starting value for the specified request for the calling \fBLWP\fR only,
+which takes effect at the next call to \fBcpc_set_restart()\fR.
+.sp
+.LP
+When a performance counter counting on behalf of a request with the
+\fBCPC_OVF_NOTIFY_EMT\fR flag set overflows, the performance counters are
+frozen and the \fBLWP\fR to which the set is bound receives a \fBSIGEMT\fR
+signal. The \fBcpc_set_restart()\fR function can be called from a \fBSIGEMT\fR
+signal handler function to quickly restart the hardware counters. Counting
+begins from each request's original preset (see
+\fBcpc_set_add_request\fR(3CPC)), or from the preset specified in a prior call
+to \fBcpc_request_preset()\fR. Applications performing performance counter
+overflow profiling should use the \fBcpc_set_restart()\fR function to quickly
+restart counting after receiving a \fBSIGEMT\fR overflow signal and recording
+any relevant program state.
+.sp
+.LP
+The \fBcpc_unbind()\fR function unbinds the set from the resource to which it
+is bound. All hardware resources associated with the bound set are freed and if
+the set was bound to a CPU, the calling \fBLWP\fR is unbound from the
+corresponding CPU. See \fBprocessor_bind\fR(2).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion these functions return 0. Otherwise, -1 is returned
+and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+Applications wanting to get detailed error values should register an error
+handler with \fBcpc_seterrhndlr\fR(3CPC). Otherwise, the library will output a
+specific error description to \fBstderr\fR.
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 11n
+.rt  
+For \fBcpc_bind_curlwp()\fR, the system has Pentium 4 processors with
+HyperThreading and at least one physical processor has more than one hardware
+thread online. See NOTES.
+.sp
+For \fBcpc_bind_cpu()\fR, the process does not have the \fIcpc_cpu\fR privilege
+to access the CPU's counters.
+.sp
+For \fBcpc_bind_curlwp()\fR, \fBcpc_bind_cpc()\fR, and \fBcpc_bind_pctx()\fR,
+access to the requested hypervisor event was denied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 11n
+.rt  
+For \fBcpc_bind_curlwp()\fR and \fBcpc_bind_pctx()\fR, the performance counters
+are not available for use by the application.
+.sp
+For \fBcpc_bind_cpu()\fR, another process has already bound to this CPU. Only
+one process is allowed to bind to a CPU at a time and only one set can be bound
+to a CPU at a time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The set does not contain any requests or \fBcpc_set_add_request()\fR was not
+called.
+.sp
+The value given for an attribute of a request is out of range.
+.sp
+The system could not assign a physical counter to each request in the system.
+See NOTES.
+.sp
+One or more requests in the set conflict and might not be programmed
+simultaneously.
+.sp
+The \fIset\fR was not created with the same \fIcpc\fR handle.
+.sp
+For \fBcpc_bind_cpu()\fR, the specified processor does not exist.
+.sp
+For \fBcpc_unbind()\fR, the set is not bound.
+.sp
+For \fBcpc_request_preset()\fR and \fBcpc_set_restart()\fR, the calling
+\fBLWP\fR does not have a bound set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 11n
+.rt  
+For \fBcpc_bind_cpu()\fR, the specified processor is not online.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBcpc_bind_curlwp()\fR function was called with the
+\fBCPC_OVF_NOTIFY_EMT\fR flag, but the underlying processor is not capable of
+detecting counter overflow.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESRCH\fR\fR
+.ad
+.RS 11n
+.rt  
+For \fBcpc_bind_pctx()\fR, the specified \fBLWP\fR in the target process does
+not exist.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse hardware performance counters to measure events in a
+process.
+.sp
+.LP
+The following example demonstrates how a standalone application can be
+instrumented with the \fBlibcpc\fR(3LIB) functions to use hardware performance
+counters to measure events in a process. The application performs 20 iterations
+of a computation, measuring the counter values for each iteration. By default,
+the example makes use of two counters to measure external cache references and
+external cache hits. These options are only appropriate  for UltraSPARC
+processors. By setting the EVENT0 and EVENT1 environment variables to other
+strings (a list of which can be obtained from the \fB-h\fR option of the
+\fBcpustat\fR(1M) or \fBcputrack\fR(1) utilities), other events can be counted.
+The \fBerror()\fR routine is assumed to be a user-provided routine analogous to
+the familiar \fBprintf\fR(3C) function from the C library that also performs an
+\fBexit\fR(2) after printing the message.
+
+.sp
+.in +2
+.nf
+#include <inttypes.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <libcpc.h>
+#include <errno.h>
+
+int
+main(int argc, char *argv[])
+{
+int iter;
+char *event0 = NULL, *event1 = NULL;
+cpc_t *cpc;
+cpc_set_t *set;
+cpc_buf_t *diff, *after, *before;
+int ind0, ind1;
+uint64_t val0, val1;
+
+if ((cpc = cpc_open(CPC_VER_CURRENT)) == NULL)
+        error("perf counters unavailable: %s", strerror(errno));
+
+if ((event0 = getenv("EVENT0")) == NULL)
+     event0 = "EC_ref";
+if ((event1 = getenv("EVENT1")) == NULL)
+     event1 = "EC_hit";
+
+if ((set = cpc_set_create(cpc)) == NULL)
+        error("could not create set: %s", strerror(errno));
+
+if ((ind0 = cpc_set_add_request(cpc, set, event0, 0, CPC_COUNT_USER, 0,
+        NULL)) == -1)
+        error("could not add first request: %s", strerror(errno));
+
+if ((ind1 = cpc_set_add_request(cpc, set, event1, 0, CPC_COUNT_USER, 0,
+        NULL)) == -1)
+        error("could not add first request: %s", strerror(errno));
+
+if ((diff = cpc_buf_create(cpc, set)) == NULL)
+        error("could not create buffer: %s", strerror(errno));
+if ((after = cpc_buf_create(cpc, set)) == NULL)
+        error("could not create buffer: %s", strerror(errno));
+if ((before = cpc_buf_create(cpc, set)) == NULL)
+        error("could not create buffer: %s", strerror(errno));
+
+if (cpc_bind_curlwp(cpc, set, 0) == -1)
+         error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
+
+for (iter = 1; iter <= 20; iter++) {
+
+        if (cpc_set_sample(cpc, set, before) == -1)
+             break;
+
+         /* ==> Computation to be measured goes here <== */
+ 
+        if (cpc_set_sample(cpc, set, after) == -1)
+             break;
+ 
+        cpc_buf_sub(cpc, diff, after, before);
+        cpc_buf_get(cpc, diff, ind0, &val0);
+        cpc_buf_get(cpc, diff, ind1, &val1);
+        
+         (void) printf("%3d: %" PRId64 " %" PRId64 "\en", iter,
+                val0, val1);
+}
+
+ if (iter != 21)
+        error("cannot sample set: %s",  strerror(errno));
+
+cpc_close(cpc);
+
+return (0);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRWrite a signal handler to catch overflow signals.
+.sp
+.LP
+The following example builds on Example 1 and demonstrates how to write the
+signal handler to catch overflow signals. A counter is preset so that it is
+1000 counts short of overflowing. After 1000 counts the signal handler is
+invoked.
+
+.sp
+.LP
+The signal handler:
+
+.sp
+.in +2
+.nf
+cpc_t     *cpc;
+cpc_set_t *set;
+cpc_buf_t *buf;
+int       index;
+
+void
+emt_handler(int sig, siginfo_t *sip, void *arg)
+{
+     ucontext_t *uap = arg;
+     uint64_t val;
+
+     if (sig != SIGEMT || sip->si_code != EMT_CPCOVF) {
+         psignal(sig, "example");
+         psiginfo(sip, "example");
+         return;
+     }   
+
+     (void) printf("lwp%d - si_addr %p ucontext: %%pc %p %%sp %p\en",
+         _lwp_self(), (void *)sip->si_addr,
+         (void *)uap->uc_mcontext.gregs[PC],
+         (void *)uap->uc_mcontext.gregs[SP]);
+
+     if (cpc_set_sample(cpc, set, buf) != 0)
+         error("cannot sample: %s", strerror(errno));
+
+     cpc_buf_get(cpc, buf, index, &val);
+
+     (void) printf("0x%" PRIx64"\en", val);
+     (void) fflush(stdout);
+
+     /*
+     * Update a request's preset and restart the counters. Counters which 
+     * have not been preset with cpc_request_preset() will resume counting 
+     * from their current value. 
+     */
+     (cpc_request_preset(cpc, ind1, val1) != 0) 
+        error("cannot set preset for request %d: %s", ind1, 
+             strerror(errno)); 
+        if (cpc_set_restart(cpc, set) != 0)                                   
+             error("cannot restart lwp%d: %s", _lwp_self(), strerror(errno));
+}
+.fi
+.in -2
+
+.sp
+.LP
+The setup code, which can be positioned after the code that opens the CPC
+library and creates a set:
+
+.sp
+.in +2
+.nf
+#define PRESET (UINT64_MAX - 999ull)
+ 
+     struct sigaction act;
+     ... 
+     act.sa_sigaction = emt_handler;
+     bzero(&act.sa_mask, sizeof (act.sa_mask));
+     act.sa_flags = SA_RESTART|SA_SIGINFO;
+     if (sigaction(SIGEMT, &act, NULL) == -1)
+         error("sigaction: %s", strerror(errno));
+ 
+     if ((index = cpc_set_add_request(cpc, set, event, PRESET,
+        CPC_COUNT_USER | CPC_OVF_NOTIFY_EMT, 0, NULL)) != 0)
+        error("cannot add request to set: %s", strerror(errno));
+ 
+     if ((buf = cpc_buf_create(cpc, set)) == NULL)
+        error("cannot create buffer: %s", strerror(errno));
+ 
+     if (cpc_bind_curlwp(cpc, set, 0) == -1)
+         error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
+ 
+     for (iter = 1; iter <= 20; iter++) {
+         /* ==> Computation to be measured goes here <== */
+     }
+ 
+     cpc_unbind(cpc, set);      /* done */
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpustat\fR(1M), \fBcputrack\fR(1), \fBpsrinfo\fR(1M),
+\fBprocessor_bind\fR(2), \fBcpc_seterrhndlr\fR(3CPC),
+\fBcpc_set_sample\fR(3CPC), \fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+When a set is bound, the system assigns a physical hardware counter to count on
+behalf of each request in the set. If such an assignment is not possible for
+all requests in the set, the bind function returns -1 and sets \fBerrno\fR to
+\fBEINVAL\fR. The assignment of requests to counters depends on the
+capabilities of the available counters. Some processors (such as Pentium 4)
+have a complicated counter control mechanism that requires the reservation of
+limited hardware resources beyond the actual counters. It could occur that two
+requests for different events might be impossible to count at the same time due
+to these limited hardware resources. See the processor manual as referenced by
+\fBcpc_cpuref\fR(3CPC) for details about the underlying processor's
+capabilities and limitations.
+.sp
+.LP
+Some processors can be configured to dispatch an interrupt when a physical
+counter overflows. The most obvious use for this facility is to ensure that the
+full 64-bit counter values are maintained without repeated sampling. Certain
+hardware, such as the UltraSPARC processor, does not record which counter
+overflowed. A more subtle use for this facility is to preset the counter to a
+value slightly less than the maximum value, then use the resulting interrupt to
+catch the counter overflow associated with that event. The overflow can then be
+used as an indication of the frequency of the occurrence of that event.
+.sp
+.LP
+The interrupt generated by the processor might not be particularly precise.
+That is, the particular instruction that caused the counter overflow might be
+earlier in the instruction stream than is indicated by the program counter
+value in the ucontext.
+.sp
+.LP
+When a request is added to a set with the \fBCPC_OVF_NOTIFY_EMT\fR flag set,
+then as before, the control registers and counter are preset from the 64-bit
+preset value given. When the flag is set, however, the kernel arranges to send
+the calling process a \fBSIGEMT\fR signal when the overflow occurs. The
+\fBsi_code\fR member of the corresponding \fBsiginfo\fR structure is set to
+\fBEMT_CPCOVF\fR and the \fBsi_addr\fR member takes the program counter value
+at the time the overflow interrupt was delivered. Counting is disabled until
+the set is bound again.
+.sp
+.LP
+If the \fBCPC_CAP_OVERFLOW_PRECISE\fR bit is set in the value returned by
+\fBcpc_caps\fR(3CPC), the processor is able to determine precisely which
+counter has overflowed after receiving the overflow interrupt. On such
+processors, the \fBSIGEMT\fR signal is sent only if a counter overflows and the
+request that the counter is counting has the \fBCPC_OVF_NOTIFY_EMT\fR flag set.
+If the capability is not present on the processor, the system sends a
+\fBSIGEMT\fR signal to the process if any of its requests have the
+\fBCPC_OVF_NOTIFY_EMT\fR flag set and any counter in its set overflows.
+.sp
+.LP
+Different processors have different counter ranges available, though all
+processors supported by Solaris allow at least 31 bits to be specified as a
+counter preset value. Portable preset values lie in the range \fBUINT64_MAX\fR
+to \fBUINT64_MAX\fR-\fBINT32_MAX\fR.
+.sp
+.LP
+The appropriate preset value will often need to be determined experimentally.
+Typically, this value will depend on the event being measured as well as the
+desire to minimize the impact of the act of measurement on the event being
+measured. Less frequent interrupts and samples lead to less perturbation of the
+system.
+.sp
+.LP
+If the processor cannot detect counter overflow, bind will fail and return
+\fBENOTSUP\fR. Only user events can be measured using this technique. See
+Example 2.
+.SS "Pentium 4"
+.sp
+.LP
+Most Pentium 4 events require the specification of an event mask for counting.
+The event mask is specified with the \fIemask\fR attribute.
+.sp
+.LP
+Pentium 4 processors with HyperThreading Technology have only one set of
+hardware counters per physical processor. To use \fBcpc_bind_curlwp()\fR or
+\fBcpc_bind_pctx()\fR to measure per-\fBLWP\fR events on a system with Pentium
+4 HT processors, a system administrator must first take processors in the
+system offline until each physical processor has only one hardware thread
+online (See the \fB-p\fR option to \fBpsrinfo\fR(1M)). If a second hardware
+thread is brought online, all per-\fBLWP\fR bound contexts will be invalidated
+and any attempt to sample or bind a CPC set will return \fBEAGAIN\fR.
+.sp
+.LP
+Only one CPC set at a time can be bound to a physical processor with
+\fBcpc_bind_cpu()\fR. Any call to \fBcpc_bind_cpu()\fR that attempts to bind a
+set to a processor that shares a physical processor with a processor that
+already has a CPU-bound set returns an error.
+.sp
+.LP
+To measure the shared state on a Pentium 4 processor with HyperThreading, the
+\fIcount_sibling_usr\fR and \fIcount_sibling_sys\fR attributes are provided for
+use with \fBcpc_bind_cpu()\fR. These attributes behave exactly as the
+\fBCPC_COUNT_USER\fR and \fBCPC_COUNT_SYSTEM\fR request flags, except that they
+act on the sibling hardware thread sharing the physical processor with the CPU
+measured by \fBcpc_bind_cpu()\fR. Some CPC sets will fail to bind due to
+resource constraints. The most common type of resource constraint is an ESCR
+conflict among one or more requests in the set. For example, the branch_retired
+event cannot be measured on counters 12 and 13 simultaneously because both
+counters require the \fBCRU_ESCR2\fR ESCR to measure this event. To measure
+\fIbranch_retired\fR events simultaneously on more than one counter, use
+counters such that one counter uses \fBCRU_ESCR2\fR and the other counter uses
+CRU_ESCR3. See the processor documentation for details.

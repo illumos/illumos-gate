@@ -1,0 +1,125 @@
+'\" te
+.\"  Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH quiesce 9E "16 Sep 2008" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+quiesce \- quiesce a device
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+\fBint prefix\fR\fBquiesce\fR(\fBdev_info_t\fR \fI*dip\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBddi_quiesce_not_needed\fR(\fBdev_info_t\fR \fI*dip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 7n
+.rt  
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBquiesce()\fR function quiesces a device so that the device no longer
+generates interrupts, modifies or accesses memory. The driver should reset the
+device to a hardware state from which the device can be correctly configured by
+the driver's \fBattach()\fR routine without a system power cycle or being
+configured by the firmware. For devices with a defined reset state
+configuration, the driver should return that device to that state as part of
+the quiesce operation. Fast Reboot, where firmware is bypassed when booting to
+a new OS image, is such a case.
+.sp
+.LP
+\fBquiesce()\fR is only called for an attached device instance as one of the
+final operations of a reboot sequence, and no other thread can be active for
+this device. The system guarantees that no other driver entry point is active
+or invoked while \fBquiesce()\fR is invoked. The system also guarantees that no
+timeout or \fBtaskq\fR is invoked. The system is single-threaded and can not be
+interrupted. Therefore, the driver's \fBquiesce()\fR implementation must not
+use locks or timeouts, or rely on them being called. The driver must discard
+all outstanding \fBI/O\fR instead of waiting for completion. At the conclusion
+of the \fBquiesce()\fR operation, the driver must guarantee that the device no
+longer has access to memory or interrupts.
+.sp
+.LP
+The only \fBDDI\fR interfaces that can be called by the \fBquiesce()\fR
+implementation are non-blocking functions, such as the \fBddi_get*()\fR and
+\fBddi_put*()\fR functions.
+.sp
+.LP
+If \fBquiesce()\fR determines a particular instance of the device cannot be
+quiesced when requested because of some exceptional condition, \fBquiesce()\fR
+returns \fBDDI_FAILURE\fR. This rarely happens.
+.sp
+.LP
+If a driver has previously implemented the obsolete \fBreset()\fR interface,
+its functionality must be merged into \fBquiesce()\fR. The driver's
+\fBreset()\fR routine is no longer called if an implementation of
+\fBquiesce()\fR is present.
+.sp
+.LP
+\fBddi_quiesce_not_needed()\fR always returns \fBDDI_SUCCESS\fR. A driver can
+set its \fBdevo_quiesce\fR device function to \fBddi_quiesce_not_needed()\fR to
+indicate that the device it manages does not need to be quiesced.
+.SH RETURN VALUES
+.sp
+.LP
+\fBquiesce()\fR returns the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+The device has been successfully quiesced.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+The operation failed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function is called from kernel context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBreboot\fR(1M), \fBuadmin\fR(1M), \fBuadmin\fR(2), \fBattach\fR(9E),
+\fBdetach\fR(9E), \fBddi_add_intr\fR(9F), \fBddi_map_regs\fR(9F),
+\fBpci_config_setup\fR(9F), \fBtimeout\fR(9F), \fBdev_ops\fR(9S)
+.SH NOTES
+.sp
+.LP
+When \fBquiesce()\fR is called, the system is single-threaded, therefore the
+driver's \fBquiesce()\fR implementation must not be blocked. For example, the
+implementation must not create or tear down mappings, call \fBFMA\fR functions,
+or create or cancel callbacks.

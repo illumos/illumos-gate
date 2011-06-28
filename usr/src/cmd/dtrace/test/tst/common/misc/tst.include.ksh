@@ -23,7 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 if [ $# != 1 ]; then
 	echo expected one argument: '<'dtrace-path'>'
@@ -83,13 +82,14 @@ files=/usr/include/sys/*.h
 # because they include static globals (!) or function bodies (!!) in the header
 # file.  Hopefully these remain sufficiently few that the O(#files * #badfiles)
 # algorithm, below, doesn't become a problem.  (And yes, writing scripts in
-# something other than ksh1888 would probably be a good idea.)  If this script
+# something other than ksh would probably be a good idea.)  If this script
 # becomes a problem, kindly fix it by reducing the number of bad files!  (That
 # is, fix it by fixing the broken file, not the broken script.)
 #
-badfiles="ctype.h eri_msg.h ser_sync.h sbpro.h neti.h hook_event.h \
+badfiles="ctype.h ser_sync.h neti.h hook_event.h \
     bootconf.h bootstat.h dtrace.h dumphdr.h exacct_impl.h fasttrap.h \
-    kobj.h kobj_impl.h ksyms.h lockstat.h smedia.h stat.h utsname.h"
+    kobj.h kobj_impl.h ksyms.h lockstat.h smedia.h stat.h utsname.h \
+    rds.h smbios_impl.h"
 
 for inc in $files; do
 	file=`basename $inc`

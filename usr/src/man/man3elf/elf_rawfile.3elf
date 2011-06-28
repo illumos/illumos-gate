@@ -1,0 +1,87 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_rawfile 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_rawfile \- retrieve uninterpreted file contents
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBchar *\fR\fBelf_rawfile\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelf_rawfile()\fR function returns a pointer to an uninterpreted byte
+image of the file. This function should be used only to retrieve a file being
+read. For example, a program might use \fBelf_rawfile()\fR to retrieve the
+bytes for an archive member.
+.sp
+.LP
+A program may not close or disable (see \fBelf_cntl\fR(3ELF)) the file
+descriptor associated with \fIelf\fR before the initial call to
+\fBelf_rawfile()\fR \fB,\fR because \fBelf_rawfile()\fR might have to read the
+data from the file if it does not already have the original bytes in memory.
+Generally, this function is more efficient for unknown file types than for
+object files. The library implicitly translates object files in memory, while
+it leaves unknown files unmodified. Thus, asking for the uninterpreted image of
+an object file may create a duplicate copy in memory.
+.sp
+.LP
+\fBelf_rawdata()\fR is a related function, providing access to sections within
+a file. See \fBelf_getdata\fR(3ELF).
+.sp
+.LP
+If \fIptr\fR is non-null, the library also stores the file's size, in bytes, in
+the location to which \fIptr\fR points. If no data are present, \fIelf\fR is
+null, or an error occurs, the return value is a null pointer, with \fB0\fR
+stored through \fIptr\fR, if  \fIptr\fR is non-null.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF), \fBelf_begin\fR(3ELF),
+\fBelf_cntl\fR(3ELF), \fBelf_getdata\fR(3ELF), \fBelf_getident\fR(3ELF),
+\fBelf_kind\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+A program that uses \fBelf_rawfile()\fR and that also interprets the same file
+as an object file potentially has two copies of the bytes in memory. If such a
+program requests the raw image first, before it asks for translated information
+(through such functions as \fBelf32_getehdr()\fR, \fBelf_getdata()\fR, and so
+on), the library ``freezes'' its original memory copy for the raw image. It
+then uses this frozen copy as the source for creating translated objects,
+without reading the file again. Consequently, the application should view the
+raw file image returned by \fBelf_rawfile()\fR as a read-only buffer, unless it
+wants to alter its own view of data subsequently translated. In any case, the
+application may alter the translated objects without changing bytes visible in
+the raw image.
+.sp
+.LP
+Multiple calls to \fBelf_rawfile()\fR with the same \fBELF\fR descriptor return
+the same value; the library does not create duplicate copies of the file.

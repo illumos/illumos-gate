@@ -1,0 +1,104 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_link_spectype 3DEVINFO "22 Mar 2004" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_link_spectype, di_link_to_lnode \- return libdevinfo link information
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldevinfo\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <libdevinfo.h>
+
+\fBint\fR \fBdi_link_spectype\fR(\fBdi_link_t\fR \fIlink\fR);
+.fi
+
+.LP
+.nf
+\fBdi_lnode_t\fR \fBdi_link_to_lnode\fR(\fBdi_link_t\fR \fIlink\fR, \fBuint_t\fR \fIendpoint\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlink\fR\fR
+.ad
+.RS 12n
+.rt  
+A handle to a link.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIendpoint\fR\fR
+.ad
+.RS 12n
+.rt  
+specifies the endpoint of the link, which should correspond to either
+\fBDI_LINK_TGT\fR or \fBDI_LINK_SRC\fR
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdi_link_spectype()\fR function returns libdevinfo link information.
+.sp
+.LP
+The \fBdi_link_to_lnode()\fR function takes a link specified by \fIlink\fR and
+returns the lnode corresponding to the link endpoint specified by
+\fIendpoint\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBdi_link_spectype()\fR function returns the spectype parameter flag that
+was used to open the target device of a link, either \fBS_IFCHR\fR or
+\fBS_IFBLK\fR.
+.sp
+.LP
+Upon successful completion, \fBdi_link_to_lnode()\fR returns a handle to an
+lnode. Otherwise, \fBDI_LINK_NIL\fR is returned and \fBerrno\fR is set to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBdi_link_to_lnode()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An argument is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_init\fR(3DEVINFO), \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)

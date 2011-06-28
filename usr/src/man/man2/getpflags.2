@@ -1,0 +1,168 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getpflags 2 "4 Jun 2009" "SunOS 5.11" "System Calls"
+.SH NAME
+getpflags, setpflags \- get or set process flags
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <priv.h>
+
+\fBuint_t\fR \fBgetpflags\fR(\fBuint_t\fR \fIflag\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsetpflags\fR(\fBuint_t\fR \fIflag\fR, \fBuint_t\fR \fIvalue\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetpflags()\fR and \fBsetpflags()\fR functions obtain and modify the
+current per-process flags.
+.sp
+.LP
+The following values for \fIflag\fR are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRIV_AWARE\fR\fR
+.ad
+.sp .6
+.RS 4n
+This one bit flag takes the value of 0 (unset) or 1 (set).  Only if this flag
+is set is the current process privilege-aware. A process can attempt to unset
+this flag but might fail silently if the observed set invariance condition
+cannot be met. Setting this flag is always successful. See \fBprivileges\fR(5)
+for a discussion of this flag.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRIV_AWARE_RESET\fR\fR
+.ad
+.sp .6
+.RS 4n
+This one bit flag takes the value of 0 (unset) or 1 (set). This causes a
+process to pretend it is non- privilege aware. The effective and permitted
+privilege set change on the change of the effective uid. When all the uid sets
+become the same through \fBsetuid\fR(\fIuid\fR) or through
+\fBsetreuid\fR(\fIuid\fR, \fIuid\fR), the effective and permitted set are set
+to the intersection between the limit set and the inheritable set. At that
+point, both \fBPRIV_AWARE\fR and \fBPRIV_AWARE_RESET\fR are unset.
+.sp
+This flag gets automatically reset when a file becomes privilege aware, either
+through calling \fBsetppriv\fR(2) or by setting \fBPRIV_AWARE\fR to 1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPRIV_DEBUG\fR\fR
+.ad
+.sp .6
+.RS 4n
+This one bit flag takes the value of 0 (unset) or 1 (set).  Only if this flag
+is set does the current process have privilege debugging enabled. Processes can
+set and unset this flag at will.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNET_MAC_AWARE\fR\fR
+.ad
+.br
+.na
+\fB\fBNET_MAC_AWARE_INHERIT\fR\fR
+.ad
+.sp .6
+.RS 4n
+These flags are available only if the system is configured with Trusted
+Extensions. These one bit flags each take the value of 0 (unset) or 1 (set). If
+the \fBNET_MAC_AWARE\fR flag is set then the current process is allowed to
+communicate with peers at labels that are different than its own, subject to
+MAC policy.
+.sp
+The \fBNET_MAC_AWARE_INHERIT\fR flag controls the propagation of the
+\fBNET_MAC_AWARE\fR flag. When a process performs one of the \fBexec\fR(2)
+functions, the \fBNET_MAC_AWARE\fR flag is unset unless the
+\fBNET_MAC_AWARE_INHERIT\fR is set. \fBNET_MAC_AWARE_INHERIT\fR is always unset
+on one of the \fBexec\fR functions. The \fBPRIV_NET_MAC_AWARE\fR privilege is
+required to set either of these flags.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetpflags()\fR returns the value associated with a given per-process
+flag. If the \fIflag\fR argument is invalid, (\fBuint_t\fR)-1 is returned and
+\fBerrno\fR is set to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBsetpflags()\fR returns 0. Otherwise, -1 is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetpflags()\fR and \fBsetpflags()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIflag\fR or the value to which the \fIflag\fR is set is out of
+range.
+.RE
+
+.sp
+.LP
+The \fBsetpflags()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 9n
+.rt  
+An attempt was made to unset \fBPRIV_AWARE\fR but the observed set invariance
+condition was not met.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBppriv\fR(1), \fBsetppriv\fR(2), \fBattributes\fR(5), \fBprivileges\fR(5)

@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lorder 1 "29 Oct 1991" "SunOS 5.11" "User Commands"
+.SH NAME
+lorder \- find ordering relation for an object or library archive
+.SH SYNOPSIS
+.LP
+.nf
+\fBlorder\fR \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The input is one or more object or library archive \fIfilenames\fR (see
+\fBar\fR(1)). The standard output is a list of pairs of object file or archive
+member names; the first file of the pair refers to external identifiers defined
+in the second. The output may be processed by \fBtsort\fR(1) to find an
+ordering of a library suitable for one-pass access by \fBld\fR. Note that the
+link editor \fBld\fR is capable of multiple passes over an archive in the
+portable archive format (see \fBar.h\fR(3HEAD)) and does not require that
+\fBlorder\fR be used when building an archive.  The usage of  the \fBlorder\fR
+command may, however, allow for a more efficient access of the archive during
+the link edit process.
+.sp
+.LP
+The following example builds a new library from existing \fB\&.o\fR files.
+.sp
+.LP
+\fBar \|\fR\fB-cr\fR\fB \|library \|`\|lorder \|*.o \|| \|tsort\|`  \fR
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTMPDIR/*symref\fR\fR
+.ad
+.RS 18n
+.rt  
+temporary files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTMPDIR/*symdef\fR\fR
+.ad
+.RS 18n
+.rt  
+temporary files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTMPDIR\fR\fR
+.ad
+.RS 18n
+.rt  
+usually \fB/var/tmp\fR but can be redefined by setting the environment variable
+\fBTMPDIR\fR (see \fBtempnam\fR() in \fBtmpnam\fR(3C))
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBld\fR(1), \fBtsort\fR(1), \fBtmpnam\fR(3C), \fBar.h\fR(3HEAD),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBlorder\fR will accept as input any object or archive file, regardless of its
+suffix, provided there is more than one input file. If there is but a single
+input file, its suffix must be \fB\&.o\fR.
+.sp
+.LP
+The length of the filename for \fBTMPDIR\fR is limited to whatever \fBsed\fR
+allows.

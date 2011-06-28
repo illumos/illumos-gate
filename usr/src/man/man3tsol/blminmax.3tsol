@@ -1,0 +1,73 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH blminmax 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+blminmax, blmaximum, blminimum \- bound of two labels
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBvoid\fR \fBblmaximum\fR(\fBm_label_t *\fR\fImaximum_label\fR,
+     \fBconst m_label_t *\fR\fIbounding_label\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBblminimum\fR(\fBm_label_t *\fR\fIminimum_label\fR,
+     \fBconst m_label_t *\fR\fIbounding_label\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBblmaximum()\fR function replaces the contents of label
+\fImaximum_label\fR with the least upper bound of the labels
+\fImaximum_label\fR and \fIbounding_label\fR. The least upper bound is the
+greater of the classifications and all of the compartments of the two labels.
+This is the least label that dominates both of the original labels.
+.sp
+.LP
+The \fBblminimum()\fR function replaces the contents of label
+\fIminimum_label\fR with the greatest lower bound of the labels
+\fIminimum_label\fR and \fIbounding_label\fR. The greatest lower bound is the
+lower of the classifications and only the compartments that are contained in
+both labels. This is the greatest label that is dominated by both of the
+original labels.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB), \fBsbltos\fR(3TSOL),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

@@ -1,0 +1,59 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH noenable 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+noenable \- prevent a queue from being scheduled
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+
+\fBvoid\fR \fBnoenable\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the queue.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnoenable()\fR function prevents the \fIq\fR from being scheduled for
+service by \fBinsq\fR(9F), \fBputq\fR(9F) or \fBputbq\fR(9F) when enqueuing an
+ordinary priority message. The queue can be re-enabled with the
+\fBenableok\fR(9F) function.
+.SH CONTEXT
+.sp
+.LP
+The \fBnoenable()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBenableok\fR(9F), \fBinsq\fR(9F), \fBputbq\fR(9F), \fBputq\fR(9F),
+\fBqenable\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

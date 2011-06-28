@@ -1,0 +1,77 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getpagesizes 3C "14 May 2001" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getpagesizes \- get system supported page sizes
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/mman.h>
+
+\fBint\fR \fBgetpagesizes\fR(\fBsize_t\fR \fIpagesize\fR[\|], \fBint\fR \fInelem\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetpagesizes()\fR function returns either the number of different page
+sizes supported by the system or the actual sizes themselves.  When called with
+\fInelem\fR as 0 and pagesize as \fINULL\fR, \fBgetpagesizes()\fR returns the
+number of supported page sizes. Otherwise, up to \fInelem\fR page sizes are
+retrieved and assigned to successive elements  of \fIpagesize\fR[\|].  The
+return value is the number of page sizes retrieved and set in
+\fIpagesize\fR[\|].
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the number of pagesizes supported or actually
+retrieved is returned. Otherwise, \(mi1 is returned and \fBerrno\fR is set to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBgetpagesizes()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fInelem\fR argument is less than 0 or \fIpagesize\fR is \fINULL\fR but
+\fInelem\fR is non-zero.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBgetpagesizes()\fR function returns all the page sizes for which the
+hardware and system software provide support for the \fBmemcntl\fR(2) command
+\fBMC_HAT_ADVISE\fR. Not all processors support all page sizes or combinations
+of page sizes with equal efficiency. Applications programmers should take this
+into consideration when using \fBgetpagesizes()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmemcntl\fR(2), \fBmmap\fR(2), \fBgetpagesize\fR(3C), \fBattributes\fR(5)

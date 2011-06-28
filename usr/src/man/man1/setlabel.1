@@ -1,0 +1,198 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setlabel 1 "20 Jul 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+setlabel \- move files to zone with corresponding sensitivity label
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/setlabel\fR \fInewlabel\fR \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBsetlabel\fR moves files into the zone whose label corresponds to
+\fInewlabel\fR. The old file pathname is adjusted so that it is relative to the
+root pathname of the new zone. If the old pathname for a file's parent
+directory does not exist as a directory in the new zone, the file is not moved.
+Once moved, the file might no longer be accessible in the current zone.
+.sp
+.LP
+Unless \fInewlabel\fR and \fIfilename\fR have been specified, no labels are
+set.
+.sp
+.LP
+Labels are defined by the security administrator at your site. The system
+always displays labels in uppercase. Users can enter labels in any combination
+of uppercase and lowercase. Incremental changes to labels are supported.
+.sp
+.LP
+Refer to \fBsetflabel\fR(3TSOL) for a complete description of the conditions
+that are required to satisfy this command, and the privileges that are needed
+to execute this command.
+.SH EXIT STATUS
+.sp
+.LP
+\fBsetlabel\fR exits with one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Usage error.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Error in getting, setting or translating the label.
+.RE
+
+.SH USAGE
+.sp
+.LP
+On the command line, enclose the label in double quotes unless the label is
+only one word. Without quotes, a second word or letter separated by a space is
+interpreted as a second argument.
+.sp
+.in +2
+.nf
+% \fBsetlabel SECRET \fIsomefile\fR\fR
+% \fBsetlabel "TOP SECRET" \fIsomefile\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Use any combination of upper and lowercase letters. You can separate items in a
+label with blanks, tabs, commas or slashes (\fB/\fR). Do not use any other
+punctuation.
+.sp
+.in +2
+.nf
+% \fBsetlabel "ts a b" \fIsomefile\fR\fR
+% \fBsetlabel "ts,a,b" \fIsomefile\fR\fR
+% \fBsetlabel "ts/a b" \fIsomefile\fR\fR
+% \fBsetlabel " TOP SECRET A B   " \fIsomefile\fR\fR
+.fi
+.in -2
+.sp
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSet a Label.
+.sp
+.LP
+To set \fIsomefile\fR's label to \fBSECRET A\fR:
+
+.sp
+.in +2
+.nf
+example% \fBsetlabel "Secret a" \fIsomefile\fR\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRTurn On a Compartment.
+.sp
+.LP
+Plus and minus signs can be used to modify an existing label. A plus sign turns
+on the specified compartment for \fIsomefile\fR's label.
+
+.sp
+.in +2
+.nf
+example% \fBsetlabel +b \fIsomefile\fR\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRTurn Off a Compartment.
+.sp
+.LP
+A minus sign turns off the compartments that are associated with a
+classification. To turn off compartment \fBA\fR in \fIsomefile\fR's label:
+
+.sp
+.in +2
+.nf
+example% \fBsetlabel -A \fIsomefile\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If an incremental change is being made to an existing label and the first
+character of the label is a hyphen (\fB\(mi\fR), a preceding double-hyphen
+(\fB--\fR) is required.
+
+.sp
+.LP
+To turn off compartment \fB-A\fR in \fIsomefile\fR's label:
+
+.sp
+.in +2
+.nf
+example% \fBsetlabel -- -A \fIsomefile\fR\fR
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsetflabel\fR(3TSOL), \fBlabel_encodings\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.
+.sp
+.LP
+This implementation of setting a label is meaningful for the Defense
+Intelligence Agency (DIA) Mandatory Access Control (MAC) policy. For more
+information, see \fBlabel_encodings\fR(4).

@@ -1,0 +1,261 @@
+'\" te
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getent 1M "26 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+getent \- get entries from administrative database
+.SH SYNOPSIS
+.LP
+.nf
+\fBgetent\fR \fIdatabase\fR [\fIkey\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBgetent\fR gets a list of entries from the administrative database specified
+by \fIdatabase\fR. The information generally comes from one or more of the
+sources that are specified for the \fIdatabase\fR in \fB/etc/nsswitch.conf\fR.
+.sp
+.LP
+\fIdatabase\fR is the name of the database to be examined. This can be
+\fBpasswd\fR, \fBgroup\fR, \fBhosts\fR, \fBipnodes\fR, \fBservices\fR,
+\fBprotocols\fR, \fBethers\fR, \fBproject\fR, \fBnetworks\fR, or
+\fBnetmasks\fR. For each of these databases, \fBgetent\fR uses the appropriate
+library routines described in \fBgetpwnam\fR(3C), \fBgetgrnam\fR(3C),
+\fBgethostbyaddr\fR(3NSL), \fBgethostbyname\fR(3NSL),
+\fBgetipnodebyaddr\fR(3SOCKET), \fBgetipnodebyname\fR(3SOCKET),
+\fBgetservbyname\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET),
+\fBethers\fR(3SOCKET), \fBgetprojbyname\fR(3PROJECT) and
+\fBgetnetbyname\fR(3SOCKET), respectively.
+.sp
+.LP
+Each \fIkey\fR must be in a format appropriate for searching on the respective
+database. For example, it can be a \fIusername\fR or \fInumeric-uid\fR for
+\fBpasswd\fR; \fIhostname\fR or \fIIP\fR \fIaddress\fR for \fBhosts\fR; or
+\fIservice\fR, \fIservice/protocol\fR, \fIport\fR, or \fIport/proto\fR for
+\fBservices\fR.
+.sp
+.LP
+\fBgetent\fR prints out the database entries that match each of the supplied
+keys, one per line, in the format of the matching administrative file:
+\fBpasswd\fR(4), \fBgroup\fR(4), \fBproject\fR(4), \fBhosts\fR(4),
+\fBservices\fR(4), \fBprotocols\fR(4), \fBethers\fR(3SOCKET),
+\fBnetworks\fR(4), or \fBnetmasks\fR(4). If no key is given, all entries
+returned by the corresponding enumeration library routine, for example,
+\fBgetpwent()\fR or \fBgethostent()\fR, are printed. Enumeration is not
+supported on \fBipnodes\fR.
+.SS "Key Interpretation for \fBpasswd\fR and \fBgroup\fR Databases"
+.sp
+.LP
+When \fBgetent\fR is invoked with database set to \fBpasswd\fR, each key value
+is processed as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the key value consists only of numeric characters, \fBgetent\fR assumes that
+the key value is a numeric user ID and searches the user database for a
+matching user ID.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the user ID is not found in the user database or if the key value contains
+any non-numeric characters, \fBgetent\fR assumes the key value is a user name
+and searches the user database for a matching user name.
+.RE
+.sp
+.LP
+Similarly, when \fBgetent\fR is invoked with database set to \fBgroup\fR, each
+key value is processed as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the key value consists only of numeric characters, \fBgetent\fR assumes that
+the key value is a numeric group ID and searches the group database for a
+matching group ID.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the group ID is not found in the \fBgroup\fR database or if the key value
+contains any non-numeric characters, \fBgetent\fR assumes the key value is a
+group name and searches the \fBgroup\fR database for a matching group name.
+.RE
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Command syntax was incorrect, an invalid option was used, or an internal error
+occurred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+At least one of the specified entry names was not found in the database.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+There is no support for enumeration on this database.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nsswitch.conf\fR\fR
+.ad
+.RS 22n
+.rt  
+name service switch configuration file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 22n
+.rt  
+password file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.RS 22n
+.rt  
+group file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/inet/hosts\fR\fR
+.ad
+.RS 22n
+.rt  
+IPv4 and IPv6 host name database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/services\fR\fR
+.ad
+.RS 22n
+.rt  
+Internet services and aliases
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/project\fR\fR
+.ad
+.RS 22n
+.rt  
+project file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/protocols\fR\fR
+.ad
+.RS 22n
+.rt  
+protocol name database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/ethers\fR\fR
+.ad
+.RS 22n
+.rt  
+Ethernet address to hostname database or domain
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/networks\fR\fR
+.ad
+.RS 22n
+.rt  
+network name database
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/netmasks\fR\fR
+.ad
+.RS 22n
+.rt  
+network mask database
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBethers\fR(3SOCKET), \fBgetgrnam\fR(3C), \fBgethostbyaddr\fR(3NSL),
+\fBgethostbyname\fR(3NSL), \fBgethostent\fR(3NSL),
+\fBgetipnodebyaddr\fR(3SOCKET), \fBgetipnodebyname\fR(3SOCKET),
+\fBgetnetbyname\fR(3SOCKET), \fBgetprojbyname\fR(3PROJECT),
+\fBgetprotobyname\fR(3SOCKET), \fBgetpwnam\fR(3C),
+\fBgetservbyname\fR(3SOCKET), \fBgroup\fR(4), \fBhosts\fR(4),
+\fBnetmasks\fR(4), \fBnetworks\fR(4), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4),
+\fBproject\fR(4), \fBprotocols\fR(4), \fBservices\fR(4), \fBattributes\fR(5)

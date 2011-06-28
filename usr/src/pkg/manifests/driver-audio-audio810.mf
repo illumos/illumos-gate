@@ -39,6 +39,8 @@ set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 driver name=audio810 \
     alias=pci1022,7445 \
     alias=pci1022,746d \
@@ -66,6 +68,7 @@ file path=kernel/drv/$(ARCH64)/audio810 group=sys
 file path=kernel/drv/audio810 group=sys
 file path=kernel/drv/audio810.conf group=sys \
     original_name=SUNWad810:kernel/drv/audio810.conf preserve=true
+file path=usr/share/man/man7d/audio810.7d
 legacy pkg=SUNWad810 \
     desc="SunOS audio device driver for W1100z & W2100z workstations" \
     name="SUNW W1100z & W2100z Audio Drivers"

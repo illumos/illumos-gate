@@ -1,0 +1,188 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_ext_sense_fields 9F "29 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_ext_sense_fields, scsi_sense_info_uint64, scsi_sense_cmdspecific_uint64 \-
+retrieve fields from SCSI sense data
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBvoid\fR \fBscsi_ext_sense_fields\fR(\fBuint8_t *\fR\fIsense_buffer\fR, \fBint *\fR\fIsense_buf_len\fR,
+     \fBuint8_t **\fR\fIinformation\fR, \fBuint8_t **\fR\fIcmd_spec_info\fR, \fBuint8_t **\fR\fIfru_code\fR,
+     \fBuint8_t **\fR\fIsk_specific\fR, \fBuint8_t **\fR\fIstream_flags\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBscsi_sense_info_uint64\fR(\fBuint8_t *\fR\fIsense_buffer\fR, \fBint\fR \fIsense_buf_len\fR,
+     \fBuint64_t *\fR\fIinformation\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBscsi_sense_cmdspecific_uint64\fR(\fBuint8_t *\fR\fIsense_buffer\fR, 
+     \fBint\fR \fIsense_buf_len\fR, \fBuint64_t *\fR\fIcmd_spec_info\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsense_buffer\fR\fR
+.ad
+.RS 17n
+.rt  
+Pointer to a buffer containing \fBSCSI\fR sense data. The sense data is
+expected in wire format starting at the response code. It can be in either a
+fixed or descriptor format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIinformation\fR\fR
+.ad
+.RS 17n
+.rt  
+For \fBscsi_ext_sense_fields()\fR, this is a call-by-reference pointer to
+\fBuint8_t\fR. A pointer to the \fBINFORMATION\fR field in the sense data may
+be returned in this parameter.
+.sp
+The \fBscsi_sense_info_uint64()\fR function requires a pointer to
+\fBuint64_t\fR. The data in the information field is returned as a 64 bit
+integer. If the sense data information field is 32 bits, fixed format, the most
+significant 32-bits are \fB\fR0.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmd_spec_info\fR\fR
+.ad
+.RS 17n
+.rt  
+For \fBscsi_ext_sense_fields()\fR, this is a call-by-reference pointer to
+\fBuint8_t\fR. A pointer to the \fBCOMMAND_SPECIFIC INFORMATION\fR field in the
+sense data can be returned in this parameter.
+.sp
+The \fBscsi_sense_cmdspecific_uint64()\fR function requires a pointer to
+\fBuint64_t\fR. The data in the command specific information field is returned
+as a 64 bit integer. If the sense data command specific information field is 32
+bits, fixed format, the most significant 32-bits are \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfru_code\fR\fR
+.ad
+.RS 17n
+.rt  
+Call-by-reference pointer to \fBuint8_t\fR. A pointer to the \fBFIELD
+REPLACEABLE UNIT CODE\fR field in the sense data can be returned in this
+parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsk_specific\fR\fR
+.ad
+.RS 17n
+.rt  
+Call-by-reference pointer to \fBuint8_t\fR. A pointer to the \fBSENSE KEY
+SPECIFIC\fR field in the sense data can be returned in this parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstream_flags\fR\fR
+.ad
+.RS 17n
+.rt  
+Call-by-reference pointer to \fBuint8_t\fR. A pointer to the byte containing
+the \fBILI\fR, \fBEOM\fR, and \fBFILEMARK\fR flags can be returned in this
+parameter.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscsi_ext_sense_fields()\fR function can be used to retrieve any of the
+extended sense data fields from a sense data buffer, regardless of whether the
+sense data is in fixed format or in descriptor format.
+.sp
+.LP
+The \fIinformation\fR, \fIcmd_spec_info\fR, \fIfru_code\fR, \fIsk_specific\fR,
+and \fIstream_specific\fR parameters are all call-by-reference output
+parameters. Each parameter corresponds to one or more of the extended sense
+data fields. Any of these parameters can be passed as \fINULL\fR if the caller
+is not interested in the associated data.
+.sp
+.LP
+If the requested data is present and valid for each output parameter, the
+pointer passed in is set to point to the relevant location in the sense buffer.
+If the data is not present or invalid, the pointer is set to \fINULL\fR. For
+example, a caller that requests a pointer to the information field would get
+\fINULL\fR when an information descriptor is not present for descriptor format
+sense data or when the valid bit is not set for fixed format sense data.
+.sp
+.LP
+The information and command specific information fields can be 4 bytes or 8
+bytes in length, depending on whether the sense data is in fixed or descriptor
+format respectively. Drivers can use \fBscsi_validate_sense\fR(9F) to determine
+the sense data format and, by extension, the length of the information and
+command specific information fields.
+.sp
+.LP
+A driver can determine whether integer data is included in the information or
+command specific information fields based on the \fBasc\fR and \fBascq\fR sense
+keys, such as the \fBLBA\fR of a failed disk request. The
+\fBscsi_sense_info_uint64()\fR function retrieves the contents of the
+information field as a 64 bit integer and the
+\fBscsi_sense_cmdspecific_uint64()\fR retrieves the command specific
+information field as a 64 bit integer.
+.sp
+.LP
+Drivers should use \fBscsi_validate_sense\fR(9F) to ensure that the sense
+buffer contains valid sense data.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_sense_info_uint64()\fR function returns \fBTRUE\fR if the
+information field is present and valid. Otherwise it returns \fBFALSE\fR.
+.sp
+.LP
+The \fBscsi_sense_cmdspecific_uint64()\fR function returns \fBTRUE\fR if the
+command specific information field is present and valid. Otherwise it returns
+\fBFALSE\fR.
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_ext_sense_fields()\fR, \fBscsi_sense_info_uint64()\fR and
+\fBscsi_sense_cmdspecific_uint64()()\fR functions can be called from user or
+interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_find_sense_descr\fR(9F), \fBscsi_sense_asc\fR(9F),
+\fBscsi_sense_ascq\fR(9F), \fBscsi_sense_key\fR(9F),
+\fBscsi_validate_sense\fR(9F)

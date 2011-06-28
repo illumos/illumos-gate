@@ -1,0 +1,74 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH mcopymsg 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+mcopymsg \- Copy message contents into a buffer and free message
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBvoid\fR \fBmcopymsg\fR(\fBmblk_t *\fR\fImp\fR, \fBvoid *\fR\fIbuf\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 7n
+.rt  
+Message to be copied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbuf\fR\fR
+.ad
+.RS 7n
+.rt  
+Buffer in which to copy.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmcopymsg()\fR function copies the contents of the specified message into
+the specified buffer. If the message consists of more than a single message
+block, the contents of each message block are placed consecutively into the
+buffer. After copying the message contents to \fIbuf\fR, \fBmcopymsg()\fR frees
+the message \fImp\fR.
+.sp
+.LP
+The provided buffer must be large enough to accommodate the message. If the
+buffer is not large enough, the results are unspecified. The \fBmsgsize\fR(9F)
+function can be used to calculate the total size of the message beforehand.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH SEE ALSO
+.sp
+.LP
+\fBfreemsg\fR(9F), \fBmsgsize\fR(9F)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

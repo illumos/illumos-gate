@@ -41,6 +41,8 @@ dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
+dir path=usr/share/man/man1
+dir path=usr/share/man/man3lib
 driver name=tnf perms="tnfctl 0600 root sys" perms="tnfmap 0600 root sys"
 file path=usr/bin/$(ARCH32)/prex mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/tnfxtract mode=0555
@@ -54,6 +56,9 @@ file path=usr/lib/$(ARCH64)/libtnfctl.so.1
 file path=usr/lib/$(ARCH64)/libtnfprobe.so.1
 file path=usr/lib/libtnfctl.so.1
 file path=usr/lib/libtnfprobe.so.1
+file path=usr/share/man/man1/prex.1
+file path=usr/share/man/man1/tnfxtract.1
+file path=usr/share/man/man3lib/libtnfctl.3lib
 hardlink path=usr/bin/prex target=../lib/isaexec
 hardlink path=usr/bin/tnfxtract target=../lib/isaexec
 legacy pkg=SUNWtnfc \

@@ -1,0 +1,664 @@
+'\" te
+.\"  Portions Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH genmsg 1 "14 May 2004" "SunOS 5.11" "User Commands"
+.SH NAME
+genmsg \- generate a message source file by extracting messages from source
+files
+.SH SYNOPSIS
+.LP
+.nf
+\fBgenmsg\fR [\fB-abdfrntx\fR] [\fB-c\fR \fImessage-tag\fR] [\fB-g\fR \fIproject-file\fR] 
+     [\fB-l\fR \fIproject-file\fR] [\fB-m\fR \fIprefix\fR] [\fB-M\fR \fIsuffix\fR] 
+     [\fB-o\fR \fImessage-file\fR] [\fB-p\fR \fIpreprocessor\fR] [\fB-s\fR \fIset-tags\fR] \fI file\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgenmsg\fR utility extracts message strings with calls to
+\fBcatgets\fR(3C) from source files and writes them in a format suitable for
+input to \fBgencat\fR(1).
+.SS "Invocation"
+.sp
+.LP
+\fBgenmsg\fR reads one or more input files and, by default, generates a message
+source file whose name is composed of the first input file name with
+\fB\&.msg\fR. If the \fB-o\fR option is specified, \fBgenmsg\fR uses the option
+argument for its output file.
+.sp
+
+.sp
+.TS
+tab() box;
+lw(3.58i) |lw(1.92i) 
+lw(3.58i) |lw(1.92i) 
+.
+\fICommand\fR\fIOutput File\fR
+_
+\fBgenmsg prog.c\fRprog.c.msg
+\fBgensmg main.c util.c tool.c\fRmain.c.msg
+\fBgenmsg -o prog.msg mail.c util.c\fRprog.msg
+.TE
+
+.sp
+.LP
+\fBgenmsg\fR also allows you to invoke a preprocessor to solve the dependencies
+of macros and define statements for the \fBcatgets\fR(3C) calls.
+.SS "Auto Message Numbering"
+.sp
+.LP
+\fBgenmsg\fR replaces message numbers with the calculated numbers based upon
+the project file if the message numbers are \fB-1\fR, and it generates copies
+of the input files with the new message numbers and a copy of the project file
+with the new maximum message numbers.
+.sp
+.LP
+A project file is a database that stores a list of set numbers with their
+maximum message numbers. Each line in a project file is composed of a set
+number and its maximum message number:
+.sp
+.ne 2
+.mk
+.na
+\fB\fISet_number\fR\fR
+.ad
+.RS 14n
+.rt  
+\fIMaximum_message_number\fR
+.RE
+
+.sp
+.LP
+In a project file, a line beginning with a number sign (\fB#\fR) or an
+\fBASCII\fR space is considered as a comment and ignored.
+.sp
+.LP
+\fBgenmsg\fR also has the reverse operation to replace all message numbers with
+\fB-1\fR.
+.SS "Comment Extraction"
+.sp
+.LP
+\fBgenmsg\fR allows you to comment about messages and set numbers to inform the
+translator how the messages should be translated. It extracts the comment,
+which is surrounded with the comment indicators and has the specified tag
+inside the comment, from the input file and writes it with a dollar (\fB$\fR)
+prefix in the output file. \fBgenmsg\fR supports the C and C++ comment
+indicators, '\fB/*\fR', '\fB*/\fR', and '\fB//\fR'.
+.SS "Testing"
+.sp
+.LP
+\fBgenmsg\fR generates two kinds of messages for testing, prefixed messages and
+long messages. Prefixed messages allow you to check that your program is
+retrieving the messages from the message catalog. Long messages allow you to
+check the appearance of your window program's initial size and position.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 19n
+.rt  
+Append the output into the message file \fImessage-file\fR that is specified by
+the \fB-o\fR option. If two different messages that have the same set and
+message number are found, the message in the specified message file is kept and
+the other message in the input file is discarded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 19n
+.rt  
+Place the extracted comment after the corresponding message in the output file.
+This option changes the placement behavior of the \fB-s\fR or \fB-c\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fI message-tag\fR\fR
+.ad
+.RS 19n
+.rt  
+Extract message comments having \fImessage-tag\fR inside them from the input
+files and write them with a '\fB$\fR' prefix as a comment in the output file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 19n
+.rt  
+Include an original text of a message as a comment to be preserved along with
+its translations. With this option, the translator can see the original
+messages even after they are replaced with their translations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 19n
+.rt  
+Overwrite the input files and the project file when used with the \fB-l\fR or
+\fB-r\fR option. With the \fB-r\fR option, \fBgenmsg\fR overwrites only the
+input files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR\fI project-file\fR\fR
+.ad
+.RS 19n
+.rt  
+Generate \fIproject-file\fR that has a list of set numbers and their maximum
+message numbers in the input files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fI project-file\fR\fR
+.ad
+.RS 19n
+.rt  
+Replace message numbers with the calculated numbers based upon
+\fIproject-file\fR if the message numbers are \fB-1\fR in the input files, and
+then generate copies of the input files with the new message numbers and a copy
+of \fIproject-file\fR with the new maximum message numbers. If
+\fIproject-file\fR is not found, \fBgenmsg\fR uses the maximum message number
+in the input file as a base number and generates \fIproject-file\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI prefix\fR\fR
+.ad
+.RS 19n
+.rt  
+Fill in the message with \fIprefix\fR. This option is useful for testing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fI suffix\fR\fR
+.ad
+.RS 19n
+.rt  
+Fill in the message with \fIsuffix\fR. This option is useful for testing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 19n
+.rt  
+Add comment lines to the output file indicating the file name and line number
+in the input files where each extracted string is encountered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fI message-file\fR\fR
+.ad
+.RS 19n
+.rt  
+Write the output to \fImessage-file\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI preprocessor\fR\fR
+.ad
+.RS 19n
+.rt  
+Invoke \fIpreprocessor\fR to preprocess macros and define statements for the
+\fBcatgets\fR(3C) calls. \fBgenmsg\fR first invokes the option argument as a
+preprocesser and then starts the normal process against the output from the
+preprocessor. \fBgenmsg\fR initiates this process for all the input files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 19n
+.rt  
+Replace message numbers with \fB-1\fR. This is the reverse operation of the
+\fB-l\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fI set-tag\fR\fR
+.ad
+.RS 19n
+.rt  
+Extract set number comments having \fIset-tag\fR inside them from the input
+files and write them with a '\fB$\fR' prefix as a comment in the output file.
+If multiple comments are specified for one set number, the first one is
+extracted and the rest of them are discarded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 19n
+.rt  
+Generate a message that is three times as long as the original message. This
+option is useful for testing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 19n
+.rt  
+Suppress warning messages about message and set number range checks and
+conflicts.
+.RE
+
+.SH OPERANDS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+An input source file.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAssigning Message Numbers and Generating New Files
+.sp
+.LP
+Suppose that you have the following source and project files:
+
+.sp
+.in +2
+.nf
+example% cat test.c
+printf(catgets(catfd, 1, -1, "line too long\en"));
+printf(catgets(catfd, 2, -1, "invalid code\en"));
+
+example% cat proj
+1   10
+2   20
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The command
+
+.sp
+.in +2
+.nf
+example% genmsg \fB-l\fR proj test.c
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would assign the calculated message numbers based upon \fBproj\fR and generate
+the following files:
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtest.c.msg\fR\fR
+.ad
+.RS 14n
+.rt  
+Message file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBproj.new\fR\fR
+.ad
+.RS 14n
+.rt  
+Updated project file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtest.c.new\fR\fR
+.ad
+.RS 14n
+.rt  
+New source file
+.RE
+
+.sp
+.in +2
+.nf
+example% cat test.c.msg
+$quote "
+$set    1
+11      "line too long\en"
+$set    2
+21      "invalid code\en"
+
+example% cat proj.new
+1   11
+2   21
+
+example% cat test.c.new
+printf(catgets(catfd, 1, 11, "line too long\en"));
+printf(catgets(catfd, 2, 21, "invalid code\en"));
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRExtracting Comments Into a File
+.sp
+.LP
+The command
+
+.sp
+.in +2
+.nf
+example% genmsg \fB-s\fR SET \fB-c\fR MSG test.c
+example% cat test.c
+/* SET: tar messages */
+/* MSG: don't translate "tar". */
+catgets(catfd, 1, 1, "tar: tape write error");
+// MSG: don't translate "tar" and "\fB-I\fR".
+catgets(catfd, 1, 2, "tar: missing argument for \fB-I\fR flag");
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would extract the comments and write them in the following output file:
+
+.sp
+.in +2
+.nf
+example% cat test.c.msg
+$ /* SET: tar messages */
+$set    1
+$ /* MSG: don't translate "tar". */
+1       "tar: tape write error"
+$ // MSG: don't translate "tar" and "-I".
+2       "tar: missing argument for -I flag"
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRGenerating Test Messages
+.sp
+.LP
+The following command:
+
+.sp
+.in +2
+.nf
+example% genmsg \fB-m\fR PRE: \fB-M\fR :FIX test.c
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+might generate the following messages for testing:
+
+.sp
+.in +2
+.nf
+example% cat test.c.msg
+1       "PRE:OK:FIX"
+2       "PRE:Cancel:FIX"
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRParsing a Macro and Writing the Extracted Messages
+.sp
+.LP
+Given the following input:
+
+.sp
+.in +2
+.nf
+example% cat example.c
+#include <nl_types.h>
+#define MSG1    "message1"
+#define MSG2    "message2"
+#define MSG3    "message3"
+#define MSG(n)  catgets(catd, 1, n, MSG ## n)
+void
+main(int argc, char **argv)
+{
+nl_catd catd = catopen(argv[0], NL_CAT_LOCALE);
+(void) printf("%s0\en, MSG(1));
+(void) printf("%s0\en, MSG(2));
+(void) printf("%s0\en, MSG(3));
+(void) catclose(catd);
+}
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following command:
+
+.sp
+.in +2
+.nf
+example% genmsg \fB-p\fR "cc \fB-E\fR" \fB-o\fR example.msg example.c
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would parse the \fBMSG\fR macros and write the extracted messages in
+\fBexample.msg\fR.
+
+.LP
+\fBExample 5 \fRAssigning Calculated Message Numbers
+.sp
+.LP
+Suppose that you have the following header, source, and project files:
+
+.sp
+.in +2
+.nf
+example% cat ../inc/msg.h
+#define WARN_SET	1
+#define ERR_SET	2
+#define WARN_MSG(id, msg) catgets(catd, WARN_SET, (id), (msg))
+#define ERR_MSG(id, msg)  catgets(catd, ERR_SET, (id), (msg))
+example% example.c
+#include "msg.h"
+printf("%s, WARN_MSG(-1, "Warning error"));
+printf("%s, ERR_MSG(-1, "Fatal error"));
+example % proj
+1     10
+2     10
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The command
+
+.sp
+.in +2
+.nf
+example% genmsg \fB-f\fR -p "cc \fB-E\fR \fB-I\fR../inc" \fB-l\fR proj \e
+   \fB-o\fR example.msg example.c
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would assign each of the \fB-1\fR message numbers a calculated number based
+upon  \fBproj\fR and would overwrite the results to \fBexample.c\fR and
+\fBproj\fR. Also, this command writes the extracted messages in
+\fBexample.msg\fR.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBgenmsg\fR: \fBLC_MESSAGES\fR and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgencat\fR(1), \fBcatgets\fR(3C), \fBcatopen\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+\fBgenmsg\fR does not handle pointers or variables in the \fBcatgets\fR(3C)
+call. For example:
+.sp
+.in +2
+.nf
+   
+const int set_num = 1;
+extern int msg_num(const char *);
+const char *msg = "Hello";
+catgets(catd, set_num, msg_num(msg), msg);
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+When the auto message numbering is turned on with a preprocessor, if there are
+multiple \fB-1's\fR in the \fBcatgets\fR(3C) line, \fBgenmsg\fR replaces all of
+the \fB-1's\fR in the line with a calculated number. For example, given the
+input:
+.sp
+.in +2
+.nf
+#define MSG(id, msg) catgets(catd, 1, (id), (msg))
+if (ret == -1) printf("%s, MSG(-1, "Failed"));
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+the command
+.sp
+.in +2
+.nf
+genmsg \fB-l\fR proj \fB-p\fR "cc \fB-E\fR"
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+would produce:
+.sp
+.in +2
+.nf
+   #define MSG(id, msg) catgets(catd, 1, (id), (msg))
+   if (ret == 1) printf("%s, MSG(1, "Failed"));
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The workaround would be to split it into two lines as follows:
+.sp
+.in +2
+.nf
+   if (ret == -1)
+         printf("%s, MSG(-1, "Failed"));
+.fi
+.in -2
+.sp
+

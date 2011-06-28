@@ -1,0 +1,178 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH download 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.SH NAME
+download \- host resident PostScript font downloader
+.SH SYNOPSIS
+.LP
+.nf
+\fBdownload\fR [\fB-f\fR] [\fB-p\fR \fIprinter\fR] [\fB-m\fR \fIname\fR] [\fB-H\fR \fIdirectory\fR] 
+     [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/lib/lp/postscript/download\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdownload\fR prepends host resident fonts to \fIfiles\fR and writes the
+results on the standard output. If no \fIfiles\fR are specified, or if
+\fB\(mi\fR is one of the input \fIfiles\fR, the standard input is read.
+\fBdownload\fR assumes the input \fIfiles\fR make up a single PostScript job
+and that requested fonts can be included at the start of each input \fBfile\fR.
+.sp
+.LP
+Requested fonts are named in a comment (marked with \fB%%DocumentFonts:\fR) in
+the input \fIfiles\fR. Available fonts are the ones listed in the map table
+selected using the \fB-m\fR option.
+.sp
+.LP
+The map table consists of fontname\(mifile pairs. The fontname is the full name
+of the PostScript font, exactly as it would appear in a \fB%%DocumentFonts:\fR
+comment. The file is the pathname of the host resident font. A file that begins
+with a \fB/\fR is used as is. Otherwise the pathname is relative to the host
+font directory. Comments are introduced by % (as in PostScript) and extend to
+the end of the line.
+.sp
+.LP
+The only candidates for downloading are  fonts listed in the map table  that
+point \fBdownload\fR to readable files. A font is downloaded once, at most.
+Requests for unlisted fonts or inaccessible files are ignored. All requests are
+ignored if the map table can not be read.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 16n
+.rt  
+Force a complete scan of each input \fBfile\fR. In the absence of an explicit
+comment pointing \fBdownload\fR to the end of the file, the default scan stops
+immediately after the PostScript header comments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fI printer\fR\fR
+.ad
+.RS 16n
+.rt  
+Check the list of printer-resident fonts in
+\fB/etc/lp/printers/\fR\fIprinter\fR\fB/residentfonts\fR before downloading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI name\fR\fR
+.ad
+.RS 16n
+.rt  
+Use \fIname\fR as the font map table. A \fIname\fR that begins with \fB/\fR is
+the full pathname of the map table and is used as is. Otherwise  \fIname\fR is
+appended to the pathname of the host font directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fI directory\fR\fR
+.ad
+.RS 16n
+.rt  
+Use \fIdir\fR as the host font directory. The default is
+\fB/usr/lib/lp/postscript\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExamples of the \fBdownload\fR command.
+.sp
+.LP
+The following  map table could be used to control the downloading of the
+Bookman font family:
+
+.sp
+.in +2
+.nf
+%
+% The first string is the full PostScript font name. The second string
+% is the file name - relative to the host font directory unless it begins
+% with a /.
+%
+    Bookman-Light               bookman/light
+    Bookman-LightItalic      bookman/lightitalic
+    Bookman-Demi               bookman/demi
+    Bookman-DemiItalic      bookman/demiitalic
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Using the file \fBmyprinter/map\fR (in the default host font directory)  as the
+map table, you could download fonts  by issuing the following command:
+
+.sp
+.in +2
+.nf
+\fBexample% download \fR\fB-m\fR\fB \fImyprinter/map file\fR\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdpost\fR(1), \fBpostdaisy\fR(1), \fBpostdmd\fR(1), \fBpostio\fR(1),
+\fBpostmd\fR(1), \fBpostprint\fR(1), \fBposttek\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBdownload\fR program should be part of a more general program.
+.sp
+.LP
+\fBdownload\fR does not look for \fB%%PageFonts:\fR comments and there is no
+way to force multiple downloads of a particular font.
+.sp
+.LP
+Using full pathnames in either map tables or the names of map tables is not
+recommended.

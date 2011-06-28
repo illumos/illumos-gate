@@ -1,0 +1,72 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH abort 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+abort \- terminate the process abnormally
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBvoid\fR \fBabort\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBabort()\fR function causes abnormal process termination to occur, unless
+the signal \fBSIGABRT\fR is being caught and the signal handler does not
+return.  The abnormal termination processing includes at least the effect of
+\fBfclose\fR(3C) on all open streams and message catalogue descriptors, and the
+default actions defined for \fBSIGABRT\fR. The \fBSIGABRT\fR signal is sent to
+the calling process as if by means of the \fBraise\fR(3C) function with the
+argument \fBSIGABRT\fR.
+.sp
+.LP
+The status made available to \fBwait\fR(3C) or \fBwaitpid\fR(3C) by
+\fBabort\fR will be that of a process terminated by the \fBSIGABRT\fR signal.
+\fBabort\fR will override blocking or ignoring the \fBSIGABRT\fR signal.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBabort()\fR function does not return.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+Catching the signal is intended to provide the application writer with a
+portable means to abort processing, free from possible interference from any
+implementation-provided library functions.  If \fBSIGABRT\fR is neither caught
+nor ignored, and the current directory is writable, a core dump may be
+produced.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBgetrlimit\fR(2), \fBkill\fR(2), \fBfclose\fR(3C),
+\fBraise\fR(3C), \fBsignal\fR(3C), \fBwait\fR(3C), \fBwaitpid\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

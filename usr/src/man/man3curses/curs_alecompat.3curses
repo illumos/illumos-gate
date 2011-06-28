@@ -1,0 +1,103 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH curs_alecompat 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.SH NAME
+curs_alecompat, movenextch, wmovenextch, moveprevch, wmoveprevch, adjcurspos,
+wadjcurspos \- these functions are added to ALE curses library for moving the
+cursor by character.
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lcurses\fR [ \fIlibrary\fR .. ]
+#include <curses.h>
+
+\fBint\fR \fBmovenextch\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwmovenextch\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmoveprevch\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwmoveprevch\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBadjcurspos\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwadjcurspos\fR(\fBWINDOW *\fR\fIwin\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBmovenextch()\fR and \fBwmovenextch()\fR move the cursor to the next
+character to the right. If the next character is a multicolumn character, the
+cursor is  positioned on the first (left-most) column of that character. The
+new cursor position will be on the next character, even if the cursor was
+originally positioned on the left-most  column of a multicolumn character.
+Note that the simple cursor  increment  (\fB++x\fR) does not guarantee movement
+to the next character,  if the cursor was originally positioned on a
+multicolumn character. \fBgetyx\fR(3CURSES) can be used to find the new
+position.
+.sp
+.LP
+\fBmoveprevc()\fR and \fBwmoveprevch()\fR routines are the opposite of
+\fBmovenextch()\fR and  \fBwmovenextch()\fR, moving the cursor to the left-most
+column of the previous character.
+.sp
+.LP
+\fBadjcurspos()\fR and \fBwadjcurspos()\fR move the cursor to the
+first(left-most) column of the multicolumn character that the cursor is
+presently on. If the cursor is already on  the first column, or if the cursor
+is on a single-column  character,  these routines will have no effect.
+.SH RETURN VALUE
+.sp
+.LP
+All routines return the integer \fBERR\fR upon failure and an integer value
+other than \fBERR\fR upon successful completion.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcurses\fR(3CURSES), \fBgetyx\fR(3CURSES), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The header file \fB<curses.h>\fR automatically includes the header files
+\fB<stdio.h>\fR , \fB<unctrl.h>\fR and \fB<widec.h>\fR\&.
+.sp
+.LP
+Note that  \fBmovenextch()\fR,\fB moveprevch()\fR, and \fBadjcurspos()\fR may
+be macros.

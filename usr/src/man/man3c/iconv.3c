@@ -1,0 +1,402 @@
+'\" te
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved .
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH iconv 3C "6 Oct 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+iconv \- code conversion function
+.SH SYNOPSIS
+.SS "Default"
+.LP
+.nf
+#include <iconv.h>
+
+\fBextern size_t\fR \fBiconv\fR(\fBiconv_t\fR \fIcd\fR, \fBconst char **restrict\fR \fIinbuf\fR,
+     \fBsize_t *restrict\fR \fIinbytesleft\fR, \fBchar **restrict\fR \fIoutbuf\fR,
+     \fBsize_t *restrict\fR \fIoutbytesleft\fR);
+.fi
+
+.SS "SUSv3"
+.LP
+.nf
+#include <iconv.h>
+
+\fBsize_t\fR \fBiconv\fR(\fBiconv_t\fR \fIcd\fR, \fBchar **restrict\fR \fIinbuf\fR,
+     \fBsize_t *restrict\fR \fIinbytesleft\fR, \fBchar **restrict\fR \fIoutbuf\fR,
+     \fBsize_t *restrict\fR \fIoutbytesleft\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBiconv()\fR function converts the sequence of characters from one code
+set,  in the array specified by \fIinbuf\fR, into a sequence of corresponding
+characters in another code set, in the array specified by \fIoutbuf\fR. The
+code sets are those specified in the \fIiconv_open\fR(\|) call that returned
+the conversion descriptor, \fIcd\fR. The \fIinbuf\fR argument points to a
+variable that points to the first character in the input buffer and
+\fIinbytesleft\fR indicates the number of bytes to the end of the buffer to be
+converted. The \fIoutbuf\fR argument points to a variable that points to the
+first available byte in the output buffer and \fIoutbytesleft\fR indicates the
+number of the available bytes to the end of the buffer.
+.sp
+.LP
+For state-dependent encodings, the conversion descriptor \fIcd\fR is placed
+into its initial shift state by a call for which \fIinbuf\fR is a null pointer,
+or for which \fIinbuf\fR points to a null pointer. When \fBiconv()\fR is called
+in this way, and if  \fIoutbuf\fR is not a null pointer or a pointer to a null
+pointer, and \fIoutbytesleft\fR points to a positive value, \fBiconv()\fR will
+place, into the output buffer,  the byte sequence to change the output buffer
+to its initial shift state.  If the output buffer is not large enough to hold
+the entire reset sequence, \fBiconv()\fR will fail and set  \fIerrno\fR to
+\fBE2BIG\fR. Subsequent calls with \fIinbuf\fR as other than a null pointer or
+a pointer to a null pointer cause the  conversion to take place from the
+current state of the conversion descriptor.
+.sp
+.LP
+If a sequence of input bytes does not form a valid character in the specified
+code set, conversion stops  after the previous successfully converted
+character. If the input buffer ends with an incomplete character or shift
+sequence, conversion stops after the previous successfully converted bytes. If
+the output buffer is not large enough to hold the entire converted input,
+conversion stops just prior to the input bytes that would cause the output
+buffer to overflow. The variable pointed to by \fIinbuf\fR is updated to point
+to the byte following the last byte successfully used in the conversion.  The
+value pointed to by \fIinbytesleft\fR is decremented to reflect the number of
+bytes still not converted in the input buffer. The variable pointed to by
+\fIoutbuf\fR is updated to point to the byte following the last byte of
+converted output data. The value pointed to by \fIoutbytesleft\fR is
+decremented to reflect the number of bytes still available in the output
+buffer. For state-dependent encodings, the conversion descriptor is updated to
+reflect the shift state in effect at the end of the last  successfully
+converted byte sequence.
+.sp
+.LP
+If  \fBiconv()\fR encounters a character in the input buffer that is legal, but
+for which an identical character does not exist in the target code set,
+\fBiconv()\fR performs an implementation-defined conversion on this character.
+.SH RETURN VALUES
+.sp
+.LP
+The  \fBiconv()\fR function updates the variables pointed to by the arguments
+to reflect the extent of the conversion and returns the number of non-identical
+conversions performed.  If the entire string in the input buffer is converted,
+the value pointed to by \fIinbytesleft\fR will be \fB0\fR. If the input
+conversion is stopped due to any conditions mentioned above, the value pointed
+to by  \fIinbytesleft\fR will be non-zero and  \fBerrno\fR is set to indicate
+the condition.  If an error occurs \fBiconv()\fR returns \fB(size_t)\fR
+\fB\(mi1\fR and sets \fIerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBiconv()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+Input conversion stopped due to an input byte that does not belong to the input
+code set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE2BIG\fR\fR
+.ad
+.RS 10n
+.rt  
+Input conversion stopped due to lack of space in the output buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Input conversion stopped due to an incomplete  character or shift sequence at
+the end of the input buffer.
+.RE
+
+.sp
+.LP
+The \fBiconv()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 9n
+.rt  
+The \fIcd\fR argument is not a valid open conversion descriptor.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBiconv()\fR Functions
+.sp
+.LP
+The following example uses the \fBiconv()\fR functions:
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <iconv.h>
+#include <stdlib.h>
+
+/*
+ * For state-dependent encodings, changes the state of the
+ * conversion descriptor to initial shift state.  Also, outputs
+ * the byte sequence to change the state to initial state.
+ * This code is assuming the iconv call for initializing the 
+ * state will not fail due to lack of space in the output buffer.
+ */
+#define INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft) \e
+    { \e
+        fptr = NULL; \e
+        ileft = 0; \e
+        tptr = to; \e
+        oleft = BUFSIZ; \e
+        (void) iconv(cd, &fptr, &ileft, &tptr, &oleft); \e
+        (void) fwrite(to, 1, BUFSIZ - oleft, stdout); \e
+    }
+
+int
+main(int argc, char **argv)
+{
+    iconv_t cd;
+    char    from[BUFSIZ], to[BUFSIZ];
+    char    *from_code, *to_code;
+    char    *tptr;
+    const char  *fptr;
+    size_t  ileft, oleft, num, ret;
+
+
+    if (argc != 3) {
+        (void) fprintf(stderr,
+            "Usage: %s from_codeset to_codeset\e\en", argv[0]);
+        return (1);
+    }
+
+    from_code = argv[1];
+    to_code = argv[2];
+
+    cd = iconv_open((const char *)to_code, (const char *)from_code);
+    if (cd == (iconv_t)-1) {
+        /*
+         * iconv_open failed
+         */
+        (void) fprintf(stderr,
+            "iconv_open(%s, %s) failed\e\en", to_code, from_code);
+        return (1);
+    }
+
+    ileft = 0;
+    while ((ileft +=
+        (num = fread(from + ileft, 1, BUFSIZ - ileft, stdin))) > 0) {
+        if (num == 0) {
+            /*
+             * Input buffer still contains incomplete character
+             * or sequence.  However, no more input character.
+             */
+
+            /*
+             * Initializes the conversion descriptor and outputs
+             * the sequence to change the state to initial state.
+             */
+            INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft);
+            (void) iconv_close(cd);
+
+            (void) fprintf(stderr, "Conversion error\e\en");
+            return (1);
+        }
+
+        fptr = from;
+        for (;;) {
+            tptr = to;
+            oleft = BUFSIZ;
+
+            ret = iconv(cd, &fptr, &ileft, &tptr, &oleft);
+            if (ret != (size_t)-1) {
+                /*
+                 * iconv succeeded
+                 */
+
+                /*
+                 * Outputs converted characters
+                 */
+                (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+                break;
+            }
+
+            /*
+             * iconv failed
+             */
+            if (errno == EINVAL) {
+                /*
+               * Incomplete character or shift sequence
+                 */
+
+                /*
+                 * Outputs converted characters
+                 */
+                (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+                /*
+                 * Copies remaining characters in input buffer
+                 * to the top of the input buffer.
+                 */
+                (void) memmove(from, fptr, ileft);
+                /*
+                 * Tries to fill input buffer from stdin
+                 */
+                break;
+            } else if (errno == E2BIG) {
+                /*
+                 * Lack of space in output buffer
+                 */
+
+                /*
+                 * Outputs converted characters
+                 */
+                (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+                /*
+                 * Tries to convert remaining characters in
+                 * input buffer with emptied output buffer
+                 */
+                continue;
+            } else if (errno == EILSEQ) {
+                /*
+                 * Illegal character or shift sequence
+                 */
+
+                /*
+                 * Outputs converted characters
+                 */
+                (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+                /*
+                 * Initializes the conversion descriptor and
+                 * outputs the sequence to change the state to
+                 * initial state.
+                 */
+                INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft);
+                (void) iconv_close(cd);
+
+                (void) fprintf(stderr,
+                 "Illegal character or sequence\e\en");
+                return (1);
+            } else if (errno == EBADF) {
+                /*
+                 * Invalid conversion descriptor.
+                 * Actually, this shouldn't happen here.
+                 */
+                (void) fprintf(stderr, "Conversion error\e\en");
+                return (1);
+            } else {
+                /*
+                 * This errno is not defined
+                 */
+                (void) fprintf(stderr, "iconv error\e\en");
+                return (1);
+            }
+        }
+    }
+
+    /*
+     * Initializes the conversion descriptor and outputs
+     * the sequence to change the state to initial state.
+     */
+    INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft);
+
+    (void) iconv_close(cd);
+    return (0);
+}
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/iconv/*.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+conversion modules for 32-bit
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/iconv/sparcv9/*.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+conversion modules for 64-bit sparc
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/iconv/amd64/*.so\fR\fR
+.ad
+.sp .6
+.RS 4n
+conversion modules for 64-bit amd64
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/iconv/geniconvtbl/binarytables/*.bt\fR\fR
+.ad
+.sp .6
+.RS 4n
+conversion binary tables
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgeniconvtbl\fR(1), \fBiconv\fR(1), \fBiconv_close\fR(3C),
+\fBiconv_open\fR(3C), \fBgeniconvtbl\fR(4), \fBattributes\fR(5),
+\fBiconv\fR(5), \fBiconv_unicode\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,89 @@
+'\" te
+.\"  Copyright (c) 1997 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH thr_min_stack 3C "12 May 1998" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+thr_min_stack \- return the minimum-allowable size for a thread's stack
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
+#include <thread.h> 
+
+\fBsize_t\fR \fBthr_min_stack\fR(\fB\fR\fIvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+When a thread is created with a user-supplied stack, the user must reserve
+enough space to run this thread. In a dynamically linked execution environment,
+it is very hard to know what the minimum stack requirments are for a thread.
+The function \fBthr_min_stack()\fR returns the amount of space needed to
+execute a null thread. This is a thread that was created to execute a null
+procedure. A thread that does something useful should have a stack size that is
+\fBthr_min_stack()\fR + \fI<some increment>\fR\&.
+.sp
+.LP
+Most users should not be creating threads with user-supplied stacks. This
+functionality was provided to support applications that wanted complete control
+over their execution environment.
+.sp
+.LP
+Typically, users should let the threads library manage stack allocation. The
+threads library provides default stacks which should meet the requirements of
+any created thread.
+.sp
+.LP
+\fBthr_min_stack()\fR will return the unsigned int \fBTHR_MIN_STACK,\fR which
+is the minimum-allowable size for a thread's stack.
+.sp
+.LP
+In this implementation the default size for a user-thread's stack is one
+mega-byte. If the second argument to \fBthr_create\fR(3C) is \fBNULL,\fR then
+the default stack size for the newly-created thread will be used. Otherwise,
+you may specify a stack-size that is at least \fBTHR_MIN_STACK,\fR yet less
+than the size of your machine's virtual memory.
+.sp
+.LP
+It is recommended that the default stack size be used.
+.sp
+.LP
+To determine the smallest-allowable size for a thread's stack, execute the
+following:
+.sp
+.in +2
+.nf
+/* cc thisfile.c -lthread */
+#define _REENTRANT
+#include <thread.h>
+#include <stdio.h>
+main(\|)  {
+        printf("thr_min_stack(\|) returns %u\en",thr_min_stack(\|));
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBstandards\fR(5)

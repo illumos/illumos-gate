@@ -1,0 +1,185 @@
+'\" te
+.\" Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH endhostent 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+endhostent, gethostbyaddr, gethostbyname, gethostent, sethostent \- network
+host database functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
+#include <netdb.h>
+extern int h_errno;
+
+\fBvoid\fR \fBendhostent\fR(void)
+.fi
+
+.LP
+.nf
+\fBstruct hostent *\fR\fBgethostbyaddr\fR(\fBconst void *\fR\fIaddr\fR, \fBsocklen_t\fR \fIlen\fR, \fBint\fR \fItype\fR);
+.fi
+
+.LP
+.nf
+\fBstruct hostent *\fR\fBgethostbyname\fR(\fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct hostent *\fR\fBgethostent\fR(void)
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsethostent\fR(\fBint\fR \fIstayopen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgethostent()\fR, \fBgethostbyaddr()\fR, and \fBgethostbyname()\fR
+functions each return a pointer to a \fBhostent\fR structure, the members of
+which contain the fields of an entry in the network host database.
+.sp
+.LP
+The \fBgethostent()\fR function reads the next entry of the database, opening a
+connection to the database if necessary.
+.sp
+.LP
+The \fBgethostbyaddr()\fR function searches the database and finds an entry
+which matches the address family specified by the \fBtype\fR argument and which
+matches the address pointed to by the \fIaddr\fR argument,  opening a
+connection to the database if necessary.  The \fIaddr\fR argument is a pointer
+to the binary-format (that is, not null-terminated) address in network byte
+order, whose length is specified by the \fIlen\fR argument.  The datatype of
+the address depends on the address family.  For an address of type
+\fBAF_INET\fR, this is an \fBin_addr\fR structure, defined in
+<\fBnetinet/in.h\fR>. For an address of type \fBAF_INET6\fR, there is an
+\fBin6_addr\fR structure defined in <\fBnetinet/in.h\fR>.
+.sp
+.LP
+The \fBgethostbyname()\fR function searches the database and finds an entry
+which matches the host name specified by the \fIname\fR argument, opening a
+connection to the database if necessary. If  \fIname\fR is an alias for a valid
+host name, the function returns information about the host name  to which the
+alias refers, and  \fIname\fR is included in the list of aliases returned.
+.sp
+.LP
+The \fBsethostent()\fR function opens a connection to the network host
+database, and sets the position of the next entry to the first entry.  If the
+\fIstayopen\fR argument is non-zero, the connection to the host database will
+not be closed after each call to \fBgethostent()\fR (either directly, or
+indirectly through one of the other \fBgethost*(\|)\fR functions).
+.sp
+.LP
+The \fBendhostent()\fR function closes the connection to the database.
+.SH USAGE
+.sp
+.LP
+The \fBgethostent()\fR, \fBgethostbyaddr()\fR, and \fBgethostbyname()\fR
+functions may return pointers to static data, which may be overwritten by
+subsequent calls to any of these functions.
+.sp
+.LP
+These functions are generally used with the Internet address family.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, \fBgethostbyaddr()\fR, \fBgethostbyname()\fR and
+\fBgethostent()\fR return a pointer to a \fBhostent\fR structure if the
+requested entry was found, and a null pointer if the end of the database was
+reached or the requested entry was not found.  Otherwise, a null pointer is
+returned.
+.sp
+.LP
+On unsuccessful completion, \fBgethostbyaddr()\fR and \fBgethostbyname()\fR
+functions set \fIh_errno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+No errors are defined for \fBendhostent()\fR, \fBgethostent()\fR and
+\fBsethostent()\fR.
+.sp
+.LP
+The \fBgethostbyaddr()\fR and \fBgethostbyname()\fR functions will fail in the
+following cases, setting \fIh_errno\fR to the value shown in the list below.
+Any changes to \fBerrno\fR are unspecified.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBHOST_NOT_FOUND\fR\fR
+.ad
+.RS 18n
+.rt  
+No such host is known.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO_DATA\fR\fR
+.ad
+.RS 18n
+.rt  
+The server recognised the request and the name but no address is available.
+Another type of request to the name server for the domain might return an
+answer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNO_RECOVERY\fR\fR
+.ad
+.RS 18n
+.rt  
+An unexpected server failure occurred which can not be recovered.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTRY_AGAIN\fR\fR
+.ad
+.RS 18n
+.rt  
+A temporary and possibly transient error occurred, such as a failure of a
+server to respond.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBendservent\fR(3XNET), \fBhtonl\fR(3XNET), \fBinet_addr\fR(3XNET),
+\fBattributes\fR(5), \fBstandards\fR(5)

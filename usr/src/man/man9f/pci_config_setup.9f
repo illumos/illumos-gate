@@ -1,0 +1,120 @@
+'\" te
+.\"  Copyright (c) 1995, Sun Microsystems, Inc. , All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pci_config_setup 9F "1 Jan 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+pci_config_setup, pci_config_teardown \- setup or tear down the resources for
+enabling accesses to the PCI Local Bus Configuration space
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h>
+ #include <sys/sunddi.h> 
+
+
+
+\fBint\fR \fBpci_config_setup\fR(\fBdev_info_t\fR \fI*dip\fR, \fBddi_acc_handle_t\fR \fI*handle\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBpci_config_teardown\fR(\fBddi_acc_handle_t\fR \fI*handle\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR \fR
+.ad
+.RS 11n
+.rt  
+Pointer to a data access handle.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpci_config_setup()\fR sets up the necessary resources for enabling
+subsequent data accesses to the  \fBPCI \fRLocal Bus Configuration space.
+\fBpci_config_teardown()\fR reclaims and removes those resources  represented
+by the data access handle returned from  \fBpci_config_setup()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+\fBpci_config_setup()\fR returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR \fR
+.ad
+.RS 16n
+.rt  
+Successfully setup the resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR \fR
+.ad
+.RS 16n
+.rt  
+Unable to allocate resources for setup.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+\fBpci_config_setup()\fR must be called from user or kernel context.
+\fBpci_config_teardown()\fR can be called from any context.
+.SH NOTES
+.sp
+.LP
+These functions are specific to \fBPCI \fRbus device drivers. For drivers using
+these functions,  a single source to support devices with multiple bus versions
+may not be easy to maintain.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitecturePCI Local Bus
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5)
+.sp
+.LP
+\fIIEEE 1275 PCI Bus Binding\fR

@@ -1,0 +1,64 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SAMESTR 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+SAMESTR, samestr \- test if next queue is in the same stream
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBSAMESTR\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the queue.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSAMESTR()\fR function is used to see if the next queue in a stream (if
+it exists) is the same type as the current queue (that is, both are read queues
+or both are write queues). This function accounts for the twisted queue
+connections that occur in a STREAMS pipe and should be used in preference to
+direct examination of the \fBq_next\fR field of \fBqueue\fR(9S) to see if the
+stream continues beyond \fIq\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBSAMESTR()\fR function returns \fB1\fR if the next queue is the same type
+as the current queue. It returns \fB0\fR if the next queue does not exist or if
+it is not the same type.
+.SH CONTEXT
+.sp
+.LP
+The \fBSAMESTR()\fR function can be called from user, interrupt, context.
+.SH SEE ALSO
+.sp
+.LP
+\fBOTHERQ\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

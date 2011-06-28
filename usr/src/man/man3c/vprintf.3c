@@ -1,0 +1,172 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vprintf 3C "7 Jan 2009" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+vprintf, vfprintf, vsprintf, vsnprintf, vasprintf \- print formatted output of
+a variable argument list
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+#include <stdarg.h>
+
+\fBint\fR \fBvprintf\fR(\fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvfprintf\fR(\fBFILE *\fR\fIstream\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvsprintf\fR(\fBchar *\fR\fIs\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvsnprintf\fR(\fBchar *\fR\fIs\fR, \fBsize_t\fR \fIn\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvasprintf\fR(\fBchar **\fR\fIret\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvprintf()\fR, \fBvfprintf()\fR, \fBvsprintf()\fR, \fBvsnprintf()\fR, and
+\fBvasprintf()\fR functions are the same as \fBprintf()\fR, \fBfprintf()\fR,
+\fBsprintf()\fR, \fBsnprintf()\fR, and \fBasprintf()\fR, respectively, except
+that instead of being called with a variable number of arguments, they are
+called with an argument list as defined in the \fB<stdarg.h>\fR header. See
+\fBprintf\fR(3C).
+.sp
+.LP
+The \fB<stdarg.h>\fR header defines the type \fBva_list\fR and a set of macros
+for advancing through a list of arguments whose number and types may vary. The
+argument \fIap\fR to the \fBvprint\fR family of functions is of type
+\fBva_list\fR. This argument is used with the <\fBstdarg.h\fR> header file
+macros \fBva_start()\fR, \fBva_arg()\fR, and \fBva_end()\fR (see
+\fBstdarg\fR(3EXT)). The \fBEXAMPLES\fR section below demonstrates the use of
+\fBva_start()\fR and \fBva_end()\fR with \fBvprintf()\fR.
+.sp
+.LP
+The macro \fBva_alist()\fR is used as the parameter list in a function
+definition, as in the function called \fBerror()\fR in the example below. The
+macro \fBva_start(\fR\fIap, name\fR\fB),\fR where \fIap\fR is of type
+\fBva_list\fR and \fIname\fR is the rightmost parameter (just before
+\|.\|.\|.), must be called before any attempt to traverse and access unnamed
+arguments is made. The  \fBva_end(\fR\fIap\fR\fB)\fR macro must be invoked when
+all desired arguments have been accessed. The argument list in \fIap\fR can be
+traversed again if \fBva_start()\fR is called again after \fBva_end()\fR. In
+the example below, the \fBerror()\fR arguments (\fIarg1\fR, \fIarg2\fR,
+\&.\|.\|.) are passed to \fBvfprintf()\fR in the argument \fIap\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Refer to \fBprintf\fR(3C).
+.SH ERRORS
+.sp
+.LP
+The \fBvprintf()\fR and \fBvfprintf()\fR functions will fail if either the
+\fIstream\fR is unbuffered or the \fIstream\fR's buffer needed to be flushed
+and:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 9n
+.rt  
+The file is a regular file and an attempt was made to write at or beyond the
+offset maximum.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBvprintf()\fR to write an error routine.
+.sp
+.LP
+The following demonstrates how \fBvfprintf()\fR could be used to write an error
+routine:
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <stdarg.h>
+\&. . .
+/*
+ *   error should be called like
+ *         error(function_name, format, arg1, \&.\|.\|.);
+ */
+void error(char *function_name, char *format, \&.\|.\|.)
+{
+        va_list ap;
+        va_start(ap, format);
+        /* print out name of function causing error */
+        (void) fprintf(stderr, "ERR in %s: ", function_name);
+        /* print out remainder of message */
+        (void) vfprintf(stderr, format, ap);
+        va_end(ap);
+        (void) abort();
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSee below.
+_
+StandardSee below.
+.TE
+
+.sp
+.LP
+All of these functions can be used safely in multithreaded applications, as
+long as \fBsetlocale\fR(3C) is not being called to change the locale.
+.sp
+.LP
+See \fBstandards\fR(5) for the standards conformance of \fBvprintf()\fR,
+\fBvfprintf()\fR, \fBvsprintf()\fR, and \fBvsnprintf()\fR. The
+\fBvasprintf()\fR function is modeled on the one that appears in the FreeBSD,
+NetBSD, and GNU C libraries.
+.SH SEE ALSO
+.sp
+.LP
+\fBprintf\fR(3C), \fBattributes\fR(5), \fBstdarg\fR(3EXT), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBvsnprintf()\fR return value when \fIn\fR = 0 was changed in the Solaris
+10 release. The change was based on the SUSv3 specification. The previous
+behavior was based on the initial SUSv2 specification, where \fBvsnprintf()\fR
+when \fIn\fR = 0 returns an unspecified value less than 1.

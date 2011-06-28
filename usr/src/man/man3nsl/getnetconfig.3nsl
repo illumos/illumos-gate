@@ -1,0 +1,155 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getnetconfig 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+getnetconfig, setnetconfig, endnetconfig, getnetconfigent, freenetconfigent,
+nc_perror, nc_sperror \- get network configuration database entry
+.SH SYNOPSIS
+.LP
+.nf
+#include <netconfig.h>
+
+
+
+
+\fBstruct netconfig *\fR\fBgetnetconfig\fR(\fBvoid *\fR\fIhandlep\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBsetnetconfig\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBendnetconfig\fR(\fBvoid *\fR\fIhandlep\fR);
+.fi
+
+.LP
+.nf
+\fBstruct netconfig *\fR\fBgetnetconfigent\fR(\fBconst char *\fR\fInetid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfreenetconfigent\fR(\fBstruct netconfig *\fR\fInetconfigp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBnc_perror\fR(\fBconst char *\fR\fImsg\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBnc_sperror\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The library routines described on this page  are part of the Network Selection
+component. They provide the application access to the system network
+configuration database,  \fB/etc/netconfig\fR. In addition to the routines for
+accessing the  \fBnetconfig\fR database, Network Selection includes the
+environment variable \fBNETPATH\fR (see \fBenviron\fR(5)) and the
+\fBNETPATH\fR access routines described in \fBgetnetpath\fR(3NSL).
+.sp
+.LP
+\fBgetnetconfig()\fR returns a pointer to the current entry in the
+\fBnetconfig\fR database, formatted as a \fBstruct netconfig\fR. Successive
+calls will return successive  \fBnetconfig\fR entries in the \fBnetconfig\fR
+database. \fBgetnetconfig()\fR can be used to search the entire
+\fBnetconfig\fR file. \fBgetnetconfig()\fR returns  \fBNULL\fR at the end of
+the file.  \fIhandlep\fR is the handle obtained through \fBsetnetconfig()\fR.
+.sp
+.LP
+A call to \fBsetnetconfig()\fR has the effect of ``binding'' to or
+``rewinding'' the \fBnetconfig\fR database. \fBsetnetconfig()\fR must be called
+before the first call to \fBgetnetconfig()\fR and may be called at any other
+time. \fBsetnetconfig()\fR need \fInot\fR be called before a call to
+\fBgetnetconfigent()\fR. \fBsetnetconfig()\fR returns a unique handle to be
+used by \fBgetnetconfig()\fR.
+.sp
+.LP
+\fBendnetconfig()\fR should be called when processing is complete to release
+resources for reuse. \fIhandlep\fR is the handle obtained through
+\fBsetnetconfig()\fR. Programmers should be aware, however, that the last call
+to \fBendnetconfig()\fR frees all memory allocated by \fBgetnetconfig()\fR for
+the \fBstruct netconfig\fR data structure. \fBendnetconfig()\fR may not be
+called before \fBsetnetconfig()\fR.
+.sp
+.LP
+\fBgetnetconfigent()\fR returns a pointer to the \fBstruct netconfig\fR
+structure corresponding to \fInetid\fR. It returns  \fBNULL\fR if \fInetid\fR
+is invalid (that is, does not name an entry in the \fBnetconfig\fR database).
+.sp
+.LP
+\fBfreenetconfigent()\fR frees the netconfig structure pointed to by
+\fInetconfigp\fR (previously returned by \fBgetnetconfigent()\fR).
+.sp
+.LP
+\fBnc_perror()\fR prints a message to the standard error indicating why any of
+the above routines failed. The message is prepended with the string \fImsg\fR
+and a colon. A \fBNEWLINE\fR is appended at the end of the message.
+.sp
+.LP
+\fBnc_sperror()\fR is similar to  \fBnc_perror()\fR but instead of sending the
+message to the standard error, will return a pointer to a string that contains
+the error message.
+.sp
+.LP
+\fBnc_perror()\fR and \fBnc_sperror()\fR can also be used with the
+\fBNETPATH\fR access routines defined in \fBgetnetpath\fR(3NSL).
+.SH RETURN VALUES
+.sp
+.LP
+\fBsetnetconfig()\fR returns a unique handle to be used by
+\fBgetnetconfig()\fR. In the case of an error,  \fBsetnetconfig()\fR returns
+\fBNULL\fR and  \fBnc_perror()\fR or \fBnc_sperror()\fR can be used to print
+the reason for failure.
+.sp
+.LP
+\fBgetnetconfig()\fR returns a pointer to the current entry in the
+\fBnetconfig()\fR database, formatted as a  \fBstruct netconfig\fR.
+\fBgetnetconfig()\fR returns  \fBNULL\fR at the end of the file, or upon
+failure.
+.sp
+.LP
+\fBendnetconfig()\fR returns \fB0\fR on success and \fB\(mi1\fR on failure (for
+example, if \fBsetnetconfig()\fR was not called previously).
+.sp
+.LP
+On success,  \fBgetnetconfigent()\fR returns a pointer to the  \fBstruct\fR
+\fBnetconfig\fR structure corresponding to \fInetid\fR; otherwise it returns
+\fBNULL.\fR
+.sp
+.LP
+\fBnc_sperror()\fR returns a pointer to a buffer which contains the error
+message string. This buffer is overwritten on each call.  In multithreaded
+applications, this buffer is implemented as thread-specific data.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetnetpath\fR(3NSL), \fBnetconfig\fR(4), \fBattributes\fR(5),
+\fBenviron\fR(5)

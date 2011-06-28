@@ -1,0 +1,276 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ufs 7FS "18 Jun 2009" "SunOS 5.11" "File Systems"
+.SH NAME
+ufs \- UFS file system
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <sys/param.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/types.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/fs/ufs_fs.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/fs/ufs_inode.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBUFS\fR is the default disk-based file system for the Solaris environment.
+The UFS file system is hierarchical, starting with its root directory (\fB/\fR)
+and continuing downward through a number of directories. The root of a UFS file
+system is \fBinode 2\fR. A UFS file system's root contents replace the contents
+of the directory upon which it is mounted.
+.sp
+.LP
+Subsequent sections of this manpage provide details of the UFS file systems.
+.SS "State Flags (\fBfs_state\fR and \fBfs_clean\fR)"
+.sp
+.LP
+UFS uses state flags to identify the state of the file system. \fBfs_state\fR
+is \fBFSOKAY\fR - \fBfs_time\fR.  \fBfs_time\fR is the timestamp that indicates
+when the last system write occurred. \fBfs_state\fR is updated whenever
+\fBfs_clean\fR changes. Some \fBfs_clean\fR values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFSCLEAN\fR\fR
+.ad
+.RS 12n
+.rt  
+Indicates an undamaged, cleanly unmounted file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFSACTIVE\fR\fR
+.ad
+.RS 12n
+.rt  
+Indicates a mounted file system that has modified data in memory. A mounted
+file system with this state flag indicates that user data or metadata would be
+lost if power to the system is interrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFSSTABLE\fR\fR
+.ad
+.RS 12n
+.rt  
+Indicates an idle mounted file system. A mounted file system with this state
+flag indicates that neither user data nor metadata would be lost if power to
+the system is interrupted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFSBAD\fR\fR
+.ad
+.RS 12n
+.rt  
+Indicates that this file system contains inconsistent file system data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBFSLOG\fR
+.ad
+.RS 12n
+.rt  
+Indicates that the file system has logging enabled. A file system with this
+flag set is either mounted or unmounted. If a file system has logging enabled,
+the only flags that it can have are \fBFSLOG\fR or \fBFSBAD\fR. A non-logging
+file system can have \fBFSACTIVE\fR, \fBFSSTABLE\fR, or \fBFSCLEAN\fR.
+.RE
+
+.sp
+.LP
+It is not necessary to run the \fBfsck\fR command on unmounted file systems
+with a state of \fBFSCLEAN\fR, \fBFSSTABLE\fR, or \fBFSLOG\fR. \fBmount\fR(2)
+returns \fBENOSPC\fR if an attempt is made to mount a \fBUFS\fR file system
+with a state of \fBFSACTIVE\fR for read/write access.
+.sp
+.LP
+As an additional safeguard, \fBfs_clean\fR should be trusted only if
+\fBfs_state\fR contains a value equal to \fBFSOKAY\fR - \fBfs_time\fR, where
+\fBFSOKAY\fR is a constant integer defined in the
+\fB/usr/include/sys/fs/ufs_fs.h\fR file.  Otherwise, \fBfs_clean\fR is treated
+as though it contains the value of \fBFSACTIVE\fR.
+.SS "Extended Fundamental Types  (\fBEFT\fR)"
+.sp
+.LP
+Extended Fundamental Types (EFT) provide 32-bit user ID (UID), group ID (GID),
+and device numbers.
+.sp
+.LP
+If a UID or GID contains an extended value, the short variable (\fBic_suid\fR,
+\fBic_sgid\fR) contains the value 65535 and the corresponding UID or GID is in
+\fBic_uid\fR or \fBic_gid\fR. Because numbers for block and character devices
+are stored in the first direct block pointer of the inode (\fBic_db[0]\fR) and
+the disk block addresses are already 32 bit values, no special encoding exists
+for device numbers (unlike UID or GID fields).
+.SS "Multiterabyte File System"
+.sp
+.LP
+A multiterabyte file system enables creation of a UFS file system up to
+approximately 16 terabytes of usable space, minus approximately one percent
+overhead. A sparse file can have a logical size of one terabyte. However, the
+actual amount of data that can be stored in a file is approximately one percent
+less than one terabyte because of file system overhead.
+.sp
+.LP
+On-disk format changes for a multiterabyte UFS file system include:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The magic number in the superblock changes from \fBFS_MAGIC\fR to
+\fBMTB_UFS_MAGIC\fR. For more information, see the
+\fB/usr/include/sys/fs/ufs_fs\fR file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBfs_logbno\fR unit is a sector for UFS that is less than 1 terabyte in
+size and fragments for a multiterabyte UFS file system.
+.RE
+.SS "UFS Logging"
+.sp
+.LP
+UFS logging bundles the multiple metadata changes that comprise a complete UFS
+operation into a transaction. Sets of transactions are recorded in an on-disk
+log and are applied to the actual UFS file system's metadata.
+.sp
+.LP
+UFS logging provides two advantages:
+.RS +4
+.TP
+1.
+A file system that is consistent with the transaction log eliminates the
+need to run \fBfsck\fR after a system crash or an unclean shutdown.
+.RE
+.RS +4
+.TP
+2.
+UFS logging often provides a significant performance improvement. This is
+because a file system with logging enabled converts multiple updates to the
+same data into single updates, thereby reducing the number of overhead disk
+operations.
+.RE
+.sp
+.LP
+The UFS log is allocated from free blocks on the file system and is sized at
+approximately 1 Mbyte per 1 Gbyte of file system, up to 256 Mbytes. The log
+size may be larger (up to a maximum of 512 Mbytes), depending upon the number
+of cylinder groups present in the file system. The log is continually flushed
+as it fills up. The log is also flushed when the file system is unmounted or as
+a result of a \fBlockfs\fR(1M) command.
+.SS "Mounting UFS File Systems"
+.sp
+.LP
+You can mount a UFS file system in various ways using syntax similar to the
+following:
+.RS +4
+.TP
+1.
+Use \fBmount\fR from the command line:
+.sp
+.in +2
+.nf
+# mount -F ufs /dev/dsk/c0t0d0s7 /export/home 
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+2.
+Include an entry in the \fB/etc/vfstab\fR file to mount the file system at
+boot time:
+.sp
+.in +2
+.nf
+/dev/dsk/c0t0d0s7 /dev/rdsk/c0t0d0s7 /export/home  ufs   2   yes  -
+.fi
+.in -2
+.sp
+
+.RE
+.sp
+.LP
+For more information on mounting UFS file systems, see \fBmount_ufs\fR(1M).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityUncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdf\fR(1M), \fBfsck\fR(1M), \fBfsck_ufs\fR(1M), \fBfstyp\fR(1M),
+\fBlockfs\fR(1M), \fBmkfs_ufs\fR(1M), \fBnewfs\fR(1M), \fBufsdump\fR(1M),
+\fBufsrestore\fR(1M), \fBtunefs\fR(1M), \fBmount\fR(2), \fBattributes\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+For information about internal UFS structures, see \fBnewfs\fR(1M) and
+\fBmkfs_ufs\fR(1M). For information about the \fBufsdump\fR and
+\fBufsrestore\fR commands, see \fBufsdump\fR(1M), \fBufsrestore\fR(1M), and
+\fB/usr/include/protocols/dumprestore.h\fR.
+.sp
+.LP
+If you experience difficulty in allocating space on the ufs filesystem, it may
+be due to framentation. Fragmentation can occur when you do not have sufficient
+free blocks to satisfy an allocation request even though \fBdf\fR(1M) indicates
+that enough free space is available. (This may occur because df only uses the
+available fragment count to calculate available space, but the file system
+requires contiguous sets of fragments for most allocations). If you suspect
+that you have exhausted contiguous  fragments on  your file system, you can use
+the \fBfstyp\fR(1M) utility with the -v option. In the \fBfstyp\fR output,
+look at the  \fInbfree\fR (number  of  blocks  free) and \fInffree\fR (number
+of fragments free) fields. On unmounted filesystems, you can use \fBfsck\fR(1M)
+and observe  the  last line of output, which reports, among other items, the
+number of fragments and the degree of fragmentation. To correct a fragmentation
+problem, run \fBufsdump\fR(1M) and \fBufsrestore\fR(1M) on the ufs filesystem.

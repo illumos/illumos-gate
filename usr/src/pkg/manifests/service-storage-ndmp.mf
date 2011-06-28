@@ -47,6 +47,9 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/ndmp
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man4
 file path=lib/svc/manifest/system/ndmp.xml group=sys mode=0444
 file path=lib/svc/method/svc-ndmp mode=0555
 file path=usr/include/libndmp.h
@@ -58,6 +61,10 @@ file path=usr/lib/llib-lndmp.ln
 file path=usr/lib/ndmp/ndmpd mode=0555
 file path=usr/sbin/ndmpadm mode=0555
 file path=usr/sbin/ndmpstat mode=0555
+file path=usr/share/man/man1m/ndmpadm.1m
+file path=usr/share/man/man1m/ndmpd.1m
+file path=usr/share/man/man1m/ndmpstat.1m
+file path=usr/share/man/man4/ndmp.4
 legacy pkg=SUNWndmpr \
     desc="Network Data Management Protocol Service (root components)" \
     name="Network Data Management Protocol Service (Root)"

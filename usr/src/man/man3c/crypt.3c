@@ -1,0 +1,139 @@
+'\" te
+.\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH crypt 3C "28 Sep 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+crypt \- string encoding function
+.SH SYNOPSIS
+.LP
+.nf
+#include <crypt.h>
+
+\fBchar *\fR\fBcrypt\fR(\fBconst char *\fR\fIkey\fR, \fBconst char *\fR\fIsalt\fR);
+.fi
+
+.SS "Standard conforming"
+.LP
+.nf
+#include <unistd.h>
+
+\fBchar *\fR\fBcrypt\fR(\fBconst char *\fR\fIkey\fR, \fBconst char *\fR\fIsalt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcrypt()\fR function encodes strings suitable for secure storage as
+passwords. It generates the password hash given the \fIkey\fR and \fIsalt\fR.
+.sp
+.LP
+The \fIkey\fR argument is the plain text password to be encrypted.
+.sp
+.LP
+If the first character of \fIsalt\fR is "$", \fBcrypt()\fR uses
+\fBcrypt.conf\fR(4) to determine which shared module to load for the encryption
+algorithm.  The algorithm name \fBcrypt()\fR uses to search in \fBcrypt.conf\fR
+is the string between the first and second "$", or between the first "$" and
+first "," if a "," comes before the second "$".
+.sp
+.LP
+If the first character of \fIsalt\fR is not "$", the algorithm described on
+\fBcrypt_unix\fR(5) is used.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBcrypt()\fR returns a pointer to the encoded
+string. Otherwise it returns a null pointer and sets \fBerrno\fR to indicate
+the error.
+.sp
+.LP
+The return value points to static data that is overwritten by each call.
+.SH ERRORS
+.sp
+.LP
+The \fBcrypt()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+An entry in \fBcrypt.conf\fR is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBELIBACC\fR\fR
+.ad
+.RS 11n
+.rt  
+The required shared library was not found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+There is insufficient memory to generate the hash.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 11n
+.rt  
+The functionality is not supported on this system.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The values returned by this function might not be portable among
+standard-conforming systems. See \fBstandards\fR(5).
+.sp
+.LP
+Applications should not use \fBcrypt()\fR to store or verify user passwords but
+should use the functions described on \fBpam\fR(3PAM) instead.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpasswd\fR(1), \fBcrypt_genhash_impl\fR(3C), \fBcrypt_gensalt\fR(3C),
+\fBcrypt_gensalt_impl\fR(3C), \fBgetpassphrase\fR(3C), \fBpam\fR(3PAM),
+\fBpasswd\fR(4), \fBpolicy.conf\fR(4), \fBattributes\fR(5),
+\fBcrypt_unix\fR(5), \fBstandards\fR(5)

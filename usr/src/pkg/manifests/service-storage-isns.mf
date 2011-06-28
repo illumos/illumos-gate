@@ -36,9 +36,12 @@ dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/network group=sys
 dir path=usr group=sys
 dir path=usr/sbin
+dir path=usr/share/man/man1m
 file path=lib/svc/manifest/network/isns_server.xml group=sys mode=0444
 file path=usr/sbin/isns mode=0555
 file path=usr/sbin/isnsadm mode=0555
+file path=usr/share/man/man1m/isns.1m
+file path=usr/share/man/man1m/isnsadm.1m
 legacy pkg=SUNWisns desc="Solaris internet Storage Name Service(iSNS) Server" \
     name="Solaris iSNS Server"
 legacy pkg=SUNWisnsadm desc="Solaris iSNS Server Administration Utility" \

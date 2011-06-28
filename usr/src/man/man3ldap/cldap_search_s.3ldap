@@ -1,0 +1,157 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cldap_search_s 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+cldap_search_s \- connectionless LDAP search
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+
+\fBint\fR \fBcldap_search_s\fR(\fBLDAP\fR \fI*ld\fR, \fBchar\fR \fI*base\fR, \fBint\fR \fIscope\fR, \fBchar\fR \fI*filter\fR,
+     \fBchar\fR \fI*attrs\fR, \fBint\fR \fIattrsonly\fR, \fBLDAPMessage\fR \fI**res\fR, \fBchar\fR \fI*logdn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcldap_search_s()\fR function performs an LDAP search using the
+Connectionless LDAP (CLDAP) protocol.
+.sp
+.LP
+\fBcldap_search_s()\fR has parameters and behavior identical to that of
+\fBldap_search_s\fR(3LDAP), except for the addition of the \fIlogdn\fR
+parameter.  \fIlogdn\fR should contain a distinguished name to be used only for
+logging purposed by the LDAP server.  It should be in the text format described
+by \fIRFC 1779, A String Representation of Distinguished Names\fR.
+.SS "Retransmission Algorithm"
+.sp
+.LP
+\fBcldap_search_s()\fR operates using the CLDAP protocol over \fBudp\fR(7P).
+Since UDP is a non-reliable protocol, a retry mechanism is used to increase
+reliability. The \fBcldap_setretryinfo\fR(3LDAP) function can be used to set
+two retry parameters:  \fItries\fR, a count of the number of times to send a
+search request and \fItimeout\fR, an initial timeout that determines how long
+to wait for a response before re-trying. \fItimeout\fR is specified seconds.
+These values are stored in the \fBld_cldaptries\fR and \fBld_cldaptimeout\fR
+members of the \fBld\fR LDAP structure, and the default values set in
+\fBldap_open\fR(3LDAP) are 4 and 3 respectively. The retransmission algorithm
+used is:
+.sp
+.ne 2
+.mk
+.na
+\fBStep 1\fR
+.ad
+.RS 10n
+.rt  
+Set the current timeout to \fBld_cldaptimeout\fR seconds, and the current LDAP
+server address to the first LDAP server found during the \fBldap_open\fR(3LDAP)
+call.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBStep 2\fR
+.ad
+.RS 10n
+.rt  
+Send the search request to the current LDAP server address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBStep 3\fR
+.ad
+.RS 10n
+.rt  
+Set the wait timeout to the current timeout divided by the number of server
+addresses found during \fBldap_open\fR(3LDAP) or to one second, whichever is
+larger. Wait at most that long for a response; if a response is received, STOP.
+Note that the wait timeout is always rounded down to the next lowest second.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBStep 4\fR
+.ad
+.RS 10n
+.rt  
+Repeat steps 2 and 3 for each LDAP server address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBStep 5\fR
+.ad
+.RS 10n
+.rt  
+Set the current timeout to twice its previous value and repeat Steps 2 through
+5 a maximum of \fItries\fR times.
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+Assume that the default values for \fItries\fR and \fItimeout\fR of 4 tries and
+3 seconds are used. Further, assume that a space-separated list of two hosts,
+each with one address, was passed to \fBcldap_open\fR(3LDAP). The pattern of
+requests sent will be (stopping as soon as a response is received):
+.sp
+.in +2
+.nf
+  Time		Search Request Sent To:
+   +0			Host A try 1
+   +1  (0+3/2)		Host B try 1
+   +2  (1+3/2)		Host A try 2
+   +5  (2+6/2)		Host B try 2
+   +8  (5+6/2)		Host A try 3
+   +14 (8+12/2)	Host B try 3
+   +20 (14+12/2)	Host A try 4
+   +32 (20+24/2)	Host B try 4
+   +44 (20+24/2)	(give up - no response)
+.fi
+.in -2
+
+.SH ERRORS
+.sp
+.LP
+\fBcldap_search_s()\fR returns  \fBLDAP_SUCCESS\fR if a search was successful
+and the appropriate LDAP error code otherwise.  See \fBldap_error\fR(3LDAP) for
+more information.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP), \fBldap_search_s\fR(3LDAP),
+\fBcldap_open\fR(3LDAP), \fBcldap_setretryinfo\fR(3LDAP),
+\fBcldap_close\fR(3LDAP), \fBattributes\fR(5), \fBudp\fR(7P)

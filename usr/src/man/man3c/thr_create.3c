@@ -1,0 +1,463 @@
+'\" te
+.\" Copyright (c) 2009 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 1995 IEEE.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH thr_create 3C "16 Mar 2009" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+thr_create \- create a thread
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
+#include <thread.h> 
+
+\fBint\fR \fBthr_create\fR(\fBvoid *\fR\fIstack_base\fR, \fBsize_t\fR \fIstack_size\fR,
+     \fBvoid *(*\fR\fIstart_func\fR) (void*), \fBvoid *\fR\fIarg\fR, \fBlong\fR \fIflags\fR,
+     \fBthread_t *\fR\fInew_thread_ID\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Thread creation adds a new thread of control to the current process. The
+procedure \fBmain()\fR is a single thread of control. Each thread executes
+concurrently with all other threads within the calling process and with other
+threads from other active processes.
+.sp
+.LP
+Although a newly created thread shares all of the calling process's global data
+with the other threads in the process, it has its own set of attributes and
+private execution stack.  The new thread inherits the calling thread's signal
+mask and scheduling priority. Pending signals for a new thread are not
+inherited and will be empty.
+.sp
+.LP
+The call to create a thread takes the address of a user-defined  function,
+specified by \fIstart_func\fR, as one of its arguments. This function is the
+complete execution routine for the new thread.
+.sp
+.LP
+The lifetime of a thread begins with the successful return from
+\fBthr_create()\fR, which calls \fIstart_func\fR(\|) and ends with one of the
+following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the normal completion of \fIstart_func\fR(\|),
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+an explicit call to \fBthr_exit\fR(3C), or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the conclusion of the calling process (see \fBexit\fR(2)).
+.RE
+.sp
+.LP
+The new thread performs by calling the function defined by \fIstart_func\fR
+with only one argument, \fIarg\fR. If more than one argument needs to be passed
+to \fIstart_func\fR, the arguments can be packed into a structure, the address
+of which can be passed to \fIarg\fR.
+.sp
+.LP
+If \fIstart_func\fR returns, the thread terminates with the exit status set to
+the \fIstart_func\fR return value (see \fBthr_exit\fR(3C)).
+.sp
+.LP
+When the thread from which \fBmain()\fR originated returns, the effect is the
+same as if an implicit call to \fBexit()\fR were made using the return value of
+\fBmain()\fR as the exit status. This behavior differs from a \fIstart_func\fR
+return. If \fBmain()\fR  calls \fBthr_exit\fR(3C), only the \fBmain\fR thread
+exits, not the entire process.
+.sp
+.LP
+If the thread creation  fails, a new thread is not created and the contents of
+the location referenced by the pointer to the new thread are undefined.
+.sp
+.LP
+The \fIflags\fR argument specifies which attributes are modifiable for the
+created thread. The value in \fIflags\fR is determined by the bitwise
+inclusive-OR of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTHR_BOUND\fR \fR
+.ad
+.RS 18n
+.rt  
+This flag is obsolete and is maintained for compatibility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTHR_DETACHED\fR \fR
+.ad
+.RS 18n
+.rt  
+This flag affects the detachstate attribute of the thread. The new thread is
+created detached. The exit status of a detached thread is not accessible to
+other threads. Its thread ID and other resources may be re-used as soon as the
+thread terminates. \fBthr_join\fR(3C) will not wait for a detached thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTHR_NEW_LWP\fR \fR
+.ad
+.RS 18n
+.rt  
+This flag is obsolete and is maintained for compatibility.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTHR_SUSPENDED\fR \fR
+.ad
+.RS 18n
+.rt  
+This flag affects the suspended attribute of the thread. The new thread is
+created suspended and will not execute \fIstart_func\fR until it is started by
+\fBthr_continue()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTHR_DAEMON\fR \fR
+.ad
+.RS 18n
+.rt  
+This flag affects the daemon attribute of the thread. In addition to being
+created detached (\fBTHR_DAEMON\fR implies \fBTHR_DETACHED\fR), the thread is
+marked as a daemon. Daemon threads do not interfere with the exit conditions
+for a process. A process will terminate when the last non-daemon thread exits
+or the process calls \fBexit\fR(2). Also, a thread that is waiting in
+\fBthr_join\fR(3C) for any thread to terminate will return \fBEDEADLK\fR when
+all remaining threads in the process are either daemon threads or other threads
+waiting in \fBthr_join()\fR. Daemon threads are most useful in libraries that
+want to use threads.
+.RE
+
+.sp
+.LP
+Default thread creation:
+.sp
+.in +2
+.nf
+thread_t tid;
+void *start_func(void *), *arg;
+thr_create(NULL, 0, start_func, arg, 0, &tid);
+.fi
+.in -2
+
+.sp
+.LP
+Create a detached thread whose thread ID we do not care about:
+.sp
+.in +2
+.nf
+thr_create(NULL, 0, start_func, arg, THR_DETACHED, NULL); 
+.fi
+.in -2
+
+.sp
+.LP
+If \fIstack_base\fR is not \fINULL\fR, the new thread uses the stack beginning
+at the address specified by \fIstack_base\fR and continuing for
+\fIstack_size\fR bytes, where \fIstack_size\fR must be greater than or equal to
+\fBTHR_MIN_STACK\fR. If \fIstack_base\fR is \fINULL\fR, \fBthr_create()\fR
+allocates a stack for the new thread with at least \fIstack_size\fR bytes. If
+\fIstack_size\fR is 0, a default size is used. If \fIstack_size\fR is not 0, it
+must be greater than or equal to \fBTHR_MIN_STACK\fR. See  \fBNOTES\fR.
+.sp
+.LP
+When  \fInew_thread_ID\fR is not \fINULL\fR, it points to a location where the
+\fBID\fR of the new thread is stored if \fBthr_create()\fR is successful. The
+\fBID\fR is only valid within the calling process.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBthr_create()\fR function returns \fB0\fR. Otherwise,  an
+error value is returned to indicate the error.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR \fR
+.ad
+.RS 11n
+.rt  
+A resource control limit on the total number of threads in a process, task,
+project, or zone has been exceeded or some system resource has been exceeded.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fIstack_base\fR argument is not \fINULL\fR and \fIstack_size\fR is less
+than \fBTHR_MIN_STACK\fR, or the \fIstack_base\fR argument is \fINULL\fR and
+\fIstack_size\fR is not \fB0\fR and is less than \fBTHR_MIN_STACK\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+The system cannot allocate stack for the thread.
+.RE
+
+.sp
+.LP
+The \fBthr_create()\fR function may use \fBmmap()\fR to  allocate thread stacks
+from \fBMAP_PRIVATE\fR, \fBMAP_NORESERVE\fR, and \fBMAP_ANON\fR memory mappings
+if \fIstack_base\fR is \fINULL\fR, and consequently may return upon failure the
+relevant error values returned by \fBmmap()\fR. See the \fBmmap\fR(2) manual
+page for these error values.
+.SH EXAMPLES
+.sp
+.LP
+The following is an example of concurrency with multithreading. Since POSIX
+threads and Solaris threads are fully compatible  even within the same process,
+this example uses \fBpthread_create()\fR if you execute \fBa.out 0\fR, or
+\fBthr_create()\fR if you execute \fBa.out 1\fR.
+.sp
+.LP
+Five threads are created that simultaneously perform a time-consuming function,
+\fBsleep(\fR10\fB)\fR. If the execution of this process is timed, the results
+will show  that all five individual calls to sleep for ten-seconds completed
+in about ten seconds, even on a uniprocessor. If a single-threaded process
+calls \fBsleep(\fR10\fB)\fR five times, the execution time will be about
+50-seconds.
+.sp
+.LP
+The command-line to time this process is:
+.sp
+.LP
+\fB/usr/bin/time\fR \fBa.out\fR \fB0\fR \fB(for\fR \fBPOSIX\fR \fBthreading)\fR
+.sp
+.LP
+or
+.sp
+.LP
+\fB/usr/bin/time\fR \fBa.out\fR \fB1\fR \fB(for\fR \fBSolaris\fR
+\fBthreading)\fR
+.LP
+\fBExample 1 \fRAn example of concurrency with multithreading.
+.sp
+.in +2
+.nf
+#define _REENTRANT    /* basic 3-lines for threads */
+#include <pthread.h>
+#include <thread.h>
+#define NUM_THREADS 5
+#define SLEEP_TIME 10
+
+void *sleeping(void *);   /* thread routine */
+int i;
+thread_t tid[NUM_THREADS];      /* array of thread IDs */
+
+int
+main(int argc, char *argv[])
+{
+    if (argc == 1)  {
+        printf("use 0 as arg1 to use pthread_create(\|)\en");
+        printf("or use 1 as arg1 to use thr_create(\|)\en");
+        return (1);
+    }
+
+    switch (*argv[1])  {
+    case '0':  /* POSIX */
+        for ( i = 0; i < NUM_THREADS; i++)
+                pthread_create(&tid[i], NULL, sleeping,
+                    (void *)SLEEP_TIME);
+        for ( i = 0; i < NUM_THREADS; i++)
+                    pthread_join(tid[i], NULL);
+        break;
+
+    case '1':  /* Solaris */
+        for ( i = 0; i < NUM_THREADS; i++)
+            thr_create(NULL, 0, sleeping, (void *)SLEEP_TIME, 0,
+                &tid[i]);
+        while (thr_join(0, NULL, NULL) == 0)
+                continue;
+        break;
+    }  /* switch */
+    printf("main(\|) reporting that all %d threads have
+        terminated\en", i);
+    return (0);
+}  /* main */
+
+void *
+sleeping(void *arg)
+{
+    int sleep_time = (int)arg;
+    printf("thread %d sleeping %d seconds ...\en", thr_self(\|),
+        sleep_time);
+    sleep(sleep_time);
+    printf("\enthread %d awakening\en", thr_self(\|));
+    return (NULL);
+}
+.fi
+.in -2
+
+.sp
+.LP
+Had \fBmain()\fR not waited for the completion of the other threads (using
+\fBpthread_join\fR(3C) or \fBthr_join\fR(3C)), it would have continued to
+process concurrently until it reached the end of its routine and the entire
+process would have exited prematurely (see \fBexit\fR(2)).
+
+.LP
+\fBExample 2 \fRCreating a default thread with a new signal mask.
+.sp
+.LP
+The following example demonstrates how to create a default thread with a new
+signal mask. The \fInew_mask\fR argument is assumed to have a value different
+from the creator's signal mask (\fIorig_mask\fR).   The \fInew_mask\fR argument
+is set to block all signals except for \fBSIGINT\fR. The creator's signal mask
+is changed so that the new thread inherits a different mask, and is restored to
+its original value after \fBthr_create()\fR returns.
+
+.sp
+.LP
+This example assumes that \fBSIGINT\fR is also unmasked in the creator.   If it
+is masked by the creator, then unmasking the signal opens the creator to this
+signal.   The other alternative is to have the new thread set its own signal
+mask in its start routine.
+
+.sp
+.in +2
+.nf
+thread_t tid;
+sigset_t new_mask, orig_mask;
+int error;
+
+(void)sigfillset(&new_mask);
+(void)sigdelset(&new_mask, SIGINT);
+(void)thr_sigsetmask(SIG_SETMASK, &new_mask, &orig_mask);
+error = thr_create(NULL, 0, do_func, NULL, 0, &tid);
+(void)thr_sigsetmask(SIG_SETMASK, &orig_mask, NULL);
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexit\fR(2), \fBgetrlimit\fR(2), \fBmmap\fR(2), \fBexit\fR(3C),
+\fBsleep\fR(3C), \fBthr_exit\fR(3C), \fBthr_join\fR(3C),
+\fBthr_min_stack\fR(3C), \fBthr_setconcurrency\fR(3C), \fBthr_suspend\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5), \fBthreads\fR(5)
+.SH NOTES
+.sp
+.LP
+Since multithreaded-application threads execute independently of each other,
+their relative behavior is unpredictable. It is therefore possible for the
+thread executing \fBmain()\fR to finish before all other user-application
+threads.
+.sp
+.LP
+Using \fBthr_join\fR(3C) in the following syntax,
+.sp
+.in +2
+.nf
+while (thr_join(0, NULL, NULL) == 0)
+    continue;
+.fi
+.in -2
+
+.sp
+.LP
+will cause the invoking thread (which may be \fBmain()\fR) to wait for the
+termination of all non-daemon threads, excluding threads that are themselves
+waiting in \fBthr_join()\fR; however, the second and third arguments to
+\fBthr_join()\fR need not necessarily be \fINULL\fR.
+.sp
+.LP
+A thread has not terminated until \fBthr_exit()\fR has finished.  The only way
+to determine this is by \fBthr_join()\fR. When \fBthr_join()\fR returns a
+departed thread, it means that this thread has terminated and its resources are
+reclaimable. For instance, if a user specified a stack to \fBthr_create()\fR,
+this stack can only be reclaimed after  \fBthr_join()\fR has reported this
+thread as a departed thread.   It is not possible to determine when a
+\fIdetached\fR thread has terminated.   A detached thread disappears without
+leaving a trace.
+.sp
+.LP
+Typically, thread stacks allocated by \fBthr_create()\fR begin on page
+boundaries and any specified (a red-zone) size is rounded up to the next page
+boundary. A page with no access permission is appended to the top of the stack
+so that most stack overflows will result in a \fBSIGSEGV\fR signal being sent
+to the offending thread. Thread stacks allocated by the caller are used as is.
+.sp
+.LP
+Using a default stack size for the new thread, instead of passing a
+user-specified stack size, results in much better \fBthr_create()\fR
+performance. The default stack size for a user-thread  is 1 megabyte in a
+32-bit process and 2 megabyte in a 64-bit process.
+.sp
+.LP
+A user-specified stack size must be greater than or equal to
+\fBTHR_MIN_STACK\fR. A minimum stack size may not accommodate the stack frame
+for  the user thread function \fIstart_func\fR. If a stack size is specified,
+it must accommodate \fIstart_func\fR requirements and the functions that it may
+call in turn,  in addition to the minimum requirement.
+.sp
+.LP
+It is usually very difficult to determine the runtime stack  requirements for a
+thread. \fBTHR_MIN_STACK\fR specifies how much stack storage is required to
+execute a trivial \fIstart_func\fR. The total runtime requirements for stack
+storage are dependent on the storage required to do runtime linking, the amount
+of storage required by library runtimes (like \fBprintf()\fR) that your thread
+calls. Since these storage parameters are not known before the program runs, it
+is best to use default stacks. If you know your runtime requirements or decide
+to use stacks that are larger than the default, then it makes sense to  specify
+your own stacks.

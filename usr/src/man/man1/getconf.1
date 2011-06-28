@@ -1,0 +1,789 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getconf 1 "1 Sep 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+getconf \- get configuration values
+.SH SYNOPSIS
+.SS "/usr/bin/getconf, /usr/xpg4/bin/getconf, /usr/xpg6/bin/getconf"
+.LP
+.nf
+\fB/usr/bin/getconf\fR [\fB-v\fR \fIspecification\fR] \fIsystem_var\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/getconf\fR [\fB-v\fR \fIspecification\fR] \fIpath_var\fR \fIpathname\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/getconf\fR \fB-a\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/getconf\fR [\fB-v\fR \fIspecification\fR] \fIsystem_var\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/getconf\fR [\fB-v\fR \fIspecification\fR] \fIpath_var\fR \fIpathname\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/getconf\fR \fB-a\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/getconf\fR [\fB-v\fR \fIspecification\fR] \fIsystem_var\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/getconf\fR [\fB-v\fR \fIspecification\fR] \fIpath_var\fR \fIpathname\fR
+.fi
+
+.LP
+.nf
+\fB/usr/xpg6/bin/getconf\fR \fB-a\fR
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fBgetconf\fR [\fB-abdlpqrtw\fR] [\fB-c\fR RE] [\fB-n\fR RE] [\fB-s\fR RE] [\fB-v\fR \fIname\fR][\fIname\fR [\fIpath\fR [\fIvalue\fR]] ...]
+.fi
+
+.SH DESCRIPTION
+.SS "/usr/bin/getconf, /usr/xpg4/bin/getconf, /usr/xpg6/bin/getconf"
+.sp
+.LP
+In the first synopsis form, the \fBgetconf\fR utility writes to the standard
+output the value of the variable specified by \fIsystem_var\fR, in accordance
+with \fIspecification\fR if the \fB-v\fR option is used.
+.sp
+.LP
+In the second synopsis form, \fBgetconf\fR writes to the standard output the
+value of the variable specified by \fIpath_var\fR for the path specified by
+\fIpathname\fR, in accordance with \fIspecification\fR if the \fB-v\fR option
+is used.
+.sp
+.LP
+In the third synopsis form, \fBconfig\fR writes to the standard output the
+names of the current system configuration variables.
+.sp
+.LP
+The value of each configuration variable is determined as if it were obtained
+by calling the function from which it is defined to be available. The value
+reflects conditions in the current operating environment.
+.SS "ksh93"
+.sp
+.LP
+The \fBgetconf\fR built-in in \fBksh93\fR is associated with the \fB/bin\fR and
+\fB/usr/bin\fR paths. It is invoked when \fBgetconf\fR is executed without a
+pathname prefix and the pathname search finds a \fB/bin/getconf\fR or
+\fB/usr/bin/getconf\fR executable.
+.sp
+.LP
+\fBgetconf\fR displays the system configuration value for \fIname\fR. If
+\fIname\fR is a filesystem specific variable, the value is determined relative
+to path, or, the current directory, if path is omitted. If \fIvalue\fR is
+specified, \fBgetconf\fR attempts to change the process local value to
+\fIvalue\fR. \fB-\fR can be used in place of path when it is not relevant. Only
+writable variables can be set. \fBreadonly\fR variables cannot be changed.
+.sp
+.LP
+The current value for \fIname\fR is written to the standard output. If
+\fIname\fR is valid but undefined, \fBundefined\fR is written to the standard
+output. If \fIname\fR is invalid or an error occurs in determining its value, a
+diagnostic is written to standard error and \fBgetconf\fR exits with a
+\fBnon-zero\fR exit status.
+.sp
+.LP
+More than one variable can be set or queried by providing the \fIname path
+value\fR 3-tuple for each variable, specifying \fB-\fR for value when querying.
+.sp
+.LP
+If no operands are specified, all known variables are written in
+\fIname\fR\fB=\fR\fIvalue\fR form to the standard output, one per line. Only
+one of \fB--call\fR, \fB--name\fR or \fB--standard\fR can be specified.
+.SH OPTIONS
+.SS "/usr/bin/getconf, /usr/xpg4/bin/getconf, /usr/xpg6/bin/getconf"
+.sp
+.LP
+The following options are supported by \fB/usr/bin/getconf\fR,
+\fB/usr/xpg4/bin/getconf\fR, and \fB/usr/xpg6/bin/getconf\fR
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 19n
+.rt  
+Writes the names of the current system configuration variables to the standard
+output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fIspecification\fR\fR
+.ad
+.RS 19n
+.rt  
+Gives the specification which governs the selection of values for configuration
+variables.
+.RE
+
+.SS "ksh93"
+.sp
+.LP
+The following options are supported by the \fBgetconf\fR built-in command in
+\fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.br
+.na
+\fB\fB--all\fR\fR
+.ad
+.RS 24n
+.rt  
+Call the native \fBgetconf -a\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.br
+.na
+\fB\fB--base\fR\fR
+.ad
+.RS 24n
+.rt  
+List base variable name without \fBcall\fR and standard prefixes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.br
+.na
+\fB\fB--call=\fR\fIRE\fR\fR
+.ad
+.RS 24n
+.rt  
+Display variables with \fBcall\fR prefix that matches \fIRE\fR. The \fBcall\fR
+prefixes are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBCS\fR
+.sp
+\fBconfstr\fR(3C),
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBPC\fR
+.sp
+\fBpathconf\fR(2)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSC\fR
+.sp
+\fBsysconf\fR(3C)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSI\fR
+.sp
+\fBsysinfo\fR(2)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBXX\fR
+.sp
+Constant value
+.RE
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.br
+.na
+\fB\fB--defined\fR\fR
+.ad
+.RS 24n
+.rt  
+Only display defined values when no operands are specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.br
+.na
+\fB\fB--lowercase\fR\fR
+.ad
+.RS 24n
+.rt  
+List variable names in lower case.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.br
+.na
+\fB\fB--name=\fR\fIRE\fR\fR
+.ad
+.RS 24n
+.rt  
+Display variables with names that match \fIRE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.br
+.na
+\fB\fB--portable\fR\fR
+.ad
+.RS 24n
+.rt  
+Display the named writable variables and values in a form that can be directly
+executed by \fBksh93\fR(1) to set the values. If \fIname\fR is omitted, lists
+all writable variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.br
+.na
+\fB\fB--quote\fR\fR
+.ad
+.RS 24n
+.rt  
+Quote values (\fB"..."\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.br
+.na
+\fB\fB--readonly\fR\fR
+.ad
+.RS 24n
+.rt  
+Display the named \fBreadonly\fR variables in \fIname\fR\fB=\fR\fIvalue\fR
+form. If \fIname\fR is omitted, lists all \fBreadonly\fR variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.br
+.na
+\fB\fB--standard=\fR\fIRE\fR\fR
+.ad
+.RS 24n
+.rt  
+Display variables with standard prefix that matches \fIRE\fR. Use the
+\fB--table\fR option to view all standard prefixes, including local additions.
+.sp
+The standard prefixes available on all systems are:
+.sp
+.in +2
+.nf
+ 
+AES
+AST
+C
+GNU
+POSIX
+SVID
+XBS5
+XOPEN
+XPG
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.br
+.na
+\fB\fB--table\fR\fR
+.ad
+.RS 24n
+.rt  
+Display the internal table that contains the name, standard, standard section,
+and system call symbol prefix for each variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.br
+.na
+\fB\fB--writable\fR\fR
+.ad
+.RS 24n
+.rt  
+Display the named writable variables in \fIname\fR\fB=\fR\fIvalue\fR form. If
+\fIname\fR is omitted, lists all writable variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.br
+.na
+\fB\fB--specification=name\fR\fR
+.ad
+.RS 24n
+.rt  
+Call the native \fBgetconf -v\fR \fIname\fR.
+.RE
+
+.SH OPERANDS
+.SS "/usr/bin/getconf, /usr/xpg4/bin/getconf, /usr/xpg6/bin/getconf"
+.sp
+.LP
+The following operands are supported by \fB/usr/bin/getconf\fR,
+\fB/usr/xpg4/bin/getconf\fR, and \fB/usr/xpg6/bin/getconf\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpath_var\fR\fR
+.ad
+.RS 12n
+.rt  
+A name of a configuration variable whose value is available from the
+\fBpathconf\fR(2) function. All of the values in the following table are
+supported:
+.RE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+LINK_MAXNAME_MAX_POSIX_CHOWN_RESTRICTED
+MAX_CANONPATH_MAX_POSIX_NO_TRUNC
+MAX_INPUTPIPE_BUF_POSIX_VDISABLE
+.TE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpathname\fR\fR
+.ad
+.RS 14n
+.rt  
+A path name for which the variable specified by \fIpath_var\fR is to be
+determined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsystem_var\fR\fR
+.ad
+.RS 14n
+.rt  
+A name of a configuration variable whose value is available from
+\fBconfstr\fR(3C) or \fBsysconf\fR(3C). All of the values in the following
+table are supported:
+.RE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+ARG_MAXBC_BASE_MAX
+BC_DIM_MAXBC_SCALE_MAX
+BC_STRING_MAXCHAR_BIT
+CHARCLASS_NAME_MAXCHAR_MAX
+CHAR_MINCHILD_MAX
+CLK_TCKCOLL_WEIGHTS_MAX
+CS_PATHEXPR_NEST_MAX
+HOST_NAME_MAXINT_MAX
+INT_MINLFS64_CFLAGS
+LFS64_LDFLAGSLFS64_LIBS
+LFS64_LINTFLAGSLFS_CFLAGS
+LFS_LDFLAGSLFS_LIBS
+LFS_LINTFLAGSLINE_MAX
+LONG_BITLONG_MAX
+LONG_MINMB_LEN_MAX
+NGROUPS_MAXNL_ARGMAX
+NL_LANGMAXNL_MSGMAX
+NL_NMAXNL_SETMAX
+NL_TEXTMAXNZERO
+OPEN_MAXPOSIX2_BC_BASE_MAX
+POSIX2_BC_DIM_MAXPOSIX2_BC_SCALE_MAX
+POSIX2_BC_STRING_MAXPOSIX2_C_BIND
+POSIX2_C_DEVPOSIX2_CHAR_TERM
+POSIX2_COLL_WEIGHTS_MAXPOSIX2_C_VERSION
+POSIX2_EXPR_NEST_MAXPOSIX2_FORT_DEV
+POSIX2_FORT_RUNPOSIX2_LINE_MAX
+POSIX2_LOCALEDEFPOSIX2_RE_DUP_MAX
+POSIX2_SW_DEVPOSIX2_SYMLINKS
+POSIX2_UPEPOSIX2_VERSION
+POSIX_ALLOC_SIZE_MINPOSIX_REC_INCR_XFER_SIZE
+POSIX_REC_MAX_XFER_SIZEPOSIX_REC_MIN_XFER_SIZE
+POSIX_REC_XFER_ALIGNPOSIX_V6_ILP32_OFF32
+POSIX_V6_ILP32_OFF32_CFLAGSPOSIX_V6_ILP32_OFF32_LDFLAGS
+POSIX_V6_ILP32_OFF32_LIBSPOSIX_V6_ILP32_OFFBIG
+POSIX_V6_ILP32_OFFBIG_CFLAGSPOSIX_V6_ILP32_OFFBIG_LDFLAGS
+POSIX_V6_ILP32_OFFBIG_LIBSPOSIX_V6_LP64_OFF64
+POSIX_V6_LP64_OFF64_CFLAGSPOSIX_V6_LP64_OFF64_LDFLAGS
+POSIX_V6_LP64_OFF64_LIBSPOSIX_V6_LPBIG_OFFBIG
+POSIX_V6_LPBIG_OFFBIG_CFLAGSPOSIX_V6_LPBIG_OFFBIG_LDFLAGS
+POSIX_V6_LPBIG_OFFBIG_LIBSPOSIX_V6_WIDTH_RESTRICTED_ENVS
+SYMLINK_MAXSYMLOOP_MAX
+_POSIX2_BC_BASE_MAX_POSIX2_BC_DIM_MAX
+_POSIX2_BC_SCALE_MAX_POSIX2_BC_STRING_MAX
+_POSIX2_CHARCLASS_NAME_MAX_POSIX2_CHAR_TERM
+_POSIX2_COLL_WEIGHTS_MAX_POSIX2_C_BIND
+_POSIX2_C_DEV_POSIX2_C_VERSION
+_POSIX2_EXPR_NEST_MAX_POSIX2_FORT_DEV
+_POSIX2_FORT_RUN_POSIX2_LINE_MAX
+_POSIX2_LOCALEDEF_POSIX2_PBS
+_POSIX2_PBS_ACCOUNTING_POSIX2_PBS_CHECKPOINT
+_POSIX2_PBS_LOCATE_POSIX2_PBS_MESSAGE
+_POSIX2_PBS_TRACK_POSIX2_RE_DUP_MAX
+_POSIX2_SW_DEV_POSIX2_UPE
+_POSIX2_VERSION_POSIX_ADVISORY_INFO
+_POSIX_AIO_LISTIO_MAX_POSIX_AIO_MAX
+_POSIX_ARG_MAX_POSIX_ASYNC_IO
+_POSIX_BARRIERS_POSIX_CHILD_MAX
+_POSIX_CLOCKRES_MIN_POSIX_CLOCK_SELECTION
+_POSIX_CPUTIME_POSIX_DELAYTIMER_MAX
+_POSIX_HOST_NAME_MAX_POSIX_IPV6
+_POSIX_JOB_CONTROL_POSIX_LINK_MAX
+_POSIX_LOGIN_NAME_MAX_POSIX_MAX_CANON
+_POSIX_MAX_INPUT_POSIX_MONOTONIC_CLOCK
+_POSIX_MQ_OPEN_MAX_POSIX_MQ_PRIO_MAX
+_POSIX_NAME_MAX_POSIX_NGROUPS_MAX
+_POSIX_OPEN_MAX_POSIX_PATH_MAX
+_POSIX_PIPE_BUF_POSIX_PRIO_IO
+_POSIX_RAW_SOCKETS_POSIX_READER_WRITER_LOCKS
+_POSIX_REGEXP_POSIX_RE_DUP_MAX
+_POSIX_RTSIG_MAX_POSIX_SAVED_IDS
+_POSIX_SEM_NSEMS_MAX_POSIX_SEM_VALUE_MAX
+_POSIX_SHELL_POSIX_SIGQUEUE_MAX
+_POSIX_SPAWN_POSIX_SPIN_LOCKS
+_POSIX_SPORADIC_SERVER_POSIX_SSIZE_MAX
+_POSIX_SS_REPL_MAX_POSIX_STREAM_MAX
+_POSIX_SYMLINK_MAX_POSIX_SYMLOOP_MAX
+_POSIX_SYNC_IO_POSIX_THREAD_ATTR_STACKADDR
+_POSIX_THREAD_ATTR_STACKSIZE_POSIX_THREAD_CPUTIME
+_POSIX_THREAD_DESTRUCTOR_ITERATIONS_POSIX_THREAD_KEYS_MAX
+_POSIX_THREAD_PRIORITY_SCHEDULING_POSIX_THREAD_PRIO_INHERIT
+_POSIX_THREAD_PRIO_PROTECT_POSIX_THREAD_PROCESS_SHARED
+_POSIX_THREAD_SAFE_FUNCTIONS_POSIX_THREAD_SPORADIC_SERVER
+_POSIX_THREAD_THREADS_MAX_POSIX_TIMEOUTS
+_POSIX_TIMER_MAX_POSIX_TRA_POSIX_TIMER_MAXCE
+_POSIX_TIMESTAMP_RESOLUTION
+_POSIX_TRACE_EVENT_FILTER_POSIX_TRACE_EVENT_NAME_MAX
+_POSIX_TRACE_INHERIT_POSIX_TRACE_LOG
+_POSIX_TRACE_NAME_MAX_POSIX_TRACE_SYS_MAX
+_POSIX_TRACE_USER_EVENT_MAX_POSIX_TTY_NAME_MAX
+_POSIX_TYPED_MEMORY_OBJECTS_POSIX_TZNAME_MAX
+_POSIX_VERSION_POSIX_V6_ILP32_OFF32
+_POSIX_V6_ILP32_OFFBIG_POSIX_V6_LP64_OFF64
+_POSIX_V6_LPBIG_OFFBIG_V6_ILP32_OFF32
+_V6_ILP32_OFFBIG_V6_LP64_OFF64
+_V6_LPBIG_OFFBIGRE_DUP_MAX
+SCHAR_MAXSCHAR_MIN
+SHRT_MAXSHRT_MIN
+SSIZE_MAXSTREAM_MAX
+TMP_MAXTZNAME_MAX
+UCHAR_MAXUINT_MAX
+ULONG_MAXUSHRT_MAX
+WORD_BITXBS5_ILP32_OFF32
+XBS5_ILP32_OFF32_CFLAGSXBS5_ILP32_OFF32_LDFLAGS
+XBS5_ILP32_OFF32_LIBSXBS5_ILP32_OFF32_LINTFLAGS
+XBS5_ILP32_OFFBIGXBS5_ILP32_OFFBIG_CFLAGS
+XBS5_ILP32_OFFBIG_LDFLAGSXBS5_ILP32_OFFBIG_LIBS
+XBS5_ILP32_OFFBIG_LINTFLAGSXBS5_LP64_OFF64
+XBS5_LP64_OFF64_CFLAGSXBS5_LP64_OFF64_LDFLAGS
+XBS5_LP64_OFF64_LIBSXBS5_LP64_OFF64_LINTFLAGS
+XBS5_LPBIG_OFFBIGXBS5_LPBIG_OFFBIG_CFLAGS
+XBS5_LPBIG_OFFBIG_LDFLAGSXBS5_LPBIG_OFFBIG_LIBS
+XBS5_LPBIG_OFFBIG_LINTFLAGS_XOPEN_CRYPT
+_XOPEN_ENH_I18N_XOPEN_IOV_MAX
+_XOPEN_LEGACY_XOPEN_NAME_MAX
+_XOPEN_PATH_MAX_XOPEN_SHM
+_XOPEN_STREAMS_XOPEN_VERSION
+_XOPEN_XCU_VERSION_XOPEN_XPG2
+_XOPEN_XPG3_XOPEN_XPG4
+.TE
+
+.sp
+.LP
+The symbol \fBPATH\fR also is recognized, yielding the same value as the
+\fBconfstr()\fR name value \fBCS_PATH\fR.
+.SH USAGE
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of
+\fB/usr/bin/getconf\fR when encountering files greater than or equal to 2 Gbyte
+( 2^31 bytes).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRWriting the Value of a Variable
+.sp
+.LP
+This example illustrates the value of \fB{NGROUPS_MAX}:\fR
+
+.sp
+.in +2
+.nf
+example% \fBgetconf NGROUPS_MAX\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRWriting the Value of a Variable for a Specific Directory
+.sp
+.LP
+This example illustrates the value of \fBNAME_MAX\fR for a specific directory:
+
+.sp
+.in +2
+.nf
+example% \fBgetconf NAME_MAX /usr\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRDealing with Unspecified Results
+.sp
+.LP
+This example shows how to deal more carefully with results that might be
+unspecified:
+
+.sp
+.in +2
+.nf
+\fBif value=$(getconf PATH_MAX /usr); then
+if [ "$value" = "undefined" ]; then
+echo PATH_MAX in /usr is infinite.
+else
+echo PATH_MAX in /usr is $value.
+fi
+else
+echo Error in getconf.
+fi\fR
+.fi
+.in -2
+
+.sp
+.LP
+For example:
+
+.sp
+.in +2
+.nf
+\fBsysconf(_SC_POSIX_C_BIND);\fR
+.fi
+.in -2
+
+.sp
+.LP
+and
+
+.sp
+.in +2
+.nf
+\fBsystem("getconf POSIX2_C_BIND");\fR
+.fi
+.in -2
+
+.sp
+.LP
+in a C program could give different answers. The \fBsysconf\fR call supplies a
+value that corresponds to the conditions when the program was either compiled
+or executed, depending on the implementation. The \fBsystem\fR call to
+\fBgetconf\fR always supplies a value corresponding to conditions when the
+program is executed.
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBgetconf\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.sp
+.LP
+The following environment variable is supported by the \fBksh93\fR built-in
+\fBgetconf\fR command:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB_AST_FEATURES\fR\fR
+.ad
+.RS 17n
+.rt  
+Local writable values that are different from the default are stored in the
+\fB_AST_FEATURES\fR environment variable. The \fB_AST_FEATURES\fR value is a
+space-separated list of \fIname path value\fR 3-tuples, where \fIname\fR is the
+system configuration name, \fIpath\fR is the corresponding path, \fB-\fR if no
+path is applicable, and \fIvalue\fR is the system configuration value.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+The specified variable is valid and information about its current state was
+written successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.SS "/usr/bin/getconf, /usr/xpg4/bin/getconf, /usr/xpg6/bin/getconf"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SS "ksh93"
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The \fBksh93\fR built-in binding to \fB/bin\fR and \fB/usr/bin\fR is Volatile.
+The built-in command-line interface is Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBksh93\fR(1), \fBsh\fR(1), \fBpathconf\fR(2), \fBsysinfo\fR(2),
+\fBconfstr\fR(3C), \fBsysconf\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBlargefile\fR(5), \fBstandards\fR(5)

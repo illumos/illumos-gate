@@ -1,0 +1,648 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright 2008 Chad Mynhier
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH proc 1 "10 Dec 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+proc, pflags, pcred, pldd, psig, pstack, pfiles, pwdx, pstop, prun, pwait,
+ptime \- proc tools
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/pflags\fR [\fB-r\fR] \fIpid\fR | \fIcore\fR [/\fIlwp\fR] ...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pcred\fR [\fIpid\fR | \fIcore\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pcred\fR [\fB-u\fR \fIuser/uid\fR] [\fB-g\fR \fIgroup/gid\fR] [\fB-G\fR \fIgrouplist\fR] pid...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pcred\fR \fB-l\fR \fIlogin\fR \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pldd\fR [\fB-Fl\fR] [\fIpid\fR | \fIcore\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/psig\fR [\fB-n\fR] \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pstack\fR [\fB-F\fR] \fIpid\fR | \fIcore\fR [/\fIlwp\fR] ...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pfiles\fR [\fB-Fn\fR] \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pwdx\fR \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pstop\fR \fIpid\fR[/\fIlwp\fR] ...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/prun\fR \fIpid\fR[/\fIlwp\fR] ...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pwait\fR [\fB-v\fR] \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/ptime\fR [\fB-Fm\fR] [\fB-p\fR] \fIpid\fR...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/ptime\fR [\fB-m\fR]\fIcommand\fR [\fIarg\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The proc tools are utilities that exercise features of \fB/proc\fR (see
+\fBproc\fR(4)). Most of them take a list of process-ids (\fIpid\fR). The tools
+that do take process-ids also accept \fB/proc/\fR\fInnn\fR as a process-id, so
+the shell expansion \fB/proc/*\fR can be used to specify all processes in the
+system.
+.sp
+.LP
+Some of the proc tools can also be applied to core files (see \fBcore\fR(4)).
+The tools that apply to core files accept a list of either process \fBID\fRs or
+names of core files or both.
+.sp
+.LP
+Some of the \fBproc\fR tools can operate on individual threads. Users can
+examine only selected threads by appending \fI/thread-id\fR to the process-id
+or core. Multiple threads can be selected using the \fB-\fR and \fB,\fR
+delimiters. For example \fB/1,2,7-9\fR examines threads \fB1\fR, \fB2\fR,
+\fB7\fR, \fB8\fR, and \fB9\fR.
+.sp
+.LP
+See \fBWARNINGS\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpflags\fR\fR
+.ad
+.RS 10n
+.rt  
+Print the \fB/proc\fR tracing flags, the pending and held signals, and other
+\fB/proc\fR status information for each process or specified lwps in each
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpcred\fR\fR
+.ad
+.RS 10n
+.rt  
+Print or set the credentials (effective, real, saved \fBUID\fRs and \fBGID\fRs)
+of each process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpldd\fR\fR
+.ad
+.RS 10n
+.rt  
+List the dynamic libraries linked into each process, including shared objects
+explicitly attached using \fBdlopen\fR(3C). See also \fBldd\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpsig\fR\fR
+.ad
+.RS 10n
+.rt  
+List the signal actions and handlers of each process. See
+\fBsignal.h\fR(3HEAD).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpstack\fR\fR
+.ad
+.RS 10n
+.rt  
+Print a hex+symbolic stack trace for each process or specified lwps in each
+process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpfiles\fR\fR
+.ad
+.RS 10n
+.rt  
+Report \fBfstat\fR(2) and \fBfcntl\fR(2) information for all open files in each
+process. For network endpoints, the local (and peer if connected) address
+information is also provided. For sockets, the socket type, socket options and
+send and receive buffer sizes are also provided. In addition, a path to the
+file is reported if the information is available from \fB/proc/pid/path\fR.
+This is not necessarily the same name used to open the file. See \fBproc\fR(4)
+for more information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpwdx\fR\fR
+.ad
+.RS 10n
+.rt  
+Print the current working directory of each process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpstop\fR\fR
+.ad
+.RS 10n
+.rt  
+Stop each process or the specified lwps (\fBPR_REQUESTED\fR stop).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBprun\fR\fR
+.ad
+.RS 10n
+.rt  
+Set running each process or the specified lwps (the inverse of \fBpstop\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpwait\fR\fR
+.ad
+.RS 10n
+.rt  
+Wait for all of the specified processes to terminate.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBptime\fR\fR
+.ad
+.RS 10n
+.rt  
+Time the \fIcommand\fR, like \fBtime\fR(1), but using microstate accounting for
+reproducible precision. Unlike \fBtime\fR(1), children of the command are not
+timed.
+.sp
+If the \fB-p\fR \fIpid\fR version is used, display a snapshot of timing
+statistics for the specified \fIpid\fR.
+.RE
+
+.SH OPTIONS
+.sp
+.LP
+The following general options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+.rt  
+Force. Grabs the target process even if another process has control.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+(\fBpsig\fR and \fBpfiles\fR only) Sets non-verbose mode. \fBpsig\fR displays
+signal handler addresses rather than names. \fBpfiles\fR does not display
+verbose information for each file descriptor. Instead, \fBpfiles\fR limits its
+output to the information that would be retrieved if the process applied
+\fBfstat\fR(2) to each of its file descriptors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+(\fBpflags\fR only) If the process is stopped, displays its machine registers.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+(\fBpwait\fR only) Verbose. Reports terminations to standard output.
+.RE
+
+.sp
+.LP
+In addition to the general options, \fBpcred\fR supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-g\fR \fIgroup/gid\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the real, effective, and saved group ids (\fBGID\fRs) of the target
+processes to the specified value.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-G\fR \fIgrouplist\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the supplementary \fBGID\fRs of the target process to the specified list
+of groups. The supplementary groups should be specified as a comma-separated
+list of group names ids. An empty list clears the supplementary group list of
+the target processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR \fIlogin\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the real, effective, and saved \fBUID\fRs of the target processes to the
+\fBUID\fR of the specified login. Sets the real, effective, and saved
+\fBGID\fRs of the target processes to the \fBGID\fR of the specified login.
+Sets the supplementary group list to the supplementary groups list of the
+specified login.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIuser/uid\fR\fR
+.ad
+.RS 16n
+.rt  
+Sets the real, effective, and saved user ids (\fBUID\fRs) of the target
+processes to the specified value.
+.RE
+
+.sp
+.LP
+In addition to the general options, \fBpldd\fR supports the following option:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Shows unresolved dynamic linker map names.
+.RE
+
+.sp
+.LP
+In addition to the general options, \fBptime\fR supports the following options:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 10n
+.rt  
+Display the full set of microstate accounting statistics.
+.sp
+The displayed fields are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBreal\fR\fR
+.ad
+.RS 8n
+.rt  
+Wall clock time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBuser\fR\fR
+.ad
+.RS 8n
+.rt  
+User level CPU time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsys\fR\fR
+.ad
+.RS 8n
+.rt  
+System call CPU time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtrap\fR\fR
+.ad
+.RS 8n
+.rt  
+Other system trap CPU time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtflt\fR\fR
+.ad
+.RS 8n
+.rt  
+Text page fault sleep time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdflt\fR\fR
+.ad
+.RS 8n
+.rt  
+Data page fault sleep time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkflt\fR\fR
+.ad
+.RS 8n
+.rt  
+Kernel page fault sleep time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlock\fR\fR
+.ad
+.RS 8n
+.rt  
+User lock wait sleep time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBslp\fR\fR
+.ad
+.RS 8n
+.rt  
+All other sleep time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlat\fR\fR
+.ad
+.RS 8n
+.rt  
+CPU latency (wait) time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBstop\fR\fR
+.ad
+.RS 8n
+.rt  
+Stopped time.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIpid\fR\fR
+.ad
+.RS 10n
+.rt  
+Displays a snapshot of timing statistics for the specified \fIpid\fR.
+.RE
+
+.sp
+.LP
+To set the credentials of another process, a process must have sufficient
+privilege to change its user and group ids to those specified according to the
+rules laid out in \fBsetuid\fR(2) and it must have sufficient privilege to
+control the target process.
+.SH USAGE
+.sp
+.LP
+These proc tools stop their target processes while inspecting them and
+reporting the results: \fBpfiles\fR, \fBpldd\fR, and \fBpstack\fR. A process
+can do nothing while it is stopped. Thus, for example, if the X server is
+inspected by one of these proc tools running in a window under the X server's
+control, the whole window system can become deadlocked because the proc tool
+would be attempting to print its results to a window that cannot be refreshed.
+Logging in from from another system using \fBrlogin\fR(1) and killing the
+offending proc tool would clear up the deadlock in this case.
+.sp
+.LP
+See \fBWARNINGS\fR.
+.sp
+.LP
+Caution should be exercised when using the \fB-F\fR flag. Imposing two
+controlling processes on one victim process can lead to chaos. Safety is
+assured only if the primary controlling process, typically a debugger, has
+stopped the victim process and the primary controlling process is doing nothing
+at the moment of application of the \fBproc\fR tool in question.
+.sp
+.LP
+Some of the proc tools can also be applied to core files, as shown by the
+synopsis above. A core file is a snapshot of a process's state and is produced
+by the kernel prior to terminating a process with a signal or by the
+\fBgcore\fR(1) utility. Some of the proc tools can need to derive the name of
+the executable corresponding to the process which dumped core or the names of
+shared libraries associated with the process. These files are needed, for
+example, to provide symbol table information for \fBpstack\fR(1). If the proc
+tool in question is unable to locate the needed executable or shared library,
+some symbol information is unavailable for display. Similarly, if a core file
+from one operating system release is examined on a different operating system
+release, the run-time link-editor debugging interface (\fBlibrtld_db\fR) cannot
+be able to initialize. In this case, symbol information for shared libraries is
+not available.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBnon-zero\fR
+.ad
+.RS 12n
+.rt  
+An error has occurred.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/*\fR\fR
+.ad
+.RS 11n
+.rt  
+process files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The human readable output is Uncommitted. The options are Committed.
+.SH SEE ALSO
+.sp
+.LP
+\fBgcore\fR(1), \fBldd\fR(1), \fBpargs\fR(1), \fBpgrep\fR(1), \fBpkill\fR(1),
+\fBplimit\fR(1), \fBpmap\fR(1), \fBpreap\fR(1), \fBps\fR(1), \fBptree\fR(1),
+\fBppgsz\fR(1), \fBpwd\fR(1), \fBrlogin\fR(1), \fBtime\fR(1), \fBtruss\fR(1),
+\fBwait\fR(1), \fBfcntl\fR(2), \fBfstat\fR(2), \fBsetuid\fR(2),
+\fBdlopen\fR(3C), \fBsignal.h\fR(3HEAD), \fBcore\fR(4), \fBproc\fR(4),
+\fBprocess\fR(4), \fBattributes\fR(5), \fBzones\fR(5)
+.SH WARNINGS
+.sp
+.LP
+The following \fBproc\fR tools stop their target processes while inspecting
+them and reporting the results: \fBpfiles\fR, \fBpldd\fR, and \fBpstack\fR.
+However, even if \fBpstack\fR operates on an individual thread, it stops the
+whole process.
+.sp
+.LP
+A process or thread can do nothing while it is stopped. Stopping a heavily used
+process or thread in a production environment, even for a short amount of time,
+can cause severe bottlenecks and even hangs of these processes or threads,
+causing them to be unavailable to users. Some databases could also terminate
+abnormally. Thus, for example, a database server under heavy load could hang
+when one of the database processes or threads is traced using the above
+mentioned \fBproc\fR tools. Because of this, stopping a UNIX process or thread
+in a production environment should be avoided.
+.sp
+.LP
+A process or thread being stopped by these tools can be identified by issuing
+\fB/usr/bin/ps\fR \fB-eflL\fR and looking for "\fBT\fR" in the first column.
+Notice that certain processes, for example "\fBsched\fR", can show the
+"\fBT\fR" status by default most of the time.
+.sp
+.LP
+The process ID returned for locked files on network file systems might not be
+meaningful.

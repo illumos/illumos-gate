@@ -1,0 +1,99 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dump 9E "9 Oct 2001" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+dump \- dump memory to device during system failure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint\fR \fBdump\fR(\fBdev_t\fR \fIdev\fR, \fBcaddr_t\fR \fIaddr\fR, \fBdaddr_t\fR \fIblkno\fR, \fBint\fR \fInblk\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris specific (Solaris DDI). This entry point is \fBrequired\fR. For drivers
+that do not implement \fBdump()\fR routines, \fBnodev\fR(9F) should be used.
+.SH ARGUMENTS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 10n
+.rt  
+Device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIaddr\fR \fR
+.ad
+.RS 10n
+.rt  
+Address for the beginning of the area to be dumped.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIblkno\fR \fR
+.ad
+.RS 10n
+.rt  
+Block offset to dump memory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInblk\fR \fR
+.ad
+.RS 10n
+.rt  
+Number of blocks to dump.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdump()\fR is used to dump a portion of virtual address space directly to a
+device in the case of system failure. It can also be used for checking the
+state of the kernel during a checkpoint operation. The memory area to be dumped
+is specified by \fIaddr\fR (base address) and \fInblk\fR (length). It is dumped
+to the device specified by \fIdev\fR starting at offset \fIblkno\fR. Upon
+completion \fBdump()\fR returns the status of the transfer.
+.sp
+.LP
+When the system is panicking, the calls of functions scheduled by
+\fBtimeout\fR(9F) and \fBddi_trigger_softintr\fR(9F) will never occur. Neither
+can delay(9F) be relied upon, since it is implemented via \fBtimeout()\fR. See
+\fBddi_in_panic\fR(9F).
+.sp
+.LP
+\fBdump()\fR is called at interrupt priority.
+.SH RETURN VALUES
+.sp
+.LP
+\fBdump()\fR returns \fB0\fR on success, or the appropriate error number.
+.SH SEE ALSO
+.sp
+.LP
+\fBcpr\fR(7), \fBnodev\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

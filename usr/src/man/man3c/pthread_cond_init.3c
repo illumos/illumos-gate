@@ -1,0 +1,184 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_cond_init 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_cond_init, pthread_cond_destroy \- initialize or destroy condition
+variables
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h>
+
+\fBint\fR \fBpthread_cond_init\fR(\fBpthread_cond_t *restrict\fR \fIcond\fR,
+     \fBconst pthread_condattr_t *restrict\fR \fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_cond_destroy\fR(\fBpthread_cond_t *\fR\fIcond\fR
+.fi
+
+.LP
+.nf
+\fBpthread_cond_t\fR \fIcond\fR= \fBPTHREAD_COND_INITIALIZER\fR;
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The function \fBpthread_cond_init()\fR initializes the condition variable
+referenced by \fIcond\fR with attributes referenced by \fIattr\fR. If
+\fIattr\fR is  \fBNULL\fR, the default condition variable attributes are used;
+the effect is the same as passing the address of a default condition variable
+attributes object. See \fBpthread_condattr_init\fR(3C). Upon successful
+initialization, the state of the condition variable becomes initialized.
+.sp
+.LP
+Attempting to initialize an already initialized condition variable results in
+undefined behavior.
+.sp
+.LP
+The function \fBpthread_cond_destroy()\fR destroys the given condition variable
+specified by \fIcond\fR; the object becomes, in effect, uninitialized. An
+implementation may cause \fBpthread_cond_destroy()\fR to set the object
+referenced by \fIcond\fR to an invalid value. A destroyed condition variable
+object can be re-initialized using \fBpthread_cond_init()\fR; the results of
+otherwise referencing the object after it has been destroyed are undefined.
+.sp
+.LP
+It is safe to destroy an initialized condition variable upon which no threads
+are currently blocked. Attempting to destroy a condition variable upon which
+other threads are currently blocked results in undefined behavior.
+.sp
+.LP
+In cases where default condition variable attributes are appropriate, the macro
+\fBPTHREAD_COND_INITIALIZER\fR can be used to initialize condition variables
+that are statically allocated. The effect is equivalent to dynamic
+initialization by a call to \fBpthread_cond_init()\fR with parameter \fIattr\fR
+specified as  \fBNULL,\fR except that no error checks are performed.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_cond_init()\fR and \fBpthread_cond_destroy()\fR
+functions return  \fB0\fR. Otherwise, an error number is returned to indicate
+the error. The \fBEBUSY\fR and \fBEINVAL\fR error checks, if implemented, act
+as if they were performed immediately at the beginning of processing for the
+function and caused an error return prior to modifying the state of the
+condition variable specified by \fIcond\fR.
+.SH ERRORS
+.sp
+.LP
+The  \fBpthread_cond_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The system lacked the necessary resources (other than memory) to initialize
+another condition variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient memory exists to initialize the condition variable.
+.RE
+
+.sp
+.LP
+The \fBpthread_cond_init()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+The implementation has detected an attempt to re-initialize the object
+referenced by \fIcond\fR, a previously initialized, but not yet destroyed,
+condition variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR is invalid.
+.RE
+
+.sp
+.LP
+The \fBpthread_cond_destroy()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+The implementation has detected an attempt to destroy the object referenced by
+\fIcond\fR while it is referenced (for example, while being used in a
+\fBpthread_cond_wait()\fR or \fBpthread_cond_timedwait()\fR) by another thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIcond\fR is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_cond_signal\fR(3C), \fBpthread_cond_broadcast\fR(3C),
+\fBpthread_cond_wait\fR(3C), \fBpthread_cond_timedwait\fR(3C),
+\fBpthread_condattr_init\fR(3C), \fBattributes\fR(5), \fBcondition\fR(5),
+\fBstandards\fR(5)

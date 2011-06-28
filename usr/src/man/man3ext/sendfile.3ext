@@ -1,0 +1,287 @@
+'\" te
+.\" Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sendfile 3EXT "31 May 2006" "SunOS 5.11" "Extended Library Functions"
+.SH NAME
+sendfile \- send files over sockets or copy files to files
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsendfile\fR [ \fIlibrary\fR\&.\|.\|. ]
+#include <sys/sendfile.h>
+
+\fBssize_t\fR \fBsendfile\fR(\fBint\fR \fIout_fd\fR, \fBint\fR \fIin_fd\fR, \fBoff_t *\fR\fIoff\fR, \fBsize_t\fR \fIlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsendfile()\fR function copies data from \fIin_fd\fR to \fIout_fd\fR
+starting at offset \fIoff\fR and of length \fIlen\fR bytes. The \fIin_fd\fR
+argument should be a file descriptor to a regular file opened for reading. See
+\fBopen\fR(2). The \fIout_fd\fR argument should be a file descriptor to a
+regular file opened for writing or to a connected \fBAF_INET\fR or
+\fBAF_INET6\fR socket of \fBSOCK_STREAM\fR type. See \fBsocket\fR(3SOCKET). The
+\fIoff\fR argument is a pointer to a variable holding the input file pointer
+position from which the data will be read. After \fBsendfile()\fR has
+completed, the variable will be set to the offset of the byte following the
+last byte that was read. The \fBsendfile()\fR function does not modify the
+current file pointer of \fIin_fd\fR, but does modify the file pointer for
+\fIout_fd\fR if it is a regular file.
+.sp
+.LP
+The \fBsendfile()\fR function can also be used to send buffers by pointing
+\fIin_fd\fR to \fBSFV_FD_SELF\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsendfile()\fR returns the total number of bytes
+written to \fIout_fd\fR and also updates the offset to point to the byte that
+follows the last byte read. Otherwise, it returns \fB-1\fR, and \fBerrno\fR is
+set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsendfile()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAFNOSUPPORT\fR\fR
+.ad
+.RS 16n
+.rt  
+The implementation does not support the specified address family for socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 16n
+.rt  
+Mandatory file or record locking is set on either the file descriptor or output
+file descriptor if it points at regular files. \fBO_NDELAY\fR or
+\fBO_NONBLOCK\fR is  set, and there is a blocking record lock. An attempt has
+been made to write to a stream that cannot accept data with the \fBO_NDELAY\fR
+or the \fBO_NONBLOCK\fR flag set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIout_fd\fR or \fIin_fd\fR argument is either not a valid file descriptor,
+\fIout_fd\fR is not opened for writing. or \fIin_fd\fR is not opened for
+reading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The offset cannot be represented by the \fBoff_t\fR structure, or the length is
+negative when cast to \fBssize_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 16n
+.rt  
+An I/O error occurred while accessing the file system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTCONN\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket is not connected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOPNOTSUPP\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket type is not supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIout_fd\fR argument is no longer connected to the peer endpoint.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 16n
+.rt  
+A signal was caught during the write operation and no data was transferred.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBsendfile()\fR function has a transitional interface for 64-bit file
+offsets. See \fBlf64\fR(5).
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSending a Buffer Over a Socket
+.sp
+.LP
+The following example demonstrates how to send the buffer \fIbuf\fR over a
+socket. At the end, it prints the number of bytes transferred over the socket
+from the buffer. It assumes that \fIaddr\fR will be filled up appropriately,
+depending upon where to send the buffer.
+
+.sp
+.in +2
+.nf
+int tfd;
+off_t baddr;
+struct sockaddr_in sin;
+char buf[64 * 1024];
+in_addr_t addr;
+size_t len;
+        
+tfd = socket(AF_INET, SOCK_STREAM, 0);
+if (tfd == -1) {
+    perror("socket");
+    exit(1);
+}
+
+sin.sin_family = AF_INET;
+sin.sin_addr.s_addr = addr;    /* Fill in the  appropriate address. */
+sin.sin_port = htons(2345);
+if (connect(tfd, (struct sockaddr *)&sin, sizeof(sin))<0) {
+    perror("connect");
+    exit(1);
+}
+
+baddr = (off_t)buf;
+len = sizeof(buf);
+while (len > 0) {
+    ssize_t res;
+    res = sendfile(tfd, SFV_FD_SELF, &baddr, len);
+    if (res == -1)
+            if (errno != EINTR) {
+                    perror("sendfile");
+                    exit(1);
+            } else continue;
+    len -= res;
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRTransferring Files to Sockets
+.sp
+.LP
+The following program demonstrates a transfer of files to sockets:
+
+.sp
+.in +2
+.nf
+int ffd, tfd;
+off_t off;
+struct sockaddr_in sin;
+in_addr_t  addr;
+int len;
+struct stat stat_buf;
+ssize_t len;
+
+ffd = open("file", O_RDONLY);
+if (ffd == -1) {
+    perror("open");
+    exit(1);
+}
+
+tfd = socket(AF_INET, SOCK_STREAM, 0);
+if (tfd == -1) {
+    perror("socket");
+    exit(1);
+}
+
+sin.sin_family = AF_INET;
+sin.sin_addr = addr;    /* Fill in the  appropriate address. */
+sin.sin_port = htons(2345);
+if (connect(tfd, (struct sockaddr *) &sin, sizeof(sin)) <0) {
+    perror("connect");
+    exit(1);
+}
+
+if (fstat(ffd, &stat_buf) == -1) {
+    perror("fstat");
+    exit(1);
+}
+
+len = stat_buf.st_size;
+while (len > 0) {
+    ssize_t res;
+    res = sendfile(tfd, ffd, &off, len);
+    if (res == -1)
+            if (errno != EINTR) {
+                    perror("sendfile");
+                    exit(1);
+            } else continue;
+    len -= res;
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBopen\fR(2), \fBlibsendfile\fR(3LIB), \fBsendfilev\fR(3EXT),
+\fBsocket\fR(3SOCKET), \fBattributes\fR(5), \fBlf64\fR(5)

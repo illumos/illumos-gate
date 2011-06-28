@@ -1,0 +1,672 @@
+'\" te
+.\"  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH filesync 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.SH NAME
+filesync \- synchronize ordinary, directory or special files
+.SH SYNOPSIS
+.LP
+.nf
+\fBfilesync\fR [\fB-aehmnqvy\fR] [\fB-o\fR src | dst] 
+     [\fB-f\fR src | dst | old | new] [\fB-r\fR \fIdirectory\fR]...
+.fi
+
+.LP
+.nf
+\fBfilesync\fR [\fB-aehmnqvy\fR] \fB-s\fR \fIsource-dir\fR \fB-d\fR \fIdest-dir\fR \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfilesync\fR utility \fIsynchronizes\fR files between multiple computer
+systems, typically a server and a portable computer. \fBfilesync\fR
+synchronizes ordinary, directory or special files. Although intended for use on
+nomadic systems, \fBfilesync\fR is useful for backup and file replication on
+more permanently connected systems.
+.sp
+.LP
+If files are synchronized between systems, the corresponding files on each of
+the systems are \fIidentical\fR. Changing a file on one or both of the systems
+causes the files to become different (not synchronized). In order to make the
+files identical again, the differences between the files must be
+\fIreconciled\fR. See \fBReconciling and Synchronizing Files\fR  for specific
+details about how \fBfilesync\fR reconciles and synchronizes files.
+.sp
+.LP
+There are two forms of the \fBfilesync\fR command. The first form of
+\fBfilesync\fR is invoked without file arguments. This form of \fBfilesync\fR
+reconciles differences between the files and systems specified in the
+\fB$HOME/.packingrules\fR file. \fB$HOME/.packingrules\fR is a packing rules
+list for \fBfilesync\fR and \fBcachefspack\fR, and contains a list of files to
+be kept synchronized. See \fBpackingrules\fR(4) and \fBcachefspack\fR(1M).
+.sp
+.LP
+The second form of \fBfilesync\fR copies specific files from a directory on the
+source system to a directory on the destination system. In addition, this form
+of \fBfilesync\fR adds the file or files specified as arguments
+(\fIfilename\fR) to \fB$HOME/.packingrules\fR. See \fB-s\fR and \fB-d\fR for
+information about specifying directories on source and destination systems. See
+\fBOPERANDS\fR for details about specifying file (\fIfilename\fR) arguments.
+.sp
+.LP
+Multiple \fBfilesync\fR commands are cumulative (that is, the specified files
+are added to the already existing packing rules file list). See \fBMultiple
+filesync Commands\fR.
+.SS "Reconciling and Synchronizing Files"
+.sp
+.LP
+\fBfilesync\fR synchronizes files between computer systems by performing the
+following two tasks:
+.RS +4
+.TP
+1.
+\fBfilesync\fR examines the directories and files specified in the packing
+rules file on both systems, and determines whether or not they are identical.
+Any file that differs requires reconciliation.
+.sp
+\fBfilesync\fR also maintains a baseline summary in the
+\fB$HOME/.filesync-base\fR file for all of the files that are being monitored.
+This file lists the names, types, and sizes of all files as of the last
+reconciliation.
+.RE
+.RS +4
+.TP
+2.
+Based on the information contained in the baseline file and the specified
+options (see  \fBResolving filesync Conflicts\fR), \fBfilesync\fR determines
+which of the various copies is the correct one, and makes the corresponding
+changes to the other system. Once this has been done, the two copies are,
+again, identical (synchronized).
+.sp
+If a source file has changed and the destination file has not, the changes on
+the source system are propagated to the destination system. If a destination
+file has changed and the corresponding source file has not, the changes on the
+destination file are propagated to the source system. If both systems have
+changed (and the files are not still identical) a warning message will be
+printed out, asking the user to resolve the conflict manually. See
+\fBResolving filesync Conflicts\fR.
+.RE
+.SS "Resolving filesync Conflicts"
+.sp
+.LP
+In cases where files on both sides have changed,  \fBfilesync\fR attempts to
+determine which version should be chosen. If  \fBfilesync\fR cannot
+automatically determine which version should be selected, it prints out a
+warning message and leaves the two incompatible versions of the file
+unreconciled.
+.sp
+.LP
+In these cases, you must either resolve the differences manually, or tell
+\fBfilesync\fR how to choose which file should win. Use the  \fB-o\fR and
+\fB-f\fR options to tell  \fBfilesync\fR how to resolve conflicts (see
+\fBOPTIONS\fR).
+.sp
+.LP
+Alternatively, for each conflicting file, you can examine the two versions,
+determine which one should be kept, and manually bring the two versions into
+agreement (by copying, deleting, or changing the ownership or protection to be
+correct). You can then re-run  \fBfilesync\fR to see whether or not any other
+conflicts remain.
+.SS "Packing Rules File"
+.sp
+.LP
+The packing rules file \fB$HOME/.packingrules\fR contains a list of files to be
+kept synchronized. The syntax of this file is described in
+\fBpackingrules\fR(4).
+.sp
+.LP
+The \fB$HOME/.packingrules\fR file is automatically created if users invoke
+\fBfilesync\fR with filename arguments. By using \fBfilesync\fR options, users
+can augment the packing rules in \fB$HOME/.packingrules\fR.
+.sp
+.LP
+Many users choose to create the packing rules file manually and edit it by
+hand. Users can edit \fB$HOME/.packingrules\fR (using any editor) to
+permanently change the  \fB$HOME/.packingrules\fR file, or to gain access to
+more powerful options  that are not available from the command line (such as
+\fBIGNORE\fR commands). It is much easier to enter complex wildcard expressions
+by editing the \fB$HOME/.packingrules\fR file.
+.SS "Baseline File"
+.sp
+.LP
+\fB$HOME/.filesync-base\fR is the \fBfilesync\fR baseline summary file.
+\fBfilesync\fR uses the information in \fB$HOME/.filesync-base\fR to identify
+the differences between files during the reconciliation and synchronization
+process. Users do not create or edit the baseline file. It is created
+automatically by \fBfilesync\fR and records the last known state of  agreement
+between all of the files being maintained.
+.SS "Multiple filesync Commands"
+.sp
+.LP
+Over a period of time, the set of files you want to keep synchronized can
+change. It is common, for instance, to want to keep files pertaining to only a
+few active projects on your notebook. If you continue to keep files associated
+with every project you have ever worked on synchronized, your notebook's disk
+will fill up with old files. Each  \fBfilesync\fR command will waste a lot of
+time updating files you no longer care about.
+.sp
+.LP
+If you delete the files from your notebook, \fBfilesync\fR will want to perform
+the corresponding deletes on the server, which would not be what you wanted.
+Rather, you would like a way to tell \fBfilesync\fR to stop synchronizing some
+of the files. There are two ways to do this:
+.RS +4
+.TP
+1.
+Edit  \fB$HOME/.packingrules\fR. Delete the rules for the files that you
+want to delete.
+.RE
+.RS +4
+.TP
+2.
+Delete \fB$HOME/.packingrules\fR. Use the  \fBfilesync\fR command to specify
+the files that you want synchronized.
+.RE
+.sp
+.LP
+Either way works, and you can choose the one that seems easiest to you. For
+minor changes, it is probably easier to just edit \fB$HOME/.packingrules\fR.
+For major changes it is probably easier to start from scratch.
+.sp
+.LP
+Once  \fBfilesync\fR is no longer synchronizing a set of files, you can delete
+them from your notebook without having any effect on the server.
+.SS "Nomadic Machines"
+.sp
+.LP
+When using \fBfilesync\fR to keep files synchronized between nomadic machines
+and a server, store the packing rules and baseline files on the nomadic
+machines, not the server. If, when logged into your notebook, the \fBHOME\fR
+environment variable does not normally point to a directory on your notebook,
+you can use the \fBFILESYNC\fR environment variable to specify an alternate
+location for the packing rules and baseline files.
+.sp
+.LP
+Each nomadic machine should carry its own packing rules and baseline file.
+Incorrect file synchronization can result if a server carries a baseline file
+and multiple nomadic machines attempt to reconcile against the server's
+baseline file. In this case, a nomadic machine could be using a baseline file
+that does not accurately describe the state of its files. This might result in
+incorrect reconciliations.
+.sp
+.LP
+To safeguard against the dangers associated with a single  baseline file being
+shared by more than two machines,  \fBfilesync\fR adds a default rule to each
+new packing rules file. This default rule prevents the  packing rules and
+baseline files from being copied.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 28n
+.rt  
+Force the checking of Access Control Lists (\fBACL\fRs )  and attempt to make
+them agree for all new and changed files. If it is not possible to set the
+\fBACL\fR for a particular file, \fBfilesync\fR stops \fBACL\fR synchronization
+for that file.
+.sp
+Some file systems do not support \fBACL\fRs . It is not possible to synchronize
+\fBACL\fRs between file systems that support \fBACL\fRs and those that do not;
+attempting to do so will result in numerous error messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fI dest-dir\fR\fR
+.ad
+.RS 28n
+.rt  
+Specify the directory on the destination system into which \fIfilename\fR is to
+be copied. Use with the \fB-s\fR\fI source-dir\fR option and the \fIfilename\fR
+operand. See \fB-s\fR and  \fBOPERANDS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 28n
+.rt  
+Flag all differences. It may not be possible to resolve all conflicts involving
+modes and ownership (unless \fBfilesync\fR is being run with root privileges).
+If you cannot change the ownership or protections on a file, \fBfilesync\fR
+will normally ignore conflicts in ownership and protection. If you specify the
+\fB-e\fR (everything must agree) flag, however, \fBfilesync\fR will flag these
+differences.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-f\fR\fB src\fR | \fBdst\fR | \fBold\fR | \fBnew\fR\fR
+.ad
+.RS 28n
+.rt  
+The \fB-f\fR option tells \fBfilesync\fR how to resolve conflicting changes. If
+a file has been changed on both systems, and an \fB-f\fR option has been
+specified, \fBfilesync\fR will retain the changes made on the favored system
+and discard the changes made on the unfavored system.
+.sp
+Specify \fB-f\fR \fBsrc\fR to favor the  source-system file. Specify \fB-f\fR
+\fBdst\fR to favor the destination-system file. Specify \fB-f\fR \fBold\fR to
+favor the older version of the file. Specify \fB-f\fR \fBnew\fR to favor the
+newer version of the file.
+.sp
+It is possible to specify the  \fB-f\fR and  \fB-o\fR options in combination
+if they both specify the same preference  (\fBsrc \fRand\fB dst\fR). If
+\fB-f\fR and  \fB-o\fR conflict, the  \fB-f\fR option is ignored. See the
+\fB-o\fR option description.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 28n
+.rt  
+Halt on error. Normally, if \fBfilesync\fR encounters a read or write error
+while copying files, it notes the error and the program continues, in an
+attempt to reconcile other files. If the \fB-h\fR option is specified,
+\fBfilesync\fR will immediately halt when one of these errors occurs and will
+not try to process any more files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 28n
+.rt  
+Ensure that both copies of the file have the same modification time. The
+modification time for newly copied files is set to the time of reconciliation
+by default. File changes are ordered by increasing modification times so that
+the propagated files have the same relative modification time ordering as the
+original changes. Users should be warned that there is usually some time skew
+between  any two systems, and transferring modification times from one system
+to another can occasionally produce strange results.
+.sp
+There are instances in which using \fBfilesync\fR to update some (but not all)
+files in a directory will confuse the  \fBmake\fR program. If, for instance,
+\fBfilesync\fR is keeping  \fB\&.c\fR files synchronized, but ignoring
+\fB\&.o\fR files, a changed  \fB\&.c\fR file may show up with a modification
+time prior to a  \fB\&.o\fR file that was built from a prior version of the
+\fB\&.c\fR file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 28n
+.rt  
+Do not really make the changes. If the  \fB-n\fR option is specified,
+\fBfilesync\fR determines what changes have been made to files, and what
+reconciliations are required and displays this information on the standard
+output. No changes are made to files, including the packing rules file.
+.sp
+Specifying both the \fB-n\fR and \fB-o\fR options causes \fBfilesync\fR to
+analyze the prevailing system and report the changes that have been made on
+that system. Using \fB-n\fR and \fB-o\fR in combination is useful if your
+machine is disconnected (and you cannot access the server) but you want to know
+what changes have been made on the local machine. See the \fB-o\fR option
+description.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-o\fR\fB src | dst\fR\fR
+.ad
+.RS 28n
+.rt  
+The \fB-o\fR option forces a one-way reconciliation, favoring either the source
+system (\fBsrc\fR) or destination system (\fBdst\fR).
+.sp
+Specify \fB-o\fR \fBsrc\fR to propagate changes only from the source system to
+the destination system. Changes made on the destination system are ignored.
+\fBfilesync\fR aborts if it cannot access a source or destination directory.
+.sp
+Specify \fB-o\fR \fBdst\fR to propagate changes only from the destination
+system to the source system. Changes made on the source system are ignored.
+\fBfilesync\fR aborts if it cannot access a source or destination directory.
+.sp
+Specifying \fB-n\fR with the \fB-o\fR option causes \fBfilesync\fR to analyze
+the prevailing system and reports on what changes have been made on that
+system. Using \fB-n\fR and \fB-o\fR in combination is useful if a machine is
+disconnected (and there is no access to the server), but you want to know what
+changes have been made on the local machine. See the \fB-n\fR option
+description.
+.sp
+It is possible to specify the \fB-o\fR and \fB-f\fR options in combination if
+they both specify the same preference (\fBsrc\fR or \fBdst\fR). If \fB-o\fR and
+\fB-f\fR options conflict, the \fB-f\fR option will be ignored. See the
+\fB-f\fR option description.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 28n
+.rt  
+Suppress the standard \fBfilesync\fR messages that describe each reconciliation
+action as it is performed.
+.sp
+The standard \fBfilesync\fR message describes each reconciliation action in the
+form of a UNIX shell command (for example, \fBmv\fR, \fBln\fR, \fBcp\fR,
+\fBrm\fR, \fBchmod\fR, \fBchown\fR, \fBchgrp\fR, \fBsetfacl\fR, and so forth).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fI directory\fR\fR
+.ad
+.RS 28n
+.rt  
+Limit the reconciliation to  \fIdirectory\fR. Specify multiple directories with
+multiple \fB-r\fR specifications.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fI source-dir\fR\fR
+.ad
+.RS 28n
+.rt  
+Specify the directory on the source system from which the  \fIfilename\fR to be
+copied is located. Use with the  \fB-d\fR\fI dest-dir\fR option and the
+\fIfilename\fR operand. See the \fB-d\fR option description and
+\fBOPERANDS\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 28n
+.rt  
+Display additional information about each file comparison as it is made on the
+standard output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-y\fR\fR
+.ad
+.RS 28n
+.rt  
+Bypass safety check prompts. Nomadic machines occasionally move between
+domains, and many of the files on which \fBfilesync\fR operates are expected to
+be accessed by NFS. There is a danger that someday  \fBfilesync\fR will be
+asked to reconcile local changes against the wrong file system or server. This
+could result in a large number of inappropriate copies and deletions. To
+prevent such a mishap,  \fBfilesync\fR performs a few safety checks prior to
+reconciliation. If large numbers of files are likely to  be deleted, or if high
+level directories have changed their I-node numbers,  \fBfilesync\fR prompts
+for a confirmation before reconciliation. If you know that this is likely, and
+do not want to be prompted, use the \fB-y\fR (yes) option to automatically
+confirm these prompts.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfilename\fR\fR
+.ad
+.RS 12n
+.rt  
+The name of the ordinary file, directory, symbolic link, or special file in the
+specified source directory (\fIsource-dir\fR) to be synchronized. Specify
+multiple files by separating each filename by spaces. Use the \fIfilename\fR
+operand with the \fB-s\fR and \fB-d\fR options. See  \fBOPTIONS\fR.
+.sp
+If \fIfilename\fR is an ordinary file, that ordinary file will be replicated
+(with the same \fIfilename\fR) in the specified destination directory
+(\fIdest-dir\fR).
+.sp
+If \fIfilename\fR is a directory, that directory and all of the files and
+subdirectories under it will be replicated (recursively) in the specified
+destination directory (\fIdest-dir\fR).
+.sp
+If  \fIfilename\fR is a symbolic link, a copy of that symbolic link will be
+replicated in the specified destination directory (\fIdest-dir\fR).
+.sp
+If \fIfilename\fR is a special file, a special file with the same major or
+minor device numbers will be replicated in the specified destination directory.
+(\fIdest-dir).\fR Only super-users can use \fBfilesync\fR to create special
+files.
+.sp
+Files created in the destination directory (\fIdest-dir\fR) will have the same
+owner, group and other permissions as the files in the source directory.
+.sp
+If \fIfilename\fR contains escaped shell wildcard characters, the wildcard
+characters are stored in \fB$HOME/.packingrules\fR and evaluated each time
+\fBfilesync\fR is run.
+.sp
+For example, the following would make sure that the two specified files,
+currently in \fB$RHOME\fR, were replicated in  \fB$HOME\fR:
+.sp
+.in +2
+.nf
+\fBfilesync \fR\fB-s\fR\fB $RHOME  \fR\fB-d\fR\fB $HOME a.c \|b.c\fR
+.fi
+.in -2
+.sp
+
+The following example would ensure that all of the \fB*.c\fR files in
+\fB$RHOME\fR were replicated in  \fB$HOME\fR, even if those files were not
+created until later.
+.sp
+.in +2
+.nf
+\fBfilesync \fR\fB-s\fR\fB $RHOME \fR\fB-d\fR\fB $HOME '*.c'\fR
+.fi
+.in -2
+.sp
+
+If any of the destination files already exist,  \fBfilesync\fR ensures that
+they are identical and issues warnings if they are not.
+.sp
+Once files have been copied, the distinction between the source and destination
+is a relatively arbitrary  one (except for its use in the \fB-o\fR and \fB-f\fR
+switches).
+.RE
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFILESYNC\fR\fR
+.ad
+.RS 15n
+.rt  
+Specifies the default location of the \fBfilesync\fR packing rules and baseline
+files. The default value for this variable is \fB$HOME\fR. The suffixes
+\fB\&.packingrules\fR and \fB\&.filesync-base\fR will be appended to form the
+names of the packing rules and baseline files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_MESSAGES\fR\fR
+.ad
+.RS 15n
+.rt  
+Determines how diagnostic and informative messages are presented. In the "C"
+locale, the messages are presented in the default form found in the program
+itself (in most cases, U.S. English).
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+Normally, if all files are already up-to-date, or if all files were
+successfully reconciled, \fBfilesync\fR will exit with a status of \fB0\fR.
+However, if either the \fB-n\fR option was specified or any errors occurred,
+the exit status will be the logical OR of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 7n
+.rt  
+No conflicts, all files up to date.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 7n
+.rt  
+Some resolvable conflicts.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 7n
+.rt  
+Some conflicts requiring manual resolution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 7n
+.rt  
+Some specified files did not exist.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB8\fR\fR
+.ad
+.RS 7n
+.rt  
+Insufficient permission for some files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB16\fR\fR
+.ad
+.RS 7n
+.rt  
+Errors accessing packing rules or baseline file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB32\fR\fR
+.ad
+.RS 7n
+.rt  
+Invalid arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB64\fR\fR
+.ad
+.RS 7n
+.rt  
+Unable to access either or both of the specified \fBsrc\fR or \fBdst\fR
+directories.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB128\fR\fR
+.ad
+.RS 7n
+.rt  
+Miscellaneous other failures.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.packingrules\fR\fR
+.ad
+.RS 24n
+.rt  
+list of files to be kept synchronized
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB$HOME/.filesync-base\fR\fR
+.ad
+.RS 24n
+.rt  
+baseline summary file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcachefspack\fR(1M), \fBpackingrules\fR(4), \fBattributes\fR(5)

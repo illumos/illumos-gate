@@ -436,7 +436,7 @@ devlinks:
 		} else if (errno != ENXIO) {
 			break;
 		}
-		sleep(1);
+		(void) sleep(1);
 	}
 	if (rv != 0)
 		zerror(zlogp, B_TRUE, "ERROR: error while acquiring slave "

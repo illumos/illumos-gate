@@ -1,0 +1,176 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH attr_get 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+attr_get, attr_off, attr_on, attr_set, color_set, wattr_get, wattr_off,
+wattr_on, wattr_set, wcolor_set \- control window attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBattr_get\fR(\fBattr_t *\fR\fIattrs\fR, \fBshort *\fR\fIcolor\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattr_off\fR(\fBattr_t\fR \fIattrs\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattr_on\fR(\fBattr_t\fR \fIattrs\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBattr_set\fR(\fBattr_t\fR \fIattrs\fR, \fBshort\fR \fIcolor\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBcolor_set\fR(\fBshort *\fR\fIcolor\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattr_get\fR(\fBWINDOW *\fR\fIwin\fR, \fBattr_t\fR \fIattrs\fR, \fBshort *\fR\fIcolor\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattr_off\fR(\fBWINDOW *\fR\fIwin\fR, \fBattr_t\fR \fIattrs\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattr_on\fR(\fBWINDOW *\fR\fIwin\fR, \fBattr_t\fR \fIattrs\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwattr_set\fR(\fBWINDOW *\fR\fIwin\fR, \fBattr_t\fR \fIattrs\fR, \fBshort\fR \fIcolor\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwcolor_set\fR(\fBWINDOW *\fR\fIwin\fR, \fBshort\fR \fIcolor\fR, \fBvoid *\fR\fIopts\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBattr_get()\fR function retrieves the current rendition of \fIstdscr\fR.
+The \fBwattr_get()\fR function retrieves the current rendition of window
+\fIwin\fR.  If \fIattrs\fR or \fIcolor\fR is a null pointer, no information is
+retrieved.
+.sp
+.LP
+The \fBattr_off()\fR and \fBattr_on()\fR functions unset and set,
+respectively, the specified window attributes of \fBstdscr\fR.  These functions
+only affect the attributes specified; attributes that existed before the call
+are retained.
+.sp
+.LP
+The \fBwattr_off()\fR and \fBwattr_on()\fR functions unset or set the
+specified attributes for window \fIwin\fR.
+.sp
+.LP
+The \fBattr_set()\fR and \fBwattr_set()\fR functions change the rendition of
+\fBstdscr\fR and \fIwin\fR; the old values are not retained.
+.sp
+.LP
+The \fBcolor_set()\fR and \fBwcolor_set()\fR functions set the window color of
+\fBstdscr\fR and \fIwin\fR to \fIcolor\fR.
+.sp
+.LP
+The attributes and color pairs that can be used are specified in the
+\fBAttributes, Color Pairs, and Renditions\fR section of the
+\fBcurses\fR(3XCURSES) man page.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattrs\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the foreground window attributes to be set or unset.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcolor\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to a color pair number .
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIopts\fR\fR
+.ad
+.RS 9n
+.rt  
+Is reserved for future use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the window in which attribute changes are to be made.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+These functions always return \fBOK\fR.
+.SH ERRORS
+.sp
+.LP
+None.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBadd_wch\fR(3XCURSES), \fBaddnwstr\fR(3XCURSES), \fBattroff\fR(3XCURSES),
+\fBbkgrndset\fR(3XCURSES), \fBcurses\fR(3XCURSES), \fBinit_color\fR(3XCURSES),
+\fBlibcurses\fR(3XCURSES), \fBstart_color\fR(3XCURSES), \fBattributes\fR(5),
+\fBstandards\fR(5)

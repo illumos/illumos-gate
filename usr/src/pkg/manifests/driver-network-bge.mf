@@ -39,6 +39,8 @@ set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 $(i386_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     perms="* 0666 root sys" \
     alias=SUNW,bge \
@@ -123,6 +125,7 @@ $(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/bge group=sys
 $(i386_ONLY)file path=kernel/drv/bge group=sys
 file path=kernel/drv/bge.conf group=sys
+file path=usr/share/man/man7d/bge.7d
 legacy pkg=SUNWbge \
     desc="Broadcom 57xx Gigabit Ethernet Network Adapter Driver" \
     name="Broadcom 57xx GE NIC Driver"

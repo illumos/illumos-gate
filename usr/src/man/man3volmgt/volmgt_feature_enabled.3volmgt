@@ -1,0 +1,86 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volmgt_feature_enabled 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+volmgt_feature_enabled \- check whether specific Volume Management features are
+enabled
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-l\fR volmgt [ \fIlibrary\fR ... ]
+#include <volmgt.h>
+
+
+
+\fBint\fR \fBvolmgt_feature_enabled\fR(\fBchar *\fR\fIfeat_str\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+The  \fBvolmgt_feature_enabled()\fR routine checks whether specific volume
+management features are enabled. \fBvolmgt_feature_enabled()\fR checks for the
+volume management features passed in to it by the  \fIfeat_str\fR parameter.
+.sp
+.LP
+Currently, the only supported feature string  that
+\fBvolmgt_feature_enabled()\fR checks for is \fBfloppy-summit-interfaces\fR.
+The  \fBfloppy-summit-interfaces\fR feature string checks for the presence of
+the \fBlibvolmgt\fR routines \fBvolmgt_acquire()\fR and \fBvolmgt_release()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample of the \fBvolmgt_feature_enabled()\fR function.
+.sp
+.LP
+In the following example,  \fBvolmgt_feature_enabled()\fR checks whether the
+\fBfloppy-summit-interfaces\fR feature is enabled.
+
+.sp
+.in +2
+.nf
+if (volmgt_feature_enabled("floppy-summit-interfaces")) {
+        (void) printf("Media Sharing Routines ARE present\en");
+} else {
+        (void) printf("Media Sharing Routines are NOT present\en");
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBvolmgt_acquire\fR(3VOLMGT), \fBvolmgt_release\fR(3VOLMGT),
+\fBattributes\fR(5), \fBhal\fR(5)

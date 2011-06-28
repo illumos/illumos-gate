@@ -1,0 +1,86 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH chroot 1M "15 Dec 2003" "SunOS 5.11" "System Administration Commands"
+.SH NAME
+chroot \- change root directory for a command
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/chroot\fR \fInewroot\fR \fIcommand\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBchroot\fR utility causes \fIcommand\fR to be executed relative to
+\fInewroot\fR. The meaning of any initial slashes (\fB\|/\|\fR) in the path
+names is changed to \fInewroot\fR for \fIcommand\fR and any of its child
+processes. Upon execution, the initial working directory is \fInewroot\fR.
+.sp
+.LP
+Notice that redirecting the output of \fIcommand\fR to a file,
+.sp
+.in +2
+.nf
+chroot\fI newroot \|command\fR >\fBx\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+will create the file \fBx\fR relative to the original root of \fIcommand\fR,
+not the new one.
+.sp
+.LP
+The new root path name is always relative to the current root. Even if a
+\fBchroot\fR is currently in effect, the \fInewroot\fR argument is relative to
+the current root of the running process.
+.sp
+.LP
+This command can be run only by the super-user.
+.SH RETURN VALUES
+.sp
+.LP
+The exit status of \fBchroot\fR is the return value of \fIcommand\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the \fBchroot\fR Utility
+.sp
+.LP
+The \fBchroot\fR utility provides an easy way to extract \fBtar\fR files (see
+\fBtar\fR(1)) written with absolute filenames to a different location. It is
+necessary to copy the shared libraries used by \fBtar\fR (see \fBldd\fR(1)) to
+the \fInewroot\fR filesystem.
+
+.sp
+.in +2
+.nf
+example# mkdir /tmp/lib; cd /lib
+example# cp ld.so.1 libc.so.1 libcmd.so.1 libdl.so.1 \e
+         libsec.so.1 /tmp/lib
+example# cp /usr/bin/tar /tmp
+example# dd if=/dev/rmt/0 | chroot /tmp tar xvf -
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcd\fR(1), \fBtar\fR(1), \fBchroot\fR(2), \fBttyname\fR(3C),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+Exercise extreme caution when referencing device files in the new root file
+system.
+.sp
+.LP
+References by routines such as \fBttyname\fR(3C) to stdin, stdout, and stderr
+will find that the device associated with the file descriptor is unknown after
+\fBchroot\fR is run.

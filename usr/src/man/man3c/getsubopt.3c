@@ -1,0 +1,223 @@
+'\" te
+.\" Copyright (c) 1989 AT&T.
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved.
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getsubopt 3C "29 Sep 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+getsubopt \- parse suboption arguments from a string
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBint\fR \fBgetsubopt\fR(\fBchar **\fR\fIoptionp\fR, \fBchar * const *\fR\fIkeylistp\fR, \fBchar **\fR\fIvaluep\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetsubopt()\fR function parses suboption arguments in a flag argument.
+Such options often result from the use of \fBgetopt\fR(3C).
+.sp
+.LP
+The \fBgetsubopt()\fR argument \fIoptionp\fR is a pointer to a pointer to the
+option argument string. The suboption arguments are separated by commas and
+each can consist of either a single token or a token-value pair separated by an
+equal sign.
+.sp
+.LP
+The \fIkeylistp\fR argument is a pointer to a vector of strings. The end of the
+vector is identified by a null pointer. Each entry in the vector is one of the
+possible tokens that might be found in *\fIoptionp\fR. Since commas delimit
+suboption arguments in \fIoptionp\fR, they should not appear in any of the
+strings pointed to by \fIkeylistp\fR. Similarly, because an equal sign
+separates a token from its value, the application should not include an equal
+sign in any of the strings pointed to by \fIkeylistp\fR.
+.sp
+.LP
+The \fIvaluep\fR argument is the address of a value string pointer.
+.sp
+.LP
+If a comma appears in \fIoptionp\fR, it is interpreted as a suboption
+separator. After commas have been processed, if there are one or more equal
+signs in a suboption string, the first equal sign in any suboption string is
+interpreted as a separator between a token and a value. Subsequent equal signs
+in a suboption string are interpreted as part of the value.
+.sp
+.LP
+If the string at *\fIoptionp\fR contains only one suboption argument
+(equivalently, no commas), \fBgetsubopt()\fR updates *\fIoptionp\fR to point to
+the null character at the end of the string. Otherwise, it isolates the
+suboption argument by replacing the comma separator with a null character and
+updates *\fIoptionp\fR to point to the start of the next suboption argument. If
+the suboption argument has an associated value (equivalently, contains an equal
+sign), \fBgetsubopt()\fR updates *\fIvaluep\fR to point to the value's first
+character. Otherwise, it sets *\fIvaluep\fR to a null pointer. The calling
+application can use this information to determine whether the presence or
+absence of a value for the suboption is an error.
+.sp
+.LP
+Additionally, when \fBgetsubopt()\fR fails to match the suboption with a token
+in the \fIkeylistp\fR array, the calling application should decide if this is
+an error or if the unrecognized option should be processed in another way.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetsubopt()\fR function returns the index of the matched token string or
+-1 if no token strings were matched.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBgetsubopt()\fR to process options.
+.sp
+.LP
+The following example demonstrates the processing of options to the
+\fBmount\fR(1M) utility using \fBgetsubopt()\fR.
+
+.sp
+.in +2
+.nf
+#include <stdlib.h>
+
+char *myopts[] = {
+#define READONLY     0
+            "ro",
+#define READWRITE    1
+            "rw",
+#define WRITESIZE    2
+            "wsize",
+#define READSIZE     3
+            "rsize",
+            NULL};
+
+main(argc, argv)
+    int  argc;
+    char **argv;
+{
+    int sc, c, errflag;
+    char *options, *value;
+    extern char *optarg;
+    extern int optind;
+    .
+    .
+    .
+    while((c = getopt(argc, argv, "abf:o:")) != -1) {
+        switch (c) {
+        case 'a': /* process a option */
+            break;
+        case 'b': /* process b option */
+            break;
+        case 'f':
+            ofile = optarg;
+            break;
+        case '?':
+            errflag++;
+            break;
+        case 'o':
+            options = optarg;
+            while (*options != '\e0') {
+                switch(getsubopt(&options,myopts,&value)){
+                case READONLY : /* process ro option */
+                    break;
+                case READWRITE : /* process rw option */
+                    break;
+                case WRITESIZE : /* process wsize option */
+                    if (value == NULL) {
+                        error_no_arg();
+                        errflag++;
+                    } else
+                        write_size = atoi(value);
+                    break;
+                case READSIZE : /* process rsize option */
+                    if (value == NULL) {
+                        error_no_arg();
+                        errflag++;
+                    } else
+                        read_size = atoi(value);
+                    break;
+                default :
+                    /* process unknown token */
+                    error_bad_token(value);
+                    errflag++;
+                    break;
+                   }
+            }
+              break;
+        }
+    }
+    if (errflag) {
+        /* print usage instructions etc. */
+    }
+    for (; optind<argc; optind++) {
+        /* process remaining arguments */
+    }
+    .
+    .
+    .
+}
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRParse suboptions.
+.sp
+.LP
+The following example uses the \fBgetsubopt()\fR function to parse a value
+argument in the \fIoptarg\fR external variable returned by a call to
+\fBgetopt\fR(3C).
+
+.sp
+.in +2
+.nf
+#include <stdlib.h>
+\&...
+char *tokens[] = {"HOME", "PATH", "LOGNAME", (char *) NULL };
+char *value;
+int opt, index;
+while ((opt = getopt(argc, argv, "e:")) != -1) {
+    switch(opt) {
+    case 'e' :
+        while ((index = getsubopt(&optarg, tokens, &value)) != -1) {
+            switch(index) {
+\&...
+        }
+        break;  
+\&...
+    }
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmount\fR(1M), \fBgetopt\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

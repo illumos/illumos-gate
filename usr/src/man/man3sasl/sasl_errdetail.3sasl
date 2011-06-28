@@ -1,0 +1,67 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems,
+.\" Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sasl_errdetail 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.SH NAME
+sasl_errdetail \- retrieve detailed information about an error
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
+#include <sasl/sasl.h>
+
+\fBconst char *\fR \fBsasl_errdetail\fR(\fBsasl_conn_t *\fR\fIconn\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsasl_errdetail()\fR interface returns an internationalized string that
+is a message that describes the error that occurred on a SASL connection. The
+\fBsasl_errdetail()\fR interface provides a more user friendly error message
+than the SASL error code returned when SASL indicates that an error has
+occurred on a connection. See \fBsasl_errors\fR(3SASL).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconn\fR\fR
+.ad
+.RS 8n
+.rt  
+The SASL connection context for which the inquiry is made.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBsasl_errdetail()\fR returns the string that describes the error that
+occurred, or \fINULL\fR, if there was an error retrieving it.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsasl_errors\fR(3SASL), \fBsasl_seterror\fR(3SASL), \fBattributes\fR(5)

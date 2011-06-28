@@ -1,0 +1,194 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH innstr 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+innstr, instr, mvinnstr, mvinstr, mvwinnstr, mvwinstr, winnstr, winstr \-
+retrieve a multibyte character string (without rendition)
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+
+:#include <curses.h>
+
+\fBint\fR \fBinnstr\fR(\fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinstr\fR(\fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvinnstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvinstr\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwinnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwinstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwinstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwinnstr\fR(\fBWINDOW *\fR\fIwin\fR, \fBchar *\fR\fIstr\fR, \fBint\fR \fIn\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstr\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to an object that can hold the retrieved multibyte character
+string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the number of characters not to exceed when retrieving \fIstr\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the y (row) coordinate of the starting position of the string to be
+retrieved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 7n
+.rt  
+Is the x (column) coordinate of the starting position of the string to  be
+retrieved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 7n
+.rt  
+Is a pointer to the window in which the string is to be retrieved.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinstr()\fR and \fBwinstr()\fR functions retrieve a multibyte character
+string (without attributes) starting at the current cursor position  of the
+\fBstdscr\fR window and window \fIwin\fR, respectively, and ending at the right
+margin. The \fBmvinstr()\fR and \fBmvwinstr()\fR functions retrieve a multibyte
+character string located at the position indicated by the \fIx\fR (column) and
+\fIy\fR (row) parameters (the former in the \fBstdscr\fR window; the latter  in
+window \fIwin\fR).
+.sp
+.LP
+The \fBinnstr()\fR, \fBwinnstr()\fR, \fBmvinnstr()\fR, and  \fBmvwinnstr()\fR
+functions retrieve at most \fIn\fR characters from the  window \fBstdscr\fR and
+\fIwin\fR, respectively.  The former two functions retrieve the string starting
+at the current cursor position; the latter two commands return the string,
+starting at the position  specified by the \fIx\fR and \fIy\fR parameters.
+.sp
+.LP
+All these functions store the retrieved string in the object pointed to by
+\fIstr\fR. They only store complete multibyte characters.   If the area pointed
+to by \fIstr\fR is not large enough to hold at least one  character, these
+functions fail.
+.sp
+.LP
+Only the character portion of the character/rendition pair is returned.  To
+return the complete character/rendition pair, use \fBwinchstr()\fR.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBOK\fR\fR
+.ad
+.RS 7n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERR\fR\fR
+.ad
+.RS 7n
+.rt  
+An error occurred.
+.RE
+
+.SH USAGE
+.sp
+.LP
+All functions except \fBwinnstr()\fR may be macros.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBinch\fR(3XCURSES), \fBinchstr\fR(3XCURSES), \fBlibcurses\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

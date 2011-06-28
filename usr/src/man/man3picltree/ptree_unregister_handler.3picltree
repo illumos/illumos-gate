@@ -1,0 +1,62 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptree_unregister_handler 3PICLTREE "1 Aug 2000" "SunOS 5.11" "PICL Plug-In Library Functions"
+.SH NAME
+ptree_unregister_handler \- unregister the event handler for the event
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag \&.\|.\|.\fR] \fIfile \fR\&.\|.\|. \fB-lpicltree\fR [\fIlibrary \&.\|.\|.\fR] 
+#include <picltree.h>
+
+\fBvoid\fR \fBptree_register_handler\fR(\fBconst char *\fR\fIename\fR,
+     \fBvoid (*\fR\fIevt_handler\fR)(\fBconst char *\fR\fIename\fR, const void *\fIearg\fR,
+     \fBsize_t\fR \fIsize\fR, \fBvoid *\fR\fIcookie\fR), \fBvoid *\fR\fIcookie\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBptree_unregister_handler()\fR function unregisters the event handler for
+the specified event. The argument \fIename\fR specifies the name of the PICL
+event for which to unregister the handler. The argument \fIevt_handler\fR
+specifies the event handler function. The argument \fIcookie\fR is the pointer
+to the caller-specific data given at the time of registration of the handler.
+.sp
+.LP
+If the handler being unregistered is currently executing, then this function
+will block until its completion. Because of this, locks acquired by the
+handlers should not be held across the call to \fBptree_unregister_handler()\fR
+or a deadlock may result.
+.sp
+.LP
+The \fBptree_unregister_handler()\fR function must not be invoked from the
+handler that is being unregistered.
+.SH RETURN VALUES
+.sp
+.LP
+This function does not return a value.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBptree_register_handler\fR(3PICLTREE), \fBattributes\fR(5)

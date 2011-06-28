@@ -1,0 +1,78 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getq 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+getq \- get the next message from a queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBmblk_t *\fR\fBgetq\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+Pointer to the queue from which the message is to be retrieved.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetq()\fR function is used by a service ( \fBsrv\fR(9E)) routine to
+retrieve its enqueued messages.
+.sp
+.LP
+A module or driver may include a service routine to process enqueued messages.
+Once the \fBSTREAMS \fRscheduler calls \fBsrv()\fR it must process all enqueued
+messages, unless prevented by flow control. \fBgetq()\fR obtains the next
+available message from the top of the queue pointed to by \fIq\fR. It should be
+called in a \fBwhile\fR loop that is exited only when there are no more
+messages or flow control prevents further processing.
+.sp
+.LP
+If an attempt was made to write to the queue while it was blocked by flow
+control, \fBgetq()\fR back-enables (restarts) the service routine once it falls
+below the low water mark.
+.SH RETURN VALUES
+.sp
+.LP
+If there is a message to retrieve, \fBgetq()\fR returns a pointer to it. If no
+message is queued, \fBgetq()\fR returns a \fBNULL\fR pointer.
+.SH CONTEXT
+.sp
+.LP
+The \fBgetq()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+See \fBdupb\fR(9F).
+.SH SEE ALSO
+.sp
+.LP
+\fBsrv\fR(9E), \fBbcanput\fR(9F), \fBcanput\fR(9F), \fBdupb\fR(9F),
+\fBputbq\fR(9F), \fBputq\fR(9F), \fBqenable\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

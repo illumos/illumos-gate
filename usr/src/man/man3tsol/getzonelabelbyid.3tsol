@@ -1,0 +1,122 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getzonelabelbyid 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+getzonelabelbyid, getzonelabelbyname, getzoneidbylabel \- map between zones and
+labels
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflags\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBm_label_t *\fR\fBgetzonelabelbyid\fR(\fBzoneid_t\fR \fIzoneid\fR);
+.fi
+
+.LP
+.nf
+\fBm_label_t *\fR\fBgetzonelabelbyname\fR(\fBconst char *\fR\fIzonename\fR);
+.fi
+
+.LP
+.nf
+\fBzoneid_t *\fR\fBgetzoneidbylabel\fR(\fBconst m_label_t *\fR\fIlabel\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgetzonelabelbyid()\fR function returns the mandatory access control
+(MAC) label of \fIzoneid\fR.
+.sp
+.LP
+The \fBgetzonelabelbyname()\fR function returns the MAC label of the zone whose
+name is \fIzonename\fR.
+.sp
+.LP
+The \fBgetzoneidbylabel()\fR function returns the zone ID of the zone whose
+label is \fIlabel\fR.
+.sp
+.LP
+All of these functions require that the specified zone's state is at least
+\fBZONE_IS_READY\fR. The zone of the calling process must dominate the
+specified zone's label, or the calling process must be in the global zone.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, the \fBgetzonelabelbyid()\fR and
+\fBgetzonelabelbyname()\fR functions return a pointer to a sensitivity label
+that is allocated within these functions. To free the storage, use
+\fBm_label_free\fR(3TSOL). If the zone does not exist, \fBNULL\fR is returned.
+.sp
+.LP
+On successful completion, the \fBgetzoneidbylabel()\fR function returns the
+zone ID with the matching label. If there is no matching zone, the function
+returns \fB-1\fR.
+.SH ERRORS
+.sp
+.LP
+The \fBgetzonelabelbyid()\fR and \fBgetzonelabelbyname()\fR functions will fail
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified zone does not exist.
+.RE
+
+.sp
+.LP
+The \fBgetzonelabelbyid()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOENT\fR\fR
+.ad
+.RS 10n
+.rt  
+No zone corresponds to the specified label.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBgetzonenamebyid\fR(3C), \fBgetzoneidbyname\fR(3C),
+\fBlibtsol\fR(3LIB), \fBm_label_free\fR(3TSOL), \fBattributes\fR(5),
+\fBlabels\fR(5)
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

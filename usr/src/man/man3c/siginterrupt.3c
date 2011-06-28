@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH siginterrupt 3C "1 Sep 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+siginterrupt \- allow signals to interrupt functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBint\fR \fBsiginterrupt\fR(\fBint\fR \fIsig\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsiginterrupt()\fR function changes the restart behavior when a function
+is interrupted by the specified signal. The function
+\fBsiginterrupt\fR(\fIsig\fR, \fIflag\fR) has an effect as if implemented as:
+.sp
+.in +2
+.nf
+siginterrupt(int sig, int flag) {
+     int ret;
+     struct sigaction act;
+     (void) sigaction(sig, NULL, &act);
+     if (flag)
+          act.sa_flags &=  SA_RESTART;
+     else
+          act.sa_flags |= SA_RESTART;
+     ret = sigaction(sig, &act, NULL);
+     return ret;
+}
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsiginterrupt()\fR returns 0. Otherwise, \(mi1 is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsiginterrupt()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsig\fR argument is not a valid signal number.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBsiginterrupt()\fR function supports programs written to historical
+system interfaces. A standard-conforming application, when being written or
+rewritten, should use \fBsigaction\fR(2) with the \fBSA_RESTART\fR flag instead
+of \fBsiginterrupt()\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsigaction\fR(2), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)

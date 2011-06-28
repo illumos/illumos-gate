@@ -1,0 +1,109 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH elf_getarsym 3ELF "11 Jul 2001" "SunOS 5.11" "ELF Library Functions"
+.SH NAME
+elf_getarsym \- retrieve archive symbol table
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
+#include <libelf.h>
+
+\fBElf_Arsym *\fR\fBelf_getarsym\fR(\fBElf *\fR\fIelf\fR, \fBsize_t *\fR\fIptr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBelf_getarsym()\fR function returns a pointer to the archive symbol
+table, if one is available for the \fBELF\fR descriptor \fIelf\fR. Otherwise,
+the archive doesn't have a symbol table, an error occurred, or \fIelf\fR was
+null; \fBelf_getarsym()\fR then returns a null value. The symbol table is an
+array of structures that include the following members.
+.sp
+.in +2
+.nf
+\fBchar	*as_name;
+size_t	as_off;
+unsigned long	as_hash;\fR
+.fi
+.in -2
+
+.sp
+.LP
+These members have the following semantics:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBas_name\fR\fR
+.ad
+.RS 11n
+.rt  
+A pointer to a null-terminated symbol name resides here.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBas_off\fR\fR
+.ad
+.RS 11n
+.rt  
+This value is a byte offset from the beginning of the archive to the member's
+header. The archive member residing at the given offset defines the associated
+symbol. Values in \fBas_off\fR may be passed as arguments to \fBelf_rand()\fR.
+See \fBelf_begin\fR(3ELF) to access the desired archive member.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBas_hash\fR\fR
+.ad
+.RS 11n
+.rt  
+This is a hash value for the name, as computed by \fBelf_hash()\fR.
+.RE
+
+.sp
+.LP
+If \fIptr\fR is non-null, the library stores the number of table entries in the
+location to which \fIptr\fR points. This value is set to \fB0\fR when the
+return value is \fINULL\fR. The table's last entry, which is included in the
+count, has a null \fBas_name\fR, a zero value for \fBas_off\fR, and \fB~0UL\fR
+for \fBas_hash\fR.
+.sp
+.LP
+The hash value returned is guaranteed not to be the bit pattern of all ones (
+\fB~0UL\fR).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar.h\fR(3HEAD), \fBelf\fR(3ELF), \fBelf_begin\fR(3ELF),
+\fBelf_getarhdr\fR(3ELF), \fBelf_hash\fR(3ELF), \fBlibelf\fR(3LIB),
+\fBattributes\fR(5)

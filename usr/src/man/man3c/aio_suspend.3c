@@ -1,0 +1,163 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
+.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
+.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH aio_suspend 3C "18 Dec 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+aio_suspend \- wait for asynchronous I/O request
+.SH SYNOPSIS
+.LP
+.nf
+#include <aio.h>
+
+\fBint\fR \fBaio_suspend\fR(\fBconst struct aiocb * const\fR \fIlist\fR[], \fBint\fR \fInent\fR,
+     \fBconst struct timespec *\fR\fItimeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBaio_suspend()\fR function suspends the calling thread  until at least
+one of the asynchronous I/O operations referenced by the \fIlist\fR argument
+has completed, until a signal interrupts the function, or, if \fItimeout\fR is
+not \fINULL\fR, until the time interval specified by \fItimeout\fR has passed.
+If any of the \fBaiocb\fR structures in the list correspond to completed
+asynchronous I/O operations (that is, the error status for the operation is not
+equal to \fBEINPROGRESS\fR) at the time of the call, the function returns
+without suspending the calling thread. The \fIlist\fR argument is an array of
+pointers to asynchronous I/O control blocks. The \fInent\fR argument indicates
+the number of elements in the array and is limited to \fB_AIO_LISTIO_MAX\fR =
+4096. Each \fBaiocb\fR structure pointed to will have been used in initiating
+an asynchronous I/O request via \fBaio_read\fR(3C), \fBaio_write\fR(3C), or
+\fBlio_listio\fR(3C). This array may contain null pointers, which are ignored.
+If this array contains pointers that refer to \fBaiocb\fR structures that have
+not been used in submitting asynchronous I/O, the effect is undefined.
+.sp
+.LP
+If the time interval indicated in the \fBtimespec\fR structure pointed to by
+\fItimeout\fR passes before any of the I/O operations referenced by \fIlist\fR
+are completed, then \fBaio_suspend()\fR returns with an error.
+.SH RETURN VALUES
+.sp
+.LP
+If \fBaio_suspend()\fR returns after one or more asynchronous I/O operations
+have completed, it returns \fB0\fR. Otherwise, it returns \fB\(mi1\fR, and sets
+\fBerrno\fR to indicate the error.
+.sp
+.LP
+The application may determine which asynchronous I/O completed by scanning the
+associated error and return status using \fBaio_error\fR(3C) and
+\fBaio_return\fR(3C), respectively.
+.SH ERRORS
+.sp
+.LP
+The \fBaio_suspend()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR \fR
+.ad
+.RS 11n
+.rt  
+No asynchronous I/O indicated in the list referenced by \fIlist\fR completed in
+the time interval indicated by \fItimeout\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR \fR
+.ad
+.RS 11n
+.rt  
+A signal interrupted the \fBaio_suspend()\fR function. Since each asynchronous
+I/O operation might provoke a signal when it completes, this error return can
+be caused by the completion of one or more of the very I/O operations being
+awaited.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fInent\fR argument is less than or equal to 0 or greater than
+\fB_AIO_LISTIO_MAX\fR, or the \fBtimespec\fR structure pointed to by
+\fItimeout\fR is not properly set because \fItv_sec\fR is less than 0 or
+\fItv_nsec\fR is either less than 0 or greater than 10^9.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 11n
+.rt  
+There is currently not enough available memory; the application can try again
+later.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fBaio_suspend()\fR function is not supported by the system.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBaio_suspend()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaio.h\fR(3HEAD), \fBaio_fsync\fR(3C), \fBaio_read\fR(3C),
+\fBaio_return\fR(3C), \fBaio_write\fR(3C), \fBlio_listio\fR(3C),
+\fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Solaris 2.6 was the first release to support the Asynchronous Input and Output
+option. Prior to this release, this function always returned \fB\(mi1\fR and
+set \fBerrno\fR to \fBENOSYS\fR.

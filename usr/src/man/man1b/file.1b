@@ -1,0 +1,142 @@
+'\" te
+.\" Copyright (c) 1992, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH file 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+file \- determine the type of a file by examining its contents
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/file\fR [\fB-f\fR \fIffile\fR] [\fB-cL\fR] [\fB-m\fR \fImfile\fR] \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBfile\fR performs a series of tests on each  \fIfilename\fR in an attempt to
+determine what it contains. If the contents of a file appear to be  \fBASCII\fR
+text, \fBfile\fR examines the first 512 bytes and tries to guess its language.
+.sp
+.LP
+\fBfile\fR uses the file \fB/etc/magic\fR to identify files that have some sort
+of \fImagic number\fR, that is, any file containing a numeric or string
+constant that indicates its type.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 12n
+.rt  
+Check for format errors in the magic number file. For reasons of efficiency,
+this validation is not normally carried out. No file type-checking is done
+under \fB-c\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIffile\fR\fR
+.ad
+.RS 12n
+.rt  
+Get a list of filenames to identify from  \fIffile.\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 12n
+.rt  
+If a file is a symbolic link, test the file the link references rather than the
+link itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fI mfile\fR\fR
+.ad
+.RS 12n
+.rt  
+Use \fImfile\fR as the name of an alternate magic number file.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBfile\fR on all the files in a specific user's
+directory.
+.sp
+.LP
+This example illustrates the use of \fBfile\fR on all the files in a specific
+user's directory:
+
+.sp
+.in +2
+.nf
+example% \fBpwd
+/usr/blort/misc\fR
+.fi
+.in -2
+.sp
+
+.sp
+.in +2
+.nf
+example% \fB/usr/ucb/file  *\fR
+
+code:           mc68020 demand paged executable
+code.c:         c program text
+counts:         ascii text
+doc:            roff,nroff, or eqn input text
+empty.file:     empty
+libz:           archive random library
+memos:          directory
+project:        symboliclink to /usr/project
+script:         executable shell script
+titles:         ascii text
+s5.stuff:       cpio archive
+
+
+example%
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+The environment variables \fBLC_CTYPE\fR, \fBLANG\fR, and \fBLC_default\fR
+control the character classification throughout \fBfile\fR. On entry to
+\fBfile\fR, these environment variables are checked in the following order:
+\fBLC_CTYPE\fR, \fBLANG\fR, and \fBLC_default\fR. When a valid value is found,
+remaining environment variables for character classification are ignored. For
+example, a new setting for \fBLANG\fR does not override the current valid
+character classification rules of \fBLC_CTYPE\fR. When none of the values is
+valid, the shell character classification defaults to the   POSIX.1 "C"
+locale.
+.SH FILES
+.sp
+.LP
+\fB/etc/magic\fR
+.SH SEE ALSO
+.sp
+.LP
+\fBmagic\fR(4), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+\fBfile\fR often makes mistakes.  In particular, it often suggests that command
+files are C programs.
+.sp
+.LP
+\fBfile\fR does not recognize Pascal or  LISP.

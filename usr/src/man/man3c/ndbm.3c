@@ -1,0 +1,317 @@
+'\" te
+.\"  Copyright (c) 1985 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992,
+.\" X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.TH ndbm 3C "17 Sep 2001" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+ndbm, dbm_clearerr, dbm_close, dbm_delete, dbm_error, dbm_fetch, dbm_firstkey,
+dbm_nextkey, dbm_open, dbm_store \- database functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <ndbm.h>
+
+\fBint\fR \fBdbm_clearerr\fR(\fBDBM *\fR\fIdb\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdbm_close\fR(\fBDBM *\fR\fIdb\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdbm_delete\fR(\fBDBM *\fR\fIdb\fR, \fBdatum\fR \fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdbm_error\fR(\fBDBM *\fR\fIdb\fR);
+.fi
+
+.LP
+.nf
+\fBdatum\fR \fBdbm_fetch\fR(\fBDBM *\fR\fIdb\fR, \fBdatum\fR \fIkey\fR);
+.fi
+
+.LP
+.nf
+\fBdatum\fR \fBdbm_firstkey\fR(\fBDBM *\fR\fIdb\fR);
+.fi
+
+.LP
+.nf
+\fBdatum\fR \fBdbm_nextkey\fR(\fBDBM *\fR\fIdb\fR);
+.fi
+
+.LP
+.nf
+\fBDBM *\fR\fBdbm_open\fR(\fBconst char *\fR\fIfile\fR, \fBint\fR \fIopen_flags\fR, \fBmode_t\fR \fIfile_mode\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdbm_store\fR(\fBDBM *\fR\fIdb\fR, \fBdatum\fR \fIkey\fR, \fBdatum\fR \fIcontent\fR, \fBint\fR \fIstore_mode\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions create, access and modify a database. They maintain
+\fIkey\fR/\fIcontent\fR pairs in a database. The functions will handle large
+databases (up to a billion blocks) and will access a keyed item in one or two
+file system accesses. This package replaces the earlier \fBdbm\fR(3UCB)
+library, which managed only a single database.
+.sp
+.LP
+\fIkey\fRs and \fIcontent\fRs are described by the \fBdatum\fR typedef. A
+\fBdatum\fR consists of at least two members, \fBdptr\fR and \fBdsize\fR. The
+\fBdptr\fR member points to an object that is \fBdsize\fR bytes in length.
+Arbitrary binary data, as well as ASCII character strings, may be stored in the
+object pointed to by \fBdptr\fR.
+.sp
+.LP
+The database is stored in two files. One file is a directory containing a bit
+map of keys and has \fB\&.dir\fR as its suffix.  The second file contains all
+data and has \fB\&.pag\fR as its suffix.
+.sp
+.LP
+The \fBdbm_open()\fR function opens a database.  The \fBfile\fR argument to the
+function is the pathname of the database.  The function opens two files named
+\fBfile\fR\fB\&.dir\fR and \fBfile\fR\fB\&.pag.\fR The \fIopen_flags\fR
+argument has the same meaning as the \fIflags\fR argument of \fBopen\fR(2)
+except that a database opened for write-only access opens the files for read
+and write access.  The \fIfile_mode\fR argument has the same meaning as the
+third argument of \fBopen\fR(2).
+.sp
+.LP
+The \fBdbm_close()\fR function closes a database.  The argument \fIdb\fR must
+be a pointer to a \fBdbm\fR structure that has been returned from a call to
+\fBdbm_open()\fR.
+.sp
+.LP
+The \fBdbm_fetch()\fR function reads a record from a database.  The argument
+\fIdb\fR is a pointer to a database structure that has been returned from a
+call to \fBdbm_open()\fR. The argument \fIkey\fR is a \fBdatum\fR that has been
+initialized by the application program to the value of the key that matches the
+key of the record the program is fetching.
+.sp
+.LP
+The \fBdbm_store()\fR function writes a record to a database.  The argument
+\fIdb\fR is a pointer to a database structure that has been returned from a
+call to \fBdbm_open()\fR. The argument \fIkey\fR is a \fBdatum\fR that has been
+initialized by the application program to the value of the key that identifies
+(for subsequent reading, writing or deleting) the record the program is
+writing. The argument \fIcontent\fR is a \fBdatum\fR that has been initialized
+by the application program to the value of the record the program is writing.
+The argument \fIstore_mode\fR controls whether \fBdbm_store()\fR replaces any
+pre-existing record that has the same key that is specified by the \fIkey\fR
+argument.  The application program must set \fIstore_mode\fR to either
+\fBDBM_INSERT\fR or \fBDBM_REPLACE\fR.  If the database contains a record that
+matches the \fIkey\fR argument and \fIstore_mode\fR is \fBDBM_REPLACE\fR, the
+existing record is replaced with the new record.  If the database contains a
+record that matches the \fIkey\fR argument and \fIstore_mode\fR is
+\fBDBM_INSERT\fR, the existing record is not replaced with the new record.  If
+the database does not contain a record that matches the \fIkey\fR argument and
+\fIstore_mode\fR is either \fBDBM_INSERT\fR or \fBDBM_REPLACE\fR, the new
+record is inserted in the database.
+.sp
+.LP
+The \fBdbm_delete()\fR function deletes a record and its key from the database.
+The argument \fIdb\fR is a pointer to a database structure that has been
+returned from a call to \fBdbm_open()\fR. The argument \fIkey\fR is a
+\fBdatum\fR that has been initialized by the application program to the value
+of the key that identifies the record the program is deleting.
+.sp
+.LP
+The \fBdbm_firstkey()\fR function returns the first key in the database.  The
+argument \fIdb\fR is a pointer to a database structure that has been returned
+from a call to \fBdbm_open()\fR.
+.sp
+.LP
+The \fBdbm_nextkey()\fR function returns the next key in the database.  The
+argument \fIdb\fR is a pointer to a database structure that has been returned
+from a call to \fBdbm_open()\fR. The \fBdbm_firstkey()\fR function must be
+called before calling \fBdbm_nextkey()\fR. Subsequent calls to
+\fBdbm_nextkey()\fR return the next key until all of the keys in the database
+have been returned.
+.sp
+.LP
+The \fBdbm_error()\fR function returns the error condition of the database.
+The argument \fIdb\fR is a pointer to a database structure that has been
+returned from a call to \fBdbm_open()\fR.
+.sp
+.LP
+The \fBdbm_clearerr()\fR function clears the error condition of the database.
+The argument \fIdb\fR is a pointer to a database structure that has been
+returned from a call to \fBdbm_open()\fR.
+.sp
+.LP
+These database functions support key/content pairs of at least 1024 bytes.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBdbm_store()\fR and \fBdbm_delete()\fR functions return \fB0\fR when they
+succeed and a negative value when they fail.
+.sp
+.LP
+The \fBdbm_store()\fR function returns \fB1\fR if it is called with a
+\fIflags\fR value of \fBDBM_INSERT\fR and the function finds an existing record
+with the same key.
+.sp
+.LP
+The \fBdbm_error()\fR function returns \fB0\fR if the error condition is not
+set and returns a non-zero value if the error condition is set.
+.sp
+.LP
+The return value of \fBdbm_clearerr()\fR is unspecified .
+.sp
+.LP
+The \fBdbm_firstkey()\fR and \fBdbm_nextkey()\fR functions return a key
+\fBdatum\fR. When the end of the database is reached, the \fBdptr\fR member of
+the key is a null pointer.  If an error is detected, the \fBdptr\fR member of
+the key is a null pointer and the error condition of the database is set.
+.sp
+.LP
+The \fBdbm_fetch()\fR function returns a content \fBdatum\fR. If no record in
+the database matches the key or if an error condition has been detected in the
+database, the \fBdptr\fR member of the content is a null pointer.
+.sp
+.LP
+The \fBdbm_open()\fR function returns a pointer to a database structure.  If an
+error is detected during the operation, \fBdbm_open()\fR returns a (\fBDBM
+*\fR)0.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+The following code can be used to traverse the database:
+.sp
+.in +2
+.nf
+for(key = dbm_firstkey(db); key.dptr != NULL; key = dbm_nextkey(db))
+.fi
+.in -2
+
+.sp
+.LP
+The \fBdbm_\fR functions provided in this library should not be confused in any
+way with those of a general-purpose database management system.  These
+functions do not provide for multiple search keys per entry, they do not
+protect against multi-user access (in other words they do not lock records or
+files), and they do not provide the many other useful database functions that
+are found in more robust database management systems.  Creating and updating
+databases by use of these functions is relatively slow because of data copies
+that occur upon hash collisions.  These functions are useful for applications
+requiring fast lookup of relatively static information that is to be indexed by
+a single key.
+.sp
+.LP
+The \fBdptr\fR pointers returned by these functions may point into static
+storage that may be changed by subsequent calls.
+.sp
+.LP
+The \fBdbm_delete()\fR function does not physically reclaim file space,
+although it does make it available for reuse.
+.sp
+.LP
+After calling \fBdbm_store()\fR or \fBdbm_delete()\fR during a pass through the
+keys by \fBdbm_firstkey()\fR and \fBdbm_nextkey()\fR, the application should
+reset the database by calling \fBdbm_firstkey()\fR before again calling
+\fBdbm_nextkey()\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the Database Functions
+.sp
+.LP
+The following example stores and retrieves a phone number, using the name as
+the key.  Note that this example does not include error checking.
+
+.sp
+.in +2
+.nf
+#include <ndbm.h>
+#include <stdio.h>
+#include <fcntl.h>
+#define NAME      "Bill"
+#define PHONE_NO          "123-4567"
+#define DB_NAME   "phones"
+main()
+{
+     DBM *db;
+     datum name = {NAME, sizeof (NAME)};
+     datum put_phone_no = {PHONE_NO, sizeof (PHONE_NO)};
+     datum get_phone_no;
+     /* Open the database and store the record */
+     db = dbm_open(DB_NAME, O_RDWR | O_CREAT, 0660);
+     (void) dbm_store(db, name, put_phone_no, DBM_INSERT);
+     /* Retrieve the record */
+     get_phone_no = dbm_fetch(db, name);
+     (void) printf("Name: %s, Phone Number: %s\en", name.dptr,
+     get_phone_no.dptr);
+     /* Close the database */
+     dbm_close(db);
+     return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBcat\fR(1), \fBcp\fR(1), \fBtar\fR(1), \fBopen\fR(2),
+\fBdbm\fR(3UCB), \fBnetconfig\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fB\&.pag\fR file will contain holes so that its apparent size may be
+larger than its actual content. Older versions of the UNIX operating system may
+create real file blocks for these holes when touched. These files cannot be
+copied by normal means ( \fBcp\fR(1), \fBcat\fR(1), \fBtar\fR(1), \fBar\fR(1))
+without filling in the holes.
+.sp
+.LP
+The sum of the sizes of a \fIkey\fR/\fIcontent\fR pair must not exceed the
+internal block size (currently 1024 bytes). Moreover all
+\fIkey\fR/\fIcontent\fR pairs that hash together must fit on a single block.
+\fBdbm_store()\fR will return an error in the event that a disk block fills
+with inseparable data.
+.sp
+.LP
+The order of keys presented by \fBdbm_firstkey()\fR and \fBdbm_nextkey()\fR
+depends on a hashing function.
+.sp
+.LP
+There are no interlocks and no reliable cache flushing; thus concurrent
+updating and reading is risky.
+.sp
+.LP
+The database files (\fBfile\fR\fB\&.dir\fR and \fBfile\fR\fB\&.pag\fR) are
+binary and are architecture-specific (for example, they depend on the
+architecture's byte order.)  These files are not guaranteed to be portable
+across architectures.

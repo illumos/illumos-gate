@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -622,7 +623,8 @@ fs_fab_acl(
 		aclentp->a_id = (gid_t)-1;	/* Really undefined */
 	} else if (vsecattr->vsa_mask & (VSA_ACECNT | VSA_ACE)) {
 		VERIFY(0 == acl_trivial_create(vattr.va_mode,
-		    (ace_t **)&vsecattr->vsa_aclentp, &vsecattr->vsa_aclcnt));
+		    (vp->v_type == VDIR), (ace_t **)&vsecattr->vsa_aclentp,
+		    &vsecattr->vsa_aclcnt));
 		vsecattr->vsa_aclentsz = vsecattr->vsa_aclcnt * sizeof (ace_t);
 	}
 

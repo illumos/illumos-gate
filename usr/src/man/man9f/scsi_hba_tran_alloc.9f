@@ -1,0 +1,107 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_hba_tran_alloc 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_hba_tran_alloc, scsi_hba_tran_free \- allocate and free transport
+structures
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+
+
+\fBscsi_hba_tran_t *\fR\fBscsi_hba_tran_alloc\fR(\fBdev_info_t *\fR\fIdip\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBscsi_hba_tran_free\fR(\fBscsi_hba_tran_t *\fR\fIhba_tran\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to a \fBdev_info\fR structure, defining the \fBHBA\fR driver instance.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 12n
+.rt  
+Flag modifiers. The only possible flag value is \fBSCSI_HBA_CANSLEEP\fR (memory
+allocation may sleep).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhba_tran\fR\fR
+.ad
+.RS 12n
+.rt  
+Pointer to a \fBscsi_hba_tran\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+For \fBscsi_hba_tran_alloc()\fR:
+.sp
+.LP
+The \fBscsi_hba_tran_alloc()\fR function allocates a  \fBscsi_hba_tran\fR(9S)
+structure for a \fBHBA\fR driver. The \fBHBA\fR must use this structure to
+register its transport vectors with the system by using
+\fBscsi_hba_attach_setup\fR(9F).
+.sp
+.LP
+If the flag \fBSCSI_HBA_CANSLEEP\fR is set in \fIflags\fR,
+\fBscsi_hba_tran_alloc()\fR may sleep when allocating resources; otherwise it
+may not sleep, and callers should be prepared to deal with allocation failures.
+.sp
+.LP
+For \fBscsi_hba_tran_free()\fR:
+.sp
+.LP
+The \fBscsi_hba_tran_free()\fR function is used to free the
+\fBscsi_hba_tran\fR(9S) structure allocated by \fBscsi_hba_tran_alloc()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_hba_tran_alloc()\fR function returns a pointer to the allocated
+transport structure, or \fBNULL\fR if no space is available.
+.SH CONTEXT
+.sp
+.LP
+The \fBscsi_hba_tran_alloc()\fR function can be called from user, interrupt, or
+kernel context. Drivers must not allow \fBscsi_hba_tran_alloc()\fR to sleep if
+called from an interrupt routine.
+.sp
+.LP
+The \fBscsi_hba_tran_free()\fR function can be called from user, interrupt, or
+kernel context context.
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_hba_attach_setup\fR(9F), \fBscsi_hba_tran\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

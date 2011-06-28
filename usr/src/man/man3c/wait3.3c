@@ -1,0 +1,241 @@
+'\" te
+.\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.   Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.TH wait3 3C "4 Nov 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wait3, wait4 \- wait for process to terminate or stop
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+
+\fBpid_t\fR \fBwait3\fR(\fBint *\fR\fIstatusp\fR, \fBint\fR \fIoptions\fR, \fBstruct rusage *\fR\fIrusage\fR);
+.fi
+
+.LP
+.nf
+\fBpid_t\fR \fBwait4\fR(\fBpid_t\fR \fIpid\fR, \fBint *\fR\fIstatusp\fR, \fBint\fR \fIoptions\fR, \fBstruct rusage *\fR\fIrusage\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwait3()\fR function delays its caller until a signal is received or one
+of its child processes terminates or stops due to tracing. If any child process
+has died or stopped due to tracing and this has not already been reported,
+return is immediate, returning the process \fBID\fR and status of one of those
+children. If that child process has died, it is discarded. If there are no
+children, \(mi1 is returned immediately. If there are only running or stopped
+but reported children, the calling process is blocked.
+.sp
+.LP
+If \fIstatusp\fR is not a null pointer, then on return from a successful
+\fBwait3()\fR call, the status of the child process is stored in the integer
+pointed to by \fIstatusp\fR. \fI*statusp\fR indicates the cause of termination
+and other information about the terminated process in the following manner:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the low-order 8 bits of \fI*statusp\fR are equal to 0177, the child process
+has stopped; the 8 bits higher up from the low-order 8 bits of \fI*statusp\fR
+contain the number of the signal that caused the process to stop. See
+\fBsignal.h\fR(3HEAD).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the low-order 8 bits of \fI*statusp\fR are non-zero and are not equal to
+0177, the child process terminated due to a signal; the low-order 7 bits of
+\fI*statusp\fR contain the number of the signal that terminated the process. In
+addition, if the low-order seventh bit of \fI*statusp\fR (that is, bit 0200) is
+set, a ``core image'' of the process was produced; see \fBsignal.h\fR(3HEAD).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, the child process terminated due to an \fBexit()\fR call; the 8 bits
+higher up from the low-order 8 bits of \fI*statusp\fR contain the low-order 8
+bits of the argument that the child process passed to \fBexit()\fR; see
+\fBexit\fR(2).
+.RE
+.sp
+.LP
+The \fIoptions\fR argument is constructed from the bitwise inclusive \fBOR\fR
+of zero or more of the following flags, defined in <\fBsys/wait.h\fR>:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWNOHANG\fR\fR
+.ad
+.RS 13n
+.rt  
+Execution of the calling process is not suspended if status is not immediately
+available for any child process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWUNTRACED\fR\fR
+.ad
+.RS 13n
+.rt  
+The status of any child processes that are stopped, and whose status has not
+yet been reported since they stopped, are also reported to the requesting
+process.
+.RE
+
+.sp
+.LP
+If \fIrusage\fR is not a null pointer, a summary of the resources used by the
+terminated process and all its children is returned. Only the user time used
+and the system time used are currently available. They are returned in the
+\fBru_utime\fR and \fBru_stime\fR, members of the rusage structure,
+respectively.
+.sp
+.LP
+When the \fBWNOHANG\fR option is specified and no processes have status to
+report, \fBwait3()\fR returns 0. The \fBWNOHANG\fR and \fBWUNTRACED\fR options
+may be combined by the bitwise \fBOR\fR operation of the two values.
+.sp
+.LP
+The \fBwait4()\fR function is an extended interface.  If \fIpid\fR is 0,
+\fBwait4()\fR is equivalent to \fBwait3()\fR. If \fIpid\fR has a nonzero value,
+\fBwait4()\fR returns status only for the indicated process \fBID,\fR but not
+for any other child processes. If \fIpid\fR has a negative value, \fBwait4()\fR
+return status only for child processes whose process group ID is equal to the
+absolute value of \fIpid\fR. The status can be evaluated using the macros
+defined by \fBwait.h\fR(3HEAD).
+.SH RETURN VALUES
+.sp
+.LP
+If \fBwait3()\fR or \fBwait4()\fR returns due to a stopped or terminated child
+process, the process \fBID\fR of the child is returned to the calling process.
+Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the
+error.
+.sp
+.LP
+If \fBwait3()\fR or \fBwait4()\fR return due to the delivery of a signal to the
+calling process, \fB\(mi1\fR is returned and \fBerrno\fR is set to \fBEINTR\fR.
+If \fBWNOHANG\fR was set in \fIoptions\fR, it has at least one child process
+specified by \fIpid\fR for which status is not available, and status is not
+available for any process specified by \fIpid\fR, \fB0\fR is returned.
+Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the
+error.
+.sp
+.LP
+The \fBwait3()\fR and \fBwait4()\fR functions return \fB0\fR if \fBWNOHANG\fR
+is specified and there are no stopped or exited children, and return the
+process \fBID\fR of the child process if they return due to a stopped or
+terminated child process. Otherwise, they return \fB\(mi1\fR and set
+\fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBwait3()\fR and \fBwait4()\fR functions will fail and return immediately
+if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECHILD\fR\fR
+.ad
+.RS 10n
+.rt  
+The calling process has no existing unwaited-for child processes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIstatusp\fR or \fIrusage\fR arguments point to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The function was interrupted by a signal. The value of the location pointed to
+by \fIstatusp\fR is undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIoptions\fR is not valid.
+.RE
+
+.sp
+.LP
+The \fBwait4()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBECHILD\fR\fR
+.ad
+.RS 10n
+.rt  
+The process specified by \fIpid\fR does not exist or is not a child of the
+calling process.
+.RE
+
+.sp
+.LP
+The \fBwait3()\fRand \fBwait4()\fR functions will terminate prematurely, return
+\fB\(mi1\fR, and set \fBerrno\fR to \fBEINTR\fR upon the arrival of a signal
+whose \fBSA_RESTART\fR bit in its flags field is not set (see
+\fBsigaction\fR(2)).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkill\fR(1), \fBexit\fR(2), \fBwaitid\fR(2), \fBwaitpid\fR(3C),
+\fBgetrusage\fR(3C), \fBsignal\fR(3C), \fBsignal.h\fR(3HEAD), \fBwait\fR(3C),
+\fBwait.h\fR(3HEAD), \fBproc\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+If a parent process terminates without waiting on its children, the
+initialization process (process \fBID\fR = 1) inherits the children.
+.sp
+.LP
+The \fBwait3()\fR and  \fBwait4()\fR functions are automatically restarted when
+a process receives a signal while awaiting termination of a child process,
+unless the \fBSA_RESTART\fR bit is not set in the flags for that signal.

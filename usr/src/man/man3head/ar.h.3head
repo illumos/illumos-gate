@@ -1,0 +1,219 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ar.h 3HEAD "1 Jul 1998" "SunOS 5.11" "Headers"
+.SH NAME
+ar.h, ar \- archive file format
+.SH SYNOPSIS
+.LP
+.nf
+#include <ar.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The archive command \fBar\fR is used to combine several files into one.
+Archives are used mainly as libraries to be searched by the link editor
+\fBld\fR.
+.sp
+.LP
+Each archive begins with the archive magic string.
+.sp
+.in +2
+.nf
+#define  ARMAG   "!<arch>\en"    /* magic string */ 
+#define  SARMAG   8             /* length of magic string */
+.fi
+.in -2
+
+.sp
+.LP
+Following the archive magic string are the archive file members. Each file
+member is preceded by a file member header which is of the following format:
+.sp
+.in +2
+.nf
+#define  ARFMAG   "`\en"         /* header trailer string */
+
+struct  ar_hdr                  /* file member header */
+{
+    char    ar_name[16];        /* '/' terminated file member name */
+    char    ar_date[12];        /* file member date */
+    char    ar_uid[6]           /* file member user identification */
+    char    ar_gid[6]           /* file member group identification */
+    char    ar_mode[8]          /* file member mode (octal) */
+    char    ar_size[10];        /* file member size */
+    char    ar_fmag[2];         /* header trailer string */
+};
+.fi
+.in -2
+
+.sp
+.LP
+All information in the file member headers is in printable \fBASCII.\fR The
+numeric information contained in the headers is stored as decimal numbers
+(except for \fIar_mode\fR which is in octal). Thus, if the archive contains
+printable files, the archive itself is printable.
+.sp
+.LP
+If the file member name fits, the \fIar_name\fR field contains the name
+directly, and is terminated by a slash (\fB/\fR) and padded with blanks on the
+right. If the member's name does not fit, \fIar_name\fR contains a slash
+(\fB/\fR) followed by a decimal representation of the name's offset in the
+archive string table described below.
+.sp
+.LP
+The \fIar_date\fR field is the modification date of the file at the time of its
+insertion into the archive. Common format archives can be moved from system to
+system as long as the portable archive command \fBar\fR is used.
+.sp
+.LP
+Each archive file member begins on an even byte boundary; a newline is inserted
+between files if necessary. Nevertheless, the size given reflects the actual
+size of the file exclusive of padding.
+.sp
+.LP
+Notice there is no provision for empty areas in an archive file.
+.sp
+.LP
+Each archive that contains object files (see  \fBa.out\fR(4)) includes an
+archive symbol table. This symbol table is used by the link editor  \fBld\fR to
+determine which archive members must be loaded during the link edit process.
+The archive symbol table (if it exists) is always the first file in the archive
+(but is never listed) and is automatically created and/or updated by  \fBar\fR.
+.sp
+.LP
+The archive symbol table has a zero length name (that is,  \fBar_name[0]\fR is
+\fB\&'/'\fR),  \fBar_name[1]==' '\fR, etc.). All ``words'' in this symbol table
+have four bytes, using the machine-independent encoding shown below. All
+machines use the encoding described here for the symbol table, even if the
+machine's ``natural'' byte order is different.
+.sp
+.in +2
+.nf
+                 0       1       2       3
+0x01020304       01      02      03      04       
+.fi
+.in -2
+
+.sp
+.LP
+The contents of this file are as follows:
+.RS +4
+.TP
+1.
+The number of symbols.  Length: 4 bytes.
+.RE
+.RS +4
+.TP
+2.
+The array of offsets into the archive file.  Length: 4 bytes * ``the number
+of symbols''.
+.RE
+.RS +4
+.TP
+3.
+The name string table.  Length: \fIar_size\fR - 4 bytes * (``the number of
+symbols'' + 1).
+.RE
+.sp
+.LP
+As an example, the following symbol table defines 4 symbols. The archive member
+at file offset 114 defines \fIname\fR. The archive member at file offset 122
+defines \fIobject\fR. The archive member at file offset 426 defines
+\fBfunction\fR and the archive member at file offset 434 defines \fIname2\fR.
+.SS "Example Symbol Table"
+.sp
+.in +2
+.nf
+Offset     +0   +1   +2   +3
+          ___________________
+ 0       |         4         | 4 offset entries
+         |___________________|
+ 4       |       114         | name
+         |___________________|
+ 8       |       122         | object
+         |___________________| 
+12       |       426         | function
+         |___________________|
+16       |       434         | name2
+         |___________________| 
+20       |  n | a  | m  | e  | 
+         |____|____|____|____|
+24       | \e0 | o  | b  | j  |
+         |____|____|____|____|
+28       |  e | c  | t  | \e0 |
+         |____|____|____|____|
+32       |  f | u  | n  | c  |
+         |____|____|____|____|
+36       |  t | i  | o  | n  |
+         |____|____|____|____|
+40       | \e0 | n  | a  | m  |
+         |____|____|____|____|
+44       |  e | 2  | \e0 |    |
+         |____|____|____|____|
+.fi
+.in -2
+
+.sp
+.LP
+The string table contains exactly as many null terminated strings as there are
+elements in the offsets array. Each offset from the array is associated with
+the corresponding name from the string table (in order). The names in the
+string table are all the defined global symbols found in the common object
+files in the archive. Each offset is the location of the archive header for the
+associated symbol.
+.sp
+.LP
+If some archive member's name is more than 15 bytes long, a special archive
+member contains a table of file names, each followed by a slash and a new-line.
+This string table member, if present, will precede all ``normal'' archive
+members. The special archive symbol table is not a ``normal'' member, and must
+be first if it exists. The \fBar_name\fR entry of the string table's member
+header holds a zero length name \fBar_name[0]=='/'\fR, followed by one trailing
+slash (\fBar_name[1]=='/'\fR), followed by blanks (\fBar_name[2]==' '\fR,
+etc.). Offsets into the string table begin at zero. Example \fIar_name\fR
+values for short and long file names appear below.
+.sp
+.in +2
+.nf
+Offset   +0   +1   +2   +3   +4   +5   +6   +7   +8   +9
+       __________________________________________________
+ 0     | f  | i  | l  | e  | _  | n  | a  | m  | e  | _  |
+       |____|____|____|____|____|____|____|____|____|____|
+10     | s  | a  | m  | p  | l  | e  | /  | \en | l  | o  |
+       |____|____|____|____|____|____|____|____|____|____|
+20     | n  | g  | e  | r  | f  | i  | l  | e  | n  | a  |
+       |____|____|____|____|____|____|____|____|____|____|
+30     | m  | e  | x  | a  | m  | p  | l  | e  | /  | \en |
+       |____|____|____|____|____|____|____|____|____|____|
+.fi
+.in -2
+
+.sp
+.in +2
+.nf
+   Member Name                            ar_name
+_______________________________________________________________
+short-name           | short-name/  | Not in string table
+                     |              |                         
+file_name_sample     | /0           | Offset 0 in string table
+                     |              |                         
+longerfilenamexample | /18          | Offset 18 in string table
+_____________________|______________|___________________________            
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBar\fR(1), \fBld\fR(1), \fBstrip\fR(1), \fBa.out\fR(4)
+.SH NOTES
+.sp
+.LP
+The \fBstrip\fR utility will remove all archive symbol entries from the header.
+The archive symbol entries must be restored with the \fB-ts\fR options of the
+\fBar\fR command before the archive can be used with the link editor \fBld\fR.

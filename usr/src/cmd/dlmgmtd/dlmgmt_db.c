@@ -1388,13 +1388,49 @@ dlmgmt_db_walk(zoneid_t zoneid, datalink_class_t class, db_walk_func_t *func)
 }
 
 /*
+ * Attempt to mitigate one of the deadlocks in the dlmgmtd architecture.
+ *
+ * dlmgmt_db_init() calls dlmgmt_process_db_req() which eventually gets to
+ * dlmgmt_zfop() which tries to fork, enter the zone and read the file.
+ * Because of the upcall architecture of dlmgmtd this can lead to deadlock
+ * with the following scenario:
+ *    a) the thread preparing to fork will have acquired the malloc locks
+ *       then attempt to suspend every thread in preparation to fork.
+ *    b) all of the upcalls will be blocked in door_ucred() trying to malloc()
+ *       and get the credentials of their caller.
+ *    c) we can't suspend the in-kernel thread making the upcall.
+ *
+ * Thus, we cannot serve door requests because we're blocked in malloc()
+ * which fork() owns, but fork() is in turn blocked on the in-kernel thread
+ * making the door upcall.  This is a fundamental architectural problem with
+ * any server handling upcalls and also trying to fork().
+ *
+ * To minimize the chance of this deadlock occuring, we check ahead of time to
+ * see if the file we want to read actually exists in the zone (which it almost
+ * never does), so we don't need fork in that case (i.e. rarely to never).
+ */
+static boolean_t
+zone_file_exists(char *zoneroot, char *filename)
+{
+	struct stat	sb;
+	char		fname[MAXPATHLEN];
+
+        (void) snprintf(fname, sizeof (fname), "%s/%s", zoneroot, filename);
+
+	if (stat(fname, &sb) == -1)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
  * Initialize the datalink <link name, linkid> mapping and the link's
  * attributes list based on the configuration file /etc/dladm/datalink.conf
  * and the active configuration cache file
  * /etc/svc/volatile/dladm/datalink-management:default.cache.
  */
 int
-dlmgmt_db_init(zoneid_t zoneid)
+dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 {
 	dlmgmt_db_req_t	*req;
 	int		err;
@@ -1404,22 +1440,28 @@ dlmgmt_db_init(zoneid_t zoneid)
 	    DATALINK_INVALID_LINKID, zoneid, DLMGMT_ACTIVE, &err)) == NULL)
 		return (err);
 
-	if ((err = dlmgmt_process_db_req(req)) != 0) {
-		/*
-		 * If we get back ENOENT, that means that the active
-		 * configuration file doesn't exist yet, and is not an error.
-		 * We'll create it down below after we've loaded the
-		 * persistent configuration.
-		 */
-		if (err != ENOENT)
-			goto done;
+	if (zone_file_exists(zoneroot, cachefile)) {
+		if ((err = dlmgmt_process_db_req(req)) != 0) {
+			/*
+			 * If we get back ENOENT, that means that the active
+			 * configuration file doesn't exist yet, and is not an
+			 * error.  We'll create it down below after we've
+			 * loaded the persistent configuration.
+			 */
+			if (err != ENOENT)
+				goto done;
+			boot = B_TRUE;
+		}
+	} else {
 		boot = B_TRUE;
 	}
 
-	req->ls_flags = DLMGMT_PERSIST;
-	err = dlmgmt_process_db_req(req);
-	if (err != 0 && err != ENOENT)
-		goto done;
+	if (zone_file_exists(zoneroot, DLMGMT_PERSISTENT_DB_PATH)) {
+		req->ls_flags = DLMGMT_PERSIST;
+		err = dlmgmt_process_db_req(req);
+		if (err != 0 && err != ENOENT)
+			goto done;
+	}
 	err = 0;
 	if (rewrite_needed) {
 		/*

@@ -1,0 +1,101 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH arch 1 "21 Oct 2002" "SunOS 5.11" "User Commands"
+.SH NAME
+arch \- display the architecture of the current host
+.SH SYNOPSIS
+.LP
+.nf
+\fBarch\fR [\fB-k\fR | \fIarchname\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBarch\fR utility displays the application architecture of the current
+host system. Due to extensive historical use of this command without any
+options, all SunOS 5.\fIx\fR SPARC based systems will return "sun4" as their
+application architecture. Use of this command is discouraged. See NOTES section
+below.
+.sp
+.LP
+Systems can be broadly classified by their \fBarchitectures\fR, which define
+what executables will run on which machines. A distinction can be made between
+\fBkernel\fR architecture and \fBapplication\fR architecture (or, commonly,
+just "architecture"). Machines that run different kernels due to underlying
+hardware differences may be able to run the same application programs.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 6n
+.rt  
+Displays the kernel architecture, such as \fBsun4u\fR.  This defines which
+specific SunOS kernel will run on the machine, and has implications only for
+programs that depend on the kernel explicitly (for example, \fBps\fR(1)).
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarchname\fR\fR
+.ad
+.RS 12n
+.rt  
+Use \fIarchname\fR to determine whether the application binaries for this
+application architecture can run on the current host system. The
+\fIarchname\fR must be a valid application architecture, such as
+\fBsun4\fR,\fB i86pc\fR, and so forth.
+.sp
+If \fBapplication\fR binaries for \fIarchname\fR can run on the current host
+system, \fBTRUE\fR (\fB0\fR) is returned. Otherwise,  \fBFALSE\fR (\fB1\fR) is
+returned.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmach\fR(1), \fBps\fR(1), \fBuname\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+This command is provided for compatibility with previous releases and its use
+is discouraged. Instead, the \fBuname\fR command is recommended. See
+\fBuname\fR(1) for usage information.

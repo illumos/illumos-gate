@@ -1,0 +1,54 @@
+'\" te
+.\" Copyright (c) 1998, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH users 1B "16 Nov 1998" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+users \- display a compact list of users logged in
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/users\fR [\fIfilename\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusers\fR utility lists the login names of the users currently on the
+system in a compact, one-line format.
+.sp
+.LP
+Specifying \fIfilename\fR tells \fBusers\fR where to find its information; by
+default it checks \fB/var/adm/utmpx\fR.
+.sp
+.LP
+Typing \fBusers\fR is equivalent to typing \fBwho\fR \fB-q\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRListing current users
+.sp
+.in +2
+.nf
+example% \fBusers
+paul george ringo\fRexample%
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/adm/utmpx\fR\fR
+.ad
+.RS 18n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBwho\fR(1), \fBattributes\fR(5)

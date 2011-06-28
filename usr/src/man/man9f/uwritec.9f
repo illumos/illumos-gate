@@ -1,0 +1,58 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc., All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH uwritec 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+uwritec \- remove a character from a uio structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/uio.h>
+
+
+
+\fBint\fR \fBuwritec\fR(\fBuio_t *\fR\fIuio_p\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuio_p\fR\fR
+.ad
+.RS 9n
+.rt  
+Pointer to the \fBuio\fR(9S) structure
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBuwritec()\fR function returns a character from the \fBuio\fR structure
+pointed to by \fIuio_p\fR and updates the \fBuio\fR structure. See
+\fBuiomove\fR(9F).
+.SH RETURN VALUES
+.sp
+.LP
+The next character for processing is returned on success, and \fB-1\fR is
+returned if \fBuio\fR is empty or if there is an error.
+.SH CONTEXT
+.sp
+.LP
+The \fBuwritec()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBuiomove\fR(9F), \fBureadc\fR(9F), \fBiovec\fR(9S), \fBuio\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

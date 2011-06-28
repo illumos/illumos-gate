@@ -1,0 +1,181 @@
+'\" te
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH if_nametoindex 3SOCKET "28 Jan 2009" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+if_nametoindex, if_indextoname, if_nameindex, if_freenameindex \- routines to
+map Internet Protocol network interface names and interface indexes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR [ \fIlibrary\fR... ]
+#include <net/if.h>
+
+\fBunsigned int\fR \fBif_nametoindex\fR(\fBconst char *\fR\fIifname\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBif_indextoname\fR(\fBunsigned int\fR \fIifindex\fR, \fBchar *\fR\fIifname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct if_nameindex *\fR\fBif_nameindex\fR(void)
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBif_freenameindex\fR(\fBstruct if_nameindex *\fR\fIptr\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIifname\fR\fR
+.ad
+.RS 11n
+.rt  
+interface name
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIifindex\fR\fR
+.ad
+.RS 11n
+.rt  
+interface index
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIptr\fR\fR
+.ad
+.RS 11n
+.rt  
+pointer returned by \fBif_nameindex()\fR
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This \fBAPI\fR defines two functions that map between an Internet Protocol
+network interface name and index, a third function that returns all the
+interface names and indexes, and a fourth function to return the dynamic memory
+allocated by the previous function.
+.sp
+.LP
+Network interfaces are normally known by names such as \fBeri0\fR, \fBsl1\fR,
+\fBppp2\fR, and the like. The \fIifname\fR argument must point to a buffer of
+at least \fBIF_NAMESIZE\fR bytes into which the interface name corresponding to
+the specified index is returned. \fBIF_NAMESIZE\fR is defined in
+<\fBnet/if.h\fR> and its value includes a terminating null byte at the end of
+the interface name.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif_nametoindex()\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fBif_nametoindex()\fR function returns the interface index corresponding
+to the interface name pointed to by the \fIifname\fR pointer. If the specified
+interface name does not exist, the return value is \fB0\fR, and \fIerrno\fR is
+set to \fBENXIO\fR. If there was a system error, such as running out of memory,
+the return value is \fB0\fR and \fIerrno\fR is set to the proper value, for
+example, \fBENOMEM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif_indextoname()\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fBif_indextoname()\fR function maps an interface index into its
+corresponding name. This pointer is also the return value of the function. If
+there is no interface corresponding to the specified index, \fBNULL\fR is
+returned, and \fIerrno\fR is set to \fBENXIO\fR, if there was a system error,
+such as running out of memory, \fBif_indextoname()\fR returns \fBNULL\fR and
+\fIerrno\fR would be set to the proper value, for example, \fBENOMEM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif_nameindex()\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fBif_nameindex()\fR function returns an array of \fBif_nameindex\fR
+structures, one structure per interface. The \fBif_nameindex\fR structure holds
+the information about a single interface and is defined when the
+<\fBnet/if.h\fR> header is included:
+.sp
+.in +2
+.nf
+struct if_nameindex 
+   unsigned int   if_index; /* 1, 2, ... */  
+   char          *if_name;  /* "net0", ... */
+};     
+.fi
+.in -2
+
+While any IPMP IP interfaces are returned by \fBif_nameindex()\fR, the
+underlying IP interfaces that comprise each IPMP group are not returned.
+.sp
+The end of the array of structures is indicated by a structure with an
+\fBif_index\fR of 0 and an \fBif_name\fR of \fBNULL\fR. The function returns a
+null pointer upon an error and sets \fIerrno\fR to the appropriate value. The
+memory used for this array of structures along with the interface names pointed
+to by the \fBif_name\fR members is obtained dynamically. This memory is freed
+by the \fBif_freenameindex()\fR function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBif_freenameindex()\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fBif_freenameindex()\fR function frees the dynamic memory that was
+allocated by \fBif_nameindex()\fR. The argument to this function must be a
+pointer that was returned by \fBif_nameindex()\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBifconfig\fR(1M), \fBif_nametoindex\fR(3XNET), \fBattributes\fR(5),
+\fBif\fR(7P)

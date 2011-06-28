@@ -1,0 +1,147 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH insq 9F "23 Mar 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+insq \- insert a message into a queue
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+
+
+
+\fBint\fR \fBinsq\fR(\fBqueue_t *\fR\fIq\fR, \fBmblk_t *\fR\fIemp\fR, \fBmblk_t *\fR\fInmp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to the queue containing message \fIemp\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIemp\fR\fR
+.ad
+.RS 7n
+.rt  
+Enqueued message before which the new message is to be inserted. \fBmblk_t\fR
+is an instance of the \fBmsgb\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInmp\fR\fR
+.ad
+.RS 7n
+.rt  
+Message to be inserted.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinsq()\fR function inserts a message into a queue. The message to be
+inserted, \fInmp\fR, is placed in \fIq\fR immediately before the message
+\fIemp\fR. If \fIemp\fR is \fINULL\fR, the new message is placed at the end of
+the queue. The queue class of the new message is ignored. All flow control
+parameters are updated. The service procedure is enabled unless \fBQNOENB\fR is
+set.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBinsq()\fR function returns \fB1\fR on success, and \fB0\fR on failure.
+.SH CONTEXT
+.sp
+.LP
+The \fBinsq()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.sp
+.LP
+This routine illustrates the steps a transport provider may take to place
+expedited data ahead of normal data on a queue (assume all \fBM_DATA\fR
+messages are converted into \fBM_PROTO T_DATA_REQ\fR messages). Normal
+\fBT_DATA_REQ\fR messages are just placed on the end of the queue (line 16).
+However, expedited \fBT_EXDATA_REQ\fR messages are inserted before any normal
+messages already on the queue (line 25). If there are no normal messages on the
+queue, \fBbp\fR will be \fINULL\fR and we fall out of the \fBfor\fR loop (line
+21). \fBinsq\fR acts like \fBputq\fR(9F) in this case.
+.sp
+.in +2
+.nf
+ 1  #include <sys/stream.h>
+ 2  #include <sys/tihdr.h>
+ 3
+ 4  static int
+ 5  xxxwput(queue_t *q, mblk_t *mp)
+ 6  {
+ 7   union T_primitives *tp;
+ 8   mblk_t *bp;
+ 9   union T_primitives *ntp;
+10
+11   switch (mp->b_datap->db_type) {
+12   case M_PROTO:
+13        tp = (union T_primitives *)mp->b_rptr;
+14        switch (tp->type) {
+15        case T_DATA_REQ:
+16                putq(q, mp);
+17                break;
+18
+19        case T_EXDATA_REQ:
+20              /* Insert code here to protect queue and message block */
+21               for (bp = q->q_first; bp; bp = bp->b_next) {
+22                  if (bp->b_datap->db_type == M_PROTO) {
+23                    ntp = (union T_primitives *)bp->b_rptr;
+24                    if (ntp->type != T_EXDATA_REQ)
+25                        break;
+26                 }
+27               }
+28               (void)insq(q, bp, mp);
+29               /* End of region that must be protected */
+30               break;
+          . . .
+31              }
+32    }
+33   }
+.fi
+.in -2
+
+.sp
+.LP
+When using \fBinsq()\fR, you must ensure that the queue and the message block
+is not modified by another thread at the same time. You can achieve this either
+by using STREAMS functions or by implementing your own locking.
+.SH SEE ALSO
+.sp
+.LP
+\fBputq\fR(9F), \fBrmvq\fR(9F), \fBmsgb\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.SH WARNINGS
+.sp
+.LP
+If \fIemp\fR is non-\fINULL\fR, it must point to a message on \fIq\fR or a
+system panic could result.

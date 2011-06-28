@@ -1,0 +1,217 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ks_snapshot 9E "4 Dec 2002" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+ks_snapshot \- take a snapshot of kstat data
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fB_ks_snapshot\fR(\fBkstat_t *\fR\fIksp\fR, \fBvoid *\fR\fIbuf\fR, \fBint\fR \fIrw\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIksp\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a \fBkstat\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbuf\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a buffer to copy the snapshot into.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrw\fR \fR
+.ad
+.RS 8n
+.rt  
+Read/Write flag. Possible values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_READ\fR\fR
+.ad
+.RS 15n
+.rt  
+Copy driver statistics from the driver to the buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBKSTAT_WRITE\fR\fR
+.ad
+.RS 15n
+.rt  
+Copy statistics from the buffer to the driver.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkstat\fR mechanism allows for an optional \fBks_snapshot()\fR function
+to copy \fBkstat\fR data. This is the routine that is called to marshall the
+\fBkstat\fR data to be copied to user-land. A driver can opt to use a custom
+snapshot routine rather than the default snapshot routine; to take advantage of
+this feature, set the \fBks_snapshot\fR field before calling
+\fBkstat_install\fR(9F).
+.sp
+.LP
+The \fBks_snapshot()\fR function must have the following structure:
+.sp
+.in +2
+.nf
+static int
+xx_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
+{
+     if (rw == KSTAT_WRITE) {
+/* set the native stats to the values in buf */
+/* return EACCES if you don't support this */
+     } else {
+/* copy the kstat-specific data into buf */
+     }
+     return (0);
+}
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In general, the \fBks_snapshot()\fR routine might need to refer to
+provider-private data; for example, it might need a pointer to the provider's
+raw statistics. The \fBks_private\fR field is available for this purpose. Its
+use is entirely at the provider's discretion.
+.sp
+.LP
+No \fBkstat\fR locking should be done inside the \fBks_update()\fR routine. The
+caller will already be holding the \fBkstat\fR's \fBks_lock\fR (to ensure
+consistent data) and will prevent the \fBkstat\fR from being removed.
+.RS +4
+.TP
+1.
+\fBks_snaptime\fR must be set (via \fBgethrtime\fR(9F)) to timestamp the
+data.
+.RE
+.RS +4
+.TP
+2.
+Data gets copied from the \fBkstat\fR to the buffer on \fBKSTAT_READ\fR, and
+from the buffer to the \fBkstat\fR on \fBKSTAT_WRITE\fR.
+.RE
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 10n
+.rt  
+Success
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+If \fBKSTAT_WRITE\fR is not allowed
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+.rt  
+For any other error
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function is called from user context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRNamed \fBkstat\fRs with Long Strings (\fBKSTAT_DATA_STRING\fR)
+.sp
+.in +2
+.nf
+static int
+xxx_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
+{
+    if (rw == KSTAT_WRITE) {
+         return (EACCES);
+    } else {
+         kstat_named_t *knp = buf;
+         char *end = knp + ksp->ks_ndata;
+         uint_t i;
+
+         bcopy(ksp->ks_data, buf,
+                 sizeof (kstat_named_t) * ksp->ks_ndata);
+/*
+ * Now copy the strings to the end of the buffer, and
+ * update the pointers appropriately.
+ */
+         for (i = 0; i < ksp->ks_ndata; i++, knp++)
+                 if (knp->data_type == KSTAT_DATA_STRING &&
+                     KSTAT_NAMED_STR_PTR(knp) != NULL) {
+                         bcopy(KSTAT_NAMED_STR_PTR(knp), end,
+                                 KSTAT_NAMED_STR_BUFLEN(knp));
+                         KSTAT_NAMED_STR_PTR(knp) = end;
+                         end += KSTAT_NAMED_STR_BUFLEN(knp);
+                 } 
+    }
+    return (0);
+}
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+\fBks_update\fR(9E), \fBkstat_create\fR(9F), \fBkstat_install\fR(9F),
+\fBkstat\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

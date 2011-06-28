@@ -1,0 +1,113 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tcsendbreak 3C "14 Aug 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+tcsendbreak \- send a ``break'' for a specific duration
+.SH SYNOPSIS
+.LP
+.nf
+#include <termios.h> 
+
+\fBint\fR \fBtcsendbreak\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIduration\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fIfildes\fR argument is an open file descriptor associated with a
+terminal.
+.sp
+.LP
+If the terminal is using asynchronous serial data transmission,
+\fBtcsendbreak()\fR will cause transmission of a continuous stream of
+zero-valued bits for a specific duration.  If \fIduration\fR is 0, it will
+cause transmission of zero-valued bits for at least 0.25 seconds, and not more
+than 0.5 seconds.  If \fIduration\fR is not 0, it behaves in a way similar to
+\fBtcdrain\fR(3C).
+.sp
+.LP
+If the terminal is not using asynchronous serial data transmission, it sends
+data to generate a break condition or returns without taking any action.
+.sp
+.LP
+Attempts to use \fBtcsendbreak()\fR from a process which is a member of a
+background process group on a \fIfildes\fR associated with its controlling
+terminal will cause the process group to be sent a \fBSIGTTOU\fR signal. If the
+calling process is blocking or ignoring \fBSIGTTOU\fR signals, the process is
+allowed to perform the operation, and no signal is sent.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBtcsendbreak()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+.rt  
+The file associated with \fIfildes\fR is not a terminal.
+.RE
+
+.sp
+.LP
+The \fBtcsendbreak()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 7n
+.rt  
+The process group of the writing process is orphaned, and the writing process
+is not ignoring or blocking \fBSIGTTOU\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe, and Async-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtcdrain\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5), \fBtermio\fR(7I)

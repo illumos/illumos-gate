@@ -1,0 +1,188 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH setlocale 3C "19 Sep 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+setlocale \- modify and query a program's locale
+.SH SYNOPSIS
+.LP
+.nf
+#include <locale.h>
+
+\fBchar *\fR\fBsetlocale\fR(\fBint\fR \fIcategory\fR, \fBconst char *\fR\fIlocale\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsetlocale()\fR function selects the appropriate piece of the program's
+locale as specified by the \fIcategory\fR and \fIlocale\fR arguments. The
+\fIcategory\fR argument may have the following values: \fBLC_CTYPE\fR,
+\fBLC_NUMERIC\fR, \fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_MONETARY\fR,
+\fBLC_MESSAGES\fR, and \fBLC_ALL\fR. These names are defined in the
+<\fBlocale.h\fR> header.  The \fBLC_ALL\fR variable names all of a program's
+locale categories.
+.sp
+.LP
+The \fBLC_CTYPE\fR variable affects the behavior of character handling
+functions such as \fBisdigit\fR(3C) and \fBtolower\fR(3C), and multibyte
+character functions such as  \fBmbtowc\fR(3C) and \fBwctomb\fR(3C).
+.sp
+.LP
+The \fBLC_NUMERIC\fR variable affects the decimal point character and thousands
+separator character for the formatted input/output functions and string
+conversion functions.
+.sp
+.LP
+The \fBLC_TIME\fR variable affects the date and time format as delivered by
+\fBascftime\fR(3C), \fBcftime\fR(3C), \fBgetdate\fR(3C), \fBstrftime\fR(3C),
+and \fBstrptime\fR(3C).
+.sp
+.LP
+The \fBLC_COLLATE\fR variable affects the sort order produced by collating
+functions such as \fBstrcoll\fR(3C) and \fBstrxfrm\fR(3C).
+.sp
+.LP
+The \fBLC_MONETARY\fR variable affects the monetary formatted information
+returned by \fBlocaleconv\fR(3C).
+.sp
+.LP
+The \fBLC_MESSAGES\fR variable affects the behavior of messaging functions such
+as \fBdgettext\fR(3C), \fBgettext\fR(3C), and \fBgettxt\fR(3C).
+.sp
+.LP
+A value of "C" for \fIlocale\fR specifies the traditional \fBUNIX\fR system
+behavior. At program startup, the equivalent of
+.sp
+.LP
+\fBsetlocale(LC_ALL, "C")\fR
+.sp
+.LP
+is executed. This has the effect of initializing each category to the locale
+described by the environment "C".
+.sp
+.LP
+A value of "" for \fIlocale\fR specifies that the locale should be taken from
+environment variables. The order in which the environment variables are checked
+for the various categories is given below:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.38i) |cw(1.38i) |cw(1.38i) |cw(1.38i) 
+lw(1.38i) |lw(1.38i) |lw(1.38i) |lw(1.38i) 
+.
+Category1st Env Var2nd Env Var3rd Env Var
+_
+LC_CTYPE:LC_ALLLC_CTYPELANG
+_
+LC_COLLATE:LC_ALLLC_COLLATELANG
+_
+LC_TIME:LC_ALLLC_TIMELANG
+_
+LC_NUMERIC:LC_ALLLC_NUMERICLANG
+_
+LC_MONETARY:LC_ALLLC_MONETARYLANG
+_
+LC_MESSAGES:LC_ALLLC_MESSAGESLANG
+.TE
+
+.sp
+.LP
+If a pointer to a string is given for \fIlocale\fR, \fBsetlocale()\fR attempts
+to set the locale for the given category to \fIlocale\fR. If \fBsetlocale()\fR
+succeeds, \fIlocale\fR is returned. If \fBsetlocale()\fR fails, a null pointer
+is returned and the program's locale is not changed.
+.sp
+.LP
+For category \fBLC_ALL\fR, the behavior is slightly different. If a pointer to
+a string is given for \fIlocale\fR and \fBLC_ALL\fR is given for
+\fIcategory\fR, \fBsetlocale()\fR attempts to set the locale for all the
+categories to \fIlocale\fR. The \fIlocale\fR may be a simple locale, consisting
+of a single locale, or a composite locale. If the locales for all the
+categories are the same after all the attempted locale changes,
+\fBsetlocale()\fR will return a pointer to the common simple locale. If there
+is a mixture of locales among the categories, \fBsetlocale()\fR will return a
+composite locale.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBsetlocale()\fR returns the string associated
+with the specified category for the new locale. Otherwise, \fBsetlocale()\fR
+returns a null pointer and the program's locale is not changed.
+.sp
+.LP
+A null pointer for \fIlocale\fR causes \fBsetlocale()\fR to return a pointer to
+the string associated with the \fIcategory\fR for the program's current locale.
+The program's locale is not changed.
+.sp
+.LP
+The string returned by \fBsetlocale()\fR is such that a subsequent call with
+that string and its associated \fIcategory\fR will restore that part of the
+program's locale. The string returned must not be modified by the program, but
+may be overwritten by a subsequent call to \fBsetlocale()\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/lib/locale/\fIlocale\fR\fR\fR
+.ad
+.RS 26n
+.rt  
+locale database directory for \fIlocale\fR
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlocale\fR(1), \fBctype\fR(3C), \fBgetdate\fR(3C) \fBgettext\fR(3C),
+\fBgettxt\fR(3C), \fBisdigit\fR(3C), \fBlibc\fR(3LIB), \fBlocaleconv\fR(3C),
+\fBmbtowc\fR(3C), \fBstrcoll\fR(3C), \fBstrftime\fR(3C), \fBstrptime\fR(3C)
+\fBstrxfrm\fR(3C) \fBtolower\fR(3C), \fBwctomb\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+It is unsafe for any thread to change locale (by calling \fBsetlocale()\fR with
+a non-null locale argument) in a multithreaded application while any other
+thread in the application is using any locale-sensitive routine. To change
+locale in a multithreaded application, \fBsetlocale()\fR should be called prior
+to using any locale-sensitive routine. Using \fBsetlocale()\fR to query the
+current locale is safe and can be used anywhere in a multithreaded application
+except when some other thread is changing locale.
+.sp
+.LP
+It is the user's responsibility to ensure that mixed locale categories are
+compatible. For example, setting \fBLC_CTYPE=C\fR and \fBLC_TIME=ja\fR (where
+\fBja\fR indicates Japanese) will not work, because Japanese time cannot be
+represented in the "C" locale's ASCII codeset.

@@ -1,0 +1,55 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_named 9S "4 Apr 1994" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+kstat_named \- structure for named kstats
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+Named \fBkstats\fR are an array of name-value pairs. These pairs are kept in
+the \fBkstat_named\fR structure. When a \fBkstat\fR is created by
+\fBkstat_create\fR(9F), the driver specifies how many of these structures will
+be allocated. The structures are returned as an array pointed to by the
+\fBks_data\fR field.
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+union {
+          char                   c[16];
+          long                   l;
+          ulong_t                ul; 
+          longlong_t             ll;
+          u_longlong_t           ull;
+} value;  /* value of counter */ 
+.fi
+.in -2
+
+.sp
+.LP
+The only member exposed to drivers is the \fBvalue\fR member. This field is a
+union of several data types. The driver must specify which type it will use in
+the call to \fBkstat_named_init()\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat_create\fR(9F), \fBkstat_named_init\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

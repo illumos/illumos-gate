@@ -1,0 +1,287 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_init_pkt 9E "11 Jan 2009" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_init_pkt, tran_destroy_pkt \- SCSI HBA packet preparation and deallocation
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+\fBstruct scsi_pkt *prefix\fR\fBtran_init_pkt\fR(\fBstruct scsi_address *\fR\fIap\fR,
+     \fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct buf *\fR\fIbp\fR, \fBint\fR \fIcmdlen\fR, 
+     \fBint\fR \fIstatuslen\fR, \fBint\fR \fItgtlen\fR, \fBint\fR\fIflags\fR, \fBint (*\fR\fIcallback\fR,
+     \fBcaddr_t),caddr_t\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBvoid prefix\fR\fBtran_destroy_pkt\fR(\fBstruct scsi_address *\fR\fIap\fR,
+     \fBstruct scsi_pkt *\fR\fIpkt\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBscsi_address\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpkt\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBscsi_pkt\fR(9S) structure allocated in an earlier call, or
+\fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to a \fBbuf\fR(9S) structure if \fBDMA \fRresources are to be allocated
+for the \fIpkt\fR, or \fINULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmdlen\fR\fR
+.ad
+.RS 13n
+.rt  
+The required length for the \fBSCSI \fRcommand descriptor block (\fBCDB\fR) in
+bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstatuslen\fR\fR
+.ad
+.RS 13n
+.rt  
+The required length for the \fBSCSI \fRstatus completion block (\fBSCB\fR) in
+bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItgtlen\fR\fR
+.ad
+.RS 13n
+.rt  
+The length of the packet private area within the \fBscsi_pkt\fR to be allocated
+on behalf of the \fBSCSI \fRtarget driver.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 13n
+.rt  
+Flags for creating the packet.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointer to either \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 13n
+.rt  
+Always \fINULL\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtran_init_pkt()\fR and \fBtran_destroy_pkt()\fR vectors in the
+\fBscsi_hba_tran\fR structure must be initialized during the \fBHBA \fRdriver's
+\fBattach\fR(9E) to point to \fBHBA \fRentry points to be called when a target
+driver calls \fBscsi_init_pkt\fR(9F) and \fBscsi_destroy_pkt\fR(9F).
+.SS "\fBtran_init_pkt()\fR"
+.sp
+.LP
+\fBtran_init_pkt()\fR is the entry point into the \fBHBA \fRwhich is used to
+allocate and initialize a \fBscsi_pkt\fR structure on behalf of a \fBSCSI
+\fRtarget driver. If \fIpkt\fR is \fINULL,\fR the \fBHBA \fRdriver must use
+\fBscsi_hba_pkt_alloc\fR(9F) to allocate a new \fBscsi_pkt\fR structure.
+.sp
+.LP
+If \fIbp\fR is non-\fINULL\fR, the \fBHBA \fRdriver must allocate appropriate
+\fBDMA \fRresources for the \fIpkt\fR, for example,
+through\fBddi_dma_buf_setup\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F).
+.sp
+.LP
+If the \fBPKT_CONSISTENT\fR bit is set in \fIflags\fR, the buffer was allocated
+by \fBscsi_alloc_consistent_buf\fR(9F). For packets marked with
+\fBPKT_CONSISTENT,\fR the \fBHBA \fRdriver must synchronize any cached data
+transfers before calling the target driver's command completion callback.
+.sp
+.LP
+If the \fBPKT_DMA_PARTIAL\fR bit is set in \fIflags\fR, the \fBHBA \fRdriver
+should set up partial data transfers, such as setting the \fBDDI_DMA_PARTIAL\fR
+bit in the \fIflags\fR argument if interfaces such as
+\fBddi_dma_buf_setup\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F) are used.
+.sp
+.LP
+If only partial \fBDMA \fRresources are available,  \fBtran_init_pkt()\fR must
+return in the \fBpkt_resid\fR field of \fIpkt\fR the number of bytes of \fBDMA
+\fRresources not allocated.
+.sp
+.LP
+If both  \fIpkt\fR and  \fIbp\fR are  non-\fINULL\fR, if the
+\fBPKT_DMA_PARTIAL\fR bit is set in  \fIflags\fR, and if \fBDMA \fRresources
+have already been allocated for the  pkt with a previous call to
+\fBtran_init_pkt()\fR that returned a non-zero \fBpkt_resid\fR field, this
+request is to move the \fBDMA \fRresources for the subsequent piece of the
+transfer.
+.sp
+.LP
+The contents of \fBscsi_address\fR(9S) pointed to by \fIap\fR are copied into
+the \fBpkt_address\fR field of the \fBscsi_pkt\fR(9S) by
+\fBscsi_hba_pkt_alloc\fR(9F).
+.sp
+.LP
+\fItgtlen\fR is the length of the packet private area in the \fBscsi_pkt\fR
+structure to be allocated on behalf of the \fBSCSI \fRtarget driver.
+.sp
+.LP
+\fIstatuslen\fR is the required length for the \fBSCSI \fRstatus completion
+block.  If the requested status length is greater than or equal to
+\fBsizeof(struct scsi_arq_status)\fR  and the  \fBauto_rqsense\fR capability
+has been set, automatic request sense (\fBARS\fR) is enabled for this packet.
+If the status length is less than \fBsizeof(struct scsi_arq_status)\fR,
+automatic request sense must be disabled for this \fIpkt\fR.
+.sp
+.LP
+If the \fBHBA\fR driver is not capable of disabling \fBARQ\fR on a per-packet
+basis and \fBtran_init_pkt()\fR is called with a \fIstatuslen\fR that is less
+than  \fBsizeof(struct scsi_arq_status)\fR, the driver's \fBtran_init_pkt\fR
+routine should  allocate at least \fBsizeof(struct scsi_arq_status)\fR. If an
+\fBARS\fR is needed, upon successful \fBARS\fR done by the \fBHBA\fR driver,
+the driver must copy the sense data over and set \fBSTAT_ARQ_DONE\fR in
+\fBpkt_state\fR.
+.sp
+.LP
+\fIcmdlen\fR is the required length for the \fBSCSI \fRcommand descriptor
+block.
+.sp
+.LP
+Note: \fItgtlen\fR, \fIstatuslen\fR, and \fIcmdlen\fR are used only when the
+\fBHBA \fRdriver allocates the \fBscsi_pkt\fR(9S), in other words, when
+\fIpkt\fR is \fINULL\fR.
+.sp
+.LP
+\fIcallback\fR indicates what the allocator routines should do when resources
+are not available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR\fR
+.ad
+.RS 14n
+.rt  
+Do not wait for resources. Return a \fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR\fR
+.ad
+.RS 14n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.SS "tran_destroy_pkt()"
+.sp
+.LP
+\fBtran_destroy_pkt()\fR is the entry point into the \fBHBA \fRthat must free
+all of the resources that were allocated to the \fBscsi_pkt\fR(9S) structure
+during \fBtran_init_pkt()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_init_pkt()\fR must return a pointer to a \fBscsi_pkt\fR(9S) structure
+on success, or \fINULL\fR on failure.
+.sp
+.LP
+If \fIpkt\fR is \fINULL\fR on entry, and \fBtran_init_pkt()\fR allocated a
+packet through\fBscsi_hba_pkt_alloc\fR(9F) but was unable to allocate \fBDMA
+\fRresources, \fBtran_init_pkt()\fR must free the packet through
+\fBscsi_hba_pkt_free\fR(9F) before returning \fINULL\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBattach\fR(9E), \fBtran_setup_pkt\fR(9E), \fBtran_sync_pkt\fR(9E),
+\fBbiodone\fR(9F), \fBbioerror\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
+\fBddi_dma_buf_setup\fR(9F), \fBkmem_cache_create\fR(9F),
+\fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_destroy_pkt\fR(9F),
+\fBscsi_hba_attach\fR(9F), \fBscsi_hba_pkt_alloc\fR(9F),
+\fBscsi_hba_pkt_free\fR(9F), \fBscsi_init_pkt\fR(9F), \fBbuf\fR(9S),
+\fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+If a \fBDMA\fR allocation request fails with \fBDDI_DMA_NOMAPPING\fR, indicate
+the error by calling \fBbioerror\fR(9F) with \fIbp\fR and an error code of
+\fBEFAULT\fR.
+.sp
+.LP
+If a \fBDMA \fRallocation request fails with \fBDDI_DMA_TOOBIG,\fR indicate the
+error by calling \fBbioerror\fR(9F) with \fIbp\fR and an error code of
+\fBEINVAL\fR.
+.sp
+.LP
+For increased performance, an HBA driver may want to provide a cache for
+\fBscsi_pkt\fR(9S) allocation. This cache should be implemented by the HBA
+driver providing a \fBtran_setup_pkt\fR(9E) implementation. Implementing this
+cache by direct use of \fBkmem_cache_create\fR(9F) adds a compile-time
+dependency on \fBscsi_pkt()\fR size, which is illegal.

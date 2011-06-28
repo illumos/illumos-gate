@@ -1,0 +1,323 @@
+'\" te
+.\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 1995 IEEE. All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH semaphore 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+semaphore, sema_init, sema_destroy, sema_wait, sema_trywait, sema_post \-
+semaphores
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... -lthread  -lc [ \fIlibrary\fR... ]
+#include <synch.h> 
+
+\fBint\fR \fBsema_init\fR(\fBsema_t *\fR\fIsp\fR, \fBunsigned int\fR \fIcount\fR, \fBint\fR \fItype\fR,
+     \fBvoid *\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsema_destroy\fR(\fBsema_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsema_wait\fR(\fBsema_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsema_trywait\fR(\fBsema_t *\fR\fIsp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsema_post\fR(\fBsema_t *\fR\fIsp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+A semaphore is a non-negative integer count and is generally used to coordinate
+access to resources. The initial semaphore count is set to the number of free
+resources, then threads slowly increment and decrement the count as resources
+are added and removed. If the semaphore count drops to 0, which means no
+available resources,  threads attempting to decrement the semaphore will block
+until the count is greater than 0.
+.sp
+.LP
+Semaphores can synchronize threads in this process and other processes if they
+are allocated in writable memory  and shared among the cooperating processes
+(see \fBmmap\fR(2)), and have been initialized for this purpose.
+.sp
+.LP
+Semaphores must be initialized before use; semaphores pointed to by \fIsp\fR to
+\fIcount\fR are initialized by \fBsema_init()\fR. The \fItype\fR argument can
+assign several different types of behavior to a semaphore. No current type uses
+\fIarg\fR, although it may be used in the future.
+.sp
+.LP
+The \fItype\fR argument may be one of the following:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSYNC_PROCESS\fR \fR
+.ad
+.RS 18n
+.rt  
+The semaphore can synchronize threads in this process and other processes.
+Initializing the semaphore should be done by only one process. A semaphore
+initialized with this type must be allocated in memory shared between
+processes, either in Sys V shared memory (see \fBshmop\fR(2)), or in memory
+mapped to a file (see \fBmmap\fR(2)). It is illegal to initialize the object
+this way and not allocate it in such shared memory. \fIarg\fR is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSYNC_THREAD\fR \fR
+.ad
+.RS 18n
+.rt  
+The semaphore can synchronize  threads only in this process. The \fIarg\fR
+argument is ignored. \fBUSYNC_THREAD\fR does not support multiple mappings to
+the same logical synch object. If you need to \fBmmap()\fR a synch object to
+different locations within the same address space, then the synch object should
+be initialized as a shared object \fBUSYNC_PROCESS\fR for Solaris threads and
+\fBPTHREAD_PROCESS_PRIVATE\fR for POSIX threads.
+.RE
+
+.sp
+.LP
+A semaphore must not be simultaneously initialized by multiple threads, nor
+re-initialized while in use by other threads.
+.sp
+.LP
+Default semaphore initialization (intra-process):
+.sp
+.in +2
+.nf
+sema_t sp;
+int count  =  1;
+sema_init(&sp, count, NULL, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+sema_init(&sp, count, USYNC_THREAD, NULL);
+.fi
+.in -2
+
+.sp
+.LP
+Customized semaphore initialization (inter-process):
+.sp
+.in +2
+.nf
+\fBsema_t sp;
+int count  =  1;
+sema_init(&sp, count, USYNC_PROCESS, NULL);\fR
+.fi
+.in -2
+
+.sp
+.LP
+The \fBsema_destroy()\fR function destroys any state related to the semaphore
+pointed to by \fIsp\fR. The semaphore storage space is not released.
+.sp
+.LP
+The \fBsema_wait()\fR function blocks the calling thread until the semaphore
+count pointed to by \fIsp\fR is greater than 0, and then it atomically
+decrements the count.
+.sp
+.LP
+The \fBsema_trywait()\fR function atomically decrements the semaphore count
+pointed to by \fIsp\fR, if the count is greater than 0; otherwise, it returns
+an error.
+.sp
+.LP
+The \fBsema_post()\fR function atomically increments the semaphore count
+pointed to by \fIsp\fR. If there are any threads blocked on the semaphore, one
+will be unblocked.
+.sp
+.LP
+The semaphore functionality described on this man page is for the Solaris
+threads implementation.  For the POSIX-conforming semaphore interface
+documentation, see \fBsem_close\fR(3C), \fBsem_destroy\fR(3C),
+\fBsem_getvalue\fR(3C), \fBsem_init\fR(3C), \fBsem_open\fR(3C),
+\fBsem_post\fR(3C), \fBsem_unlink\fR(3C), and \fBsem_wait\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fB0\fR is returned; otherwise, a non-zero value
+indicates an error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR \fR
+.ad
+.RS 11n
+.rt  
+The \fIsp\fR argument does not refer to a valid semaphore.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR \fR
+.ad
+.RS 11n
+.rt  
+Either the \fIsp\fR or \fIarg\fR argument points to an illegal address.
+.RE
+
+.sp
+.LP
+The \fBsema_wait()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR \fR
+.ad
+.RS 10n
+.rt  
+The wait was interrupted by a signal or \fBfork()\fR.
+.RE
+
+.sp
+.LP
+The \fBsema_trywait()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR \fR
+.ad
+.RS 10n
+.rt  
+The semaphore pointed to by \fIsp\fR has a 0 count.
+.RE
+
+.sp
+.LP
+The \fBsema_post()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR \fR
+.ad
+.RS 14n
+.rt  
+The semaphore value pointed to by \fIsp\fR exceeds \fBSEM_VALUE_MAX\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe customer waiting-line in a bank is analogous to the
+synchronization scheme of a semaphore using \fBsema_wait()\fR and
+\fBsema_trywait()\fR:
+.sp
+.in +2
+.nf
+/* cc [ flag \|.\|.\|. ] file \|.\|.\|. -lthread [ library \|.\|.\|. ] */
+#include <errno.h>
+#define TELLERS 10
+sema_t     tellers;     /* semaphore */
+int banking_hours(), deposit_withdrawal;
+void*customer(), do_business(), skip_banking_today();
+\&.\|.\|.
+
+sema_init(&tellers, TELLERS, USYNC_THREAD, NULL);
+    /* 10 tellers available */
+while(banking_hours())
+    pthread_create(NULL, NULL, customer, deposit_withdrawal);
+\&.\|.\|.
+
+void *
+customer(int deposit_withdrawal)
+{
+     int this_customer, in_a_hurry = 50;
+     this_customer = rand() % 100;
+
+     if (this_customer == in_a_hurry)  {
+         if (sema_trywait(&tellers) != 0)
+             if (errno == EBUSY){ /* no teller available */
+                  skip_banking_today(this_customer);
+                  return;
+         } /* else go immediately to available teller and
+                                decrement tellers */
+      }
+      else
+         sema_wait(&tellers); /* wait for next teller, then 
+                                proceed, and decrement tellers */
+
+      do_business(deposit_withdrawal);
+      sema_post(&tellers); /* increment tellers; this_customer's 
+                              teller is now available */
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmmap\fR(2), \fBshmop\fR(2), \fBsem_close\fR(3C), \fBsem_destroy\fR(3C),
+\fBsem_getvalue\fR(3C), \fBsem_init\fR(3C), \fBsem_open\fR(3C),
+\fBsem_post\fR(3C), \fBsem_unlink\fR(3C), \fBsem_wait\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+These functions are also available by way of:
+.sp
+.in +2
+.nf
+#include <thread.h>
+.fi
+.in -2
+
+.sp
+.LP
+By default, there is no defined order of unblocking for multiple threads
+waiting for a semaphore.

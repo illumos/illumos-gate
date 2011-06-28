@@ -1,0 +1,97 @@
+'\" te
+.\"  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH volmgt_root 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+volmgt_root \- return the volume management root directory
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lvolmgt\fR [ \fIlibrary\fR ... ]
+#include <volmgt.h>
+\fBconst char *\fR\fBvolmgt_root\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+The \fBvolmgt_root()\fR function returns the current volume management root
+directory, which by default is \fB/vol\fR but can be configured to be in a
+different location.
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH ERRORS
+.sp
+.LP
+This function may fail if an \fBopen()\fR of \fB/dev/volctl\fR fails.  If this
+occurs a pointer to the default Volume Management root directory is returned.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRFinding the Volume Management Root directory.
+.sp
+.LP
+To find out where the volume management root directory is:
+
+.sp
+.in +2
+.nf
+if ((path = volmgt_root()) != NULL) {
+        (void) printf("Volume Management root dir=%s\en", path);
+} else {
+        (void) printf("can't find Volume Management root dir\en");
+}
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev\fR\fR
+.ad
+.RS 8n
+.rt  
+default location for the volume management root directory
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBopen\fR(2), \fBvolmgt_check\fR(3VOLMGT), \fBvolmgt_inuse\fR(3VOLMGT),
+\fBvolmgt_running\fR(3VOLMGT), \fBattributes\fR(5), \fBhal\fR(5)
+.SH NOTES
+.sp
+.LP
+This function returns the default root directory location even when volume
+management is not running.

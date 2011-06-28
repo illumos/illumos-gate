@@ -1,0 +1,238 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH port_send 3C "24 Oct 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+port_send, port_sendn \- send a user-defined event to a port or list of ports
+.SH SYNOPSIS
+.LP
+.nf
+#include <port.h>
+
+\fBint\fR \fBport_send\fR(\fBint\fR \fIport\fR, \fBint\fR \fIevents\fR, \fBvoid *\fR\fIuser\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBport_sendn\fR(\fBint\fR \fIports\fR[], \fBint\fR \fIerrors\fR[], \fBuint_t\fR \fInent\fR,
+     \fBint\fR \fIevents\fR, \fBvoid *\fR\fIuser\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBport_send()\fR function submits a user-defined event to a specified
+port. The \fIport\fR argument is a file descriptor that represents a port.  The
+sent event has its \fBportev_events\fR member set to the value specified in the
+\fIevents\fR parameter and its \fBportev_user\fR member set to the value
+specified in the \fIuser\fR parameter.  The \fBportev_object\fR member of an
+event sent with \fBport_send()\fR is unspecified.
+.sp
+.LP
+The \fBport_sendn()\fR function submits a user-defined event to multiple ports.
+The \fIports\fR argument is an array of file descriptors that represents ports
+(see \fBport_create\fR(3C)). The \fInent\fR argument specifies the number of
+file descriptors in the \fIports\fR[] array. An event is submitted to each
+specified port. Each event has its \fBportev_events\fR member set to the value
+specified in the \fIevents\fR parameter and its \fBportev_user\fR member set to
+the value specified in the \fIuser\fR parameter.  The \fBportev_object\fR
+member of \fIevents\fR sent with \fBport_sendn()\fR is unspecified.
+.sp
+.LP
+A port that is in alert mode can be sent an event, but that event will not be
+retrievable until the port has resumed normal operation.  See
+\fBport_alert\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBport_send()\fR function returns 0.
+Otherwise, it returns \(mi1 and sets \fBerrno\fR to indicate the error.
+.sp
+.LP
+The \fBport_sendn()\fR function returns the number of successfully submitted
+events.  A non-negative return value less than the \fInent\fR argument
+indicates that at least one error occurred. In this case, each element of the
+\fIerrors\fR[] array is filled in. An element of the \fIerrors\fR[] array is
+set to 0 if the event was successfully sent to the corresponding port in the
+\fIports\fR[] array, or is set to indicate the error if the event was not
+successfully sent.  If an error occurs, the \fBport_sendn()\fR function returns
+\(mi1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBport_send()\fR and \fBport_sendn()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The maximum number of events per port is exceeded.  The maximum allowable
+number of events per port is the minimum value of the
+\fBprocess.max-port-events\fR resource control at the time
+\fBport_create\fR(3C) was used to create the port.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The port file descriptor is not valid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADFD\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIport\fR argument is not an event port file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+There is not enough memory available to satisfy the request.
+.RE
+
+.sp
+.LP
+The \fBport_sendn()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIports\fR[] pointer or \fIerrors\fR[] pointer is not reasonable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of the \fInent\fR argument is 0.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUse \fBport_send()\fR to send a user event (PORT_SOURCE_USER)
+to a port.
+.sp
+.LP
+The following example uses \fBport_send()\fR to send a user event
+(\fBPORT_SOURCE_USER\fR) to a port and \fBport_get()\fR to retrieve it. The
+\fBportev_user\fR and \fBportev_events\fR members of the \fBport_event_t\fR
+structure are the same as the corresponding user and events arguments of the
+\fBport_send()\fR function.
+
+.sp
+.in +2
+.nf
+#include <port.h>
+ 
+int             myport;
+port_event_t    pe;
+struct timespec timeout;
+int             ret;
+void            *user;
+
+myport = port_create();
+if (myport) {
+        /* port creation failed ... */
+        ...
+        return(...);
+}
+\&...
+events = 0x01;          /* own event definition(s) */
+user = <my_own_value>;
+ret = port_send(myport, events, user);
+if (ret == -1) {
+        /* error detected ... */
+        ...
+        close(myport);
+        return (...);
+}
+
+/*
+ * The following code could also be executed from another thread or
+ * process.
+ */
+timeout.tv_sec = 1;     /* user defined */
+timeout.tv_nsec = 0;
+ret = port_get(myport, &pe, &timeout);
+if (ret == -1) {
+        /*
+         * error detected :
+         * - EINTR or ETIME : log error code and try again ...
+         * - Other kind of errors : may have to close the port ...
+         */
+        return(...);
+}
+
+/*
+ * After port_get() returns successfully, the port_event_t
+ * structure will be filled with:
+ * pe.portev_source =   PORT_SOURCE_USER
+ * pe.portev_events = 0x01
+ * pe.portev_object = unspecified
+ * pe.portev_user = <my_own_value>
+ */
+\&...
+close(myport);
+.fi
+.in -2
+
+.SH USAGE
+.sp
+.LP
+See \fBsetrctl\fR(2) and \fBrctladm\fR(1M) for information on using resource
+controls.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Architectureall
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrctladm\fR(1M), \fBsetrctl\fR(2), \fBport_alert\fR(3C),
+\fBport_associate\fR(3C), \fBport_create\fR(3C), \fBport_get\fR(3C),
+\fBattributes\fR(5)

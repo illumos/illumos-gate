@@ -1,0 +1,409 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.) All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nroff 1 "1 Nov 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+nroff \- format documents for display or line-printer
+.SH SYNOPSIS
+.LP
+.nf
+\fBnroff\fR [\fB-ehiq\fR] [\fB-m\fR\fIname\fR] [\fB-n\fR\fIN\fR] [\fB-o\fR\fIpagelist\fR] [\fB-r\fR\fIaN\fR] [\fB-s\fR\fIN\fR] 
+     [\fB-T\fR\fIname\fR] [\fB-u\fR\fIN\fR] [\fIfilename...\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnroff\fR utility formats text in the named \fIfilename\fR for
+typewriter-like devices. See also \fBtroff\fR(1).
+.sp
+.LP
+If no \fIfilename\fR argument is present, \fBnroff\fR reads the standard input.
+An argument consisting of a `\fB\(mi\fR\&' is taken to be a file name
+corresponding to the standard input.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported. Options can appear in any order so long as
+they appear \fIbefore\fR the files.
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 14n
+.rt  
+Produces equally-spaced words in adjusted lines, using full terminal
+resolution.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 14n
+.rt  
+Uses output \fITAB\fR characters during horizontal spacing to speed output and
+reduces output character count. \fITAB\fR settings are assumed to be every 8
+nominal character widths.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 14n
+.rt  
+Reads the standard input after the input files are exhausted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 14n
+.rt  
+Does not print output that was read from an \fB\&.rd\fR request.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fIname\fR\fR
+.ad
+.RS 14n
+.rt  
+Prepends the macro file \fB/usr/share/lib/tmac/\fIname\fR\fR to the input
+files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Numbers first generated page \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR\fIpagelist\fR\fR
+.ad
+.RS 14n
+.rt  
+Prints only pages whose page numbers appear in the comma-separated \fIlist\fR
+of numbers and ranges. A range \fIN\fR\fB-\fR\fIM\fR means pages \fIN\fR
+through \fIM\fR; an initial \fB-N\fR means from the beginning to page \fIN\fR;
+and a final \fIN\fR\(mi means from \fIN\fR to the end.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fIaN\fR\fR
+.ad
+.RS 14n
+.rt  
+Sets register \fIa\fR (one-character) to \fIN\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Stops every \fIN\fR pages. \fBnroff\fR halts prior to every \fIN\fR pages
+(default \fIN\fR=1) to allow paper loading or changing, and resumes upon
+receipt of a \fINEWLINE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR\fIname\fR\fR
+.ad
+.RS 14n
+.rt  
+Prepares output for a device of the specified \fIname\fR. Known \fIname\fRs
+are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB37\fR\fR
+.ad
+.RS 14n
+.rt  
+Teletype Corporation Model 37 terminal \(em this is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlp\fR | \fBtn300\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBGE\fR \(em any line printer or terminal without half-line capability.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB300\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-300.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB300-12\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-300 \(em 12-pitch.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB300S\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-300S.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB300S-12\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-300S.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB382\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-382 (fancy \fBDTC\fR 382).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB450\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-450 (Diablo Hyterm).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB450-12\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBDASI\fR-450 (Diablo Hyterm) \(em 12-pitch.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB832\fR\fR
+.ad
+.RS 14n
+.rt  
+\fBAJ\fR 832.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fIN\fR\fR
+.ad
+.RS 14n
+.rt  
+Set the emboldening factor for the font mounted in position \fB3\fR to \fIN\fR.
+If \fIN\fR is missing, then set the emboldening factor to \fB0\fR.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfilename\fR\fR
+.ad
+.RS 12n
+.rt  
+The file containing text to be processed by \fBnroff\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRFormatting with a macro package
+.sp
+.LP
+The following command formats \fBusers.guide\fR using the \fB-me\fR macro
+package, and stopping every 4 pages:
+
+.sp
+.in +2
+.nf
+example% \fBnroff \(mis4 \(mime users.guide\fR
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBnroff\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+and \fBNLSPATH\fR.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/tmp/trtmp*\fR\fR
+.ad
+.sp .6
+.RS 4n
+temporary file (see NOTES)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/tmac/tmac.*\fR\fR
+.ad
+.sp .6
+.RS 4n
+standard macro files
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/nterm/*\fR\fR
+.ad
+.sp .6
+.RS 4n
+terminal driving tables for \fBnroff\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/nterm/README\fR\fR
+.ad
+.sp .6
+.RS 4n
+index to terminal description files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchecknr\fR(1), \fBcol\fR(1), \fBeqn\fR(1), \fBman\fR(1), \fBtbl\fR(1),
+\fBtroff\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBme\fR(5),
+\fBms\fR(5), \fBterm\fR(5)
+.SH NOTES
+.sp
+.LP
+\fB/usr/tmp\fR is currently a symbolic link to \fB/var/tmp\fR.
+.sp
+.LP
+Previous documentation incorrectly described the numeric register \fByr\fR as
+being the \fBLast two digits of current year\fR. \fByr\fR is in actuality the
+number of years since 1900. To correctly obtain the last two digits of the
+current year through the year 2099, the definition given below of string
+register \fByy\fR can be included in a document and subsequently used to
+display a two-digit year. Notice that any other available one- or two-character
+register name can be substituted for \fByy\fR.
+.sp
+.in +2
+.nf
+\&.\e" definition of new string register yy--last two digits of year
+\&.\e" use yr (# of years since 1900) if it is < 100
+\&.ie \en(yr<100 .ds yy \en(yr
+\&.el \e{             .\e" else, subtract 100 from yr, store in ny
+\&.nr ny \en(yr-100
+\&.ie \en(ny>9 \e{     .\e" use ny if it is two digits
+\&.ds yy \en(ny
+\&.\e" remove temporary number register ny
+\&.rr ny \e}
+\&.el \e{.ds yy 0
+\&.\e" if ny is one digit, append it to 0
+\&.as yy \en(ny
+\&.rr ny \e} \e}
+.fi
+.in -2
+

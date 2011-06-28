@@ -1,0 +1,378 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" Portions Copyright (c) The Internet Society (2006) All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sdp_add_origin 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.SH NAME
+sdp_add_origin, sdp_add_name, sdp_add_information, sdp_add_uri, sdp_add_email,
+sdp_add_phone, sdp_add_connection, sdp_add_bandwidth, sdp_add_repeat,
+sdp_add_time, sdp_add_zone, sdp_add_key, sdp_add_attribute, sdp_add_media \-
+add specific SDP fields to the SDP session structure
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR...] \fIfile\fR... -\fBlcommputil\fR [ \fIlibrary\fR...]
+#include <sdp.h>
+
+\fBint\fR \fBsdp_add_origin\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint64_t\fR \fIid\fR, \fBuint64_t\fR \fIver\fR, \fBconst char *\fR\fInettype\fR,
+     \fBconst char *\fR\fIaddrtype\fR, \fBconst char *\fR\fIaddress\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR sdp_add_name(\fBsdp_session_t *\fR\fIsession\fR, \fBconst char *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_information\fR(\fBchar **\fR\fIinformation\fR, \fBconst char *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_uri\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBconst char *\fR\fIuri\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_email\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBconst char *\fR\fIemail\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_phone\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBconst char *\fR\fIphone\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_connection\fR(\fBsdp_conn_t **\fR\fIconn\fR, \fBconst char *\fR\fInettype\fR,
+     \fBconst char *\fR\fIaddrtype\fR, \fBconst char *\fR\fIaddress\fR, \fBuint8_t\fR \fIttl\fR,
+     \fBint\fR \fIaddrcount\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_bandwidth\fR(\fBsdp_bandwidth_t **\fR\fIbw\fR, \fBconst char *\fR\fItype\fR,
+     \fBuint64_t\fR \fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_repeat\fR(\fBsdp_time_t *\fR\fItime\fR, \fBuint64_t\fR \fIinterval\fR,
+     \fBuint64_t\fR \fIduration\fR, \fBconst char *\fR\fIoffset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_time\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBuint64_t\fR \fIstarttime\fR,
+     \fBuint64_t\fR \fIstoptime\fR, \fBsdp_time_t **\fR\fItime\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_zone\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBuint64_t\fR \fItime\fR,
+     \fBconst char *\fR\fIoffset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_key\fR(\fBsdp_key_t **\fR\fIkey\fR, \fBconst char *\fR\fImethod\fR,
+     \fBconst char *\fR\fIenckey\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_attribute\fR(\fBsdp_attr_t **\fR\fIattr\fR, \fBconst char *\fR\fIname\fR,
+     \fBconst char *\fR\fIvalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_add_media\fR(\fBsdp_session_t *\fR\fIsession\fR, \fBconst char *\fR\fIname\fR,
+     \fBuint_t\fR \fIport\fR, \fBint\fR \fIportcount\fR, \fBconst char *\fR\fIprotocol\fR,
+     \fBconst char *\fR\fIformat\fR, \fBsdp_media_t **\fR\fImedia\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The caller has to first call \fBsdp_new_session\fR(3COMMPUTIL) and get pointer
+to a session structure. Then that pointer is used as argument in the following
+functions and the session structure is constructed. Once the structure is built
+the caller converts it to a string representation using
+\fBsdp_session_to_str\fR(3COMMPUTIL).
+.sp
+.LP
+The \fBsdp_add_origin()\fR function adds ORIGIN (o=) SDP field to the session
+structure (\fBsdp_session_t\fR) using \fIname\fR, \fIid\fR, \fIver\fR,
+\fInettype\fR, \fIaddrtype\fR, and \fIaddress\fR.
+.sp
+.LP
+The \fBsdp_add_name()\fR function adds NAME (s=) SDP field to the session
+structure (\fBsdp_session_t\fR) using \fIname\fR.
+.sp
+.LP
+The \fBsdp_add_information()\fR function adds INFO (i=) SDP field to the
+session structure (sdp_session_t) or media structure (\fBsdp_media_t\fR) using
+value. Since this field can be either in the media section or the session
+section of an SDP description the caller has to pass
+&\fIsession\fR\(->\fBs_info\fR or &\fImedia\fR\(->\fBm_info\fR as the first
+argument.
+.sp
+.LP
+The \fBsdp_add_uri()\fR function adds URI (u=) SDP field to the session
+structure (\fBsdp_session_t\fR) using \fIuri\fR.
+.sp
+.LP
+The \fBsdp_add_email()\fR function adds EMAIL (e=) SDP field to the session
+structure (\fBsdp_session_t\fR) using \fIemail\fR.
+.sp
+.LP
+The \fBsdp_add_phone()\fR function adds PHONE (p=) SDP field to the session
+structure (\fBsdp_session_t\fR) using \fIphone\fR.
+.sp
+.LP
+The \fBsdp_add_connection()\fR function adds CONNECTION (c=) SDP field to the
+session structure (\fBsdp_session_t\fR) or the media structure
+(\fBsdp_media_t\fR) using \fInettype\fR, \fIaddrtype\fR, \fIaddress\fR,
+\fIttl\fR, and \fIaddrcount\fR. While adding an IP4 or IP6 unicast address the
+\fIttl\fR and \fIaddrcount\fR should be set to 0. For multicast address the
+\fIttl\fR should be set a reasonable value (0 - 255) and \fIaddrcount\fR cannot
+be 0. Also since this field can be either in the media section or the session
+section of an SDP description, the caller has to pass
+&\fIsession\fR\(->\fBs_conn\fR or &\fImedia\fR\(->\fBm_conn\fR as the first
+argument.
+.sp
+.LP
+The \fBsdp_add_bandwidth()\fR function adds BANDWIDTH (b=) SDP field to the
+session structure (\fBsdp_session_t\fR) or the media structure
+(\fBsdp_media_t\fR) using \fItype\fR and \fIvalue\fR. Since this field can be
+either in the media section or the session section of an SDP description, the
+caller has to pass &\fBsession\fR\(->\fBs_bw\fR or &\fBmedia\fR\(->\fBm_bw\fR
+as the first argument.
+.sp
+.LP
+The \fBsdp_add_time()\fR function adds the TIME (t=) SDP field to the session
+structure using \fIstartime\fR and \fIstoptime\fR. The pointer to the newly
+created time structure is returned in \fItime\fR. This pointer is then used in
+\fBsdp_add_repeat()\fR function.
+.sp
+.LP
+The \fBsdp_add_repeat()\fR function adds the REPEAT (r=) SDP field to the
+session structure using interval, duration and offset. Here, offset is a string
+holding one or more offset values, for example "60" or "60 1d 3h".
+.sp
+.LP
+The \fBsdp_add_zone()\fR function adds the ZONE (z=) SDP field to the session
+structure using \fItime\fR and \fIoffset\fR. To add multiple time and offset
+values in a single zone field, call this function once for each pair. See the
+example below.
+.sp
+.LP
+The \fBsdp_add_key()\fR function adds the KEY (k=) SDP field to the session
+structure (\fBsdp_session_t\fR) or media structure (\fBsdp_media_t\fR) using
+\fImethod\fR and \fIenckey\fR.  Since this field can be either in the media
+section or the session section of an SDP description, the caller has to pass
+&\fIsession\fR\(->\fBs_key\fR or &\fImedia\fR\(->\fBm_key\fR as the first
+argument.
+.sp
+.LP
+The \fBsdp_add_attribute()\fR function adds the ATTRIBUTE (a=) SDP field to the
+session structure (\fBsdp_session_t\fR) or media structure (\fBsdp_media_t\fR)
+using \fIname\fR and \fIvalue\fR. Since this field can be either in the media
+section or the session section of an SDP description, the caller has to pass
+&\fIsession\fR\(->\fBs_attr\fR or &\fImedia\fR\(->\fBm_attr\fR as the first
+argument.
+.sp
+.LP
+The \fBsdp_add_media()\fR function adds the MEDIA (m=) SDP field to the session
+structure (\fBsdp_session_t\fR) using \fIname\fR, \fIport\fR, \fIportcount\fR,
+\fIprotocol\fR, and \fIformat\fR. Here, \fIformat\fR is a string holding
+possibly more than one value, for example, "0 31 32 97". The pointer to the
+newly created media structure is returned in \fImedia\fR. This pointer is then
+used to add SDP fields specific to that media section.
+.SH RETURN VALUES
+.sp
+.LP
+These functions return 0 on success and the appropriate error value on failure.
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Mandatory parameters are not provided (they are null).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+The allocation of memory failed.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRBuild an SDP session structure
+.sp
+.LP
+In the following example we see how to build an SDP session structure using the
+functions described on this manual page. We first get a pointer to
+\fBsdp_session_t\fR structure by calling \fBsdp_new_session()\fR. Then to this
+newly created structure we add various SDP fields. Once the structure is built
+we obtain a string representation of the structure using
+\fBsdp_session_to_str()\fR function. Since its caller responsibility to free
+the session we call \fBsdp_free_session()\fR towards the end.
+
+.sp
+.in +2
+.nf
+/* SDP Message we will be building
+"v=0\er\en\e
+o=Alice 2890844526 2890842807 IN IP4 10.47.16.5\er\en\e
+s=-\er\en\e
+i=A Seminar on the session description protocol\er\en\e
+u=http://www.example.com/seminars/sdp.pdf\er\en\e
+e=alice@example.com (Alice Smith)\er\en\e
+p=+1 911-345-1160\er\en\e
+c=IN IP4 10.47.16.5\er\en\e
+b=CT:1024\er\en\e
+t=2854678930 2854679000\er\en\e
+r=604800 3600 0 90000\er\en\e
+z=2882844526 -1h 2898848070 0h\er\en\e
+a=recvonly\er\en\e
+m=audio 49170 RTP/AVP 0\er\en\e
+i=audio media\er\en\e
+b=CT:1000\er\en\e
+k=prompt\er\en\e
+m=video 51372 RTP/AVP 99 90\er\en\e
+i=video media\er\en\e
+a=rtpmap:99 h232-199/90000\er\en\e
+a=rtpmap:90 h263-1998/90000\er\en"
+*/
+
+#include stdio.h>
+#include string.h>
+#include errno.h>
+#include sdp.h>
+
+int main ()
+{
+    sdp_session_t         *my_sess;
+    sdp_media_t           *my_media;
+    sdp_time_t            *my_time;
+    char *b_sdp;
+
+    my_sess = sdp_new_session();
+    if (my_sess == NULL) {
+        return (ENOMEM);
+    }
+    my_sess->version = 0;
+    if (sdp_add_name(my_sess, "-") != 0)
+        goto err_ret;
+    if (sdp_add_origin(my_sess, "Alice", 2890844526ULL, 2890842807ULL, 
+         "IN", "IP4", "10.47.16.5") != 0)
+        goto err_ret;
+    if (sdp_add_information(&my_sess->s_info, "A Seminar on the session"
+                "description protocol") != 0)
+        goto err_ret;
+    if (sdp_add_uri (my_sess, "http://www.example.com/seminars/sdp.pdf") 
+                != 0)
+        goto err_ret;
+    if (sdp_add_email(my_sess, "alice@example.com (Alice smith)") != 0)
+        goto err_ret;
+    if (sdp_add_phone(my_sess, "+1 911-345-1160") != 0)
+        goto err_ret;
+    if (sdp_add_connection(&my_sess->s_conn, "IN", "IP4", "10.47.16.5",
+               0, 0) != 0)
+        goto err_ret;
+    if (sdp_add_bandwidth(&my_sess->s_bw, "CT", 1024) != 0)
+        goto err_ret;
+    if (sdp_add_time(my_sess, 2854678930ULL, 2854679000ULL, &my_time)
+               != 0)
+        goto err_ret;
+    if (sdp_add_repeat(my_time, 604800ULL, 3600ULL, "0 90000") != 0)
+        goto err_ret;
+    if (sdp_add_zone(my_sess, 2882844526ULL, "-1h") != 0)
+        goto err_ret;
+    if (sdp_add_zone(my_sess, 2898848070ULL, "0h") != 0)
+        goto err_ret;
+    if (sdp_add_attribute(&my_sess->s_attr, "sendrecv", NULL) != 0)
+        goto err_ret;
+    if (sdp_add_media(my_sess, "audio", 49170, 1, "RTP/AVP",
+                      "0", &my_media) != 0)
+        goto err_ret;
+    if (sdp_add_information(&my_media->m_info, "audio media") != 0)
+        goto err_ret;
+    if (sdp_add_bandwidth(&my_media->m_bw, "CT", 1000) != 0)
+        goto err_ret;
+    if (sdp_add_key(&my_media->m_key, "prompt", NULL) != 0)
+        goto err_ret;
+    if (sdp_add_media(my_sess, "video", 51732, 1, "RTP/AVP",
+                "99 90", &my_media) != 0)
+        goto err_ret;
+    if (sdp_add_information(&my_media->m_info, "video media") != 0)
+        goto err_ret;
+    if (sdp_add_attribute(&my_media->m_attr, "rtpmap", 
+              "99 h232-199/90000") != 0)
+        goto err_ret;
+    if (sdp_add_attribute(&my_media->m_attr, "rtpmap", 
+              "90 h263-1998/90000") != 0)
+        goto err_ret;
+    b_sdp = sdp_session_to_str(my_sess, &error);
+
+    /*
+     * b_sdp is the string representation of my_sess structure
+     */
+
+    free(b_sdp);
+    sdp_free_session(my_sess);
+    return (0);
+err_ret:
+    free(b_sdp);
+    sdp_free_session(my_sess);
+    return (1);        
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcommputil\fR(3LIB), \fBsdp_new_session\fR(3COMMPUTIL),
+\fBsdp_parse\fR(3COMMPUTIL), \fBsdp_session_to_str\fR(3COMMPUTIL),
+\fBattributes\fR(5)

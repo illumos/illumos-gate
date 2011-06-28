@@ -1,0 +1,139 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH wcsrtombs 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+wcsrtombs \- convert a wide-character string to a character string
+(restartable)
+.SH SYNOPSIS
+.LP
+.nf
+#include <wchar.h>
+
+\fBsize_t\fR \fBwcsrtombs\fR(\fBchar *restrict\fR \fIdst\fR,
+     \fBconst wchar_t **restrict\fR \fIsrc\fR, \fBsize_t\fR \fIlen\fR,
+     \fBmbstate_t *restrict\fR \fIps\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwcsrtombs()\fR function converts a sequence of wide-characters from the
+array indirectly pointed to by \fIsrc\fR into a sequence of corresponding
+characters, beginning in the conversion state described by the object pointed
+to by \fIps\fR. If \fIdst\fR is not a null pointer, the converted characters
+are then stored into the array pointed to by \fIdst\fR. Conversion continues up
+to and including a terminating null  wide-character, which is also stored.
+Conversion stops earlier in the following cases:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When a code is reached that does not correspond to a valid character.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+When the next character would exceed the limit of \fIlen\fR total bytes to be
+stored in the array pointed to by \fIdst\fR (and \fIdst\fR is not a null
+pointer).
+.RE
+.sp
+.LP
+Each conversion takes place as if by a call to the \fBwcrtomb()\fR function.
+.sp
+.LP
+If \fIdst\fR is not a null pointer, the pointer object pointed to by \fIsrc\fR
+is assigned either a null pointer (if conversion stopped due to reaching a
+terminating null wide-character) or the address just  past the last
+wide-character converted (if any). If conversion stopped due to reaching a
+terminating null wide-character, the resulting state described is the initial
+conversion state.
+.sp
+.LP
+If \fIps\fR is a null pointer, the \fBwcsrtombs()\fR function uses its own
+internal \fBmbstate_t\fR object, which is initialized at program startup to the
+initial conversion state.  Otherwise, the  \fBmbstate_t\fR object pointed to by
+\fIps\fR is used to completely describe the current conversion state of the
+associated character sequence. Solaris will behave as if no function defined in
+the Solaris Reference Manual calls \fBwcsrtombs()\fR.
+.sp
+.LP
+The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
+current locale.  See \fBenviron\fR(5).
+.SH RETURN VALUES
+.sp
+.LP
+If conversion stops because a code is reached that does not correspond to a
+valid character, an encoding error occurs.  In this case, the \fBwcsrtombs()\fR
+function stores the value of the macro \fBEILSEQ\fR in \fBerrno\fR and returns
+\fB(size_t)\(mi1\fR; the conversion state is undefined.  Otherwise, it returns
+the number of bytes in the resulting character sequence, not including the
+terminating null (if any).
+.SH ERRORS
+.sp
+.LP
+The \fBwcsrtombs()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIps\fR argument points to an object that contains an invalid conversion
+state.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+A wide-character code does not correspond to a valid character.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If \fIps\fR is not a null pointer, \fBwcsrtombs()\fR uses the \fBmbstate_t\fR
+object pointed to by \fIps\fR and the function can be used safely in
+multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
+to change the locale. If \fIps\fR is a null pointer, \fBwcsrtombs()\fR uses its
+internal \fBmbstate_t\fR object and the function is Unsafe in multithreaded
+applications.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSee NOTES below
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmbsinit\fR(3C), \fBsetlocale\fR(3C), \fBwcrtomb\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,53 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_mactype 3DLPI "15 Jun 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_mactype \- convert a DLPI MAC type to a string
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
+#include <libdlpi.h>
+
+\fBconst char\fR *\fIdlpi_mactype\fR(\fBuint_t\fR \fImactype\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_mactype()\fR function returns a pointer to a string that describes
+the specified \fImactype\fR. Possible \fBMAC\fR types are defined in
+\fB<sys/dlpi.h>\fR\&. The string is not dynamically allocated and must not be
+freed by the caller.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, the function returns a pointer string that describes the
+\fBMAC\fR type. If \fImactype\fR is unknown, the string "Unknown MAC Type" is
+returned.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdlpi\fR(3LIB), \fBattributes\fR(5)

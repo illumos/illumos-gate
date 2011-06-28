@@ -2757,6 +2757,22 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return (dtrace_getreg(lwp->lwp_regs, ndx));
 	}
 
+	case DIF_VAR_VMREGS: {
+		uint64_t rval;
+
+		if (!dtrace_priv_kernel(state))
+			return (0);
+
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
+
+		rval = dtrace_getvmreg(ndx,
+		    &cpu_core[CPU->cpu_id].cpuc_dtrace_flags);
+
+		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+
+		return (rval);
+	}
+
 	case DIF_VAR_CURTHREAD:
 		if (!dtrace_priv_kernel(state))
 			return (0);
@@ -10967,10 +10983,10 @@ dtrace_enabling_matchall(void)
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
 		dtrace_cred_t *dcr = &enab->dten_vstate->dtvs_state->dts_cred;
 		cred_t *cr = dcr->dcr_cred;
-		zoneid_t zone = cr != NULL ? crgetzonedid(cr) : 0;
+		zoneid_t zone = cr != NULL ? crgetzoneid(cr) : 0;
 
 		if ((dcr->dcr_visible & DTRACE_CRV_ALLZONE) || (cr != NULL &&
-		    (zone == GLOBAL_ZONEID || getzonedid() == zone)))
+		    (zone == GLOBAL_ZONEID || getzoneid() == zone)))
 			(void) dtrace_enabling_match(enab, NULL);
 	}
 

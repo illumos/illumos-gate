@@ -362,6 +362,8 @@ extern "C" {
 #define	X86FSET_PCLMULQDQ	32
 #define	X86FSET_XSAVE		33
 #define	X86FSET_AVX		34
+#define	X86FSET_VMX		35
+#define	X86FSET_SVM		36
 
 /*
  * flags to patch tsc_read routine.
@@ -585,7 +587,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	35
+#define	NUM_X86_FEATURES	37
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

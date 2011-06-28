@@ -1,0 +1,55 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH time 2 "28 Dec 1996" "SunOS 5.11" "System Calls"
+.SH NAME
+time \- get time
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <time.h>
+
+\fBtime_t\fR \fBtime\fR(\fBtime_t *\fR\fItloc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtime()\fR function returns the value of time in seconds since 00:00:00
+UTC, January 1, 1970.
+.sp
+.LP
+If \fItloc\fR is non-zero, the return value is also stored in the location to
+which \fItloc\fR points. If \fItloc\fR points to an illegal address,
+\fBtime()\fR fails and its actions are undefined.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBtime()\fR returns the value of time. Otherwise,
+\fB(time_t)\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBstime\fR(2), \fBctime\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

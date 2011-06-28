@@ -1,0 +1,535 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_RequestIO 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_RequestIO, csx_ReleaseIO \- request or release I/O resources for the client
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_RequestIO\fR(\fBclient_handle_t\fR \fIch\fR, \fBio_req_t *\fR\fIir\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBcsx_ReleaseIO\fR(\fBclient_handle_t\fR \fIch\fR, \fBio_req_t *\fR\fIir\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI\fR)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 6n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIir\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to an \fBio_req_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The functions \fBcsx_RequestIO()\fR and \fBcsx_ReleaseIO()\fR request or
+release, respectively, \fBI/O\fR resources for the client.
+.sp
+.LP
+If a client requires \fBI/O\fR resources, \fBcsx_RequestIO()\fR must be called
+to request \fBI/O\fR resources from Card Services; then
+\fBcsx_RequestConfiguration\fR(9F) must be used to establish the configuration.
+\fBcsx_RequestIO()\fR can be called multiple times until a successful set of
+\fBI/O\fR resources is found. \fBcsx_RequestConfiguration\fR(9F) only uses the
+last configuration specified.
+.sp
+.LP
+\fBcsx_RequestIO()\fR fails if it has already been called without a
+corresponding \fBcsx_ReleaseIO()\fR.
+.sp
+.LP
+\fBcsx_ReleaseIO()\fR releases previously requested \fBI/O\fR resources. The
+Card Services window resource list is adjusted by this function. Depending on
+the adapter hardware, the \fBI/O\fR window might also be disabled.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBio_req_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t      Socket;            /* socket number*/
+
+uint32_t      Baseport1.base;    /* IO range base port address */
+acc_handle_t  Baseport1.handle;  /* IO range base address 
+                                  /*   or port num */
+uint32_t      NumPorts1;         /* first IO range number contiguous 
+                                  /*   ports */
+uint32_t      Attributes1;       /* first IO range attributes */
+
+uint32_t      Baseport2.base;    /* IO range base port address */
+acc_handle_t  Baseport2.handle;  /* IO range base address or port num */
+uint32_t      NumPorts2;         /* second IO range number contiguous 
+                                  /*   ports */
+uint32_t      Attributes2;       /* second IO range attributes */
+
+uint32_t      IOAddrLines;       /* number of IO address lines decoded */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR\fR
+.ad
+.RS 20n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBBasePort1.base\fR\fR
+.ad
+.br
+.na
+\fB\fBBasePort1.handle\fR\fR
+.ad
+.br
+.na
+\fB\fBBasePort2.base\fR\fR
+.ad
+.br
+.na
+\fB\fBBasePort2.handle\fR\fR
+.ad
+.RS 20n
+.rt  
+Two \fBI/O\fR address ranges can be requested by \fBcsx_RequestIO()\fR. Each
+\fBI/O\fR address range is specified by the \fBBasePort\fR, \fBNumPorts\fR, and
+\fBAttributes\fR fields. If only a single \fBI/O\fR range is being requested,
+the \fBNumPorts2\fR field must be reset to \fB0\fR.
+.sp
+When calling \fBcsx_RequestIO()\fR, the \fBBasePort.base\fR field specifies the
+first port address requested. Upon successful return from
+\fBcsx_RequestIO()\fR, the \fBBasePort.handle\fR field contains an access
+handle, corresponding to the first byte of the allocated \fBI/O\fR window,
+which the client must use when accessing the \fBPC\fR Card's \fBI/O\fR space
+via the common access functions. A client \fImust not\fR make any assumptions
+as to the format of the returned \fBBasePort.handle\fR field value.
+.sp
+If the \fBBasePort.base\fR field is set to \fB0\fR, Card Services returns an
+\fBI/O\fR resource based on the available \fBI/O\fR resources and the number of
+contiguous ports requested. When \fBBasePort.base\fR is \fB0\fR, Card Services
+aligns the returned resource in the host system's \fBI/O\fR address space on a
+boundary that is a multiple of the number of contiguous ports requested,
+rounded up to the nearest power of two. For example, if a client requests two
+\fBI/O\fR ports, the resource returned will be a multiple of two. If a client
+requests five contiguous \fBI/O\fR ports, the resource returned will be a
+multiple of eight.
+.sp
+If multiple ranges are being requested, at least one of the \fBBasePort.base\fR
+fields must be non-zero.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNumPorts\fR\fR
+.ad
+.RS 20n
+.rt  
+This field is the number of contiguous ports being requested.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR\fR
+.ad
+.RS 20n
+.rt  
+This field is bit-mapped. The following bits are defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIO_DATA_WIDTH_8\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBI/O\fR resource uses 8-bit data path.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIO_DATA_WIDTH_16\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBI/O\fR resource uses 16-bit data path.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_NEVER_SWAP\fR\fR
+.ad
+.RS 27n
+.rt  
+Host endian byte ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_BIG_ENDIAN\fR\fR
+.ad
+.RS 27n
+.rt  
+Big endian byte ordering
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_LITTLE_ENDIAN\fR\fR
+.ad
+.RS 27n
+.rt  
+Little endian byte ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_STRICT_ORDER\fR\fR
+.ad
+.RS 27n
+.rt  
+Program ordering references.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_UNORDERED_OK\fR\fR
+.ad
+.RS 27n
+.rt  
+May re-order references.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_MERGING_OK\fR\fR
+.ad
+.RS 27n
+.rt  
+Merge stores to consecutive locations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_LOADCACHING_OK\fR\fR
+.ad
+.RS 27n
+.rt  
+May cache load operations.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_STORECACHING_OK\fR\fR
+.ad
+.RS 27n
+.rt  
+May cache store operations.
+.RE
+
+For some combinations of host system busses and adapter hardware, the width of
+an \fBI/O\fR resource can not be set via \fBRequestIO()\fR; on those systems,
+the host bus cycle access type determines the \fBI/O\fR resource data path
+width on a per-cycle basis.
+.sp
+\fBWIN_ACC_BIG_ENDIAN\fR and \fBWIN_ACC_LITTLE\fR \fBENDIAN\fR describe the
+endian characteristics of the device as big endian or little endian,
+respectively. Even though most of the devices will have the same endian
+characteristics as their busses, there are examples of devices with an
+\fBI/O\fR processor that has opposite endian characteristics of the busses.
+When \fBWIN_ACC_BIG_ENDIAN\fR or \fBWIN_ACC_LITTLE\fR \fBENDIAN\fR is set, byte
+swapping will automatically be performed by the system if the host machine and
+the device data formats have opposite endian characteristics. The
+implementation may take advantage of hardware platform byte swapping
+capabilities.
+.sp
+When \fBWIN_ACC_NEVER_SWAP\fR is specified, byte swapping will not be invoked
+in the data access functions. The ability to specify the order in which the
+\fBCPU\fR will reference data is provided by the following \fBAttributes\fR
+bits. Only one of the following bits may be specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_STRICT_ORDER\fR\fR
+.ad
+.sp .6
+.RS 4n
+The data references must be issued by a \fBCPU\fR in program order. Strict
+ordering is the default behavior.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_UNORDERED_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU\fR may re-order the data references. This includes all kinds of
+re-ordering (that is, a load followed by a store may be replaced by a store
+followed by a load).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_MERGING_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU\fR may merge individual stores to consecutive locations. For
+example, the \fBCPU\fR may turn two consecutive byte stores into one halfword
+store. It may also batch individual loads. For example, the \fBCPU\fR may turn
+two consecutive byte loads into one halfword load. \fBIO_MERGING_OK_ACC\fR also
+implies re-ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_LOADCACHING_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU\fR may cache the data it fetches and reuse it until another store
+occurs. The default behavior is to fetch new data on every load.
+\fBWIN_ACC_LOADCACHING_OK\fR also implies merging and re-ordering.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBWIN_ACC_STORECACHING_OK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBCPU\fR may keep the data in the cache and push it to the device (perhaps
+with other data) at a later time. The default behavior is to push the data
+right away. \fBWIN_ACC_STORECACHING_OK\fR also implies load caching, merging,
+and re-ordering.
+.RE
+
+These values are advisory, not mandatory. For example, data can be ordered
+without being merged or cached, even though a driver requests unordered, merged
+and cached together. All other bits in the \fBAttributes\fR field must be set
+to \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBIOAddrLines\fR\fR
+.ad
+.RS 20n
+.rt  
+This field is the number of \fBI/O\fR address lines decoded by the \fBPC\fR
+Card in the specified socket.
+.RE
+
+.sp
+.LP
+On some systems, multiple calls to \fBcsx_RequestIO()\fR with different
+\fBBasePort\fR, \fBNumPorts\fR, and/or \fBIOAddrLines\fR values will have to be
+made to find an acceptable combination of parameters that can be used by Card
+Services to allocate \fBI/O\fR resources for the client. (See \fBNOTES\fR).
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ATTRIBUTE\fR\fR
+.ad
+.RS 27n
+.rt  
+Invalid \fBAttributes\fR specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_BASE\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBBasePort\fR value is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_CONFIGURATION_LOCKED\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBcsx_RequestConfiguration\fR(9F) has already been done.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_IN_USE\fR\fR
+.ad
+.RS 27n
+.rt  
+\fBcsx_RequestIO()\fR has already been done without a corresponding
+\fBcsx_ReleaseIO()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPC\fR Card in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_WINDOW\fR\fR
+.ad
+.RS 27n
+.rt  
+Unable to allocate \fBI/O\fR resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_OUT_OF_RESOURCE\fR\fR
+.ad
+.RS 27n
+.rt  
+Unable to allocate \fBI/O\fR resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPCMCIA\fR hardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_RegisterClient\fR(9F), \fBcsx_RequestConfiguration\fR(9F)
+.sp
+.LP
+\fIPC Card 95 Standard\fR, PCMCIA/JEIDA
+.SH NOTES
+.sp
+.LP
+It is important for clients to try to use the minimum amount of \fBI/O\fR
+resources necessary. One way to do this is for the client to parse the
+\fBCIS\fR of the \fBPC\fR Card and call \fBcsx_RequestIO()\fR first with any
+\fBIOAddrLines\fR values that are \fB0\fR or that specify a minimum number of
+address lines necessary to decode the \fBI/O\fR space on the \fBPC\fR Card.
+Also, if no convenient minimum number of address lines can be used to decode
+the \fBI/O\fR space on the \fBPC\fR Card, it is important to try to avoid
+system conflicts with well-known architectural hardware features.

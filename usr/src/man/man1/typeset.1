@@ -1,0 +1,823 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T Copyright
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.TH typeset 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+typeset, whence \- shell built-in functions to set/get attributes and values
+for shell variables and functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBtypeset\fR [\(+- HLRZfilrtux [\fIn\fR]] [\fIname\fR[=\fIvalue\fR]]...
+.fi
+
+.LP
+.nf
+\fBwhence\fR [\fB-pv\fR] \fIname\fR...
+.fi
+
+.SS "ksh93"
+.LP
+.nf
+\fB++typeset\fR [\(+-AHflbnprtux] [\(+-EFLRZi[\fIn\fR]] [\fIvname\fR[=\fIvalue\fR]]
+.fi
+
+.LP
+.nf
+\fBwhence\fR [\fB-afpv\fR] \fIname\fR...
+.fi
+
+.SH DESCRIPTION
+.SS "ksh"
+.sp
+.LP
+\fBtypeset\fR sets attributes and values for shell variables and functions.
+When \fBtypeset\fR is invoked inside a function, a new instance of the
+variables \fIname\fR is created. The variables \fIvalue\fR and \fBtype\fR are
+restored when the function completes. The following list of attributes can be
+specified:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+The names refer to function names rather than variable names. No assignments
+can be made and the only other valid flags are \fB-t\fR, \fB-u\fR and \fB-x\fR.
+The flag \fB-t\fR turns on execution tracing for this function. The flag
+\fB-u\fR causes this function to be marked undefined. The \fBF\fR\fBPATH\fR
+variable is searched to find the function definition when the function is
+referenced. The flag \fB-x\fR allows the function definition to remain in
+effect across shell procedures invoked by name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 6n
+.rt  
+This flag provides UNIX to hostname file mapping on non-UNIX machines.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 6n
+.rt  
+Parameter is an integer. This makes arithmetic faster. If \fIn\fR is
+\fBnon-zero\fR it defines the output arithmetic base; otherwise, the first
+assignment determines the output base.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+All uppercase characters are converted to lowercase. The uppercase flag,
+\fB-u\fR is turned off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 6n
+.rt  
+Left justify and remove leading blanks from \fIvalue\fR. If \fIn\fR is
+\fBnon-zero\fR it defines the width of the field; otherwise, it is determined
+by the width of the value of first assignment. When the variable is assigned
+to, it is filled on the right with blanks or truncated, if necessary, to fit
+into the field. Leading zeros are removed if the \fB-Z\fR flag is also set. The
+\fB-R\fR flag is turned off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 6n
+.rt  
+The specified \fIname\fRs are marked \fBreadonly\fR and these names cannot be
+changed by subsequent assignment.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR\fR
+.ad
+.RS 6n
+.rt  
+Right justify and fill with leading blanks. If \fIn\fR is \fBnon-zero\fR it
+defines the width of the field, otherwise it is determined by the width of the
+value of first assignment. The field is left filled with blanks or truncated
+from the end if the variable is reassigned. The \fB-L\fR flag is turned off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Tags the variables. Tags are user definable and have no special meaning to the
+shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 6n
+.rt  
+All lowercase characters are converted to uppercase characters. The lowercase
+flag, \fB-l\fR is turned off.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+The specified \fIname\fRs are marked for automatic export to the
+\fBenvironment\fR of subsequently-executed commands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Z\fR\fR
+.ad
+.RS 6n
+.rt  
+Right justify and fill with leading zeros if the first non-blank character is a
+digit and the \fB-L\fR flag has not been set. If \fIn\fR is \fBnon-zero\fR it
+defines the width of the field. Otherwise, it is determined by the width of the
+value of first assignment.
+.RE
+
+.sp
+.LP
+The \fB-i\fR attribute can not be specified along with \fB-R\fR, \fB-L\fR,
+\fB-Z\fR, or \fB-f\fR.
+.sp
+.LP
+Using \fB+\fR rather than \fB\(mi\fR causes these flags to be turned off. If no
+\fIname\fR arguments are specified but flags are specified, a list of
+\fInames\fR (and optionally the \fIvalues\fR) of the \fIvariables\fR which have
+these flags set is printed. (Using \fB+\fR rather than \fB\(mi\fR keeps the
+values from being printed.) If no \fIname\fRs and flags are specified, the
+\fInames\fR and \fIattributes\fR of all \fIvariables\fR are printed.
+.sp
+.LP
+For each \fIname\fR, \fBwhence\fR indicates how it would be interpreted if used
+as a command name.
+.sp
+.LP
+The \fB-v\fR flag produces a more verbose report.
+.sp
+.LP
+The \fB-p\fR flag does a path search for \fIname\fR even if name is an alias, a
+function, or a reserved word.
+.sp
+.LP
+On this manual page, \fBksh\fR(1) commands that are preceded by one or two *
+(asterisks) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+I/O redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+Words, following a command preceded by \fB**\fR that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and word
+splitting and file name generation are not performed.
+.RE
+.SS "ksh93"
+.sp
+.LP
+If the \fB-f\fR option is not specified, \fBtypeset\fR sets, unsets, or
+displays attributes of variables as specified with the options. If the first
+option is specified with a \fB-\fR then the attributes are set for each of the
+specified names. If the first option is specified with a \fB+\fR, then the
+specified attributes are unset. If \fB=\fR\fIvalue\fR is specified, \fIvalue\fR
+is assigned before the attributes are set.
+.sp
+.LP
+When \fBtypeset\fR is called inside a function that is defined with the
+\fBfunction\fR reserved word, and \fIname\fR does not contain a \fB\&.\fR, a
+local variable statically scoped to that function is created.
+.sp
+.LP
+Not all option combinations are possible. For example, the numeric options
+\fB-i\fR, \fB-E\fR, and \fB-F\fR cannot be specified with the justification
+options \fB-L\fR, \fB-R\fR, and \fB-Z\fR.
+.sp
+.LP
+The following preset aliases are set by the shell:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfloat\fR\fR
+.ad
+.RS 13n
+.rt  
+\fBtypeset\fR \fB-E\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBfunctions\fR\fR
+.ad
+.RS 13n
+.rt  
+\fBtypeset\fR \fB-f\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinteger\fR\fR
+.ad
+.RS 13n
+.rt  
+\fBtypeset\fR \fB-i\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnameref\fR\fR
+.ad
+.RS 13n
+.rt  
+\fBtypeset\fR \fB-n\fR
+.RE
+
+.sp
+.LP
+If no \fInames\fR are specified, variables that have the specified options are
+displayed. If the first option is specified with a leading \fB-\fR then the
+name and value of each variable is written to standard output. Otherwise, only
+the names are written. If no options or only the \fB-p\fR option are specified,
+the names and attributes of all variables that have attributes are written to
+standard output. When \fB-f\fR is specified, the names displayed are function
+names.
+.sp
+.LP
+If \fB-f\fR is specified, then each name refers to a function and the only
+valid options are \fB-u\fR and \fB-t\fR. In this case no \fB=\fR\fIvalue\fR can
+be specified.
+.sp
+.LP
+\fBtypeset\fR is built-in to the shell as a declaration command so that field
+splitting and pathname expansion are not performed on the arguments. Tilde
+expansion occurs on \fIvalue\fR.
+.sp
+.LP
+The following options are supported by the \fBtypeset\fR built-in command in
+\fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 13n
+.rt  
+Indexed array. This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-A\fR\fR
+.ad
+.RS 13n
+.rt  
+Associative array. Each \fIname\fR is converted to an associative array. If a
+variable already exists, the current value becomes index \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 13n
+.rt  
+Each name can contain binary data. Its value is the mime \fBbase64\fR encoding
+of the data. This option can be used with \fB-Z\fR, to specify fixed sized
+fields.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 13n
+.rt  
+Reserved for future use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR [\fIn\fR]\fR
+.ad
+.RS 13n
+.rt  
+Floating point number represented in scientific notation. \fIn\fR specifies the
+number of significant figures when the value is expanded. The default value is
+\fB10\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 13n
+.rt  
+Each of the options and names refers to a function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-F\fR [\fIn\fR]\fR
+.ad
+.RS 13n
+.rt  
+Floating point. \fIn\fR is the number of places after the decimal point when
+the value is expanded. The default value is \fB10\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 13n
+.rt  
+Reserved for future use.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 13n
+.rt  
+Hostname mapping. Each name holds a native pathname. Assigning a UNIX format
+pathname causes it to be converted to a pathname suitable for the current host.
+This has no effect when the native system is UNIX.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR [\fIbase\fR]\fR
+.ad
+.RS 13n
+.rt  
+An integer. \fIbase\fR represents the arithmetic base from \fB2\fR to \fB64\fR.
+The option value can be omitted. The default value is \fB10\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 13n
+.rt  
+Convert uppercase characters to lowercase characters. Unsets the \fB-u\fR
+option. When used with \fB-i\fR, \fB-E\fR, or \fB-F\fR indicates long variant.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR [\fIn\fR]\fR
+.ad
+.RS 13n
+.rt  
+Left justify. If \fIn\fR is specified, it represents the field width. If the
+\fB-Z\fR attribute is also specified, then leading zeros are stripped. The
+option value can be omitted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 13n
+.rt  
+Name reference. The value is the name of a variable that \fIname\fR references.
+\fIname\fR cannot contain a \fB\&.\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 13n
+.rt  
+Causes the output to be in a format that can be used as input to the shell to
+recreate the attributes for variables.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 13n
+.rt  
+Enables read-only. Once this option is enabled, it cannot be disabled. See
+\fBreadonly\fR(1).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-R\fR [\fIn\fR]\fR
+.ad
+.RS 13n
+.rt  
+Right justify. If \fIn\fR is specified it represents the field width. If the
+\fB-Z\fR option is also specified, zeros are used as the fill character.
+Otherwise, SPACEs are used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+.rt  
+Restricts integer size to short when used with \fB-i\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 13n
+.rt  
+When used inside a function defined with the function reserved word, the
+specified variables will have function static scope.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 13n
+.rt  
+When used with \fB-f\fR, enables tracing for each of the specified functions.
+Otherwise, \fB-t\fR is a user defined attribute and has no meaning to the
+shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR \fItname\fR\fR
+.ad
+.RS 13n
+.rt  
+\fItname\fR is the name of a type name given to each name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 13n
+.rt  
+Without \fB-f\fR or \fB-i\fR, converts lowercase characters to uppercase and
+unsets \fB-l\fR. When used with \fB-f\fR, specifies that \fIname\fR is a
+function that has not yet been loaded. When used with \fB-i\fR specifies that
+the value is displayed as an unsigned integer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 13n
+.rt  
+Puts each name on the export list. See \fBexport\fR(1). \fIname\fR cannot
+contain a \fB\&.\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-X\fR [\fIn\fR]\fR
+.ad
+.RS 13n
+.rt  
+Floating point number represented in hexadecimal notation. \fIn\fR specifies
+the number of significant figures when the value is expanded. The option value
+may be omitted. The default value is 10.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Z\fR [\fIn\fR]\fR
+.ad
+.RS 13n
+.rt  
+Zero fill. If \fIn\fR is specified it represents the field width. The option
+value can be omitted.
+.RE
+
+.sp
+.LP
+The following exit values are returned by \fBtypeset\fR in \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.LP
+If the \fB-v\fR is not specified, \fBwhence\fR writes on standard output an
+absolute pathname, if any, corresponding to \fIname\fR based on the complete
+search order that the shell uses. If \fIname\fR is not found, no output is
+produced.
+.sp
+.LP
+If the \fB-v\fR is specified, the output from \fBwhence\fR also contains
+information that indicates how the specified name would be interpreted by the
+shell in the current execution environment.
+.sp
+.LP
+The following options are supported by the \fBwhence\fR built-in command in
+\fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 6n
+.rt  
+Display all uses for each name rather than the first.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not check for functions.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not check to see if name is a reserved word, a built-in, an alias, or a
+function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+For each name specified, the shell displays a line that indicates if that name
+is one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Reserved word
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Alias
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Built-in
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Undefined function
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Function
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Tracked alias
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Program
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Not found
+.RE
+.RE
+
+.sp
+.LP
+The following exit values are returned by \fBwhence\fR in \fBksh93\fR:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+Successful completion. Each name was found by the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+.rt  
+One or more names were not found by the shell.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>1\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.sp
+.LP
+On this manual page, \fBksh93\fR(1) commands that are preceded by one or two
+\fB+\fR (plus signs) are treated specially in the following ways:
+.RS +4
+.TP
+1.
+Variable assignment lists preceding the command remain in effect when the
+command completes.
+.RE
+.RS +4
+.TP
+2.
+I/O redirections are processed after variable assignments.
+.RE
+.RS +4
+.TP
+3.
+Errors cause a script that contains them to abort.
+.RE
+.RS +4
+.TP
+4.
+They are not valid function names.
+.RE
+.RS +4
+.TP
+5.
+Words, following a command preceded by \fB++\fR that are in the format of a
+variable assignment, are expanded with the same rules as a variable assignment.
+This means that tilde substitution is performed after the \fB=\fR sign and word
+splitting and file name generation are not performed.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBksh\fR(1), \fBksh93\fR(1), \fBreadonly\fR(1), \fBset\fR(1), \fBsh\fR(1),
+\fBattributes\fR(5)

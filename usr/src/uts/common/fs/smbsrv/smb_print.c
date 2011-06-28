@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -127,7 +128,7 @@ smb_com_open_print_file(smb_request_t *sr)
 		sp = kmem_zalloc(sizeof (smb_kspooldoc_t), KM_SLEEP);
 		(void) snprintf(sp->sd_path, MAXPATHLEN, "%s/%s", si->shr_path,
 		    op->fqi.fq_path.pn_path);
-		sp->sd_spool_num = sr->sr_server->sp_info.sp_cnt;
+		/* sp->sd_spool_num set by smb_spool_add_doc() */
 		sp->sd_ipaddr = sr->session->ipaddr;
 		(void) strlcpy(sp->sd_username, sr->uid_user->u_name,
 		    MAXNAMELEN);

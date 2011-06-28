@@ -1,0 +1,79 @@
+'\" te
+.\" Copyright (c) 1994, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ul 1 "17 Mar 1994" "SunOS 5.11" "User Commands"
+.SH NAME
+ul \- do underlining
+.SH SYNOPSIS
+.LP
+.nf
+\fBul\fR [\fB-i\fR] [\fB-t\fR \fIterminal\fR] [\fIfilename\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBul\fR reads the named \fIfilename\fRs (or the standard input if none are
+given) and translates occurrences of underscores to the sequence which
+indicates underlining for the terminal in use, as specified by the environment
+variable \fB\fR \fBTERM.\fR \fBul\fR uses the \fB/usr/share/lib/terminfo
+\fRentry to determine the appropriate sequences for underlining. If the
+terminal is incapable of underlining, but is capable of a standout mode then
+that is used instead. If the terminal can overstrike, or handles underlining
+automatically, \fBul\fR degenerates to \fBcat\fR(1). If the terminal cannot
+underline, underlining is ignored.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fI terminal\fR\fR
+.ad
+.RS 15n
+.rt  
+Override the terminal kind specified in the environment. If the terminal cannot
+underline, underlining is ignored. If the terminal name is not found, no
+underlining is attempted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 15n
+.rt  
+Indicate underlining by a separate line containing appropriate dashes
+`\fB\(mi\fR\&'; this is useful when you want to look at the underlining which
+is present in an \fBnroff\fR(1) output stream on a \fBCRT-terminal.\fR
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBul\fR returns exit code 1 if the file specified is not found.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/terminfo/*\fR\fR
+.ad
+.RS 29n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcat\fR(1), \fBman\fR(1), \fBnroff\fR(1), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+\fBnroff\fR usually generates a series of backspaces and underlines intermixed
+with the text to indicate underlining. \fBul\fR makes attempt to optimize the
+backward motion.

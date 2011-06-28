@@ -1,0 +1,172 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ptree_create_node 3PICLTREE "28 Mar 2000" "SunOS 5.11" "PICL Plug-In Library Functions"
+.SH NAME
+ptree_create_node, ptree_destroy_node \- create or destroy a node
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicltree\fR [ \fIlibrary\fR... ]
+#include <picltree.h>
+
+\fBint\fR \fBptree_create_node\fR(\fBchar *\fR\fIname\fR, \fBchar *\fR\fIclname\fR,
+     \fBpicl_nodehdl_t *\fR\fInodeh\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBptree_destroy_node\fR(\fBpicl_nodehdl_t\fR \fInodeh\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBptree_create_node()\fR function creates a node and sets the "name"
+property value to the string specified in \fIname\fR and the "class" property
+value to the string specified in \fIclname\fR. The handle of the new node is
+copied into the location given by \fInodeh\fR.
+.sp
+.LP
+The \fBptree_destroy_node()\fR function destroys the node specified by
+\fInodeh\fR and frees up any allocated space. The node to be destroyed must
+have been previously deleted by ptree_delete_node (see
+\fBptree_add_node\fR(3PICLTREE)). Otherwise, \fBPICL_CANTDESTROY\fR is
+returned.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fB0\fR is returned. On failure, a non-negative
+integer is returned to indicate an error.
+.sp
+.LP
+\fBPICL_STALEHANDLE\fR is returned if the handle is no longer valid. This
+occurs if the PICL tree was refreshed or reinitialized.
+.sp
+.LP
+\fBPICL_INVALIDHANDLE\fR is returned if the specified handle never existed.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDARG\fR\fR
+.ad
+.RS 22n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_VALUETOOBIG\fR\fR
+.ad
+.RS 22n
+.rt  
+Value exceeds maximum size
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTSUPPORTED\fR\fR
+.ad
+.RS 22n
+.rt  
+Property version not supported
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_CANTDESTROY\fR\fR
+.ad
+.RS 22n
+.rt  
+Attempting to destroy before delete
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_TREEBUSY\fR\fR
+.ad
+.RS 22n
+.rt  
+PICL tree is busy
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTNODE\fR\fR
+.ad
+.RS 22n
+.rt  
+Not a node
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDHANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+Invalid handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_STALEHANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+Stale handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 22n
+.rt  
+General system failure
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBptree_add_node\fR(3PICLTREE), \fBattributes\fR(5)

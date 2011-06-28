@@ -1,0 +1,758 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 1997, The Open Group. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scanf 3C "10 Jul 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+scanf, fscanf, sscanf, vscanf, vfscanf, vsscanf \- convert formatted input
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdio.h>
+
+\fBint\fR \fBscanf\fR(\fBconst char *restrict\fR \fIformat\fR...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfscanf\fR(\fBFILE *restrict\fR \fIstream\fR, \fBconst char *restrict\fR \fIformat\fR...);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsscanf\fR(\fBconst char *restrict\fR \fIs\fR, \fBconst char *restrict\fR \fIformat\fR...);
+.fi
+
+.LP
+.nf
+#include <stdarg.h>
+#include <stdio.h>
+
+\fBint\fR \fBvscanf\fR(\fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvfscanf\fR(\fBFILE *\fR\fIstream\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBvsscanf\fR(\fBconst char *\fR\fIs\fR, \fBconst char *\fR\fIformat\fR, \fBva_list\fR \fIarg\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBscanf()\fR function reads from the standard input stream \fBstdin\fR.
+.sp
+.LP
+The \fBfscanf()\fR function reads from the named input \fIstream\fR.
+.sp
+.LP
+The \fBsscanf()\fR function reads from the string \fIs\fR.
+.sp
+.LP
+The \fBvscanf()\fR, \fBvfscanf()\fR, and \fBvsscanf()\fR functions are
+equivalent to the \fBscanf()\fR, \fBfscanf()\fR, and \fBsscanf()\fR functions,
+respectively, except that instead of being called with a variable number of
+arguments, they are called with an argument list as defined by the
+<\fBstdarg.h\fR> header . These functions do not invoke the \fBva_end()\fR
+macro. Applications using these functions should call \fBva_end\fR(\fIap\fR)
+afterwards to clean up.
+.sp
+.LP
+Each function reads bytes, interprets them according to a format, and stores
+the results in its arguments. Each expects, as arguments, a control string
+\fIformat\fR described below, and a set of \fIpointer\fR arguments indicating
+where the converted input should be stored. The result is undefined if there
+are insufficient arguments for the format. If the format is exhausted while
+arguments remain, the excess arguments are evaluated but are otherwise ignored.
+.sp
+.LP
+Conversions can be applied to the \fInth\fR argument after the \fIformat\fR in
+the argument list, rather than to the next unused argument. In this case, the
+conversion character \fB%\fR (see below) is replaced by the sequence
+\fB%\fR\fIn\fR\fB$\fR, where \fIn\fR is a decimal integer in the range [1,
+\fBNL_ARGMAX\fR]. This feature provides for the definition of format strings
+that select arguments in an order appropriate to specific languages. In format
+strings containing the \fB%\fR\fIn\fR\fB$\fR form of conversion specifications,
+it is unspecified whether numbered arguments in the argument list can be
+referenced from the format string more than once.
+.sp
+.LP
+The \fIformat\fR can contain either form of a conversion specification, that
+is, \fB%\fR or \fB%\fR\fIn\fR\fB$\fR, but the two forms cannot normally be
+mixed within a single \fIformat\fR string. The only exception to this is that
+\fB%%\fR or \fB%*\fR can be mixed with the \fB%\fR\fIn\fR\fB$\fR form.
+.sp
+.LP
+The \fBscanf()\fR function in all its forms allows for detection of a
+language-dependent radix character in the input string.  The radix character is
+defined in the program's locale (category \fBLC_NUMERIC\fR). In the POSIX
+locale, or in a locale where the radix character is not defined, the radix
+character defaults to a period (.).
+.sp
+.LP
+The format is a character string, beginning and ending in its initial shift
+state, if any, composed of zero or more directives. Each directive is composed
+of one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+one or more \fIwhite-space characters\fR (space, tab, newline, vertical-tab or
+form-feed characters);
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+an \fIordinary character\fR (neither \fB%\fR nor a white-space character); or
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a \fIconversion specification\fR.
+.RE
+.SS "Conversion Specifications"
+.sp
+.LP
+Each conversion specification is introduced by the character \fB%\fR or the
+character sequence \fB%\fR\fIn\fR\fB$\fR, after which the following appear in
+sequence:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An optional assignment-suppressing character \fB*\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An optional non-zero decimal integer that specifies the maximum field width.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An option length modifier that specifies the size of the receiving object.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A conversion specifier character that specifies the type of conversion to be
+applied. The valid conversion characters are described below.
+.RE
+.sp
+.LP
+The \fBscanf()\fR functions execute each directive of the format in turn.  If a
+directive fails, as detailed below, the function returns.  Failures are
+described as input failures (due to the unavailability of input bytes) or
+matching failures (due to inappropriate input).
+.sp
+.LP
+A directive composed of one or more white-space characters is executed by
+reading input until no more valid input can be read, or up to the first byte
+which is not a white-space character which remains unread.
+.sp
+.LP
+A directive that is an ordinary character is executed as follows. The next byte
+is read from the input and compared with the byte that comprises the directive;
+if the comparison shows that they are not equivalent, the directive fails, and
+the differing and subsequent bytes remain unread.
+.sp
+.LP
+A directive that is a conversion specification defines a set of matching input
+sequences, as described below for each conversion character. A conversion
+specification is executed in the following steps:
+.sp
+.LP
+Input white-space characters (as specified by \fBisspace\fR(3C)) are skipped,
+unless the conversion specification includes a \fB[\fR, \fBc\fR, \fBC\fR, or
+\fBn\fR conversion character.
+.sp
+.LP
+An item is read from the input unless the conversion specification includes an
+\fBn\fR conversion character. The length of the item read is limited to any
+specified maximum field width, which is interpreted in either characters or
+bytes depending on the conversion character. In Solaris default mode, the input
+item is defined as the longest sequence of input bytes that forms a matching
+sequence. In some cases, \fBscanf()\fR might need to read several extra
+characters beyond the end of the input item to find the end of a matching
+sequence. In C99/SUSv3 mode, the input item is defined as the longest sequence
+of input bytes that is, or is a prefix of, a matching sequence. With this
+definition, \fBscanf()\fR need only read at most one character beyond the end
+of the input item. Therefore, in C99/SUSv3 mode, some sequences that are
+acceptable to \fBstrtod\fR(3C), \fBstrtol\fR(3C), and similar functions are
+unacceptable to \fBscanf()\fR. In either mode, \fBscanf()\fR attempts to push
+back any excess bytes read using \fBungetc\fR(3C). Assuming all such attempts
+succeed, the first byte, if any, after the input item remains unread. If the
+length of the input item is 0, the conversion fails. This condition is a
+matching failure unless end-of-file, an encoding error, or a read error
+prevented input from the stream, in which case it is an input failure.
+.sp
+.LP
+Except in the case of a \fB%\fR conversion character, the input item (or, in
+the case of a \fB%\fR\fIn\fR conversion specification, the count of input
+bytes) is converted to a type appropriate to the conversion character. If the
+input item is not a matching sequence, the execution of the conversion
+specification fails; this condition is a matching failure. Unless assignment
+suppression was indicated by a \fB*\fR, the result of the conversion is placed
+in the object pointed to by the first argument following the \fIformat\fR
+argument that has not already received a conversion result if the conversion
+specification is introduced by \fB%\fR, or in the \fIn\fRth argument if
+introduced by the character sequence \fB%\fR\fIn\fR\fB$\fR. If this object does
+not have an appropriate type, or if the result of the conversion cannot be
+represented in the space provided, the behavior is undefined.
+.SS "Length Modifiers"
+.sp
+.LP
+The length modifiers and their meanings are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBhh\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBsigned char\fR or \fBunsigned char\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBh\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBshort\fR or \fBunsigned short\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBl\fR (ell)\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBlong\fR or \fBunsigned long\fR; that a following \fBa\fR,
+\fBA\fR, \fBe\fR, \fBE\fR, \fBf\fR, \fBF\fR, \fBg\fR, or \fBG\fR conversion
+specifier applies to an argument with type pointer to \fBdouble\fR; or that a
+following \fBc\fR, \fBs\fR, or \fB[\fR conversion specifier applies to an
+argument with type pointer to \fBwchar_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBll\fR (ell-ell)\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBlong long\fR or \fBunsigned long long\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBj\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBintmax_t\fR or \fBuintmax_t\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBz\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBsize_t\fR or the corresponding signed integer type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBt\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBd\fR, \fBi\fR, \fBo\fR, \fBu\fR, \fBx\fR,
+\fBX\fR, or \fBn\fR conversion specifier applies to an argument with type
+pointer to \fBptrdiff_t\fR or the corresponding \fBunsigned\fR type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBL\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies that a following \fBa\fR, \fBA\fR, \fBe\fR, \fBE\fR, \fBf\fR,
+\fBF\fR, \fBg\fR, or \fBG\fR conversion specifier applies to an argument with
+type pointer to \fBlong double\fR.
+.RE
+
+.sp
+.LP
+If a length modifier appears with any conversion specifier other than as
+specified above, the behavior is undefined.
+.SS "Conversion Characters"
+.sp
+.LP
+The following conversion characters are valid:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBd\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches an optionally signed decimal integer, whose format is the same as
+expected for the subject sequence of \fBstrtol\fR(3C) with the value 10 for the
+\fIbase\fR argument. In the absence of a size modifier, the corresponding
+argument must be a pointer to \fBint\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBi\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches an optionally signed integer, whose format is the same as expected for
+the subject sequence of \fBstrtol()\fR with 0 for the \fIbase\fR argument. In
+the absence of a size modifier, the corresponding argument must be a pointer to
+\fBint\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches an optionally signed octal integer, whose format is the same as
+expected for the subject sequence of \fBstrtoul\fR(3C) with the value 8 for the
+\fIbase\fR argument. In the absence of a size modifier, the corresponding
+argument must be a pointer to \fBunsigned int\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBu\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches an optionally signed decimal integer, whose format is the same as
+expected for the subject sequence of \fBstrtoul()\fR with the value 10 for the
+\fIbase\fR argument. In the absence of a size modifier, the corresponding
+argument must be a pointer to \fBunsigned int\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches an optionally signed hexadecimal integer, whose format is the same as
+expected for the subject sequence of \fBstrtoul()\fR with the value 16 for the
+\fIbase\fR argument. In the absence of a size modifier, the corresponding
+argument must be a pointer to \fBunsigned int\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR,\fBe\fR,\fBf\fR,\fBg\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches an optionally signed floating-point number, infinity, or NaN, whose
+format is the same as expected for the subject sequence of \fBstrtod\fR(3C). In
+the absence of a size modifier, the corresponding argument must be a pointer to
+\fBfloat\fR. The \fBe\fR, \fBf\fR, and \fBg\fR specifiers match hexadecimal
+floating point values only in C99/SUSv3 (see \fBstandards\fR(5)) mode, but the
+\fBa\fR specifier always matches hexadecimal floating point values.
+.sp
+These conversion specifiers match any subject sequence accepted by
+\fBstrtod\fR(3C), including the INF, INFINITY, NAN, and
+NAN(\fIn-char-sequence\fR) forms.  The result of the conversion is the same as
+that of calling \fBstrtod()\fR (or \fBstrtof()\fR or \fBstrtold()\fR) with the
+matching sequence, including the raising of floating point exceptions and the
+setting of \fBerrno\fR to \fBERANGE\fR, if applicable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBs\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches a sequence of bytes that are not white-space characters. The
+corresponding argument must be a pointer to the initial byte of an array of
+\fBchar\fR, \fBsigned char\fR, or \fBunsigned char\fR large enough to accept
+the sequence and a terminating null character code, which will be added
+automatically.
+.sp
+If an \fBl\fR (ell) qualifier is present, the input is a sequence of characters
+that begins in the initial shift state.  Each character is converted to a
+wide-character as if by a call to the \fBmbrtowc\fR(3C) function, with the
+conversion state described by an \fBmbstate_t\fR object initialized to zero
+before the first character is converted.  The corresponding argument must be a
+pointer to an array of \fBwchar_t\fR large enough to accept the sequence and
+the terminating null  wide-character, which will be added automatically.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB[\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches a non-empty sequence of characters from a set of expected characters
+(the \fIscanset\fR). The normal skip over white-space characters is suppressed
+in this case. The corresponding argument must be a pointer to the initial byte
+of an array of \fBchar\fR, \fBsigned char\fR, or \fBunsigned char\fR large
+enough to accept the sequence and a terminating null byte, which will be added
+automatically.
+.sp
+If an \fBl\fR (ell) qualifier is present, the input is a sequence of characters
+that begins in the initial shift state.  Each character in the sequence is
+converted to a wide-character as if by a call to the \fBmbrtowc()\fR function,
+with the conversion state described by an \fBmbstate_t\fR object initialized to
+zero before the first character is converted.  The corresponding argument must
+be a pointer to an array of \fBwchar_t\fR large enough to accept the sequence
+and the terminating null wide-character, which will be added automatically.
+.sp
+The conversion specification includes all subsequent characters in the
+\fIformat\fR string up to and including the matching right square bracket
+(\fB]\fR). The characters between the square brackets (the \fIscanlist\fR)
+comprise the scanset, unless the character after the left square bracket is a
+circumflex (\fB^\fR), in which case the scanset contains all characters that do
+not appear in the scanlist between the circumflex and the right square bracket.
+If the conversion specification begins with \fB[\|]\fR or \fB[^]\fR, the right
+square bracket is included in the scanlist and the next right square bracket is
+the matching right square bracket that ends the conversion specification;
+otherwise the first right square bracket is the one that ends the conversion
+specification. If a \fB-\fR is in the scanlist and is not the first character,
+nor the second where the first character is a \fB^\fR, nor the last character,
+it indicates a range of characters to be matched.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBc\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches a sequence of characters of the number specified by the field width (1
+if no field width is present in the conversion specification). The
+corresponding argument must be a pointer to the initial byte of an array of
+\fBchar\fR, \fBsigned char\fR, or \fBunsigned char\fR large enough to accept
+the sequence. No null byte is added. The normal skip over white-space
+characters is suppressed in this case.
+.sp
+If an \fBl\fR (ell) qualifier is present, the input is a sequence of characters
+that begins in the initial shift state.  Each character in the sequence is
+converted to a wide-character as if by a call to the \fBmbrtowc()\fR function,
+with the conversion state described by an \fBmbstate_t\fR object initialized to
+zero before the first character is converted.  The corresponding argument must
+be a pointer to an array of \fBwchar_t\fR large enough to accept the resulting
+sequence of wide-characters.  No null wide-character is added.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches the set of sequences that is the same as the set of sequences that is
+produced by the \fB%p\fR conversion of the corresponding \fBprintf\fR(3C)
+functions. The corresponding argument must be a pointer to a pointer to
+\fBvoid\fR. If the input item is a value converted earlier during the same
+program execution, the pointer that results will compare equal to that value;
+otherwise the behavior of the \fB%p\fR conversion is undefined.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 11n
+.rt  
+No input is consumed. The corresponding argument must be a pointer to the
+integer into which is to be written the number of bytes read from the input so
+far by this call to the \fBscanf()\fR functions. Execution of a \fB%n\fR
+conversion specification does not increment the assignment count returned at
+the completion of execution of the function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBC\fR\fR
+.ad
+.RS 11n
+.rt  
+Same as \fBlc\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBS\fR\fR
+.ad
+.RS 11n
+.rt  
+Same as \fBls\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%\fR\fR
+.ad
+.RS 11n
+.rt  
+Matches a single \fB%\fR; no conversion or assignment occurs. The complete
+conversion specification must be \fB%%\fR.
+.RE
+
+.sp
+.LP
+If a conversion specification is invalid, the behavior is undefined.
+.sp
+.LP
+The conversion characters \fBA\fR, \fBE\fR, \fBF\fR, \fBG\fR, and \fBX\fR are
+also valid and behave the same as, respectively, \fBa\fR, \fBe\fR, \fBf\fR,
+\fBg\fR, and \fBx\fR.
+.sp
+.LP
+If end-of-file is encountered during input, conversion is terminated. If
+end-of-file occurs before any bytes matching the current conversion
+specification (except for \fB%n\fR) have been read (other than leading
+white-space characters, where permitted), execution of the current conversion
+specification terminates with an input failure.  Otherwise, unless execution of
+the current conversion specification is terminated with a matching failure,
+execution of the following conversion specification (if any) is terminated with
+an input failure.
+.sp
+.LP
+Reaching the end of the string in \fBsscanf()\fR is equivalent to encountering
+end-of-file for \fBfscanf()\fR.
+.sp
+.LP
+If conversion terminates on a conflicting input, the offending input is left
+unread in the input. Any trailing white space (including newline characters) is
+left unread unless matched by a conversion specification. The success of
+literal matches and suppressed assignments is only directly determinable via
+the \fB%n\fR conversion specification.
+.sp
+.LP
+The \fBfscanf()\fR and \fBscanf()\fR functions may mark the \fBst_atime\fR
+field of the file associated with \fIstream\fR for update. The \fBst_atime\fR
+field will be marked for update by the first successful execution of
+\fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfread\fR(3C), \fBfscanf(\|),\fR
+\fBgetc\fR(3C), \fBgetchar\fR(3C), \fBgets\fR(3C), or \fBscanf()\fR using
+\fIstream\fR that returns data not supplied by a prior call to
+\fBungetc\fR(3C).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the number of successfully
+matched and assigned input items; this number can be 0 in the event of an early
+matching failure.  If the input ends before the first matching failure or
+conversion, \fBEOF\fR is returned.  If a read error occurs the error indicator
+for the stream is set, \fBEOF\fR is returned, and \fBerrno\fR is set to
+indicate the error.
+.SH ERRORS
+.sp
+.LP
+For the conditions under which the \fBscanf()\fR functions will fail and may
+fail, refer to \fBfgetc\fR(3C) or \fBfgetwc\fR(3C).
+.sp
+.LP
+In addition, \fBfscanf()\fR may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+Input byte sequence does not form a valid character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+There are insufficient arguments.
+.RE
+
+.SH USAGE
+.sp
+.LP
+If the application calling the \fBscanf()\fR functions has any objects of type
+\fBwint_t\fR or \fBwchar_t,\fR it must also include the header \fB<wchar.h>\fR
+to have these objects defined.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRThe call:
+.sp
+.in +2
+.nf
+int i, n; float x; char name[50];
+n = scanf("%d%f%s", &i, &x, name)
+.fi
+.in -2
+
+.sp
+.LP
+with the input line:
+
+.sp
+.in +2
+.nf
+25 54.32E-1 Hamster
+.fi
+.in -2
+
+.sp
+.LP
+will assign to \fIn\fR the value 3, to \fIi\fR the value 25, to \fIx\fR the
+value 5.432, and \fIname\fR will contain the string Hamster.
+
+.LP
+\fBExample 2 \fRThe call:
+.sp
+.in +2
+.nf
+int i; float x; char name[50];
+(void) scanf("%2d%f%*d %[0123456789]", &i, &x, name);
+.fi
+.in -2
+
+.sp
+.LP
+with input:
+
+.sp
+.in +2
+.nf
+56789 0123 56a72
+.fi
+.in -2
+
+.sp
+.LP
+will assign 56 to \fIi\fR, 789.0 to \fIx\fR, skip 0123, and place the string
+56\e0 in \fIname\fR. The next call to \fBgetchar\fR(3C) will return the
+character \fBa\fR.
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfgetwc\fR(3C), \fBfread\fR(3C),
+\fBisspace\fR(3C), \fBprintf\fR(3C), \fBsetlocale\fR(3C), \fBstrtod\fR(3C),
+\fBstrtol\fR(3C), \fBstrtoul\fR(3C), \fBwcrtomb\fR(3C), \fBungetc\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The behavior of the conversion specifier "%%" has changed for all of the
+functions described on this manual page. Previously the "%%" specifier accepted
+a "%" character from input only if there were no preceding whitespace
+characters.  The new behavior accepts "%" even if there are preceding
+whitespace characters. This new behavior now aligns with the description on
+this manual page and in various standards. If the old behavior is desired, the
+conversion specification "%*[%]" can be used.

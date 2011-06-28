@@ -1,0 +1,272 @@
+'\" te
+.\"  Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_GetTupleData 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_GetTupleData \- return the data portion of a tuple
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h> 
+
+
+
+\fBint32_t\fR \fBcsx_GetTupleData\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIch\fR\fR
+.ad
+.RS 6n
+.rt  
+Client handle returned from \fBcsx_RegisterClient\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItu\fR\fR
+.ad
+.RS 6n
+.rt  
+Pointer to a \fBtuple_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+This function returns the data portion of a tuple, as returned by the
+\fBcsx_GetFirstTuple\fR(9F) and \fBcsx_GetNextTuple\fR(9F) functions.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBtuple_t\fR are:
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.in +2
+.nf
+uint32_t  Socket;                           /* socket number */
+uint32_t  Attributes;                       /* tuple attributes*/
+cisdata_t DesiredTuple;                     /* tuple to search for*/
+cisdata_t TupleOffset;                      /* tuple data offset*/
+cisdata_t TupleDataMax;                     /* max tuple data size*/
+cisdata_t TupleDataLen;                     /* actual tuple data length*/
+cisdata_t TupleData[CIS_MAX_TUPLE_DATA_LEN];/* tuple body data buffer*/
+cisdata_t TupleCode;                        /* tuple type code*/
+cisdata_t TupleLink;                        /* tuple link */
+.fi
+.in -2
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR\fR
+.ad
+.RS 16n
+.rt  
+Not used in Solaris, but for portability with other Card Services
+implementations, it should be set to the logical socket number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR\fR
+.ad
+.RS 16n
+.rt  
+Initialized by \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F); the
+client must not modify the value in this field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDesiredTuple\fR\fR
+.ad
+.RS 16n
+.rt  
+Initialized by \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F); the
+client must not modify the value in this field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleOffset\fR\fR
+.ad
+.RS 16n
+.rt  
+This field allows partial tuple information to be retrieved, starting anywhere
+within the tuple.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleDataMax\fR\fR
+.ad
+.RS 16n
+.rt  
+This field is the size of the tuple data buffer that Card Services uses to
+return raw tuple data from \fBcsx_GetTupleData\fR. It can be larger than the
+number of bytes in the tuple data body. Card Services ignores any value placed
+here by the client.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleDataLen\fR\fR
+.ad
+.RS 16n
+.rt  
+This field is the actual size of the tuple data body. It represents the number
+of tuple data body bytes returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleData\fR\fR
+.ad
+.RS 16n
+.rt  
+This field is an array of bytes containing the raw tuple data body contents.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleCode\fR\fR
+.ad
+.RS 16n
+.rt  
+Initialized by \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F); the
+client must not modify the value in this field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTupleLink\fR\fR
+.ad
+.RS 16n
+.rt  
+Initialized by \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F); the
+client must not modify the value in this field.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR\fR
+.ad
+.RS 27n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR\fR
+.ad
+.RS 27n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_ARGS\fR\fR
+.ad
+.RS 27n
+.rt  
+Data from prior \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F) is
+corrupt.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CIS\fR\fR
+.ad
+.RS 27n
+.rt  
+No Card Information Structure (CIS) on \fBPC \fRCard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_MORE_ITEMS\fR\fR
+.ad
+.RS 27n
+.rt  
+Card Services was not able to read the tuple from the \fBPC \fRCard.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
+.ad
+.RS 27n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_GetFirstTuple\fR(9F), \fBcsx_ParseTuple\fR(9F),
+\fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
+.sp
+.LP
+\fIPC Card 95 Standard, PCMCIA/JEIDA\fR

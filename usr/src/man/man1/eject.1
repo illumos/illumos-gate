@@ -1,0 +1,258 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH eject 1 "8 Sep 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+eject \- eject media such as CD-ROM and floppy from drive
+.SH SYNOPSIS
+.LP
+.nf
+\fBeject\fR [\fB-dflqt\fR] [ [\fIdevice\fR | \fInickname\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBeject\fR utility is used for those removable media devices that do not
+have a manual eject button, or for those that might be locked due to, for
+instance, being mounted. The device may be specified by its name or by a
+nickname. If no device is specified, the default device is used.
+.sp
+.LP
+Only devices that support \fBeject\fR under program control respond to this
+command.
+.sp
+.LP
+When \fBeject\fR is used on media that can only be ejected manually, it does
+everything except remove the media, including unmounting the file system if it
+is mounted. In this case, \fBeject\fR displays a message that the media can now
+be manually ejected.
+.sp
+.LP
+Do not physically eject media from a device that contains mounted file systems.
+\fBeject\fR automatically searches for any mounted file systems that reside on
+the device, and attempts to umount them prior to ejecting the media. See
+\fBmount\fR(1M). If the unmount operation fails, \fBeject\fR prints a warning
+message and exits. The \fB-f\fR option can be used to specify an eject even if
+the device contains mounted partitions.
+.sp
+.LP
+If you have inserted a floppy diskette, you might need to use \fBvolcheck\fR(1)
+before ejecting the media to inform the system the floppy's presence.
+.sp
+.LP
+Pressing the physical media eject button located on some drives' front panel
+has the same effect as invoking \fBeject\fR for the respective drive. Not all
+drives have this capability.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 6n
+.rt  
+Display the name of the default device to be ejected.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Force the device to eject even if it is busy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 6n
+.rt  
+Display paths and nicknames of ejectable devices.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-q\fR\fR
+.ad
+.RS 6n
+.rt  
+Query to see if the media is present.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 6n
+.rt  
+Issues the drive a CD-ROM tray close command.
+.sp
+Not all devices support this command.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdevice\fR\fR
+.ad
+.RS 12n
+.rt  
+Specifies which device to \fBeject\fR, by the name it appears in the directory
+\fB/dev\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInickname\fR\fR
+.ad
+.RS 12n
+.rt  
+Specifies which device to \fBeject\fR, by its nickname as known to this
+command.
+.sp
+Volume label or device type (for example, cdrom or floppy0) can be used as a
+nickname.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fREjecting Media
+.sp
+.LP
+The following example ejects media by its volume label:
+
+.sp
+.in +2
+.nf
+example> \fBeject \&'My Pictures\&'\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fREjecting a Floppy Disk
+.sp
+.LP
+The following example ejects a floppy disk from the first floppy drive:
+
+.sp
+.in +2
+.nf
+example> \fBeject floppy0\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit codes are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+The operation was successful or, with the \fB-q\fR option, the media \fIis\fR
+in the drive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+The operation was unsuccessful or, with the \fB-q\fR option, the media is
+\fInot\fR in the drive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid options were specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+An \fBioctl()\fR request failed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 5n
+.rt  
+Manually ejectable media is now okay to remove.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/diskette0\fR\fR
+.ad
+.RS 18n
+.rt  
+default diskette file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/sr0\fR\fR
+.ad
+.RS 18n
+.rt  
+default \fBCD-ROM\fR file (deprecated)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBvolcheck\fR(1), \fBmount\fR(1M), \fBrmmount\fR(1M), \fBioctl\fR(2),
+\fBattributes\fR(5)

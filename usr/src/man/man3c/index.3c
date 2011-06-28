@@ -1,0 +1,78 @@
+'\" te
+.\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH index 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+index, rindex \- string operations
+.SH SYNOPSIS
+.LP
+.nf
+#include <strings.h>
+
+\fBchar *\fR\fBindex\fR(\fBconst char *\fR\fIs\fR, \fBint\fR \fIc\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBrindex\fR(\fBconst char *\fR\fIs\fR, \fBint\fR \fIc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBindex()\fR and \fBrindex()\fR functions operate on null-terminated
+strings.
+.sp
+.LP
+The \fBindex()\fR function returns a pointer to the first occurrence of
+character \fIc\fR in string \fIs\fR.
+.sp
+.LP
+The \fBrindex()\fR function returns a pointer to the last occurrence of
+character \fIc\fR in string \fIs\fR.
+.sp
+.LP
+Both \fBindex()\fR and  \fBrindex()\fR return a null pointer if \fIc\fR does
+not occur in the string. The null character terminating a string is considered
+to be part of the string.
+.SH USAGE
+.sp
+.LP
+On most modern computer systems, you can \fInot\fR use a null pointer to
+indicate a null string.  A null pointer is an error and results in an abort of
+the program.  If you wish to indicate a null string, you must use a pointer
+that points to an explicit null string.  On some machines and with some
+implementations of the C programming language, a null pointer, if dereferenced,
+would yield a null string.  Though often used, this practice is not always
+portable. Programmers using a null pointer to represent an empty string should
+be aware of this portability issue.  Even on machines where dereferencing a
+null pointer does not cause an abort of the program, it does not necessarily
+yield a null string.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbstring\fR(3C), \fBmalloc\fR(3C), \fBstring\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

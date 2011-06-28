@@ -1,0 +1,105 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH isaexec 3C "20 Mar 1998" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+isaexec \- invoke isa-specific executable
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBisaexec\fR(\fBconst char *\fR\fIpath\fR, \fBchar *const\fR \fIargv[]\fR, \fBchar *const\fR \fIenvp[]\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBisaexec()\fR function takes the path specified as \fIpath\fR and breaks
+it into directory and file name components. It enquires from the running system
+the list of supported instruction set architectures; see \fBisalist\fR(5). The
+function traverses the list for an executable file in named subdirectories of
+the original directory.  When such a file is located, \fBexecve()\fR is invoked
+with \fIargv\fR\fB[\|]\fR and \fIenvp\fR\fB[\|]\fR. See \fBexec\fR(2).
+.SH RETURN VALUES
+.sp
+.LP
+If no file is located, \fBisaexec()\fR returns \fBENOENT\fR. Other return
+values are the same as for \fBexecve()\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of \fBisaexec()\fR function.
+.sp
+.LP
+On a system whose \fBisalist\fR is
+
+.sp
+.in +2
+.nf
+sparcv7 sparc
+.fi
+.in -2
+
+.sp
+.LP
+the program
+
+.sp
+.in +2
+.nf
+int
+main(int argc, char *argv[], char *envp[])
+{
+        return (isaexec("/bin/thing", argv, envp));
+}
+.fi
+.in -2
+
+.sp
+.LP
+will look first for an executable file named \fB/bin/sparcv7/thing\fR, then for
+an executable file named \fB/bin/sparc/thing\fR. It will invoke \fBexecve()\fR
+on the first executable file it finds named \fBthing\fR.
+
+.sp
+.LP
+On that same system, a program called \fB/u/bin/tofu\fR can cause either
+\fB/u/bin/sparcv7/tofu\fR or \fB/u/bin/sparc/tofu\fR to be invoked using the
+following code:
+
+.sp
+.in +2
+.nf
+int
+main(int argc, char *argv[], char *envp[])
+{
+              return (isaexec(getexecname(), argv, envp));
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+_
+Interface StabilityStable
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexec\fR(2), \fBgetexecname\fR(3C), \fBattributes\fR(5), \fBisalist\fR(5)

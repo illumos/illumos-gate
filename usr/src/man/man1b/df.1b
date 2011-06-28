@@ -1,0 +1,122 @@
+'\" te
+.\"  Copyright (c) 1988 Sun Microsystems, Inc. - All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH df 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+df \- display status of disk space on file systems
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/df\fR [\fB-a\fR] [\fB-i\fR] [\fB-t\fR \fItype\fR] [\fIfilesystem...\fR] 
+     [\fIfilename...\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdf\fR utility displays the amount of disk space occupied by currently
+mounted file systems, the amount of used and available space, and how much of
+the file system's total capacity has been used.
+.sp
+.LP
+If arguments to \fBdf\fR are path names, \fBdf\fR produces a report on the file
+system containing the named file. Thus `\fBdf  .\fR' shows the amount of space
+on the file system containing the current directory.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 11n
+.rt  
+Report on all filesystems including the uninteresting ones which have zero
+total blocks (that is, auto-mounter).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 11n
+.rt  
+Report the number of used and free inodes. Print ` \fB*\fR ' if no information
+is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\fR\fB-t\fR\fB \fR\fItype\fR\fR
+.ad
+.RS 11n
+.rt  
+Report on filesystems of a given type (for example, nfs or ufs).
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBdf\fR
+.sp
+.LP
+A sample of output for \fBdf\fR looks like:
+
+.sp
+.in +2
+.nf
+example% \fBdf\fR
+Filesystem   kbytes  used  avail  capacity  Mounted on
+sparky:/       7445  4714  1986     70%     /
+sparky:/usr   42277 35291  2758     93%     /usr
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Note that \fBused\fR+\fBavail\fR is less than the amount of space in the file
+system (kbytes); this is because the system reserves a fraction of the space in
+the file system to allow its file system allocation routines to work well. The
+amount reserved is typically about 10%; this can be adjusted using \fBtunefs\fR
+(see \fBtunefs\fR(1M)). When all the space on a file system except for this
+reserve is in use, only the super-user can allocate new files and data blocks
+to existing files. When a file system is overallocated in this way, \fBdf\fR
+can report that the file system is more than 100% utilized.
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.RS 15n
+.rt  
+List of file systems currently mounted
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.RS 15n
+.rt  
+List of default parameters for each file system
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdu\fR(1), \fBquot\fR(1M), \fBtunefs\fR(1M), \fBmnttab\fR(4),
+\fBattributes\fR(5)

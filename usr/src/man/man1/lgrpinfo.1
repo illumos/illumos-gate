@@ -1,0 +1,619 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH lgrpinfo 1 "11 Sep 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+lgrpinfo \- display information about locality groups
+.SH SYNOPSIS
+.LP
+.nf
+\fBlgrpinfo\fR [\fB-aceGlLmrt\fR] [\fB-u \fR\fIunit\fR] [\fB-C\fR | \fB-P\fR] \fIlgrp\fR ...
+.fi
+
+.LP
+.nf
+\fBlgrpinfo\fR \fB-h\fR
+.fi
+
+.LP
+.nf
+\fBlgrpinfo\fR \fB-I\fR [\fB-c\fR] [\fB-G\fR] [\fB-C\fR | \fB-P\fR] \fIlgrp\fR ...
+.fi
+
+.LP
+.nf
+\fBlgrpinfo\fR [\fB-T\fR] [\fB-aceGlLmr\fR] [\fB-u \fR\fIunit\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBlgrpinfo\fR prints information about the locality group (\fBlgroup\fR)
+hierarchy and its contents.
+.sp
+.LP
+An lgroup represents the set of CPU and memory-like hardware devices that are
+at most some distance (latency) apart from each other. All lgroups in the
+system are identified by a unique integer called an \fBlgroup ID\fR.
+.sp
+.LP
+lgroups are organized into a hierarchy to facilitate finding the nearest
+resources. Leaf lgroups each contain a set of resources that are closest
+(local) to each other. Each parent lgroup in the hierarchy contains the
+resources of its child lgroups plus their next nearest resources. Finally, the
+\fBroot\fR lgroup contains all the resources in the domain within the largest
+latency.
+.sp
+.LP
+A Uniform Memory Access (UMA) machine is simply represented by the root lgroup.
+A Non Uniform Memory Access (NUMA) machine is represented by a hierarchy of
+lgroups to show the corresponding levels of locality. For example, a NUMA
+machine with two latencies (local and remote) has an \fBlgroup\fR hierarchy
+consisting of two levels with its leaves and the root.
+.sp
+.LP
+Every application thread is assigned a \fBhome\fR lgroup. When the system needs
+to allocate a CPU or memory resource for a thread, it searches lgroup hierarchy
+from the thread's home lgroup for the closest available resources to the
+thread's home. See \fBplgrp\fR(1) for details.
+.sp
+.LP
+Without arguments, \fBlgrpinfo\fR prints general information about all lgroups
+in the system. If any lgroup IDs are specified on the command line, the command
+only prints information about the specified lgroups. Various options control
+which lgroups are displayed and the exact information that is printed for each
+lgroup.
+.sp
+.LP
+lgroups can be specified on the command line as lgroup IDs or by using specific
+keywords. See \fBOPERANDS\fR.
+.SH OPTIONS
+.sp
+.LP
+You can combine options together and the order in which options are specified
+is not important. Lowercase options select what information should be printed
+about lgroups.
+.sp
+.LP
+Invoking \fBlgrpinfo\fR without arguments is equivalent to:
+.sp
+.in +2
+.nf
+lgrpinfo -c -e -l -m -r -t all
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 12n
+.rt  
+Print topology, CPU, memory, load and latency information.
+.sp
+This option is a shorthand for
+.sp
+.in +2
+.nf
+lgrpinfo -t -c -e -m -r -l -L
+.fi
+.in -2
+.sp
+
+unless \fB-T\fR is specified as well. When \fB-T\fR is specified, the \fB-t\fR
+option is not included.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 12n
+.rt  
+Print CPU information.
+.sp
+This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-C\fR\fR
+.ad
+.RS 12n
+.rt  
+Replace each lgroup in the list with its children.
+.sp
+This option cannot be used with the \fB-P\fR or the \fB-T\fR option. When no
+arguments are specified, this option is applied to the lgroups displayed by
+default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fR
+.ad
+.RS 12n
+.rt  
+Print lgroup load average. The lgroup load averages are only displayed for leaf
+lgroups.
+.sp
+This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-G\fR\fR
+.ad
+.RS 12n
+.rt  
+Print OS view of lgroup hierarchy.
+.sp
+By default, the caller's view of the lgroup hierarchy is displayed which only
+includes what the caller can use, for example, only the CPUs in the caller's
+processor set is displayed. See \fBlgrp_init\fR(3LGRP) on the operating system
+and the caller's view.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 12n
+.rt  
+Print short help message and exit.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR\fR
+.ad
+.RS 12n
+.rt  
+Print matching IDs only.
+.sp
+This option is intended for scripts and can be used with \fB-c\fR, \fB-G\fR,
+and \fB-C\fR or \fB-P\fR. If \fB-c\fR is specified, print list of CPUs
+contained in all matching lgroups. Otherwise, the IDs for the matching lgroups
+is displayed. See \fBEXAMPLES\fR.
+.sp
+When no arguments are specified, this option is applied to the lgroups
+displayed, which, by default is all lgroups.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 12n
+.rt  
+Print information about lgroup latencies.
+.sp
+The latency value specified for each lgroup is defined by the operating system
+and is platform-specific. It can only be used for relative comparison of
+lgroups on the running system. It does not necessarily represent the actual
+latency between hardware devices and might not be applicable across platforms.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 12n
+.rt  
+Print the lgroup latency table. The lgroup latency table displays the relative
+latency from each lgroup to each of the other lgroups including itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 12n
+.rt  
+Print memory information.
+.sp
+Memory sizes are scaled to the unit of measure that yields an integer from
+\fB0\fR to \fB1023\fR unless the \fB-u\fR option is specified as well. The
+fractional part of the number is only displayed for values less than \fB10\fR.
+This behavior is similiar to using the \fB-h\fR option of \fBls\fR(1) or
+\fBdf\fR(1M) to display a human readable format.
+.sp
+This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-P\fR\fR
+.ad
+.RS 12n
+.rt  
+Replace each lgroup in the list with its parents.
+.sp
+This option cannot be used with the \fB-C\fR or \fB-T\fR option. When no
+arguments are specified, this option is applied to the lgroups displayed,
+which, by default is all lgroups.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 12n
+.rt  
+Print information about lgroup resources.
+.sp
+The resources are represented by a set of lgroups in which each member lgroup
+directly contains CPU and memory resources. If \fB-T\fR is specified as well,
+only information about resources of the intermediate lgroups is displayed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 12n
+.rt  
+Print information about lgroup topology.
+.sp
+This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-T\fR\fR
+.ad
+.RS 12n
+.rt  
+Print the lgroup topology of a system graphically as a tree. This option can
+only be used with the \fB-a\fR, \fB-c\fR, \fB-e\fR, \fB-G\fR,
+\fB-l\fR,\fB-L\fR, \fB-m\fR, \fB-r\fR, and \fB-u\fR options. It only prints
+lgroup resources for intermediate lgroups when used with the \fB-r\fR. The
+\fB-t\fR option is omitted when \fB-T\fR is used with \fB-a\fR. No information
+is printed for the \fBroot\fR lgroup unless it is the only lgroup.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR \fIunits\fR\fR
+.ad
+.RS 12n
+.rt  
+Specify memory units. Units should be b, k, m, g, t, p, or e for bytes,
+kilobytes, megabytes, gigabytes, terabytes, petabytes, or exabytes
+respectively. The fractional part of the number is only displayed for values
+less than 10. This behavior is similiar to using the \fB-h\fR option of
+\fBls\fR(1) or \fBdf\fR(1M) to display a human readable format.
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlgrp\fR\fR
+.ad
+.RS 8n
+.rt  
+lgroups can be specified on the command line as lgroup ID, by using one of the
+following keywords:
+.sp
+.ne 2
+.mk
+.na
+\fBall\fR
+.ad
+.RS 16n
+.rt  
+All lgroups.
+.sp
+This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBintermediate\fR
+.ad
+.RS 16n
+.rt  
+All intermediate lgroups. An intermediate lgroup is an lgroup that has a parent
+and children.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBleaves\fR
+.ad
+.RS 16n
+.rt  
+All leaf lgroups. A leaf lgroup is an lgroup that has no children in the lgroup
+hierarchy.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBroot\fR
+.ad
+.RS 16n
+.rt  
+Root lgroup. Root lgroup contains all the resources in the domain within the
+largest latency and has no parent lgroup.
+.RE
+
+.RE
+
+.sp
+.LP
+If an invalid lgroup is specified, the lgrpinfo command prints a message on
+standard error showing the invalid ID and continues processing other lgroups
+specified on the command line. When none of the specified lgroups are valid,
+\fBlgrpinfo\fR exits with an exit status of \fB2\fR.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPrinting Information about lgroups
+.sp
+.LP
+The following example prints general information about lgroups in the system.
+
+.sp
+.LP
+In this example, the system is a 2 CPU AMD Opteron machine with two nodes, each
+having one CPU and 2 gigabytes of memory. Each of these nodes is represented by
+a leaf lgroup. The root lgroup contains all the resources in the machine:
+
+.sp
+.in +2
+.nf
+$ lgrpinfo
+  lgroup 0 (root):
+          Children: 1 2
+          CPUs: 0 1
+          Memory: installed 4.0G, allocated 2.2G, free 1.8G
+          Lgroup resources: 1 2 (CPU); 1 2 (memory)
+          Latency: 83
+  lgroup 1 (leaf):
+          Children: none, Parent: 0
+          CPU: 0
+          Memory: installed 2.0G, allocated 1.2G, free 788M
+          Lgroup resources: 1 (CPU); 1 (memory)
+          Load: 0.793
+          Latency: 56
+  lgroup 2 (leaf):
+          Children: none, Parent: 0
+          CPU: 1
+          Memory: installed 2.0G, allocated 1017M, free 1.0G
+          Lgroup resources: 2 (CPU); 2 (memory)
+          Load: 0.817
+          Latency: 56
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRPrinting lgroup Topology
+.sp
+.LP
+The following example prints the lgroup topology tree on a 4 CPU AMD Opteron
+machine:
+
+.sp
+.in +2
+.nf
+$ lgrpinfo -T
+  0
+  |-- 5
+  |   `-- 1
+  |-- 6
+  |   `-- 2
+  |-- 7
+  |   `-- 3
+  `-- 8
+      `-- 4
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRPrinting lgroup Topology
+.sp
+.LP
+The following example prints the lgroup topology tree, resources, memory and
+CPU information on a 2 CPU AMD Opteron machine:
+
+.sp
+.in +2
+.nf
+$ lgrpinfo -Ta
+  0
+  |-- 1
+  |   CPU: 0
+  |   Memory: installed 2.0G, allocated 1.2G, free 790M
+  |   Load: 0.274
+  |   Latency: 56
+  `-- 2
+      CPU: 1
+      Memory: installed 2.0G, allocated 1019M, free 1.0G
+      Load: 0.937
+      Latency: 56
+
+Lgroup latencies:
+
+------------
+    |  0  1  2
+  ------------
+  0 | 83 83 83
+  1 | 83 56 83
+  2 | 83 83 56
+  ------------
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRPrinting lgroup IDs
+.sp
+.LP
+The following example prints lgroup IDs for children of the root lgroup:
+
+.sp
+.in +2
+.nf
+$ lgrpinfo -I -C root
+  1 2
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRPrinting CPU IDs
+.sp
+.LP
+The following example prints CPU IDs for all CPUs in lgroup 1:
+
+.sp
+.in +2
+.nf
+$ lgrpinfo -c -I 1
+  0
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRPrinting Information about lgropu Latencies
+.sp
+.LP
+The following example prints information about lgroup latencies:
+
+.sp
+.in +2
+.nf
+ $ lgrpinfo -l
+  lgroup 0 (root):
+          Latency: 83
+  lgroup 1 (leaf):
+          Latency: 56
+  lgroup 2 (leaf):
+          Latency: 5
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+.rt  
+Unable to get lgroup information from the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+.rt  
+All lgroups specified are invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 5n
+.rt  
+Invalid syntax.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilitySee below.
+.TE
+
+.sp
+.LP
+The human readable output is Unstable.
+.SH SEE ALSO
+.sp
+.LP
+\fBls\fR(1), \fBplgrp\fR(1), \fBpmap\fR(1), \fBproc\fR(1), \fBps\fR(1),
+\fBdf\fR(1M), \fBprstat\fR(1M), \fBlgrp_init\fR(3LGRP), \fBliblgrp\fR(3LIB),
+\fBproc\fR(4), \fBattributes\fR(5)

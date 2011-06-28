@@ -1,0 +1,183 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldi_prop_exists 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ldi_prop_exists \- Check for the existence of a property
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/sunldi.h>
+
+\fBint\fR \fBldi_prop_exists\fR(\fBldi_handle_t\fR \fIlh\fR, \fBuint_t\fR \fIflags\fR, \fBchar *\fR\fIname\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlh\fR\fR
+.ad
+.RS 9n
+.rt  
+Layered handle.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 9n
+.rt  
+Possible flag values are some combination of:
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBLDI_DEV_T_ANY\fR
+.ad
+.RS 21n
+.rt  
+Match the lookup request independent of the actual dev_t value that was used
+when the property was created. The flag indicates any dev_t value (including
+DDI_DEV_T_NONE)  associated with a possible property match satisfies the
+matching criteria.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDDI_PROP_DONTPASS\fR
+.ad
+.RS 21n
+.rt  
+Do not pass request to parent device information node if the property  is not
+found.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBDDI_PROP_NOTPROM\fR
+.ad
+.RS 21n
+.rt  
+Do not look at PROM properties  (ignored  on platforms that do not support PROM
+properties).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 21n
+.rt  
+String containing the name of the property.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBldi_prop_exists()\fR checks for the existence of a property associated with
+a device represented by the layered driver handle, regardless of the property
+value data type.
+.sp
+.LP
+Properties are searched for based on the dip and dev_t values associated with
+the layered handle, and the property name. This  association is handled by the
+layered driver infrastructure on behalf of the consumers of
+\fBldi_prop_exists()\fR.
+.sp
+.LP
+The property search order is as follows:
+.RS +4
+.TP
+1.
+Search software-properties created by the driver.
+.RE
+.RS +4
+.TP
+2.
+Search the software properties created by the system (or nexus nodes in the
+device info tree).
+.RE
+.RS +4
+.TP
+3.
+Search the driver global properties list.
+.RE
+.RS +4
+.TP
+4.
+If DDI_PROP_NOTPROM is not set, search the PROM properties (if they exist).
+.RE
+.RS +4
+.TP
+5.
+If DDI_PROP_DONTPASS is not set, pass this request to the parent device
+information node of the device  represented by the layered handle.
+.RE
+.RS +4
+.TP
+6.
+Return \fB0\fR if not found and \fB1\fR if found.
+.RE
+.sp
+.LP
+Typically, the specific dev_t value associated with the device represented by
+the layered handle (ldi_handle_t) is used as a part of the property match
+criteria. This association is handled by the layered driver infrastructure on
+behalf of the consumers of the ldi property look up functions.
+.sp
+.LP
+However, if the LDI_DEV_T_ANY flag is used, the ldi property lookup functions
+will match the request regardless of the dev_t value associated with the
+property at the time of its creation.  If a property was created with a dev_t
+set to DDI_DEV_T_NONE, the only way to look up this property is with the
+LDI_DEV_T_ANY flag.  PROM properties are always created with a dev_t set to
+DDI_DEV_T_NONE.
+.sp
+.LP
+name must always be set to the name of the property being looked up.
+.SH RETURN VALUES
+.sp
+.LP
+\fBldi_prop_exists()\fR returns \fB1\fR if the property exists and \fB0\fR
+otherwise.
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH EXAMPLE
+.sp
+.in +2
+.nf
+The following example demonstrates the use of ldi_prop_exists().
+
+     /* Determine the existence of the "interrupts" property */
+       ldi_prop_exists(lh, LDI_DEV_T_ANY|DDI_PROP_NOTPROM, "interrupts");
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_prop_exists(9F)\fR
+.sp
+.LP
+\fIWriting Device Drivers\fR

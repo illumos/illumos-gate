@@ -1,0 +1,124 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH posix_spawnattr_destroy 3C "30 Jan 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+posix_spawnattr_destroy, posix_spawnattr_init \- destroy and initialize spawn
+attributes object
+.SH SYNOPSIS
+.LP
+.nf
+#include <spawn.h>
+
+\fBint\fR \fBposix_spawnattr_destroy\fR(\fBposix_spawnattr_t *\fR\fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBposix_spawnattr_init\fR(\fBposix_spawnattr_t *\fR\fIattr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBposix_spawnattr_destroy()\fR function destroys a spawn attributes
+object. A destroyed \fIattr\fR attributes object can be reinitialized using
+\fBposix_spawnattr_init()\fR. The results of otherwise referencing the object
+after it has been destroyed are undefined. An implementation can cause
+\fBposix_spawnattr_destroy()\fR to set the object referenced by \fIattr\fR to
+an invalid value.
+.sp
+.LP
+The \fBposix_spawnattr_init()\fR function initializes a spawn attributes object
+\fIattr\fR with the default value for all of the individual attributes used by
+the implementation. Results are undefined if \fBposix_spawnattr_init()\fR is
+called specifying an already initialized \fIattr\fR attributes object.
+.sp
+.LP
+A spawn attributes object is of type \fBposix_spawnattr_t\fR (defined in
+<\fBspawn.h\fR>) and is used to specify the inheritance of process attributes
+across a spawn operation.
+.sp
+.LP
+No attributes other than those defined by IEEE Std 1003.1-200x are provided.
+.sp
+.LP
+The resulting spawn attributes object (possibly modified by setting individual
+attribute values), is used to modify the behavior of \fBposix_spawn\fR(3C) or
+\fBposix_spawnp\fR(3C). After a spawn attributes object has been used to spawn
+a process by a call to \fBposix_spawn()\fR or \fBposix_spawnp()\fR, any
+function affecting the attributes object (including destruction) will not
+affect any process that has been spawned in this way.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBposix_spawnattr_destroy()\fR and
+\fBposix_spawnattr_init()\fR return 0. Otherwise, an error number is returned
+to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBposix_spawnattr_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient memory exists to initialize the spawn attributes object.
+.RE
+
+.sp
+.LP
+The \fBposix_spawnattr_destroy()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBposix_spawn\fR(3C), \fBposix_spawnattr_getflags\fR(3C),
+\fBposix_spawnattr_getpgroup\fR(3C), \fBposix_spawnattr_getschedparam\fR(3C),
+\fBposix_spawnattr_getschedpolicy\fR(3C),
+\fBposix_spawnattr_getsigdefault\fR(3C), \fBposix_spawnattr_getsigmask\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

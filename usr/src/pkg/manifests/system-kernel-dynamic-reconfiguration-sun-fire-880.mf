@@ -48,9 +48,11 @@ dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
 dir path=usr/platform/SUNW,Sun-Fire-880/lib
 dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
 dir path=usr/platform/SUNW,Sun-Fire-V890/lib
+dir path=usr/share/man/man1m
 file path=lib/svc/manifest/platform/sun4u/sf880drd.xml group=sys mode=0444
 file path=lib/svc/method/sf880dr mode=0555
 file path=usr/platform/SUNW,Sun-Fire-880/lib/sf880drd group=sys mode=0755
+file path=usr/share/man/man1m/sf880drd.1m
 legacy pkg=SUNWsfdr.u arch=$(ARCH).sun4u desc="Sun Fire 880 DR Daemon" \
     name="Sun Fire 880 DR Daemon"
 legacy pkg=SUNWsfdrr.u arch=$(ARCH).sun4u \

@@ -1,0 +1,221 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH xdr_complex 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+xdr_complex, xdr_array, xdr_bytes, xdr_opaque, xdr_pointer, xdr_reference,
+xdr_string, xdr_union, xdr_vector, xdr_wrapstring \- library routines for
+external data representation
+.SH DESCRIPTION
+.sp
+.LP
+\fBXDR\fR library routines allow C programmers to describe complex data
+structures in a machine-independent fashion. Protocols such as remote procedure
+calls (RPC) use these routines to describe the format of the data. These
+routines are the \fBXDR\fR library routines for complex data structures. They
+require the creation of \fBXDR\fR streams. See \fBxdr_create\fR(3NSL).
+.SS "Routines"
+.sp
+.LP
+See \fBrpc\fR(3NSL) for the definition of the \fBXDR\fR data structure. Note
+that any buffers passed to the \fBXDR\fR routines must be properly aligned. It
+is suggested either that \fBmalloc()\fR be used to allocate these buffers, or
+that the programmer insure  that the buffer address is divisible evenly by
+four.
+.sp
+.LP
+\fB#include <rpc/xdr.h>\fR
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_array(XDR *\fIxdrs\fR, caddr_t *\fIarrp\fR, uint_t *\fIsizep\fR,
+const uint_t \fImaxsize\fR, const uint_t \fIelsize\fR, const xdrproc_t
+\fIelproc\fR);\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_array()\fR translates between variable-length arrays and their
+corresponding external representations. The parameter \fIarrp\fR is the address
+of the pointer to the array, while \fIsizep\fR is the address of the element
+count of the array; this element count cannot exceed \fImaxsize\fR. The
+parameter \fIelsize\fR is the size of each of the array's elements, and
+\fIelproc\fR is an \fBXDR\fR routine that translates between the array
+elements' C form and their external representation. If \fB*\fR\fIaarp\fR is
+\fINULL\fR when decoding, \fB xdr_array()\fR allocates memory and
+\fB*\fR\fIaarp\fR points to it. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_bytes(XDR *\fIxdrs\fR, char **\fIsp\fR, uint_t *\fIsizep\fR,
+const uint_t \fImaxsize\fR);\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_bytes()\fR translates between counted byte strings and their external
+representations. The parameter \fIsp\fR is the address of the string pointer.
+The length of the string is located at address \fIsizep\fR; strings cannot be
+longer than \fImaxsize\fR. If \fB*\fR\fIsp\fR is  \fINULL\fR when decoding,
+\fBxdr_bytes()\fR allocates memory and \fB*\fR\fIsp\fR points to it. This
+routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_opaque(XDR *\fIxdrs\fR, caddr_t \fIcp\fR, const uint_t
+\fIcnt\fR);\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_opaque()\fR translates between fixed size opaque data and its external
+representation. The parameter \fBcp\fR is the address of the opaque object, and
+\fIcnt\fR is its size in bytes. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_pointer(XDR *\fIxdrs\fR, char **objpp, uint_t \fIobjsize\fR,
+const xdrproc_t \fIxdrobj\fR);\fR
+.ad
+.sp .6
+.RS 4n
+Like \fBxdr_reference()\fR except that it serializes null pointers, whereas
+\fBxdr_reference()\fR does not.  Thus, \fBxdr_pointer()\fR can represent
+recursive data structures, such as binary trees or linked lists. If
+\fB*\fR\fIobjpp\fR is  \fINULL\fR when decoding, \fBxdr_pointer()\fR allocates
+memory and \fB*\fR\fIobjpp\fR points to it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_reference(XDR *\fIxdrs\fR, caddr_t *\fIpp\fR, uint_t \fIsize\fR,
+const xdrproc_t \fIproc\fR);\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_reference()\fR provides pointer chasing within structures.  The
+parameter \fIpp\fR is the address of the pointer; \fBsize\fR is the
+\fBsizeof\fR the structure that \fI*pp\fR points to; and \fBproc\fR is an
+\fBXDR\fR procedure that translates the structure between its C form and its
+external representation. If \fB*\fR\fIpp\fR is  \fINULL\fR when decoding,
+\fBxdr_reference()\fR allocates memory and \fB*\fR\fIpp\fR points to it.  This
+routine returns \fB1\fR if it succeeds, \fB0\fR otherwise.
+.sp
+Warning: this routine does not understand null pointers. Use
+\fBxdr_pointer()\fR instead.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_string(XDR *\fIxdrs\fR, char **\fIsp\fR, const uint_t
+\fImaxsize\fR);\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_string()\fR translates between C strings and their corresponding
+external representations. Strings cannot be longer than \fImaxsize\fR. Note:
+\fIsp\fR is the address of the string's pointer. If \fB*\fR\fIsp\fR is
+\fINULL\fR when decoding, \fBxdr_string()\fR allocates memory and
+\fB*\fR\fIsp\fR points to it. This routine returns \fBTRUE\fR if it succeeds,
+\fBFALSE\fR otherwise. Note: \fBxdr_string()\fR can be used to send an empty
+string ("\|"), but not a null string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_union(XDR *\fIxdrs\fR, enum_t *\fIdscmp\fR, char *\fIunp\fR,
+const struct xdr_discrim *\fIchoices\fR, const xdrproc_t
+(*\fIdefaultarm\fR));\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_union()\fR translates between a discriminated C \fBunion\fR and its
+corresponding external representation. It first translates the discriminant of
+the union located at \fIdscmp\fR. This discriminant is always an \fBenum_t\fR.
+Next the union located at \fIunp\fR is translated.  The parameter \fIchoices\fR
+is a pointer to an array of \fBxdr_discrim\fR structures. Each structure
+contains an ordered pair of [\fIvalue, proc\fR]. If the union's discriminant is
+equal to the associated \fIvalue\fR, then the \fBproc\fR is called to translate
+the union. The end of the \fBxdr_discrim\fR structure array is denoted by a
+routine of value \fINULL\fR. If the discriminant is not found in the
+\fIchoices\fR array, then the \fIdefaultarm\fR procedure is called (if it is
+not \fINULL\fR). It returns \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_vector(XDR *\fIxdrs\fR, char *\fIarrp\fR, const uint_t
+\fIsize\fR, const uint_t \fIelsize\fR, const xdrproc_t \fIelproc\fR);\fR
+.ad
+.sp .6
+.RS 4n
+\fBxdr_vector()\fR translates between fixed-length arrays and their
+corresponding external representations. The parameter \fIarrp\fR is the address
+of the pointer to the array, while \fBsize\fR is the element count of the
+array. The parameter \fIelsize\fR is the \fBsizeof\fR each of the array's
+elements, and \fIelproc\fR is an \fBXDR\fR routine that translates between the
+array elements' C form and their external representation. This routine returns
+\fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBbool_t xdr_wrapstring(XDR *\fIxdrs\fR, char **\fIsp\fR);\fR
+.ad
+.sp .6
+.RS 4n
+A routine that calls \fBxdr_string(\fR\fIxdrs\fR\fB,\fR \fIsp\fR\fB,
+\fR\fImaxuint\fR\fB);\fR where \fImaxuint\fR is the maximum value of an
+unsigned integer.
+.sp
+Many routines, such as \fBxdr_array()\fR, \fBxdr_pointer()\fR, and
+\fBxdr_vector()\fR take a function pointer of type \fBxdrproc_t()\fR, which
+takes two arguments. \fBxdr_string()\fR, one of the most frequently used
+routines, requires three arguments, while \fBxdr_wrapstring()\fR only requires
+two. For these routines, \fBxdr_wrapstring()\fR is desirable. This routine
+returns \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmalloc\fR(3C), \fBrpc\fR(3NSL), \fBxdr_admin\fR(3NSL),
+\fBxdr_create\fR(3NSL), \fBxdr_simple\fR(3NSL), \fBattributes\fR(5)

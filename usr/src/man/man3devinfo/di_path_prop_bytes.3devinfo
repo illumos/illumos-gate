@@ -1,0 +1,247 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH di_path_prop_bytes 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.SH NAME
+di_path_prop_bytes, di_path_prop_ints, di_path_prop_int64s, di_path_prop_name,
+di_path_prop_strings, di_path_prop_type \- access path property information
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
+#include <libdevinfo.h>
+
+\fBchar *\fR\fBdi_path_prop_bytes\fR(\fBdi_path_prop_t\fR \fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB\fR(\fBdi_path_prop_t\fR \fIprop\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB\fR(\fBdi_path_prop_t\fR \fIprop\fR, \fBuchar_t **\fR\fIprop_data\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB\fR(\fBdi_path_prop_t\fR \fIprop\fR, \fBint **\fR\fIprop_data\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fB\fR(\fBdi_path_prop_t\fR \fIprop\fR, \fBint64_t **\fR\fIprop_data\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdi_path_prop_type\fR(\fBdi_path_prop_t\fR \fIprop\fR, \fBchar **\fR\fIprop_data\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprop\fR\fR
+.ad
+.RS 13n
+.rt  
+A handle to a property returned by \fBdi_path_prop_next\fR(3DEVINFO).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprop_data\fR\fR
+.ad
+.RS 13n
+.rt  
+For \fBdi_path_prop_bytes()\fR, the address of a pointer to an unsigned
+character.
+.sp
+For \fBdi_path_prop_ints()\fR, the address of a pointer to an integer.
+.sp
+For \fBdi_path_prop_int64()\fR, the address of a pointer to a 64-bit integer.
+.sp
+For \fBdi_path_prop_strings()\fR, the address of pointer to a character.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions access information associated with path property values and
+attributes such as the property name or data type.
+.sp
+.LP
+The \fBdi_path_prop_name()\fR function returns a pointer to a string containing
+the name of the property.
+.sp
+.LP
+The \fBdi_path_prop_type()\fR function returns the type of the path property.
+The type determines the appropriate interface to access property values.
+Possible property types are the same as for \fBdi_prop_type\fR(3DEVINFO),
+excluding \fBDI_PROP_TYPE_UNKNOWN\fR and \fBDI_PROP_UNDEFINED\fR. Thus,
+\fBdi_path_prop_type()\fR can return one of the following constants:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDI_PROP_TYPE_INT\fR\fR
+.ad
+.RS 23n
+.rt  
+Use \fBdi_path_prop_ints()\fR to access property data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDI_PROP_TYPE_INT64\fR\fR
+.ad
+.RS 23n
+.rt  
+Use \fBdi_path_prop_int64s()\fR to access property data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDI_PROP_TYPE_STRING\fR\fR
+.ad
+.RS 23n
+.rt  
+Use \fBdi_path_prop_strings()\fR to access property data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDI_PROP_TYPE_BYTE\fR\fR
+.ad
+.RS 23n
+.rt  
+Use \fBdi_path_prop_bytes()\fR to access property data.
+.RE
+
+.sp
+.LP
+The \fBdi_path_prop_bytes()\fR function returns the property data as a series
+of unsigned characters.
+.sp
+.LP
+The \fBdi_path_prop_ints()\fR function returns the property data as a series of
+integers.
+.sp
+.LP
+The \fBdi_path_prop_int64s()\fR function returns the property data as a series
+of integers.
+.sp
+.LP
+The \fBdi_path_prop_strings()\fR function returns the property data as a
+concatenation of null-terminated strings.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion,  \fBdi_path_prop_bytes()\fR,
+\fBdi_path_prop_ints()\fR, \fBdi_path_prop_int64s()\fR, and
+\fBdi_path_prop_strings()\fR return a non-negative value, indicating the number
+of entries in the property value buffer. If the property is found, the number
+of entries in \fIprop_data\fR is returned. Otherwise, -1 is returned and
+\fBerrno\fR is set to indicate the error.
+.sp
+.LP
+For \fBdi_path_prop_bytes()\fR, the number of entries is the number of unsigned
+characters contained in the buffer pointed to by \fIprop_data\fR.
+.sp
+.LP
+For \fBdi_path_prop_ints()\fR, the number of entries is the number of integers
+contained in the buffer pointed to by \fIprop_data\fR.
+.sp
+.LP
+For \fBdi_path_prop_ints()\fR, the number of entries is the number of 64-bit
+integers contained in the buffer pointed to by \fIprop_data\fR.
+.sp
+.LP
+For \fBdi_path_prop_strings()\fR, the number of entries is the number of
+null-terminated strings contained in the buffer. The strings are stored in a
+concatenated format in the buffer.
+.sp
+.LP
+The \fBdi_path_prop_name()\fR function returns the name of the property.
+.sp
+.LP
+The \fBdi_path_prop_type()\fR function can return one of types described in the
+Description.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 11n
+.rt  
+One of the arguments is invalid. For example, the property type does not match
+the interface.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.RS 11n
+.rt  
+The snapshot contains no property information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+The path property does not exist.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdi_path_prop_next\fR(3DEVINFO), \fBdi_prop_type\fR(3DEVINFO),
+\fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,0 +1,98 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cpc_event_diff 3CPC "28 Mar 2005" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.SH NAME
+cpc_event_diff, cpc_event_accum \- simple difference and accumulate operations
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
+#include <libcpc.h>
+
+\fBvoid\fR \fBcpc_event_accum\fR(\fBcpc_event_t *\fR\fIaccum\fR, \fBcpc_event_t *\fR\fIevent\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBcpc_event_diff\fR(\fBcpc_event_t *\fR\fIdiff\fR, \fBcpc_event_t *\fR\fIafter\fR,
+     \fBcpc_event_t *\fR\fIbefore\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcpc_event_accum()\fR and \fBcpc_event_diff()\fR functions  perform
+common accumulate and difference operations on \fBcpc_event\fR(3CPC) data
+structures. Use of these functions increases program portability, since
+structure members are not referenced directly .
+.SS "\fBcpc_event_accum()\fR"
+.sp
+.LP
+The \fBcpc_event_accum()\fR function adds the \fBce_pic\fR fields of
+\fIevent\fR into the corresponding fields of \fIaccum\fR. The \fBce_hrt\fR
+field of \fIaccum\fR is set to the later of the times in \fIevent\fR and
+\fIaccum\fR.
+.SS "SPARC:"
+.sp
+.LP
+The function adds the contents of the \fBce_tick\fR field of \fIevent\fR into
+the corresponding field of \fIaccum\fR.
+.SS "x86:"
+.sp
+.LP
+The function adds the contents of the \fBce_tsc\fR field of \fIevent\fR into
+the corresponding field of \fIaccum\fR.
+.SS "\fBcpc_event_diff()\fR"
+.sp
+.LP
+The \fBcpc_event_diff()\fR function places the difference between the
+\fBce_pic\fR fields of \fIafter\fR and \fIbefore\fR and places them in the
+corresponding field of \fIdiff\fR. The \fBce_hrt\fR field of \fIdiff\fR is set
+to the \fBce_hrt\fR field of \fIafter\fR.
+.SS "SPARC:"
+.sp
+.LP
+Additionally, the function computes the difference between the \fBce_tick\fR
+fields of \fIafter\fR and \fIbefore\fR, and places it in the corresponding
+field of \fBdiff\fR.
+.SS "x86:"
+.sp
+.LP
+Additionally, the function computes the difference between the \fBce_tsc\fR
+fields of \fIafter\fR and \fIbefore\fR, and places it in the corresponding
+field of \fIdiff\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityObsolete
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcpc\fR(3CPC), \fBcpc_buf_add\fR(3CPC), \fBcpc_buf_sub\fR(3CPC),
+\fBcpc_event\fR(3CPC), \fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBcpc_event_accum()\fR and \fBcpc_event_diff()\fR functions exist for
+binary compatibility only. Source containing these functions will not compile.
+These functions are obsolete and might be removed in a future release.
+Applications should use \fBcpc_buf_add\fR(3CPC) and \fBcpc_buf_sub\fR(3CPC)
+instead.

@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 
 include ../Makefile.master
 
@@ -53,9 +54,6 @@ SUBDIRS= \
 	../cmd/sgs/libconv		\
 	../cmd/sgs/libdl	.WAIT
 
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/libc_i18n
-
 SUBDIRS += \
 	libc			.WAIT	\
 	../cmd/sgs/libelf	.WAIT	\
@@ -85,6 +83,8 @@ SUBDIRS += \
 	librt			\
 	libadm			\
 	libctf			\
+	libbrand	.WAIT   \
+	libzonecfg	.WAIT	\
 	libdtrace		\
 	libdtrace_jni		\
 	libcurses		\
@@ -204,8 +204,6 @@ SUBDIRS += \
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
-	libbrand	.WAIT   \
-	libzonecfg	\
 	libzdoor	\
 	libzoneinfo	\
 	libzonestat	\
@@ -498,7 +496,6 @@ HDRSUBDIRS=		\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
-	$(CLOSED)/lib/libc_i18n	\
 	$(CLOSED)/lib/libike
 
 i386_HDRSUBDIRS=	\
@@ -559,7 +556,6 @@ _dc:			$(DCSUBDIRS:%=%-nodepend)
 auditd_plugins: libbsm libnsl libsecdb
 gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
-$(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libast: 	libsocket
 libadutils: 	libldap5 libresolv libsocket libnsl
 nsswitch:	libadutils libidmap

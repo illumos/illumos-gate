@@ -1,0 +1,356 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ea_pack_object 3EXACCT "4 Oct 2007" "SunOS 5.11" "Extended Accounting File Access Library Functions"
+.SH NAME
+ea_pack_object, ea_unpack_object, ea_get_creator, ea_get_hostname,
+ea_next_object, ea_previous_object, ea_get_object, ea_write_object,
+ea_copy_object, ea_copy_object_tree, ea_get_object_tree \- construct, read, and
+write extended accounting records
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <exacct.h>
+
+\fBsize_t\fR \fBea_pack_object\fR(\fBea_object_t *\fR\fIobj\fR, \fBvoid *\fR\fIbuf\fR,
+     \fBsize_t\fR \fIbufsize\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t\fR \fBea_unpack_object\fR(\fBea_object_t **\fR\fIobjp\fR, \fBint\fR \fIflag\fR,
+     \fBvoid *\fR\fIbuf\fR, \fBsize_t\fR \fIbufsize\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBea_get_creator\fR(\fBea_file_t *\fR\fIef\fR);
+.fi
+
+.LP
+.nf
+\fBconst char *\fR\fBea_get_hostname\fR(\fBea_file_t *\fR\fIef\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t\fR \fBea_next_object\fR(\fBea_file_t *\fR\fIef\fR, \fBea_object_t *\fR\fIobj\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t\fR \fBea_previous_object\fR(\fBea_file_t *\fR\fIef\fR,
+     \fBea_object_t *\fR\fIobj\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t\fR \fBea_get_object\fR(\fBea_file_t *\fR\fIef\fR, \fBea_object_t *\fR\fIobj\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBea_write_object\fR(\fBea_file_t *\fR\fIef\fR, \fBea_object_t *\fR\fIobj\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t *\fR\fBea_copy_object\fR(\fBconst ea_object_t *\fR\fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t *\fR\fBea_copy_object_tree\fR(\fBconst ea_object_t *\fR\fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBea_object_type_t *\fR\fBea_get_object_tree\fR(\fBea_file_t *\fR\fIef\fR,
+     \fBuint32_t\fR\fInobj\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBea_pack_object()\fR function converts \fBexacct\fR objects from their
+in-memory representation to their file representation. It is passed an object
+pointer that points to the top of an \fBexacct\fR object hierarchy representing
+one or more \fBexacct\fR records. It returns the size of the buffer required to
+contain the packed buffer representing the object hierarchy. To obtain the
+correct size of the required buffer, the \fIbuf\fR and \fIbufsize\fR parameters
+can be set to \fINULL\fR and 0 respectively, and the required buffer size will
+be returned. The resulting packed record can be passed to \fBputacct\fR(2) or
+to \fBea_set_item\fR(3EXACCT) when constructing an object of type
+\fBEXT_EXACCT_OBJECT\fR.
+.sp
+.LP
+The \fBea_unpack_object()\fR function reverses the packing process performed by
+\fBea_pack_object()\fR. A packed buffer passed to \fBea_unpack_object()\fR is
+unpacked into the original hierarchy of objects.  If the unpack operation fails
+(for example, due to a corrupted or incomplete buffer), it returns
+\fBEO_ERROR\fR; otherwise, the object type of the first object in the hierarchy
+is returned.  If \fBea_unpack_object()\fR is invoked with \fIflag\fR equal to
+\fBEUP_ALLOC\fR, it allocates memory for the variable-length data in the
+included objects.  Otherwise, with \fIflag\fR equal to \fBEUP_NOALLOC\fR, it
+sets the variable length data pointers within the unpacked object structures to
+point within the buffer indicated by \fIbuf\fR. In both cases,
+\fBea_unpack_object()\fR allocates all the necessary \fBexacct\fR objects to
+represent the unpacked record. The resulting object hierarchy can be freed
+using \fBea_free_object\fR(3EXACCT) with the same \fIflag\fR value.
+.sp
+.LP
+The \fBea_get_creator()\fR function returns a pointer to a string representing
+the recorded creator of the \fBexacct\fR file. The \fBea_get_hostname()\fR
+function returns a pointer to a string representing the recorded hostname on
+which the \fBexacct\fR file was created.  These functions will return
+\fINULL\fR if their respective field was not recorded in the exacct file
+header.
+.sp
+.LP
+The \fBea_next_object()\fR function reads the basic fields (\fBeo_catalog\fR
+and \fBeo_type\fR) into the \fBea_object_t\fR indicated by \fIobj\fR from the
+\fBexacct\fR file referred to by \fIef\fR and rewinds to the head of the
+record.  If the read object is corrupted, \fBea_next_object()\fR returns
+\fBEO_ERROR\fR and records the extended accounting error code, accessible with
+\fBea_error\fR(3EXACCT). If end-of-file is reached, \fBEO_ERROR\fR is returned
+and the extended accounting error code is set to \fBEXR_EOF\fR.
+.sp
+.LP
+The \fBea_previous_object()\fR function skips back one object in the file and
+reads its basic fields (\fBeo_catalog\fR and \fBeo_type\fR) into the indicated
+\fBea_object_t\fR.  If the read object is corrupted, \fBea_previous_object()\fR
+returns \fBEO_ERROR\fR and records the extended accounting error code,
+accessible with \fBea_error\fR(3EXACCT). If end-of-file is reached,
+\fBEO_ERROR\fR is returned and the extended accounting error code is set to
+\fBEXR_EOF\fR.
+.sp
+.LP
+The \fBea_get_object()\fR function reads the value fields into the
+\fBea_object_t\fR indicated by \fIobj\fR, allocating memory as necessary, and
+advances to the head of the next record. Once a record group object is
+retrieved using \fBea_get_object()\fR, subsequent calls to
+\fBea_get_object()\fR and \fBea_next_object()\fR will track through the objects
+within the record group, and on reaching the end of the group, will return the
+next object at the same level as the group from the file. If the read object is
+corrupted, \fBea_get_object()\fR returns \fBEO_ERROR\fR and records the
+extended accounting error code, accessible with \fBea_error\fR(3EXACCT). If
+end-of-file is reached, \fBEO_ERROR\fR is returned and the extended accounting
+error code is set to \fBEXR_EOF\fR.
+.sp
+.LP
+The \fBea_write_object()\fR function appends the given object to the open
+\fBexacct\fR file indicated by \fIef\fR and returns 0. If the write fails,
+\fBea_write_object()\fR returns \(mi1 and sets the extended accounting error
+code to indicate the error, accessible with \fBea_error\fR(3EXACCT).
+.sp
+.LP
+The \fBea_copy_object()\fR function copies an \fBea_object_t\fR. If the source
+object is part of a chain, only the current object is copied. If the source
+object is a group, only the group object is copied without its list of members
+and the \fBeg_nobjs\fR and \fBeg_objs\fR fields are set to 0 and \fINULL\fR,
+respectively. Use \fBea_copy_tree()\fR to copy recursively a group or a list of
+items.
+.sp
+.LP
+The \fBea_copy_object_tree()\fR function recursively copies an
+\fBea_object_t\fR. All elements in the \fBeo_next\fR list are copied, and any
+group objects are recursively copied. The returned object can be completely
+freed with \fBea_free_object\fR(3EXACCT) by specifying the \fBEUP_ALLOC\fR
+flag.
+.sp
+.LP
+The \fBea_get_object_tree()\fR function reads in \fInobj\fR top-level objects
+from the file, returning the same data structure that would have originally
+been passed to \fBea_write_object()\fR. On encountering a group object, the
+\fBea_get_object()\fR function reads only the group header part of the group,
+whereas \fBea_get_object_tree()\fR reads the group and all its member items,
+recursing into sub-records if necessary. The returned object data structure can
+be completely freed with \fBea_free_object()\fR by specifying the
+\fBEUP_ALLOC\fR flag.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBea_pack_object()\fR function returns the number of bytes required to
+hold the \fBexacct\fR object being operated upon. If the returned size exceeds
+\fIbufsize\fR, the pack operation does not complete and the function returns
+(\fBsize_t\fR) -1 and sets the extended accounting error code to indicate the
+error.
+.sp
+.LP
+The \fBea_get_object()\fR function returns the \fBea_object_type\fR of the
+object if the object was retrieved successfully. Otherwise, it returns
+\fBEO_ERROR\fR and sets the extended accounting error code to indicate the
+error.
+.sp
+.LP
+The \fBea_next_object()\fR function returns the \fBea_object_type\fR of the
+next \fBexacct\fR object in the file.  It returns \fBEO_ERROR\fR if the
+\fBexacct\fR file is corrupted sets the extended accounting error code to
+indicate the error.
+.sp
+.LP
+The \fBea_unpack_object()\fR function returns the \fBea_object_type\fR of the
+first \fBexacct\fR object unpacked from the buffer. It returns \fBEO_ERROR\fR
+if the exacct file is corrupted, and sets the extended accounting error code to
+indicate the error.
+.sp
+.LP
+The \fBea_write_object()\fR function returns 0 on success. Otherwise it returns
+\(mi1 and sets the extended accounting error code to indicate the error.
+.sp
+.LP
+The \fBea_copy_object()\fR and \fBea_copy_object_tree()\fR functions return the
+copied object on success. Otherwise they return \fINULL\fR and set the extended
+accounting error code to indicate the error.
+.sp
+.LP
+The \fBea_get_object_tree()\fR function returns the list of objects read from
+the file on success. Otherwise it returns \fINULL\fR and sets the extended
+accounting error code to indicate the error.
+.sp
+.LP
+The extended account error code can be retrieved using \fBea_error\fR(3EXACCT).
+.SH ERRORS
+.sp
+.LP
+These functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXR_SYSCALL_FAIL\fR\fR
+.ad
+.sp .6
+.RS 4n
+A system call invoked by the function failed. The \fBerrno\fR variable contains
+the error value set by the underlying call. On memory allocation failure,
+\fBerrno\fR will be set to \fBENOMEM\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXR_CORRUPT_FILE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file referred to by \fIname\fR is not a valid \fBexacct\fR file, or is
+unparsable, and therefore appears corrupted. This error is also used by
+\fBea_unpack_buffer()\fR to indicate a corrupted buffer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEXR_EOF\fR\fR
+.ad
+.sp .6
+.RS 4n
+The end of the file has been reached.  In the case of
+\fBea_previous_record()\fR, the previous record could not be reached, either
+because the head of the file was encountered or because the previous record
+could not be skipped over.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBexacct\fR file format can be used to represent data other than that in
+the extended accounting format.  By using a unique creator type in the file
+header, application writers can develop their own format suited to the needs of
+their application.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fROpen and close \fBexacct\fR file.
+.sp
+.LP
+The following example opens the extended accounting data file for processes.
+The \fBexacct\fR file is then closed.
+
+.sp
+.in +2
+.nf
+#include <stdio.h>
+#include <exacct.h>
+
+ea_file_t ef;
+ea_object_t *obj;
+
+\&...
+
+ea_open(&ef, "foo", O_RDONLY, ...);
+
+while ((obj = ea_get_object_tree(&ef, 1)) != NULL) {
+    if (obj->eo_type == EO_ITEM) {
+        /* handle item */
+    } else {
+        /* handle group */
+    }
+    ea_free_object(obj, EUP_ALLOC);
+}
+
+if (ea_error() != EXR_EOF) {
+    /* handle error */
+}
+
+ea_close(&ef);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRConstruct an \fBexacct\fR file consisting of a single object
+containing the current process ID.
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <unistd.h>
+#include <exacct.h>
+
+\&...
+
+ea_file_t ef;
+ea_object_t obj;
+pid_t my_pid;
+
+ea_open(&ef, "foo", O_CREAT | O_WRONLY, ...);
+
+my_pid = getpid();
+ea_set_item(&obj, EXT_UINT32 | EXC_DEFAULT | EXT_PROC_PID, &my_pid, 0);
+(void) ea_write_object(&ef, &obj);
+
+ea_close(&ef);
+ 
+\&...
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBread\fR(2), \fBea_error\fR(3EXACCT), \fBea_open\fR(3EXACCT),
+\fBea_set_item\fR(3EXACCT), \fBlibexacct\fR(3LIB), \fBattributes\fR(5)

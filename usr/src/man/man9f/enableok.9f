@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH enableok 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+enableok \- reschedule a queue for service
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/ddi.h>
+
+
+
+\fBvoid\fR \fBenableok\fR(\fBqueue_t *\fR\fIq\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIq\fR\fR
+.ad
+.RS 5n
+.rt  
+A pointer to the queue to be rescheduled.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBenableok()\fR function enables queue \fIq\fR to be rescheduled for
+service. It reverses the effect of a previous call to \fBnoenable\fR(9F) on
+\fIq\fR by turning off the \fBQNOENB\fR flag in the queue.
+.SH CONTEXT
+.sp
+.LP
+The \fBenableok()\fR function can be called from user, interrupt, or kernel
+context.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBemableok()\fR
+.sp
+.LP
+The \fBqrestart()\fR routine uses two STREAMS functions to restart a queue that
+has been disabled. The \fBenableok()\fR function turns off the  \fBQNOENB\fR
+flag, allowing the \fBqenable\fR(9F) to schedule the queue for immediate
+processing.
+
+.sp
+.in +2
+.nf
+1  void
+2  qrestart(rdwr_q)
+3          register queue_t *rdwr_q;
+4  {
+5     enableok(rdwr_q);
+6     /* re-enable a queue that has been disabled */
+7     (void) qenable(rdwr_q);
+8  }
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBnoenable\fR(9F), \fBqenable\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

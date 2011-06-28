@@ -1,0 +1,150 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (C) 2003, Sun Microsystems,
+.\" Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sasl_setpass 3SASL "15 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.SH NAME
+sasl_setpass \- set the password for a user
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
+#include <sasl/sasl.h>
+
+\fBint\fR \fBsasl_setpass\fR(\fBsasl_conn_t *\fR\fIconn\fR, \fBconst char *\fR\fIuser\fR, \fBconst char *\fR\fIpass\fR,
+     \fBunsigned\fR \fIpasslen\fR, \fBconst char *\fR\fIoldpass\fR, \fBunsigned\fR \fIoldpasslen\fR,
+     \fBunsigned\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Use the \fBsasl_setpass()\fR interface to set passwords. \fBsasl_setpass()\fR
+uses the \fBSASL_CB_SERVER_USERDB_SETPASS\fR callback, if one is supplied.
+Additionally, if any server mechanism plugins supply a setpass callback, the
+setpass callback would be called. None of the server mechanism plugins
+currently supply a setpass callback.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconn\fR\fR
+.ad
+.RS 14n
+.rt  
+The SASL connection context
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuser\fR\fR
+.ad
+.RS 14n
+.rt  
+The username for which the password is set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpass\fR\fR
+.ad
+.RS 14n
+.rt  
+The password to set
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpasslen\fR\fR
+.ad
+.RS 14n
+.rt  
+The length of \fIpass\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoldpass\fR\fR
+.ad
+.RS 14n
+.rt  
+The old password, which is optional
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoldpasslen\fR\fR
+.ad
+.RS 14n
+.rt  
+The length of \fIoldpass\fR, which is optional
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 14n
+.rt  
+Refers to flags, including, \fBSASL_SET_CREATE\fR and \fBSASL_SET_DISABLE\fR.
+Use these flags to create and disable accounts.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+\fBsasl_setpass()\fR returns an integer that corresponds to a SASL error code.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSASL_OK\fR\fR
+.ad
+.RS 11n
+.rt  
+The call to \fBsasl_setpass()\fR was successful.
+.RE
+
+.sp
+.LP
+See \fBsasl_errors\fR(3SASL) for information on SASL error codes.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsasl_errors\fR(3SASL), \fBsasl_getprop\fR(3SASL), \fBattributes\fR(5)

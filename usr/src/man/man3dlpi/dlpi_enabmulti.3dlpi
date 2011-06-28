@@ -1,0 +1,114 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_enabmulti 3DLPI "22 Aug 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_enabmulti, dlpi_disabmulti \- enable or disable DLPI multicast messages
+for an address
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldlpi\fR [ \fIlibrary\fR... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_enabmulti\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBconst void *\fR\fIaddrp\fR,
+     \fBsize_t\fR \fIaddrlen\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBdlpi_disabmulti\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBconst void *\fR\fIaddrp\fR,
+     \fBsize_t\fR \fIaddrlen\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_enabmulti()\fR function enables reception of messages destined to
+the multicast address pointed to by \fIaddrp\fR on the \fBDLPI\fR link instance
+associated with \fBDLPI\fR handle \fIdh\fR. The \fBDLPI\fR link instance will
+pass up only those messages destined for enabled multicast addresses. This
+operation can be performed in any \fBDLPI\fR state of a handle.
+.sp
+.LP
+The \fBdlpi_disabmulti()\fR function disables a specified multicast address
+pointed to by \fIaddrp\fR on the \fBDLPI\fR link instance associated with
+\fBDLPI\fR handle \fIdh\fR. This operation can be performed in any \fBDLPI\fR
+state of a handle.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
+\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or \fBDLPI_EINHANDLE\fR is
+returned.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EBADMSG\fR\fR
+.ad
+.RS 18n
+.rt  
+Bad DLPI message
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINHANDLE\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid \fBDLPI\fR handle
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EINVAL\fR\fR
+.ad
+.RS 18n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ETIMEDOUT\fR\fR
+.ad
+.RS 18n
+.rt  
+\fBDLPI\fR operation timed out
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdlpi\fR(3LIB), \fBattributes\fR(5)

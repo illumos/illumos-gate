@@ -1,0 +1,197 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dial 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+dial, undial \- establish an outgoing terminal line connection
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnsl\fR [ \fIlibrary\fR... ]
+#include <dial.h>
+
+\fBint\fR \fBdial\fR(\fBCALL\fR \fIcall\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBundial\fR(\fBint\fR \fIfd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdial()\fR function returns a file-descriptor for a terminal line open
+for read/write. The argument to \fBdial()\fR is a \fBCALL\fR structure (defined
+in the header <\fBdial.h\fR>).
+.sp
+.LP
+When finished with the terminal line, the calling program must  invoke
+\fBundial()\fR to release the semaphore that has been set during the allocation
+of the terminal device.
+.sp
+.LP
+\fBCALL\fR is defined in the header <\fBdial.h\fR> and has the following
+members:
+.sp
+.in +2
+.nf
+struct termio *attr;	  /* pointer to termio attribute struct */
+int           baud;	   /* transmission data rate */
+int           speed;	   /* 212A modem: low=300, high=1200 */
+char          *line;	   /* device name for out-going line */
+char          *telno;	 /* pointer to tel-no digits string */
+int           modem;	   /* specify modem control for direct lines */
+char          *device;	/* unused */
+int           dev_len;	/* unused */
+.fi
+.in -2
+
+.sp
+.LP
+The \fBCALL\fR element \fBspeed\fR is intended only for use with an outgoing
+dialed call, in which case its value should be the desired transmission baud
+rate.  The \fBCALL\fR element \fBbaud\fR is no longer used.
+.sp
+.LP
+If the desired terminal line is a direct line, a string pointer to its
+device-name should be placed in the \fBline\fR element in the \fBCALL\fR
+structure. Legal values for such terminal device names are kept in the
+\fBDevices\fR file. In this case, the value of the \fBbaud\fR element should be
+set to -1. This value will cause \fBdial\fR to determine the correct value from
+the \fB<Devices>\fR file.
+.sp
+.LP
+The \fBtelno\fR element is for a pointer to a character string representing the
+telephone number to be dialed. Such numbers may consist only of these
+characters:
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+0-9dial 0-9
+*dail  *
+#dail  #
+=wait for secondary dial tone
+-delay for approximately 4 seconds
+.TE
+
+.sp
+.LP
+The \fBCALL\fR element \fBmodem\fR is used to specify modem control for direct
+lines. This element should be non-zero if modem control is required. The
+\fBCALL\fR element \fBattr\fR is a pointer to a \fBtermio\fR structure, as
+defined in the header \fB<termio.h>\fR\&. A \fINULL\fR value for this pointer
+element may be passed to the \fBdial\fR function, but if such a structure is
+included, the elements specified in it will be set for the outgoing terminal
+line before the connection is established. This setting is often important for
+certain attributes such as parity and baud-rate.
+.sp
+.LP
+The \fBCALL\fR elements \fBdevice\fR and \fBdev_len\fR are no longer used. They
+are retained in the \fBCALL\fR structure for compatibility reasons.
+.SH RETURN VALUES
+.sp
+.LP
+On failure, a negative value indicating the reason for the failure will be
+returned. Mnemonics for these negative indices as listed here are defined in
+the header <\fBdial.h\fR>.
+.sp
+.in +2
+.nf
+INTRPT  \(mi1        /* interrupt occurred */
+D_HUNG  \(mi2        /* dialer hung (no return from write) */
+NO_ANS  \(mi3        /* no answer within 10 seconds */
+ILL_BD  \(mi4        /* illegal baud-rate */
+A_PROB  \(mi5        /* acu problem (open(\|) failure) */
+L_PROB  \(mi6        /* line problem (open(\|) failure) */
+NO_Ldv  \(mi7        /* can't open Devices file */
+DV_NT_A \(mi8        /* requested device not available */
+DV_NT_K \(mi9        /* requested device not known */
+NO_BD_A \(mi10       /* no device available at requested baud */        
+NO_BD_K \(mi11       /* no device known at requested baud */
+DV_NT_E \(mi12       /* requested speed does not match */
+BAD_SYS \(mi13       /* system not in Systems file*/
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/uucp/Devices\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/uucp/Systems\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/spool/uucp/LCK..\fR\fItty-device\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBuucp\fR(1C), \fBalarm\fR(2), \fBread\fR(2), \fBwrite\fR(2),
+\fBattributes\fR(5), \fBtermio\fR(7I)
+.SH NOTES
+.sp
+.LP
+Including the header <\fBdial.h\fR> automatically includes the header
+\fB<termio.h>\fR\&. An \fBalarm\fR(2) system call for 3600 seconds is made (and
+caught) within the \fBdial\fR module for the purpose of ``touching'' the
+\fBLCK..\fR file and constitutes the device allocation semaphore for the
+terminal device. Otherwise, \fBuucp\fR(1C) may simply delete the \fBLCK..\fR
+entry on its 90-minute clean-up rounds. The alarm may go off while the user
+program is in a \fBread\fR(2) or \fBwrite\fR(2) function, causing an apparent
+error return. If the user program expects to be around for an hour or more,
+error returns from \fBread()\fRs should be checked for \fB(errno==EINTR)\fR,
+and the \fBread()\fR possibly reissued.
+.sp
+.LP
+This interface is unsafe in multithreaded applications.  Unsafe interfaces
+should be called only from the main thread.

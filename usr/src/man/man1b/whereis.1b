@@ -1,0 +1,195 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH whereis 1B "10 Jan 2000" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+whereis \- locate the binary, source, and manual page files for a command
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/whereis\fR [\fB-bmsu\fR] [\fB-BMS\fR \fIdirectory\fR... \fB-f\fR] \fIfilename\fR...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwhereis\fR utility locates source/binary and manuals sections for
+specified files. The supplied names are first stripped of leading pathname
+components and any (single) trailing extension of the form \fB\&.\fR\fIext\fR,
+for example, \fB\&.c\fR. Prefixes of \fBs.\fR resulting from use of source code
+control are also dealt with. \fBwhereis\fR then attempts to locate the desired
+program in a list of standard places:
+.sp
+.in +2
+.nf
+\fBetc
+/sbin
+/usr/bin
+/usr/ccs/bin
+/usr/ccs/lib
+/usr/lang
+/usr/lbin
+/usr/lib
+/usr/sbin
+/usr/ucb
+/usr/ucblib
+/usr/ucbinclude
+/usr/games
+/usr/local
+/usr/local/bin
+/usr/new
+/usr/old
+/usr/hosts
+/usr/include
+/usr/etc\fR
+.fi
+.in -2
+.sp
+
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 6n
+.rt  
+Searches only for binaries.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-B\fR\fR
+.ad
+.RS 6n
+.rt  
+Changes or otherwise limits the places where \fBwhereis\fR searches for
+binaries.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Terminates the last directory list and signals the start of file names, and
+\fImust\fR be used when any of the \fB-B\fR, \fB-M\fR, or \fB-S\fR options are
+used.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+.rt  
+Searches only for manual sections.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-M\fR\fR
+.ad
+.RS 6n
+.rt  
+Changes or otherwise limits the places where \fBwhereis\fR searches for manual
+sections.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 6n
+.rt  
+Searches only for sources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 6n
+.rt  
+Changes or otherwise limit the places where \fBwhereis\fR searches for sources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 6n
+.rt  
+Searches for unusual entries. A file is said to be unusual if it does not have
+one entry of each requested type. Thus `\fBwhereis\fR \fB-m\fR \fB-u\fR
+\fB*\fR' asks for those files in the current directory which have no
+documentation.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRFinding files
+.sp
+.LP
+Find all files in \fB/usr/bin\fR which are not documented in
+\fB/usr/share/man/man1\fR with source in \fB/usr/src/cmd\fR:
+
+.sp
+.in +2
+.nf
+example% \fBcd /usr/ucb\fR
+example% \fBwhereis -u -M /usr/share/man/man1 -S /usr/src/cmd -f *\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/usr/src/*\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/usr/{doc,man}/*\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/etc, /usr/{lib,bin,ucb,old,new,local}\fR
+.RE
+.SH SEE ALSO
+.sp
+.LP
+\fBchdir\fR(2), \fBattributes\fR(5)
+.SH BUGS
+.sp
+.LP
+Since \fBwhereis\fR uses \fBchdir\fR(2) to run faster, pathnames given with the
+\fB-M\fR, \fB-S\fR, or \fB-B\fR must be full; that is, they must begin with a
+`\fB/\fR'.

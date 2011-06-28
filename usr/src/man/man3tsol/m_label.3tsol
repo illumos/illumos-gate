@@ -1,0 +1,139 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH m_label 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.SH NAME
+m_label, m_label_alloc, m_label_dup, m_label_free \- m_label functions
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [\fIflag\fR...] \fIfile\fR... \fB-ltsol\fR [\fIlibrary\fR...]
+.fi
+
+.LP
+.nf
+#include <tsol/label.h>
+
+\fBm_label_t *\fR\fBm_label_alloc\fR(\fBconst m_label_type_t\fR \fIlabel_type\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBm_label_dup\fR(\fBm_label_t **\fR\fIdst\fR, \fBconst m_label_t *\fR\fIsrc\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBm_label_free\fR(\fBm_label_t *\fR\fIlabel\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBm_label_alloc()\fR function allocates resources for a new label. The
+\fIlabel_type\fR argument defines the type for a newly allocated label. The
+label type can be:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBMAC_LABEL\fR\fR
+.ad
+.RS 14n
+.rt  
+A Mandatory Access Control (MAC) label.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUSER_CLEAR\fR\fR
+.ad
+.RS 14n
+.rt  
+A user clearance.
+.RE
+
+.sp
+.LP
+The \fBm_label_dup()\fR function allocates resources for a new \fIdst\fR label.
+The function returns a pointer to the allocated label, which is an exact copy
+of the \fIsrc\fR label. The caller is responsible for freeing the allocated
+resources by calling \fBm_label_free()\fR.
+.sp
+.LP
+The \fBm_label_free()\fR function frees resources that are associated with the
+previously allocated label.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBm_label_alloc()\fR function returns a
+pointer to the newly allocated label. Otherwise, \fBm_label_alloc()\fR returns
+\fINULL\fR and \fIerrno\fR is set to indicate the error.
+.sp
+.LP
+Upon successful completion, the \fBm_label_dup()\fR function returns 0.
+Otherwise, \fB-1\fR is returned and \fIerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBm_label_alloc()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+Invalid parameter.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+The physical limits of the system are exceeded by size bytes of memory which
+cannot be allocated.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB), \fBstr_to_label\fR(3TSOL),
+\fBlabel_encodings\fR(4), \fBattributes\fR(5), \fBlabels\fR(5)
+.sp
+.LP
+\fIDetermining Whether the Printing Service Is Running in a Labeled
+Environment\fR in \fISolaris Trusted Extensions Developer\&'s Guide\fR
+.SH NOTES
+.sp
+.LP
+The functionality described on this manual page is available only if the system
+is configured with Trusted Extensions.

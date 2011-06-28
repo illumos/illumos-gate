@@ -1,0 +1,132 @@
+'\" te
+.\"  Copyright (c) 2007 Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_create_dialog_req 3SIP "6 Aug 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_create_dialog_req, sip_create_dialog_req_nocontact \- create an in-dialog
+request
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBsip_msg_t\fR \fBsip_create_dialog_req\fR(\fBsip_method_t\fR \fImethod\fR, 
+     \fBsip_dialog_t\fR \fIdialog\fR, \fBchar *\fR\fItransport\fR, \fBchar *\fR\fIsent_by\fR,
+     \fBint\fR \fIsent_by_port\fR, \fBchar *\fR\fIvia_param\fR, \fBuint32_t\fR \fIsmaxforward\fR,
+     \fBint\fR \fIcseq\fR);
+.fi
+
+.LP
+.nf
+\fBsip_msg_t\fR \fBsip_create_dialog_req_nocontact\fR(\fBsip_method_t\fR \fImethod\fR,
+     \fBsip_dialog_t\fR \fIdialog\fR, \fBchar *\fR\fItransport\fR, \fBchar *\fR\fIsent_by\fR,
+     \fBint\fR \fIsent_by_port\fR, \fBchar *\fR\fIvia_param\fR, \fBuint32_t\fR \fIsmaxforward\fR,
+     \fBint\fR \fIcseq\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsip_create_dialog_req()\fR function creates and returns a \fBSIP\fR
+request with the state information contained in \fIdialog\fR. The method in the
+resulting request is from \fImethod\fR. The method can be one of the following:
+.br
+.in +2
+\fBINVITE\fR
+.in -2
+.br
+.in +2
+\fBACK\fR
+.in -2
+.br
+.in +2
+\fBOPTIONS\fR
+.in -2
+.br
+.in +2
+\fBBYE\fR
+.in -2
+.br
+.in +2
+\fBCANCEL\fR
+.in -2
+.br
+.in +2
+\fBREGISTER\fR
+.in -2
+.br
+.in +2
+\fBREFER\fR
+.in -2
+.br
+.in +2
+\fBINFO\fR
+.in -2
+.br
+.in +2
+\fBSUBSCRIBE\fR
+.in -2
+.br
+.in +2
+\fBNOTIFY\fR
+.in -2
+.br
+.in +2
+\fBPRACK\fR
+.in -2
+.sp
+.LP
+The resulting request line in the \fBSIP\fR message has the \fBSIP\fR-Version
+of "2.0". The \fBURI\fR in the request line is from the remote target in the
+\fIdialog\fR or from the route set in the \fIdialog\fR, if present. See RFC
+3261 (section 12.2) for details. The \fBFROM\fR, \fBTO\fR, and \fBCALL-ID\fR
+headers are added from the \fIdialog\fR. The \fBMAX-FORWARDS\fR header is added
+using the value in \fImaxforward\fR. The \fBCSEQ\fR header is added using the
+\fBSIP\fR method in \fImethod\fR and the sequence number value in \fIcseq\fR.
+If \fIcseq\fR is \fB-1\fR, the sequence number is obtained from the local
+sequence number in the \fIdialog\fR. The local sequence number in the
+\fIdialog\fR is incremented and is used in the \fBCSEQ\fR header. The \fBVIA\fR
+header added is created using the \fItransport\fR, \fIsent_by\fR,
+\fIsent_by_port\fR (if \fInon-zero\fR), and \fIvia_param\fR (if any). If
+\fIdialog\fR has a non-empty route set, the resulting \fBSIP\fR request has the
+route set from the \fIdialog\fR.
+.sp
+.LP
+The \fBsip_create_dialog_req_nocontact()\fR function is similar to
+\fBsip_create_dialog_req()\fR, except that it does not add the contact header.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsip_create_dialog_req()\fR and \fBsip_create_dialog_req_nocontact()\fR
+functions return the resulting \fBSIP\fR message on success and \fBNULL\fR on
+failure.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB), \fBattributes\fR(5)

@@ -1,0 +1,80 @@
+'\" te
+.\"  Copyright (c) 1988, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH biff 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+biff \- give notice of incoming mail messages
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/biff\fR [y | n]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBbiff\fR turns mail notification on or off for the terminal session. With no
+arguments, \fBbiff\fR displays the current notification status for the
+terminal.
+.sp
+.LP
+If notification is allowed, the terminal rings the bell and displays the header
+and the first few lines of each arriving mail message. \fBbiff\fR operates
+asynchronously. For synchronized notices, use the \fBMAIL\fR variable of
+\fBsh\fR(1) or the \fBmail\fR variable of \fBcsh\fR(1).
+.sp
+.LP
+A `\fBbiff y\fR' command can be included in your \fB~/.login\fR or
+\fB~/.profile\fR file for execution when you log in.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBy\fR\fR
+.ad
+.RS 5n
+.rt  
+Allow mail notification for the terminal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBn\fR\fR
+.ad
+.RS 5n
+.rt  
+Disable notification for the terminal.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.login\fR\fR
+.ad
+.RS 14n
+.rt  
+User's login file
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB~/.profile\fR\fR
+.ad
+.RS 14n
+.rt  
+User's profile file
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBmail\fR(1), \fBsh\fR(1), \fBattributes\fR(5)

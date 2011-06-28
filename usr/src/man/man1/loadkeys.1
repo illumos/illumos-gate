@@ -1,0 +1,71 @@
+'\" te
+.\"  Copyright (c) 1995 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH loadkeys 1 "20 Apr 1998" "SunOS 5.11" "User Commands"
+.SH NAME
+loadkeys, dumpkeys \- load and dump keyboard translation tables
+.SH SYNOPSIS
+.LP
+.nf
+\fBloadkeys\fR [\fIfilename\fR]
+.fi
+
+.LP
+.nf
+\fBdumpkeys\fR 
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBloadkeys\fR reads the file specified by \fIfilename\fR, and modifies the
+keyboard streams module's translation tables. If no file is specified,
+\fBloadkeys\fR loads the file:
+\fB/usr/share/lib/keytables/type_\fR\fItt\fR\fB/layout_\fR\fIdd,\fR where
+\fItt\fR is the value returned by the \fBKIOCTYPE\fR \fBioctl\fR, and \fBdd\fR
+is the value returned by the \fBKIOCLAYOUT\fR \fBioctl\fR (see  \fBkb\fR(7M)).
+These keytable files specify only the entries that change between the specified
+layout and the default layout for the particular keyboard type. On
+self-identifying keyboards, the value returned by the  \fBKIOCLAYOUT\fR
+\fBioctl\fR is set from the \fBDIP\fR switches.
+.sp
+.LP
+\fBdumpkeys\fR writes the current contents of the keyboard streams module's
+translation tables, in the format specified by \fBkeytables\fR(4), to the
+standard output.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/usr/share/lib/keytables/layout_\fR\fBdd\fR\fR
+.ad
+.sp .6
+.RS 4n
+default keytable files
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkbd\fR(1), \fBkeytables\fR(4), \fBattributes\fR(5), \fBkb\fR(7M),
+\fBusbkbm\fR(7M)

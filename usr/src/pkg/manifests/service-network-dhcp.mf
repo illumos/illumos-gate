@@ -46,6 +46,9 @@ dir path=usr/lib/inet/dhcp/nsu
 dir path=usr/lib/inet/dhcp/svc
 dir path=usr/lib/inet/dhcp/svcadm
 dir path=usr/sbin
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+dir path=usr/share/man/man5
 file path=etc/init.d/dhcp group=sys mode=0744
 file path=lib/svc/manifest/network/dhcp-server.xml group=sys mode=0444
 file path=usr/include/dhcp_svc_public.h
@@ -64,6 +67,15 @@ file path=usr/lib/libdhcpsvc.so.1
 file path=usr/sbin/dhcpconfig mode=0555
 file path=usr/sbin/dhtadm mode=0555
 file path=usr/sbin/pntadm mode=0555
+file path=usr/share/man/man1m/dhcpconfig.1m
+file path=usr/share/man/man1m/dhtadm.1m
+file path=usr/share/man/man1m/dsvclockd.1m
+file path=usr/share/man/man1m/in.dhcpd.1m
+file path=usr/share/man/man1m/pntadm.1m
+file path=usr/share/man/man4/dhcp_network.4
+file path=usr/share/man/man4/dhcpsvc.conf.4
+file path=usr/share/man/man4/dhcptab.4
+file path=usr/share/man/man5/dhcp_modules.5
 legacy pkg=SUNWdhcsr \
     desc="Root filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
     name="BOOTP/DHCP Server Services, (Root)"

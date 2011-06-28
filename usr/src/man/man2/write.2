@@ -1,0 +1,635 @@
+'\" te
+.\" Copyright (c) 2087, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH write 2 "29 Jan 2008" "SunOS 5.11" "System Calls"
+.SH NAME
+write, pwrite, writev \- write on a file
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBssize_t\fR \fBwrite\fR(\fBint\fR \fIfildes\fR, \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fInbyte\fR);
+.fi
+
+.LP
+.nf
+\fBssize_t\fR \fBpwrite\fR(\fBint\fR \fIfildes\fR, \fBconst void *\fR\fIbuf\fR, \fBsize_t\fR \fInbyte\fR,
+     \fBoff_t\fR \fIoffset\fR);
+.fi
+
+.LP
+.nf
+#include <sys/uio.h>
+
+\fBssize_t\fR \fBwritev\fR(\fBint\fR \fIfildes\fR, \fBconst struct iovec *\fR\fIiov\fR, \fBint\fR \fIiovcnt\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBwrite()\fR function attempts to write \fInbyte\fR bytes from the buffer
+pointed to by \fIbuf\fR to the file associated with the open file descriptor,
+\fIfildes\fR.
+.sp
+.LP
+If \fInbyte\fR is 0, \fBwrite()\fR will return 0 and have no other results if
+the file is a regular file; otherwise, the results are unspecified.
+.sp
+.LP
+On a regular file or other file capable of seeking, the actual writing of data
+proceeds from the position in the file indicated by the file offset associated
+with \fIfildes\fR. Before successful return from \fBwrite()\fR, the file offset
+is incremented by the number of bytes actually written. On a regular file, if
+this incremented file offset is greater than the length of the file, the length
+of the file will be set to this file offset.
+.sp
+.LP
+If the \fBO_SYNC\fR bit has been set, write I/O operations on the file
+descriptor complete as defined by synchronized I/O file integrity completion.
+.sp
+.LP
+If \fIfildes\fR refers to a socket, \fBwrite()\fR is equivalent to
+\fBsend\fR(3SOCKET) with no flags set.
+.sp
+.LP
+On a file not capable of seeking, writing always takes place starting at the
+current position.  The value of a file offset associated with such a device is
+undefined.
+.sp
+.LP
+If the \fBO_APPEND\fR flag of the file status flags is set, the file offset
+will be set to the end of the file prior to each write and no intervening file
+modification operation will occur between changing the file offset and the
+write operation.
+.sp
+.LP
+For regular files, no data transfer will occur past the offset maximum
+established in the open file description with \fIfildes\fR.
+.sp
+.LP
+A \fBwrite()\fR to a regular file is blocked if mandatory file/record locking
+is set (see \fBchmod\fR(2)), and there is a record lock owned by another
+process  on the segment of the file to be written:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is set, \fBwrite()\fR returns \fB\(mi1\fR
+and sets \fBerrno\fR to \fBEAGAIN\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are clear, \fBwrite()\fR sleeps until
+all blocking locks are removed or the \fBwrite()\fR is terminated by a signal.
+.RE
+.sp
+.LP
+If a  \fBwrite()\fR requests that more bytes be written than there is room
+for\(emfor example, if the write would exceed the process file size limit (see
+\fBgetrlimit\fR(2) and \fBulimit\fR(2)), the system file size limit, or the
+free space on the device\(emonly as many bytes as there is room for will be
+written. For example, suppose there is space for 20 bytes more in a file before
+reaching a limit. A \fBwrite()\fR of 512-bytes returns 20. The next
+\fBwrite()\fR of a non-zero number of bytes gives a failure return (except as
+noted for pipes and FIFO below).
+.sp
+.LP
+If \fBwrite()\fR is interrupted by a signal before it writes any data, it will
+return \(mi1 with \fBerrno\fR set to \fBEINTR\fR.
+.sp
+.LP
+If \fBwrite()\fR is interrupted by a signal after it successfully writes some
+data, it will return the number of bytes written.
+.sp
+.LP
+If \fBwrite()\fR exceeds the process file size limit, the application generates
+a \fBSIGXFSZ\fR signal, whose default behavior is to dump core.
+.sp
+.LP
+After a \fBwrite()\fR to a regular file has successfully returned:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any successful \fBread\fR(2) from each byte position in the file that was
+modified by that write will return the data specified by the \fBwrite()\fR for
+that position until such byte positions are again modified.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any subsequent successful \fBwrite()\fR to the same byte position in the file
+will overwrite that file data.
+.RE
+.sp
+.LP
+Write requests to a pipe or FIFO are handled the same as a regular file with
+the following exceptions:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+There is no file offset associated with a pipe, hence each write request
+appends to the end of the pipe.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Write requests of \fB{PIPE_BUF}\fR bytes or less are guaranteed not to be
+interleaved with data from other processes doing writes on the same pipe.
+Writes of greater than \fB{PIPE_BUF}\fR bytes may have data interleaved, on
+arbitrary boundaries, with writes by other processes, whether or not the
+\fBO_NONBLOCK\fR or \fBO_NDELAY\fR flags are set.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NONBLOCK\fR and \fBO_NDELAY\fR are clear, a write request may cause the
+process to block, but on normal completion it returns \fInbyte\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NONBLOCK\fR and \fBO_NDELAY\fR are set, \fBwrite()\fR does not block
+the process. If a \fBwrite()\fR request for \fBPIPE_BUF\fR or fewer bytes
+succeeds completely  \fBwrite()\fR returns \fInbyte\fR. Otherwise, if
+\fBO_NONBLOCK\fR is set, it returns \fB\(mi1\fR and sets \fBerrno\fR to
+\fBEAGAIN\fR or if \fBO_NDELAY\fR is set, it returns \fB0\fR.  A \fBwrite()\fR
+request for greater than \fB{PIPE_BUF}\fR bytes  transfers what it can and
+returns the number of bytes written or it transfers no data and, if
+\fBO_NONBLOCK\fR is set, returns \fB\(mi1\fR with \fBerrno\fR set to
+\fBEAGAIN\fR or if \fBO_NDELAY\fR is set, it returns \fB0\fR.  Finally, if a
+request is greater than \fBPIPE_BUF\fR bytes and all data previously written to
+the pipe has been read, \fBwrite()\fR transfers at least \fBPIPE_BUF\fR bytes.
+.RE
+.sp
+.LP
+When attempting to write to a file descriptor (other than a pipe, a FIFO, a
+socket, or a stream) that supports nonblocking writes and cannot accept the
+data immediately:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NONBLOCK\fR and \fBO_NDELAY\fR are clear, \fBwrite()\fR blocks until
+the data can be accepted.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NONBLOCK\fR or \fBO_NDELAY\fR is set, \fBwrite()\fR does not block the
+process. If some data can be written without blocking the process,
+\fBwrite()\fR writes what it can and returns the number of bytes written.
+Otherwise, if \fBO_NONBLOCK\fR is set, it returns \fB\(mi1\fR  and sets
+\fBerrno\fR to \fBEAGAIN\fR or if \fBO_NDELAY\fR is set,  it returns \fB0\fR.
+.RE
+.sp
+.LP
+Upon successful completion, where \fInbyte\fR is greater than 0, \fBwrite()\fR
+will mark for update the \fBst_ctime\fR and \fBst_mtime\fR fields of the file,
+and if the file is a regular file, the \fBS_ISUID\fR and \fBS_ISGID\fR bits of
+the file mode may be cleared.
+.sp
+.LP
+For streams files (see \fBIntro\fR(2) and \fBstreamio\fR(7I)), the operation of
+\fBwrite()\fR is determined by the values of the minimum and maximum
+\fInbyte\fR range ("packet size") accepted by the stream. These values are
+contained in the topmost stream module, and can not be set or tested from user
+level. If \fInbyte\fR falls within the packet size range, \fInbyte\fR bytes are
+written. If \fInbyte\fR does not fall within the range and the minimum packet
+size value  is zero, \fBwrite()\fR breaks the buffer into maximum packet size
+segments prior  to sending the data downstream (the last segment may be smaller
+than the maximum  packet size). If \fInbyte\fR does not fall within the range
+and the minimum value is non-zero, \fBwrite()\fR fails and sets \fBerrno\fR to
+\fBERANGE\fR. Writing a zero-length buffer (\fInbyte\fR is zero) to a streams
+device sends  a zero length message with zero returned. However, writing a
+zero-length buffer to a pipe or FIFO sends no message  and zero is returned.
+The user program may issue the \fBI_SWROPT\fR \fBioctl\fR(2) to enable
+zero-length messages to be sent across the pipe or FIFO (see
+\fBstreamio\fR(7I)).
+.sp
+.LP
+When writing to a stream, data messages are created with a priority band of
+zero. When writing to a socket or to a stream that is not a pipe or a FIFO:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are not set, and the stream cannot
+accept data (the stream write queue is full due to internal flow control
+conditions), \fBwrite()\fR blocks until data can be accepted.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is set and the stream cannot accept data,
+\fBwrite()\fR returns \fB-1\fR and sets \fBerrno\fR to \fBEAGAIN\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is set and part of the buffer has already
+been written when a condition occurs in which the stream cannot accept
+additional data, \fBwrite()\fR terminates and returns the number of bytes
+written.
+.RE
+.sp
+.LP
+The \fBwrite()\fR and \fBwritev()\fR functions will fail if the stream head had
+processed an asynchronous error before the call.  In this case, the value of
+\fBerrno\fR does not reflect the result of \fBwrite()\fR or \fBwritev()\fR but
+reflects the prior error.
+.SS "\fBpwrite()\fR"
+.sp
+.LP
+The \fBpwrite()\fR function is equivalent to \fBwrite()\fR, except that it
+writes into a given position and does not change the file offset (regardless of
+whether \fBO_APPEND\fR is set). The first three arguments to \fBpwrite()\fR are
+the same as \fBwrite()\fR, with the addition of a fourth argument \fIoffset\fR
+for the desired position inside the file.
+.SS "\fBwritev()\fR"
+.sp
+.LP
+The \fBwritev()\fR function performs the same action as \fBwrite()\fR, but
+gathers the output data from the \fIiovcnt\fR buffers specified by the members
+of the \fIiov\fR array: \fIiov\fR[0], \fIiov\fR[1], \&.\|.\|.,
+\fIiov\fR[\fIiovcnt\fR\|\(mi\|1]. The \fIiovcnt\fR buffer is valid if greater
+than 0 and less than or equal to \fB{IOV_MAX}\fR. See \fBIntro\fR(2) for a
+definition of \fB{IOV_MAX}\fR.
+.sp
+.LP
+The \fBiovec\fR structure contains the following members:
+.sp
+.in +2
+.nf
+caddr_t  iov_base;
+int      iov_len;
+.fi
+.in -2
+
+.sp
+.LP
+Each \fBiovec\fR entry specifies the base address and length of an area in
+memory from which data should be written.  The \fBwritev()\fR function always
+writes all data from an area before proceeding to the next.
+.sp
+.LP
+If \fIfildes\fR refers to a regular file and all of the \fBiov_len\fR members
+in the array pointed to by \fIiov\fR are 0, \fBwritev()\fR will return 0 and
+have no other effect.  For other file types, the behavior is unspecified.
+.sp
+.LP
+If the sum of the \fBiov_len\fR values is greater than \fBSSIZE_MAX\fR, the
+operation fails and no data is transferred.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBwrite()\fR returns the number of bytes actually
+written to the file associated with \fIfildes\fR. This number is never greater
+than \fInbyte\fR. Otherwise, \fB\(mi1\fR is returned, the file-pointer remains
+unchanged, and \fBerrno\fR is set to indicate the error.
+.sp
+.LP
+Upon successful completion, \fBwritev()\fR returns the number of bytes actually
+written.  Otherwise, it returns  \fB\(mi1\fR, the file-pointer remains
+unchanged, and \fBerrno\fR is set to indicate an error.
+.SH ERRORS
+.sp
+.LP
+The \fBwrite()\fR, \fBpwrite()\fR, and \fBwritev()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 11n
+.rt  
+Mandatory file/record locking is set, \fBO_NDELAY\fR or \fBO_NONBLOCK\fR is
+set, and there is a blocking record lock; an attempt is made to write to a
+stream that can not accept data with the \fBO_NDELAY\fR or \fBO_NONBLOCK\fR
+flag set; or a write to a pipe or FIFO of \fBPIPE_BUF\fR bytes or less is
+requested and less than \fInbytes\fR of free space is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is not a valid file descriptor open for writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDEADLK\fR\fR
+.ad
+.RS 11n
+.rt  
+The write was going to go to sleep  and cause a deadlock situation to occur.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEDQUOT\fR\fR
+.ad
+.RS 11n
+.rt  
+The user's quota of disk blocks on the file system containing the file has been
+exhausted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 11n
+.rt  
+An attempt is made to write a file that exceeds the process's file size limit
+or the maximum file size (see \fBgetrlimit\fR(2) and \fBulimit\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFBIG\fR\fR
+.ad
+.RS 11n
+.rt  
+The file is a regular file, \fInbyte\fR is greater than 0, and the starting
+position is greater than or equal to the offset maximum established in the file
+description associated with \fIfildes\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 11n
+.rt  
+A signal was caught during the write  operation and no data was transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 11n
+.rt  
+The process is in the background and is attempting to write to its controlling
+terminal whose \fBTOSTOP\fR flag is set, or the process is  neither ignoring
+nor blocking \fBSIGTTOU\fR signals and the process  group of the process is
+orphaned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLCK\fR\fR
+.ad
+.RS 11n
+.rt  
+Enforced record locking was enabled and \fB{LOCK_MAX}\fR regions  are already
+locked in the system, or the system record lock table was full and the write
+could not go to sleep  until the blocking record lock was removed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOLINK\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fIfildes\fR argument is on a remote machine and the link to that machine
+is no longer active.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 11n
+.rt  
+During a write to an ordinary file, there is no  free space left on the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSR\fR\fR
+.ad
+.RS 11n
+.rt  
+An attempt is made to write to a streams with insufficient streams memory
+resources  available in the system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 11n
+.rt  
+A hangup occurred on the stream being written to.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 11n
+.rt  
+An attempt is made to write to a pipe or a \fBFIFO\fR that is not open for
+reading by any process, or that has only one end open (or to a file descriptor
+created by \fBsocket\fR(3SOCKET), using type \fBSOCK_STREAM\fR that is no
+longer connected to a peer endpoint). A \fBSIGPIPE\fR signal will also be sent
+to the thread. The process dies unless special provisions were taken to catch
+or ignore the signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 11n
+.rt  
+The transfer request size was outside the range supported by the streams file
+associated with \fIfildes\fR.
+.RE
+
+.sp
+.LP
+The \fBwrite()\fR and \fBpwrite()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIbuf\fR argument points to an illegal address.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fInbyte\fR argument overflowed an \fBssize_t\fR.
+.RE
+
+.sp
+.LP
+The \fBpwrite()\fR function fails and the file pointer remains unchanged if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBESPIPE\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIfildes\fR argument is associated with a pipe or FIFO.
+.RE
+
+.sp
+.LP
+The \fBwrite()\fR and \fBwritev()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The stream or multiplexer referenced by \fIfildes\fR is linked (directly or
+indirectly) downstream from a multiplexer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+.rt  
+A request was made of a non-existent device, or the request was outside the
+capabilities of the device.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+.rt  
+A hangup occurred on the stream being written to.
+.RE
+
+.sp
+.LP
+A write to a streams file may fail if an error message has been received at the
+stream head.  In this case, \fBerrno\fR is set to the value included in the
+error message.
+.sp
+.LP
+The \fBwritev()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIiovcnt\fR argument was less than or equal to 0 or greater than
+{\fBIOV_MAX\fR}; one of the \fBiov_len\fR values in the \fIiov\fR array was
+negative; or the sum of the \fBiov_len\fR values in the \fIiov\fR array
+overflowed an \fBssize_t\fR.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBpwrite()\fR function has a transitional interface for 64-bit file
+offsets.  See \fBlf64\fR(5).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-Level\fBwrite()\fR is Async-Signal-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(2), \fBchmod\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2),
+\fBgetrlimit\fR(2), \fBioctl\fR(2), \fBlseek\fR(2), \fBopen\fR(2),
+\fBpipe\fR(2), \fBulimit\fR(2), \fBsend\fR(3SOCKET), \fBsocket\fR(3SOCKET),
+\fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5), \fBstreamio\fR(7I)

@@ -1,0 +1,129 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH kstat_chain_update 3KSTAT "3 Aug 2004" "SunOS 5.11" "Kernel Statistics Library Functions"
+.SH NAME
+kstat_chain_update \- update the kstat header chain
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkstat\fR [ \fIlibrary\fR\&.\|.\|.]
+#include <kstat.h>
+
+
+
+\fBkid_t\fR \fBkstat_chain_update\fR(\fBkstat_ctl_t *\fR\fIkc\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBkstat_chain_update()\fR function brings the user's kstat header chain in
+sync with that of the kernel. The kstat chain is a linked list of kstat headers
+(\fBkstat_t\fR's) pointed to by \fIkc\fR->\fBkc_chain\fR, which is initialized
+by \fBkstat_open\fR(3KSTAT). This chain constitutes a list of all kstats
+currently in the system.
+.sp
+.LP
+During normal operation, the kernel creates new kstats and delete old ones as
+various device instances are added and removed, thereby causing the user's copy
+of the kstat chain to become out of date. The \fBkstat_chain_update()\fR
+function detects this condition by comparing the kernel's current kstat chain
+ID (KCID), which is incremented every time the kstat chain changes, to the
+user's KCID, \fIkc\fR->\fBkc_chain_id\fR. If the KCIDs match,
+\fBkstat_chain_update()\fR does nothing.  Otherwise, it deletes any invalid
+kstat headers from the user's kstat chain, adds any new ones, and sets
+\fIkc\fR->\fBkc_chain_id\fR to the new KCID. All other kstat headers in the
+user's kstat chain are unmodified.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBkstat_chain_update()\fR returns the new KCID if
+the kstat chain has changed and 0 if it has not changed. Otherwise, it returns
+\(mi1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBkstat_chain_update()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 13n
+.rt  
+The kstat was temporarily unavailable for reading or writing.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 13n
+.rt  
+Insufficient storage space is available.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 13n
+.rt  
+The given kstat could not be located for reading.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOVERFLOW\fR\fR
+.ad
+.RS 13n
+.rt  
+The data for the given kstat was too large to be stored in the structure.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/dev/kstat\fR\fR
+.ad
+.RS 14n
+.rt  
+kernel statistics driver
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStable
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBkstat\fR(3KSTAT), \fBkstat_lookup\fR(3KSTAT), \fBkstat_open\fR(3KSTAT),
+\fBkstat_read\fR(3KSTAT), \fBattributes\fR(5)

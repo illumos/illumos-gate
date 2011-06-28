@@ -1,0 +1,172 @@
+'\" te
+.\"  Copyright (c) 1990, 1995 by Mortice Kern Systems Inc.  All Rights Reserved  Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH chgat 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.SH NAME
+chgat, mvchgat, mvwchgat, wchgat \- change the rendition of characters in a
+window
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-I\fR /usr/xpg4/include \fB -L \fR /usr/xpg4/lib \e
+\fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
+
+\fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
+ 
+#include <curses.h>
+
+\fBint\fR \fBchgat\fR(\fBint\fR \fIn\fR, \fBattr_t\fR \fIattr\fR, \fBshort\fR \fIcolor\fR, \fBconst void *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvchgat\fR(\fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBint\fR \fIn\fR, \fBattr_t\fR \fIattr\fR, \fBshort\fR \fIcolor\fR,
+     \fBconst void *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmvwchgat\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIy\fR, \fBint\fR \fIx\fR, \fBint\fR \fIn\fR, \fBattr_t\fR \fIattr\fR,
+     \fBshort\fR \fIcolor\fR, \fBconst void *\fR\fIopts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBwchgat\fR(\fBWINDOW *\fR\fIwin\fR, \fBint\fR \fIn\fR, \fBattr_t\fR \fIattr\fR, \fBshort\fR \fIcolor\fR,
+     \fBconst void *\fR\fIopts\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These  functions change the renditions of the next \fIn\fR characters in the
+current or specified window (or of the remaining characters on the current or
+specified line, if \fIn\fR is \(mi1),  beginning at the current or specified
+cursor position. The attributes and colors are specified by \fIattr\fR and
+\fIcolor\fR as for \fBsetcchar\fR(3XCURSES).
+.sp
+.LP
+These function neither update the cursor nor perform wrapping.
+.sp
+.LP
+A value of \fIn\fR that is greater than the remaining  characters on a line is
+not an error.
+.sp
+.LP
+The \fIopts\fR argument is reserved for definition in a future release.
+Currently, the application must provide a null pointer for \fIopts\fR.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the number of characters whose rendition is to be changed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIattr\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the set of attributes to be assigned to the characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcolor\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the new color pair to be assigned to the characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIopts\fR\fR
+.ad
+.RS 9n
+.rt  
+Is reserved for future use.   Currently, this must be a null pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIy\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the y (row) coordinate of the starting position in the window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIx\fR\fR
+.ad
+.RS 9n
+.rt  
+Is the x (column) coordinate of the starting position in the window. changed in
+the window.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwin\fR\fR
+.ad
+.RS 9n
+.rt  
+Is a pointer to the window in which the rendition of characters is to be
+changed.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+ Upon successful completion, these functions returned \fBOK\fR. Otherwise, they
+return \fBERR\fR.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBbkgrnd\fR(3XCURSES), \fBlibcurses\fR(3XCURSES), \fBsetcchar\fR(3XCURSES),
+\fBattributes\fR(5), \fBstandards\fR(5)

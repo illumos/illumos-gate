@@ -1,0 +1,185 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH copyout 9F "27 Sep 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+copyout \- copy data from a driver to a user program
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+
+
+
+\fBint\fR \fBcopyout\fR(\fBconst void *\fR\fIdriverbuf\fR, \fBvoid *\fR\fIuserbuf\fR, \fBsize_t\fR \fIcn\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+This interface is obsolete. \fBddi_copyout\fR(9F) should be used instead.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdriverbuf\fR \fR
+.ad
+.RS 14n
+.rt  
+Source address in the driver from which the data is transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuserbuf\fR \fR
+.ad
+.RS 14n
+.rt  
+Destination address in the user program to which the data is transferred.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcn\fR \fR
+.ad
+.RS 14n
+.rt  
+Number of bytes moved.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBcopyout()\fR copies data from driver buffers to user data space.
+.sp
+.LP
+Addresses that are word-aligned are moved most efficiently.  However, the
+driver developer is not obligated to ensure alignment.  This function
+automatically finds the most efficient move algorithm according to address
+alignment.
+.SH RETURN VALUES
+.sp
+.LP
+Under normal conditions, a \fB0\fR is returned to indicate a successful copy.
+Otherwise, a \(mi\fB1\fR is returned if one of the following occurs:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Paging fault; the driver tried to access a page of memory for which it did not
+have read or write access.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Invalid user address, such as a user area or stack area.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Invalid address that would have resulted in data being copied into the user
+block.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Hardware fault; a hardware error prevented access to the specified user memory.
+For example, an uncorrectable parity or \fBECC\fR error occurred.
+.RE
+.sp
+.LP
+If a \(mi\fB1\fR is returned to the caller, driver entry point routines should
+return \fBEFAULT\fR.
+.SH CONTEXT
+.sp
+.LP
+\fBcopyout()\fR can be called from user context only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn \fBioctl()\fR Routine
+.sp
+.LP
+A driver \fBioctl\fR(9E) routine (line 10) can be used to get or set device
+attributes or registers.  In the \fBXX_GETREGS\fR condition (line 17), the
+driver copies the current device register values to a user data area (line 18).
+If the specified argument contains an invalid address, an error code is
+returned.
+
+.sp
+.in +2
+.nf
+ 1  struct device  {      /* layout of physical device registers  */
+ 2       int      control;     /* physical device control word  */
+ 3       int      status;      /* physical device status word   */
+ 4       short    recv_char;   /* receive character from device */
+ 5       short    xmit_char;   /* transmit character to device  */
+ 6  };
+ 7
+ 8  extern struct device xx_addr[]; /* phys. device regs. location */
+ 9    . . .
+10  xx_ioctl(dev_t dev, int cmd, int arg, int mode,
+11      cred_t *cred_p, int *rval_p)
+12               ...
+13  {
+14      register struct device *rp = &xx_addr[getminor(dev) >> 4];
+15      switch (cmd) {
+16
+17      case XX_GETREGS:     /* copy device regs. to user program */
+18            if (copyout(rp, arg, sizeof(struct device)))
+19                return(EFAULT);
+20            break;
+21               ...
+22      }
+23               ...
+24  }
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Stability LevelObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBioctl\fR(9E), \fBbcopy\fR(9F), \fBcopyin\fR(9F),
+\fBddi_copyin\fR(9F), \fBddi_copyout\fR(9F), \fBuiomove\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Driver writers who intend to support layered ioctls in their \fBioctl\fR(9E)
+routines should use \fBddi_copyout\fR(9F) instead.
+.sp
+.LP
+Driver defined locks should not be held across calls to this function.
+.sp
+.LP
+\fBcopyout()\fR should not be used from a streams driver. See \fBM_COPYIN\fR
+and \fBM_COPYOUT\fR in \fISTREAMS Programming Guide\fR.

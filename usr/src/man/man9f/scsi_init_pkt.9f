@@ -1,0 +1,409 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_init_pkt 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+scsi_init_pkt \- prepare a complete SCSI packet
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+
+
+
+\fBstruct scsi_pkt *\fR\fBscsi_init_pkt\fR(\fBstruct scsi_address *\fR\fIap\fR, 
+     \fBstruct scsi_pkt *\fR\fIpktp\fR, \fBstruct buf *\fR\fIbp\fR, \fBint\fR \fIcmdlen\fR, \fBint\fR \fIstatuslen\fR, 
+     \fBint\fR \fIprivatelen\fR, \fBint\fR \fIflags\fR, \fBint\fR \fB(*\fRcallback\fB)(caddr_t)\fR, \fBcaddr_t\fR \fIarg\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pointer to a \fBscsi_address\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpktp\fR\fR
+.ad
+.sp .6
+.RS 4n
+A pointer to a \fBscsi_pkt\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pointer to a \fBbuf\fR(9S) structure.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcmdlen\fR\fR
+.ad
+.sp .6
+.RS 4n
+The required length for the \fBSCSI \fRcommand descriptor block (\fBCDB\fR) in
+bytes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstatuslen\fR\fR
+.ad
+.sp .6
+.RS 4n
+The required length for the \fBSCSI \fRstatus completion block (\fBSCB\fR) in
+bytes. Valid values are:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+No status back.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return SCSI status byte.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsizeof(scsi_arq_status)\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return status information in a \fBscsi_arq_status\fR structure. This will
+include up to 20 bytes of sense data. Please refer to \fBscsi_arq_status\fR(9S)
+for more information.
+.sp
+For extra sense packets (\fBPKT_XARQ\fR flag asserted), set \fIstatuslen\fR to
+be a greater number like, (\fIN\fR + \fBsizeof(struct scsi_arq_status)\fR)
+where \fIN\fR is the number of extra bytes beyond the default 20. For example,
+\fIN\fR=1 requests 21 bytes of sense, \fIN\fR=235 asks for 255 bytes.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIprivatelen\fR\fR
+.ad
+.sp .6
+.RS 4n
+The required length for the \fIpkt_private\fR area.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflags\fR\fR
+.ad
+.sp .6
+.RS 4n
+Flags modifier.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcallback\fR\fR
+.ad
+.sp .6
+.RS 4n
+A pointer to a callback function, \fBNULL_FUNC\fR, or \fBSLEEP_FUNC\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIcallback\fR function argument.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+Target drivers use \fBscsi_init_pkt()\fR to request the transport layer to
+allocate and initialize a packet for a \fBSCSI\fR command which possibly
+includes a data transfer. If \fIpktp\fR is \fINULL,\fR a new \fBscsi_pkt\fR(9S)
+is allocated using the \fBHBA\fR driver's packet allocator. The \fIbp\fR is a
+pointer to a \fBbuf\fR(9S) structure. If \fIbp\fR is non-\fINULL\fR and
+contains a valid byte count, the \fBbuf\fR(9S) structure is also set up for
+\fBDMA \fRtransfer using the \fBHBA\fR driver \fBDMA\fR resources allocator.
+When \fIbp\fR is allocated by \fBscsi_alloc_consistent_buf\fR(9F), the
+\fBPKT_CONSISTENT\fR bit must be set in the \fIflags\fR argument to ensure
+proper operation. If \fIprivatelen\fR is non-zero then additional space is
+allocated for the \fIpkt_private\fR area of the \fBscsi_pkt\fR(9S). On return
+\fIpkt_private\fR points to this additional space. Otherwise \fIpkt_private\fR
+is a pointer that is typically used to store the \fIbp\fR during execution of
+the command. In this case \fIpkt_private\fR is \fINULL\fR on return.
+.sp
+.LP
+The \fIflags\fR argument is a set of bit flags. Possible bits include:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPKT_CONSISTENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+This must be set if the \fBDMA\fR buffer was allocated using
+\fBscsi_alloc_consistent_buf\fR(9F). In this case, the \fBHBA\fR driver will
+guarantee that the data transfer is properly synchronized before performing the
+target driver's command completion callback.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPKT_DMA_PARTIAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+This may be set if the driver can accept a partial \fBDMA\fR mapping. If set,
+\fBscsi_init_pkt()\fR will allocate \fBDMA\fR resources with the
+\fBDDI_DMA_PARTIAL\fR bit set in the \fBdmar_flag\fR element of the
+\fBddi_dma_req\fR(9S) structure. The \fBpkt_resid\fR field of the
+\fBscsi_pkt\fR(9S) structure may be returned with a non-zero value, which
+indicates the number of bytes for which \fBscsi_init_pkt()\fR was unable to
+allocate DMA resources. In this case, a subsequent call to
+\fBscsi_init_pkt()\fR may be made for the same \fIpktp\fR and \fIbp\fR to
+adjust the DMA resources to the next portion of the transfer. This sequence
+should be repeated until the \fBpkt_resid\fR field is returned with a zero
+value, which indicates that with transport of this final portion the entire
+original request will have been satisfied.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPKT_XARQ\fR\fR
+.ad
+.sp .6
+.RS 4n
+Setting this flag requests that the \fBHBA\fR return  extra sense data for this
+\fBscsi_pkt\fR(9S). The default  auto request sense mechanism returns up to  20
+bytes. More than 20 bytes of sense data can be requested by setting this flag
+and setting the \fIstatuslen\fR correctly. Set the \fIstatuslen\fR to be the
+\fBsizeof(struct scsi_arq_status)\fR plus the number of sense bytes needed
+beyond 20. For example, set statuslen to be \fB(sizeof(struct scsi_arq_status)
++ 5)\fR for 25 bytes of sense.
+.RE
+
+.sp
+.LP
+When calling \fBscsi_init_pkt()\fR to move already-allocated \fBDMA\fR
+resources, the \fIcmdlen\fR, \fIstatuslen\fR, and \fIprivatelen\fR fields are
+ignored.
+.sp
+.LP
+The last argument \fIarg\fR is supplied to the \fIcallback\fR function when it
+is invoked.
+.sp
+.LP
+\fIcallback\fR indicates what the allocator routines should do when resources
+are not available:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNULL_FUNC\fR\fR
+.ad
+.RS 16n
+.rt  
+Do not wait for resources. Return a \fINULL\fR pointer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSLEEP_FUNC\fR\fR
+.ad
+.RS 16n
+.rt  
+Wait indefinitely for resources.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBOther Values\fR
+.ad
+.RS 16n
+.rt  
+\fIcallback\fR points to a function which is called when resources may have
+become available. \fIcallback\fR must return either \fB0\fR (indicating that it
+attempted to allocate resources but again failed to do so), in which case it is
+put back on a list to be called again later, or \fB1\fR indicating either
+success in allocating resources or indicating that it no longer cares for a
+retry.
+.RE
+
+.sp
+.LP
+When allocating \fBDMA\fR resources, \fBscsi_init_pkt()\fR returns the
+\fBscsi_pkt\fR field \fBpkt_resid\fR as the number of residual bytes for which
+the system was unable to allocate \fBDMA\fR resources.  A \fBpkt_resid\fR of
+\fB0\fR means that all necessary \fBDMA\fR resources were allocated.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBscsi_init_pkt()\fR function returns \fINULL\fR if the packet or
+\fBDMA\fR resources could not be allocated. Otherwise, it returns a pointer to
+an initialized \fBscsi_pkt\fR(9S). If \fIpktp\fR was not \fINULL\fR the return
+value will be \fIpktp\fR on successful initialization of the packet.
+.SH CONTEXT
+.sp
+.LP
+If \fIcallback\fR is \fBSLEEP_FUNC\fR, then this routine can be called only
+from user-level code. Otherwise, it can be called from user, interrupt, or
+kernel context. The \fIcallback\fR function may not block or call routines that
+block.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAllocating a Packet Without \fBDMA\fR Resources Attached
+.sp
+.LP
+To allocate a packet without \fBDMA\fR resources attached, use:
+
+.sp
+.in +2
+.nf
+pkt = scsi_init_pkt(&devp->sd_address, NULL, NULL, CDB_GROUP1,
+        1, sizeof (struct my_pkt_private *), 0,
+        sd_runout, sd_unit);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRAllocating a Packet With \fBDMA\fR Resources Attached
+.sp
+.LP
+To allocate a packet with \fBDMA\fR resources attached use:
+
+.sp
+.in +2
+.nf
+pkt = scsi_init_pkt(&devp->sd_address, NULL, bp, CDB_GROUP1,
+        sizeof(struct scsi_arq_status), 0, 0, NULL_FUNC, NULL);
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRAttaching \fBDMA\fR Resources to a Preallocated Packet
+.sp
+.LP
+To attach \fBDMA\fR resources to a preallocated packet, use:
+
+.sp
+.in +2
+.nf
+pkt = scsi_init_pkt(&devp->sd_address, old_pkt, bp, 0,
+        0, 0, 0, sd_runout, (caddr_t) sd_unit);
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRAllocating a Packet with Consistent \fBDMA\fR Resources
+Attached
+.sp
+.LP
+Since the packet is already allocated, the \fIcmdlen\fR, \fIstatuslen\fR and
+\fIprivatelen\fR are \fB0\fR. To allocate a packet with consistent \fBDMA\fR
+resources attached, use:
+
+.sp
+.in +2
+.nf
+bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
+	       SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
+	pkt = scsi_init_pkt(&devp->sd_address, NULL, bp, CDB_GROUP0,
+        sizeof(struct scsi_arq_status), sizeof (struct my_pkt_private *), 
+        PKT_CONSISTENT, SLEEP_FUNC, NULL);
+.fi
+.in -2
+
+.LP
+\fBExample 5 \fRAllocating a Packet with Partial \fBDMA\fR Resources Attached
+.sp
+.LP
+To allocate a packet with partial \fBDMA\fR resources attached, use:
+
+.sp
+.in +2
+.nf
+my_pkt = scsi_init_pkt(&devp->sd_address, NULL, bp, CDB_GROUP0,
+          1, sizeof (struct buf *), PKT_DMA_PARTIAL,
+          SLEEP_FUNC, NULL);
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+\fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_destroy_pkt\fR(9F),
+\fBscsi_dmaget\fR(9F), \fBscsi_pktalloc\fR(9F), \fBbuf\fR(9S),
+\fBddi_dma_req\fR(9S), \fBscsi_address\fR(9S), \fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+If a \fBDMA\fR allocation request fails with \fBDDI_DMA_NOMAPPING\fR, the
+\fBB_ERROR\fR flag will be set in \fIbp\fR, and the \fBb_error\fR field will be
+set to \fBEFAULT\fR.
+.sp
+.LP
+If a \fBDMA\fR allocation request fails with \fBDDI_DMA_TOOBIG\fR, the
+\fBB_ERROR\fR flag will be set in \fIbp\fR, and the \fBb_error\fR field will be
+set to \fBEINVAL\fR.

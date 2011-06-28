@@ -1,0 +1,90 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stoi 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+stoi, numtos \- convert between an integer and a decimal string
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+
+\fBint\fR \fBstoi\fR(\fBchar\fR \fI**str\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBnumtos\fR(\fBunsigned long\fR \fInum\fR, \fBchar *\fR\fIs\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstr\fR\fR
+.ad
+.RS 7n
+.rt  
+Pointer to a character string to be converted.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fInum\fR\fR
+.ad
+.RS 7n
+.rt  
+Decimal number to be converted to a character string.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs\fR\fR
+.ad
+.RS 7n
+.rt  
+Character buffer to hold converted decimal number.
+.RE
+
+.SH DESCRIPTION
+.SS "\fBstoi()\fR"
+.sp
+.LP
+The \fBstoi()\fR function returns the integer value of a string of decimal
+numeric characters beginning at \fI**str\fR. No overflow checking is done.
+\fI*str\fR is updated to point at the last character examined.
+.SS "\fBnumtos()\fR"
+.sp
+.LP
+The \fBnumtos()\fR function converts a \fBlong\fR into a null-terminated
+character string. No bounds checking is done. The caller must ensure there is
+enough space to hold the result.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBstoi()\fR function returns the integer value of the string \fIstr\fR.
+.SH CONTEXT
+.sp
+.LP
+The \fBstoi()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+The \fBstoi()\fR function handles only positive integers; it does not handle
+leading minus signs.

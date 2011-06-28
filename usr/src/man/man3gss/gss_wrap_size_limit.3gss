@@ -1,0 +1,200 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH gss_wrap_size_limit 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.SH NAME
+gss_wrap_size_limit \- allow application to determine maximum message size with
+resulting output token of a specified maximum size
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+#include <gssapi/gssapi.h>
+
+\fBOM_uint32\fR \fBgss_process_context_token\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
+     \fBconst gss_ctx_id_t\fR \fIcontext_handle\fR, \fBint\fR  \fIconf_req_flag\fR,
+     \fBgss_qop_t\fR \fIqop_req\fR, \fBOM_uint32\fR \fIreq_output_size\fR,
+     \fBOM_uint32 *\fR\fImax_input_size\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBgss_wrap_size_limit()\fR function allows an application to determine the
+maximum message size that, if presented to \fBgss_wrap()\fR with the same
+\fIconf_req_flag\fR and \fIqop_req\fR parameters, results in an output token
+containing no more than \fIreq_output_size\fR bytes. This call is intended for
+use by applications that communicate over protocols that impose a maximum
+message size. It enables the application to fragment messages prior to applying
+protection. The \fBGSS-API\fR detects invalid \fBQOP\fR values when
+\fBgss_wrap_size_limit()\fR is called. This routine guarantees only a maximum
+message size, not the availability of specific \fBQOP\fR values for message
+protection.
+.sp
+.LP
+Successful completion of \fBgss_wrap_size_limit()\fR does not guarantee that
+\fBgss_wrap()\fR will be able to protect a message of length
+\fImax_input_size\fR bytes, since this ability might depend on the availability
+of system resources at the time that \fBgss_wrap()\fR is called.
+.SH PARAMETERS
+.sp
+.LP
+The parameter descriptions for \fBgss_wrap_size_limit()\fR are as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIminor_status\fR\fR
+.ad
+.RS 19n
+.rt  
+A mechanism-specific status code.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIcontext_handle\fR\fR
+.ad
+.RS 19n
+.rt  
+A handle that refers to the security over which the messages will be sent.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIconf_req_flag\fR\fR
+.ad
+.RS 19n
+.rt  
+Indicates whether \fBgss_wrap()\fR will be asked to apply confidential
+protection in addition to integrity protection. See \fBgss_wrap\fR(3GSS) for
+more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIqop_req\fR\fR
+.ad
+.RS 19n
+.rt  
+Indicates the level of protection that \fBgss_wrap()\fR will be asked to
+provide.  See \fBgss_wrap\fR(3GSS) for more details.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIreq_output_size\fR\fR
+.ad
+.RS 19n
+.rt  
+The desired maximum size for tokens emitted by \fBgss_wrap()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImax_input_size\fR\fR
+.ad
+.RS 19n
+.rt  
+The maximum input message size that can be presented to \fBgss_wrap()\fR to
+guarantee that the emitted token will be no larger than \fIreq_output_size\fR
+bytes.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+\fBgss_wrap_size_limit()\fR returns one of the following status codes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_COMPLETE\fR\fR
+.ad
+.RS 25n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_NO_CONTEXT\fR\fR
+.ad
+.RS 25n
+.rt  
+The referenced context could not be accessed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_CONTEXT_EXPIRED\fR\fR
+.ad
+.RS 25n
+.rt  
+The context has expired.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_BAD_QOP\fR\fR
+.ad
+.RS 25n
+.rt  
+The specified \fBQOP\fR is not supported by the mechanism.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBGSS_S_FAILURE\fR\fR
+.ad
+.RS 25n
+.rt  
+The underlying mechanism detected an error for which no specific \fBGSS\fR
+status code is defined.  The mechanism-specific status code reported by means
+of the \fIminor_status\fR parameter details the error condition.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgss_wrap\fR(3GSS), \fBattributes\fR(5)
+.sp
+.LP
+\fISolaris Security for Developers Guide\fR

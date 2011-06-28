@@ -1,0 +1,92 @@
+'\" te
+.\"  Copyright (c) 1988 Sun Microsystems, Inc - All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH echo 1B "3 Aug 1994" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+echo \- echo arguments to standard output
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/ucb/echo\fR [\fB-n\fR] [\fIargument\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBecho\fR writes its arguments, separated by \fIBLANK\fRs and terminated by a
+\fINEWLINE\fR, to the standard output.
+.sp
+.LP
+\fBecho\fR is useful for producing diagnostics in command files and for sending
+known data into a pipe, and for displaying the contents of environment
+variables.
+.sp
+.LP
+For example, you can use \fBecho\fR to determine how many subdirectories below
+the root directory (\fB/\fR) is your current directory, as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+echo your current-working-directory's full pathname
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+pipe the output through \fBtr\fR to translate the path's embedded
+slash-characters into space-characters
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+pipe that output through \fBwc\fR \fB-w\fR for a count of the names in your
+path.
+.sp
+.in +2
+.nf
+example% \fB/usr/bin/echo "echo $PWD | tr '/' ' ' | wc -w"\fR
+.fi
+.in -2
+.sp
+
+.RE
+.sp
+.LP
+See \fBtr\fR(1) and \fBwc\fR(1) for their functionality.
+.sp
+.LP
+The shells \fBcsh\fR(1), \fBksh\fR(1), and \fBsh\fR(1), each have an \fBecho\fR
+built-in command, which, by default, will have precedence, and will be invoked
+if the user calls \fBecho\fR without a full pathname. \fB/usr/ucb/echo\fR and
+\fBcsh\fR's \fBecho()\fR have an \fB-n\fR option, but do not understand
+back-slashed escape characters. \fBsh\fR's \fBecho()\fR, \fBksh\fR's
+\fBecho()\fR, and \fB/usr/bin/echo\fR, on the other hand, understand the
+black-slashed escape characters, and \fBksh\fR's \fBecho()\fR also understands
+\fB\ea\fR as the audible bell character; however, these commands do not have an
+\fB-n\fR option.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not add the \fINEWLINE\fR to the output.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBecho\fR(1), \fBksh\fR(1), \fBsh\fR(1), \fBtr\fR(1),
+\fBwc\fR(1), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fB-n\fR option is a transition aid for \fBBSD\fR applications, and may not
+be supported in future  releases.

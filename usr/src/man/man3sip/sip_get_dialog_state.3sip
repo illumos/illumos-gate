@@ -1,0 +1,293 @@
+'\" te
+.\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sip_get_dialog_state 3SIP "11 Jan 2008" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.SH NAME
+sip_get_dialog_state, sip_get_dialog_callid, sip_get_dialog_local_tag,
+sip_get_dialog_remote_tag, sip_get_dialog_local_uri, sip_get_dialog_remote_uri,
+sip_get_dialog_local_contact_uri, sip_get_dialog_remote_target_uri,
+sip_get_dialog_route_set, sip_get_dialog_local_cseq,
+sip_get_dialog_remote_cseq, sip_get_dialog_type, sip_get_dialog_method,
+sip_is_dialog_secure, sip_get_dialog_msgcnt \- get dialog attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
+#include <sip.h>
+
+\fBint\fR \fBsip_get_dialog_state\fR(\fBsip_dialog_t\fR \fIdialog\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fIsip_get_dialog_callid\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fBsip_get_dialog_local_tag\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fBsip_get_dialog_remote_tag\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_uri *\fR\fBsip_get_dialog_local_uri\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_uri *\fR\fBsip_get_dialog_remote_uri\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_uri *\fR\fBsip_get_dialog_local_contact_uri\fR(
+     \fBsip_dialog_t\fR \fIdialog\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst struct sip_uri *\fR\fBsip_get_dialog_remote_target_uri\fR(
+     \fBsip_dialog_t\fR \fIdialog\fR, \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBconst sip_str_t *\fR\fBsip_get_dialog_route_set\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBsip_is_dialog_secure\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBuint32_t\fR \fBsip_get_dialog_local_cseq\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBuint32_t\fR \fBsip_get_dialog_remote_cseq\fR(\fBsip_dialog_t\fR \fIdialog\fR, 
+     \fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsip_get_dialog_type\fR(\fBsip_dialog_t\fR \fIdialog\fR,\fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsip_get_dialog_method\fR(\fBsip_dialog_t\fR \fIdialog\fR,\fBint *\fR\fIerror\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsip_get_dialog_msgcnt\fR(\fBsip_dialog_t\fR \fIdialog\fR,\fBint *\fR\fIerror\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+For functions that return a pointer of type \fBsip_str_t\fR, \fBsip_str_t\fR is
+supplied by:
+.sp
+.in +2
+.nf
+typedef struct sip_str {
+     char	*sip_str_ptr;
+     int	sip_str_len;
+}sip_str_t;
+.fi
+.in -2
+
+.sp
+.LP
+The \fIsip_str_ptr\fR parameter points to the start of the returned value and
+\fIsip_str_len\fR supplies the length of the returned value.
+.sp
+.LP
+The \fBsip_get_dialog_state()\fR returns the state of the \fIdialog\fR. A
+\fIdialog\fR can be in one of the following states:
+.br
+.in +2
+\fBSIP_DLG_NEW\fR
+.in -2
+.br
+.in +2
+\fBSIP_DLG_EARLY\fR
+.in -2
+.br
+.in +2
+\fBSIP_DLG_CONFIRMED\fR
+.in -2
+.br
+.in +2
+\fBSIP_DLG_DESTROYED\fR
+.in -2
+.sp
+.LP
+The \fBsip_get_dialog_callid()\fR function returns the call ID value maintained
+in the \fIdialog\fR.
+.sp
+.LP
+The \fBsip_get_dialog_local_tag()\fR and \fBsip_get_dialog_remote_tag()\fR
+functions return the local and remote tag values, maintained in the
+\fIdialog\fR.
+.sp
+.LP
+The \fBsip_get_dialog_local_uri()\fR, \fBsip_get_dialog_remote_uri()\fR,
+\fBsip_get_dialog_local_contact_uri()\fR, and
+\fBsip_get_dialog_remote_target_uri()\fR functions return the local, remote,
+local contract, and the remote target \fBURI\fRs, maintained in the
+\fIdialog\fR.
+.sp
+.LP
+The \fBsip_get_dialog_route_set()\fR function returns the route set, if any,
+maintained in the \fIdialog\fR.
+.sp
+.LP
+The \fBsip_get_dialog_local_cseq()\fR and \fBsip_get_dialog_remote_cseq()\fR
+functions return the local and remote \fBCSEQ\fR numbers maintained in the
+\fIdialog\fR.
+.sp
+.LP
+The \fBsip_get_dialog_type()\fR function returns one of the following dialog
+types, depending on whether it is created by the client or the server.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIP_UAC_DIALOG\fR\fR
+.ad
+.RS 18n
+.rt  
+created by client
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSIP_UAS_DIALOG\fR\fR
+.ad
+.RS 18n
+.rt  
+created by server
+.RE
+
+.sp
+.LP
+The \fBsip_get_dialog_method()\fR function returns the \fBSIP\fR method,
+\fBINVITE\fR or \fBSUBSCRIBE\fR, of the request that created the dialog.
+.sp
+.LP
+The \fBsip_is_dialog_secure()\fR function returns \fBB_TRUE\fR if the
+\fIdialog\fR is secure and \fBB_FALSE\fR otherwise.
+.sp
+.LP
+The \fBsip_get_dialog_msgcnt()\fR function returns the number of SIP messages
+(requests and responses) that were sent and received within the context of the
+given dialog.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBsip_get_dialog_state()\fR, \fBsip_get_dialog_local_cseq()\fR,
+\fBsip_get_dialog_remote_cseq()\fR, \fBsip_get_dialog_type()\fR,
+\fBsip_get_dialog_method()\fR, and \fBsip_get_dialog_msgcnt()\fR functions
+return the required value on success and \fB-1\fR on failure.
+.sp
+.LP
+The \fBsip_get_dialog_callid()\fR, \fBsip_get_dialog_local_tag()\fR,
+\fBsip_get_dialog_remote_tag()\fR, \fBsip_get_dialog_local_uri()\fR,
+\fBsip_get_dialog_remote_uri()\fR, \fBsip_get_dialog_local_contact_uri()\fR,
+\fBsip_get_dialog_remote_target_uri()\fR, and \fBsip_get_dialog_route_set()\fR
+functions return the required value on success and \fBNULL\fR on failure.
+.sp
+.LP
+The value of \fBerrno\fR is not changed by these calls in the event of an
+error.
+.SH ERRORS
+.sp
+.LP
+These functions take an \fIerror\fR argument.
+.sp
+.LP
+If the error is non-null, one of the following values is set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIdialog\fR is \fBNULL\fR or the stack is not configured to manage
+dialogs.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSUP\fR\fR
+.ad
+.sp .6
+.RS 4n
+The input \fBSIP\fR message cannot be modified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.sp .6
+.RS 4n
+The memory allocation fails when the request/response line or the headers in
+the \fBACK\fR request are created.
+.RE
+
+.sp
+.LP
+On success, the value of the location pointed to by \fIerror\fR is set to
+\fB0\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibsip\fR(3LIB)

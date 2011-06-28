@@ -1,0 +1,77 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pause 2 "28 Dec 1996" "SunOS 5.11" "System Calls"
+.SH NAME
+pause \- suspend process until signal
+.SH SYNOPSIS
+.LP
+.nf
+#include <unistd.h>
+
+\fBint\fR \fBpause\fR(\fBvoid\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpause()\fR function suspends the calling process until it receives a
+signal. The signal must be one that is not currently set to be ignored by the
+calling process.
+.sp
+.LP
+If the signal causes termination of the calling process, \fBpause()\fR does not
+return.
+.sp
+.LP
+If the signal is caught by the calling process and control is returned from the
+signal-catching function (see \fBsignal\fR(3C)), the calling process resumes
+execution from the point of suspension.
+.SH RETURN VALUES
+.sp
+.LP
+Since \fBpause()\fR suspends thread  execution indefinitely unless interrupted
+by a signal, there is no successful completion return value.  If interrupted,
+it returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpause()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 9n
+.rt  
+A signal is caught by the calling process and control is returned from the
+signal-catching function.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBalarm\fR(2), \fBkill\fR(2), \fBsignal\fR(3C), \fBwait\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

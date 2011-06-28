@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -48,6 +50,7 @@
 #include <libintl.h>
 #include <tzfile.h>
 #include <project.h>
+#include <paths.h>
 
 #include "cron.h"
 
@@ -70,6 +73,7 @@
 #define	WARNSHELL	"commands will be executed using %s\n"
 #define	CANTCD		"can't change directory to the at directory"
 #define	CANTCHOWN	"can't change the owner of your job to you"
+#define	CANTCHUID	"can't change user identifier"
 #define	CANTCREATE	"can't create a job for you"
 #define	INVALIDUSER	"you are not a valid user (no entry in /etc/passwd)"
 #define	NOOPENDIR	"can't open the at directory"
@@ -83,10 +87,6 @@
 	"       at -r at_job_id ...\n"
 
 #define	FORMAT		"%a %b %e %H:%M:%S %Y"
-
-/* Macros used in format for fscanf */
-#define	AQ(x)		#x
-#define	BUFFMT(p)		AQ(p)
 
 static int leap(int);
 static int atoi_for2(char *);
@@ -553,7 +553,6 @@ copy(char *jobfile, FILE *inputfile, int when)
 {
 	int c;
 	FILE *pfp;
-	FILE *xfp;
 	char *shell;
 	char	dirbuf[PATH_MAX + 1];
 	char	line[LINE_MAX];
@@ -561,9 +560,7 @@ copy(char *jobfile, FILE *inputfile, int when)
 	mode_t um;
 	char *val;
 	extern char **environ;
-	int pfd[2];
-	pid_t pid;
-	uid_t realusr;
+	uid_t realusr, effeusr;
 	int ttyinput;
 	int ulimit_flag = 0;
 	struct rlimit rlp;
@@ -606,11 +603,7 @@ copy(char *jobfile, FILE *inputfile, int when)
 			ulimit_flag = 1;
 	} else {
 		/* SHELL is NULL or unset, therefore use default */
-#ifdef XPG4
-		Shell = shell = "/usr/xpg4/bin/sh";
-#else
-		Shell = shell = "/bin/sh";
-#endif /* XPG4 */
+		Shell = shell = _PATH_BSHELL;
 		ulimit_flag = 1;
 	}
 
@@ -667,40 +660,25 @@ copy(char *jobfile, FILE *inputfile, int when)
 			goto out;
 		case 'd':
 			/*
-			 * fork off a child with submitter's permissions,
-			 * otherwise, when IFS=/, /usr/bin/pwd would be parsed
-			 * by the shell as file "bin".  The shell would
-			 * then search according to the submitter's PATH
-			 * and run the file bin with root permission
+			 * Must obtain current working directory as the user
 			 */
 
-			(void) fflush(stdout);
-			dirbuf[0] = NULL;
-			if (pipe(pfd) != 0)
-				atabort("pipe open failed");
-			realusr = getuid(); /* get realusr before the fork */
-			if ((pid = fork()) == (pid_t)-1)
-				atabort("fork failed");
-			if (pid == 0) {			/* child process */
-				(void) close(pfd[0]);
-				/* remove setuid for pwd */
-				(void) setuid(realusr);
-				if ((xfp = popen("/usr/bin/pwd", "r"))
-				    != NULL) {
-					fscanf(xfp, "%" BUFFMT(PATH_MAX) "s",
-					    dirbuf);
-					(void) pclose(xfp);
-					xfp = fdopen(pfd[1], "w");
-					fprintf(xfp, "%s", dirbuf);
-					(void) fclose(xfp);
-				}
-				_exit(0);
+			dirbuf[0] = '\0';
+			realusr = getuid();
+			effeusr = geteuid();
+			/* change euid for getcwd */
+			if (seteuid(realusr) < 0) {
+				atabort(CANTCHUID);
 			}
-			(void) close(pfd[1]);		/* parent process */
-			xfp = fdopen(pfd[0], "r");
-			fscanf(xfp, "%" BUFFMT(PATH_MAX) "s", dirbuf);
+			if (getcwd(dirbuf, sizeof (dirbuf)) == NULL) {
+				atabort(
+				    "can't obtain current working directory");
+			}
+			/* change back afterwards */
+			if (seteuid(effeusr) < 0) {
+				atabort(CANTCHUID);
+			}
 			printf("%s", dirbuf);
-			(void) fclose(xfp);
 			break;
 		case 'm':
 			printf("%o", um);

@@ -1,0 +1,239 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dlpi_open 3DLPI "17 Nov 2008" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.SH NAME
+dlpi_open \- open DLPI link
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
+#include <libdlpi.h>
+
+\fBint\fR \fBdlpi_open\fR(\fBconst char *\fR\fIlinkname\fR, \fBdlpi_handle_t *\fR\fIdhp\fR, 
+     \fBuint_t\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdlpi_open()\fR function creates an open instance of the \fBDLPI\fR
+Version 2 link named by \fIlinkname\fR and associates it with a
+dynamically-allocated \fBdlpi_handle_t\fR, which is returned to the caller in
+\fIdhp\fR upon success. The \fBDLPI\fR handle is left in the \fBDL_UNBOUND\fR
+\fBDLPI\fR state after a successful open of the \fBDLPI\fR link. The DLPI
+handles can only be used by one thread at a time, but multiple handles can be
+used by multiple threads. This function can open both \fBDL_STYLE1\fR and
+\fBDL_STYLE2\fR \fBDLPI\fR links.
+.sp
+.LP
+By default (if \fBDLPI_DEVIPNET\fR is not set in \fIflags\fR), the
+\fBdlpi_open()\fR function scans the \fB/dev/net\fR and \fB/dev\fR directories
+for DLPI links, in order. Within each scanned directory, \fBdlpi_open()\fR
+first looks for a matching \fBDL_STYLE1\fR link, then for a matching
+\fBDL_STYLE2\fR link. If \fIprovider\fR is considered the \fIlinkname\fR with
+its trailing digits removed, a matching \fBDL_STYLE1\fR link has a filename of
+\fIlinkname\fR, and a matching \fBDL_STYLE2\fR link has a filename of
+\fIprovider\fR. If a \fBDL_STYLE2\fR link is opened, \fBdlpi_open()\fR
+automatically performs the necessary \fBDLPI\fR operations to place the
+\fBDLPI\fR link instance and the associated \fBDLPI\fR handle in the
+\fBDL_UNBOUND\fR state. See \fBdlpi\fR(7P) for the definition of
+\fIlinkname\fR.
+.sp
+.LP
+If \fBDLPI_DEVIPNET\fR is set in \fIflags\fR, \fBdlpi_open()\fR opens the file
+\fIlinkname\fR in \fB/dev/ipnet\fR as a \fBDL_STYLE1\fR DLPI device and does
+not look in any other directories.
+.sp
+.LP
+The value of \fIflags\fR is constructed by a bitwise-inclusive-OR of the flags
+listed below, defined in \fB<libdlpi.h>\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_DEVIPNET\fR\fR
+.ad
+.RS 18n
+.rt  
+Specify that the named DLPI device is an IP observability device (see
+\fBipnet\fR(7D)), and \fBdl_open()\fR will open the device from the
+\fB/dev/ipnet/\fR directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_IPNETINFO\fR\fR
+.ad
+.RS 18n
+.rt  
+This flag is applicable only when opening IP Observability devices (with
+\fBDLPI_DEVIPNET\fR or by opening the \fB/dev/lo0\fR device). This flag causes
+the \fBipnet\fR driver to prepend an \fBipnet\fR header to each received IP
+packet. See \fBipnet\fR(7D) for the contents of this header.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_NATIVE\fR\fR
+.ad
+.RS 18n
+.rt  
+Enable \fBDLPI\fR native mode (see \fBDLIOCNATIVE\fR in \fBdlpi\fR(7P)) on a
+\fBDLPI\fR link instance. Native mode persists until the \fBDLPI\fR handle is
+closed by \fBdlpi_close\fR(3DLPI).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_PASSIVE\fR\fR
+.ad
+.RS 18n
+.rt  
+Enable \fBDLPI\fR passive mode (see \fBDL_PASSIVE_REQ\fR in \fBdlpi\fR(7P)) on
+a \fBDLPI\fR link instance. Passive mode persists until the \fBDLPI\fR handle
+is closed by \fBdlpi_close\fR(3DLPI).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_RAW\fR\fR
+.ad
+.RS 18n
+.rt  
+Enable \fBDLPI\fR raw mode (see \fBDLIOCRAW\fR in \fBdlpi\fR(7P)) on a
+\fBDLPI\fR link instance. Raw mode persists until the \fBDLPI\fR handle is
+closed by \fBdlpi_close\fR(3DLPI).
+.RE
+
+.sp
+.LP
+Each \fBDLPI\fR handle has an associated timeout value that is used as a
+timeout interval for certain \fBlibdlpi\fR operations. The default timeout
+value ensures that \fBDLPI_ETIMEDOUT\fR is returned from a \fBlibdlpi\fR
+operation only in the event that the \fBDLPI\fR link becomes unresponsive. The
+timeout value can be changed with \fBdlpi_set_timeout\fR(3DLPI), although this
+should seldom be necessary.
+.SH RETURN VALUES
+.sp
+.LP
+Upon success, \fBDLPI_SUCCESS\fR is returned. If \fBDL_SYSERR\fR is returned,
+\fBerrno\fR contains the specific UNIX system error value. Otherwise, a
+\fBDLPI\fR error value defined in \fB<sys/dlpi.h>\fR or listed in the following
+section is returned.
+.SH ERRORS
+.sp
+.LP
+The \fBdlpi_open()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EBADLINK\fR\fR
+.ad
+.RS 25n
+.rt  
+Bad \fBDLPI\fR link
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_EIPNETINFONOTSUP\fR\fR
+.ad
+.RS 25n
+.rt  
+The \fBDLPI_IPNETINFO\fR flag was set but the device opened does not support
+the \fBDLIOCIPNETINFO\fR ioctl.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ELINKNAMEINVAL\fR\fR
+.ad
+.RS 25n
+.rt  
+Invalid \fBDLPI\fR \fIlinkname\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ENOLINK\fR\fR
+.ad
+.RS 25n
+.rt  
+\fBDLPI\fR link does not exist
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ERAWNOTSUP\fR\fR
+.ad
+.RS 25n
+.rt  
+DLPI raw mode not supported
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_ETIMEDOUT\fR\fR
+.ad
+.RS 25n
+.rt  
+\fBDLPI\fR operation timed out
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDLPI_FAILURE\fR\fR
+.ad
+.RS 25n
+.rt  
+DLPI operation failed
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdlpi_close\fR(3DLPI), \fBdlpi_set_timeout\fR(3DLPI), \fBlibdlpi\fR(3LIB),
+\fBattributes\fR(5), \fBdlpi\fR(7P), \fBipnet\fR(7D)

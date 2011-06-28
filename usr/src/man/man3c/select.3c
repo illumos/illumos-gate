@@ -1,0 +1,435 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH select 3C "1 Nov 2004" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+select, pselect, FD_SET, FD_CLR, FD_ISSET, FD_ZERO \- synchronous I/O
+multiplexing
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/time.h>
+
+\fBint\fR \fBselect\fR(\fBint\fR \fInfds\fR,
+     \fBfd_set *restrict\fR \fIreadfds\fR, \fBfd_set *restrict\fR \fIwritefds\fR,
+     \fBfd_set *restrict\fR \fIerrorfds\fR,
+     \fBstruct timeval *restrict\fR \fItimeout\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpselect\fR(\fBint\fR \fInfds\fR,
+     \fBfd_set *restrict\fR \fIreadfds\fR, \fBfd_set *restrict\fR \fIwritefds\fR,
+     \fBfd_set *restrict\fR \fIerrorfds\fR,
+     \fBconst struct timespec *restrict\fR \fItimeout\fR,
+     \fBconst sigset_t *restrict\fR \fIsigmask\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBFD_SET\fR(\fBint\fR \fIfd\fR, \fBfd_set *\fR\fIfdset\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBFD_CLR\fR(\fBint\fR \fIfd\fR, \fBfd_set *\fR\fIfdset\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBFD_ISSET\fR(\fBint\fR \fIfd\fR, \fBfd_set *\fR\fIfdset\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBFD_ZERO\fR(\fBfd_set *\fR\fIfdset\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpselect()\fR function examines the file descriptor sets whose addresses
+are passed in the \fIreadfds\fR, \fIwritefds\fR, and \fIerrorfds\fR parameters
+to see if some of their descriptors are ready for reading, are ready for
+writing, or have an exceptional condition pending, respectively.
+.sp
+.LP
+The \fBselect()\fR function is equivalent to the \fBpselect()\fR function,
+except as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For the \fBselect()\fR function, the timeout period is given in seconds and
+microseconds in an argument of type \fBstruct timeval\fR, whereas for the
+\fBpselect()\fR function the timeout period is given in seconds and nanoseconds
+in an argument of type \fBstruct timespec\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBselect()\fR function has no \fIsigmask\fR argument. It behaves as
+\fBpselect()\fR does when \fIsigmask\fR is a null pointer.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Upon successful completion, the \fBselect()\fR function might modify the object
+pointed to by the \fItimeout\fR argument.
+.RE
+.sp
+.LP
+The \fBselect()\fR and \fBpselect()\fR functions support regular files,
+terminal and pseudo-terminal devices, STREAMS-based files, FIFOs, pipes, and
+sockets. The behavior of \fBselect()\fR and \fBpselect()\fR on file descriptors
+that refer to other types of file is unspecified.
+.sp
+.LP
+The \fInfds\fR argument specifies the range of file descriptors to be tested.
+The first \fInfds\fR descriptors are checked in each set; that is, the
+descriptors from zero through \fInfds\fR-1 in the descriptor sets are examined.
+.sp
+.LP
+If the \fIreadfs\fR argument is not a null pointer, it points to an object of
+type \fBfd_set\fR that on input specifies the file descriptors to be checked
+for being ready to read, and on output indicates which file descriptors are
+ready to read.
+.sp
+.LP
+If the \fIwritefs\fR argument is not a null pointer, it points to an object of
+type \fBfd_set\fR that on input specifies the file descriptors to be checked
+for being ready to write, and on output indicates which file descriptors are
+ready to write.
+.sp
+.LP
+If the \fIerrorfds\fR argument is not a null pointer, it points to an object of
+type \fBfd_set\fR that on input specifies the file descriptors to be checked
+for error conditions pending, and on output indicates which file descriptors
+have error conditions pending.
+.sp
+.LP
+Upon successful completion, the objects pointed to by the \fIreadfs\fR,
+\fIwritefs\fR, and \fIerrorfds\fR arguments are modified to indicate which file
+descriptors are ready for reading, ready for writing, or have an error
+condition pending, respectively, and return the total number of ready
+descriptors in all the output sets. For each file descriptor less than
+\fInfds\fR, the corresponding bit will be set on successful completion if it
+was set on input and the associated condition is true for that file descriptor.
+.sp
+.LP
+If none of the selected descriptors are ready for the requested operation, the
+\fBselect()\fR or \fBpselect()\fR function blocks until at least one of the
+requested operations becomes ready, until the timeout occurs, or until
+interrupted by a signal. The \fItimeout\fR parameter controls how long the
+\fBselect()\fR or \fBpselect()\fR function takes before timing out. If the
+\fItimeout\fR parameter is not a null pointer, it specifies a maximum interval
+to wait for the selection to complete. If the specified time interval expires
+without any requested operation becoming ready, the function returns. If the
+\fItimeout\fR parameter is a null pointer, then the call to \fBselect()\fR or
+\fBpselect()\fR blocks indefinitely until at least one descriptor meets the
+specified criteria. To effect a poll, the \fItimeout\fR parameter should not be
+a null pointer, and should point to a zero-valued \fBtimespec\fR structure.
+.sp
+.LP
+The use of a \fItimeout\fR does not affect any pending timers set up by
+\fBalarm\fR(2), \fBualarm\fR(3C), or \fBsetitimer\fR(2).
+.sp
+.LP
+If \fIsigmask\fR is not a null pointer, then the \fBpselect()\fR function
+replaces the signal mask of the process by the set of signals pointed to by
+\fIsigmask\fR before examining the descriptors, and restores the signal mask of
+the process before returning.
+.sp
+.LP
+A descriptor is considered ready for reading when a call to an input function
+with \fBO_NONBLOCK\fR clear would not block, whether or not the function would
+transfer data successfully. (The function might return data, an end-of-file
+indication, or an error other than one indicating that it is blocked, and in
+each of these cases the descriptor will be considered ready for reading.)
+.sp
+.LP
+A descriptor is considered ready for writing when a call to an output function
+with \fBO_NONBLOCK\fR clear would not block, whether or not the function would
+transfer data successfully.
+.sp
+.LP
+If a socket has a pending error, it is considered to have an exceptional
+condition pending. Otherwise, what constitutes an exceptional condition is file
+type-specific. For a file descriptor for use with a socket, it is
+protocol-specific except as noted below. For other file types, if the operation
+is meaningless for a particular file type, \fBselect()\fR or \fBpselect()\fR
+indicates that the descriptor is ready for read or write operations and
+indicates that the descriptor has no exceptional condition pending.
+.sp
+.LP
+If a descriptor refers to a socket, the implied input function is the
+\fBrecvmsg\fR(3XNET) function with parameters requesting normal and ancillary
+data, such that the presence of either type causes the socket to be marked as
+readable. The presence of out-of-band data is checked if the socket option
+\fBSO_OOBINLINE\fR has been enabled, as out-of-band data is enqueued with
+normal data. If the socket is currently listening, then it is marked as
+readable if an incoming connection request has been received, and a call to the
+accept function completes without blocking.
+.sp
+.LP
+If a descriptor refers to a socket, the implied output function is the
+\fBsendmsg\fR(3XNET) function supplying an amount of normal data equal to the
+current value of the \fBSO_SNDLOWAT\fR option for the socket. If a non-blocking
+call to the connect function has been made for a socket, and the connection
+attempt has either succeeded or failed leaving a pending error, the socket is
+marked as writable.
+.sp
+.LP
+A socket is considered to have an exceptional condition pending if a receive
+operation with \fBO_NONBLOCK\fR clear for the open file description and with
+the \fBMSG_OOB\fR flag set would return out-of-band data without blocking. (It
+is protocol-specific whether the \fBMSG_OOB\fR flag would be used to read
+out-of-band data.) A socket will also be considered to have an exceptional
+condition pending if an out-of-band data mark is present in the receive queue.
+.sp
+.LP
+A file descriptor for a socket that is listening for connections will indicate
+that it is ready for reading, when connections are available.  A file
+descriptor for a socket that is connecting asynchronously will indicate that it
+is ready for writing, when a connection has been established.
+.sp
+.LP
+Selecting true for reading on a socket descriptor upon which a
+\fBlisten\fR(3XNET) call has been performed indicates that a subsequent
+\fBaccept\fR(3XNET) call on that descriptor will not block.
+.sp
+.LP
+If the \fItimeout\fR argument is not a null pointer, it points to an object of
+type \fBstruct timeval\fR that specifies a maximum interval to wait for the
+selection to complete. If the \fItimeout\fR argument points to an object of
+type \fBstruct timeval\fR whose members are 0, \fBselect()\fR does not block.
+If the \fItimeout\fR argument is a null pointer, \fBselect()\fR blocks until an
+event causes one of the masks to be returned with a valid (non-zero) value.  If
+the time limit expires before any event occurs that would cause one of the
+masks to be set to a non-zero value, \fBselect()\fR completes successfully and
+returns 0.
+.sp
+.LP
+If the \fIreadfs\fR, \fIwritefs\fR, and \fIerrorfds\fR arguments are all null
+pointers and the \fItimeout\fR argument is not a null pointer, \fBselect()\fR
+or \fBpselect()\fR blocks for the time specified, or until interrupted by a
+signal. If the \fIreadfs\fR, \fIwritefs\fR, and \fIerrorfds\fR arguments are
+all null pointers and the \fItimeout\fR argument is a null pointer,
+\fBselect()\fR blocks until interrupted by a signal.
+.sp
+.LP
+File descriptors associated with regular files always select true for ready to
+read, ready to write, and error conditions.
+.sp
+.LP
+On failure, the objects pointed to by the \fIreadfs\fR, \fIwritefs\fR, and
+\fIerrorfds\fR arguments are not modified.  If the timeout interval expires
+without the specified condition being true for any of the specified file
+descriptors, the objects pointed to by the \fIreadfs\fR, \fIwritefs\fR, and
+\fIerrorfds\fR arguments have all bits set to 0.
+.sp
+.LP
+File descriptor masks of type \fBfd_set\fR can be initialized and tested with
+the macros \fBFD_CLR()\fR, \fBFD_ISSET()\fR, \fBFD_SET()\fR, and
+\fBFD_ZERO()\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFD_CLR\fR(\fIfd\fR, &\fIfdset\fR)\fR
+.ad
+.RS 24n
+.rt  
+Clears the bit for the file descriptor \fIfd\fR in the file descriptor set
+\fIfdset\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFD_ISSET\fR(\fIfd\fR, &\fIfdset\fR)\fR
+.ad
+.RS 24n
+.rt  
+Returns a non-zero value if the bit for the file descriptor \fIfd\fR is set in
+the file descriptor set pointed to by \fIfdset\fR, and 0 otherwise.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFD_SET\fR(\fIfd\fR, &\fIfdset\fR)\fR
+.ad
+.RS 24n
+.rt  
+Sets the bit for the file descriptor \fIfd\fR in the file descriptor set
+\fIfdset\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFD_ZERO\fR(&\fIfdset\fR)\fR
+.ad
+.RS 24n
+.rt  
+Initializes the file descriptor set \fIfdset\fR to have zero bits for all file
+descriptors.
+.RE
+
+.sp
+.LP
+The behavior of these macros is undefined if the \fIfd\fR argument is less than
+0 or greater than or equal to \fBFD_SETSIZE\fR, or if \fIfd\fR is not a valid
+file descriptor, or if any of the arguments are expressions with side effects.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, \fBselect()\fR and \fBpselect()\fR return the total
+number of bits set in the bit masks. Otherwise, \fB\(mi1\fR is returned and
+\fBerrno\fR is set to indicate the error.
+.sp
+.LP
+The \fBFD_CLR()\fR, \fBFD_SET()\fR, and \fBFD_ZERO()\fR macros return no value.
+The \fBFD_ISSET()\fR macro returns a non-zero value if the bit for the file
+descriptor \fIfd\fR is set in the file descriptor set pointed to by
+\fIfdset\fR, and \fB0\fR otherwise.
+.SH ERRORS
+.sp
+.LP
+The \fBselect()\fR and \fBpselect()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+One or more of the file descriptor sets specified a file descriptor that is not
+a valid open file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The function was interrupted before any of the selected events occurred and
+before the timeout interval expired.
+.sp
+If \fBSA_RESTART\fR has been set for the interrupting signal, it is
+implementation-dependent whether \fBselect()\fR restarts or returns with
+\fBEINTR\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An invalid timeout interval was specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fInfds\fR argument is less than 0 or greater than \fBFD_SETSIZE\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+One of the specified file descriptors refers to a STREAM or multiplexer that is
+linked (directly or indirectly) downstream from a multiplexer.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+A component of the pointed-to time limit is outside the acceptable range:
+\fBt_sec\fR must be between \fB0\fR and 10^8, inclusive.   \fBt_usec\fR must be
+greater than or equal to \fB0\fR, and less than 10^6.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBpoll\fR(2) function is preferred over this function. It must be used
+when the number of file descriptors exceeds  \fBFD_SETSIZE\fR.
+.sp
+.LP
+The use of a timeout does not affect any pending timers set up by
+\fBalarm\fR(2), \fBualarm\fR(3C) or \fBsetitimer\fR(2).
+.sp
+.LP
+On successful completion, the object pointed to by the \fItimeout\fR argument
+may be modified.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBalarm\fR(2), \fBfcntl\fR(2), \fBpoll\fR(2), \fBread\fR(2),
+\fBsetitimer\fR(2), \fBwrite\fR(2), \fBaccept\fR(3SOCKET),
+\fBlisten\fR(3SOCKET), \fBualarm\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+The default value for \fBFD_SETSIZE\fR (currently 1024) is larger than the
+default limit on the number of open files. To accommodate 32-bit applications
+that  wish to use a larger number of open files with \fBselect()\fR, it is
+possible to increase this size at compile time by providing a larger definition
+of \fBFD_SETSIZE\fR before the inclusion of any system-supplied header. The
+maximum supported size for \fBFD_SETSIZE\fR is 65536. The default value is
+already 65536 for 64-bit applications.

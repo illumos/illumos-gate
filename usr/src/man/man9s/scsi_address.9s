@@ -1,0 +1,70 @@
+'\" te
+.\"  Copyright (c) 2000, Sun Microsystems, Inc.,  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH scsi_address 9S "30 Aug 1995" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+scsi_address \- SCSI address structure
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h> 
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris architecture specific (Solaris DDI)
+.SH DESCRIPTION
+.sp
+.LP
+A \fBscsi_address\fR structure defines the addressing components for a
+\fBSCSI\fR target device. The address of the target device is separated into
+two components: target number and logical unit number. The two addressing
+components are used to uniquely identify any type of \fBSCSI\fR device;
+however, most devices can be addressed with the target component of the
+address.
+.sp
+.LP
+In the case where only the target component is used to address the device, the
+logical unit should be set to  \fB0\fR. If the \fBSCSI\fR target device
+supports logical units, then the \fBHBA\fR must interpret the logical units
+field of the data structure.
+.sp
+.LP
+The \fBpkt_address\fR member of a \fBscsi_pkt\fR(9S) is initialized by
+\fBscsi_init_pkt\fR(9F).
+.SH STRUCTURE MEMBERS
+.sp
+.in +2
+.nf
+scsi_hba_tran_t   *a_hba_tran;  /* Transport vectors for the SCSI bus */
+ushort_t          a_target;     /* SCSI target id */
+uchar_t           a_lun;        /* SCSI logical unit */
+.fi
+.in -2
+
+.sp
+.LP
+\fBa_hba_tran\fR is a pointer to the controlling \fBHBA\fR's transport vector
+structure. The \fBSCSA\fR interface uses this field to pass any transport
+requests from the \fBSCSI\fR target device drivers to the \fBHBA\fR driver.
+.sp
+.LP
+\fBa_target\fR is the target component of the \fBSCSI\fR address.
+.sp
+.LP
+\fBa_lun\fR is the logical unit component of the \fBSCSI\fR address. The
+logical unit is used to further distinguish a \fBSCSI\fR target device that
+supports multiple logical units from one that does not. The \fBmakecom\fR(9F)
+family of functions use the \fBa_lun\fR field to set the logical unit field in
+the \fBSCSI\fR \fBCDB\fR, for compatibility with \fBSCSI-1\fR.
+.SH SEE ALSO
+.sp
+.LP
+\fBmakecom\fR(9F), \fBscsi_init_pkt\fR(9F), \fBscsi_hba_tran\fR(9S),
+\fBscsi_pkt\fR(9S)
+.sp
+.LP
+\fIWriting Device Drivers\fR

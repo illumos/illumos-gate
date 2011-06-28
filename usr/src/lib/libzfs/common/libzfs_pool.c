@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Joyent, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -207,7 +208,7 @@ zpool_state_to_name(vdev_state_t state, vdev_aux_t aux)
  */
 int
 zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
-    zprop_source_t *srctype)
+    zprop_source_t *srctype, boolean_t literal)
 {
 	uint64_t intval;
 	const char *strval;
@@ -266,6 +267,12 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 	case PROP_TYPE_NUMBER:
 		intval = zpool_get_prop_int(zhp, prop, &src);
 
+		if (literal) {
+			(void) snprintf(buf, len, "%llu",
+			    (u_longlong_t)intval);
+			break;
+		}
+
 		switch (prop) {
 		case ZPOOL_PROP_SIZE:
 		case ZPOOL_PROP_ALLOCATED:
@@ -297,6 +304,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 		default:
 			(void) snprintf(buf, len, "%llu", intval);
 		}
+
 		break;
 
 	case PROP_TYPE_INDEX:
@@ -363,7 +371,7 @@ pool_is_bootable(zpool_handle_t *zhp)
 	char bootfs[ZPOOL_MAXNAMELEN];
 
 	return (zpool_get_prop(zhp, ZPOOL_PROP_BOOTFS, bootfs,
-	    sizeof (bootfs), NULL) == 0 && strncmp(bootfs, "-",
+	    sizeof (bootfs), NULL, B_FALSE) == 0 && strncmp(bootfs, "-",
 	    sizeof (bootfs)) != 0);
 }
 
@@ -635,7 +643,7 @@ zpool_expand_proplist(zpool_handle_t *zhp, zprop_list_t **plp)
 
 		if (entry->pl_prop != ZPROP_INVAL &&
 		    zpool_get_prop(zhp, entry->pl_prop, buf, sizeof (buf),
-		    NULL) == 0) {
+		    NULL, B_FALSE) == 0) {
 			if (strlen(buf) > entry->pl_width)
 				entry->pl_width = strlen(buf);
 		}

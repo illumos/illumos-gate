@@ -1,0 +1,149 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH picl_get_node_by_path 3PICL "5 Feb 2004" "SunOS 5.11" "PICL Library Functions"
+.SH NAME
+picl_get_node_by_path \- get handle of node specified by PICL tree path
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpicl\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <picl.h>
+
+\fBint\fR \fBpicl_get_node_by_path\fR(\fBconst char *\fR\fIpiclpath\fR,
+     \fBpicl_nodehdl_t *\fR\fInodeh\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpicl_get_node_by_path()\fR function copies the handle of the node in the
+PICL tree specified by the path given in \fIpiclpath\fR into the location
+\fInodeh\fR.
+.sp
+.LP
+The syntax of a PICL tree path is:
+.sp
+.in +2
+.nf
+[<def_\fIpropname\fR>:]/[<\fIdef_propval\fR>[<\fImatch_cond\fR>]... ]
+.fi
+.in -2
+
+.sp
+.LP
+where the <\fIdef_propname\fR> prefix is a shorthand notation to specify the
+name of the property whose value is specified in <\fIdef_propval\fR>, and the
+<\fImatch_cond\fR> expression specifies the matching criteria for that node in
+the form of one or more pairs of property names and values such as
+.sp
+.in +2
+.nf
+[@<address>][?<prop_name>[=<prop_val>]... ]
+.fi
+.in -2
+
+.sp
+.LP
+where '@' is a shorthand notation to refer to the device address or a FRU's
+location label and is followed by <\fIaddress\fR>, which gives the device
+address or the location label.
+.sp
+.LP
+For nodes under the \fB/platform\fR tree, the address value is matched with the
+value of the property \fBbus-addr\fR, if it exists. If no \fBbus-addr\fR
+property exists, the address value is matched with the value of the property
+\fBUnitAddress\fR. To explicitly limit the comparison to \fBbus-addr\fR or
+\fBUnitAddress\fR property, use the '?' notation described below.
+.sp
+.LP
+For nodes under the \fB/frutree\fR tree, the <\fIaddress\fR> value is matched
+with the value of the \fBLabel\fR property.
+.sp
+.LP
+The expression following '?' specifies matching property name and value pairs,
+where <\fIprop_name\fR> specifies the property name and <\fIprop_val\fR>
+specifies the property value for properties not of type \fBPICL_PTYPE_VOID\fR.
+The values for properties of type \fBPICL_PTYPE_TABLE\fR,
+\fBPICL_PTYPE_BYTEARRAY\fR, and \fBPICL_PTYPE_REFERENCE\fR cannot be specified
+in the <\fImatch_cond\fR> expression.
+.sp
+.LP
+A \fB_class\fR property value of \fBpicl\fR can be used to match nodes of any
+\fBPICL\fR classes. The class \fBpicl\fR is the base class of all the classes
+in \fBPICL\fR.
+.sp
+.LP
+All valid paths must begin at the root node denoted by '/'.
+.sp
+.LP
+If no prefix is specified for the path, the prefix defaults to the \fBname\fR
+property.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, 0 is returned. Otherwise a non-negative integer is
+returned to indicate an error.
+.sp
+.LP
+The value \fBPICL_NOTNODE\fR is returned if there is no node corresponding to
+the specified path.
+.SH ERRORS
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_FAILURE\fR\fR
+.ad
+.RS 19n
+.rt  
+General system failure
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_INVALIDARG\fR\fR
+.ad
+.RS 19n
+.rt  
+Invalid argument
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBPICL_NOTNODE\fR\fR
+.ad
+.RS 19n
+.rt  
+Not a node
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpicl_get_propval_by_name\fR(3PICL), \fBattributes\fR(5)

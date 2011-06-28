@@ -1,0 +1,506 @@
+'\" te
+.\"  Copyright (c) 1988, 1995 Sun Microsystems, Inc.   All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tset 1B "15 Feb 1995" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.SH NAME
+tset, reset \- establish or restore terminal characteristics
+.SH SYNOPSIS
+.LP
+.nf
+\fBtset\fR [\fB-InQrs\fR] [\fB-e\fR\fIc\fR] [\fB-k\fR\fIc\fR] 
+     [\fB-m\fR [\fIport-ID\fR [\fIbaudrate\fR] : \fItype\fR]...] [\fItype\fR]
+.fi
+
+.LP
+.nf
+\fBreset\fR [\fB-\fR] [\fB-e\fR\fIc\fR] [\fB-I\fR] [\fB-k\fR\fIc\fR] 
+     [\fB-n\fR] [\fB-Q\fR] [\fB-r\fR] [\fB-s\fR] 
+     [\fB-m\fR [\fIindent\fR] [\fItest\fR \fIbaudrate\fR] : \fItype\fR]... [\fItype\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtset\fR utility sets up your terminal, typically when you first log in.
+It does terminal dependent processing such as setting erase and kill
+characters, setting or resetting delays, sending any sequences needed to
+properly initialized the terminal, and the like. \fBtset\fR first determines
+the \fBtype\fR of terminal involved, and then does necessary initializations
+and mode settings. If a port is not wired permanently to a specific terminal
+(not hardwired) it is given an appropriate generic identifier such as
+\fBdialup\fR.
+.sp
+.LP
+\fBreset\fR clears the terminal settings by turning off  CBREAK and  RAW modes,
+output delays and parity checking, turns on NEWLINE translation, echo and TAB
+expansion, and restores undefined special characters to their default state.
+It then sets the modes as usual, based on the terminal type (which will
+probably override some of the above). See \fBstty\fR(1) for more information.
+All arguments to \fBtset\fR may be used with \fBreset\fR. \fBreset\fR also uses
+\fBrs=\fR and \fBrf=\fR to reset the initialization string and file. This is
+useful after a program dies and leaves the terminal in a funny state. Often in
+this situation, characters will not echo as you type them. You may have to type
+LINEFEED \fBreset\fR LINEFEED since RETURN may not work.
+.sp
+.LP
+When no arguments are specified, \fBtset\fR reads the terminal type from the
+\fBTERM\fR environment variable and re-initializes the terminal, and performs
+initialization of mode, environment and other options at login time to
+determine the terminal type and set up terminal modes.
+.sp
+.LP
+When used in a startup script (\fB\&.profile\fR for \fBsh\fR(1) users or
+\fB\&.login\fR for \fBcsh\fR(1) users) it is desirable to give information
+about the type of terminal you will usually use on ports that are not
+hardwired. Any of the alternate generic names given in the file
+\fB/etc/termcap\fR are possible identifiers. Refer to the \fB-m\fR option below
+for more information. If no mapping applies and a final \fBtype\fR option, not
+preceded by a \fB-m\fR, is given on the command line then that type is used.
+.sp
+.LP
+It is usually desirable to return the terminal type, as finally determined by
+\fBtset\fR, and information about the terminal's capabilities, to a shell's
+environment. This can be done using the \fB\(mi\fR, \fB-s\fR, or \fB-S\fR
+options.
+.sp
+.LP
+For the Bourne shell, put this command in your \fB\&.profile\fR file:
+.sp
+.in +2
+.nf
+eval `tset \fB-s\fR \fIoptions...\fR`
+.fi
+.in -2
+
+.sp
+.LP
+or using the C shell, put these commands in your \fB\&.login\fR file:
+.sp
+.in +2
+.nf
+set noglob
+eval `tset \fB-s\fR \fIoptions...\fR\fB`\fRunset noglob
+.fi
+.in -2
+
+.sp
+.LP
+With the C shell, it is also convenient to make an alias in your \fB\&.cshrc\fR
+file:
+.sp
+.in +2
+.nf
+alias ts 'eval `tset \fB-s\fR \e!*`'
+.fi
+.in -2
+
+.sp
+.LP
+This also allows the command:
+.sp
+.in +2
+.nf
+ts 2621
+.fi
+.in -2
+
+.sp
+.LP
+to be invoked at any time to set the terminal and environment. It is not
+possible to get this aliasing effect with a Bourne shell script, because shell
+scripts cannot set the environment of their parent. If a process could set its
+parent's environment, none of this nonsense would be necessary in the first
+place.
+.sp
+.LP
+Once the terminal type is known, \fBtset\fR sets the terminal driver mode. This
+normally involves sending an initialization sequence to the terminal, setting
+the single character erase (and optionally the line-kill (full line erase))
+characters, and setting special character delays. TAB and NEWLINE expansion are
+turned off during transmission of the terminal initialization sequence.
+.sp
+.LP
+On terminals that can backspace but not overstrike (such as a CRT), and when
+the erase character is `\fB#\fR', the erase character is changed as if \fB-e\fR
+had been used.
+.SH OPTIONS
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\(mi\fR\fR
+.ad
+.RS 8n
+.rt  
+The name of the terminal finally decided upon is output on the standard output.
+This is intended to be captured by the shell and placed in the \fBTERM\fR
+environment variable.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-e\fR\fIc\fR\fR
+.ad
+.RS 8n
+.rt  
+Set the erase character to be the named character \fIc\fR on all terminals.
+Default is the BACKSPACE key on the keyboard, usually \fB^H\fR (CTRL-H). The
+character \fIc\fR can either be typed directly, or entered using the
+circumflex-character notation used here.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fIc\fR\fR
+.ad
+.RS 8n
+.rt  
+Set the interrupt character to be the named character \fIc\fR on all terminals.
+Default is \fB^C\fR (CTRL-C). The character \fIc\fR can either be typed
+directly, or entered using the circumflex-character notation used here.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-I\fR\fR
+.ad
+.RS 8n
+.rt  
+Suppress transmitting terminal-initialization strings.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fIc\fR\fR
+.ad
+.RS 8n
+.rt  
+Set the line kill character to be the named character \fIc\fR on all terminals.
+Default is \fB^U\fR (CTRL-U). The kill character is left alone if \fB-k\fR is
+not specified. Control characters can be specified by prefixing the
+alphabetical character with a circumflex (as in CTRL-U) instead of entering the
+actual control key itself.  This allows you to specify control keys that are
+currently assigned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 8n
+.rt  
+Specify that the new tty driver modes should be initialized for this terminal.
+Probably useless since \fBstty new\fR is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-Q\fR\fR
+.ad
+.RS 8n
+.rt  
+Suppress printing the `\fBErase set to\fR' and `\fBKill set to\fR' messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 8n
+.rt  
+In addition to other actions, reports the terminal type.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 8n
+.rt  
+Output commands to set and export \fBTERM\fR. This can be used with
+.sp
+.in +2
+.nf
+\fBset noglob
+eval `tset \fR\fB-s\fR\fB .\|.\|.`
+unset noglob\fR
+.fi
+.in -2
+.sp
+
+to bring the terminal information into the environment. Doing so makes programs
+such as \fBvi\fR(1) start up faster. If the \fBSHELL\fR environment variable
+ends with \fBcsh\fR, C shell commands are output, otherwise Bourne shell
+commands are output.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-m\fR [ \fIport-ID\fR [ \fIbaudrate\fR ] \fB:\fR \fBtype\fR ] .\|.\|.\fR
+.ad
+.sp .6
+.RS 4n
+Specify (map) a terminal type when connected to a generic port (such as
+\fIdialup\fR or \fIplugboard\fR) identified by \fIport-ID\fR. The
+\fIbaudrate\fR argument can be used to check the baudrate of the port and set
+the terminal type accordingly.  The target rate is prefixed by any combination
+of the following operators to specify the conditions under which the mapping is
+made:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>\fR\fR
+.ad
+.RS 5n
+.rt  
+Greater than
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB@\fR\fR
+.ad
+.RS 5n
+.rt  
+Equals or ``at''
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB<\fR\fR
+.ad
+.RS 5n
+.rt  
+Less than
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB!\fR\fR
+.ad
+.RS 5n
+.rt  
+It is not the case that (negates the above operators)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB?\fR\fR
+.ad
+.RS 5n
+.rt  
+Prompt for the terminal type.  If no response is given, then \fBtype\fR is
+selected by default.
+.RE
+
+In the following example, the terminal type is set to \fBadm3a\fR if the port
+is a dialup with a speed of greater than 300 or to \fBdw2\fR if the port is a
+dialup at 300 baud or less. In the third case, the question mark preceding the
+terminal type indicates that the user is to verify the type desired.  A
+\fINULL\fR response indicates that the named type is correct. Otherwise, the
+user's response is taken to be the type desired.
+.sp
+.in +2
+.nf
+\fBtset \fR\fB-m\fR\fB 'dialup>300:adm3a' \fR\fB-m\fR\fB 'dialup:dw2' \fR\fB-m\fR\fB 'plugboard:?adm3a'\fR
+.fi
+.in -2
+.sp
+
+To prevent interpretation as metacharacters, the entire argument to \fB-m\fR
+should be enclosed in single quotes.   When using the C shell, exclamation
+points should be preceded by a backslash (\e).
+.RE
+
+.SH EXAMPLES
+.sp
+.LP
+These examples all use the `\fB\(mi\fR\&' option.  A typical use of \fBtset\fR
+in a \fB\&.profile\fR or \fB\&.login\fR will also use the \fB-e\fR and \fB-k\fR
+options, and often the \fB-n\fR or \fB-Q\fR options as well. These options have
+been omitted here to keep the examples short.
+.LP
+\fBExample 1 \fRSelecting a terminal
+.sp
+.LP
+To select a 2621, you might put the following sequence of commands in your
+\fB\&.login\fR file (or \fB\&.profile\fR for Bourne shell users).
+
+.sp
+.in +2
+.nf
+\fBset noglob
+eval `tset \fR\fB-s\fR\fB 2621`
+unset noglob\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If you want to make the selection based only on the baud rate, you might use
+the following:
+
+.sp
+.in +2
+.nf
+\fBset noglob
+eval `tset \fR\fB-s\fR\fB \fR\fB-m\fR\fB '>1200:wy' 2621`
+unset noglob\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSelecting terminals according to speed or baud rate
+.sp
+.LP
+If you have a switch which connects to various ports (making it impractical to
+identify which port you may be connected to), and use various terminals from
+time to time, you can select from among those terminals according to the
+\fIspeed\fR or baud rate. In the example below, \fBtset\fR will prompt you for
+a terminal type if the baud rate is greater than 1200 (say, 9600 for a terminal
+connected by an RS-232 line), and use a Wyse\(rg 50 by default.  If the baud
+rate is less than or equal to 1200, it will select a 2621. Note the placement
+of the question mark, and the quotes to protect the \fB>\fR and \fB?\fR from
+interpretation by the shell.
+
+.sp
+.in +2
+.nf
+\fBset noglob
+eval `tset \fR\fB-s\fR\fB \fR\fB-m\fR\fB 'switch>1200:?wy' \fR\fB-m\fR\fB 'switch<=1200:2621'`
+unset noglob\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSelecting the terminal used most often
+.sp
+.LP
+The following entry is appropriate if you always dial up, always at the same
+baud rate, on many different kinds of terminals, and the terminal you use most
+often is an \fBadm3a\fR.
+
+.sp
+.in +2
+.nf
+\fBset noglob
+eval `tset \fR\fB-s\fR\fB ?adm3a`
+unset noglob\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRSelecting a terminal with specific settings
+.sp
+.LP
+The following example quietly sets the erase character to \fBBACKSPACE,\fR and
+kill to \fBCTRL-U.\fR If the port is switched, it selects a Concept\(tm 100 for
+speeds less than or equal to 1200, and asks for the terminal type otherwise
+(the default in this case is a Wyse 50). If the port is a direct dialup, it
+selects Concept 100 as the terminal type. If logging in over the \fBARPANET,\fR
+the terminal type selected is a Datamedia\(rg 2500 terminal or emulator.  Note
+the backslash escaping the \fBNEWLINE\fR at the end of the first line in the
+example.
+
+.sp
+.in +2
+.nf
+set noglob
+eval `tset \fB-e\fR \fB-k\fR^U \fB-Q\fR \fB-s\fR \fB-m\fR 'switch<=1200:concept100' \fB-m\fR\e
+   'switch:?wy' \fB-m\fR dialup:concept100 \fB-m\fR arpanet:dm2500`
+unset noglob
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\&.login\fR\fR
+.ad
+.RS 16n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB\&.profile\fR\fR
+.ad
+.RS 16n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/termcap\fR\fR
+.ad
+.RS 16n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBcsh\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBvi\fR(1), \fBattributes\fR(5),
+\fBenviron\fR(5)
+.SH NOTES
+.sp
+.LP
+The \fBtset\fR command is one of the first commands a user must master when
+getting started on a \fBUNIX\fR system. Unfortunately, it is one of the most
+complex, largely because of the extra effort the user must go through to get
+the environment of the login shell set. Something needs to be done to make all
+this simpler, either the \fBlogin\fR program should do this stuff, or a default
+shell alias should be made, or a way to set the environment of the parent
+should exist.
+.sp
+.LP
+This program cannot intuit personal choices for erase, interrupt and line kill
+characters, so it leaves these set to the local system standards.
+.sp
+.LP
+It could well be argued that the shell should be responsible for ensuring that
+the terminal remains in a sane state; this would eliminate the need for the
+\fBreset\fR program.

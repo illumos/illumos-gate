@@ -2123,7 +2123,7 @@ function child_wstype {
 	echo $scm_type
 }
 
-export SCM_TYPE=$(child_wstype)
+SCM_TYPE=$(child_wstype)
 
 #
 #	Decide whether to clobber
@@ -2672,11 +2672,7 @@ fi
 
 if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 	#
-	# Copy the open sources into their own tree, set up the closed
-	# binaries, and set up the environment.  The build looks for
-	# the closed binaries in a location that depends on whether
-	# it's a DEBUG build, so we might need to make two copies.
-	#
+	# Copy the open sources into their own tree.
 	# If copy_source fails, it will have already generated an
 	# error message and set build_ok=n, so we don't need to worry
 	# about that here.
@@ -2685,34 +2681,7 @@ if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 fi
 
 if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
-
-	echo "\n==== Generating skeleton closed binaries for" \
-	    "open-only build ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	rm -rf $CODEMGR_WS/closed.skel
-	if [ "$D_FLAG" = y ]; then
-		mkclosed $MACH $ROOT $CODEMGR_WS/closed.skel/root_$MACH \
-		    >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create skeleton DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		root=$ROOT
-		[ "$MULTI_PROTO" = yes ] && root=$ROOT-nd
-		mkclosed $MACH $root $CODEMGR_WS/closed.skel/root_$MACH-nd \
-		    >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create skeleton non-DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-      
 	SRC=$OPEN_SRCDIR/usr/src
-	# Try not to clobber any user-provided closed binaries.
-	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
 	export CLOSED_IS_PRESENT=no
 fi
 
@@ -2736,10 +2705,6 @@ if is_source_build && [ $build_ok = y ] ; then
 
 	export EXPORT_RELEASE_BUILD ; EXPORT_RELEASE_BUILD=#
 	normal_build
-fi
-
-if [[ "$SO_FLAG" = "y" && "$build_ok" = "y" ]]; then
-	rm -rf $ON_CLOSED_BINS
 fi
 
 #

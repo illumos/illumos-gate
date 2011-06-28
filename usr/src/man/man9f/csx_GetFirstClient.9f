@@ -1,0 +1,208 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH csx_GetFirstClient 9F "16 May 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+csx_GetFirstClient, csx_GetNextClient \- return first or next client
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/pccard.h>
+
+
+
+\fBint32_t\fR \fBcsx_GetFirstClient\fR(\fBget_firstnext_client_t *\fR\fIfnc\fR);
+.fi
+
+.LP
+.nf
+\fBint32_t\fR \fBcsx_GetNextClient\fR(\fBget_firstnext_client_t *\fR\fIfnc\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfnc\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a \fBget_firstnext_client_t\fR structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The functions \fBcsx_GetFirstClient()\fR and \fBcsx_GetNextClient()\fR return
+information about the first or subsequent \fBPC \fRcards, respectively, that
+are installed in the system.
+.SH STRUCTURE MEMBERS
+.sp
+.LP
+The structure members of \fBget_firstnext_client_t\fR are:
+.sp
+.in +2
+.nf
+uint32_t          Socket;          /* socket number */
+uint32_t          Attributes;      /* attributes */
+client_handle_t   client_handle;   /* client handle */
+uint32_t          num_clients;     /* number of clients */
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSocket\fR \fR
+.ad
+.RS 18n
+.rt  
+If the \fBCS_GET_FIRSTNEXT_CLIENT_SOCKET_ONLY\fR attribute is set, return
+information only on the  \fBPC \fRcard installed in this socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBAttributes\fR \fR
+.ad
+.RS 18n
+.rt  
+This field indicates the type of client. The field is bit-mapped; the following
+bits are defined:
+.sp
+.ne 2
+.mk
+.na
+\fBCS_GET_FIRSTNEXT_CLIENT_ALL_CLIENTS\fR
+.ad
+.sp .6
+.RS 4n
+Return information on all clients.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBCS_GET_FIRSTNEXT_CLIENT_SOCKET_ONLY\fR
+.ad
+.sp .6
+.RS 4n
+Return client information for the specified socket only.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclient_handle\fR \fR
+.ad
+.RS 18n
+.rt  
+The client handle of the \fBPC \fRcard driver is returned in this field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnum_clients\fR \fR
+.ad
+.RS 18n
+.rt  
+The number of clients is returned in this field.
+.RE
+
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_SUCCESS\fR \fR
+.ad
+.RS 28n
+.rt  
+Successful operation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_HANDLE\fR \fR
+.ad
+.RS 28n
+.rt  
+Client handle is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_BAD_SOCKET\fR \fR
+.ad
+.RS 28n
+.rt  
+Socket number is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_CARD\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPC \fRCard in socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_NO_MORE_ITEMS\fR \fR
+.ad
+.RS 28n
+.rt  
+\fBPC \fRCard driver does not handle the \fBCS_EVENT_CLIENT_INFO\fR event.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
+.ad
+.RS 28n
+.rt  
+No \fBPCMCIA \fRhardware installed.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+This function may be called from user or kernel context.
+.SH SEE ALSO
+.sp
+.LP
+\fBcsx_event_handler\fR(9E)
+.sp
+.LP
+\fIPC Card 95 Standard,\fR PCMCIA/JEIDA

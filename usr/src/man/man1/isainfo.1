@@ -1,0 +1,169 @@
+'\" te
+.\"  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH isainfo 1 "8 Feb 2007" "SunOS 5.11" "User Commands"
+.SH NAME
+isainfo \- describe instruction set architectures
+.SH SYNOPSIS
+.LP
+.nf
+\fBisainfo\fR [ [\fB-v\fR] [\fB-b\fR | \fB-n\fR | \fB-k\fR] | [\fB-x\fR]]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBisainfo\fR utility is used to identify various attributes of the
+instruction set architectures supported on the currently running system. Among
+the questions it can answer are whether 64-bit applications are supported, or
+whether the running kernel uses 32-bit or 64-bit device drivers.
+.sp
+.LP
+When invoked with no options, \fBisainfo\fR prints the names of the native
+instruction sets for applications supported by the current version of the
+operating system. These are a subset of the list returned by \fBisalist\fR(1).
+The subset corresponds to the basic applications environments supported by the
+currently running system.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 6n
+.rt  
+Prints the number of bits in the address space of the native instruction set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 6n
+.rt  
+Prints the name of the instruction set(s) used by the operating system kernel
+components such as device drivers and \fBSTREAMS\fR modules.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Prints the name of the native instruction set used by portable applications
+supported by the current version of the operating system.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 6n
+.rt  
+When used with the \fB-b\fR, \fB-k\fR or \fB-n\fR options, prints more detailed
+information.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+Prints instruction extensions to the native ABI which are supported by the
+platform.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInvoking \fBisainfo\fR on a 32-bit x86 Platform
+.sp
+.LP
+The following example invokes \fBisainfo\fR on a 32-bit x86 platform:
+
+.sp
+.in +2
+.nf
+example% isainfo -v
+32-bit i386 applications
+
+example% isainfo -k
+i386
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRInvoking \fBisainfo\fR on a System Running the 64-bit Operating
+System on a 64-bit SPARC Processor
+.sp
+.LP
+The following example invokes \fBisainfo\fR on a system running the 64-bit
+operating system on a 64-bit SPARC processor:
+
+.sp
+.in +2
+.nf
+example% isainfo
+sparcv9 sparc
+example% isainfo -n
+sparcv9
+example% isainfo -v
+64-bit sparcv9 applications
+32-bit sparc applications
+example% isainfo -vk
+64-bit sparcv9 kernel modules
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRInvoking \fBisainfo\fR \fB-x\fR on an AMD Opteron CPU
+.sp
+.LP
+The following example invokes \fBisainfo\fR with the \fB-x\fR option on an AMD
+Opteron CPU:
+
+.sp
+.in +2
+.nf
+example% isainfo -x
+i386: fpu tsc cx8 sep cmov mmx ammx a3dnow a3dnowx fxsr sse sse2 pause
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.sp
+.ne 2
+.mk
+.na
+\fBNon-zero\fR
+.ad
+.RS 12n
+.rt  
+Options are not specified correctly, or the command is unable to recognize
+attributes of the system on which it is running. An error message is printed to
+\fBstderr\fR.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisalist\fR(1), \fBuname\fR(1), \fBpsrinfo\fR(1M), \fBgetisax\fR(2),
+\fBsysinfo\fR(2), \fBattributes\fR(5), \fBisalist\fR(5)

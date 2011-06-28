@@ -1051,6 +1051,9 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	if (brand_poststatechg(zlogp, zstate, Z_BOOT, debug) != 0)
 		goto bad;
 
+	/* Startup a thread to perform memory capping for the zone. */
+	create_mcap_thread(zlogp, zone_id);
+
 	return (0);
 
 bad:
@@ -1072,6 +1075,9 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
 
 	if (brand_prestatechg(zlogp, zstate, Z_HALT, debug) != 0)
 		return (-1);
+
+	/* Shutting down, stop the memcap thread */
+	destroy_mcap_thread();
 
 	if (vplat_teardown(zlogp, unmount_cmd, rebooting, debug) != 0) {
 		if (!bringup_failure_recovery)
@@ -1712,11 +1718,20 @@ top:
 		 * state.
 		 */
 		if (zstate > ZONE_STATE_INSTALLED) {
+			static zoneid_t zid;
+
 			zerror(zlogp, B_FALSE,
 			    "zone '%s': WARNING: zone is in state '%s', but "
 			    "zoneadmd does not appear to be available; "
 			    "restarted zoneadmd to recover.",
 			    zone_name, zone_state_str(zstate));
+
+			/*
+			 * Startup a thread to perform memory capping for the
+			 * zone.
+			 */
+			if ((zid = getzoneidbyname(zone_name)) != -1)
+				create_mcap_thread(zlogp, zid);
 		}
 
 		(void) fdetach(zone_door_path);

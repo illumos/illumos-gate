@@ -1,0 +1,99 @@
+'\" te
+.\"  Copyright (c) 2000 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH tran_quiesce 9E "31 Jan 1999" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+tran_quiesce, tran_unquiesce \- quiesce and unquiesce a SCSI bus
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/scsi/scsi.h>
+
+\fBint prefix\fR\fBtran_quiesce\fR(\fBdev_info_t\fR \fI*hba_dip\fR);
+.fi
+
+.LP
+.nf
+\fBint prefix\fR\fBtran_unquiesce\fR(\fBdev_info_t\fR \fI*hba_dip\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhba_dip\fR\fR
+.ad
+.RS 11n
+.rt  
+The \fBdev_info_t\fR pointer associated with the SCSI HBA.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBtran_quiesce()\fR and  \fBtran_unquiesce()\fR vectors in the
+\fBscsi_hba_tran\fR(9S) structure should be initialized during the HBA driver's
+\fBattach\fR(9E). They are HBA entry points to be called when a user initiates
+quiesce and unquiesce operations through device control interfaces.
+.sp
+.LP
+\fBtran_quiesce()\fR should wait for all outstanding commands to complete and
+blocks (or queues) any I/O requests issued. \fBtran_unquiesce()\fR should allow
+I/O activities to resume on the SCSI bus.
+.sp
+.LP
+Implementation is hardware specific.
+.SH RETURN VALUES
+.sp
+.LP
+\fBtran_quiesce()\fR and \fBtran_unquiesce()\fR should return:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBNon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(5), \fBtran_bus_reset\fR(9E), \fBscsi_hba_tran\fR(9S)

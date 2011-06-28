@@ -1,0 +1,94 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH merror 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+merror \- Send an M_ERROR message upstream
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/stream.h>
+#include <sys/strsun.h>
+
+
+
+\fBvoid\fR \fBmerror\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBint\fR \fIerror\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIwq\fR\fR
+.ad
+.RS 9n
+.rt  
+Write queue associated with the read queue to send the M_ERROR on.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImp\fR\fR
+.ad
+.RS 9n
+.rt  
+Optionally, a STREAMS message to convert to an M_ERROR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerror\fR\fR
+.ad
+.RS 9n
+.rt  
+Error code to include in the M_ERROR message.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmerror()\fR function constructs an M_ERROR message, and sends the
+resulting message upstream.
+.sp
+.LP
+If \fImp\fR is NULL, \fBmerror()\fR allocates a one-byte M_ERROR message. If
+\fImp\fR is non-NULL, \fBmerror()\fR attempts to convert the passed-in message
+to an M_ERROR. However, if the passed-in message has more than one reference
+(see \fBdupmsg\fR(9F)), or if it is of zero length, it is freed and a new
+message is allocated.
+.sp
+.LP
+If the allocation or conversion fails, \fBmerror()\fR silently fails.
+Otherwise, the resulting one-byte data block is assigned the specified error
+code and sent upstream.
+.SH RETURN VALUES
+.sp
+.LP
+None.
+.SH CONTEXT
+.sp
+.LP
+This function can be called from user, kernel or interrupt context.
+.SH NOTES
+.sp
+.LP
+Callers must not hold any locks across an \fBmerror()\fR that can be acquired
+as part of \fBput\fR(9E) processing.
+.SH SEE ALSO
+.sp
+.LP
+\fBput\fR(9E), \fBdupmsg\fR(9F)
+.sp
+.LP
+\fISTREAMS Programming Guide\fR

@@ -17,7 +17,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2008, 2010, Richard Lowe
+# Copyright 2008, 2011, Richard Lowe
 #
 
 '''
@@ -58,7 +58,8 @@ class VersionMismatch(Exception):
 #
 # List of versions that are explicitly acceptable to us
 #
-GOOD_VERSIONS = ['1.3.1', '1.4.2', '1.5.4', '1.6.2', '1.6.3']
+GOOD_VERSIONS = ['1.3.1', '1.4.2', '1.5.4', '1.6.2', '1.6.3', '1.7.5',
+                 '1.8', '1.8.1']
 
 
 def check_version():

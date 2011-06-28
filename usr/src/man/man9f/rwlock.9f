@@ -1,0 +1,264 @@
+'\" te
+.\"  Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rwlock 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+rwlock, rw_init, rw_destroy, rw_enter, rw_exit, rw_tryenter, rw_downgrade,
+rw_tryupgrade, rw_read_locked \- readers/writer lock functions
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ksynch.h>
+
+
+
+\fBvoid\fR \fBrw_init\fR(\fBkrwlock_t *\fR\fIrwlp\fR, \fBchar *\fR\fIname\fR, \fBkrw_type_t\fR \fItype\fR, \fBvoid *\fR\fIarg\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrw_destroy\fR(\fBkrwlock_t *\fR\fIrwlp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrw_enter\fR(\fBkrwlock_t *\fR\fIrwlp\fR, \fBkrw_t\fR \fIenter_type\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrw_exit\fR(\fBkrwlock_t *\fR\fIrwlp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrw_tryenter\fR(\fBkrwlock_t *\fR\fIrwlp\fR, \fBkrw_t\fR \fIenter_type\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBrw_downgrade\fR(\fBkrwlock_t *\fR\fIrwlp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrw_tryupgrade\fR(\fBkrwlock_t *\fR\fIrwlp\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBrw_read_locked\fR(\fBkrwlock_t *\fR\fIrwlp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIrwlp\fR\fR
+.ad
+.RS 14n
+.rt  
+Pointer to a \fBkrwlock_t\fR readers/writer lock.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIname\fR\fR
+.ad
+.RS 14n
+.rt  
+Descriptive string. This is obsolete and should be \fBNULL\fR. (Non-null
+strings are legal, but they're a waste of kernel memory.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 14n
+.rt  
+Type of readers/writer lock.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIarg\fR\fR
+.ad
+.RS 14n
+.rt  
+Type-specific argument for initialization function.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIenter_type\fR\fR
+.ad
+.RS 14n
+.rt  
+One of the values \fBRW_READER\fR or \fBRW_WRITER\fR, indicating whether the
+lock is to be acquired non-exclusively (\fBRW_READER\fR) or exclusively
+(\fBRW_WRITER\fR).
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+A multiple-readers, single-writer lock is represented by the \fBkrwlock_t\fR
+data type. This type of lock will allow many threads to have simultaneous
+read-only access to an object. Only one thread may have write access at any one
+time. An object which is searched more frequently than it is changed is a good
+candidate for a readers/writer lock.
+.sp
+.LP
+Readers/writer locks are slightly more expensive than mutex locks, and the
+advantage of multiple read access may not occur if the lock will only be held
+for a short time.
+.sp
+.LP
+The \fBrw_init()\fR function initializes a readers/writer lock. It is an error
+to initialize a lock more than once. The \fItype\fR argument should be set to
+\fBRW_DRIVER\fR. If the lock is used by the interrupt handler, the
+type-specific argument, \fIarg\fR, should be the interrupt priority returned
+from \fBddi_intr_get_pri\fR(9F) or \fBddi_intr_get_softint_pri\fR(9F). Note
+that arg should be the value of the interrupt priority cast by calling the
+\fBDDI_INTR_PRI\fR macro. If the lock is not used by any interrupt handler, the
+argument should be \fINULL.\fR
+.sp
+.LP
+The \fBrw_destroy()\fR function releases any resources that might have been
+allocated by \fBrw_init()\fR. It should be called before freeing the memory
+containing the lock. The lock must not be held by any thread when it is
+destroyed.
+.sp
+.LP
+The \fBrw_enter()\fR function acquires the lock, and blocks if necessary. If
+\fIenter_type\fR is \fBRW_READER\fR, the caller blocks if there is a writer or
+a thread attempting to enter for writing. If \fIenter_type\fR is
+\fBRW_WRITER\fR, the caller blocks if any thread holds the lock.
+.sp
+.LP
+NOTE: It is a programming error for any thread to acquire an rwlock it already
+holds, even as a reader. Doing so can deadlock the system: if thread R acquires
+the lock as a reader, then thread W tries to acquire the lock as a writer, W
+will set write-wanted and block. When R tries to get its second read hold on
+the lock, it will honor the write-wanted bit and block waiting for W; but W
+cannot run until R drops the lock. Thus threads R and W deadlock.
+.sp
+.LP
+The \fBrw_exit()\fR function releases the lock and may wake up one or more
+threads waiting on the lock.
+.sp
+.LP
+The \fBrw_tryenter()\fR function attempts to enter the lock, like
+\fBrw_enter()\fR, but never blocks. It returns a non-zero value if the lock was
+successfully entered, and zero otherwise.
+.sp
+.LP
+A thread which holds the lock exclusively (entered with \fBRW_WRITER\fR), may
+call \fBrw_downgrade()\fR to convert to holding the lock non-exclusively (as if
+entered with \fBRW_READER\fR). One or more waiting readers may be unblocked.
+.sp
+.LP
+The \fBrw_tryupgrade()\fR function can be called by a thread which holds the
+lock for reading to attempt to convert to holding it for writing. This upgrade
+can only succeed if no other thread is holding the lock and no other thread is
+blocked waiting to acquire the lock for writing.
+.sp
+.LP
+The \fBrw_read_locked()\fR function returns non-zero if the calling thread
+holds the lock for read, and zero if the caller holds the lock for write. The
+caller must hold the lock. The system may panic if \fBrw_read_locked()\fR is
+called for a lock that isn't held by the caller.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+\fBrw_tryenter()\fR could not obtain the lock without blocking.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+\fBrw_tryupgrade()\fR was unable to perform the upgrade because of other
+threads holding or waiting to hold the lock.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 12n
+.rt  
+\fBrw_read_locked()\fR returns \fB0\fR if the lock is held by the caller for
+write.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+from \fBrw_read_locked()\fR if the lock is held by the caller for read.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBnon-zero\fR\fR
+.ad
+.RS 12n
+.rt  
+successful return from \fBrw_tryenter()\fR or \fBrw_tryupgrade()\fR.
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+These functions can be called from user, interrupt, or kernel context, except
+for \fBrw_init()\fR and \fBrw_destroy()\fR, which can be called from user
+context only.
+.SH SEE ALSO
+.sp
+.LP
+\fBcondvar\fR(9F), \fBddi_intr_alloc\fR(9F), \fBddi_intr_add_handler\fR(9F),
+\fBddi_intr_get_pri\fR(9F), \fBddi_intr_get_softint_pri\fR(9F),
+\fBmutex\fR(9F), \fBsemaphore\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+Compiling with \fB_LOCKTEST\fR or \fB_MPSTATS\fR defined no longer has any
+effect. To gather lock statistics, see \fBlockstat\fR(1M).

@@ -1,0 +1,361 @@
+'\" te
+.\" Copyright 1989 AT&T  
+.\" Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH rpc_clnt_calls 3NSL "1 Aug 2001" "SunOS 5.11" "Networking Services Library Functions"
+.SH NAME
+rpc_clnt_calls, clnt_call, clnt_send, clnt_freeres, clnt_geterr, clnt_perrno,
+clnt_perror, clnt_sperrno, clnt_sperror, rpc_broadcast, rpc_broadcast_exp,
+rpc_call \- library routines for client side calls
+.SH SYNOPSIS
+.LP
+.nf
+#include <rpc/rpc.h>
+
+\fBenum  clnt_stat\fR \fBclnt_call\fR(\fBCLIENT *\fR\fIclnt\fR, \fBconst rpcproc_t\fR \fIprocnum\fR,
+     \fBconst xdrproc_t\fR \fIinproc\fR,\ \fBconst caddr_t\fR \fIin\fR, \fBconst xdrproc_t\fR \fIoutproc\fR,
+     \fBcaddr_t\fR \fIout\fR, \fBconst struct timeval\fR \fItout\fR);
+.fi
+
+.LP
+.nf
+\fBenum clnt_stat\fR \fBclnt_send\fR (\fBCLIENT *\fR\fIclnt\fR, \fBconst u_long\fR
+     \fIprocnum\fR, \fBconst xdrproc_t\fR \fIproc\fR, \fBconst caddr_t\fR \fIin\fR);
+.fi
+
+.LP
+.nf
+\fBbool_t\fR \fBclnt_freeres\fR(\fBCLIENT *\fR\fIclnt\fR, \fBconst xdrproc_t\fR \fIoutproc\fR,
+     \fBcaddr_t\fR \fIout\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBclnt_geterr\fR(\fBconst CLIENT *\fR\fIclnt\fR, \fBstruct rpc_err *\fR\fIerrp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBclnt_perrno\fR(\fBconst enum clnt_stat\fR \fIstat\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBclnt_perror\fR(\fBconst CLIENT *\fR\fIclnt\fR, \fBconst char *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBclnt_sperrno\fR(\fBconst enum clnt_stat\fR \fIstat\fR);
+.fi
+
+.LP
+.nf
+\fBchar *\fR\fBclnt_sperror\fR(\fBconst CLIENT *\fR\fIclnt\fR, \fBconst char *\fR\fIs\fR);
+.fi
+
+.LP
+.nf
+\fBenum clnt_stat\fR \fBrpc_broadcast\fR(\fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst rpcproc_t\fR \fIprocnum\fR,
+     \fBconst xdrproc_t\fR\fIinproc\fR, \fBconst caddr_t\fR \fIin\fR,
+     \fBconst xdrproc_t\fR \fIoutproc\fR, \fBcaddr_t\fR \fIout\fR,
+     \fBconst resultproc_t\fR \fIeachresult\fR, \fBconst char *\fR\fInettype\fR);
+.fi
+
+.LP
+.nf
+\fBenum clnt_stat\fR \fBrpc_broadcast_exp\fR(\fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR,\fBconst rpcproc_t\fR \fIprocnum\fR,
+     \fBconst xdrproc_t\fR\fIxargs\fR, \fBcaddr_t\fR \fIargsp\fR, \fBconst xdrproc_t\fR\fIxresults\fR,
+     \fBcaddr_t\fR \fIresultsp\fR, \fBconst resultproc_t\fR \fIeachresult\fR, \fBconst int\fR \fIinittime\fR,
+     \fBconst int\fR \fIwaittime\fR, \fBconst char *\fR\fInettype\fR);
+.fi
+
+.LP
+.nf
+\fBenum clnt_stat\fR \fBrpc_call\fR(\fBconst char *\fR\fIhost\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst rpcproc_t\fR \fIprocnum\fR, \fBconst xdrproc_t\fR \fIinproc\fR,
+     \fBconst char *\fR\fIin\fR, \fBconst xdrproc_t\fR \fIoutproc\fR, \fBchar *\fR\fIout\fR, \fBconst char *\fR\fInettype\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBRPC\fR library routines allow  \fBC\fR language programs to make procedure
+calls on other machines across the network. First, the client calls a procedure
+to send a request to the server. Upon receipt of the request, the server calls
+a dispatch routine to perform the requested service and then sends back a
+reply.
+.sp
+.LP
+The \fBclnt_call()\fR, \fBrpc_call()\fR, and \fBrpc_broadcast()\fR routines
+handle the client side of the procedure call. The remaining routines deal with
+error handling.
+.sp
+.LP
+Some of the routines take a \fBCLIENT\fR handle as one of the parameters. A
+\fBCLIENT\fR handle can be created by an  \fBRPC\fR creation routine such as
+\fBclnt_create()\fR. See \fBrpc_clnt_create\fR(3NSL).
+.sp
+.LP
+These routines are safe for use in multithreaded applications. \fBCLIENT\fR
+handles can be shared between threads; however, in this implementation requests
+by different threads are serialized. In other words, the first request will
+receive its results before the second request is sent.
+.SS "Routines"
+.sp
+.LP
+See \fBrpc\fR(3NSL) for the definition of the \fBCLIENT\fR data structure.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_call()\fR\fR
+.ad
+.RS 23n
+.rt  
+A function macro that calls the remote procedure \fIprocnum\fR associated with
+the client handle, \fIclnt\fR, which is obtained with an \fBRPC\fR client
+creation routine such as \fBclnt_create()\fR. See \fBrpc_clnt_create\fR(3NSL).
+The parameter \fIinproc\fR is the  \fBXDR\fR function used to encode the
+procedure's parameters, and \fIoutproc\fR is the  \fBXDR\fR function used to
+decode the procedure's results. \fIin\fR is the address of the procedure's
+argument(s), and \fIout\fR is the address of where to place the result(s).
+\fItout\fR is the time allowed for results to be returned, which is overridden
+by a time-out set explicitly through \fBclnt_control()\fR. See
+\fBrpc_clnt_create\fR(3NSL).
+.sp
+If the remote call succeeds, the status returned is \fBRPC_SUCCESS\fR.
+Otherwise, an appropriate status is returned.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_send()\fR\fR
+.ad
+.RS 23n
+.rt  
+Use the \fBclnt_send()\fR function to call a remote asynchronous function.
+.sp
+The \fBclnt_send()\fR function calls the remote function \fBprocnum()\fR
+associated with the client handle, \fIclnt\fR, which is obtained with an RPC
+client creation routine such as \fBclnt_create()\fR. See
+\fBrpc_clnt_create\fR(3NSL). The parameter \fIproc\fR is the XDR function used
+to encode the procedure's parameters. The parameter \fIin\fR is the address of
+the procedure's argument(s).
+.sp
+By default, the blocking I/O mode is used. See the \fBclnt_control\fR(3NSL) man
+page for more information on I/O modes.
+.sp
+The \fBclnt_send()\fR function does not check if the program version number
+supplied to \fBclnt_create()\fR is registered with the \fBrpcbind\fR service.
+Use \fBclnt_create_vers()\fR instead of \fBclnt_create()\fR to check on
+incorrect version number registration. \fBclnt_create_vers()\fR will return a
+valid handle to the client only if a version within the range supplied to
+\fBclnt_create_vers()\fR is supported by the server.
+.sp
+\fBRPC_SUCCESS\fR is returned when a request is successfully delivered to the
+transport layer. This does not mean that the request was received. If an error
+is returned, use the \fBclnt_getterr()\fR routine to find the failure status or
+the \fBclnt_perrno()\fR routine to translate the failure status into error
+messages.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_freeres()\fR\fR
+.ad
+.RS 23n
+.rt  
+A function macro that frees any data allocated by the \fBRPC/XDR\fR system when
+it decoded the results of an  \fBRPC\fR call. The parameter \fIout\fR is the
+address of the results, and \fIoutproc\fR is the \fBXDR\fR routine describing
+the results. This routine returns \fB1\fR if the results were successfully
+freed; otherwise it returns \fB0\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_geterr()\fR\fR
+.ad
+.RS 23n
+.rt  
+A function macro that copies the error structure out of the client handle to
+the structure at address \fIerrp\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_perrno()\fR\fR
+.ad
+.RS 23n
+.rt  
+Prints a message to standard error corresponding to the condition indicated by
+\fIstat\fR. A newline is appended. It is normally used after a procedure call
+fails for a routine for which a client handle is not needed, for instance
+\fBrpc_call()\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_perror()\fR\fR
+.ad
+.RS 23n
+.rt  
+Prints a message to the standard error indicating why an \fBRPC\fR call failed;
+\fIclnt\fR is the handle used to do the call. The message is prepended with
+string \fIs\fR and a colon. A newline is appended. This routine is normally
+used after a remote procedure call fails for a routine that requires a client
+handle, for instance \fBclnt_call()\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_sperrno()\fR\fR
+.ad
+.RS 23n
+.rt  
+Takes the same arguments as \fBclnt_perrno()\fR, but instead of sending a
+message to the standard error indicating why an \fBRPC\fR call failed, returns
+a pointer to a string that contains the message.
+.sp
+\fBclnt_sperrno()\fR is normally used instead of \fBclnt_perrno()\fR when the
+program does not have a standard error, as a program running as a server quite
+likely does not. \fBclnt_sperrno()\fR is also used if the programmer does not
+want the message to be output with \fBprintf()\fR, or if a message format
+different than that supported by \fBclnt_perrno()\fR is to be used. See
+\fBprintf\fR(3C). Unlike \fBclnt_sperror()\fR and \fBclnt_spcreaterror()\fR,
+\fBclnt_sperrno()\fR does not return a pointer to static data. Therefore, the
+result is not overwritten on each call. See \fBrpc_clnt_create\fR(3NSL).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBclnt_sperror()\fR\fR
+.ad
+.RS 23n
+.rt  
+Similar to \fBclnt_perror()\fR, except that like \fBclnt_sperrno()\fR, it
+returns a string instead of printing to standard error. However,
+\fBclnt_sperror()\fR does not append a newline at the end of the message.
+.sp
+\fBclnt_sperror()\fR returns a pointer to a buffer that is overwritten on each
+call. In multithreaded applications, this buffer is implemented as
+thread-specific data.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrpc_broadcast()\fR\fR
+.ad
+.RS 23n
+.rt  
+Similar to \fBrpc_call()\fR, except that the call message is broadcast to all
+the connectionless transports specified by \fInettype\fR. If \fInettype\fR is
+\fINULL\fR, it defaults to \fBnetpath\fR. Each time it receives a response,
+this routine calls \fBeachresult()\fR, whose form is:
+.sp
+.in +2
+.nf
+bool_t eachresult(caddr_t out,  const struct netbuf *addr,  
+const struct netconfig *netconf);
+.fi
+.in -2
+
+where \fIout\fR is the same as \fIout\fR passed to \fBrpc_broadcast()\fR,
+except that the remote procedure's output is decoded there. \fIaddr\fR points
+to the address of the machine that sent the results, and \fInetconf\fR is the
+netconfig structure of the transport on which the remote server responded. If
+\fBeachresult()\fR returns \fB0\fR, \fBrpc_broadcast()\fR waits for more
+replies; otherwise, it returns with appropriate status.
+.sp
+The broadcast file descriptors are limited in size to the maximum transfer size
+of that transport. For Ethernet, this value is 1500 bytes.
+\fBrpc_broadcast()\fR uses \fBAUTH_SYS\fR credentials by default. See
+\fBrpc_clnt_auth\fR(3NSL).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrpc_broadcast_exp()\fR\fR
+.ad
+.RS 23n
+.rt  
+Similar to \fBrpc_broadcast()\fR, except that the initial timeout,
+\fIinittime\fR and the maximum timeout, \fIwaittime\fR, are specified in
+milliseconds.
+.sp
+\fIinittime\fR is the initial time that \fBrpc_broadcast_exp()\fR waits before
+resending the request. After the first resend, the retransmission interval
+increases exponentially until it exceeds \fIwaittime\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrpc_call()\fR\fR
+.ad
+.RS 23n
+.rt  
+Calls the remote procedure associated with \fIprognum\fR, \fIversnum\fR, and
+\fIprocnum\fR on the machine, \fIhost\fR. The parameter \fIinproc\fR is used to
+encode the procedure's parameters, and \fIoutproc\fR is used to decode the
+procedure's results. \fIin\fR is the address of the procedure's argument(s),
+and \fIout\fR is the address of where to place the result(s). \fInettype\fR can
+be any of the values listed on \fBrpc\fR(3NSL). This routine returns
+\fBRPC_SUCCESS\fR if it succeeds, or it returns an appropriate status. Use the
+\fBclnt_perrno()\fR routine to translate failure status into error messages.
+.sp
+The \fBrpc_call()\fR function uses the first available transport belonging to
+the class \fInettype\fR on which it can create a connection. You do not have
+control of timeouts or authentication using this routine.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+ArchitectureAll
+_
+Interface StabilityEvolving
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBprintf\fR(3C), \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
+\fBrpc_clnt_create\fR(3NSL), \fBattributes\fR(5)

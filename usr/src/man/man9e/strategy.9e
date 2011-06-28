@@ -1,0 +1,70 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc., All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH strategy 9E "6 Nov 2003" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+strategy \- perform block I/O
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/buf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBstrategy\fR(\fBstruct buf *\fR\fIbp\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI). This entry point is required for
+block devices.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIbp\fR \fR
+.ad
+.RS 7n
+.rt  
+Pointer to the \fBbuf\fR(9S) structure.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstrategy()\fR routine is called indirectly (through \fBcb_ops\fR(9S)) by
+the kernel to read and write blocks of data on the block device.
+\fBstrategy()\fR may also be called directly or indirectly to support the raw
+character interface of a block device (\fBread\fR(9E), \fBwrite\fR(9E) and
+\fBioctl\fR(9E)). The \fBstrategy()\fR routine's responsibility is to set up
+and initiate the transfer.
+.sp
+.LP
+In general, \fBstrategy()\fR should not block. It can, however, perform a
+\fBkmem_cache_create\fR(9F) with both the \fBKM_PUSHPAGE\fR and \fBKM_SLEEP\fR
+flags set, which might block, without causing deadlock in low memory
+situations.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBstrategy()\fR function must return \fB0\fR. On an error condition, it
+should call \fBbioerror\fR(9F) to set \fBb_flags\fR to the proper error code,
+and call \fBbiodone\fR(9F). Note that a partial transfer is not considered to
+be an error.
+.SH SEE ALSO
+.sp
+.LP
+\fBioctl\fR(9E), \fBread\fR(9E), \fBwrite\fR(9E), \fBbiodone\fR(9F),
+\fBbioerror\fR(9F), \fBbuf\fR(9S), \fBcb_ops\fR(9S),
+\fBkmem_cache_create\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

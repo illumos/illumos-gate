@@ -1,0 +1,126 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNSServiceRegister 3DNS_SD "20 Aug 2007" "SunOS 5.11" "DNS Service Discovery Library Functions"
+.SH NAME
+DNSServiceRegister \- register service with DNS
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldns_sd\fR [ \fIlibrary\fR ... ]
+#include <dns_sd.h>
+
+\fBDNSServiceErrorType\fR \fIDNSServiceRegister\fR(\fBDNSServiceRef\fR *\fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBuint32_t\fR \fIinterfaceIndex\fR,
+     \fBconst char\fR *\fIname\fR, \fBconst char\fR *\fIregtype\fR,
+     \fBconst char\fR *\fIdomain\fR, \fBconst char\fR *\fIhost\fR,
+     \fBuint16_t\fR \fIport\fR, \fBuint16_t\fR *\fItxtLen\fR, \fBconst void\fR *\fItxtRecord\fR
+     \fBDNSServiceServiceRegisterReply\fR \fIcallBack\fR
+     \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.LP
+.nf
+\fBtypedef\fR \fIvoid\fR(*\fBDNSServiceRegisterReply\fR)(\fBDNSServiceRef\fR \fIsdRef\fR,
+     \fBDNSServiceFlags\fR \fIflags\fR, \fBDNSServiceErrorType\fR \fIerrorCode\fR,
+     \fBconst char\fR *\fIname\fR, \fBconst char\fR *\fIregtype\fR,
+     \fBconst char\fR *\fIdomain\fR, \fBvoid\fR *\fIcontext\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBDNSServiceRegister\fR function is used by clients to advertise a service
+that uses \fBDNS\fR. The service is registered with multicast \fBDNS\fR if the
+domain name is \fB\&.local\fR or the interface requested is local only.
+Otherwise, the service registration is attempted with the unicast \fBDNS\fR
+server. The callback argument should point to a function of type
+\fBDNSServiceRegisterReply\fR listed above.
+.sp
+.LP
+The \fIsdRef\fR parameter points to an uninitialized \fBDNSServiceRef\fR
+instance. If the \fBDNSServiceRegister()\fR call succeeds, \fIsdRef\fR is
+initialized and \fBkDNSServiceErr_NoError\fR is returned. The service
+registration remains active until the client terminates the registration by
+passing the initialized \fIsdRef\fR to \fBDNSServiceRefDeallocate()\fR. The
+\fIinterfaceIndex\fR when non-zero specifies the interface on which the service
+should be registered. Most applications pass \fB0\fR to register the service on
+all interfaces. See the section "Constants for specifying an interface index"
+in \fB<dns_sd.h>\fR for more details. The \fIflags\fR parameter determines the
+renaming behavior on a service name conflict. Most applications pass \fB0\fR to
+allow auto-rename of the service name in case of a name conflict. Applications
+can pass the flag \fBkDNSServiceFlagsNoAutoRename\fR defined in
+\fB<dns_sd.h>\fR to disable auto-rename.
+.sp
+.LP
+The \fIregtype\fR indicates the service type followed by the protocol,
+separated by a dot, for example "\fB_ftp._tcp.\fR". The service type must be an
+underscore that is followed by 1 to 14 characters that can be letters, digits,
+or hyphens. The transport protocol must be \fB_tcp\fR or \fB_udp\fR. New
+service types should be registered at
+http://www.dns-sd.org/ServiceTypes.html\&. The \fIdomain\fR parameter specifies
+the domain on which a service is advertised. Most applications leave the
+\fIdomain\fR parameter \fINULL\fR to register the service in default domains.
+The \fIhost\fR parameter specifies the \fBSRV\fR target host name. Most
+applications do not specify the host parameter value. Instead, the default host
+name of the machine is used. The port value on which the service accepts
+connections must be passed in network byte order. A value of \fB0\fR for a port
+is passed to register \fIplaceholder\fR services. Placeholder services are not
+found when browsing, but other clients cannot register with the same name as
+the placeholder service.
+.sp
+.LP
+The \fItxtLen\fR parameter specifies the length of the passed \fItxtRecord\fR
+in bytes. The value must be zero if the \fItxtRecord\fR passed is \fINULL\fR.
+The \fItxtRecord\fR points to the \fBTXT\fR record rdata. A non-\fINULL\fR
+\fItxtRecord\fR must be a properly formatted \fBDNS\fR\fBTXT\fR record. For
+more details see the \fBDNSServiceRegister\fR call defined in
+\fB<dns_sd.h>\fR\&. The callback argument points to a function to be called
+when registration completes or when the call asynchronously fails. The client
+can pass \fINULL\fR for the callback and not be notified of the registration
+results or asynchronous errors. The client may not pass the \fBNoAutoRename\fR
+flag if the callback is \fINULL\fR. The client can unregister the service at
+any time via \fBDNSServiceRefDeallocate()\fR.
+.sp
+.LP
+The callback function argument \fIsdRef\fR is initialized by
+\fBDNSServiceRegister()\fR. The \fIflags\fR argument in the callback function
+is currently unused and reserved for future use. The error code returned to the
+callback is \fBkDNSServiceErr_NoError\fR on success. Otherwise, an error code
+defined in \fB<dns_sd.h>\fR is returned to indicate an error condition such as
+a name conflict in \fBkDNSServiceFlagsNoAutoRename\fR mode. The \fIname\fR
+argument holds the registered service name and the \fIregtype\fR argument is
+the registered service type passed to \fBDNSServiceRegister()\fR. The domain
+argument returned in the callback indicates the domain on which the service was
+registered.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBDNSServiceRegister\fR function returns \fBkDNSServiceErr_NoError\fR on
+success. Otherwise, an error code defined in \fB<dns_sd.h>\fR is returned. Upon
+registration, any subsequent asynchronous errors are delivered to the callback.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBDNSServiceRefDeallocate\fR(3DNS_SD), \fBattributes\fR(5)

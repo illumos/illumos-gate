@@ -1,0 +1,157 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ddi_dma_sync 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+ddi_dma_sync \- synchronize CPU and I/O views of memory
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/ddi.h> 
+#include <sys/sunddi.h>
+
+\fBint\fR \fBddi_dma_sync\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t\fR \fIoffset\fR, 
+     \fBsize_t\fR \fIlength\fR, \fBuint_t\fR \fItype\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Solaris DDI specific (Solaris DDI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIhandle\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIhandle\fR filled in by a call to \fBddi_dma_alloc_handle\fR(9F).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIoffset\fR\fR
+.ad
+.RS 10n
+.rt  
+The offset into the object described by the \fIhandle\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlength\fR\fR
+.ad
+.RS 10n
+.rt  
+The length, in bytes, of the area to synchronize. When \fIlength\fR is zero,
+the entire range starting from \fIoffset\fR to the end of the object has the
+requested operation applied to it.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 10n
+.rt  
+Indicates the caller's desire about what view of the memory object to
+synchronize. The possible values are \fBDDI_DMA_SYNC_FORDEV\fR,
+\fBDDI_DMA_SYNC_FORCPU\fR and \fBDDI_DMA_SYNC_FORKERNEL\fR.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBddi_dma_sync()\fR function is used to selectively synchronize either a
+\fBDMA\fR device's or a \fBCPU\fR's view of a memory object that has \fBDMA\fR
+resources allocated for I/O . This may involve operations such as flushes of
+\fBCPU\fR or I/O caches, as well as other more complex operations such as
+stalling until hardware write buffers have drained.
+.sp
+.LP
+This function need only be called under certain circumstances. When resources
+are allocated for \fBDMA\fR using  \fBddi_dma_addr_bind_handle()\fR or
+\fBddi_dma_buf_bind_handle()\fR, an implicit \fBddi_dma_sync()\fR is done. When
+\fBDMA\fR resources are deallocated using \fBddi_dma_unbind_handle\fR(9F), an
+implicit \fBddi_dma_sync()\fR is done. However, at any time between  \fBDMA\fR
+resource allocation and deallocation, if the memory object has been modified by
+either the \fBDMA\fR device or a \fBCPU\fR and you wish to ensure that the
+change is noticed by the party that did \fBnot\fR do the modifying, a call to
+\fBddi_dma_sync()\fR is required. This is true independent of any attributes of
+the memory object including, but not limited to, whether or not the memory was
+allocated for consistent mode I/O (see \fBddi_dma_mem_alloc\fR(9F)) or whether
+or not  \fBDMA\fR resources have been allocated for consistent mode I/O (see
+\fBddi_dma_addr_bind_handle\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F)).
+.sp
+.LP
+If a consistent view of the memory object must be ensured between the time
+\fBDMA\fR resources are allocated for the object and the time they are
+deallocated, you \fBmust\fR call \fBddi_dma_sync()\fR to ensure that either a
+\fBCPU\fR or a \fBDMA\fR device has such a consistent view.
+.sp
+.LP
+What to set \fBtype\fR to depends on the view you are trying to ensure
+consistency for. If the memory object is modified by a \fBCPU\fR, and the
+object is going to be \fBread\fR by the \fBDMA\fR engine of the device, use
+\fBDDI_DMA_SYNC_FORDEV\fR. This ensures that the device's \fBDMA\fR engine sees
+any changes that a \fBCPU\fR has made to the memory object. If the \fBDMA\fR
+engine for the device has \fBwritten\fR to the memory object, and you are going
+to \fBread\fR (with a \fBCPU\fR) the object (using an extant virtual address
+mapping that you have to the memory object), use \fBDDI_DMA_SYNC_FORCPU\fR.
+This ensures that a \fBCPU\fR's view of the memory object includes any changes
+made to the object by the device's \fBDMA\fR engine. If you are only interested
+in the kernel's view (kernel-space part of the \fBCPU\fR's view) you may use
+\fBDDI_DMA_SYNC_FORKERNEL\fR. This gives a hint to the system\(emthat is, if it
+is more economical to synchronize the kernel's view only, then do so;
+otherwise, synchronize for \fBCPU\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBddi_dma_sync()\fR function returns:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_SUCCESS\fR\fR
+.ad
+.RS 15n
+.rt  
+Caches are successfully flushed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDDI_FAILURE\fR\fR
+.ad
+.RS 15n
+.rt  
+The address range to be flushed is out of the address range established by
+\fBddi_dma_addr_bind_handle\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F).
+.RE
+
+.SH CONTEXT
+.sp
+.LP
+The \fBddi_dma_sync()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
+\fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_mem_alloc\fR(9F),
+\fBddi_dma_unbind_handle\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

@@ -1,0 +1,378 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH u8_strcmp 3C "12 Sep 2007" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+u8_strcmp \- UTF-8 string comparison function
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/u8_textprep.h>
+
+\fBint\fR \fBu8_strcmp\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR,
+     \fBint\fR \fIflag\fR, \fBsize_t\fR \fIversion\fR, \fBint *\fR\fIerrnum\fR);
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs1\fR, \fIs2\fR\fR
+.ad
+.RS 13n
+.rt  
+Pointers to null-terminated UTF-8 strings
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIn\fR\fR
+.ad
+.RS 13n
+.rt  
+The maximum number of bytes to be compared.  If 0, the comparison is performed
+until either or both of the strings are examined to the string terminating null
+byte.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 13n
+.rt  
+The possible comparison options constructed by a bit-wise-inclusive-OR of the
+following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_CS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform case-sensitive string comparison. This is the default.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_CI_UPPER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform case-insensitive string comparison based on Unicode upper case
+converted results of \fIs1\fR and \fIs2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_CI_LOWER\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform case-insensitive string comparison based on Unicode lower case
+converted results of \fIs1\fR and \fIs2\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_NFD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform string comparison after \fIs1\fR and \fIs2\fR have been normalized by
+using Unicode Normalization Form D.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_NFC\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform string comparison after \fIs1\fR and \fIs2\fR have been normalized by
+using Unicode Normalization Form C.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_NFKD\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform string comparison after \fIs1\fR and \fIs2\fR have been normalized by
+using Unicode Normalization Form KD.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_STRCMP_NFKC\fR\fR
+.ad
+.sp .6
+.RS 4n
+Perform string comparison after \fIs1\fR and \fIs2\fR have been normalized by
+using Unicode Normalization Form KC.
+.RE
+
+Only one case-sensitive or case-insensitive option is allowed. Only one Unicode
+Normalization option is allowed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIversion\fR\fR
+.ad
+.RS 13n
+.rt  
+The version of Unicode data that should be used during comparison. The
+following values are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_UNICODE_320\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use Unicode 3.2.0 data during comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_UNICODE_500\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use Unicode 5.0.0 data during comparison.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBU8_UNICODE_LATEST\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use the latest Unicode version data available, which is Unicode 5.0.0.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIerrnum\fR\fR
+.ad
+.RS 13n
+.rt  
+A non-zero value indicates that an error has occurred during comparison. The
+following values are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified option values are conflicting and cannot be supported.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEILSEQ\fR\fR
+.ad
+.RS 10n
+.rt  
+There was an illegal character at \fIs1\fR, \fIs2\fR, or both.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+There was an incomplete character at \fIs1\fR, \fIs2\fR, or both.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBERANGE\fR\fR
+.ad
+.RS 10n
+.rt  
+The specified Unicode version value is not supported.
+.RE
+
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBu8_stcmp()\fR function internally processes UTF-8 strings pointed to by
+\fIs1\fR and \fIs2\fR based on the corresponding version of the Unicode
+Standard and other input arguments and compares the result strings in
+byte-by-byte, machine ordering.
+.sp
+.LP
+When multiple comparison options are specified, Unicode Normalization is
+performed after case-sensitive or case-insensitive processing is performed.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBu8_strcmp()\fR function returns an integer greater than, equal to, or
+less than 0 if the string pointed to by \fIs1\fR is greater than, equal to, or
+less than the string pointed to by \fIs2\fR, respectively.
+.sp
+.LP
+When \fBu8_strcmp()\fR detects an illegal or incomplete character, such
+character causes the function to set \fIerrnum\fR to indicate the error.
+Afterward, the comparison is still performed on the resultant strings and a
+value based on byte-by-byte comparison is always returned.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRPerform simple default string comparison.
+.sp
+.in +2
+.nf
+#include <sys/u8_textprep.h>
+
+int
+docmp_default(const char *u1, const char *u2) {
+    int result;
+    int errnum;
+
+    result = u8_strcmp(u1, u2, 0, 0, U8_UNICODE_LATEST, &errnum);
+    if (errnum == EILSEQ)
+        return (-1);
+    if (errnum == EINVAL)
+        return (-2);
+    if (errnum == EBADF)
+        return (-3);
+    if (errnum == ERANGE)
+        return (-4);
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRPerform upper case based case-insensitive comparison with
+Unicode 3.2.0 date.
+.sp
+.in +2
+.nf
+#include <sys/u8_textprep.h>
+
+int
+docmp_caseinsensitive_u320(const char *u1, const char *u2) {
+    int result;
+    int errnum;
+
+    result = u8_strcmp(u1, u2, 0, U8_STRCMP_CI_UPPER,
+        U8_UNICODE_320, &errnum);
+    if (errnum == EILSEQ)
+        return (-1);
+    if (errnum == EINVAL)
+        return (-2);
+    if (errnum == EBADF)
+        return (-3);
+    if (errnum == ERANGE)
+        return (-4);
+
+    return (result);
+}
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRPerform Unicode Normalization Form D.
+.sp
+.LP
+Perform Unicode Normalization Form D and upper case based case-insensitive
+comparison with Unicode 3.2.0 date.
+
+.sp
+.in +2
+.nf
+#include <sys/u8_textprep.h>
+
+int
+docmp_nfd_caseinsensitive_u320(const char *u1, const char *u2) {
+    int result;
+    int errnum;
+
+    result = u8_strcmp(u1, u2, 0,
+        (U8_STRCMP_NFD|U8_STRCMP_CI_UPPER), U8_UNICODE_320,
+        &errnum);
+    if (errnum == EILSEQ)
+        return (-1);
+    if (errnum == EINVAL)
+        return (-2);
+    if (errnum == EBADF)
+        return (-3);
+    if (errnum == ERANGE)
+        return (-4);
+
+    return (result);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBu8_textprep_str\fR(3C), \fBu8_validate\fR(3C), \fBattributes\fR(5),
+\fBu8_strcmp\fR(9F), \fBu8_textprep_str\fR(9F), \fBu8_validate\fR(9F)
+.sp
+.LP
+The Unicode Standard (http://www.unicode.org)

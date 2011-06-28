@@ -1,0 +1,126 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_attr_getstack 3C "23 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_attr_getstack, pthread_attr_setstack \- get or set stack attributes
+.SH SYNOPSIS
+.LP
+.nf
+cc \fB-mt\fR  [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpthread\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <pthread.h>
+
+\fBint\fR \fBpthread_attr_getstack\fR(\fBconst pthread_attr_t *restrict\fR \fIattr\fR,
+     \fBvoid **restrict\fR \fIstackaddr\fR, \fBsize_t *restrict\fR \fIstacksize\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_attr_setstack\fR(\fBpthread_attr_t *\fR \fIattr\fR, \fBvoid *\fR\fIstackaddr\fR,
+     \fBsize_t\fR \fIstacksize\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_attr_getstack()\fR and \fBpthread_attr_setstack()\fR functions,
+respectively, get and set the thread creation stack attributes \fIstackaddr\fR
+and \fIstacksize\fR in the \fIattr\fR object.
+.sp
+.LP
+The stack attributes specify the area of storage to be used for the created
+thread's stack. The base (lowest addressable byte) of the storage is
+\fIstackaddr\fR, and the size of the storage is \fIstacksize\fR bytes. The
+\fIstacksize\fR argument must be at least {\fBPTHREAD_STACK_MIN\fR}. The
+\fIstackaddr\fR argument must be aligned appropriately to be used as a stack;
+for example, \fBpthread_attr_setstack()\fR might fail with \fBEINVAL\fR if
+(\fIstackaddr\fR & 0x7) is not 0. All pages within the stack described by
+\fIstackaddr\fR and \fIstacksize\fR are both readable and writable by the
+thread.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return a 0; otherwise, an error
+number is returned to indicate the error.
+.sp
+.LP
+The \fBpthread_attr_getstack()\fR function stores the stack attribute values in
+stackaddr and stacksize if successful.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_attr_setstack()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIstacksize\fR is less than {\fBPTHREAD_STACK_MIN\fR}.
+.RE
+
+.sp
+.LP
+The \fBpthread_attr_setstack()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+.rt  
+The stack page(s) described by \fIstackaddr\fR and \fIstacksize\fR are not both
+readable and writable by the thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value of \fIstackaddr\fR does not have proper alignment to be used as a
+stack, or (\fIstackaddr\fR + \fIstacksize\fR) lacks proper alignment.
+.RE
+
+.SH USAGE
+.sp
+.LP
+These functions are appropriate for use by applications in an environment where
+the stack for a thread must be placed in some particular region of memory.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_attr_init\fR(3C), \fBpthread_attr_setdetachstate\fR(3C),
+\fBpthread_attr_setstacksize\fR(3C), \fBpthread_create\fR(3C),
+\fBattributes\fR(5)

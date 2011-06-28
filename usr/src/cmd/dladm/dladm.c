@@ -4754,6 +4754,12 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	if ((flags & DLADM_OPT_FORCE) != 0 && vid == 0)
 		die("-f option can only be used with -v");
 
+	/*
+	 * If creating a transient VNIC for a zone, mark it in the kernel.
+	 */
+	if (strstr(propstr, "zone=") != NULL && !(flags & DLADM_OPT_PERSIST))
+		flags |= DLADM_OPT_TRANSIENT;
+
 	if (mac_prefix_len != 0 && mac_addr_type != VNIC_MAC_ADDR_TYPE_RANDOM &&
 	    mac_addr_type != VNIC_MAC_ADDR_TYPE_FIXED)
 		usage();

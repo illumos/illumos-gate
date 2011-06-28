@@ -1,0 +1,196 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.,  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH Intro 9S "15 May 2001" "SunOS 5.11" "Data Structures for Drivers"
+.SH NAME
+Intro, intro \- introduction to kernel data structures and properties
+.SH DESCRIPTION
+.sp
+.LP
+Section 9P describes kernel properties used by device drivers. Section 9S
+describes the data structures used by drivers to share information between the
+driver and the kernel. See \fBIntro\fR(9E) for an overview of device driver
+interfaces.
+.sp
+.LP
+In Section 9S, reference pages contain the following headings:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBNAME\fR summarizes the purpose of the structure or property.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSYNOPSIS\fR lists the include file that defines the structure or property.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBINTERFACE\fR \fBLEVEL\fR describes any architecture dependencies.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDESCRIPTION\fR provides general information about the structure or property.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSTRUCTURE\fR \fBMEMBERS\fR lists all accessible structure members (for
+Section 9S).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSEE\fR \fBALSO\fR gives sources for further information.
+.RE
+.sp
+.LP
+Of the preceding headings, Section 9P reference pages contain the \fBNAME\fR,
+\fBDESCRIPTION\fR, and \fBSEE\fR \fBALSO\fR fields.
+.sp
+.LP
+Every driver MUST include <\fBsys/ddi.h\fR> and <\fBsys/sunddi.h\fR>, in that
+order, and as final entries.
+.sp
+.LP
+The following table summarizes the STREAMS structures described in Section 9S.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+StructureType
+_
+\fBcopyreq\fRDDI/DKI
+_
+\fBcopyresp\fRDDI/DKI
+_
+\fBdatab\fRDDI/DKI
+_
+\fBfmodsw\fRSolaris DDI 
+_
+\fBfree_rtn\fRDDI/DKI
+_
+\fBiocblk\fRDDI/DKI
+_
+\fBlinkblk\fRDDI/DKI 
+_
+\fBmodule_info\fRDDI/DKI 
+_
+\fBmsgb\fRDDI/DKI 
+_
+\fBqband\fRDDI/DKI 
+_
+\fBqinit\fRDDI/DKI 
+_
+\fBqueclass\fRSolaris DDI
+_
+\fBqueue\fRDDI/DKI
+_
+\fBstreamtab\fRDDI/DKI
+_
+\fBstroptions\fRDDI/DKI
+.TE
+
+.sp
+.LP
+The following table summarizes structures that are not specific to STREAMS I/O.
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+StructureType
+_
+\fBaio_req\fRSolaris DDI
+_
+\fBbuf\fRDDI/DKI
+_
+\fBcb_ops\fRSolaris DDI
+_
+\fBddi_device_acc_attr\fRSolaris DDI
+_
+\fBddi_dma_attr\fRSolaris DDI 
+_
+\fBddi_dma_cookie\fRSolaris DDI
+_
+\fBddi_dma_lim_sparc\fRSolaris SPARC DDI
+_
+\fBddi_dma_lim_x86\fRSolaris x86 DDI
+_
+\fBddi_dma_req\fRSolaris DDI
+_
+\fBddi_dmae_req\fRSolaris x86 DDI
+_
+\fBddi_idevice_cookie\fRSolaris DDI
+_
+\fBddi_mapdev_ctl\fRSolaris DDI
+_
+\fBdevmap_callback_ctl\fRSolaris DDI
+_
+\fBdev_ops\fRSolaris DDI 
+_
+\fBiovec\fRDDI/DKI
+_
+\fBkstat\fRSolaris DDI
+_
+\fBkstat_intr\fRSolaris DDI
+_
+\fBkstat_io\fRSolaris DDI
+_
+\fBkstat_named\fRSolaris DDI 
+_
+\fBmap\fRDDI/DKI
+_
+\fBmodldrv\fRSolaris DDI
+_
+\fBmodlinkage\fRSolaris DDI
+_
+\fBmodlstrmod\fRSolaris DDI
+_
+\fBscsi_address\fRSolaris DDI 
+_
+\fBscsi_arq_status\fRSolaris DDI
+_
+\fBscsi_device\fRSolaris DDI 
+_
+\fBscsi_extended_sense\fRSolaris DDI
+_
+\fBscsi_hba_tran\fRSolaris DDI
+_
+\fBscsi_inquiry\fRSolaris DDI
+_
+\fBscsi_pkt\fRSolaris DDI
+_
+\fBscsi_status\fRSolaris DDI
+_
+\fBuio\fRDDI/DKI
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBIntro\fR(9E)
+.SH NOTES
+.sp
+.LP
+Do not declare arrays of structures as the size of the structures can change
+between releases. Rely only on the structure members listed in this chapter and
+not on unlisted members or the position of a member in a structure.

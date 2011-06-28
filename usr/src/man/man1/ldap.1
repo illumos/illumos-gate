@@ -1,0 +1,340 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap 1 "28 Aug 2006" "SunOS 5.11" "User Commands"
+.SH NAME
+ldap \- LDAP as a naming repository
+.SH DESCRIPTION
+.sp
+.LP
+LDAP refers to Lightweight Directory Access Protocol, which is an industry
+standard for accessing directory servers. By initializing the client using
+\fBldapclient\fR(1M) and using the keyword \fBldap\fR in the name service
+switch file, \fB/etc/nsswitch.conf\fR, Solaris clients can obtain naming
+information from an LDAP server. Information such as usernames, hostnames, and
+passwords are stored on the LDAP server in a Directory Information Tree or
+\fBDIT\fR. The \fBDIT\fR consists of entries which in turn are composed of
+attributes. Each attribute has a type and one or more values.
+.sp
+.LP
+Solaris LDAP clients use the LDAP v3 protocol to access naming information from
+LDAP servers. The LDAP server must support the object classes and attributes
+defined in \fIRFC2307bis (draft)\fR, which maps the naming service model on to
+LDAP. As an alternate to using the schema defined in \fIRFC2307bis (draft)\fR,
+the system can be configured to use other schema sets and the schema mapping
+feature is configured to map between the two. Refer to the \fISystem
+Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)\fR for
+more details.
+.sp
+.LP
+The \fBldapclient\fR(1M) utility can make a Solaris machine an LDAP client by
+setting up the appropriate directories, files, and configuration information.
+The LDAP client caches this configuration information in local cache files.
+This configuration information is accessed through the \fBldap_cachemgr\fR(1M)
+daemon. This daemon also refreshes the information in the configuration files
+from the LDAP server, providing better performance and security. The
+\fBldap_cachemgr\fR must run at all times for the proper operation of the
+naming services.
+.sp
+.LP
+There are two types of configuration information, the information available
+through a profile, and the information configured per client. The profile
+contains all the information as to how the client accesses the directory. The
+credential information for proxy user is configured on a per client basis and
+is not downloaded through the profile.
+.sp
+.LP
+The profile contains server-specific parameters that are required by all
+clients to locate the servers for the desired LDAP domain. This information
+could be the server's IP address and the search base Distinguished Name (DN),
+for instance. It is configured on the client from the default profile during
+client initialization and is periodically updated by the \fBldap_cachemgr\fR
+daemon when the expiration time has elapsed.
+.sp
+.LP
+Client profiles can be stored on the LDAP server and can be used by the
+\fBldapclient\fR utility to initialize an LDAP client. Using the client profile
+is the easiest way to configure a client machine. See \fBldapclient\fR(1M).
+.sp
+.LP
+Credential information includes client-specific parameters that are used by a
+client. This information could be the Bind DN (LDAP "login" name) of the client
+and the password. If these parameters are required, they are manually defined
+during the initialization through \fBldapclient\fR(1M).
+.sp
+.LP
+The naming information is stored in containers on the LDAP server. A container
+is a non-leaf entry in the DIT that contains naming service information.
+Containers are similar to maps in NIS and tables in NIS+. A default mapping
+between the NIS databases and the containers in LDAP is presented below. The
+location of these containers as well as their names can be overridden through
+the use of \fBserviceSearchDescriptors\fR. For more information, see
+\fBldapclient\fR(1M).
+.sp
+
+.sp
+.TS
+tab() box;
+cw(1.83i) |cw(1.83i) |cw(1.83i) 
+lw(1.83i) |lw(1.83i) |lw(1.83i) 
+.
+DatabaseObject ClassContainer
+_
+passwdposixAccountou=people,dc=... 
+shadowAccount
+_
+groupposixGroupou=Group,dc=...
+_
+servicesipServiceou=Services,dc=...
+_
+protocolsipProtocolou=Protocols,dc=...
+_
+rpconcRpcou=Rpc,dc=...
+_
+hostsipHostou=Hosts,dc=...
+ipnodesipHostou=Hosts,dc=...
+_
+ethersieee802Deviceou=Ethers,dc=...
+_
+bootparamsbootableDeviceou=Ethers,dc=...
+_
+networksipNetworkou=Networks,dc=...
+netmasksipNetwork ou=Networks,dc=... 
+_
+netgroupnisNetgroupou=Netgroup,dc=...
+_
+aliasesmailGroupou=Aliases,dc=...
+_
+publickeynisKeyObject 
+_
+genericnisObjectnisMapName=...,dc=...
+_
+printersprinterServiceou=Printers,dc=... 
+_
+auth_attrSolarisAuthAttrou=SolarisAuthAttr,dc=...
+_
+prof_attrSolarisProfAttrou=SolarisProfAttr,dc=...
+_
+exec_attrSolarisExecAttrou=SolarisProfAttr,dc=...
+_
+user_attrSolarisUserAttrou=people,dc=...
+_
+audit_userSolarisAuditUserou=people,dc=...
+.TE
+
+.sp
+.LP
+The security model for clients is defined by a combination of the credential
+level to be used, the authentication method, and the PAM modules to be used.
+The credential level defines what credentials the client should use to
+authenticate to the directory server, and the authentication method defines the
+method of choice. Both these can be set with multiple values. The Solaris LDAP
+supports the following values for credential level :
+.br
+.in +2
+\fBanonymous\fR
+.in -2
+.br
+.in +2
+\fBproxy\fR
+.in -2
+.br
+.in +2
+\fBself\fR
+.in -2
+.sp
+.LP
+The Solaris LDAP supports the following values for authentication method:
+.br
+.in +2
+\fBnone\fR
+.in -2
+.br
+.in +2
+\fBsimple\fR
+.in -2
+.br
+.in +2
+\fBsasl/CRAM-MD5\fR
+.in -2
+.br
+.in +2
+\fBsasl/DIGEST-MD5\fR
+.in -2
+.br
+.in +2
+\fBsasl/GSSAPI\fR
+.in -2
+.br
+.in +2
+\fBtls:simple\fR
+.in -2
+.br
+.in +2
+\fBtls:sasl/CRAM-MD5\fR
+.in -2
+.br
+.in +2
+\fBtls:sasl/DIGEST-MD5\fR
+.in -2
+.sp
+.LP
+When the credential level is configured as \fBself\fR, DNS must be configured
+and the authentication method must be \fBsasl/GSSAPI\fR. The \fBhosts\fR and
+\fBipnodes\fR in \fB/etc/nsswitch.conf\fR must be configured to use DNS, for
+example \fBhosts: dns files\fR and \fBipnodes: dns files\fR.
+.sp
+.LP
+\fBsasl/GSSAPI\fR automatically uses \fBGSSAPI\fR confidentiality and integrity
+options, if they are configured on the directory server.
+.sp
+.LP
+The credential level of \fBself\fR enables per-user naming service lookups, or
+lookups that use the \fBGSSAPI\fR credentials of the user when connecting to
+the directory server. Currently the only \fBGSSAPI\fR mechanism supported in
+this model is Kerberos V5. Kerberos must be configured before you can use this
+credential level. See \fBkerberos\fR(5) for details.
+.sp
+.LP
+More protection can be provided by means of access control, allowing the server
+to grant access for certain containers or entries. Access control is specified
+by Access Control Lists (ACLs) that are defined and stored in the LDAP server.
+The Access Control Lists on the LDAP server are called Access Control
+Instructions (ACIs) by the the SunOne Directory Server. Each ACL or ACI
+specifies one or more directory objects, for example, the \fBcn\fR attribute in
+a specific container, one or more clients to whom you grant or deny access, and
+one or more access rights that determine what the clients can do to or with the
+objects. Clients can be users or applications. Access rights can be specified
+as read and write, for example. Refer to the \fISystem Administration Guide:
+Naming and Directory Services (DNS, NIS, and LDAP)\fR regarding the
+restrictions on ACLs and ACIs when using LDAP as a naming repository.
+.sp
+.LP
+A sample \fBnsswitch.conf\fR(4) file called \fBnsswitch.ldap\fR is provided in
+the \fB/etc\fR directory. This is copied to \fB/etc/nsswitch.conf\fR by the
+\fBldapclient\fR(1M) utility. This file uses LDAP as a repository for the
+different databases in the \fBnsswitch.conf\fR file.
+.sp
+.LP
+The following is a list of the user commands related to LDAP:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBidsconfig\fR(1M)\fR
+.ad
+.RS 18n
+.rt  
+Prepares a SunOne Directory Server to be ready to support Solaris LDAP clients.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBldapaddent\fR(1M)\fR
+.ad
+.RS 18n
+.rt  
+Creates LDAP entries from corresponding \fB/etc\fR files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBldapclient\fR(1M)\fR
+.ad
+.RS 18n
+.rt  
+Initializes LDAP clients, or generates a configuration profile to be stored in
+the directory.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBldaplist\fR(1)\fR
+.ad
+.RS 18n
+.rt  
+Lists the contents of the LDAP naming space.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/var/ldap/ldap_client_cred\fR\fR
+.ad
+.br
+.na
+\fB\fB/var/ldap/ldap_client_file\fR\fR
+.ad
+.RS 30n
+.rt  
+Files that contain the LDAP configuration of the client. Do not manually modify
+these files. Their content is not guaranteed to be human readable. Use
+\fBldapclient\fR(1M) to update them.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nsswitch.conf\fR\fR
+.ad
+.RS 30n
+.rt  
+Configuration file for the name-service switch.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/nsswitch.ldap\fR\fR
+.ad
+.RS 30n
+.rt  
+Sample configuration file for the name-service switch configured with LDAP and
+files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/pam.conf\fR\fR
+.ad
+.RS 30n
+.rt  
+PAM framework configuration file.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldaplist\fR(1), \fBidsconfig\fR(1M), \fBldap_cachemgr\fR(1M),
+\fBldapaddent\fR(1M), \fBldapclient\fR(1M), \fBnsswitch.conf\fR(4),
+\fBpam.conf\fR(4), \fBkerberos\fR(5)\fBpam_authtok_check\fR(5),
+\fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5),
+\fBpam_ldap\fR(5), \fBpam_passwd_auth\fR(5), \fBpam_unix_account\fR(5),
+\fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
+.sp
+.LP
+\fISystem Administration Guide: Naming and Directory Services (DNS, NIS, and
+LDAP)\fR
+.SH NOTES
+.sp
+.LP
+The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
+\fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
+\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
+and\fBpam_unix_session\fR(5).

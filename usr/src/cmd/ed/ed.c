@@ -39,6 +39,7 @@
 #include	<regexpr.h>
 #include	<regex.h>
 #include	<errno.h>
+#include	<paths.h>
 
 static const 	char	*msgtab[] =
 {
@@ -263,8 +264,6 @@ static int 	save28 = 0; /* Flag whether buffer empty at start of read */
 static long 	savtime;
 static char	*name = "SHELL";
 static char	*rshell = "/usr/lib/rsh";
-static	char	*shpath; /* pointer to correct shell for execution */
-			/* of execlp() */
 static char	*val;
 static char	*home;
 static int	nodelim;
@@ -1581,13 +1580,7 @@ unixcom(void)
 		signal(SIGHUP, oldhup);
 		signal(SIGQUIT, oldquit);
 		close(tfile);
-		if (__xpg4 == 0) {	/* not XPG4 */
-			shpath = "/usr/bin/sh";
-		} else {
-			/* XPG4 */
-			shpath = "/usr/xpg4/bin/sh";
-		}
-		execlp((const char *)shpath, "sh", "-c", curcmd, (char *)0);
+		execlp(_PATH_BSHELL, "sh", "-c", curcmd, (char *)0);
 		exit(0100);
 	}
 	savint = signal(SIGINT, SIG_IGN);
@@ -2697,13 +2690,7 @@ xerr:		(void) error(0);
 		close(w_or_r(0, 1));
 		dup(w_or_r(pf[0], pf[1]));
 		close(w_or_r(pf[0], pf[1]));
-		if (__xpg4 == 0) {	/* not XPG4 */
-			shpath = "/usr/bin/sh";
-		} else {
-			/* XPG4 */
-			shpath = "/usr/xpg4/bin/sh";
-		}
-		execlp((const char *)shpath, "sh", "-c", string, (char *)0);
+		execlp(_PATH_BSHELL, "sh", "-c", string, (char *)0);
 		exit(1);
 	}
 	if (i == (pid_t)-1)

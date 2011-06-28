@@ -1,0 +1,151 @@
+'\" te
+.\"  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH media_getattr 3VOLMGT "8 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.SH NAME
+media_getattr, media_setattr \- get and set media attributes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lvolmgt\fR [ \fIlibrary\fR ... ]
+#include <volmgt.h> 
+
+
+
+\fBchar *\fR\fBmedia_getattr\fR(\fBchar *\fR\fIvol_path\fR, \fBchar *\fR\fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBmedia_setattr\fR(\fBchar *\fR\fIvol_path\fR, \fBchar *\fR\fIattr\fR, \fBchar *\fR\fIvalue\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This function is obsolete. The management of removable media by the Volume
+Management feature, including \fBvold\fR, has been replaced by software that
+supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
+through the HAL APIs, which are documented on the HAL web site. See
+\fBhal\fR(5). The return value of this function is undefined.
+.sp
+.LP
+\fBmedia_setattr()\fR and \fBmedia_getattr()\fR respectively set and get
+attribute-value pairs (called properties) on a per-volume basis.
+.sp
+.LP
+Volume management supports system properties and user properties. System
+properties are ones that volume management predefines. Some of these system
+properties are writable, but only by the user that owns the volume being
+specified, and some system properties are read only:
+.sp
+
+.sp
+.TS
+tab();
+cw(.91i) cw(.83i) cw(1.2i) cw(2.56i) 
+lw(.91i) lw(.83i) lw(1.2i) lw(2.56i) 
+.
+\fBAttribute\fR\fBWritable\fR\fBValue\fR\fBDescription\fR
+_
+\fBs-access\fRRO"seq", "rand"sequential or random access
+\fBs-density\fRRO"low", "medium", "high"media density
+\fBs-parts\fRROcomma separated list of slice numbers list of partitions on this volume
+\fBs-location\fRRO\fIpathname\fRvolume management pathname to media
+\fBs-mejectable\fRRO"true", "false"T{
+whether or not media is manually ejectable
+T}
+\fBs-rmoneject\fRR/W"true", "false"T{
+should media access points be removed from database upon ejection
+T}
+\fBs-enxio\fRR/W"true", "false"T{
+if set return \fBENXIO\fR when media access attempted
+T}
+.TE
+
+.sp
+.LP
+Properties can also be defined by the user. In this case the value can be any
+string the user wishes.
+.SH RETURN VALUES
+.sp
+.LP
+The return from this function is undefined.
+.SH ERRORS
+.sp
+.LP
+Both \fBmedia_getattr()\fR and \fBmedia_setattr()\fR can fail returning a null
+pointer if an \fBopen\fR(2) of the specified \fIvol_path\fR fails, if an
+\fBfstat\fR(2) of that pathname fails, or if that pathname is not a block or
+character special device.
+.sp
+.LP
+\fBmedia_getattr()\fR can also fail if the specified attribute was not found,
+and \fBmedia_setattr()\fR can also fail if the caller doesn't have permission
+to set the attribute, either because it's is a system attribute, or because the
+caller doesn't own the specified volume.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing \fBmedia_getattr()\fR
+.sp
+.LP
+The following example checks to see if the volume called \fIfred\fR that volume
+management is managing can be ejected by means of software, or if it can only
+be manually ejected:
+
+.sp
+.in +2
+.nf
+\fBif (media_getattr("/rdsk/fred", "s-mejectable") != NULL) {
+        (void) printf("\e"fred\e" must be manually ejected\en");
+} else {
+        (void) printf("software can eject \e"fred\e"\en");
+}\fR
+.fi
+.in -2
+
+.sp
+.LP
+This example shows setting the \fIs-enxio\fR property for the floppy volume
+currently in the first floppy drive:
+
+.sp
+.in +2
+.nf
+\fBint     res;
+if ((res = media_setattr("/dev/aliases/floppy0", "s-enxio",
+    "true")) == 0) {
+        (void) printf("can't set s-enxio flag for floppy0\en");
+}\fR
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe
+_
+Interface StabilityObsolete
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlstat\fR(2), \fBopen\fR(2), \fBreadlink\fR(2), \fBstat\fR(2),
+\fBfree\fR(3C), \fBmalloc\fR(3C), \fBmedia_findname\fR(3VOLMGT),
+\fBvolmgt_check\fR(3VOLMGT), \fBvolmgt_inuse\fR(3VOLMGT),
+\fBvolmgt_root\fR(3VOLMGT), \fBvolmgt_running\fR(3VOLMGT),
+\fBvolmgt_symname\fR(3VOLMGT), \fBattributes\fR(5), \fBhal\fR(5)

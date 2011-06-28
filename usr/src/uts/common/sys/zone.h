@@ -95,13 +95,14 @@ extern "C" {
 #define	ZONE_ATTR_INITNAME	9
 #define	ZONE_ATTR_BOOTARGS	10
 #define	ZONE_ATTR_BRAND		11
-#define	ZONE_ATTR_PHYS_MCAP	12
+#define	ZONE_ATTR_PMCAP_NOVER	12
 #define	ZONE_ATTR_SCHED_CLASS	13
 #define	ZONE_ATTR_FLAGS		14
 #define	ZONE_ATTR_HOSTID	15
 #define	ZONE_ATTR_FS_ALLOWED	16
 #define	ZONE_ATTR_NETWORK	17
 #define	ZONE_ATTR_DID		18
+#define	ZONE_ATTR_PMCAP_PAGEOUT	19
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -324,6 +325,7 @@ typedef struct zone_net_data {
  * libraries which may be defining ther own versions.
  */
 #include <sys/list.h>
+#include <sys/cpuvar.h>
 
 #define	GLOBAL_ZONEUNIQID	0	/* uniqid of the global zone */
 
@@ -388,6 +390,7 @@ typedef struct {
 } sys_zio_cntr_t;
 
 typedef struct {
+	kstat_named_t	zv_zonename;
 	kstat_named_t	zv_nread;
 	kstat_named_t	zv_reads;
 	kstat_named_t	zv_rtime;
@@ -404,6 +407,7 @@ typedef struct {
 } zone_vfs_kstat_t;
 
 typedef struct {
+	kstat_named_t	zz_zonename;
 	kstat_named_t	zz_nread;
 	kstat_named_t	zz_reads;
 	kstat_named_t	zz_rtime;
@@ -412,6 +416,31 @@ typedef struct {
 	kstat_named_t	zz_writes;
 	kstat_named_t	zz_waittime;
 } zone_zfs_kstat_t;
+
+typedef struct {
+	kstat_named_t	zm_zonename;
+	kstat_named_t	zm_rss;
+	kstat_named_t	zm_phys_cap;
+	kstat_named_t	zm_swap;
+	kstat_named_t	zm_swap_cap;
+	kstat_named_t	zm_nover;
+	kstat_named_t	zm_pagedout;
+	kstat_named_t	zm_pgpgin;
+	kstat_named_t	zm_anonpgin;
+	kstat_named_t	zm_execpgin;
+	kstat_named_t	zm_fspgin;
+	kstat_named_t	zm_anon_alloc_fail;
+} zone_mcap_kstat_t;
+
+typedef struct {
+	kstat_named_t	zm_zonename;	/* full name, kstat truncates name */
+	kstat_named_t	zm_utime;
+	kstat_named_t	zm_stime;
+	kstat_named_t	zm_wtime;
+	kstat_named_t	zm_avenrun1;
+	kstat_named_t	zm_avenrun5;
+	kstat_named_t	zm_avenrun15;
+} zone_misc_kstat_t;
 
 typedef struct zone {
 	/*
@@ -508,7 +537,7 @@ typedef struct zone {
 	char		*zone_initname;	/* fs path to 'init' */
 	int		zone_boot_err;  /* for zone_boot() if boot fails */
 	char		*zone_bootargs;	/* arguments passed via zone_boot() */
-	uint64_t	zone_phys_mcap;	/* physical memory cap */
+	rctl_qty_t	zone_phys_mem_ctl;	/* current phys. memory limit */
 	/*
 	 * zone_kthreads is protected by zone_status_lock.
 	 */
@@ -602,6 +631,45 @@ typedef struct zone {
 	rctl_qty_t	zone_nprocs_ctl;	/* current limit protected by */
 						/* zone_rctls->rcs_lock */
 	kstat_t		*zone_nprocs_kstat;
+
+	/*
+	 * kstats and counters for physical memory capping.
+	 */
+	rctl_qty_t	zone_phys_mem;	/* current bytes of phys. mem. (RSS) */
+	kstat_t		*zone_physmem_kstat;
+	uint64_t	zone_mcap_nover;	/* # of times over phys. cap */
+	uint64_t	zone_mcap_pagedout;	/* bytes of mem. paged out */
+	kmutex_t	zone_mcap_lock;	/* protects mcap statistics */
+	kstat_t		*zone_mcap_ksp;
+	zone_mcap_kstat_t *zone_mcap_stats;
+	uint64_t	zone_pgpgin;		/* pages paged in */
+	uint64_t	zone_anonpgin;		/* anon pages paged in */
+	uint64_t	zone_execpgin;		/* exec pages paged in */
+	uint64_t	zone_fspgin;		/* fs pages paged in */
+	uint64_t	zone_anon_alloc_fail;	/* cnt of anon alloc fails */
+
+	/*
+	 * Misc. kstats and counters for zone cpu-usage aggregation.
+	 * The zone_Xtime values are the sum of the micro-state accounting
+	 * values for all threads that are running or have run in the zone.
+	 * This is tracked in msacct.c as threads change state.
+	 * The zone_stime is the sum of the LMS_SYSTEM times.
+	 * The zone_utime is the sum of the LMS_USER times.
+	 * The zone_wtime is the sum of the LMS_WAIT_CPU times.
+	 * As with per-thread micro-state accounting values, these values are
+	 * not scaled to nanosecs.  The scaling is done by the
+	 * zone_misc_kstat_update function when kstats are requested.
+	 */
+	kmutex_t	zone_misc_lock;		/* protects misc statistics */
+	kstat_t		*zone_misc_ksp;
+	zone_misc_kstat_t *zone_misc_stats;
+	uint64_t	zone_stime;		/* total system time */
+	uint64_t	zone_utime;		/* total user time */
+	uint64_t	zone_wtime;		/* total time waiting in runq */
+
+	struct loadavg_s zone_loadavg;		/* loadavg for this zone */
+	uint64_t	zone_hp_avenrun[3];	/* high-precision avenrun */
+	int		zone_avenrun[3];	/* FSCALED avg. run queue len */
 } zone_t;
 
 /*
@@ -638,6 +706,7 @@ extern zoneid_t getzonedid(void);
 extern zone_t *zone_find_by_id_nolock(zoneid_t);
 extern int zone_datalink_walk(zoneid_t, int (*)(datalink_id_t, void *), void *);
 extern int zone_check_datalink(zoneid_t *, datalink_id_t);
+extern void zone_loadavg_update();
 
 /*
  * Zone-specific data (ZSD) APIs
@@ -828,6 +897,7 @@ extern int zone_walk(int (*)(zone_t *, void *), void *);
 
 extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;
+extern rctl_hndl_t rc_zone_phys_mem;
 extern rctl_hndl_t rc_zone_max_lofi;
 
 #endif	/* _KERNEL */

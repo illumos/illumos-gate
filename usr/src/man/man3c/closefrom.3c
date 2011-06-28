@@ -1,0 +1,147 @@
+'\" te
+.\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH closefrom 3C "27 Apr 2000" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+closefrom, fdwalk \- close or iterate over open file descriptors
+.SH SYNOPSIS
+.LP
+.nf
+#include <stdlib.h>
+
+\fBvoid\fR \fBclosefrom\fR(\fBint\fR \fIlowfd\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfdwalk\fR(\fBint\fR (*\fIfunc\fR)(\fBvoid\fR *, \fBint\fR), \fBvoid *\fR\fIcd\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBclosefrom()\fR function calls \fBclose\fR(2) on all open file
+descriptors greater than or equal to \fIlowfd\fR.
+.sp
+.LP
+The effect of \fBclosefrom\fR(\fIlowfd\fR) is the same as the code
+.sp
+.in +2
+.nf
+#include <sys/resource.h>
+struct rlimit rl;
+int i;
+
+getrlimit(RLIMIT_NOFILE, &rl);
+for (i = lowfd; i < rl.rlim_max; i++)
+     (void) close(i);
+.fi
+.in -2
+
+.sp
+.LP
+except that \fBclose()\fR is called only on file descriptors that are actually
+open, not on every possible file descriptor greater than or equal to
+\fIlowfd\fR, and \fBclose()\fR is also called on any open file descriptors
+greater than or equal to \fBrl.rlim_max\fR (and \fIlowfd\fR), should any exist.
+.sp
+.LP
+The \fBfdwalk()\fR function first makes a list of all currently open file
+descriptors. Then for each file descriptor in the list, it calls the
+user-defined function, \fIfunc\fR(\fIcd\fR, \fIfd\fR), passing it the pointer
+to the callback data, \fIcd\fR, and the value of the file descriptor from the
+list, \fIfd\fR.  The list is processed in file descriptor value order, lowest
+numeric value first.
+.sp
+.LP
+If \fIfunc\fR() returns a non-zero value, the iteration over the list is
+terminated and \fBfdwalk()\fR returns the non-zero value returned by
+\fIfunc\fR().  Otherwise, \fBfdwalk()\fR returns 0 after having called
+\fIfunc\fR() for every file descriptor in the list.
+.sp
+.LP
+The \fBfdwalk()\fR function can be used for fine-grained control over the
+closing of file descriptors.  For example, the \fBclosefrom()\fR function can
+be implemented as:
+.sp
+.in +2
+.nf
+static int
+close_func(void *lowfdp, int fd)
+{
+     if (fd >= *(int *)lowfdp)
+          (void) close(fd);
+     return (0);
+}
+
+void
+closefrom(int lowfd)
+{
+     (void) fdwalk(close_func, &lowfd);
+}
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfdwalk()\fR function can then be used to count the number of open files
+in the process.
+.SH RETURN VALUES
+.sp
+.LP
+No return value is defined for \fBclosefrom()\fR. If \fBclose()\fR fails for
+any of the open file descriptors, the error is ignored and the file descriptors
+whose \fBclose()\fR operation failed might remain open on return from
+\fBclosefrom()\fR.
+.sp
+.LP
+The \fBfdwalk()\fR function returns the return value of the last call to the
+callback function \fIfunc\fR(), or 0 if \fIfunc\fR() is never called (no open
+files).
+.SH ERRORS
+.sp
+.LP
+No errors are defined. The \fBclosefrom()\fR and \fBfdwalk()\fR functions do
+not set \fBerrno\fR but \fBerrno\fR can be set by \fBclose()\fR or by another
+function called by the callback function, \fIfunc\fR().
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/proc/self/fd\fR\fR
+.ad
+.RS 17n
+.rt  
+directory (list of open files)
+.RE
+
+.SH USAGE
+.sp
+.LP
+The act of closing all open file descriptors should be performed only as the
+first action of a daemon process.  Closing file descriptors that are in use
+elsewhere in the current process normally leads to disastrous results.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBclose\fR(2), \fBgetrlimit\fR(2), \fBproc\fR(4), \fBattributes\fR(5)

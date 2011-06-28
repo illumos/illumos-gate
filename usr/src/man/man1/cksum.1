@@ -1,0 +1,178 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited All Rights Reserved Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH cksum 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.SH NAME
+cksum \- write file checksums and sizes
+.SH SYNOPSIS
+.LP
+.nf
+\fBcksum\fR [\fIfile\fR]...
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcksum\fR command calculates and writes to standard output a cyclic
+redundancy check (CRC) for each input file, and also writes to standard output
+the number of octets in each file.
+.sp
+.LP
+For each file processed successfully, \fBcksum\fR will write in the following
+format:
+.sp
+.LP
+\fB"%u %d %s\en"\fR <\fIchecksum\fR>, <\fI# of octets\fR>, <\fIpath name\fR>
+.sp
+.LP
+If no \fIfile\fR operand was specified, the path name and its leading space
+will be omitted.
+.sp
+.LP
+The CRC used is based on the polynomial used for CRC error checking in the
+referenced Ethernet standard.
+.sp
+.LP
+The encoding for the CRC checksum is defined by the generating polynomial:
+.sp
+.LP
+\fIG\|\fR(\fIx\fR) = \fIx\fR^32 + \fIx\fR^26 + \fIx\fR^23 + \fIx\fR^22 +
+\fIx\fR^16 + \fIx\fR^12 + \fIx\fR^11 + \fIx\fR^10 + \fIx\fR^8 + \fIx\fR^7 +
+\fIx\fR^5 + \fIx\fR^4 + \fIx\fR^2 + \fIx\fR + 1
+.sp
+.LP
+Mathematically, the CRC value corresponding to a given file is defined by the
+following procedure:
+.RS +4
+.TP
+1.
+The \fIn\fR bits to be evaluated are considered to be the coefficients of a
+mod 2 polynomial \fIM\fR(\fIx\fR) of degree \fIn\fR\(mi\fI1.\fR These \fIn\fR
+bits are the bits from the file, with the most significant bit being the most
+significant bit of the first octet of the file and the last bit being the least
+significant bit of the last octet, padded with zero bits (if necessary) to
+achieve an integral number of octets, followed by one or more octets
+representing the length of the file as a binary value, least significant octet
+first. The smallest number of octets capable of representing this integer is
+used.
+.RE
+.RS +4
+.TP
+2.
+\fIM\fR(\fIx\fR) is multiplied by \fIx\fR ^\fI32\fR (that is, shifted left
+32 bits) and divided by \fIG\fR(\fIx\fR) using mod 2 division, producing a
+remainder \fIR\fR(\fIx\fR) of degree \(<= 31.
+.RE
+.RS +4
+.TP
+3.
+The coefficients of \fIR\fR(\fIx\fR) are considered to be a 32-bit sequence.
+.RE
+.RS +4
+.TP
+4.
+The bit sequence is complemented and the result is the CRC.
+.RE
+.SH OPERANDS
+.sp
+.LP
+The following operand is supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 8n
+.rt  
+A path name of a file to be checked. If no \fIfile\fR operands are specified,
+the standard input is used.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The \fBcksum\fR command is typically used to quickly compare a suspect file
+against a trusted version of the same, such as to ensure that files transmitted
+over noisy media arrive intact. However, this comparison cannot be considered
+cryptographically secure. The chances of a damaged file producing the same CRC
+as the original are astronomically small; deliberate deception is difficult,
+but probably not impossible.
+.sp
+.LP
+Although input files to \fBcksum\fR can be any type, the results need not be
+what would be expected on character special device files. Since this document
+does not specify the block size used when doing input, checksums of character
+special files need not process all of the data in those files.
+.sp
+.LP
+The algorithm is expressed in terms of a bitstream divided into octets. If a
+file is transmitted between two systems and undergoes any data transformation
+(such as moving 8-bit characters into 9-bit bytes or changing "Little Endian"
+byte ordering to "Big Endian"), identical CRC values cannot be expected.
+Implementations performing such transformations may extend \fBcksum\fR to
+handle such situations.
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBcksum\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBcksum\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All files were processed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdigest\fR(1), \fBsum\fR(1), \fBbart\fR(1M), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)

@@ -1,0 +1,79 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH timezone 4 "18 Feb 2003" "SunOS 5.11" "File Formats"
+.SH NAME
+timezone \- default timezone data base
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/timezone\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The timezone file contains information regarding the default timezone for each
+host in a domain. Alternatively, a single default line for the entire domain
+may be specified. Each entry has the format:
+.sp
+.in +2
+.nf
+\fITimezone-name    official-host-or-domain-name\fR
+.fi
+.in -2
+
+.sp
+.LP
+Items are separated by any number of blanks and/or TAB characters. A `#'
+indicates the beginning of a comment; characters up to the end of the line are
+not interpreted by routines which search the file. The timezone is a pathname
+relative to the directory \fB/usr/share/lib/zoneinfo\fR.
+.sp
+.LP
+This file is not actually referenced by any system software; it is merely used
+as a source file to construct the \fBNIS\fR \fBtimezone.byname\fR map. This map
+is read by \fBsysidtool\fR(1M) to initialize the timezone of the client system
+at installation time. For more information, see the \fISolaris Express
+Installation Guide: Basic Installations\fR.
+.sp
+.LP
+The \fBtimezone\fR file does not set the timezone environment variable
+\fBTZ\fR. See \fBTIMEZONE\fR(4) for information to set the \fBTZ\fR environment
+variable.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRTypical timezone line
+.sp
+.LP
+Here is a typical line from the \fB/etc/timezone\fR file:
+
+.sp
+.in +2
+.nf
+US/Eastern          East.Sun.COM #Sun East Coast
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/timezone\fR\fR
+.ad
+.RS 17n
+.rt  
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsysidtool\fR(1M), \fBTIMEZONE\fR(4)
+.sp
+.LP
+\fISolaris Express Installation Guide: Basic Installations\fR

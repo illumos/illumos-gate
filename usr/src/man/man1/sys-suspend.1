@@ -1,0 +1,134 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.	If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sys-suspend 1 "10 Mar 2009" "SunOS 5.11" "User Commands"
+.SH NAME
+sys-suspend \- suspend or shutdown the system and power off
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/bin/sys-suspend\fR [\fB-fnxh\fR][\fB-d\fR \fIdisplayname\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBsys-suspend\fR provides options to suspend or shutdown the whole system.
+.sp
+.LP
+A system can be suspended to conserve power or to prepare the system for
+transport. The suspend should not be used when performing any hardware
+reconfiguration or replacement.
+.sp
+.LP
+In case of suspend, the current system state is preserved either by keeping
+memory powered (Suspend to RAM), or by saving the state to non-volatile storage
+(Suspend to Disk) until a resume operation is performed by power on or a
+wake-up event.
+.sp
+.LP
+On a resume in the windows environment, the system brings up lockscreen to
+ensure that only the authorized person has access to the system. In a
+non-windows environment, the user is prompted for password.
+.sp
+.LP
+It is possible that when devices or processes are performing critical or time
+sensitive operations (such as real time operations) the system fails to
+suspend. When this occurs, the system remains in its current running state.
+Messages reporting the failure are displayed on the console or system log. Once
+the system is successfully suspended, the resume operation always succeed
+barring external influences such as hardware reconfiguration or the like.
+.sp
+.LP
+In case of shutdown, the system responds as if \fBpoweroff\fR(1M) was
+performed.
+.sp
+.LP
+This command enforces the \fBsolaris.system.power.suspend.\fR authorizations.
+On a default install these are associated with the console user. Other users
+need to include these authorizations or include the Suspend profile.
+.SH OPTIONS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR \fIdisplayname\fR\fR
+.ad
+.RS 18n
+.rt  
+Connect to the X server specified by \fIdisplayname\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 6n
+.rt  
+Force suspend. Causes a \fBpoweroff\fR(1M) to occur if the suspend fails.
+System state are not be saved, and a normal boot follows.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 6n
+.rt  
+Change the default from suspend to shutdown.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 6n
+.rt  
+Do not display messages or request user intervention.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR\fR
+.ad
+.RS 6n
+.rt  
+Disable \fBlockscreen\fR. This flag disables the execution of \fBlockscreen\fR
+at resume time.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBhalt\fR(1M), \fBpowerd\fR(1M), \fBpoweroff\fR(1M), \fBshutdown\fR(1M),
+\fBattributes\fR(5), \fBcpr\fR(7)

@@ -1,0 +1,160 @@
+'\" te
+.\" Copyright (C) 1990, Regents of the University of Michigan.  All Rights Reserved.
+.\" Portions Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ldap_getfilter 3LDAP "28 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.SH NAME
+ldap_getfilter, ldap_init_getfilter, ldap_init_getfilter_buf,
+ldap_getfilter_free, ldap_getfirstfilter, ldap_getnextfilter,
+ldap_setfilteraffixes, ldap_build_filter \- LDAP filter generating functions
+.SH SYNOPSIS
+.LP
+.nf
+cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
+#include <lber.h>
+#include <ldap.h>
+#define LDAP_FILT_MAXSIZ	1024
+
+\fBLDAPFiltDesc *\fR\fBldap_init_getfilter\fR(\fBchar\fR \fI*file\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPFiltDesc *\fR\fBldap_init_getfilter_buf\fR(\fBchar\fR \fI*buf\fR, \fBlong\fR \fIbuflen\fR);
+.fi
+
+.LP
+.nf
+\fB\fR\fBldap_getfilter_free\fR(\fBLDAPFiltDesc\fR \fI*lfdp\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPFiltInfo *\fR\fBldap_getfirstfilter\fR(\fBLDAPFiltDesc\fR \fI*lfdp\fR, \fBchar\fR \fI*tagpat\fR,
+     \fBchar\fR \fI*value\fR);
+.fi
+
+.LP
+.nf
+\fBLDAPFiltInfo *\fR\fBldap_getnextfilter\fR(\fBLDAPFiltDesc\fR \fI*lfdp\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_setfilteraffixes\fR(\fBLDAPFiltDesc\fR \fI*lfdp\fR, \fBchar\fR \fI*prefix\fR,
+     \fBchar\fR \fI*suffix\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBldap_build_filter\fR(\fBchar\fR \fI*buf\fR, \fBunsigned long\fR \fIbuflen\fR, \fBchar\fR \fI*pattern\fR,
+     \fBchar\fR \fI*prefix\fR, \fBchar\fR \fI*suffix\fR, \fBchar\fR \fI*attr\fR, \fBchar\fR \fI*value\fR,
+     \fBchar\fR \fI**valwords\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions are used to generate filters to be used in
+\fBldap_search\fR(3LDAP) or  \fBldap_search_s\fR(3LDAP). Either
+\fBldap_init_getfilter\fR or \fBldap_init_getfilter_buf\fR must be called prior
+to calling any of the other functions except  \fBldap_build_filter\fR.
+.sp
+.LP
+\fBldap_init_getfilter()\fR takes a file name as its only argument.  The
+contents of the file must be a valid LDAP filter configuration file (see
+\fBldapfilter.conf\fR(4)). If the file is successfully read, a pointer to an
+\fBLDAPFiltDesc\fR is returned.  This is an opaque object that is passed in
+subsequent get filter calls.
+.sp
+.LP
+\fBldap_init_getfilter_buf()\fR reads from \fIbuf\fR, whose length is
+\fIbuflen\fR, the LDAP filter configuration information. \fIbuf\fR must point
+to the contents of a valid LDAP filter configuration file. See
+\fBldapfilter.conf\fR(4). If the filter configuration information is
+successfully read, a pointer to an  \fBLDAPFiltDesc\fR is returned.  This is an
+opaque object that is passed in subsequent get filter calls.
+.sp
+.LP
+\fBldap_getfilter_free()\fR deallocates the memory consumed by
+\fBldap_init_getfilter\fR. Once it is called, the  \fBLDAPFiltDesc\fR is no
+longer valid and cannot be used again.
+.sp
+.LP
+\fBldap_getfirstfilter()\fR retrieves the first filter that is appropriate for
+\fIvalue.\fR Only filter sets that have tags that match the regular expession
+\fItagpat\fR are considered. \fBldap_getfirstfilter\fR returns a pointer to an
+\fBLDAPFiltInfo\fR structure, which contains a filter with \fIvalue\fR inserted
+as appropriate in  \fBlfi_filter,\fR a text match description in
+\fBlfi_desc,\fR \fBlfi_scope\fR set to indicate the search scope, and
+\fBlfi_isexact\fR set to indicate the type of filter.   \fINULL\fR is returned
+if no matching filters are found.   \fBlfi_scope\fR will be one of
+\fBLDAP_SCOPE_BASE\fR, \fBLDAP_SCOPE_ONELEVEL\fR, or
+\fBLDAP_SCOPE_SUBTREE\fR\fB\&.\fR \fBlfi_isexact\fR will be zero if the filter
+has any '~' or '*' characters in it and non-zero otherwise.
+.sp
+.LP
+\fBldap_getnextfilter()\fR retrieves the next appropriate filter in the filter
+set that was determined when  \fBldap_getfirstfilter\fR was called.  It returns
+\fINULL\fR when the list has been exhausted.
+.sp
+.LP
+\fBldap_setfilteraffixes()\fR sets a \fIprefix\fR to be prepended and a
+\fIsuffix\fR to be appended to all filters returned in the future.
+.sp
+.LP
+\fBldap_build_filter()\fR constructs an LDAP search filter in \fIbuf.\fR
+\fIbuflen\fR is the size, in bytes, of the largest filter \fIbuf\fR can hold.
+A pattern for the desired filter is passed in \fIpattern.\fR Where the string
+%a appears in the pattern it is replaced with \fIattr.\fR \fIprefix\fR is
+pre-pended to the resulting filter, and \fIsuffix\fR is appended.  Either can
+be NULL , in which case they are not used. \fIvalue\fR and \fIvalwords\fR are
+used when the string %v appears in \fIpattern.\fR See  \fBldapfilter.conf\fR(4)
+for a description of how %v is handled.
+.SH ERRORS
+.sp
+.LP
+\fINULL\fR is returned by  \fBldap_init_getfilter\fR if there is an error
+reading \fIfile.\fR \fINULL\fR \fBis\fR \fBreturned\fR \fBby\fR
+\fBldap_getfirstfilter\fR and \fBldap_getnextfilter\fR when there are no more
+appropriate filters to return.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBETCDIR/ldapfilter.conf\fR\fR
+.ad
+.RS 26n
+.rt  
+LDAP filtering routine configuration file.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+Interface StabilityEvolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBldap\fR(3LDAP), \fBldapfilter.conf\fR(4), \fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+The return values for all of these functions are declared in the <\fBldap.h\fR>
+header file.  Some functions may allocate memory which must be freed by the
+calling application.

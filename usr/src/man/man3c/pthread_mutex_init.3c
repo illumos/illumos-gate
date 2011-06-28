@@ -1,0 +1,214 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pthread_mutex_init 3C "11 Nov 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+pthread_mutex_init, pthread_mutex_destroy \- initialize or destroy a mutex
+.SH SYNOPSIS
+.LP
+.nf
+cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
+#include <pthread.h> 
+
+\fBint\fR \fBpthread_mutex_init\fR(\fBpthread_mutex_t *restrict\fR \fImutex\fR,
+     \fBconst pthread_mutexattr_t *restrict\fR \fIattr\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBpthread_mutex_destroy\fR(\fBpthread_mutex_t *\fR\fImutex\fR);
+.fi
+
+.LP
+.nf
+\fBpthread_mutex_t\fR \fImutex\fR= \fBPTHREAD_MUTEX_INITIALIZER\fR;
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpthread_mutex_init()\fR function initializes the mutex referenced by
+\fImutex\fR with attributes specified by \fIattr\fR. If \fIattr\fR is
+\fINULL\fR, the default mutex attributes are used; the effect is the same as
+passing the address of a default mutex attributes object. Upon successful
+initialization, the state of the mutex becomes initialized and unlocked.
+.sp
+.LP
+Except for robust mutexes, attempting to initialize an already initialized
+mutex results in undefined behavior.
+.sp
+.LP
+The \fBpthread_mutex_destroy()\fR function destroys the mutex object referenced
+by \fImutex\fR; the mutex object becomes, in effect, uninitialized. A destroyed
+mutex object can be re-initialized using \fBpthread_mutex_init()\fR; the
+results of otherwise referencing the object after it has been destroyed are
+undefined.
+.sp
+.LP
+It is safe to destroy an initialized mutex that is unlocked. Attempting to
+destroy a locked mutex results in undefined behavior.
+.sp
+.LP
+In cases where default mutex attributes are appropriate, the macro
+\fBPTHREAD_MUTEX_INITIALIZER\fR can be used to initialize mutexes that are
+statically allocated. The effect is equivalent to dynamic initialization by a
+call to \fBpthread_mutex_init()\fR with parameter \fIattr\fR specified as
+\fINULL\fR, except that no error checks are performed.
+.SH RETURN VALUES
+.sp
+.LP
+If successful, the \fBpthread_mutex_init()\fR and \fBpthread_mutex_destroy()\fR
+functions return  \fB0\fR. Otherwise, an error number is returned to indicate
+the error.
+.SH ERRORS
+.sp
+.LP
+The \fBpthread_mutex_init()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+The system lacked the necessary resources (other than memory) to initialize
+another mutex.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was detected to  re-initialize a robust mutex previously initialized
+but not yet destroyed. See \fBpthread_mutexattr_setrobust\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was detected to re-initialize a robust mutex previously initialized
+with a different set of attributes. See \fBpthread_mutexattr_setrobust\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOMEM\fR\fR
+.ad
+.RS 10n
+.rt  
+Insufficient memory exists to initialize the mutex.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+.rt  
+The caller does not have the privilege to perform the operation.
+.RE
+
+.sp
+.LP
+The \fBpthread_mutex_init()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was detected to re-initialize the object referenced by \fImutex\fR,
+a mutex previously initialized but not yet destroyed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fIattr\fR or \fImutex\fR is invalid.
+.RE
+
+.sp
+.LP
+The \fBpthread_mutex_destroy()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+.rt  
+An attempt was detected to destroy the object referenced by \fImutex\fR while
+it is locked or referenced (for example, while being used in a
+\fBpthread_cond_wait\fR(3C) or \fBpthread_cond_timedwait\fR(3C)) by another
+thread.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The value specified by \fImutex\fR is invalid.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpthread_cond_wait\fR(3C), \fBpthread_mutex_lock\fR(3C),
+\fBpthread_mutexattr_setprioceiling\fR(3C),
+\fBpthread_mutexattr_setprotocol\fR(3C),
+\fBpthread_mutexattr_setpshared\fR(3C), \fBpthread_mutexattr_setrobust\fR(3C),
+\fBpthread_mutexattr_settype\fR(3C), \fBattributes\fR(5), \fBmutex\fR(5),
+\fBstandards\fR(5)

@@ -1,0 +1,196 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH getauevent 3BSM "25 Jun 2008" "SunOS 5.11" "Security and Auditing Library Functions"
+.SH NAME
+getauevent, getauevnam, getauevnum, getauevnonam, setauevent, endauevent,
+getauevent_r, getauevnam_r, getauevnum_r \- get audit_event entry
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lbsm\fR \fB -lsocket \fR \fB -lnsl \fR  [ \fIlibrary\fR... ]
+#include <sys/param.h>
+#include <bsm/libbsm.h>
+
+\fBstruct au_event_ent *\fR\fBgetauevent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct au_event_ent *\fR\fBgetauevnam\fR(\fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct au_event_ent *\fR\fBgetauevnum\fR(\fBau_event_t\fR \fIevent_number\fR);
+.fi
+
+.LP
+.nf
+\fBau_event_t\fR \fBgetauevnonam\fR(\fBchar *\fR\fIevent_name\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBsetauevent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBendauevent\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBstruct au_event_ent *\fR\fBgetauevent_r\fR(\fBau_event_ent_t *\fR\fIe\fR);
+.fi
+
+.LP
+.nf
+\fBstruct au_event_ent *\fR\fBgetauevnam_r\fR(\fBau_event_ent_t *\fR\fIe\fR, \fBchar *\fR\fIname\fR);
+.fi
+
+.LP
+.nf
+\fBstruct au_event_ent *\fR\fBgetauevnum_r\fR(\fBau_event_ent_t *\fR\fIe\fR,
+     \fBau_event_t\fR \fIevent_number\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions document the programming interface for obtaining entries from
+the \fBaudit_event\fR(4) file. The \fBgetauevent()\fR, \fBgetauevnam()\fR,
+\fBgetauevnum()\fR, \fBgetauevent()\fR, \fBgetauevnam()\fR, and
+\fBgetauevnum()\fR functions each return a pointer to an \fBaudit_event\fR
+structure.
+.sp
+.LP
+The \fBgetauevent()\fR and \fBgetauevent_r()\fR functions enumerate
+\fBaudit_event\fR entries. Successive calls to these functions return either
+successive \fBaudit_event\fR entries or \fINULL\fR.
+.sp
+.LP
+The \fBgetauevnam()\fR and \fBgetauevnam_r()\fR functions search for an
+\fBaudit_event\fR entry with \fIevent_name\fR.
+.sp
+.LP
+The \fBgetauevnum()\fR and \fBgetauevnum_r()\fR functions search for an
+\fBaudit_event\fR entry with \fIevent_number\fR.
+.sp
+.LP
+The \fBgetauevnonam()\fR function searches for an \fBaudit_event\fR entry with
+\fIevent_name\fR and returns the corresponding event number.
+.sp
+.LP
+The \fBsetauevent()\fR function ``rewinds'' to the beginning of the enumeration
+of  \fBaudit_event\fR entries.  Calls to \fBgetauevnam()\fR,
+\fBgetauevnum()\fR, \fBgetauevnonum()\fR, \fBgetauevnam_r()\fR, or
+\fBgetauevnum_r()\fR can leave the enumeration in an indeterminate state. The
+\fBsetauevent()\fR function should be called before the first call to
+\fBgetauevent()\fR or \fBgetauevent_r()\fR.
+.sp
+.LP
+The \fBendauevent()\fR function can be called to indicate that
+\fBaudit_event\fR processing is complete. The system can then close any open
+\fBaudit_event\fR file, deallocate storage, and so forth.
+.sp
+.LP
+The \fBgetauevent_r()\fR, \fBgetauevnam_r()\fR, and \fBgetauevnum_r()\fR
+functions each take an argument \fIe\fR, which is a pointer to an
+\fBau_event_ent_t\fR. This pointer is returned on a successful function call.
+To assure there is enough space for the information returned, the applications
+programmer should be sure to allocate \fBAU_EVENT_NAME_MAX\fR and
+\fBAU_EVENT_DESC_MAX\fR bytes for the \fBae_name\fR and \fBac_desc\fR elements
+of the \fBau_event_ent_t\fR data structure.
+.sp
+.LP
+The internal representation of an \fBaudit_event\fR entry is an
+\fBau_event_ent\fR structure defined in <\fBbsm/libbsm.h\fR> with the following
+members:
+.sp
+.in +2
+.nf
+au_event_t      ae_number
+char            *ae_name;
+char            *ae_desc*;
+au_class_t      ae_class;
+.fi
+.in -2
+
+.SH RETURN VALUES
+.sp
+.LP
+The \fBgetauevent()\fR, \fBgetauevnam()\fR, \fBgetauevnum()\fR,
+\fBgetauevent_r()\fR, \fBgetauevnam_r()\fR, and \fBgetauevnum_r()\fR functions
+return a pointer to a \fBau_event_ent\fR structure if the requested entry is
+successfully located. Otherwise they return \fINULL\fR.
+.sp
+.LP
+The \fBgetauevnonam()\fR function returns an event number of type
+\fBau_event_t\fR if it successfully enumerates an entry. Otherwise it returns
+\fINULL\fR, indicating it could not find the requested event name.
+.SH FILES
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/security/audit_event\fR\fR
+.ad
+.RS 29n
+.rt  
+file that maps audit event numbers to audit event names
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 29n
+.rt  
+file that stores user-ID to username mappings
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.sp
+.LP
+The \fBgetauevent()\fR,  \fBgetauevnam()\fR, and \fBgetauevnum()\fR functions
+are Unsafe. The equivalent functions \fBgetauevent_r()\fR,
+\fBgetauevnam_r()\fR, and \fBgetauevnum_r()\fR provide the same functionality
+and an MT-Safe function call interface.
+.SH SEE ALSO
+.sp
+.LP
+\fBbsmconv\fR(1M), \fBgetauclassent\fR(3BSM), \fBgetpwnam\fR(3C),
+\fBaudit_class\fR(4), \fBaudit_event\fR(4), \fBpasswd\fR(4),
+\fBattributes\fR(5)
+.SH NOTES
+.sp
+.LP
+All information for the \fBgetauevent()\fR, \fBgetauevnam()\fR, and
+\fBgetauevnum()\fR functions is contained in a static area, so it must be
+copied if it is to be saved.
+.sp
+.LP
+The functionality described on this manual page is available only if the
+Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

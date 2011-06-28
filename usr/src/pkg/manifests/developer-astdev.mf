@@ -35,6 +35,7 @@ dir path=usr/ast/bin
 dir path=usr/include
 dir path=usr/include/ast
 dir path=usr/lib
+dir path=usr/share/man/man1
 file path=usr/ast/bin/msgcc mode=0555
 file path=usr/ast/bin/msgcpp mode=0555
 file path=usr/ast/bin/msgcvt mode=0555
@@ -43,6 +44,11 @@ file path=usr/ast/bin/msgget mode=0555
 file path=usr/include/ast/pp.h
 file path=usr/include/ast/ppkey.h
 file path=usr/lib/libpp.so.1
+file path=usr/share/man/man1/msgcc.1
+file path=usr/share/man/man1/msgcpp.1
+file path=usr/share/man/man1/msgcvt.1
+file path=usr/share/man/man1/msggen.1
+file path=usr/share/man/man1/msgget.1
 legacy pkg=SUNWastdev desc="AT&T AST development utilities" \
     name="AT&T AST development utilities"
 license cr_Sun license=cr_Sun

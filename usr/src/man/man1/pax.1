@@ -1,0 +1,3024 @@
+'\" te
+.\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pax 1 "16 Jul 2008" "SunOS 5.11" "User Commands"
+.SH NAME
+pax \- portable archive interchange
+.SH SYNOPSIS
+.LP
+.nf
+\fBpax\fR [\fB-cdnv\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... 
+     [\fB-s\fR \fIreplstr\fR]... [\fIpattern\fR]...
+.fi
+
+.LP
+.nf
+\fBpax\fR \fB-r\fR [\fB-cdiknuv@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... 
+     [\fB-p\fR \fIstring\fR]... [\fB-s\fR \fIreplstr\fR]... [\fIpattern\fR]...
+.fi
+
+.LP
+.nf
+\fBpax\fR \fB-w\fR [\fB-dituvX@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-b\fR \fIblocksize\fR] [\fB-a\fR] 
+     [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... [\fB-s\fR \fIreplstr\fR]... 
+     [\fB-x\fR \fIformat\fR] [\fIfile\fR]...
+.fi
+
+.LP
+.nf
+\fBpax\fR \fB-r\fR \fB-w\fR [\fB-diklntuvX@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-o\fR \fIoptions\fR]... 
+     [\fB-p\fR \fIstring\fR]... [\fB-s\fR \fIreplstr\fR]... [\fIfile\fR]... \fIdirectory\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpax\fR reads, writes, and writes lists of the members of archive files and
+copies directory hierarchies. A variety of archive formats are supported. See
+the \fB-x\fR \fIformat\fR option.
+.SS "Modes of Operations"
+.sp
+.LP
+The action to be taken depends on the presence of the \fB-r\fR and \fB-w\fR
+options. The four combinations of \fB-r\fR and \fB-w\fR are referred to as the
+four modes of operation: \fBlist\fR, \fBread\fR, \fBwrite\fR, and \fBcopy\fR
+modes, corresponding respectively to the four forms shown in the SYNOPSIS.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlist\fR\fR
+.ad
+.RS 9n
+.rt  
+In \fBlist\fR mode, that is, when neither \fB-r\fR nor \fB-w\fR are specified,
+\fBpax\fR writes the names of the members of the archive file read from the
+standard input, with path names matching the specified patterns, to standard
+output. If a named file has extended attributes, the extended attributes are
+also listed. If a named file is of type directory, the file hierarchy rooted at
+that file is listed as well.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBread\fR\fR
+.ad
+.RS 9n
+.rt  
+In \fBread\fR mode, that is, when \fB-r\fR is specified, but \fB-w\fR is not,
+\fBpax\fR extracts the members of the archive file read from the standard
+input, with path names matching the specified patterns. If an extracted file is
+of type directory, the file hierarchy rooted at that file is extracted as well.
+The extracted files are created performing path name resolution with the
+directory in which \fBpax\fR was invoked as the current working directory.
+.sp
+If an attempt is made to extract a directory when the directory already exists,
+this is not considered an error. If an attempt is made to extract a \fBFIFO\fR
+when the \fBFIFO\fR already exists, this is not considered an error.
+.sp
+The ownership, access and modification times, and file mode of the restored
+files are discussed under the \fB-p\fR option.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwrite\fR\fR
+.ad
+.RS 9n
+.rt  
+In \fBwrite\fR mode, that is, when \fB-w\fR is specified, but \fB-r\fR is not,
+\fBpax\fR writes the contents of the \fIfile\fR operands to the standard output
+in an archive format. If no \fIfile\fR operands are specified, a list of files
+to copy, one per line, are read from the standard input. A file of type
+directory includes all of the files in the file hierarchy rooted at the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcopy\fR\fR
+.ad
+.RS 9n
+.rt  
+In \fBcopy\fR mode, that is, when both \fB-r\fR and \fB-w\fR are specified,
+\fBpax\fR copies the \fIfile\fR operands to the destination directory.
+.sp
+If no \fIfile\fR operands are specified, a list of files to copy, one per line,
+are read from the standard input. A file of type directory includes all of the
+files in the file hierarchy rooted at the file.
+.sp
+The effect of the \fBcopy\fR is as if the copied files were written to an
+archive file and then subsequently extracted, except that there can be hard
+links between the original and the copied files. If the destination directory
+is a subdirectory of one of the files to be copied, the results are
+unspecified. It is an error if \fIdirectory\fR does not exist, is not writable
+by the user, or is not a directory.
+.RE
+
+.sp
+.LP
+In \fBread\fR or \fBcopy\fR modes, if intermediate directories are necessary to
+extract an archive member, \fBpax\fR performs actions equivalent to the
+\fBmkdir\fR(2) function, called with the following arguments:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The intermediate directory used as the \fIpath\fR argument.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The octal value of \fB777\fR or \fBrwx\fR (read, write, and execute
+permissions) as the \fImode\fR argument (see \fBchmod\fR(1)).
+.RE
+.sp
+.LP
+If any specified \fIpattern\fR or \fIfile\fR operands are not matched by at
+least one file or archive member, \fBpax\fR writes a diagnostic message to
+standard error for each one that did not match and exits with a non-zero exit
+status.
+.sp
+.LP
+The supported archive formats are automatically detected on input. The default
+output archive format is \fBtar\fR(1).
+.sp
+.LP
+A single archive can span multiple files. \fBpax\fR determines what file to
+read or write as the next file.
+.sp
+.LP
+If the selected archive format supports the specification of linked files, it
+is an error if these files cannot be linked when the archive is extracted,
+except if the files to be linked are symbolic links and the system is not
+capable of making hard links to symbolic links. In that case, separate copies
+of the symbolic link are created instead. Any of the various names in the
+archive that represent a file can be used to select the file for extraction.
+For archive formats that do not store file contents with each name that causes
+a hard link, if the file that contains the data is not extracted during this
+\fBpax\fR session, either the data is restored from the original file, or a
+diagnostic message is displayed with the name of a file that can be used to
+extract the data. In traversing directories, \fBpax\fR detects infinite loops,
+that is, entering a previously visited directory that is an ancestor of the
+last file visited. When it detects an infinite loop, \fBpax\fR writes a
+diagnostic message to standard error and terminates.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 16n
+.rt  
+Appends files to the end of the archive. This option does not work for some
+archive devices, such as 1/4-inch streaming tapes and 8mm tapes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-b\fR \fIblocksize\fR\fR
+.ad
+.RS 16n
+.rt  
+Blocks the output at a positive decimal integer number of bytes per write to
+the archive file. Devices and archive formats can impose restrictions on
+blocking. Blocking is automatically determined on input. Portable applications
+must not specify a \fIblocksize\fR value larger than \fB32256\fR. Default
+blocking when creating archives depends on the archive format. See the \fB-x\fR
+option below.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 16n
+.rt  
+Matches all file or archive members except those specified by the \fIpattern\fR
+or \fIfile\fR operands.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 16n
+.rt  
+Causes files of type directory being copied or archived or archive members of
+type directory being extracted or listed to match only the file or archive
+member itself and not the file hierarchy rooted at the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-f\fR \fIarchive\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the path name of the input or output archive, overriding the default
+standard input (in \fBlist\fR or \fBread\fR modes) or standard output
+(\fBwrite\fR mode).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 16n
+.rt  
+If a symbolic link referencing a file of type directory is specified on the
+command line, \fBpax\fR archives the file hierarchy rooted in the file
+referenced by the link, using the name of the link as the root of the file
+hierarchy. Otherwise, if a symbolic link referencing a file of any other file
+type which \fBpax\fR can normally archive is specified on the command line,
+then \fBpax\fR archives the file referenced by the link, using the name of the
+link. The default behavior is to archive the symbolic link itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 16n
+.rt  
+Interactively renames files or archive members. For each archive member
+matching a \fIpattern\fR operand or file matching a \fIfile\fR operand, a
+prompt is written to the file \fB/dev/tty\fR. The prompt contains the name of
+the file or archive member. A line is then read from \fB/dev/tty\fR. If this
+line is blank, the file or archive member is skipped. If this line consists of
+a single period, the file or archive member is processed with no modification
+to its name. Otherwise, its name is replaced with the contents of the line.
+\fBpax\fR immediately exits with a non-zero exit status if end-of-file is
+encountered when reading a response or if \fB/dev/tty\fR cannot be opened for
+reading and writing.
+.sp
+The results of extracting a hard link to a file that has been renamed during
+extraction are unspecified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-k\fR\fR
+.ad
+.RS 16n
+.rt  
+Prevents the overwriting of existing files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 16n
+.rt  
+Links files. In \fBcopy\fR mode, hard links are made between the source and
+destination file hierarchies whenever possible. If specified in conjunction
+with \fB-H\fR or \fB-L\fR, when a symbolic link is encountered, the hard link
+created in the destination file hierarchy is to the file referenced by the
+symbolic link. If specified when neither \fB-H\fR nor \fB-L\fR is specified,
+when a symbolic link is encountered, the implementation creates a hard link to
+the symbolic link in the source file hierarchy or copies the symbolic link to
+the destination.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-L\fR\fR
+.ad
+.RS 16n
+.rt  
+If a symbolic link referencing a file of type directory is specified on the
+command line or encountered during the traversal of a file hierarchy, \fBpax\fR
+archives the file hierarchy rooted in the file referenced by the link, using
+the name of the link as the root of the file hierarchy. Otherwise, if a
+symbolic link referencing a file of any other file type which \fBpax\fR can
+normally archive is specified on the command line or encountered during the
+traversal of a file hierarchy, \fBpax\fR archives the file referenced by the
+link, using the name of the link. The default behavior is to archive the
+symbolic link itself.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 16n
+.rt  
+Selects the first archive member that matches each \fIpattern\fR operand. No
+more than one archive member is matched for each pattern, although members of
+type directory still match the file hierarchy rooted at that file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-o\fR \fIoptions\fR\fR
+.ad
+.RS 16n
+.rt  
+Provides information to the implementation to modify the algorithm for
+extracting or writing files. The value of options consists of one or more
+comma-separated keywords of the form:
+.sp
+.in +2
+.nf
+\fIkeyword\fR[[:]=\fIvalue\fR][,\fIkeyword\fR[[:]=\fIvalue\fR], ...]
+.fi
+.in -2
+.sp
+
+Some keywords apply only to certain file formats, as indicated with each
+description. Use of keywords that are inapplicable to the file format being
+processed produces undefined results.
+.sp
+Keywords in the \fIoptions\fR argument must be a string that would be a valid
+portable filename.
+.sp
+Keywords are not expected to be filenames, merely to follow the same character
+composition rules as portable filenames.
+.sp
+Keywords can be preceded with white space. The \fIvalue\fR field consists of
+zero or more characters. Within \fIvalue\fR, the application precedes any
+literal comma with a backslash, which is ignored, but preserves the comma as
+part of \fIvalue\fR. A comma as the final character, or a comma followed solely
+by white space as the final characters, in \fIoptions\fR is ignored. Multiple
+\fB-o\fR options can be specified. If keywords given to these multiple \fB-o\fR
+options conflict, the keywords and values appearing later in command line
+sequence take precedence and the earlier ones are silently ignored. The
+following keyword values of \fIoptions\fR are supported for the file formats as
+indicated:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBdelete=\fR\fIpattern\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword is applicable only to the \fB-x\fR \fBpax\fR format. When used in
+\fBwrite\fR or \fBcopy\fR mode, \fBpax\fR omits from extended header records
+that it produces any keywords matching the string pattern. When used in
+\fBread\fR or \fBlist\fR mode, \fBpax\fR ignores any keywords matching the
+string pattern in the extended header records. In both cases, matching is
+performed using the pattern matching notation. For example:
+.sp
+.in +2
+.nf
+\fB-o delete=security.*\fR
+.fi
+.in -2
+.sp
+
+would suppress security-related information.
+.sp
+When multiple \fB-o\fR \fBdelete=\fR\fIpattern\fR options are specified, the
+patterns are additive. All keywords matching the specified string patterns are
+omitted from extended header records that \fBpax\fR produces.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBexthdr.name=\fR\fIstring\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword is applicable only to the \fB-x\fR \fBpax\fR format. This keyword
+allows user control over the name that is written into the \fBustar\fR header
+blocks for the extended header. The name is the contents of \fIstring\fR, after
+the following character substitutions have been made:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%d\fR\fR
+.ad
+.RS 6n
+.rt  
+The directory name of the file, equivalent to the result of the \fIdirname\fR
+utility on the translated path name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%f\fR\fR
+.ad
+.RS 6n
+.rt  
+The filename of the file, equivalent to the result of the \fIbasename\fR
+utility on the translated path name.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%p\fR\fR
+.ad
+.RS 6n
+.rt  
+The process ID of the \fBpax\fR process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+A '%' character.
+.RE
+
+Any other '%' characters in \fIstring\fR produce undefined results.
+.sp
+If no \fB-o\fR \fBexthdr.name\fR=\fIstring\fR is specified, \fBpax\fR uses the
+following default value:
+.sp
+.in +2
+.nf
+%d/PaxHeaders.%p/%f
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBglobexthdr.name=\fR\fIstring\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword is applicable only to the \fB-x\fR \fBpax\fR format. When used in
+\fBwrite\fR or \fBcopy\fR mode with the appropriate options, \fBpax\fR creates
+global extended header records with \fBustar\fR header blocks that are treated
+as regular files by previous versions of \fBpax\fR. This keyword allows user
+control over the name that is written into the \fBustar\fR header blocks for
+global extended header records. The name is the contents of \fIstring\fR, after
+the following character substitutions have been made:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%n\fR\fR
+.ad
+.RS 6n
+.rt  
+An integer that represents the sequence number of the global extended header
+record in the archive, starting at \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%p\fR\fR
+.ad
+.RS 6n
+.rt  
+The process ID of the \fBpax\fR process.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB%%\fR\fR
+.ad
+.RS 6n
+.rt  
+A '%' character.
+.RE
+
+Any other '%' characters in \fIstring\fR produce undefined results.
+.sp
+If no \fB-o\fR \fBglobexthdr.name\fR=\fIstring\fR is specified, \fBpax\fR uses
+the following default value:
+.sp
+.in +2
+.nf
+$TMPDIR/GlobalHead.%p.%n
+.fi
+.in -2
+.sp
+
+where \fB$TMPDIR\fR represents the value of the \fBTMPDIR\fR environment
+variable. If \fBTMPDIR\fR is not set, \fBpax\fR uses \fB/tmp\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBinvalid=\fR\fIaction\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword is applicable only to the \fB-x\fR \fBpax\fR format. This keyword
+allows user control over the action \fBpax\fR takes upon encountering values in
+an extended header record that, in \fBread\fR or \fBcopy\fR mode, are invalid
+in the destination hierarchy or, in \fBlist\fR mode , cannot be written in the
+codeset and current locale of the implementation. The following are invalid
+values that are recognized by \fBpax\fR:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In \fBread\fR or \fBcopy\fR mode, a filename or link name that contains
+character encodings invalid in the destination hierarchy. For example, the name
+can contain embedded \fBNUL\fRs.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In \fBread\fR or \fBcopy\fR mode, a filename or link name that is longer than
+the maximum allowed in the destination hierarchy, for either a path name
+component or the entire path name.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In \fBlist\fR mode, any character string value (filename, link name, user name,
+and so on) that cannot be written in the codeset and current locale of the
+implementation.
+.RE
+The following mutually-exclusive values of the \fIaction\fR argument are
+supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBbypass\fR\fR
+.ad
+.RS 10n
+.rt  
+In \fBread\fR or \fBcopy\fR mode, \fBpax\fR bypasses the file, causing no
+change to the destination hierarchy. In \fBlist\fR mode, \fBpax\fR writes all
+requested valid values for the file, but its method for writing invalid values
+is unspecified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrename\fR\fR
+.ad
+.RS 10n
+.rt  
+In \fBread\fR or \fBcopy\fR mode, \fBpax\fR acts as if the \fB-i\fR option were
+in effect for each file with invalid filename or link name values, allowing the
+user to provide a replacement name interactively. In \fBlist\fR mode, \fBpax\fR
+behaves identically to the \fBbypass\fR action.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBUTF-8\fR\fR
+.ad
+.RS 10n
+.rt  
+\fBpax\fR uses the actual \fBUTF-8\fR encoding for the name when it is used in
+\fBread\fR, \fBcopy\fR, or \fBlist\fR mode and a filename, link name, owner
+name, or any other field in an extended header record cannot be translated from
+the \fBpax\fR \fBUTF-8\fR codeset format to the codeset and current locale of
+the implementation.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwrite\fR\fR
+.ad
+.RS 10n
+.rt  
+In \fBread\fR or \fBcopy\fR mode, \fBpax\fR writes the file, translating the
+name, regardless of whether this can overwrite an existing file with a valid
+name. In \fBlist\fR mode, \fBpax\fR behaves identically to the \fBbypass\fR
+action.
+.RE
+
+If no \fB-o\fR \fBinvalid=\fR option is specified, \fBpax\fR acts as if
+\fB-o\fR \fBinvalid=bypass\fR were specified. Any overwriting of existing files
+that can be allowed by the \fB-o\fR \fBinvalid=\fR \fIaction\fRs are subject to
+permission (\fB-p\fR) and modification time (\fB-u\fR) restrictions, and are
+suppressed if the \fB-k\fR option is also specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlinkdata\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword is applicable only to the \fB-x\fR \fBpax\fR format. In
+\fBwrite\fR mode, \fBpax\fR writes the contents of a file to the archive even
+when that file is merely a hard link to a file whose contents have already been
+written to the archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlistopt=\fR\fIformat\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword specifies the output format of the table of contents produced when
+the \fB-v\fR option is specified in \fBlist\fR mode. (See \fBList Mode Format
+Specifications\fR below.) To avoid ambiguity, the \fBlistopt=\fR\fIformat\fR is
+the only or final \fIkeyword\fR=\fIvalue\fR pair in an \fB-o\fR
+option-argument. All characters in the remainder of the option-argument are
+considered to be part of the format string. When multiple \fB-o\fR
+\fBlistopt=\fR\fIformat\fR options are specified, the format strings are
+considered to be a single, concatenated string, evaluated in command line
+order.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBtimes\fR\fR
+.ad
+.sp .6
+.RS 4n
+This keyword is applicable only to the \fB-x\fR \fBpax\fR and \fB-x\fR
+\fBxustar\fR formats. When used in write or copy mode, \fBpax\fR includes
+\fBatime\fR and \fImtime\fR extended header records for each file.
+.RE
+
+In addition to these keywords, if the \fB-x\fR \fBpax\fR format is specified,
+any of the keywords and values, including implementation extensions, can be
+used in \fB-o\fR option-arguments, in either of two modes:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeyword=\fR\fIvalue\fR\fR
+.ad
+.RS 18n
+.rt  
+When used in \fBwrite\fR or \fBcopy\fR mode, these keyword/value pairs are
+included at the beginning of the archive as \fBtypeflag g\fR global extended
+header records. When used in \fBread\fR or \fBlist\fR mode, these keyword/value
+pairs act as if they had been at the beginning of the archive as \fBtypeflag
+g\fR global extended header records.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBkeyword:=\fR\fIvalue\fR\fR
+.ad
+.RS 18n
+.rt  
+When used in \fBwrite\fR or \fBcopy\fR mode, these keyword/value pairs are
+included as records at the beginning of a \fBtypeflag x\fR extended header for
+each file. This is equivalent to the equal-sign form except that it creates no
+\fBtypeflag g\fR global extended header records. When used in \fBread\fR or
+\fBlist\fR mode, these keyword/value pairs act as if they were included as
+records at the end of each extended header. Thus, they override any global or
+file-specific extended header record keywords of the same names. For example,
+in the command:
+.sp
+.in +2
+.nf
+\fBpax -r -o "
+gname:=mygroup,
+" <archive\fR
+.fi
+.in -2
+.sp
+
+the group name is forced to a new value for all files read from the archive.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fIstring\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies one or more file characteristic options (privileges). The
+\fIstring\fR option-argument must be a string specifying file characteristics
+to be retained or discarded on extraction. The string consists of the
+specification characters \fBa\fR, \fBe\fR, \fBm\fR, \fBo\fR, and \fBp\fR.
+Multiple characteristics can be concatenated within the same string and
+multiple \fB-p\fR options can be specified. The meaning of the specification
+characters is as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBa\fR\fR
+.ad
+.RS 5n
+.rt  
+Does not preserve file access times.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBe\fR\fR
+.ad
+.RS 5n
+.rt  
+Preserves the user \fBID\fR, group \fBID\fR, file mode bits, access time, and
+modification time.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBm\fR\fR
+.ad
+.RS 5n
+.rt  
+Does not preserve file modification times.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBo\fR\fR
+.ad
+.RS 5n
+.rt  
+Preserves the user \fBID\fR and group \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBp\fR\fR
+.ad
+.RS 5n
+.rt  
+Preserves the file mode bits.
+.RE
+
+In the preceding list, \fBpreserve\fR indicates that an attribute stored in the
+archive is given to the extracted file, subject to the permissions of the
+invoking process. Otherwise, the attribute is determined as part of the normal
+file creation action. The access and modification times of the file is
+preserved unless otherwise specified with the \fB-p\fR option or not stored in
+the archive. All attributes that are not preserved are determined as part of
+the normal file creation action.
+.sp
+If neither the \fBe\fR nor the \fBo\fR specification character is specified, or
+the user \fBID\fR and group \fBID\fR are not preserved for any reason,
+\fBpax\fR does not set the \fBsetuid\fR and \fBsetgid\fR bits of the file mode.
+.sp
+If the preservation of any of these items fails for any reason, \fBpax\fR
+writes a diagnostic message to standard error. Failure to preserve these items
+affects the final exit status, but does not cause the extracted file to be
+deleted.
+.sp
+If file-characteristic letters in any of the \fIstring\fR option-arguments are
+duplicated or conflict with each other, the ones given last take precedence.
+For example, if \fB-p\fR \fBeme\fR is specified, file modification times are
+preserved.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 16n
+.rt  
+Reads an archive file from standard input.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-s\fR \fIreplstr\fR\fR
+.ad
+.RS 16n
+.rt  
+Modifies file or archive member names named by \fIpattern\fR or \fIfile\fR
+operands according to the substitution expression \fIreplstr\fR, which is based
+on the \fBed\fR(1) \fBs\fR (substitution) utility, using the regular expression
+syntax of \fBregex\fR(5). The concepts of ``address'' and ``line'' are
+meaningless in the context of the \fBpax\fR command, and must not be supplied.
+The format is:
+.sp
+.in +2
+.nf
+-s /\fIold\fR/\fInew\fR/ [gp]
+.fi
+.in -2
+.sp
+
+where, as in \fBed\fR, \fIold\fR is a basic regular expression and \fInew\fR
+can contain an ampersand (\fB&\fR), a \e\fIn\fR backreference, where \fIn\fR is
+a digit, or subexpression matching. The \fIold\fR string is also permitted to
+contain newlines.
+.sp
+Any non-null character can be used as a delimiter (\fB/\fR shown here).
+Multiple \fB-s\fR expressions can be specified. The expressions are applied in
+the order specified, terminating with the first successful substitution. The
+optional trailing \fBg\fR is as defined in the \fBed\fR command. The optional
+trailing \fBp\fR causes successful substitutions to be written to standard
+error. File or archive member names that substitute to the empty string are
+ignored when reading and writing archives.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 16n
+.rt  
+When reading files from the file system, and if the user has the permissions
+required by \fButime()\fR to do so, sets the access time of each file read to
+the access time that it had before being read by \fBpax\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-u\fR\fR
+.ad
+.RS 16n
+.rt  
+Ignores files that are older (having a less recent file modification time) than
+a pre-existing file or archive member with the same name.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBread\fR mode\fR
+.ad
+.RS 14n
+.rt  
+An archive member with the same name as a file in the file system is extracted
+if the archive member is newer than the file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBwrite\fR mode\fR
+.ad
+.RS 14n
+.rt  
+An archive file member with the same name as a file in the file system is
+superseded if the file is newer than the archive member. If option \fB-a\fR is
+also specified, this is accomplished by appending to the archive. Otherwise, it
+is unspecified whether this is accomplished by actual replacement in the
+archive or by appending to the archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcopy\fR mode\fR
+.ad
+.RS 14n
+.rt  
+The file in the destination hierarchy is replaced by the file in the source
+hierarchy or by a link to the file in the source hierarchy if the file in the
+source hierarchy is newer.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 16n
+.rt  
+In \fBlist\fR mode, produces a verbose table of contents (see \fBStandard
+Output\fR). Otherwise, writes archive member path names and extended attributes
+to standard error (see \fBStandard Error\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 16n
+.rt  
+Writes files to the standard output in the specified archive format.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-x\fR \fIformat\fR\fR
+.ad
+.RS 16n
+.rt  
+Specifies the output archive format. The \fBpax\fR utility recognizes the
+following formats:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcpio\fR\fR
+.ad
+.RS 10n
+.rt  
+The extended \fBcpio\fR(1) interchange format. See IEEE Std 1003.1-2001. The
+default \fIblocksize\fR for this format for character special archive files is
+\fB5120\fR. Implementations support all \fIblocksize\fR values less than or
+equal to \fB32256\fR that are multiples of \fB512\fR.
+.sp
+This archive format allows files with \fBUID\fRs and \fBGID\fRs up to
+\fB262143\fR to be stored in the archive. Files with \fBUID\fRs and \fBGID\fRs
+greater than this value are archived with the \fBUID\fR and \fBGID\fR of
+\fB60001\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpax\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBpax\fR interchange format. See IEEE Std 1003.1-2001. The default
+\fIblocksize\fR for this format for character special archive files is
+\fB5120\fR. Implementations support all \fIblocksize\fR values less than or
+equal to \fB32256\fR that are multiples of \fB512\fR.
+.sp
+Similar to \fBustar\fR. Also allows archiving and extracting files whose size
+is greater than 8GB; whose \fBUID\fR, \fBGID\fR, \fIdevmajor\fR, or
+\fIdevminor\fR values are greater than \fB2097151\fR; whose path (including
+filename) is greater than \fB255\fR characters; or whose \fIlinkname\fR is
+greater than \fB100\fR characters.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBustar\fR\fR
+.ad
+.RS 10n
+.rt  
+The extended \fBtar\fR(1) interchange format. See the IEEE 1003.1(1990)
+specifications. The default \fIblocksize\fR for this format for character
+special archive files is \fB10240\fR. Implementations support all
+\fIblocksize\fR values less than or equal to \fB32256\fR that are multiples of
+\fB512\fR.
+.sp
+This archive format allows files with \fBUID\fRs and \fBGID\fRs up to
+\fB2097151\fR to be stored in the archive. Files with \fBUID\fRs and \fBGID\fRs
+greater than this value are archived with the \fBUID\fR and \fBGID\fR of
+\fB60001\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBxustar\fR\fR
+.ad
+.RS 10n
+.rt  
+Similar to \fBustar\fR. Also allows archiving and extracting files whose size
+is greater than 8GB; whose \fBUID\fR, \fBGID\fR, \fIdevmajor\fR, or
+\fIdevminor\fR values are greater than \fB2097151\fR; whose path (including
+filename) is greater than \fB255\fR characters; or whose \fIlinkname\fR is
+greater than \fB100\fR characters. This option should not be used if the
+archive is to be extracted by an archiver that cannot handle the larger values.
+.RE
+
+Any attempt to append to an archive file in a format different from the
+existing archive format causes \fBpax\fR to exit immediately with a non-zero
+exit status.
+.sp
+In \fBcopy\fR mode, if no \fB-x\fR format is specified, \fBpax\fR behaves as if
+\fB-x\fR \fBpax\fR were specified.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-X\fR\fR
+.ad
+.RS 16n
+.rt  
+When traversing the file hierarchy specified by a path name, \fBpax\fR does not
+descend into directories that have a different device ID (\fBst_dev\fR, see
+\fBstat\fR(2)).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-@\fR\fR
+.ad
+.RS 16n
+.rt  
+Includes extended attributes in the archive. \fBpax\fR does not place extended
+attributes in the archive by default.
+.sp
+When traversing the file hierarchy specified by a path name, \fBpax\fR descends
+into the attribute directory for any file with extended attributes. Extended
+attributes go into the archive as special files.
+.sp
+When this flag is used during file extraction, any extended attributes
+associated with a file being extracted are also extracted. Extended attribute
+files can only be extracted from an archive as part of a normal file extract.
+Attempts to explicitly extract attribute records are ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-/\fR\fR
+.ad
+.RS 16n
+.rt  
+Includes extended system attributes in the archive. \fBpax\fR does not place
+extended system attributes in the archive by default.
+.sp
+When traversing the file hierarchy specified by a path name, \fBpax\fR descends
+into the attribute directory for any file with extended attributes. Extended
+attributes go into the archive as special files. When this flag is used during
+file extraction, any extended attributes associated with a file being extracted
+are also extracted. Extended attribute files can only be extracted from an
+archive as part of a normal file extract. Attempts to explicitly extract
+attribute records are ignored.
+.RE
+
+.sp
+.LP
+Specifying more than one of the mutually-exclusive options \fB-H\fR and
+\fB-L\fR is not considered an error. The last option specified determines the
+behavior of the utility.
+.sp
+.LP
+The options that operate on the names of files or archive members (\fB-c\fR,
+\fB-i\fR, \fB-n\fR, \fB-s\fR, \fB-u\fR and \fB-v\fR) interact as follows.
+.sp
+.LP
+In \fBread\fR mode, the archive members are selected based on the
+user-specified \fIpattern\fR operands as modified by the \fB-c\fR, \fB-n\fR and
+\fB-u\fR options. Then, any \fB-s\fR and \fB-i\fR options modify, in that
+order, the names of the selected files. The \fB-v\fR option writes names
+resulting from these modifications.
+.sp
+.LP
+In \fBwrite\fR mode, the files are selected based on the user-specified path
+names as modified by the \fB-n\fR and \fB-u\fR options. Then, any \fB-s\fR and
+\fB-i\fR options modify, in that order, the names of these selected files. The
+\fB-v\fR option writes names resulting from these modifications.
+.sp
+.LP
+If both the \fB-u\fR and \fB-n\fR options are specified, \fBpax\fR does not
+consider a file selected unless it is newer than the file to which it is
+compared.
+.SS "List Mode Format Specifications"
+.sp
+.LP
+In \fBlist\fR mode with the \fB-o\fR \fBlistopt=\fR\fIformat\fR option, the
+format argument is applied for each selected file. \fBpax\fR appends a NEWLINE
+to the \fBlistopt\fR output for each selected file. The \fIformat\fR argument
+is used as the format string with the following exceptions. (See
+\fBprintf\fR(1) for the first five exceptions.)
+.RS +4
+.TP
+1.
+A \fBSPACE\fR character in the format string, in any context other than a
+flag of a conversion specification, is treated as an ordinary character that is
+copied to the output.
+.RE
+.RS +4
+.TP
+2.
+A \fB\&' '\fR character in the format string is treated as a \fB\&' '\fR
+character, not as a SPACE.
+.RE
+.RS +4
+.TP
+3.
+In addition to the escape sequences described in the \fBformats\fR(5) manual
+page, (\fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR,
+\fB\et\fR, \fB\ev\fR), \fB\e\fR\fIddd\fR, where \fIddd\fR is a one-, two-, or
+three-digit octal number, is written as a byte with the numeric value specified
+by the octal number.
+.RE
+.RS +4
+.TP
+4.
+Output from the \fBd\fR or \fBu\fR conversion specifiers is not preceded or
+followed with BLANKs not specified by the format operand.
+.RE
+.RS +4
+.TP
+5.
+Output from the \fBo\fR conversion specifier is not preceded with zeros that
+are not specified by the format operand.
+.RE
+.RS +4
+.TP
+6.
+The sequence (\fIkeyword\fR) can occur before a format conversion specifier.
+The conversion argument is defined by the value of \fIkeyword\fR. The following
+keywords are supported (see IEEE Std 1003.1-2001):
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any of the Field Name entries in \fBustar Header Block\fR and \fBOctet-Oriented
+cpio Archive Entry\fR. The implementation supports the \fBcpio\fR keywords
+without the leading \fBc_\fR in addition to the form required by \fBValues for
+cpio c_ mode Field\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any keyword defined for the extended header in \fBpax Extended Header\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Any keyword provided as an implementation-defined extension within the extended
+header defined in \fBpax Extended Header\fR.
+.RE
+For example, the sequence "\fB%(charset)s\fR" is the string value of the name
+of the character set in the extended header.
+.sp
+The result of the keyword conversion argument is the value from the applicable
+header field or extended header, without any trailing \fBNUL\fRs.
+.sp
+All keyword values used as conversion arguments are translated from the UTF -8
+encoding to the character set appropriate for the local file system, user
+database, and so on, as applicable.
+.RE
+.RS +4
+.TP
+7.
+An additional conversion specifier character, \fBT\fR, is used to specify
+time formats. The \fBT\fR conversion specifier character can be preceded by the
+sequence (\fIkeyword\fR=\fIsubformat\fR), where \fIsubformat\fR is a date
+format as defined by \fIdate\fR operands. The default \fIkeyword\fR is
+\fImtime\fR and the default \fIsubformat\fR is:
+.sp
+.in +2
+.nf
+%b %e %H:%M %Y
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+8.
+An additional conversion specifier character, \fBM\fR, is used to specify
+the file mode string as defined in \fBls\fR Standard Output. If (\fIkeyword\fR)
+is omitted, the \fBmode\fR keyword is used. For example, \fB%.1M\fR writes the
+single character corresponding to the \fIentry type\fR field of the \fBls\fR
+\fB-l\fR command.
+.RE
+.RS +4
+.TP
+9.
+An additional conversion specifier character, \fBD\fR, is used to specify
+the device for block or special files, if applicable, in an
+implementation-defined format. If not applicable, and (\fIkeyword\fR) is
+specified, then this conversion is equivalent to \fB%\fR(\fIkeyword\fR)\fBu\fR.
+If not applicable, and (\fIkeyword\fR) is omitted, then this conversion is
+equivalent to SPACE.
+.RE
+.RS +4
+.TP
+10.
+An additional conversion specifier character, \fBF\fR, is used to specify a
+path name. The \fBF\fR conversion character can be preceded by a sequence of
+comma-separated keywords:
+.sp
+.in +2
+.nf
+(\fIkeyword\fR[,\fIkeyword\fR] ... )
+.fi
+.in -2
+.sp
+
+The values for all the keywords that are non-null are concatenated, each
+separated by a '\fB/\fR'. The default is (\fBpath\fR) if the keyword \fBpath\fR
+is defined. Otherwise, the default is (\fIprefix\fR,\fBname\fR).
+.RE
+.RS +4
+.TP
+11.
+An additional conversion specifier character, \fBL\fR, is used to specify a
+symbolic link expansion. If the current file is a symbolic link, then \fB%L\fR
+expands to:
+.sp
+.in +2
+.nf
+"%s -> %s", \fIvalue of keyword\fR, \fIcontents of link\fR
+.fi
+.in -2
+.sp
+
+Otherwise, the \fB%L\fR conversion specification is the equivalent of \fB%F\fR.
+.RE
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdirectory\fR\fR
+.ad
+.RS 13n
+.rt  
+The destination directory path name for \fBcopy\fR mode.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 13n
+.rt  
+A path name of a file to be copied or archived.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIpattern\fR\fR
+.ad
+.RS 13n
+.rt  
+A pattern matching one or more path names of archive members. A pattern must
+conform to the pattern matching notation found on the \fBfnmatch\fR(5) manual
+page. The default, if no \fIpattern\fR is specified, is to select all members
+in the archive.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+Output formats are discussed below:
+.SS "Standard Output"
+.sp
+.LP
+In \fBwrite\fR mode, if \fB-f\fR is not specified, the standard output is the
+archive formatted according to one of the formats described below. See \fB-x\fR
+\fBformat\fR for a list of supported formats.
+.sp
+.LP
+In \fBlist\fR mode, when the \fB-o\fR \fBlistopt=\fR\fIformat\fR option has
+been specified, the selected archive members are written to standard output
+using the format described above under \fBList Mode Format Specifications\fR.
+In \fBlist\fR mode without the \fB-o\fR \fBlistopt=\fR\fIformat\fR option, the
+table of contents of the selected archive members are written to standard
+output using the following format:
+.sp
+.in +2
+.nf
+"%s\en", \fIpathname\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If the \fB-v\fR option is specified in \fBlist\fR mode, the table of contents
+of the selected archive members are written to standard output using the
+following formats:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For path names representing hard links to previous members of the archive:
+.sp
+.in +2
+.nf
+"%s == %s\en", <\fIls\fR -l \fIlisting, linkname\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For all other path names:
+.sp
+.in +2
+.nf
+"%s\en", <\fIls\fR -l \fIlisting\fR>
+.fi
+.in -2
+.sp
+
+where <\fIls\fR \fB-l\fR \fIlisting\fR> is the format specified by the \fBls\fR
+command with the \fB-l\fR option. When writing path names in this format, it is
+unspecified what is written for fields for which the underlying archive format
+does not have the correct information, although the correct number of
+blank-character-separated fields is written.
+.RE
+.sp
+.LP
+In \fBlist\fR mode, standard output is not buffered more than a line at a time.
+.SS "Standard Error"
+.sp
+.LP
+If \fB-v\fR is specified in \fBread\fR, \fBwrite\fR or \fBcopy\fR modes,
+\fBpax\fR writes the path names it processes to the standard error output using
+the following format:
+.sp
+.in +2
+.nf
+"%s\en", \fIpathname\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+These path names are written as soon as processing is begun on the file or
+archive member, and are flushed to standard error. The trailing NEWLINE
+character, which is not buffered, is written when the file has been read or
+written.
+.sp
+.LP
+If the \fB-s\fR option is specified, and the replacement string has a trailing
+\fBp\fR, substitutions are written to standard error in the following format:
+.sp
+.in +2
+.nf
+"%s >> %s\en", <\fIoriginal pathname\fR>, <\fInew pathname\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+In all operating modes of \fBpax\fR, optional messages of unspecified format
+concerning the input archive format and volume number, the number of files,
+blocks, volumes, and media parts as well as other diagnostic messages can be
+written to standard error.
+.sp
+.LP
+In all formats, for both standard output and standard error, it is unspecified
+how non-printable characters in path names or link names are written.
+.sp
+.LP
+When \fBpax\fR is in \fBread\fR mode or \fBlist\fR mode, using the \fB-x\fR
+\fBpax\fR archive format, and a file name, link name, owner name, or any other
+field in an extended header record cannot be translated from the \fBpax\fR
+UTF-8 codeset format to the codeset and current locale of the implementation,
+\fBpax\fR writes a diagnostic message to standard error, processes the file as
+described for the \fB-o\fR \fBinvalid=\fRoption, and then processes the next
+file in the archive.
+.SS "Output Files"
+.sp
+.LP
+In \fBread\fR mode, the extracted output files are of the archived file type.
+In \fBcopy\fR mode, the copied output files are the type of the file being
+copied . In either mode, existing files in the destination hierarchy are
+overwritten only when all permission (\fB-p\fR), modification time (\fB-u\fR),
+and invalid-value (\fB-o\fR \fBinvalid=\fR) tests allow it. In \fBwrite\fR
+mode, the output file named by the \fB-f\fR option-argument is a file formatted
+according to one of the specifications in IEEE Std 1003.1-2001.
+.SH ERRORS
+.sp
+.LP
+If \fBpax\fR cannot create a file or a link when reading an archive, or cannot
+find a file when writing an archive, or cannot preserve the user \fBID\fR,
+group \fBID\fR, or file mode when the \fB-p\fR option is specified, a
+diagnostic message is written to standard error and a non-zero exit status is
+returned, but processing continues. In the case where \fBpax\fR cannot create a
+link to a file, \fBpax\fR does not, by default, create a second copy of the
+file.
+.sp
+.LP
+If the extraction of a file from an archive is prematurely terminated by a
+signal or error, \fBpax\fR can have only partially extracted the file or, if
+the \fB-n\fR option was not specified, can have extracted a file of the same
+name as that specified by the user, but which is not the file the user wanted.
+Additionally, the file modes of extracted directories can have additional bits
+from the read, write, execute mask set as well as incorrect modification and
+access times.
+.SH USAGE
+.sp
+.LP
+The \fB-p\fR (privileges) option was invented to reconcile differences between
+historical \fBtar\fR(1) and \fBcpio\fR(1) implementations. In particular, the
+two utilities use \fB-m\fR in diametrically opposed ways. The \fB-p\fR option
+also provides a consistent means of extending the ways in which future file
+attributes can be addressed, such as for enhanced security systems or
+high-performance files. Although it can seem complex, there are really two
+modes that are most commonly used:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fBe\fR\fR
+.ad
+.RS 8n
+.rt  
+Preserve everything. This would be used by the historical superuser, someone
+with all the appropriate privileges, to preserve all aspects of the files as
+they are recorded in the archive. The \fBe\fR flag is the sum of \fBo\fR and
+\fBp\fR, and other implementation-dependent attributes.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-p\fR \fBp\fR\fR
+.ad
+.RS 8n
+.rt  
+Preserve the file mode bits. This would be used by the user with regular
+privileges who wished to preserve aspects of the file other than the ownership.
+The file times are preserved by default, but two other flags are offered to
+disable these and use the time of extraction.
+.RE
+
+.sp
+.LP
+The one path name per line format of standard input precludes path names
+containing newlines. Although such path names violate the portable filename
+guidelines, they can exist and their presence can inhibit usage of \fBpax\fR
+within shell scripts. This problem is inherited from historical archive
+programs. The problem can be avoided by listing file name arguments on the
+command line instead of on standard input.
+.sp
+.LP
+It is almost certain that appropriate privileges are required for \fBpax\fR to
+accomplish parts of this. Specifically, creating files of type block special or
+character special, restoring file access times unless the files are owned by
+the user (the \fB-t\fR option), or preserving file owner, group, and mode (the
+\fB-p\fR option) all probably require appropriate privileges.
+.sp
+.LP
+In \fBread\fR mode, implementations are permitted to overwrite files when the
+archive has multiple members with the same name. This can fail if permissions
+on the first version of the file do not permit it to be overwritten.
+.sp
+.LP
+When using the \fB-x\fR \fBxustar\fR and \fB-x\fR \fB-pax\fR archive formats,
+if the underlying file system reports that the file being archived contains
+holes, the Solaris \fBpax\fR utility records the presence of holes in an
+extended header record when the file is archived. If this extended header
+record is associated with a file in the archive, those holes are recreated
+whenever that file is extracted from the archive. See the \fBSEEK_DATA\fR and
+\fBSEEK_HOLE\fR whence values in \fBlseek\fR(2). In all other cases, any
+\fBNUL\fR (\fB\e0\fR) characters found in the archive is written to the file
+when it is extracted.
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBpax\fR when
+encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+.SS "Standard Input"
+.sp
+.LP
+In \fBwrite\fR mode, the standard input is used only if no \fIfile\fR operands
+are specified. It is a text file containing a list of path names, one per line,
+without leading or trailing blanks. In \fBlist\fR and \fBread\fR modes, if
+\fB-f\fR is not specified, the standard input is an archive file. Otherwise,
+the standard input is not used.
+.SS "Input Files"
+.sp
+.LP
+The input file named by the \fIarchive\fR option-argument, or standard input
+when the archive is read from there, is a file formatted according to one of
+the formats described below. See \fBExtended Description\fR. The file
+\fB/dev/tty\fR is used to write prompts and read responses.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRCopying the Contents of the Current Directory
+.sp
+.LP
+The following command:
+
+.sp
+.in +2
+.nf
+example% \fBpax -w -f /dev/rmt/1m .\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+copies the contents of the current directory to tape drive 1, medium density.
+This assumes historical System V device naming procedures. The historical
+\fBBSD\fR device name would be \fB/dev/rmt9\fR.
+
+.LP
+\fBExample 2 \fRCopying the Directory Hierarchy
+.sp
+.LP
+The following commands:
+
+.sp
+.in +2
+.nf
+example% \fBmkdir newdir\fR
+example% \fBpax -rw olddir newdir\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+copy the \fBolddir\fR directory hierarchy to \fBnewdir\fR.
+
+.LP
+\fBExample 3 \fRReading an Archive Extracted Relative to the Current Directory
+.sp
+.LP
+The following command:
+
+.sp
+.in +2
+.nf
+example% \fBpax -r -s ',^//*usr//*,,' -f a.pax\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+reads the archive \fBa.pax\fR, with all files rooted in \fB/usr\fR in the
+archive extracted relative to the current directory.
+
+.LP
+\fBExample 4 \fROverriding the Default Output Description
+.sp
+.LP
+Using the option:
+
+.sp
+.in +2
+.nf
+\fB-o listopt="%M %(atime)T %(size)D %(name)s"\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+overrides the default output description in \fBStandard Output\fR and instead
+writes:
+
+.sp
+.in +2
+.nf
+-rw-rw- - - Jan 12 15:53 2003 1492 /usr/foo/bar
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Using the options:
+
+.sp
+.in +2
+.nf
+\fB-o listopt='%L\et%(size)D\en%.7' \e
+-o listopt='(name)s\en%(atime)T\en%T'\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+overrides the default output description in standard output and instead writes:
+
+.sp
+.in +2
+.nf
+usr/foo/bar -> /tmp             1492
+/usr/foo
+Jan 12 15:53 1991
+Jan 31 15:53 2003
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+See \fBenviron\fR(5) for descriptions of the following environment variables
+that affect the execution of \fBpax\fR: \fBLANG\fR, \fBLC_ALL\fR,
+\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBLC_COLLATE\fR\fR
+.ad
+.RS 14n
+.rt  
+Determine the locale for the behaviour of ranges, equivalence classes, and
+multi-character collating elements used in the pattern matching expressions for
+the \fIpattern\fR operand, the basic regular expression for the \fB-s\fR
+option, and the extended regular expression defined for the \fByesexpr\fR
+locale keyword in the \fBLC_MESSAGES\fR category.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTMPDIR\fR\fR
+.ad
+.RS 14n
+.rt  
+Determine the path name that provides part of the default global extended
+header record file, as described for the \fB-o\fR \fBglobexthdr=\fR keyword as
+described in the OPTIONS section.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBTZ\fR\fR
+.ad
+.RS 14n
+.rt  
+Determine the timezone used to calculate date and time strings when the
+\fB-v\fR option is specified. If \fBTZ\fR is unset or null, an unspecified
+default timezone is used.
+.RE
+
+.SH EXIT STATUS
+.sp
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+.rt  
+All files were processed successfully.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+.rt  
+An error occurred.
+.RE
+
+.SH EXTENDED DESCRIPTION
+.SS "\fBpax\fR Interchange Format"
+.sp
+.LP
+A \fBpax\fR archive tape or file produced in the \fB-xpax\fR format contains a
+series of blocks. The physical layout of the archive is identical to the
+\fBustar\fR format described in \fBustar Interchange Format\fR. Each file
+archived is represented by the following sequence:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An optional header block with extended header records. This header block is of
+the form 27403 with a \fItypeflag\fR value of \fBx\fR or \fBg\fR. The extended
+header records is included as the data for this header block.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A header block that describes the file. Any fields in the preceding optional
+extended header overrides the associated fields in this header block for this
+file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Zero or more blocks that contain the contents of the file.
+.RE
+.sp
+.LP
+At the end of the archive file there are two 512-byte blocks filled with binary
+zeroes, interpreted as an end-of-archive indicator.
+.sp
+.LP
+The following is a schematic of an example archive with global extended header
+records and two actual files in pax format archive. In the example, the second
+file in the archive has no extended header preceding it, presumably because it
+has no need for extended attributes.
+.sp
+
+.sp
+.TS
+tab();
+cw(2.67i) cw(2.83i) 
+lw(2.67i) lw(2.83i) 
+.
+DescriptionBlock
+Global Extended Headerustar Header [\fItypeflag\fR=g]
+Global Extended Header Data
+File 1: Extended Header is includedustar Header [\fItypeflag\fR=x]
+Extended Header Data
+[\fItypeflag\fR=0]
+ustar Header Data for File 1
+File 2: No Extended Header is includedustar Header [\fItypeflag\fR=0]
+Data for File2
+End of Archive IndicatorBlock of binary zeros
+Block of binary zeros
+.TE
+
+.SS "\fBpax\fR Header Block"
+.sp
+.LP
+The \fBpax\fR header block is identical to the \fBustar\fR header block
+described in \fBustar Interchange Format\fR except that two additional
+\fItypeflag\fR values are defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBg\fR\fR
+.ad
+.RS 5n
+.rt  
+Represents global extended header records for the following files in the
+archive. The format of these extended header records are as described in \fBpax
+Extended Header\fR. Each value affects all subsequent files that do not
+override that value in their own extended header record and until another
+global extended header record is reached that provides another value for the
+same field. The \fItypeflag\fR \fBg\fR global headers should not be used with
+interchange media that could suffer partial data loss in transporting the
+archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBx\fR\fR
+.ad
+.RS 5n
+.rt  
+Represents extended header records for the following file in the archive (which
+has its own \fBustar\fR header block). The format of these extended header
+records is as described in \fBpax Extended Header\fR.
+.RE
+
+.sp
+.LP
+For both of these types, the \fIsize\fR field is the size of the extended
+header records in octets. The other fields in the header block are not
+meaningful to this version of \fBpax\fR. However, if this archive is read by
+\fBpax\fR conforming to a previous version of \fIISO POSIX-2:1993 Standard\fR,
+the header block fields are used to create a regular file that contains the
+extended header records as data. Therefore, header block field values should be
+selected to provide reasonable file access to this regular file.
+.sp
+.LP
+A further difference from the \fBustar\fR header block is that data blocks for
+files of \fItypeflag\fR \fB1\fR (the digit one) (hard link) might be included,
+which means that the \fIsize\fR field can be greater than zero. Archives
+created by \fBpax\fR \fB-o\fR \fBlinkdata\fR includes these data blocks with
+the hard links.
+.SS "\fBpax\fR Extended Header"
+.sp
+.LP
+A \fBpax\fR extended header contains values that are inappropriate for the
+\fBustar\fR header block because of limitations in that format: fields
+requiring a character encoding other than that described in the \fIISO/IEC 646:
+1991 standard\fR, fields representing file attributes not described in the
+\fBustar\fR header, and fields whose format or length do not fit the
+requirements of the \fBustar\fR header. The values in an extended header add
+attributes to the specified file or files or override values in the specified
+header blocks, as indicated in the following list of keywords. See the
+description of the \fItypeflag\fR \fBg\fR header block.
+.sp
+.LP
+An extended header consists of one or more records, each constructed as
+follows:
+.sp
+.in +2
+.nf
+"%d %s=%s\en", \fIlength\fR, \fIkeyword\fR, \fIvalue\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The extended header records are encoded according to the\fI ISO/IEC 10646-1:
+2000 standard\fR (UTF-8). \fIlength\fR, \fBBLANK\fR, equals sign (\fB=\fR), and
+NEWLINE are limited to the portable character set, as encoded in UTF-8.
+\fIkeyword\fR and \fIvalue\fR can be any UTF-8 characters. \fIlength\fR is the
+decimal length of the extended header record in octets, including the trailing
+NEWLINE.
+.sp
+.LP
+\fIkeyword\fR is one of the entries from the following list or a keyword
+provided as an implementation extension. Keywords consisting entirely of
+lowercase letters, digits, and periods are reserved for future standardization.
+A keyword does not include an equals sign.
+.sp
+.LP
+In the following list, the notation of \fBfile(s)\fR or \fBblock(s)\fR are used
+to acknowledge that a keyword affects the specified single file after a
+\fItypeflag\fR \fBx\fR extended header, but possibly multiple files after
+\fItypeflag\fR \fBg\fR. Any requirements in the list for \fBpax\fR to include a
+record when in write or copy mode applies only when such a record has not
+already been provided through the use of the \fB-o\fR option. When used in copy
+mode, \fBpax\fR behaves as if an archive had been created with applicable
+extended header records and then extracted.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBatime\fR\fR
+.ad
+.RS 16n
+.rt  
+The file access time for the specified files, equivalent to the value of the
+\fBst_atime\fR member of the stat structure for a file, as described by the
+\fBstat\fR(2) function. The access time (\fBatime\fR) is restored if the
+process has the appropriate privilege required to do so. The format of the
+\fIvalue\fR is as described in \fBpax Extended Header File Times\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcharset\fR\fR
+.ad
+.RS 16n
+.rt  
+The name of the character set used to encode the data in the specified files.
+The entries in the following table are defined to refer to known standards;
+additional names can be agreed on between the originator and recipient.
+.sp
+
+.sp
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fIvalue\fRFormal Standard
+ISO-IR 646 1990ISO/IEC646:1990
+ISO-IR 8859 1 1998ISO/IEC8859-1:1998
+ISO-IR 8859 2 1999ISO/IEC 8859-2:1999
+ISO-IR 8859 3 1999ISO/IEC 8859-3:1999
+ISO-IR 8859 4 1999ISO/IEC8859-4:1998
+ISO-IR 8859 5 1999ISO/IEC8859-5-1999
+ISO-IR 8859 6 1999ISO/IEC8859-6-1999
+ISO-IR 8859 7 1987ISO/IEC8859-7:1987
+ISO-IR 8859 8 1999ISO/IEC8859-8:1999
+ISO-IR 8859 9 1999ISO/IEC8859-9:1999
+ISO-IR 8859 10 1998ISO/IEC8859-10:1999
+ISO-IR 8859 13 1998ISO/IEC8859-13:1998
+ISO-IR 8859 14 1998ISO/IEC8859-14:1998
+ISO-IR 8859 15 1999ISO/IEC8859-15:1999
+ISO-IR 10646 2000ISO/IEC 10646:2000
+ISO-IR 10646 2000 UTF-8ISO/IEC 10646,UTF-8 encoding
+BINARYNone
+.TE
+
+The encoding is included in an extended header for information only; when
+\fBpax\fR is used as described in \fIIEEE Std 1003.1-200\fIx\fR\fR, it does not
+translate the file data into any other encoding. The BINARY entry indicates
+unencoded binary data. When used in write or copy mode, it is
+implementation-defined whether \fBpax\fR includes a \fBcharset\fR extended
+header record for a file.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBcomment\fR\fR
+.ad
+.RS 16n
+.rt  
+A series of characters used as a comment. All characters in the \fIvalue\fR
+field are ignored by \fBpax\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBgid\fR\fR
+.ad
+.RS 16n
+.rt  
+The group ID of the group that owns the file, expressed as a decimal number
+using digits from the \fIISO/IEC 646: 1991 standard\fR. This record overrides
+the \fBgid\fR field in the specified header blocks. When used in write or copy
+mode, \fBpax\fR includes a \fBgid\fR extended header record for each file whose
+group ID is greater than 2097151 (octal \fB7777777\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIgname\fR\fR
+.ad
+.RS 16n
+.rt  
+The group of the files, formatted as a group name in the group database. This
+record overrides the \fBgid\fR and \fIgname\fR fields in the specified header
+blocks, and any \fBgid\fR extended header record. When used in read, copy, or
+list mode, \fBpax\fR translates the name from the UTF-8 encoding in the header
+record to the character set appropriate for the group database on the receiving
+system. If any of the UTF-8 characters cannot be translated, and if the \fB-o
+invalid=UTF-8\fR option is not specified, the results are
+implementation-defined. When used in write or copy mode, \fBpax\fR includes a
+\fIgname\fR extended header record for each file whose group name cannot be
+represented entirely with the letters and digits of the portable character set.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBlinkpath\fR\fR
+.ad
+.RS 16n
+.rt  
+The pathname of a link being created to another file, of any type, previously
+archived. This record overrides the \fIlinkname\fR field in the specified
+\fBustar\fR header blocks. The specified \fBustar\fR header block determines
+the type of link created. If \fItypeflag\fR of the specified header block is 1,
+it is a hard link. If \fItypeflag\fR is 2, it is a symbolic link and the
+\fBlinkpath\fR value is the contents of the symbolic link. \fBpax\fR translates
+the name of the link (contents of the symbolic link) from the UTF-8 encoding to
+the character set appropriate for the local file system. When used in write or
+copy mode, \fBpax\fR includes a \fBlinkpath\fR extended header record for each
+link whose pathname cannot be represented entirely with the members of the
+portable character set other than \fBNULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImtime\fR\fR
+.ad
+.RS 16n
+.rt  
+The pathname of a link being created to another file, of any type, previously
+archived. This record overrides the \fIlinkname\fR field in the specified
+\fBustar\fR header blocks. The specified \fBustar\fR header block determines
+the type of link created. If \fItypeflag\fR of the specified header block is
+\fB1\fR, it is a hard link. If \fItypeflag\fR is \fB2\fR, it is a symbolic link
+and the \fBlinkpath\fR value is the contents of the symbolic link. \fBpax\fR
+translates the name of the link (contents of the symbolic link) from the UTF-8
+encoding to the character set appropriate for the local file system. When used
+in write or copy mode, \fBpax\fR includes a \fBlinkpath\fR extended header
+record for each link whose pathname cannot be represented entirely with the
+members of the portable character set other than \fBNULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBpath\fR\fR
+.ad
+.RS 16n
+.rt  
+The pathname of the specified files. This record overrides the name and
+\fIprefix\fR fields in the specified header blocks. \fBpax\fR translates the
+pathname of the file from the UTF-8 encoding to the character set appropriate
+for the local file system. When used in write or copy mode, \fBpax\fR includes
+a path extended header record for each file whose pathname cannot be
+represented entirely with the members of the portable character set other than
+\fBNULL\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBrealtime.\fR\fIany\fR\fR
+.ad
+.RS 16n
+.rt  
+The keywords prefixed by \fBrealtime\fR are reserved for future
+standardization.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBsecurity.\fR\fIany\fR\fR
+.ad
+.RS 16n
+.rt  
+The keywords prefixed by \fBsecurity\fR are reserved for future
+standardization.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 16n
+.rt  
+The size of the file in octets, expressed as a decimal number using digits from
+the \fIISO/IEC 646: 1991 standard\fR. This record overrides the \fIsize\fR
+field in the specified header blocks. When used in write or copy mode,
+\fBpax\fR includes a size extended header record for each file with a
+\fIsize\fR value greater than \fB8589934591\fR (octal \fB77777777777\fR).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuid\fR\fR
+.ad
+.RS 16n
+.rt  
+The user \fBID\fR of the file owner, expressed as a decimal number using digits
+from the I\fISO/IEC 646:1991\fR standard. This record overrides the \fBuid\fR
+field in the following header block(s). When used in write or copy mode,
+\fBpax\fR includes a \fBuid\fR extended header record for each file whose owner
+ID is greater than \fB2097151 (octal 7777777)\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIuname\fR\fR
+.ad
+.RS 16n
+.rt  
+The owner of the specified files, formatted as a user name in the user
+database. This record overrides the \fIuid\fR and \fIuname\fR fields in the
+specified header blocks, and any \fIuid\fR extended header record. When used in
+read, copy, or list mode, \fBpax\fR translates the name from the UTF-8 encoding
+in the header record to the character set appropriate for the user database on
+the receiving system. If any of the UTF-8 characters cannot be translated, and
+if the \fB-o invalid= UTF-8\fR option is not specified, the results are
+implementation-defined. When used in write or copy mode, \fBpax\fR includes a
+\fIuname\fR extended header record for each file whose user name cannot be
+represented entirely with the letters and digits of the portable character set.
+.RE
+
+.sp
+.LP
+If the \fBvalue\fR field is zero length, it deletes any header block field,
+previously entered extended header value, or global extended header value of
+the same name.
+.sp
+.LP
+If a keyword in an extended header record (or in an \fB-o\fR option-argument)
+overrides or deletes a corresponding field in the \fBustar\fR header block,
+\fBpax\fR ignores the contents of that header block field.
+.sp
+.LP
+Unlike the \fBustar\fR header block fields, \fBNULLs\fR does not delimit
+values; all characters within the value field are considered data for the
+field.
+.SS "\fBpax\fR Extended Header Keyword Precedence"
+.sp
+.LP
+This section describes the precedence in which the various header records and
+fields and command line options are selected to apply to a file in the archive.
+When \fBpax\fR is used in read or list modes, it determines a file attribute in
+the following sequence:
+.RS +4
+.TP
+1.
+If \fB-o delete\fR\fB=\fR\fIkeyword-prefix\fR is used, the affected
+attributes is determined from step 7, if applicable, or ignored otherwise.
+.RE
+.RS +4
+.TP
+2.
+If \fB-o\fR \fIkeyword:=\fR is used, the affected attributes is ignored.
+.RE
+.RS +4
+.TP
+3.
+If \fB-o\fR \fIkeyword:=value\fR is used, the affected attribute is assigned
+the value.
+.RE
+.RS +4
+.TP
+4.
+If there is a \fItypeflag\fR \fBx\fR extended header record, the affected
+attribute is assigned the value. When extended header records conflict, the
+last one given in the header takes precedence.
+.RE
+.RS +4
+.TP
+5.
+If \fB-o\fR \fIkeyword=value\fR is used, the affected attribute is assigned
+the value.
+.RE
+.RS +4
+.TP
+6.
+If there is a \fItypeflag g\fR global extended header record, the affected
+attribute is assigned the value. When global extended header records conflict,
+the last one given in the global header takes precedence.
+.RE
+.RS +4
+.TP
+7.
+Otherwise, the attribute is determined from the \fBustar\fR header block.
+.RE
+.SS "\fBpax\fR Extended Header File Times"
+.sp
+.LP
+\fBpax\fR writes an \fImtime\fR record for each file in write or copy modes if
+the file's modification time cannot be represented exactly in the \fBustar\fR
+header logical record described in \fBustar\fR Interchange Format. This can
+occur if the time is out of \fBustar\fR range, or if the file system of the
+underlying implementation supports non-integer time granularities and the time
+is not an integer. All of these time records are formatted as a decimal
+representation of the time in seconds since the Epoch. If a period (\fB\&.\fR)
+decimal point character is present, the digits to the right of the point
+represents the units of a sub-second timing granularity, where the first digit
+is tenths of a second and each subsequent digit is a tenth of the previous
+digit. In read or copy mode, \fBpax\fR truncates the time of a file to the
+greatest value that is not greater than the input header file time. In write or
+copy mode, \fBpax\fR outputs a time exactly if it can be represented exactly as
+a decimal number, and otherwise generates only enough digits so that the same
+time is recovered if the file is extracted on a system whose underlying
+implementation supports the same time granularity.
+.SS "\fBustar\fR Interchange Format"
+.sp
+.LP
+A \fBustar\fR archive tape or file contains a series of logical records. Each
+logical record is a fixed-size logical record of 512 octets. Although this
+format can be thought of as being stored on 9-track industry-standard 12.7mm
+(0.5 in) magnetic tape, other types of transportable media are not excluded.
+Each file archived is represented by a header logical record that describes the
+file, followed by zero or more logical records that give the contents of the
+file. At the end of the archive file there are two 512-octet logical records
+filled with binary zeros, interpreted as an end-of-archive indicator.
+.sp
+.LP
+The logical records can be grouped for physical I/O operations, as described
+under the \fB-b\fR\fIblocksize\fR and \fB-x\fR \fBustar\fR options. Each group
+of logical records can be written with a single operation equivalent to the
+\fBwrite\fR(2) function. On magnetic tape, the result of this write is a single
+tape physical block. The last physical block always is the full size, so
+logical records after the two zero logical records can contain undefined data.
+.sp
+.LP
+The header logical record is structured as shown in the following table. All
+lengths and offsets are in decimal.
+.sp
+\fBTable 1 \fR\fBustar\fR Header Block
+.sp
+.TS
+tab();
+cw(1.83i) cw(1.83i) cw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+Field NameOctet OffsetLength (in Octets)
+\fIname\fR\fB0\fR100
+\fImode\fR1008
+\fIuid\fR1088
+\fIgid\fR1168
+\fIsize\fR12412
+\fImtime\fR13612
+\fIchksum\fR1488
+\fItypeflag\fR1561
+\fIlinkname\fR157100
+\fImagic\fR2576
+\fIversion\fR2632
+\fIuname\fR26532
+\fIgname\fR29732
+\fIdevmajor\fR3298
+\fIdevminor\fR3378
+\fIprefix\fR345155
+.TE
+
+.sp
+.LP
+All characters in the header logical record is represented in the coded
+character set of the \fIISO/IEC 646: 1991\fR standard. For maximum portability
+between implementations, names should be selected from characters represented
+by the portable filename character set as octets with the most significant bit
+zero. If an implementation supports the use of characters outside of slash and
+the portable filename character set in names for files, users, and groups, one
+or more implementation-defined encodings of these characters are provided for
+interchange purposes.
+.sp
+.LP
+\fBpax\fR never creates filenames on the local system that cannot be accessed
+using the procedures described in \fIIEEE Std 1003.1-200x\fR. If a filename is
+found on the medium that would create an invalid filename, it is
+implementation-defined whether the data from the file is stored on the file
+hierarchy and under what name it is stored. \fBpax\fR can choose to ignore
+these files as long as it produces an error indicating that the file is being
+ignored. Each field within the header logical record is contiguous; that is,
+there is no padding used.
+.sp
+.LP
+Each field within the header logical record is contiguous. There is no padding
+used. Each character on the archive medium is stored contiguously.
+.sp
+.LP
+The fields \fImagic\fR, \fIuname\fR and \fIgname\fR are character strings, each
+of which is terminated by a NULL character. The fields \fIname\fR,
+\fIlinkname\fR, and \fIprefix\fR are NULL-terminated character strings except
+when all characters in the array contain non-NULL characters including the last
+character. The \fIversion\fR field is two octets containing the characters
+\fB00\fR (zero-zero) The \fItypeflag\fR contains a single character. All other
+fields are leading zero-filled octal numbers using digits from the \fIISO/IEC
+646:1991\fR standard IRV. Each numeric field is terminated by one or more SPACE
+of NULL characters.
+.sp
+.LP
+Each character on the archive medium is stored contiguously. The fields
+\fImagic\fR, \fIuname\fR, and \fIgname\fR are character strings each terminated
+by a \fBNULL\fR character.
+.sp
+.LP
+\fIname\fR, \fIlinkname\fR, and \fIprefix\fR are NULL-terminated character
+strings except when all characters in the array contain non-NULL characters
+including the last character. The \fIversion\fR field is two octets containing
+the characters \fB00\fR (zero-zero). The \fItypeflag\fR contains a single
+character. All other fields are leading zero-filled octal numbers using digits
+from the \fIISO/IEC 646: 1991\fR standard IRV. Each numeric field is terminated
+by one or more spaces or NULL characters.
+.sp
+.LP
+The \fIname\fR and the \fIprefix\fR fields produce the pathname of the file. A
+new pathname is formed, if \fIprefix\fR is not an empty string (its first
+character is not \fBNULL\fR), by concatenating \fIprefix\fR (up to the first
+\fBNULL\fR character), a slash character, and name; otherwise, name is used
+alone. In either case, name is terminated at the first \fBNULL\fR character. If
+\fIprefix\fR begins with a \fBNULL\fR character, it is ignored. In this manner,
+pathnames of at most 256 characters can be supported. If a pathname does not
+fit in the space provided, \fBpax\fR notifies the user of the error, and does
+not store any part of the file-header or data-on the medium.
+.sp
+.LP
+The \fIlinkname\fR field does not use the \fIprefix\fR to produce a pathname.
+As such, a \fIlinkname\fR is limited to 100 characters. If the name does not
+fit in the space provided, \fBpax\fR notifies the user of the error, and does
+not attempt to store the link on the medium. The \fImode\fR field provides 12
+bits encoded in the \fIISO/IEC 646: 1991\fR standard octal digit
+representation. The encoded bits represent the following values in the
+\fBustar\fR \fImode\fR field:
+.sp
+
+.sp
+.TS
+tab();
+lw(.57i) lw(1.64i) lw(3.29i) 
+lw(.57i) lw(1.64i) lw(3.29i) 
+.
+Bit ValueIEE Std 1003.1-2001 BitDescription
+04000S_ISUIDSet UID on execution
+02000S_ISGIDSet GID on exectution
+01000\fIreserved\fRReserved for future standardization
+00400S_IRUSRRead permission for file owner class
+00200S_IWUSRWrite permission for file owner class
+00100S_IXUSRT{
+Execute/search permission for file owner class
+T}
+00040S_IRGRPRead permission for file group class
+00020S_IWGRPWrite permission for file group class
+00010S_IXGRPT{
+Execute/search permission for file group class
+T}
+00004S_IROTHRead permission for file other class
+00002S_IWOTHWrite permission for file other class
+00001S_IXOTHT{
+Execute/search permission for file other class
+T}
+.TE
+
+.sp
+.LP
+When appropriate privilege is required to set one of these mode bits, and the
+user restoring the files from the archive does not have the appropriate
+privilege, the mode bits for which the user does not have appropriate privilege
+are ignored. Some of the mode bits in the archive format are not mentioned
+elsewhere in volume \fIIEEE Std 1003.1-200x\fR. If the implementation does not
+support those bits, they can be ignored.
+.sp
+.LP
+The \fIuid\fR and \fIgid\fR fields are the user and group ID of the owner and
+group of the file, respectively.
+.sp
+.LP
+The \fIsize\fR field is the size of the file in octets. If the \fItypeflag\fR
+field is set to specify a file to be of type \fB1\fR (a link) or \fI2\fR (a
+symbolic link), the \fIsize\fR field is specified as zero. If the
+\fItypeflag\fR field is set to specify a file of type 5 (directory), the
+\fIsize\fR field is interpreted as described under the definition of that
+record type. No data logical records are stored for types 1, 2, or 5. If the
+\fItypeflag\fR field is set to 3 (character special file), 4 (block special
+file), or 6 (FIFO), the meaning of the \fIsize\fR field is unspecified by
+volume \fIIEEE Std 1003.1-200x\fR, and no data logical records is stored on the
+medium. Additionally, for type 6, the \fIsize\fR field is ignored when reading.
+If the \fItypeflag\fR field is set to any other value, the number of logical
+records written following the header is (\fIsize\fR+511)/512, ignoring any
+fraction in the result of the division.
+.sp
+.LP
+The \fImtime\fR field is the modification time of the file at the time it was
+archived. It is the \fIISO/IEC 646: 1991\fR standard representation of the
+octal value of the modification time obtained from the \fBstat()\fR function.
+.sp
+.LP
+The \fIchksum\fR field is the \fIISO/IEC 646: 1991\fR standard IRV
+representation of the octal value of the simple sum of all octets in the header
+logical record. Each octet in the header is treated as an unsigned value. These
+values are added to an unsigned integer, initialized to zero, the precision of
+which is not less than 17 bits. When calculating the checksum, the \fIchksum\fR
+field is treated as if it were all spaces.
+.sp
+.LP
+The \fItypeflag\fR field specifies the type of file archived. If a particular
+implementation does not recognize the type, or the user does not have
+appropriate privilege to create that type, the file is extracted as if it were
+a regular file if the file type is defined to have a meaning for the \fIsize\fR
+field that could cause data logical records to be written on the medium. If
+conversion to a regular file occurs, \fBpax\fR produces an error indicating
+that the conversion took place. All of the \fItypeflag\fR fields are coded in
+the \fIISO/IEC 646: 1991\fR standard IRV:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 17n
+.rt  
+Represents a regular file. For backward compatibility, a \fItypeflag\fR value
+of binary zero ('\e0') should be recognized as meaning a regular file when
+extracting files from the archive. Archives written with this version of the
+archive file format create regular files with a \fItypeflag\fR value of the
+\fIISO/IEC 646: 1991\fR standard IRV '0'.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 17n
+.rt  
+Represents a file linked to another file, of any type, previously archived.
+Such files are identified by each file having the same device and file serial
+number. The linked-to name is specified in the \fIlinkname\fR field with a
+\fBNULL\fR-character terminator if it is less than 100 octets in length.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 17n
+.rt  
+Represents a symbolic link. The contents of the symbolic link are stored in the
+\fIlinkname\fR field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB3,4\fR\fR
+.ad
+.RS 17n
+.rt  
+Represents character special files and block special files respectively. In
+this case the \fIdevmajor\fR and \fIdevminor\fR fields contain information
+defining the device, the format of which is unspecified by volume \fIIEEE Std
+1003.1-200x\fR. Implementations can map the device specifications to their own
+local specification or can ignore the entry.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB5\fR\fR
+.ad
+.RS 17n
+.rt  
+Specifies a directory or subdirectory. On systems where disk allocation is
+performed on a directory basis, the \fIsize\fR field contain the maximum number
+of octets (which can be rounded to the nearest disk block allocation unit) that
+the directory can hold. A \fIsize\fR field of zero indicates no such limiting.
+Systems that do not support limiting in this manner should ignore the
+\fIsize\fR field.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB6\fR\fR
+.ad
+.RS 17n
+.rt  
+Specifies a FIFO special file. The archiving of a FIFO file archives the
+existence of this file and not its contents.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB7\fR\fR
+.ad
+.RS 17n
+.rt  
+Reserved to represent a file to which an implementation has associated some
+high- performance attribute. Implementations without such extensions should
+treat this file as a regular file (type 0).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBA-Z\fR\fR
+.ad
+.RS 17n
+.rt  
+The letters \fBA\fR through \fBZ\fR inclusive are reserved for custom
+implementations. All other values are reserved for future versions of \fIIEEE
+Std 1003.1-200x\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSUN.devmajor\fR\fR
+.ad
+.RS 17n
+.rt  
+A Solaris extension to \fBpax\fR extended header keywords. Specifies the major
+device number of the file.
+.sp
+When used in write or copy mode and the \fBxustar\fR or \fBpax\fR format (see
+\fB-x format\fR) was specified, \fBpax\fR includes a \fBSUN.devmajor\fR
+extended header record for each file whose major device number is too large to
+fit in 8 octets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSUN.devminor\fR\fR
+.ad
+.RS 17n
+.rt  
+A Solaris extension to \fBpax\fR extended header keywords. Specifies the minor
+device number of the file.
+.sp
+When used in write or copy mode and the \fBxustar\fR or \fBpax\fR format (see
+\fB-x format\fR) is specified, \fBpax\fR includes a \fBSUN.\fR\fIdevminor\fR
+extended header record for each file whose minor device number is too large to
+fit in 8 octets.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBSUN.holesdata\fR\fR
+.ad
+.RS 17n
+.rt  
+A Solaris extension to \fBpax\fR extended header keywords. Specifies the data
+and hole pairs for a sparse file.
+.sp
+In write or copy modes and when the \fBxustar\fR or \fBpax\fR format (see \fB-x
+format\fR) is specified, \fBpax\fR includes a \fBSUN.holesdate\fR extended
+header record if the underlying file system supports the detection of files
+with holes (see \fBfpathconf\fR(2)) and reports that there is at least one hole
+in the file being archived. \fIvalue\fR consists of two or more consecutive
+entries of the following form:
+.sp
+.in +2
+.nf
+\fBSPACE\fR\fIdata_offset\fR\fBSPACE\fR\fIhole_offset\fR
+.fi
+.in -2
+.sp
+
+where the data and hole offsets are the long values returned by passing
+\fBSEEK_DATA\fR and \fBSEEK_HOLE\fR to \fBlseek\fR(2), respectively. For
+example, the following entry is an example of the \fBSUN.holesdata\fR entry in
+the extended header for a file with data offsets at bytes 0, 24576, and 49152,
+and hole offsets at bytes 8192, 32768, and 49159: 49 \fBSUN.holesdata= 0 8192
+24576 32768 49152 49159\fR:
+.sp
+.in +2
+.nf
+49 SUN.holesdata= 0 8192 24576 32768 49152 49159
+.fi
+.in -2
+.sp
+
+When extracting a file from an archive in read or copy modes, if a
+\fBSUN.holesdata =\fR pair is found in the extended header for the file, then
+the file is restored with the holes identified using this data. For example,
+for the \fBSUN.holesdata\fR provided in the example above, bytes from 0 to 8192
+are restored as data, a hole is created up to the next data position (24576),
+bytes 24576 to 32768 is restored as data, and so forth.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBX\fR\fR
+.ad
+.RS 17n
+.rt  
+A Solaris custom \fBtypeflag\fR implementation which specifies an \fBxustar\fR
+format (see \fB-x format\fR) extended header. The \fBtypeflag 'x'\fR extended
+header is treated as a \fBustar typeflag 'x'\fR extended header.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBE\fR\fR
+.ad
+.RS 17n
+.rt  
+A Solaris custom \fBtypeflag\fR implementation which specifies an extended
+attributes header. See \fBfsattr\fR(5).
+.RE
+
+.sp
+.LP
+Attempts to archive a socket using \fBustar\fR interchange format produce a
+diagnostic message. Handling of other file types is implementation-defined.
+.sp
+.LP
+The \fImagic\fR field is the specification that this archive was output in this
+archive format. If this field contains \fBustar\fR (the five characters from
+the \fIISO/IEC 646: 1991\fR standard IRV shown followed by \fBNULL\fR), the
+\fIuname\fR and \fIgname\fR fields contain the \fIISO/IEC 646: 1991\fR standard
+IRV representation of the owner and group of the file, respectively (truncated
+to fit, if necessary). When the file is restored by a privileged,
+protection-preserving version of the utility, the user and group databases are
+scanned for these names. If found, the user and group IDs contained within
+these files are used rather than the values contained within the \fIuid\fR and
+\fBgid\fR fields.
+.SS "\fBcpio\fR Interchange Format"
+.sp
+.LP
+The octet-oriented \fBcpio\fR archive format are a series of entries, each
+comprising a header that describes the file, name of the file, and contents of
+the file.
+.sp
+.LP
+An archive can be recorded as a series of fixed-size blocks of octets. This
+blocking is be used only to make physical I/O more efficient. The last group of
+blocks are always at the full size.
+.sp
+.LP
+For the octet-oriented \fBcpio\fR archive format, the individual entry
+information are in the order indicated and described by the following table:
+Octet-Oriented \fBcpio\fR Archive Entry. See the \fBcpio.h\fR header for
+additional details.
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+Header Field NameLength (in Octets)Interpreted as
+\fIc_magic\fR6Octal number
+\fIc_dev\fR6Octal number
+\fIc_ino\fR6Octal number
+\fIc_mode\fR6Octal number
+\fIc_uid\fR6Octal number
+\fIc_gid\fR6Octal number
+\fIc_nlink\fR6Octal number
+\fIc_rdev\fR6Octal number
+\fIc_mtime\fR11Octal number
+\fIc_namesize\fR6Octal number
+\fIc_filesize\fR11Octal number
+.TE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+Filename Field NameLengthInterpreted as
+\fIc_name\fR\fIc_namesize\fRPathname string
+.TE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+Filename Field NameLengthInterpreted as
+\fIc_filedata\fR\fIc_filesize\fRData
+.TE
+
+.SS "\fBcpio\fR Header"
+.sp
+.LP
+For each file in the archive, a header as defined previously written. The
+information in the header fields is written as streams of the \fIISO/IEC 646:
+1991\fR standard characters interpreted as octal numbers. The octal numbers are
+extended to the necessary length by appending the \fIISO/IEC 646: 1991\fR
+standard IRV zeros at the most-significant-digit end of the number. The result
+is written to the most-significant digit of the stream of octets first. The
+fields are interpreted as follows:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_magic\fR\fR
+.ad
+.RS 15n
+.rt  
+Identifies the archive as being a transportable archive by containing the
+identifying value \fB"070707"\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_dev,c_ino\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains values that uniquely identify the file within the archive (that is, no
+files contain the same pair of \fIc_dev\fR and \fIc_ino\fR values unless they
+are links to the same file). The values are determined in an unspecified
+manner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_mode\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains the file type and access permissions as defined in the following
+table.
+.sp
+Directories, FIFOs, symbolic links, and regular files are supported on a system
+conforming to volume \fIIEEE Std 1003.1-200x\fR; additional values defined
+previously are reserved for compatibility with existing systems. Additional
+file types can be supported. Such files should not be written to archives
+intended to be transported to other systems.
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+File Permissions NameValueIndicates
+\fBC_IRUSR\fR\fB000400\fRby owner
+\fBC_IWUSR\fR\fB000200\fRby owner
+\fBC_IXUSR\fR\fB000100\fRby owner
+\fBC_IRGRP\fR\fB000040\fRby group
+\fBCW_IWFGP\fR\fB000020\fRby group
+\fBCW_IXGRP\fR\fB000010\fRby group
+\fBCW_IROTH\fR\fB000004\fRby others
+\fBCW_IWOTH\fR\fB000002\fRby others
+\fBCW_IXOTH\fR\fB000001\fRby others
+\fBCW_ISUID\fR\fB004000\fRSet \fBuid\fR
+\fBW_ISGID\fR\fB002000\fRSet \fBgid\fR
+\fBW_ISVTX\fR\fB001000\fRReserved
+.TE
+
+.sp
+
+.sp
+.TS
+tab();
+lw(1.83i) lw(1.83i) lw(1.83i) 
+lw(1.83i) lw(1.83i) lw(1.83i) 
+.
+File Type NameValueIndicates
+\fBC_ISDIR\fR\fB040000\fRDirectory
+\fBC_ISFIFO\fR\fB010000\fRFIFO
+\fBC_ISREG\fR\fB0100000\fRRegular file
+\fBC_ISLNK\fR\fB0120000\fRSymbolic link
+\fBC_ISBLK\fR\fB060000\fRBlock special file
+\fBC_ISCHR\fR\fB020000\fRCharacter special file
+\fBC_ISSOCK\fR\fB0140000\fRSocket
+\fBC_ISCTG\fR\fB0110000\fRReserved
+.TE
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_uid\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains the user ID of the owner.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_gid\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains the group ID of the group
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_nlink\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains a number greater than or equal to the number of links in the archive
+referencing the file. If the \fB-a\fR option is used to append to a \fBcpio\fR
+archive, \fBpax\fR does need not to account for the files in the existing part
+of the archive when calculating the \fIc_nlink\fR values for the appended part
+of the archive. It does also need not alter the \fIc_nlink\fR values in the
+existing part of the archive if additional files with the same \fIc_dev\fR and
+\fIc-ino\fR values are appended to the archive.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_rdev\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains implementation-defined information for character or block special
+files.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_mtime\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains the latest time of modification of the file at the time the archive
+was created.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_namesize\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains the length of the pathname, including the terminating NULL character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIc_filesize\fR\fR
+.ad
+.RS 15n
+.rt  
+Contains the length of the file in octets. This is the length of the data
+section following the header structure.
+.RE
+
+.SS "\fBcpio\fR Filename"
+.sp
+.LP
+The \fIc_name\fR field contains the pathname of the file. The length of this
+field in octets is the value of \fIc_namesize\fR. If a filename is found on the
+medium that would create an invalid pathname, it is implementation-defined
+whether the data from the file is stored on the file hierarchy and under what
+name it is stored. All characters are represented in the \fIISO/IEC 646:
+1991\fR standard IRV. For maximum portability between implementations, names
+should be selected from characters represented by the portable filename
+character set as octets with the most significant bit zero. If an
+implementation supports the use of characters outside the portable filename
+character set in names for files, users, and groups, one or more
+implementation-defined encodings of these characters are provided for
+interchange purposes.\fBpax\fR does not create filenames on the local system
+that cannot be accessed by way of the procedures described in volume \fIIEEE
+Std 1003.1-200x\fR. If a filename is found on the medium that would create an
+invalid filename, it is implementation-defined whether the data from the file
+is stored on the local file system and under what name it is stored. \fBpax\fR
+can choose to ignore these files as long as it produces an error indicating
+that the file is being ignored.
+.SS "\fBcpio\fR File Data"
+.sp
+.LP
+Following \fIc_name\fR, there is \fIc_filesize\fR octets of data.
+Interpretation of such data occurs in a manner dependent on the file. If
+\fIc_filesize\fR is zero, no data is contained in \fIc_filedata\fR . When
+restoring from an archive:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the user does not have the appropriate privilege to create a file of the
+specified type, \fBpax\fR ignores the entry and writes an error message to
+standard error.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Only regular files have data to be restored. Presuming a regular file meets any
+selection criteria that might be imposed on the format-reading utility by the
+user, such data is restored.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If a user does not have appropriate privilege to set a particular \fImode\fR
+flag, the flag is ignored. Some of the \fImode\fR flags in the archive format
+are not mentioned in volume \fIIEEE Std 1003.1-200x\fR. If the implementation
+does not support those flags, they can be ignored.
+.RE
+.SS "\fBcpio\fR Special Entries"
+.sp
+.LP
+FIFO special files, directories, and the trailer are recorded with
+\fIc_filesize\fR equal to zero. For other special files, \fIc_filesize\fR is
+unspecified in volume \fIIEEE Std 1003.1-200x\fR. The header for the next file
+entry in the archive are written directly after the last octet of the file
+entry preceding it. A header denoting the filename trailer indicates the end of
+the archive; the contents of octets in the last block of the archive following
+such a header are undefined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBchmod\fR(1), \fBcpio\fR(1), \fBed\fR(1), \fBprintf\fR(1), \fBtar\fR(1),
+\fBmkdir\fR(2), \fBlseek\fR(2), \fBstat\fR(2), \fBwrite\fR(2),
+\fBarchives.h\fR(3HEAD), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBfnmatch\fR(5), \fBformats\fR(5)\fBfsattr\fR(5), \fBlargefile\fR(5),
+\fBregex\fR(5), \fBstandards\fR(5)
+.sp
+.LP
+\fIIEEE Std 1003.1-200x\fR, \fIISO/IEC 646: 1991\fR, \fIISO POSIX-2:1993
+Standard\fR

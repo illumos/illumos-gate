@@ -1,0 +1,72 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (c) 1997, Sun Microsystems, Inc., All Rights Reserved 
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH print 9E "15 Sep 1992" "SunOS 5.11" "Driver Entry Points"
+.SH NAME
+print \- display a driver message on system console
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+
+
+\fBint prefix\fR\fBprint\fR(\fBdev_t\fR \fIdev\fR, \fBchar *\fR\fIstr\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI). This entry point is required for
+block devices.
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIdev\fR \fR
+.ad
+.RS 8n
+.rt  
+Device number.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIstr\fR \fR
+.ad
+.RS 8n
+.rt  
+Pointer to a character string describing the problem.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBprint()\fR routine is called by the kernel when it has detected an
+exceptional condition (such as out of space) in the device.  To display the
+message on the console, the driver should use the  \fBcmn_err\fR(9F) kernel
+function. The driver should print the message along with any driver specific
+information.
+.SH RETURN VALUES
+.sp
+.LP
+The  \fBprint()\fR routine should return \fB0\fR for success, or the
+appropriate error number.  The  \fBprint\fR routine can fail if the driver
+implemented a non-standard  \fBprint()\fR routine that attempted to perform
+error logging, but was unable to complete the logging for whatever reason.
+.SH SEE ALSO
+.sp
+.LP
+\fBcmn_err\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

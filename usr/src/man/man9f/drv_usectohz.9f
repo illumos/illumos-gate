@@ -1,0 +1,78 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH drv_usectohz 9F "24 Apr 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.SH NAME
+drv_usectohz \- convert microseconds to clock ticks
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/types.h>
+#include <sys/ddi.h>
+
+
+
+\fBclock_t\fR \fBdrv_usectohz\fR(\fBclock_t\fR \fImicrosecs\fR);
+.fi
+
+.SH INTERFACE LEVEL
+.sp
+.LP
+Architecture independent level 1 (DDI/DKI).
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fImicrosecs\fR\fR
+.ad
+.RS 13n
+.rt  
+The number of microseconds to convert.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdrv_usectohz()\fR function converts a length of time expressed in
+microseconds to a number of system clock ticks. The time arguments to
+\fBtimeout\fR(9F) and \fBdelay\fR(9F) are expressed in clock ticks.
+.sp
+.LP
+The \fBdrv_usectohz()\fR function is a portable interface for drivers to make
+calls to \fBtimeout\fR(9F) and \fBdelay\fR(9F) and remain binary compatible
+should the driver object file be used on a system with a different clock speed
+(a different number of ticks in a second).
+.SH RETURN VALUES
+.sp
+.LP
+The value returned is the number of system clock ticks equivalent to the
+\fImicrosecs\fR argument. No error value is returned. If the clock tick
+equivalent to \fImicrosecs\fR is too large to be represented as a
+\fBclock_t\fR, then the maximum \fBclock_t\fR value will be returned.
+.SH CONTEXT
+.sp
+.LP
+The \fBdrv_usectohz()\fR function can be called from user, interrupt, or kernel
+context.
+.SH SEE ALSO
+.sp
+.LP
+\fBdelay\fR(9F), \fBdrv_hztousec\fR(9F), \fBtimeout\fR(9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH NOTES
+.sp
+.LP
+If the \fImicrosecs\fR argument to \fBdrv_usectohz()\fR is less than
+\fBdrv_hztousec\fR(9F), \fBdrv_usectohz()\fR returns one tick. This, coupled
+with multiplication, can result in significantly longer durations than
+expected. For example, on a machine where \fBhz\fR is 100, calling
+\fBdrv_usectohz()\fR with a \fImicrosecs\fR value less than 10000 returns a
+result equivalent to 10000 (1 tick). This type of mistake causes code such
+as"5000 * drv_usectohz(1000)" to compute a duration of 50 seconds instead of
+the intended 5 seconds.

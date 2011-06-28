@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -1236,7 +1238,8 @@ sv_lyr_open(dev_t *devp, int flag, int otyp, cred_t *crp)
 			 */
 
 			if (*devp != odev) {
-				rw_exit(&svp->sv_lock);
+				if (svp != NULL)
+					rw_exit(&svp->sv_lock);
 
 				svp = sv_dev_to_sv(*devp, NULL);
 

@@ -1,0 +1,128 @@
+'\" te
+.\" This manual page is derived from the DAT/uDAPL 1.2 specification.
+.\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH dat_ep_free 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.SH NAME
+dat_ep_free \- destroy an instance of the Endpoint
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+#include <\fBdat/udat.h\fR>
+
+DAT_RETURN
+    dat_ep_free (
+    IN    DAT_EP_HANDLE    ep_handle
+    )
+.fi
+
+.SH PARAMETERS
+.sp
+.ne 2
+.mk
+.na
+\fB\fIep_handle\fR\fR
+.ad
+.RS 13n
+.rt  
+Handle for an instance of the Endpoint.
+.RE
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdat_ep_free()\fR function destroys an instance of the Endpoint.
+.sp
+.LP
+The Endpoint can be destroyed in any Endpoint state except Reserved, Passive
+Connection Pending, and Tentative Connection Pending. The destruction of the
+Endpoint can also cause the destruction of DTOs and RMRs posted to the Endpoint
+and not dequeued yet. This includes completions for all outstanding and
+in-progress DTOs/RMRs. The Consumer must be ready for all completions that are
+not dequeued yet either still being on the Endpoint \fIrecv_evd_handle\fR and
+\fIrequest_evd_handle\fR or not being there.
+.sp
+.LP
+The destruction of the Endpoint during connection setup aborts connection
+establishment.
+.sp
+.LP
+If the Endpoint is in the Reserved state, the Consumer shall first destroy the
+associated Reserved Service Point that transitions the Endpoint into the
+Unconnected state where the Endpoint can be destroyed. If the Endpoint is in
+the Passive Connection Pending state, the Consumer shall first reject the
+associated Connection Request that transitions the Endpoint into the
+Unconnected state where the Endpoint can be destroyed. If the Endpoint is in
+the Tentative Connection Pending state, the Consumer shall reject the
+associated Connection Request that transitions the Endpoint back to Provider
+control, and the Endpoint is destroyed as far as the Consumer is concerned.
+.sp
+.LP
+The freeing of an Endpoint also destroys an Event Stream for each of the
+associated Event Dispatchers.
+.sp
+.LP
+Use of the handle of the destroyed Endpoint in any subsequent operation except
+for the \fBdat_ep_free()\fR fails.
+.SH RETURN VALUES
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_SUCCESS\fR\fR
+.ad
+.RS 22n
+.rt  
+The operation was successful.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_HANDLE\fR\fR
+.ad
+.RS 22n
+.rt  
+The \fIep_handle\fR parameter is invalid.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBDAT_INVALID_STATE\fR\fR
+.ad
+.RS 22n
+.rt  
+Parameter in an invalid state. The Endpoint is in \fBDAT_EP_STATE_RESERVED\fR,
+\fBDAT_EP_STATE_PASSIVE_CONNECTION_PENDING\fR, or
+\fBDAT_EP_STATE_TENTATIVE_CONNECTION_PENDING\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard: uDAPL, 1.1, 1.2
+_
+MT-LevelUnsafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibdat\fR(3LIB), \fBattributes\fR(5)

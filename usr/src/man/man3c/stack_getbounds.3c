@@ -1,0 +1,74 @@
+'\" te
+.\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH stack_getbounds 3C "18 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+stack_getbounds \- retrieve stack boundaries
+.SH SYNOPSIS
+.LP
+.nf
+#include <ucontext.h>
+
+\fBint\fR \fBstack_getbounds\fR(\fBstack_t *\fR\fIsp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBstack_getbounds()\fR function retrieves the stack boundaries that the
+calling thread is currently operating on. If the thread is currently operating
+on the alternate signal stack, this function will retrieve the bounds of that
+stack.
+.sp
+.LP
+If successful, \fBstack_getbounds()\fR sets the \fBss_sp\fR member of the
+\fBstack_t\fR structure pointed to by \fIsp\fR to the base of the stack region
+and the \fBss_size\fR member to its size (maximum extent) in bytes. The
+\fBss_flags\fR member is set to \fBSS_ONSTACK\fR if the calling thread is
+executing on its alternate signal stack, and zero otherwise.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, \fBstack_getbounds()\fR returns 0. Otherwise, \(mi1
+is returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBstack_getbounds()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIsp\fR argument does not refer to a valid address.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelAsync-Signal-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBgetustack\fR(2), \fBsigaction\fR(2), \fBsigaltstack\fR(2),
+\fBstack_setbounds\fR(3C), \fBattributes\fR(5)

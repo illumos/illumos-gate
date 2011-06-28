@@ -32,6 +32,7 @@
 #include <dirent.h>
 #include <alloca.h>
 #include <spawn.h>
+#include <paths.h>
 
 #define	ALL_POSIX_SPAWN_FLAGS			\
 		(POSIX_SPAWN_RESETIDS |		\
@@ -382,9 +383,6 @@ posix_spawnp(
 	char **newargs;
 	int argc;
 	int i;
-	static const char *sun_path = "/bin/sh";
-	static const char *xpg4_path = "/usr/xpg4/bin/sh";
-	static const char *shell = "sh";
 
 	if (attrp != NULL && sap == NULL)
 		return (EINVAL);
@@ -483,13 +481,12 @@ posix_spawnp(
 		(void) set_error(&error, 0);
 		(void) execve(path, argv, envp);
 		if (set_error(&error, errno) == ENOEXEC) {
-			newargs[0] = (char *)shell;
+			newargs[0] = "sh";
 			newargs[1] = path;
 			for (i = 1; i <= argc; i++)
 				newargs[i + 1] = argv[i];
 			(void) set_error(&error, 0);
-			(void) execve(xpg4? xpg4_path : sun_path,
-			    newargs, envp);
+			(void) execve(_PATH_BSHELL, newargs, envp);
 			if (sap != NULL &&
 			    (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP))
 				_exit(127);

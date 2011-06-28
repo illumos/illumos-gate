@@ -1,0 +1,109 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sockatmark 3XNET "1 Oct 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.SH NAME
+sockatmark \- determine whether a socket is at the out-of-band mark
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
+#include <sys/socket.h>
+
+\fBint\fR \fBsockatmark\fR(\fBint\fR \fIs\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsockatmark()\fR function determines whether the socket specified by the
+descriptor \fIs\fR is at the out-of-band data mark. If the protocol for the
+socket supports out-of-band data by marking the stream with an out-of-band data
+mark, the \fBsockatmark()\fR function returns 1 when all data preceding the
+mark has been read and the out-of-band data mark is the first element in the
+receive queue. The \fBsockatmark()\fR function does not remove the mark from
+the stream.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBsockatmark()\fR function returns a value
+indicating whether the socket is at an out-of-band data mark. If the protocol
+has marked the data stream and all data preceding the mark has been read, the
+return value is 1. If there is no mark, or if data precedes the mark in the
+receive queue, the \fBsockatmark()\fR function returns 0. Otherwise, it returns
+\(mi1 and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsockatmark()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIs\fR argument is not a valid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIs\fR argument does not specify a descriptor for a socket.
+.RE
+
+.SH USAGE
+.sp
+.LP
+The use of this function between receive operations allows an application to
+determine which received data precedes the out-of-band data and which follows
+the out-of-band data.
+.sp
+.LP
+There is an inherent race condition in the use of this function. On an empty
+receive queue, the current read of the location might well be at the "mark",
+but the system has no way of knowing that the next data segment that will
+arrive from the network will carry the mark, and \fBsockatmark()\fR will return
+false, and the next read operation will silently consume the mark.
+.sp
+.LP
+Hence, this function can only be used reliably when the application already
+knows that the out-of-band data has been seen by the system or that it is known
+that there is data waiting to be read at the socket, either by \fBSIGURG\fR or
+\fBselect\fR(3C).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBrecv\fR(3XNET), \fBrecvmsg\fR(3XNET), \fBselect\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

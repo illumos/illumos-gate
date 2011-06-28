@@ -1,0 +1,87 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sdp_delete_media 3COMMPUTIL "12 Oct 2007" "SunOS 5.11" "Communication Protocol Parser Utilities Library Functions"
+.SH NAME
+sdp_delete_media, sdp_delete_attribute \- delete the specified media or
+attribute from the appropriate list
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR...] \fIfile\fR... -\fBlcommputil\fR [ \fIlibrary\fR...]
+#include <sdp.h>
+
+\fBint\fR \fBsdp_delete_media\fR(\fBsdp_media_t **\fR\fIl_media\fR, \fBsdp_media_t *\fR\fImedia\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsdp_delete_attribute\fR(\fBsdp_attr_t **\fR\fIl_attr\fR, \fBsdp_attr_t *\fR\fIattr\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsdp_delete_media()\fR function deletes the specified media from the
+media list. It is similar to deleting a node in a linked list. The function
+first finds the media that needs to be deleted using
+\fBsdp_find_media\fR(3COMMPUTIL). The found media is then passed to
+\fBsdp_delete_media()\fR to delete it. The function frees the memory allocated
+to media structure after deleting it.
+.sp
+.LP
+The \fBsdp_delete_attribute()\fR function deletes the specified attribute from
+the attribute list. It is similar to deleting a node in a linked list. The
+function first finds the attribute that needs to be deleted using
+\fBsdp_find_media_rtpmap\fR(3COMMPUTIL) or
+\fBsdp_find_attribute\fR(3COMMPUTIL). The found attribute is then passed to
+\fBsdp_delete_attribute()\fR to delete it. The function frees the memory
+allocated to attribute structure after deleting it.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return 0. Otherwise, the
+appropriate error value is returned. The value of \fBerrno\fR is not changed by
+these calls in the event of an error.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The mandatory input parameters are not provided or are \fINULL\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBlibcommputil\fR(3LIB), \fBsdp_find_attribute\fR(3COMMPUTIL),
+\fBsdp_find_media\fR(3COMMPUTIL), \fBsdp_find_media_rtpmap\fR(3COMMPUTIL),
+\fBattributes\fR(5)

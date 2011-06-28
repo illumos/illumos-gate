@@ -1,0 +1,216 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sctp_send 3SOCKET "19 Mar 2004" "SunOS 5.11" "Sockets Library Functions"
+.SH NAME
+sctp_send \- send message from an SCTP socket
+.SH SYNOPSIS
+.LP
+.nf
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR \fB -lnsl \fR \fB -lsctp \fR [ \fIlibrary\fR... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/sctp.h>
+
+\fBssize_t\fR \fBsctp_send\fR(\fBint\fR \fIs\fR, \fBconst void *\fR\fImsg\fR, \fBsize_t *\fR\fIlen\fR,
+     \fBconst struct sctp_sndrcvinfo *\fR\fIsinfo\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBsctp_send()\fR function sends messages from one-to-one and one-to-many
+style SCTP endpoints. The following parameters can be set:
+.sp
+.ne 2
+.mk
+.na
+\fB\fIs\fR\fR
+.ad
+.RS 7n
+.rt  
+Socket created by \fBsocket\fR(3SOCKET)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fImsg\fR\fR
+.ad
+.RS 7n
+.rt  
+Message to be sent
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fIlen\fR\fR
+.ad
+.RS 7n
+.rt  
+Size of the message to be sent in bytes
+.RE
+
+.sp
+.LP
+The caller completes the \fIsinfo\fR parameter with values used to send a
+message. Such values might include the stream number, payload protocol
+identifier, time to live, and the SCTP message flag and context. For a
+one-to-many socket, the association ID can be specified in the \fIsinfo\fR
+parameter to send a message to the association represented in the ID.
+.sp
+.LP
+Flags supported for \fBsctp_send()\fR are reserved for future use.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBsctp_send()\fR function returns the number
+of bytes sent. The function returns \fB-1\fR if an error occurs.
+.SH ERRORS
+.sp
+.LP
+The \fBsctp_send()\fR function fails under the following conditions.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIs\fR argument is an invalid file descriptor.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTSOCK\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fIs\fR argument is not a socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEOPNOTSUPP\fR\fR
+.ad
+.RS 16n
+.rt  
+\fBMSG_ABORT\fR or \fBMSG_EOF\fR is set in the \fBsinfo_flags\fR field of
+\fBsinfo\fR for a one-to-one style SCTP socket.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEPIPE\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket is shutting down and no more writes are allowed.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 16n
+.rt  
+The socket is non-blocking and the transmit queue is full.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOTCONN\fR\fR
+.ad
+.RS 16n
+.rt  
+There is no established association.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+Control message length is incorrect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+Specified destination address does not belong to the association.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+.rt  
+The \fBstream_no\fR is outside the number of outbound streams supported by the
+association.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAFNOSUPPORT\fR\fR
+.ad
+.RS 16n
+.rt  
+Address family of the specified destination address is other than \fBAF_INET\fR
+or \fBAF_INET6\fR.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityEvolving
+_
+MT-LevelSafe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBaccept\fR(3SOCKET), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
+\fBin.h\fR(3HEAD), \fBlibsctp\fR(3LIB), \fBlisten\fR(3SOCKET),
+\fBsctp_sendmsg\fR(3SOCKET), \fBsendmsg\fR(3SOCKET), \fBsocket\fR(3SOCKET),
+\fBsocket.h\fR(3HEAD), \fBsctp\fR(7P)

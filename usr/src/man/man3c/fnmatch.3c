@@ -1,0 +1,145 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fnmatch 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+fnmatch \- match filename or path name
+.SH SYNOPSIS
+.LP
+.nf
+#include <fnmatch.h>
+
+\fBint\fR \fBfnmatch\fR(\fBconst char *\fR\fIpattern\fR, \fBconst char *\fR\fIstring\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfnmatch()\fR function matches patterns as described on the
+\fBfnmatch\fR(5) manual page.  It checks the \fIstring\fR argument to see if it
+matches the \fIpattern\fR argument.
+.sp
+.LP
+The \fIflags\fR argument modifies the interpretation of \fIpattern\fR and
+\fIstring\fR. It is the bitwise inclusive \fBOR\fR of zero or more of the
+following flags defined in the header <\fBfnmatch.h\fR>.
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFNM_PATHNAME\fR  \fR
+.ad
+.RS 18n
+.rt  
+If set, a slash (\fB/\fR) character in \fIstring\fR will be explicitly matched
+by a slash in \fIpattern\fR; it will not be matched by either the asterisk
+(\fB*\fR) or question-mark (\fB?\fR) special characters, nor by a bracket
+(\fB[\|]\fR) expression.
+.sp
+If not set, the slash character is treated as an ordinary character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFNM_NOESCAPE\fR\fR
+.ad
+.RS 18n
+.rt  
+If not set, a backslash character (\fB\e\fR) in \fIpattern\fR followed by any
+other character will match that second character in \fIstring\fR. In
+particular, "\fB\e\e\fR" will match a backslash in \fIstring\fR.
+.sp
+If set, a backslash character will be treated as an ordinary character.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFNM_PERIOD\fR\fR
+.ad
+.RS 18n
+.rt  
+If set, a leading period in \fIstring\fR will match a period in \fIpattern\fR;
+where the location of "leading" is indicated by the value of
+\fBFNM_PATHNAME\fR:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBFNM_PATHNAME\fR is set, a period is "leading" if it is the first
+character in \fIstring\fR or if it immediately follows a slash.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBFNM_PATHNAME\fR is not set, a period is "leading" only if it is the first
+character of \fIstring\fR.
+.RE
+.RE
+
+.sp
+.LP
+If not set, no special restrictions are placed on matching a period.
+.SH RETURN VALUES
+.sp
+.LP
+If \fIstring\fR matches the pattern specified by \fIpattern\fR, then
+\fBfnmatch()\fR returns \fB0\fR. If there is no match, \fBfnmatch()\fR returns
+\fBFNM_NOMATCH\fR, which is defined in the header <\fBfnmatch.h\fR>. If an
+error occurs, \fBfnmatch()\fR returns another non-zero value.
+.SH USAGE
+.sp
+.LP
+The \fBfnmatch()\fR function has two major uses. It could be used by an
+application or utility that needs to read a directory and apply a pattern
+against each entry. The \fBfind\fR(1) utility is an example of this. It can
+also be used by the \fBpax\fR(1) utility to process its \fIpattern\fR operands,
+or by applications that need to match strings in a similar manner.
+.sp
+.LP
+The name \fBfnmatch()\fR is intended to imply \fIfilename\fR match, rather than
+\fIpathname\fR match. The default action of this function is to match
+filenames, rather than path names, since it gives no special significance to
+the slash character. With the \fBFNM_PATHNAME\fR flag, \fBfnmatch()\fR does
+match path names, but without tilde expansion, parameter expansion, or special
+treatment for period at the beginning of a filename.
+.sp
+.LP
+The \fBfnmatch()\fR function can be used safely in multithreaded applications,
+as long as \fBsetlocale\fR(3C) is not being called to change the locale.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+CSIEnabled
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfind\fR(1), \fBpax\fR(1), \fBglob\fR(3C), \fBsetlocale\fR(3C),
+\fBwordexp\fR(3C), \fBattributes\fR(5), \fBfnmatch\fR(5), \fBstandards\fR(5)

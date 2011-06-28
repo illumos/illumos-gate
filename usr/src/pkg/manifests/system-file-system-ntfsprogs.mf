@@ -34,6 +34,7 @@ set name=variant.arch value=i386
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/sbin
+dir path=usr/share/man/man1m
 file path=usr/lib/libntfs.so.10
 file path=usr/sbin/mkntfs mode=0555
 file path=usr/sbin/ntfscat mode=0555
@@ -47,6 +48,19 @@ file path=usr/sbin/ntfslabel mode=0555
 file path=usr/sbin/ntfsls mode=0555
 file path=usr/sbin/ntfsresize mode=0555
 file path=usr/sbin/ntfsundelete mode=0555
+file path=usr/share/man/man1m/mkntfs.1m
+file path=usr/share/man/man1m/ntfscat.1m
+file path=usr/share/man/man1m/ntfsclone.1m
+file path=usr/share/man/man1m/ntfscluster.1m
+file path=usr/share/man/man1m/ntfscmp.1m
+file path=usr/share/man/man1m/ntfscp.1m
+file path=usr/share/man/man1m/ntfsfix.1m
+file path=usr/share/man/man1m/ntfsinfo.1m
+file path=usr/share/man/man1m/ntfslabel.1m
+file path=usr/share/man/man1m/ntfsls.1m
+file path=usr/share/man/man1m/ntfsprogs.1m
+file path=usr/share/man/man1m/ntfsresize.1m
+file path=usr/share/man/man1m/ntfsundelete.1m
 legacy pkg=SUNWntfsprogs \
     desc="ntfsprogs are utilities that provide access to and manipulation of NTFS" \
     name="ntfsprogs - Utilities that provide access to NTFS"

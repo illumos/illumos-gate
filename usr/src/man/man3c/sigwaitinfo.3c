@@ -1,0 +1,180 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH sigwaitinfo 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.SH NAME
+sigwaitinfo, sigtimedwait \- wait for queued signals
+.SH SYNOPSIS
+.LP
+.nf
+#include <signal.h>
+
+\fBint\fR \fBsigwaitinfo\fR(\fBconst sigset_t *restrict\fR \fIset\fR,
+     \fBsiginfo_t *restrict\fR \fIinfo\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsigtimedwait\fR(\fBconst sigset_t *restrict\fR \fIset\fR,
+     \fBsiginfo_t *restrict\fR \fIinfo\fR,
+     \fBconst struct timespec *restrict\fR \fItimeout\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBsigwaitinfo()\fR function selects the pending signal from the set
+specified by \fBset\fR. Should any of multiple pending signals in the range
+\fBSIGRTMIN\fR to \fBSIGRTMAX\fR be selected, it will be the lowest numbered
+one. The selection order between realtime and non-realtime signals, or between
+multiple pending non-realtime signals, is unspecified. If no signal in
+\fBset\fR is pending at the time of the call, the calling thread is suspended
+until one or more signals in \fBset\fR become pending or until it is
+interrupted by an unblocked, caught signal.
+.sp
+.LP
+The  \fBsigwaitinfo()\fR function behaves the same as the \fBsigwait\fR(2)
+function if the \fIinfo\fR argument is \fINULL\fR. If the \fIinfo\fR argument
+is non-\fINULL\fR, the \fBsigwaitinfo()\fR function behaves the same as
+\fBsigwait\fR(2), except that the selected signal number is stored in the
+\fIsi_signo\fR member, and the cause of the signal is stored in the
+\fIsi_code\fR member. If any value is queued to the selected signal, the first
+such queued value is dequeued and, if the \fIinfo\fR argument is
+non-\fINULL\fR, the value is stored in the \fIsi_value\fR member of \fIinfo\fR.
+The system resource used to queue the signal will be released and made
+available to queue other signals. If no value is queued, the content of the
+\fIsi_value\fR member is undefined. If no further signals are queued for the
+selected signal, the pending indication for that signal will be reset. If the
+value of the \fBsi_code\fR member is \fBSI_NOINFO\fR, only the \fBsi_signo\fR
+member of \fBsiginfo_t\fR is meaningful, and the value of all other members is
+unspecified.
+.sp
+.LP
+The  \fBsigtimedwait()\fR function behaves the same as \fBsigwaitinfo()\fR
+except that if none of the signals specified by \fBset\fR are pending,
+\fBsigtimedwait()\fR waits for the time interval specified in the
+\fBtimespec\fR structure referenced by \fItimeout\fR. If the \fBtimespec\fR
+structure pointed to by \fItimeout\fR is zero-valued and if none of the signals
+specified by \fBset\fR are pending, then \fBsigtimedwait()\fR returns
+immediately with an error. If \fItimeout\fR is the \fINULL\fR pointer, the
+behavior is unspecified.
+.sp
+.LP
+If, while \fBsigwaitinfo()\fR or \fBsigtimedwait()\fR is waiting, a signal
+occurs which is eligible for delivery (that is, not blocked by the process
+signal mask), that signal is handled asynchronously and the wait is
+interrupted.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion (that is, one of the signals specified by \fIset\fR
+is pending or is generated) \fBsigwaitinfo()\fR and \fBsigtimedwait()\fR will
+return the selected signal number. Otherwise, the function returns \fB\(mi1\fR
+and sets \fBerrno\fR to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBsigwaitinfo()\fR and \fBsigtimedwait()\fR functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 10n
+.rt  
+The wait was interrupted by an unblocked, caught signal.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fBsigwaitinfo()\fR and \fBsigtimedwait()\fR functions are not supported.
+.RE
+
+.sp
+.LP
+The \fBsigtimedwait()\fR function will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 10n
+.rt  
+No signal specified by \fBset\fR was generated within the specified timeout
+period.
+.RE
+
+.sp
+.LP
+The \fBsigwaitinfo()\fR and \fBsigtimedwait()\fR functions may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fIset\fR, \fIinfo\fR, or \fItimeout\fR argument points to an invalid
+address.
+.RE
+
+.sp
+.LP
+The \fBsigtimedwait()\fR function may fail if:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+.rt  
+The \fItimeout\fR argument specified a \fBtv_nsec\fR value less than zero or
+greater than or equal to 1000 million. The system only checks for this error if
+no signal is pending in \fIset\fR and it is necessary to wait.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) |lw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+_
+Interface StabilityCommitted
+_
+MT-LevelAsync-Safe
+_
+StandardSee \fBstandards\fR(5).
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtime\fR(2), \fBsigqueue\fR(3C), \fBsiginfo.h\fR(3HEAD),
+\fBsignal.h\fR(3HEAD), \fBtime.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)
