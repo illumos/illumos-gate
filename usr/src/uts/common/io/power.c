@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1058,9 +1059,8 @@ power_probe_method_button(struct power_soft_state *softsp)
 	softsp->button_obj = button_obj;	/* remember obj */
 	if ((button_obj != NULL) &&
 	    (power_get_prw_gpe(button_obj, &gpe_dev, &gpe_num) == AE_OK) &&
-	    (AcpiSetGpeType(gpe_dev, gpe_num, ACPI_GPE_TYPE_WAKE_RUN) ==
-	    AE_OK) &&
-	    (AcpiEnableGpe(gpe_dev, gpe_num, ACPI_NOT_ISR) == AE_OK) &&
+	    (AcpiSetupGpeForWake(button_obj, gpe_dev, gpe_num) == AE_OK) &&
+	    (AcpiEnableGpe(gpe_dev, gpe_num) == AE_OK) &&
 	    (AcpiInstallNotifyHandler(button_obj, ACPI_DEVICE_NOTIFY,
 	    power_acpi_notify_event, (void*)softsp) == AE_OK))
 		return (1);

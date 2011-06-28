@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 /*
  * Solaris x86 ACPI CA Embedded Controller operation region handler
@@ -48,11 +49,22 @@ static int ec_wait_obf_set(int sc_addr);
 
 /*
  * EC status bits
+ * Low to high
+ *	Output buffer full?
+ *	Input buffer full?
+ *	<reserved>
+ *	Data register is command byte?
+ *	Burst mode enabled?
+ *	SCI event?
+ *	SMI event?
+ *	<reserved>
  */
-#define	EC_IBF	(0x02)
 #define	EC_OBF	(0x01)
-#define	EC_SMI	(0x40)
+#define	EC_IBF	(0x02)
+#define	EC_DRC	(0x08)
+#define	EC_BME	(0x10)
 #define	EC_SCI	(0x20)
+#define	EC_SMI	(0x40)
 
 /*
  * EC commands
@@ -300,8 +312,10 @@ ec_gpe_callback(void *ctx)
 }
 
 static UINT32
-ec_gpe_handler(void *ctx)
+ec_gpe_handler(ACPI_HANDLE GpeDevice, UINT32 GpeNumber, void *ctx)
 {
+	_NOTE(ARGUNUSED(GpeDevice))
+	_NOTE(ARGUNUSED(GpeNumber))
 	_NOTE(ARGUNUSED(ctx))
 
 	AcpiOsExecute(OSL_GPE_HANDLER, ec_gpe_callback, NULL);
@@ -473,8 +487,7 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 		 */
 	}
 
-	(void) AcpiSetGpeType(NULL, gpe, ACPI_GPE_TYPE_RUNTIME);
-	(void) AcpiEnableGpe(NULL, gpe, ACPI_NOT_ISR);
+	(void) AcpiEnableGpe(NULL, gpe);
 
 	return (AE_OK);
 }
