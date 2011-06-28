@@ -167,6 +167,8 @@ UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
 UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed
+UNREF_OBJ	/libc\.so\.1.*\ of\ .*kldap\.so\.1              # gcc build
+
 
 # Objects that used to contain system functionalty that has since
 # migrated to libc. We preserve these libraries as pure filters for
