@@ -357,6 +357,17 @@ The following properties are supported:
 .ad
 .sp .6
 .RS 4n
+\fBfs-allowed\fR
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB(global)\fR
+.ad
+.sp .6
+.RS 4n
 \fBzfs-io-priority\fR
 .RE
 
@@ -922,6 +933,26 @@ have their own caps, the minimum value takes precedence.
 The \fBcapped-cpu\fR property is an alias for \fBzone.cpu-cap\fR resource
 control and is related to the \fBzone.cpu-cap\fR resource control. See
 \fBresource_controls\fR(5).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBglobal: \fBfs-allowed\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of additional filesystems that may be mounted within
+the zone; for example "ufs,pcfs". By default, only hsfs(7fs) and network
+filesystems can be mounted.
+
+This property does not apply to filesystems mounted into the zone via "add fs"
+or "add dataset".
+
+WARNING: allowing filesystem mounts other than the default may allow the zone
+administrator to compromise the system with a malicious filesystem image, and
+is not supported.
 .RE
 
 .sp
