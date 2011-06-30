@@ -1,4 +1,5 @@
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, Boris Popov
  * All rights reserved.
  *
@@ -334,7 +335,8 @@ smb_rap_request(struct smb_rap *rap, struct smb_ctx *ctx)
 
 	rdatacnt = rap->r_rcvbuflen;
 	rparamcnt = rap->r_plen;
-	error = smb_t2_request(ctx, 0, NULL, "\\PIPE\\LANMAN",
+	error = smb_t2_request(ctx->ct_dev_fd,
+	    0, NULL, "\\PIPE\\LANMAN",
 	    rap->r_plen, rap->r_pbuf,		/* int tparamcnt,void *tparam */
 	    0, NULL,				/* int tdatacnt, void *tdata */
 	    &rparamcnt, rap->r_pbuf,		/* rparamcnt, void *rparam */

@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -57,6 +58,8 @@
 #include <netsmb/smb_rq.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_tran.h>
+
+#define	STYPE_LEN	8	/* share type strings */
 
 /*
  * Largest size to use with LARGE_READ/LARGE_WRITE.
@@ -88,6 +91,64 @@ static int smb_smb_readx(struct smb_share *ssp, uint16_t fid,
 static int smb_smb_writex(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
 
+/*
+ * Get the string representation of a share "use" type,
+ * as needed for the "service" in tree connect.
+ */
+static const char *
+smb_share_typename(uint32_t stype)
+{
+	const char *p;
+
+	switch (stype) {
+	case STYPE_DISKTREE:
+		p = "A:";
+		break;
+	case STYPE_PRINTQ:
+		p = "LPT1:";
+		break;
+	case STYPE_DEVICE:
+		p = "COMM";
+		break;
+	case STYPE_IPC:
+		p = "IPC";
+		break;
+	case STYPE_UNKNOWN:
+	default:
+		p = "?????";
+		break;
+	}
+	return (p);
+}
+
+/*
+ * Parse a share type name (inverse of above)
+ */
+static uint32_t
+smb_share_parsetype(char *name)
+{
+	int stype;
+
+	switch (*name) {
+	case 'A':	/* A: */
+		stype = STYPE_DISKTREE;
+		break;
+	case 'C':	/* COMM */
+		stype = STYPE_DEVICE;
+		break;
+	case 'I':	/* IPC */
+		stype = STYPE_IPC;
+		break;
+	case 'L':	/* LPT: */
+		stype = STYPE_PRINTQ;
+		break;
+	default:
+		stype = STYPE_UNKNOWN;
+		break;
+	}
+	return (stype);
+}
+
 int
 smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 {
@@ -95,10 +156,12 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	struct smb_rq *rqp = NULL;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
+	const char *tname;
 	char *pbuf, *unc_name = NULL;
 	int error, tlen, plen, unc_len;
 	uint16_t bcnt, options;
 	uint8_t wc;
+	char stype_str[STYPE_LEN];
 
 	vcp = SSTOVC(ssp);
 
@@ -127,12 +190,14 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	    vcp->vc_srvname, ssp->ss_name);
 	SMBSDEBUG("unc_name: \"%s\"", unc_name);
 
+
 	/*
-	 * The password is now pre-computed in the
-	 * user-space helper process.
+	 * Share-level password (pre-computed in user-space)
+	 * MS-SMB 2.2.6 says this should be null terminated,
+	 * and the pw length includes the null.
 	 */
-	plen = ssp->ss_pwlen;
 	pbuf = ssp->ss_pass;
+	plen = strlen(pbuf) + 1;
 
 	/*
 	 * Build the request.
@@ -161,8 +226,9 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	 * Put the type string (always ASCII),
 	 * including the null.
 	 */
-	tlen = strlen(ssp->ss_type_req) + 1;
-	error = mb_put_mem(mbp, ssp->ss_type_req, tlen, MB_MSYSTEM);
+	tname = smb_share_typename(ssp->ss_use);
+	tlen = strlen(tname) + 1;
+	error = mb_put_mem(mbp, tname, tlen, MB_MSYSTEM);
 	if (error)
 		goto out;
 
@@ -210,15 +276,17 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 		goto out;
 
 	/*
-	 * Get the returned share type string,
-	 * i.e. "IPC" or whatever.   Don't care
-	 * if we get an error reading the type.
+	 * Get the returned share type string, i.e. "IPC" or whatever.
+	 * (See smb_share_typename, smb_share_parsetype).  If we get
+	 * an error reading the type, just say STYPE_UNKNOWN.
 	 */
-	tlen = sizeof (ssp->ss_type_ret);
-	bzero(ssp->ss_type_ret, tlen--);
+	tlen = STYPE_LEN;
+	bzero(stype_str, tlen--);
 	if (tlen > bcnt)
 		tlen = bcnt;
-	md_get_mem(mdp, ssp->ss_type_ret, tlen, MB_MSYSTEM);
+	md_get_mem(mdp, stype_str, tlen, MB_MSYSTEM);
+	stype_str[tlen] = '\0';
+	ssp->ss_type = smb_share_parsetype(stype_str);
 
 	/* Success! */
 	SMB_SS_LOCK(ssp);
@@ -277,6 +345,258 @@ smb_smb_treedisconnect(struct smb_share *ssp, struct smb_cred *scred)
 	SMBSDEBUG("%d\n", error);
 	smb_rq_done(rqp);
 	ssp->ss_tid = SMB_TID_UNKNOWN;
+	return (error);
+}
+
+/*
+ * Modern create/open of file or directory.
+ */
+int
+smb_smb_ntcreate(
+	struct smb_share *ssp,
+	struct mbchain	*name_mb,
+	uint32_t cr_flags,	/* create flags */
+	uint32_t req_acc,	/* requested access */
+	uint32_t efa,		/* ext. file attrs (DOS attr +) */
+	uint32_t share_acc,
+	uint32_t open_disp,	/* open disposition */
+	uint32_t createopt,	/* NTCREATEX_OPTIONS_ */
+	uint32_t impersonate,	/* NTCREATEX_IMPERSONATION_... */
+	struct smb_cred *scrp,
+	uint16_t *fidp,		/* returned FID */
+	uint32_t *cr_act_p,	/* optional create action */
+	struct smbfattr *fap)	/* optional attributes */
+{
+	struct smb_rq rq, *rqp = &rq;
+	struct smb_vc *vcp = SSTOVC(ssp);
+	struct mbchain *mbp;
+	struct mdchain *mdp;
+	struct smbfattr fa;
+	uint64_t llongint;
+	uint32_t longint, createact;
+	uint16_t fid;
+	uint8_t wc;
+	int error;
+
+	bzero(&fa, sizeof (fa));
+	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_NT_CREATE_ANDX, scrp);
+	if (error)
+		return (error);
+	smb_rq_getrequest(rqp, &mbp);
+
+	/* Word parameters */
+	smb_rq_wstart(rqp);
+	mb_put_uint8(mbp, 0xff);	/* secondary command */
+	mb_put_uint8(mbp, 0);		/* MBZ */
+	mb_put_uint16le(mbp, 0);	/* offset to next command (none) */
+	mb_put_uint8(mbp, 0);		/* MBZ */
+	mb_put_uint16le(mbp, name_mb->mb_count);
+	mb_put_uint32le(mbp, cr_flags);	/* NTCREATEX_FLAGS_* */
+	mb_put_uint32le(mbp, 0);	/* FID - basis for path if not root */
+	mb_put_uint32le(mbp, req_acc);
+	mb_put_uint64le(mbp, 0);	/* "initial allocation size" */
+	mb_put_uint32le(mbp, efa);
+	mb_put_uint32le(mbp, share_acc);
+	mb_put_uint32le(mbp, open_disp);
+	mb_put_uint32le(mbp, createopt);
+	mb_put_uint32le(mbp, impersonate);
+	mb_put_uint8(mbp, 0);   /* security flags (?) */
+	smb_rq_wend(rqp);
+
+	/*
+	 * Byte parameters: Just the path name, aligned.
+	 * Note: mb_put_mbuf consumes mb_top, so clear it.
+	 */
+	smb_rq_bstart(rqp);
+	if (SMB_UNICODE_STRINGS(vcp))
+		mb_put_padbyte(mbp);
+	mb_put_mbuf(mbp, name_mb->mb_top);
+	bzero(name_mb, sizeof (*name_mb));
+	smb_rq_bend(rqp);
+
+	/*
+	 * Don't want to risk missing a successful
+	 * open response, or we could "leak" FIDs.
+	 */
+	rqp->sr_flags |= SMBR_NOINTR_RECV;
+	error = smb_rq_simple_timed(rqp, smb_timo_open);
+	if (error)
+		goto done;
+	smb_rq_getreply(rqp, &mdp);
+	/*
+	 * spec says 26 for word count, but 34 words are defined
+	 * and observed from win2000
+	 */
+	error = md_get_uint8(mdp, &wc);
+	if (error)
+		goto done;
+	if (wc != 26 && wc < 34) {
+		error = EBADRPC;
+		goto done;
+	}
+	md_get_uint8(mdp, NULL);		/* secondary cmd */
+	md_get_uint8(mdp, NULL);		/* mbz */
+	md_get_uint16le(mdp, NULL);		/* andxoffset */
+	md_get_uint8(mdp, NULL);		/* oplock lvl granted */
+	md_get_uint16le(mdp, &fid);		/* file ID */
+	md_get_uint32le(mdp, &createact);	/* create_action */
+
+	md_get_uint64le(mdp, &llongint);	/* creation time */
+	smb_time_NT2local(llongint, &fa.fa_createtime);
+	md_get_uint64le(mdp, &llongint);	/* access time */
+	smb_time_NT2local(llongint, &fa.fa_atime);
+	md_get_uint64le(mdp, &llongint);	/* write time */
+	smb_time_NT2local(llongint, &fa.fa_mtime);
+	md_get_uint64le(mdp, &llongint);	/* change time */
+	smb_time_NT2local(llongint, &fa.fa_ctime);
+
+	md_get_uint32le(mdp, &longint);		/* attributes */
+	fa.fa_attr = longint;
+	md_get_uint64le(mdp, &llongint);	/* allocation size */
+	fa.fa_allocsz = llongint;
+	md_get_uint64le(mdp, &llongint);	/* EOF position */
+	fa.fa_size = llongint;
+
+	error = md_get_uint16le(mdp, NULL);	/* file type */
+	/* other stuff we don't care about */
+
+done:
+	smb_rq_done(rqp);
+	if (error)
+		return (error);
+
+	*fidp = fid;
+	if (cr_act_p)
+		*cr_act_p = createact;
+	if (fap)
+		*fap = fa; /* struct copy */
+
+	return (0);
+}
+
+int
+smb_smb_close(struct smb_share *ssp, uint16_t fid, struct timespec *mtime,
+	struct smb_cred *scrp)
+{
+	struct smb_rq rq, *rqp = &rq;
+	struct mbchain *mbp;
+	long time;
+	int error;
+
+	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_CLOSE, scrp);
+	if (error)
+		return (error);
+	smb_rq_getrequest(rqp, &mbp);
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, fid);
+	if (mtime) {
+		int sv_tz = SSTOVC(ssp)->vc_sopt.sv_tz;
+		smb_time_local2server(mtime, sv_tz, &time);
+	} else {
+		time = 0;
+	}
+	mb_put_uint32le(mbp, time);
+	smb_rq_wend(rqp);
+	smb_rq_bstart(rqp);
+	smb_rq_bend(rqp);
+
+	/* Make sure we send it... */
+	rqp->sr_flags |= SMBR_NOINTR_SEND;
+	error = smb_rq_simple(rqp);
+	smb_rq_done(rqp);
+	return (error);
+}
+
+int
+smb_smb_open_prjob(
+	struct smb_share *ssp,
+	char	*title,
+	uint16_t setuplen,
+	uint16_t mode,
+	struct smb_cred *scrp,
+	uint16_t *fidp)
+{
+	struct smb_rq rq, *rqp = &rq;
+	struct smb_vc *vcp = SSTOVC(ssp);
+	struct mbchain *mbp;
+	struct mdchain *mdp;
+	uint16_t fid;
+	uint8_t wc;
+	int error;
+
+	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_OPEN_PRINT_FILE, scrp);
+	if (error)
+		return (error);
+	smb_rq_getrequest(rqp, &mbp);
+
+	/* Word parameters */
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, setuplen);
+	mb_put_uint16le(mbp, mode);
+	smb_rq_wend(rqp);
+
+	/*
+	 * Byte parameters: Just the title
+	 */
+	smb_rq_bstart(rqp);
+	mb_put_uint8(mbp, SMB_DT_ASCII);
+	error = smb_put_dstring(mbp, vcp, title, SMB_CS_NONE);
+	smb_rq_bend(rqp);
+	if (error)
+		goto done;
+
+	/*
+	 * Don't want to risk missing a successful
+	 * open response, or we could "leak" FIDs.
+	 */
+	rqp->sr_flags |= SMBR_NOINTR_RECV;
+	error = smb_rq_simple_timed(rqp, smb_timo_open);
+	if (error)
+		goto done;
+
+	smb_rq_getreply(rqp, &mdp);
+	error = md_get_uint8(mdp, &wc);
+	if (error || wc < 1) {
+		error = EBADRPC;
+		goto done;
+	}
+	error = md_get_uint16le(mdp, &fid);
+
+done:
+	smb_rq_done(rqp);
+	if (error)
+		return (error);
+
+	*fidp = fid;
+	return (0);
+}
+
+/*
+ * Like smb_smb_close, but for print shares.
+ */
+int
+smb_smb_close_prjob(struct smb_share *ssp, uint16_t fid,
+	struct smb_cred *scrp)
+{
+	struct smb_rq rq, *rqp = &rq;
+	struct mbchain *mbp;
+	int error;
+
+	error = smb_rq_init(rqp, SSTOCP(ssp),
+	    SMB_COM_CLOSE_PRINT_FILE, scrp);
+	if (error)
+		return (error);
+	smb_rq_getrequest(rqp, &mbp);
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, fid);
+	smb_rq_wend(rqp);
+	smb_rq_bstart(rqp);
+	smb_rq_bend(rqp);
+
+	/* Make sure we send it... */
+	rqp->sr_flags |= SMBR_NOINTR_SEND;
+	error = smb_rq_simple(rqp);
+	smb_rq_done(rqp);
 	return (error);
 }
 

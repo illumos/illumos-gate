@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +31,8 @@
 #include <sys/vnode.h>
 #include <sys/vfs.h>
 
-#include "smbfs.h"
-#include "smbfs_node.h"
+#include <smbfs/smbfs.h>
+#include <smbfs/smbfs_node.h>
 
 #define	OPT_VERBOSE	0x0001	/* Be [-v]erbose in dcmd's */
 

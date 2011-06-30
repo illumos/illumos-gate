@@ -20,29 +20,39 @@
 #
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 
-MDBTGT		= kvm
-MODULE		= nsmb.so
-MODSRCS_DIR	= ../../../common/modules/nsmb
-MODSRCS		= nsmb.c
+FSTYPE=		smbfs
+LIBPROG=	testnp
+ROOTFS_PROG=	$(LIBPROG)
 
-include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.sparcv9
+include		../../Makefile.fstype
 
-# This kmod goes in /usr/kernel/kmdb
-ROOTKMOD = $(ROOT)/usr/kernel/kmdb$(MACHMODDIR)
+OBJS=	$(LIBPROG).o
+SRCS=	$(LIBPROG).c $(FSLIBSRC)
 
-include ../../../Makefile.module
+LDLIBS += -lsmbfs
 
-CPPFLAGS	+= -I$(SRC)/uts/common/fs/smbclnt
-CPPFLAGS	+= -I$(SRC)/uts/common
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
 
-C99MODE=	$(C99_ENABLE)
+CLOBBERFILES	+= $(LIBPROG)
 
-# maybe not the best place for this, but
-# we need to create this directory.
-$(ROOTKMOD):
-	$(INS.dir)
+# uncomment these for dbx debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
+
+all:	$(ROOTFS_PROG)
+
+install:	$(ROOTLIBFSTYPEPROG)
+
+lint:	lint_SRCS
+
+clean:     
+	$(RM) $(OBJS)
+
+.KEEP_STATE:

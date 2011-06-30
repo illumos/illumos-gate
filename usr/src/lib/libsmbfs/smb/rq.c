@@ -1,4 +1,5 @@
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, Boris Popov
  * All rights reserved.
  *
@@ -279,7 +280,7 @@ smb_rq_simple(struct smb_rq *rqp)
 
 
 int
-smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
+smb_t2_request(int dev_fd, int setupcount, uint16_t *setup,
 	const char *name,
 	int tparamcnt, void *tparam,
 	int tdatacnt, void *tdata,
@@ -311,7 +312,7 @@ smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
 	krq->ioc_rparam = rparam;
 	krq->ioc_rdata  = rdata;
 
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_T2RQ, krq) == -1) {
+	if (ioctl(dev_fd, SMBIOC_T2RQ, krq) == -1) {
 		return (errno);
 	}
 

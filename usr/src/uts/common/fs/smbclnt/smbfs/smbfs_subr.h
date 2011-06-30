@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -42,6 +43,8 @@
 
 #include <sys/cmn_err.h>
 #include <netsmb/mchain.h>
+#include <netsmb/smb_subr.h>
+#include <smbfs/smbfs_node.h>
 
 #if defined(DEBUG) || defined(lint)
 #define	SMB_VNODE_DEBUG 1
@@ -196,7 +199,7 @@ int  smbfs_smb_findnext(struct smbfs_fctx *ctx, int limit,
 	struct smb_cred *scrp);
 int  smbfs_smb_findclose(struct smbfs_fctx *ctx, struct smb_cred *scrp);
 int  smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp,
-	struct smbnode *dnp, const char *name, int *nmlenp, uint8_t sep);
+	struct smbnode *dnp, const char *name, int nmlen, uint8_t sep);
 int  smbfs_smb_lookup(struct smbnode *dnp, const char **namep, int *nmlenp,
 	struct smbfattr *fap, struct smb_cred *scrp);
 int  smbfs_smb_hideit(struct smbnode *np, const char *name, int len,

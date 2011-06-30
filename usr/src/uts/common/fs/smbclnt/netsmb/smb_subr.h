@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -42,6 +43,7 @@
 #include <sys/cmn_err.h>
 #include <sys/lock.h>
 #include <sys/note.h>
+#include <netsmb/smb_conn.h>
 
 /* Helper function for SMBERROR */
 /*PRINTFLIKE3*/
@@ -82,6 +84,27 @@ extern smb_unichar smb_unieol;
 struct mbchain;
 struct smb_rq;
 struct smb_vc;
+
+/*
+ * These are the attributes we can get from the server via
+ * SMB commands such as TRANS2_QUERY_FILE_INFORMATION
+ * with info level SMB_QFILEINFO_ALL_INFO, and directory
+ * FindFirst/FindNext info. levels FIND_DIRECTORY_INFO
+ * and FIND_BOTH_DIRECTORY_INFO, etc.
+ *
+ * Values in this struct are always native endian,
+ * and times are converted converted to Unix form.
+ * Note: zero in any of the times means "unknown".
+ */
+typedef struct smbfattr {
+	timespec_t	fa_createtime;	/* Note, != ctime */
+	timespec_t	fa_atime;	/* these 3 are like unix */
+	timespec_t	fa_mtime;
+	timespec_t	fa_ctime;
+	u_offset_t	fa_size;	/* EOF position */
+	u_offset_t	fa_allocsz;	/* Allocated size. */
+	uint32_t	fa_attr;	/* Ext. file (DOS) attr */
+} smbfattr_t;
 
 /*
  * Tunable timeout values.  See: smb_smb.c
@@ -128,6 +151,39 @@ int smb_calcv2mackey(struct smb_vc *, const uchar_t *,
 int smb_calcmackey(struct smb_vc *, const uchar_t *,
 	const uchar_t *, size_t);
 void smb_crypto_mech_init(void);
+
+
+/*
+ * SMB protocol level functions
+ */
+int  smb_smb_echo(smb_vc_t *vcp, smb_cred_t *scred, int timo);
+int  smb_smb_treeconnect(smb_share_t *ssp, smb_cred_t *scred);
+int  smb_smb_treedisconnect(smb_share_t *ssp, smb_cred_t *scred);
+
+int
+smb_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
+	uint32_t crflag, uint32_t req_acc, uint32_t efa, uint32_t sh_acc,
+	uint32_t disp, uint32_t createopt,  uint32_t impersonate,
+	struct smb_cred *scrp, uint16_t *fidp,
+	uint32_t *cr_act_p, struct smbfattr *fap);
+
+int  smb_smb_close(struct smb_share *ssp, uint16_t fid,
+	struct timespec *mtime, struct smb_cred *scrp);
+
+int
+smb_smb_open_prjob(struct smb_share *ssp, char *title,
+	uint16_t setuplen, uint16_t mode,
+	struct smb_cred *scrp, uint16_t *fidp);
+
+int  smb_smb_close_prjob(struct smb_share *ssp, uint16_t fid,
+	struct smb_cred *scrp);
+
+int smb_rwuio(smb_share_t *ssp, uint16_t fid, uio_rw_t rw,
+	uio_t *uiop, smb_cred_t *scred, int timo);
+
+/*
+ * time conversions
+ */
 
 void smb_time_init(void);
 void smb_time_fini(void);

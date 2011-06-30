@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
@@ -35,11 +36,10 @@ ROOTKMOD = $(ROOT)/usr/kernel/kmdb
 
 include ../../../Makefile.module
 
-CPPFLAGS	+= -I$(SRC)/uts/common/fs/smbclnt/netsmb
+CPPFLAGS	+= -I$(SRC)/uts/common/fs/smbclnt
 CPPFLAGS	+= -I$(SRC)/uts/common
 
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+C99MODE=	$(C99_ENABLE)
 
 # maybe not the best place for this, but
 # we need to create this directory.

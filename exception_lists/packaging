@@ -821,6 +821,7 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
 usr/lib/fs/smbfs/chacl
 usr/lib/fs/smbfs/lsacl
+usr/lib/fs/smbfs/testnp
 #
 # FC related files
 kernel/kmdb/fcip		i386

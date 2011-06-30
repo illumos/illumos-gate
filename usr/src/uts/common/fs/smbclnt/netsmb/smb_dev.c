@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -317,14 +318,9 @@ nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_failed;
 	}
 
-	/*
-	 * Need to see if this field is required.
-	 * REVISIT
-	 */
-	sdp->smb_dip = dip;
+	sdp->sd_dip = dip;
 	sdp->sd_seq = 0;
-	sdp->sd_opened = 1;
-
+	sdp->sd_smbfid = -1;
 	mutex_exit(&dev_lck);
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
@@ -397,6 +393,10 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 		err = smb_usr_get_ssnkey(sdp, arg, flags);
 		break;
 
+	case SMBIOC_DUP_DEV:
+		err = smb_usr_dup_dev(sdp, arg, flags);
+		break;
+
 	case SMBIOC_REQUEST:
 		err = smb_usr_simplerq(sdp, arg, flags, cr);
 		break;
@@ -408,6 +408,18 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 	case SMBIOC_READ:
 	case SMBIOC_WRITE:
 		err = smb_usr_rw(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_NTCREATE:
+		err = smb_usr_ntcreate(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_PRINTJOB:
+		err = smb_usr_printjob(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_CLOSEFH:
+		err = smb_usr_closefh(sdp, cr);
 		break;
 
 	case SMBIOC_SSN_CREATE:
@@ -523,9 +535,9 @@ nsmb_open(dev_t *dev, int flags, int otyp, cred_t *cr)
 		return (ENXIO);
 	}
 
-	sdp->sd_opened = 1;
 	sdp->sd_seq = nsmb_minor;
-	sdp->smb_cred = cr;
+	sdp->sd_cred = cr;
+	sdp->sd_smbfid = -1;
 	sdp->sd_flags |= NSMBFL_OPEN;
 	sdp->zoneid = crgetzoneid(cr);
 	mutex_exit(&dev_lck);
@@ -570,12 +582,14 @@ nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 {
 	struct smb_vc *vcp;
 	struct smb_share *ssp;
-	struct smb_cred scred;
 
-	smb_credinit(&scred, cr);
+	if (sdp->sd_smbfid != -1)
+		(void) smb_usr_closefh(sdp, cr);
+
 	ssp = sdp->sd_share;
 	if (ssp != NULL)
 		smb_share_rele(ssp);
+
 	vcp = sdp->sd_vc;
 	if (vcp != NULL) {
 		/*
@@ -588,10 +602,69 @@ nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 		smb_vc_rele(vcp);
 	}
 
-	smb_credrele(&scred);
 	return (0);
 }
 
+/*
+ * Helper for SMBIOC_DUP_DEV
+ * Duplicate state from the FD @arg ("from") onto
+ * the FD for this device instance.
+ */
+int
+smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
+{
+	file_t *fp = NULL;
+	vnode_t *vp;
+	smb_dev_t *from_sdp;
+	dev_t dev;
+	int32_t ufd;
+	int err;
+
+	/* Should be no VC */
+	if (sdp->sd_vc != NULL)
+		return (EISCONN);
+
+	/*
+	 * Get from_sdp (what we will duplicate)
+	 */
+	if (ddi_copyin((void *) arg, &ufd, sizeof (ufd), flags))
+		return (EFAULT);
+	if ((fp = getf(ufd)) == NULL)
+		return (EBADF);
+	/* rele fp below */
+	vp = fp->f_vnode;
+	dev = vp->v_rdev;
+	if (dev == 0 || dev == NODEV ||
+	    getmajor(dev) != nsmb_major) {
+		err = EINVAL;
+		goto out;
+	}
+	from_sdp = ddi_get_soft_state(statep, getminor(dev));
+	if (from_sdp == NULL) {
+		err = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Duplicate VC and share references onto this FD.
+	 */
+	if ((sdp->sd_vc = from_sdp->sd_vc) != NULL)
+		smb_vc_hold(sdp->sd_vc);
+	if ((sdp->sd_share = from_sdp->sd_share) != NULL)
+		smb_share_hold(sdp->sd_share);
+	sdp->sd_level = from_sdp->sd_level;
+	err = 0;
+
+out:
+	if (fp)
+		releasef(ufd);
+	return (err);
+}
+
+
+/*
+ * Helper used by smbfs_mount
+ */
 int
 smb_dev2share(int fd, struct smb_share **sspp)
 {
@@ -604,12 +677,13 @@ smb_dev2share(int fd, struct smb_share **sspp)
 
 	if ((fp = getf(fd)) == NULL)
 		return (EBADF);
+	/* rele fp below */
 
 	vp = fp->f_vnode;
 	dev = vp->v_rdev;
 	if (dev == 0 || dev == NODEV ||
 	    getmajor(dev) != nsmb_major) {
-		err = EBADF;
+		err = EINVAL;
 		goto out;
 	}
 

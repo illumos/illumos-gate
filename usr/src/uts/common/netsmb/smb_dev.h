@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -71,7 +72,7 @@
  * make them incompatible with an old driver.
  */
 #define	NSMB_VERMAJ	1
-#define	NSMB_VERMIN	3900
+#define	NSMB_VERMIN	4000
 #define	NSMB_VERSION	(NSMB_VERMAJ * 100000 + NSMB_VERMIN)
 
 /*
@@ -217,14 +218,11 @@ typedef struct smbioc_ossn smbioc_ossn_t;
 /*
  * Structure used with SMBIOC_TREE_FIND, _CONNECT
  */
-#define	SMBIOC_STYPE_LEN	8
 struct smbioc_oshare {
-	uint32_t	sh_pwlen;
+	uint32_t	sh_use;		/* requested */
+	uint32_t	sh_type;	/* returned */
 	char		sh_name[SMBIOC_MAX_NAME];
 	char		sh_pass[SMBIOC_MAX_NAME];
-	/* share types, in ASCII form, i.e. "A:", "IPC", ... */
-	char		sh_type_req[SMBIOC_STYPE_LEN];	/* requested */
-	char		sh_type_ret[SMBIOC_STYPE_LEN];	/* returned */
 };
 typedef struct smbioc_oshare smbioc_oshare_t;
 
@@ -342,13 +340,28 @@ typedef struct smbioc_flags {
 } smbioc_flags_t;
 
 typedef struct smbioc_rw {
-	uint32_t	ioc_fh;
+	int32_t		ioc_fh;
 	uint32_t	ioc_cnt;
 	lloff_t	_ioc_offset;
 	lptr_t	_ioc_base;
 } smbioc_rw_t;
 #define	ioc_offset	_ioc_offset._f
 #define	ioc_base	_ioc_base.lp_ptr
+
+typedef struct smbioc_ntcreate {
+	uint32_t	ioc_req_acc;
+	uint32_t	ioc_efattr;
+	uint32_t	ioc_share_acc;
+	uint32_t	ioc_open_disp;
+	uint32_t	ioc_creat_opts;
+	char		ioc_name[SMBIOC_MAX_NAME];
+} smbioc_ntcreate_t;
+
+typedef struct smbioc_printjob {
+	uint16_t	ioc_setuplen;
+	uint16_t	ioc_prmode;
+	char		ioc_title[SMBIOC_MAX_NAME];
+} smbioc_printjob_t;
 
 /* Password Keychain (PK) support. */
 typedef struct smbioc_pk {
@@ -375,11 +388,16 @@ typedef enum nsmb_ioc {
 	SMBIOC_GETVERS = SMBIOC_BASE,	/* keep first */
 	SMBIOC_FLAGS2,		/* get hflags2 */
 	SMBIOC_GETSSNKEY,	/* get SMB session key */
+	SMBIOC_DUP_DEV,		/* duplicate dev handle */
 
 	SMBIOC_REQUEST,		/* simple request */
 	SMBIOC_T2RQ,		/* trans2 request */
+
 	SMBIOC_READ,		/* read (pipe) */
 	SMBIOC_WRITE,		/* write (pipe) */
+	SMBIOC_NTCREATE,	/* open or create */
+	SMBIOC_PRINTJOB,	/* open print job */
+	SMBIOC_CLOSEFH,		/* from ntcreate or printjob */
 
 	SMBIOC_SSN_CREATE,
 	SMBIOC_SSN_FIND,
