@@ -25,6 +25,9 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
+#
 require 5.8.4;
 
 use File::Find;
@@ -36,7 +39,7 @@ use Cwd 'abs_path';
 $PNAME = $0;
 $PNAME =~ s:.*/::;
 $OPTSTR = 'abd:fghi:jlnqsx:';
-$USAGE = "Usage: $PNAME [-abfghjlnqs] [-d dir] [-i isa] "
+$USAGE = "Usage: $PNAME [-abfFghjlnqs] [-d dir] [-i isa] "
     . "[-x opt[=arg]] [file | dir ...]\n";
 ($MACH = `uname -p`) =~ s/\W*\n//;
 ($PLATFORM = `uname -i`) =~ s/\W*\n//;
@@ -69,6 +72,20 @@ sub dirname {
 	return $i == -1 ? '.' : $i == 0 ? '/' : $s;
 }
 
+sub inpath
+{
+	my ($exec) = (@_);
+	my @path = File::Spec->path();
+
+	for my $dir (@path) {
+		if (-x $dir . "/" . $exec) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 sub usage
 {
 	print $USAGE;
@@ -77,6 +94,7 @@ sub usage
 	print "\t -d  specify directory for test results files and cores\n";
 	print "\t -g  enable libumem debugging when running tests\n";
 	print "\t -f  force bypassed tests to run\n";
+	print "\t -F  force tests to be run, even if missing dependencies\n";
 	print "\t -h  display verbose usage message\n";
 	print "\t -i  specify ISA to test instead of isaexec(3C) default\n";
 	print "\t -j  execute test suite using jdtrace (Java API) only\n";
@@ -546,9 +564,20 @@ $dt_bin = '/opt/SUNWdtrt/bin';
 $defdir = -d $dt_tst ? $dt_tst : '.';
 $bindir = -d $dt_bin ? $dt_bin : '.';
 
+if (!$opt_F) {
+	my @dependencies = ("gcc", "cc", "make", "java", "perl");
+	
+	for my $dep (@dependencies) {
+		if (!inpath($dep)) {
+			die "$PNAME: '$dep' not found (use -F to force run)";
+		}
+	}
+}
+
 find(\&wanted, "$defdir/common") if (scalar(@ARGV) == 0);
 find(\&wanted, "$defdir/$MACH") if (scalar(@ARGV) == 0);
 find(\&wanted, "$defdir/$PLATFORM") if (scalar(@ARGV) == 0);
+
 die $USAGE if (scalar(@files) == 0);
 
 $dtrace_path = '/usr/sbin/dtrace';

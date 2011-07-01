@@ -32,7 +32,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
 ROOTBIN = $(ROOTOPTPKG)/bin
 
-SRCS = dtest itest dstyle
+SRCS = dtest itest dstyle dtfailures
 CMDS = $(SRCS:%=$(ROOTBIN)/%)
 
 $(CMDS) := FILEMODE = 0555
