@@ -70,12 +70,12 @@ main(int argc, char **argv)
 }
 EOF
 
-cc -I. -xarch=generic -c test.c
+cc -I. -m32 -c test.c
 if [ $? -ne 0 ]; then
 	print -u2 "failed to compile test.c"
 	exit 1
 fi
-cc -xarch=generic -o test test.o
+cc -m32 -o test test.o
 if [ $? -ne 0 ]; then
 	print -u2 "failed to link final executable"
 	exit 1

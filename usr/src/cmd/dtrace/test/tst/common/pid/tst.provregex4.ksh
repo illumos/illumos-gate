@@ -47,10 +47,10 @@ cat > Makefile <<EOF
 all: main altlib.so
 
 main: main.o provmain.o
-	cc -o main main.o provmain.o
+	gcc -o main main.o provmain.o
 
 main.o: main.c prov.h
-	cc -c main.c
+	gcc -c main.c
 
 prov.h: prov.d
 	$dtrace -h -s prov.d
@@ -59,10 +59,10 @@ provmain.o: prov.d main.o
 	$dtrace -G -32 -o provmain.o -s prov.d main.o
 
 altlib.so: altlib.o provalt.o
-	cc -z defs -G -o altlib.so altlib.o provalt.o -lc
+	gcc -shared -o altlib.so altlib.o provalt.o -lc
 
 altlib.o: altlib.c prov.h
-	cc -c altlib.c
+	gcc -c altlib.c
 
 provalt.o: prov.d altlib.o
 	$dtrace -G -32 -o provalt.o -s prov.d altlib.o
