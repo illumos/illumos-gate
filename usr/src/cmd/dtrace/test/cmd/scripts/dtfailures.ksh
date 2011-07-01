@@ -1,3 +1,4 @@
+#!/usr/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -20,41 +21,22 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
-# Make sure <unistd.h> defines _DTRACE_VERSION
+let failure=0
 
-DIR=/var/tmp/dtest.$$
+printf "%-3s %-10s %-31s %s\n" "#" "KIND" "TEST" "DETAILS" 
 
-mkdir $DIR
-cd $DIR
+while [[ -d failure.$failure ]]; do
+	dir=failure.$failure
+	tst=`cat $dir/README | head -1 | nawk '{ print $2 }'`
+	kind=`basename $(dirname $tst)`
+	name=`basename $tst`
+	cols=$(expr `tput cols` - 47)
+	details=`tail -1 $dir/*.err | cut -c1-$cols`
+	printf "%-3d %-10s %-31s " $failure $kind $name
+	echo $details
+	let failure=failure+1
+done
 
-cat > test.c <<EOF
-#include <unistd.h>
-
-int
-main(int argc, char **argv)
-{
-#ifdef _DTRACE_VERSION
-	return (0);
-#else
-	return (1);
-#endif
-}
-EOF
-
-gcc -m32 -o test test.c
-if [ $? -ne 0 ]; then
-	print -u2 "failed to compile test.c"
-	exit 1
-fi
-
-./test
-status=$?
-
-cd /
-/usr/bin/rm -rf $DIR
-
-exit $status

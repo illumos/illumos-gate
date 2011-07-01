@@ -128,6 +128,7 @@ file path=opt/SUNWdtrt/bin/badioctl mode=0555
 file path=opt/SUNWdtrt/bin/chkargs mode=0555
 file path=opt/SUNWdtrt/bin/dstyle mode=0555
 file path=opt/SUNWdtrt/bin/dtest mode=0555
+file path=opt/SUNWdtrt/bin/dtfailures mode=0555
 file path=opt/SUNWdtrt/bin/exception.lst mode=0444
 file path=opt/SUNWdtrt/bin/jdtrace mode=0555
 file path=opt/SUNWdtrt/lib/java/jdtrace.jar

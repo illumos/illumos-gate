@@ -30,7 +30,7 @@ if [ $# != 1 ]; then
 fi
 
 dtrace=$1
-CC=/usr/sfw/bin/gcc
+CC=`which gcc`
 CFLAGS=
 
 doit()
@@ -86,10 +86,33 @@ files=/usr/include/sys/*.h
 # becomes a problem, kindly fix it by reducing the number of bad files!  (That
 # is, fix it by fixing the broken file, not the broken script.)
 #
-badfiles="ctype.h ser_sync.h neti.h hook_event.h \
-    bootconf.h bootstat.h dtrace.h dumphdr.h exacct_impl.h fasttrap.h \
-    kobj.h kobj_impl.h ksyms.h lockstat.h smedia.h stat.h utsname.h \
-    rds.h smbios_impl.h"
+badfiles="\
+	bootconf.h \
+	bootstat.h \
+	ctype.h \
+	dtrace.h \
+	dumphdr.h \
+	exacct_impl.h \
+	fasttrap.h \
+	hook_event.h \
+	iscsi_authclient.h \
+	kiconv_ja.h \
+	kiconv_ja_jis_to_unicode.h \
+	kiconv_ja_unicode_to_jis.h \
+	kobj.h \
+	kobj_impl.h \
+	ksyms.h \
+	lockstat.h \
+	neti.h \
+	rds.h \
+	ser_sync.h \
+	smbios_impl.h \
+	smedia.h \
+	sockfilter.h \
+	stat.h \
+	u8_textprep_data.h \
+	utsname.h \
+	vnic.h"
 
 for inc in $files; do
 	file=`basename $inc`
