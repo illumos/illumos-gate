@@ -357,8 +357,8 @@ i_cpr_pre_resume_cpus()
 		gdt.limit = cpup->wc_gdt_limit;
 
 #if defined(__amd64)
-		code_length = (uint32_t)(uintptr_t)wc_long_mode_64 -
-		    (uint32_t)(uintptr_t)wc_rm_start;
+		code_length = (uintptr_t)wc_long_mode_64 -
+		    (uintptr_t)wc_rm_start;
 #else
 		code_length = 0;
 #endif
