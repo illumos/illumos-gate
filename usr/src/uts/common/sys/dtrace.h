@@ -1353,7 +1353,7 @@ typedef struct dof_helper {
  *   dtps_resume()           <-- Resume specified probe
  *   dtps_getargdesc()       <-- Get the argument description for args[X]
  *   dtps_getargval()        <-- Get the value for an argX or args[X] variable
- *   dtps_usermode()         <-- Find out if the probe was fired in user mode
+ *   dtps_mode()             <-- Return the mode of the fired probe
  *   dtps_destroy()          <-- Destroy all state associated with this probe
  *
  * 1.2  void dtps_provide(void *arg, const dtrace_probedesc_t *spec)
@@ -1602,24 +1602,32 @@ typedef struct dof_helper {
  *   This is called from within dtrace_probe() meaning that interrupts
  *   are disabled. No locks should be taken within this entry point.
  *
- * 1.10  int dtps_usermode(void *arg, dtrace_id_t id, void *parg)
+ * 1.10  int dtps_mode(void *arg, dtrace_id_t id, void *parg)
  *
  * 1.10.1  Overview
  *
- *   Called to determine if the probe was fired in a user context.
+ *   Called to determine the mode of a fired probe.
  *
  * 1.10.2  Arguments and notes
  *
  *   The first argument is the cookie as passed to dtrace_register(). The
- *   second argument is the identifier of the current probe. The third
+ *   second argument is the identifier of the current probe.  The third
  *   argument is the probe argument as passed to dtrace_probe_create().  This
  *   entry point must not be left NULL for providers whose probes allow for
- *   mixed mode tracing, that is to say those probes that can fire during
- *   kernel- _or_ user-mode execution
+ *   mixed mode tracing, that is to say those unanchored probes that can fire
+ *   during kernel- or user-mode execution.
  *
  * 1.10.3  Return value
  *
- *   A boolean value.
+ *   A bitwise OR that encapsulates both the mode (either DTRACE_MODE_KERNEL
+ *   or DTRACE_MODE_USER) and the policy when the privilege of the enabling
+ *   is insufficient for that mode (either DTRACE_MODE_NOPRIV_DROP or
+ *   DTRACE_MODE_NOPRIV_RESTRICT).  If the policy is DTRACE_MODE_NOPRIV_DROP,
+ *   insufficient privilege will result in the probe firing being silently
+ *   ignored for the enabling; if the policy is DTRACE_NODE_NOPRIV_RESTRICT,
+ *   insufficient privilege will not prevent probe processing for the
+ *   enabling, but restrictions will be in place that induce a UPRIV fault
+ *   upon attempt to examine probe arguments or current process state.
  *
  * 1.10.4  Caller's context
  *
@@ -2010,9 +2018,14 @@ typedef struct dtrace_pops {
 	    dtrace_argdesc_t *desc);
 	uint64_t (*dtps_getargval)(void *arg, dtrace_id_t id, void *parg,
 	    int argno, int aframes);
-	int (*dtps_usermode)(void *arg, dtrace_id_t id, void *parg);
+	int (*dtps_mode)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_destroy)(void *arg, dtrace_id_t id, void *parg);
 } dtrace_pops_t;
+
+#define	DTRACE_MODE_KERNEL			0x01
+#define	DTRACE_MODE_USER			0x02
+#define	DTRACE_MODE_NOPRIV_DROP			0x10
+#define	DTRACE_MODE_NOPRIV_RESTRICT		0x20
 
 typedef uintptr_t	dtrace_provider_id_t;
 

@@ -1108,9 +1108,12 @@ dtrace_priv_proc_common_nocd()
 }
 
 static int
-dtrace_priv_proc_destructive(dtrace_state_t *state)
+dtrace_priv_proc_destructive(dtrace_state_t *state, dtrace_mstate_t *mstate)
 {
 	int action = state->dts_cred.dcr_action;
+
+	if (!(mstate->dtms_access & DTRACE_ACCESS_PROC))
+		goto bad;
 
 	if (((action & DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE) == 0) &&
 	    dtrace_priv_proc_common_zone(state) == 0)
@@ -1133,15 +1136,17 @@ bad:
 }
 
 static int
-dtrace_priv_proc_control(dtrace_state_t *state)
+dtrace_priv_proc_control(dtrace_state_t *state, dtrace_mstate_t *mstate)
 {
-	if (state->dts_cred.dcr_action & DTRACE_CRA_PROC_CONTROL)
-		return (1);
+	if (mstate->dtms_access & DTRACE_ACCESS_PROC) {
+		if (state->dts_cred.dcr_action & DTRACE_CRA_PROC_CONTROL)
+			return (1);
 
-	if (dtrace_priv_proc_common_zone(state) &&
-	    dtrace_priv_proc_common_user(state) &&
-	    dtrace_priv_proc_common_nocd())
-		return (1);
+		if (dtrace_priv_proc_common_zone(state) &&
+		    dtrace_priv_proc_common_user(state) &&
+		    dtrace_priv_proc_common_nocd())
+			return (1);
+	}
 
 	cpu_core[CPU->cpu_id].cpuc_dtrace_flags |= CPU_DTRACE_UPRIV;
 
@@ -1149,9 +1154,10 @@ dtrace_priv_proc_control(dtrace_state_t *state)
 }
 
 static int
-dtrace_priv_proc(dtrace_state_t *state)
+dtrace_priv_proc(dtrace_state_t *state, dtrace_mstate_t *mstate)
 {
-	if (state->dts_cred.dcr_action & DTRACE_CRA_PROC)
+	if ((mstate->dtms_access & DTRACE_ACCESS_PROC) &&
+	    (state->dts_cred.dcr_action & DTRACE_CRA_PROC))
 		return (1);
 
 	cpu_core[CPU->cpu_id].cpuc_dtrace_flags |= CPU_DTRACE_UPRIV;
@@ -1179,6 +1185,109 @@ dtrace_priv_kernel_destructive(dtrace_state_t *state)
 	cpu_core[CPU->cpu_id].cpuc_dtrace_flags |= CPU_DTRACE_KPRIV;
 
 	return (0);
+}
+
+/*
+ * Determine if the dte_cond of the specified ECB allows for processing of
+ * the current probe to continue.  Note that this routine may allow continued
+ * processing, but with access(es) stripped from the mstate's dtms_access
+ * field.
+ */
+static int
+dtrace_priv_probe(dtrace_state_t *state, dtrace_mstate_t *mstate,
+    dtrace_ecb_t *ecb)
+{
+	dtrace_probe_t *probe = ecb->dte_probe;
+	dtrace_provider_t *prov = probe->dtpr_provider;
+	dtrace_pops_t *pops = &prov->dtpv_pops;
+	int mode = DTRACE_MODE_NOPRIV_DROP;
+
+	ASSERT(ecb->dte_cond);
+
+	if (pops->dtps_mode != NULL) {
+		mode = pops->dtps_mode(prov->dtpv_arg,
+		    probe->dtpr_id, probe->dtpr_arg);
+
+		ASSERT((mode & DTRACE_MODE_USER) ||
+		    (mode & DTRACE_MODE_KERNEL));
+		ASSERT((mode & DTRACE_MODE_NOPRIV_RESTRICT) ||
+		    (mode & DTRACE_MODE_NOPRIV_DROP));
+	}
+
+	/*
+	 * If the dte_cond bits indicate that this consumer is only allowed to
+	 * see user-mode firings of this probe, call the provider's dtps_mode()
+	 * entry point to check that the probe was fired while in a user
+	 * context.  If that's not the case, use the policy specified by the
+	 * provider to determine if we drop the probe or merely restrict
+	 * operation.
+	 */
+	if (ecb->dte_cond & DTRACE_COND_USERMODE) {
+		ASSERT(mode != DTRACE_MODE_NOPRIV_DROP);
+
+		if (!(mode & DTRACE_MODE_USER)) {
+			if (mode & DTRACE_MODE_NOPRIV_DROP)
+				return (0);
+
+			mstate->dtms_access &= ~DTRACE_ACCESS_ARGS;
+		}
+	}
+
+	/*
+	 * This is more subtle than it looks. We have to be absolutely certain
+	 * that CRED() isn't going to change out from under us so it's only
+	 * legit to examine that structure if we're in constrained situations.
+	 * Currently, the only times we'll this check is if a non-super-user
+	 * has enabled the profile or syscall providers -- providers that
+	 * allow visibility of all processes. For the profile case, the check
+	 * above will ensure that we're examining a user context.
+	 */
+	if (ecb->dte_cond & DTRACE_COND_OWNER) {
+		cred_t *cr;
+		cred_t *s_cr = state->dts_cred.dcr_cred;
+		proc_t *proc;
+
+		ASSERT(s_cr != NULL);
+
+		if ((cr = CRED()) == NULL ||
+		    s_cr->cr_uid != cr->cr_uid ||
+		    s_cr->cr_uid != cr->cr_ruid ||
+		    s_cr->cr_uid != cr->cr_suid ||
+		    s_cr->cr_gid != cr->cr_gid ||
+		    s_cr->cr_gid != cr->cr_rgid ||
+		    s_cr->cr_gid != cr->cr_sgid ||
+		    (proc = ttoproc(curthread)) == NULL ||
+		    (proc->p_flag & SNOCD)) {
+			if (mode & DTRACE_MODE_NOPRIV_DROP)
+				return (0);
+
+			mstate->dtms_access &= ~DTRACE_ACCESS_PROC;
+		}
+	}
+
+	/*
+	 * If our dte_cond is set to DTRACE_COND_ZONEOWNER and we are not
+	 * in our zone, check to see if our mode policy is to restrict rather
+	 * than to drop; if to restrict, strip away both DTRACE_ACCESS_PROC
+	 * and DTRACE_ACCESS_ARGS
+	 */
+	if (ecb->dte_cond & DTRACE_COND_ZONEOWNER) {
+		cred_t *cr;
+		cred_t *s_cr = state->dts_cred.dcr_cred;
+
+		ASSERT(s_cr != NULL);
+
+		if ((cr = CRED()) == NULL ||
+		    s_cr->cr_zone->zone_id != cr->cr_zone->zone_id) {
+			if (mode & DTRACE_MODE_NOPRIV_DROP)
+				return (0);
+
+			mstate->dtms_access &=
+			    ~(DTRACE_ACCESS_PROC | DTRACE_ACCESS_ARGS);
+		}
+	}
+
+	return (1);
 }
 
 /*
@@ -2713,6 +2822,12 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 
 	switch (v) {
 	case DIF_VAR_ARGS:
+		if (!(mstate->dtms_access & DTRACE_ACCESS_ARGS)) {
+			cpu_core[CPU->cpu_id].cpuc_dtrace_flags |=
+			    CPU_DTRACE_KPRIV;
+			return (0);
+		}
+
 		ASSERT(mstate->dtms_present & DTRACE_MSTATE_ARGS);
 		if (ndx >= sizeof (mstate->dtms_arg) /
 		    sizeof (mstate->dtms_arg[0])) {
@@ -2748,7 +2863,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 	case DIF_VAR_UREGS: {
 		klwp_t *lwp;
 
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		if ((lwp = curthread->t_lwp) == NULL) {
@@ -2828,7 +2943,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return (mstate->dtms_stackdepth);
 
 	case DIF_VAR_USTACKDEPTH:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 		if (!(mstate->dtms_present & DTRACE_MSTATE_USTACKDEPTH)) {
 			/*
@@ -2883,7 +2998,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return (mstate->dtms_caller);
 
 	case DIF_VAR_UCALLER:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		if (!(mstate->dtms_present & DTRACE_MSTATE_UCALLER)) {
@@ -2931,7 +3046,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		    state, mstate));
 
 	case DIF_VAR_PID:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -2953,7 +3068,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return ((uint64_t)curthread->t_procp->p_pidp->pid_id);
 
 	case DIF_VAR_PPID:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -2980,7 +3095,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return ((uint64_t)curthread->t_tid);
 
 	case DIF_VAR_EXECNAME:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -3000,7 +3115,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		    state, mstate));
 
 	case DIF_VAR_ZONENAME:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -3020,7 +3135,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		    state, mstate));
 
 	case DIF_VAR_UID:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -3041,7 +3156,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return ((uint64_t)curthread->t_procp->p_cred->cr_uid);
 
 	case DIF_VAR_GID:
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -3063,7 +3178,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 
 	case DIF_VAR_ERRNO: {
 		klwp_t *lwp;
-		if (!dtrace_priv_proc(state))
+		if (!dtrace_priv_proc(state, mstate))
 			return (0);
 
 		/*
@@ -3403,7 +3518,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		uint64_t size = tupregs[2].dttk_value;
 
 		if (!dtrace_destructive_disallow &&
-		    dtrace_priv_proc_control(state) &&
+		    dtrace_priv_proc_control(state, mstate) &&
 		    !dtrace_istoxic(kaddr, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			dtrace_copyout(kaddr, uaddr, size, flags);
@@ -3418,7 +3533,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		uint64_t size = tupregs[2].dttk_value;
 
 		if (!dtrace_destructive_disallow &&
-		    dtrace_priv_proc_control(state) &&
+		    dtrace_priv_proc_control(state, mstate) &&
 		    !dtrace_istoxic(kaddr, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			dtrace_copyoutstr(kaddr, uaddr, size, flags);
@@ -5722,6 +5837,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 #endif
 
 		mstate.dtms_present = DTRACE_MSTATE_ARGS | DTRACE_MSTATE_PROBE;
+		mstate.dtms_access = DTRACE_ACCESS_ARGS | DTRACE_ACCESS_PROC;
 		*flags &= ~CPU_DTRACE_ERROR;
 
 		if (prov == dtrace_provider) {
@@ -5759,65 +5875,8 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			}
 		}
 
-		if (ecb->dte_cond) {
-			/*
-			 * If the dte_cond bits indicate that this
-			 * consumer is only allowed to see user-mode firings
-			 * of this probe, call the provider's dtps_usermode()
-			 * entry point to check that the probe was fired
-			 * while in a user context. Skip this ECB if that's
-			 * not the case.
-			 */
-			if ((ecb->dte_cond & DTRACE_COND_USERMODE) &&
-			    prov->dtpv_pops.dtps_usermode(prov->dtpv_arg,
-			    probe->dtpr_id, probe->dtpr_arg) == 0)
-				continue;
-
-			/*
-			 * This is more subtle than it looks. We have to be
-			 * absolutely certain that CRED() isn't going to
-			 * change out from under us so it's only legit to
-			 * examine that structure if we're in constrained
-			 * situations. Currently, the only times we'll this
-			 * check is if a non-super-user has enabled the
-			 * profile or syscall providers -- providers that
-			 * allow visibility of all processes. For the
-			 * profile case, the check above will ensure that
-			 * we're examining a user context.
-			 */
-			if (ecb->dte_cond & DTRACE_COND_OWNER) {
-				cred_t *cr;
-				cred_t *s_cr =
-				    ecb->dte_state->dts_cred.dcr_cred;
-				proc_t *proc;
-
-				ASSERT(s_cr != NULL);
-
-				if ((cr = CRED()) == NULL ||
-				    s_cr->cr_uid != cr->cr_uid ||
-				    s_cr->cr_uid != cr->cr_ruid ||
-				    s_cr->cr_uid != cr->cr_suid ||
-				    s_cr->cr_gid != cr->cr_gid ||
-				    s_cr->cr_gid != cr->cr_rgid ||
-				    s_cr->cr_gid != cr->cr_sgid ||
-				    (proc = ttoproc(curthread)) == NULL ||
-				    (proc->p_flag & SNOCD))
-					continue;
-			}
-
-			if (ecb->dte_cond & DTRACE_COND_ZONEOWNER) {
-				cred_t *cr;
-				cred_t *s_cr =
-				    ecb->dte_state->dts_cred.dcr_cred;
-
-				ASSERT(s_cr != NULL);
-
-				if ((cr = CRED()) == NULL ||
-				    s_cr->cr_zone->zone_id !=
-				    cr->cr_zone->zone_id)
-					continue;
-			}
-		}
+		if (ecb->dte_cond && !dtrace_priv_probe(state, &mstate, ecb))
+			continue;
 
 		if (now - state->dts_alive > dtrace_deadman_timeout) {
 			/*
@@ -5857,9 +5916,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 		mstate.dtms_present |= DTRACE_MSTATE_EPID;
 
 		if (state->dts_cred.dcr_visible & DTRACE_CRV_KERNEL)
-			mstate.dtms_access = DTRACE_ACCESS_KERNEL;
-		else
-			mstate.dtms_access = 0;
+			mstate.dtms_access |= DTRACE_ACCESS_KERNEL;
 
 		if (pred != NULL) {
 			dtrace_difo_t *dp = pred->dtp_difo;
@@ -5919,7 +5976,8 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 			switch (act->dta_kind) {
 			case DTRACEACT_STOP:
-				if (dtrace_priv_proc_destructive(state))
+				if (dtrace_priv_proc_destructive(state,
+				    &mstate))
 					dtrace_action_stop();
 				continue;
 
@@ -5946,7 +6004,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 			case DTRACEACT_JSTACK:
 			case DTRACEACT_USTACK:
-				if (!dtrace_priv_proc(state))
+				if (!dtrace_priv_proc(state, &mstate))
 					continue;
 
 				/*
@@ -6032,7 +6090,8 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 				continue;
 
 			case DTRACEACT_RAISE:
-				if (dtrace_priv_proc_destructive(state))
+				if (dtrace_priv_proc_destructive(state,
+				    &mstate))
 					dtrace_action_raise(val);
 				continue;
 
@@ -6072,7 +6131,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			case DTRACEACT_UADDR: {
 				struct pid *pid = curthread->t_procp->p_pidp;
 
-				if (!dtrace_priv_proc(state))
+				if (!dtrace_priv_proc(state, &mstate))
 					continue;
 
 				DTRACE_STORE(uint64_t, tomax,
@@ -7004,9 +7063,9 @@ dtrace_register(const char *name, const dtrace_pattr_t *pap, uint32_t priv,
 
 	if ((priv & DTRACE_PRIV_KERNEL) &&
 	    (priv & (DTRACE_PRIV_USER | DTRACE_PRIV_OWNER)) &&
-	    pops->dtps_usermode == NULL) {
+	    pops->dtps_mode == NULL) {
 		cmn_err(CE_WARN, "failed to register provider '%s': need "
-		    "dtps_usermode() op for given privilege attributes", name);
+		    "dtps_mode() op for given privilege attributes", name);
 		return (EINVAL);
 	}
 
@@ -7105,7 +7164,6 @@ dtrace_unregister(dtrace_provider_id_t id)
 	dtrace_provider_t *prev = NULL;
 	int i, self = 0, noreap = 0;
 	dtrace_probe_t *probe, *first = NULL;
-	hrtime_t when;
 
 	if (old->dtpv_pops.dtps_enable ==
 	    (int (*)(void *, dtrace_id_t, void *))dtrace_enable_nullop) {
