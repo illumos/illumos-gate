@@ -1300,7 +1300,10 @@ file path=opt/SUNWdtrt/tst/common/printf/tst.widths1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.wp.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.wp.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/privs/tst.func_access.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.noprivdrop.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.noprivrestrict.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/privs/tst.op_access.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.tick.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/privs/tst.unpriv_funcs.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probeqtn.d mode=0444
 file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probestar.d \
