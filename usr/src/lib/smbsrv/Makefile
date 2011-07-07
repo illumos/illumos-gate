@@ -20,8 +20,8 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.lib
@@ -31,12 +31,10 @@ SUBDIRS = \
 	libmlrpc \
 	libsmb \
 	libsmbns \
-	libsmbrdr \
 	libsmbrp
 
 libmlrpc: libsmb
-libsmbrdr: libsmb
 libsmbns: libsmb
-libmlsvc: libsmb libmlrpc libsmbrdr libsmbns
+libmlsvc: libsmb libmlrpc libsmbns
 
 include ./Makefile.subdirs

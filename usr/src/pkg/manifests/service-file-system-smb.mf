@@ -20,8 +20,8 @@
 #
 
 #
-# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/smb@$(PKGVERS)
@@ -82,7 +82,6 @@ file path=usr/lib/smbsrv/libmlrpc.so.1
 file path=usr/lib/smbsrv/libmlsvc.so.1
 file path=usr/lib/smbsrv/libsmb.so.1
 file path=usr/lib/smbsrv/libsmbns.so.1
-file path=usr/lib/smbsrv/libsmbrdr.so.1
 file path=usr/lib/smbsrv/libsqlite.so.1
 file path=usr/lib/smbsrv/smbd mode=0555
 file path=usr/sbin/smbadm mode=0555
@@ -110,4 +109,3 @@ link path=usr/lib/smbsrv/libmlrpc.so target=libmlrpc.so.1
 link path=usr/lib/smbsrv/libmlsvc.so target=libmlsvc.so.1
 link path=usr/lib/smbsrv/libsmb.so target=libsmb.so.1
 link path=usr/lib/smbsrv/libsmbns.so target=libsmbns.so.1
-link path=usr/lib/smbsrv/libsmbrdr.so target=libsmbrdr.so.1

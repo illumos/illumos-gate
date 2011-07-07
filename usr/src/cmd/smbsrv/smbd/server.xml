@@ -21,6 +21,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 
 CDDL HEADER END
 
+Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 
 NOTE:  This service manifest is not editable; its contents will
@@ -67,6 +68,14 @@ file.
 	    restart_on='none'
 	    type='service'>
 		<service_fmri value='svc:/system/idmap:default'/>
+	</dependency>
+
+	<!-- Must have SMB client service started -->
+	<dependency name='smb-client'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/smb/client:default'/>
 	</dependency>
 
 	<!--

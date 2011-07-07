@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -447,14 +448,16 @@ typedef struct ndr_xa {
 CONTEXT_HANDLE(ndr_hdid) ndr_hdid_t;
 
 typedef struct ndr_client {
+	/* transport stuff (xa_* members) */
 	int (*xa_init)(struct ndr_client *, ndr_xa_t *);
 	int (*xa_exchange)(struct ndr_client *, ndr_xa_t *);
 	int (*xa_read)(struct ndr_client *, ndr_xa_t *);
 	void (*xa_preserve)(struct ndr_client *, ndr_xa_t *);
 	void (*xa_destruct)(struct ndr_client *, ndr_xa_t *);
 	void (*xa_release)(struct ndr_client *);
+	void			*xa_private;
+	int			xa_fd;
 
-	int			fid;
 	ndr_hdid_t		*handle;
 	ndr_binding_t		*binding;
 	ndr_binding_t		*binding_list;

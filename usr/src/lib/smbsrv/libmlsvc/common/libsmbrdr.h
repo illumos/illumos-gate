@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -32,24 +33,18 @@
 extern "C" {
 #endif
 
+void smbrdr_init(void);
+
+struct smb_ctx;
+int smbrdr_ctx_new(struct smb_ctx **, char *, char *, char *);
+void smbrdr_ctx_free(struct smb_ctx *);
+
 /* Redirector LOGON function */
 extern int smbrdr_logon(char *, char *, char *);
 extern int smbrdr_get_ssnkey(int, unsigned char *, size_t);
 
-/* Redirector named pipe functions */
-extern int smbrdr_open_pipe(char *, char *, char *, char *);
-extern int smbrdr_close_pipe(int);
-extern int smbrdr_readx(int, char *, int);
-extern int smbrdr_transact(int, char *, int, char *, int);
-
 /* Redirector session functions */
-extern int smbrdr_echo(const char *);
 extern void smbrdr_disconnect(const char *);
-
-/* DEBUG functions */
-extern void smbrdr_dump_ofiles(void);
-extern void smbrdr_dump_sessions(void);
-extern void smbrdr_dump_netuse();
 
 #ifdef	__cplusplus
 }
