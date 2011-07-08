@@ -10288,13 +10288,16 @@ dtrace_buffer_activate(dtrace_state_t *state)
 
 static int
 dtrace_buffer_alloc(dtrace_buffer_t *bufs, size_t size, int flags,
-    processorid_t cpu)
+    processorid_t cpu, int *factor)
 {
 	cpu_t *cp;
 	dtrace_buffer_t *buf;
+	int allocated = 0, desired = 0;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(MUTEX_HELD(&dtrace_lock));
+
+	*factor = 1;
 
 	if (size > dtrace_nonroot_maxsize &&
 	    !PRIV_POLICY_CHOICE(CRED(), PRIV_ALL, B_FALSE))
@@ -10320,7 +10323,8 @@ dtrace_buffer_alloc(dtrace_buffer_t *bufs, size_t size, int flags,
 
 		ASSERT(buf->dtb_xamot == NULL);
 
-		if ((buf->dtb_tomax = kmem_zalloc(size, KM_NOSLEEP)) == NULL)
+		if ((buf->dtb_tomax = kmem_zalloc(size,
+		    KM_NOSLEEP | KM_NORMALPRI)) == NULL)
 			goto err;
 
 		buf->dtb_size = size;
@@ -10331,7 +10335,8 @@ dtrace_buffer_alloc(dtrace_buffer_t *bufs, size_t size, int flags,
 		if (flags & DTRACEBUF_NOSWITCH)
 			continue;
 
-		if ((buf->dtb_xamot = kmem_zalloc(size, KM_NOSLEEP)) == NULL)
+		if ((buf->dtb_xamot = kmem_zalloc(size,
+		    KM_NOSLEEP | KM_NORMALPRI)) == NULL)
 			goto err;
 	} while ((cp = cp->cpu_next) != cpu_list);
 
@@ -10345,22 +10350,27 @@ err:
 			continue;
 
 		buf = &bufs[cp->cpu_id];
+		desired += 2;
 
 		if (buf->dtb_xamot != NULL) {
 			ASSERT(buf->dtb_tomax != NULL);
 			ASSERT(buf->dtb_size == size);
 			kmem_free(buf->dtb_xamot, size);
+			allocated++;
 		}
 
 		if (buf->dtb_tomax != NULL) {
 			ASSERT(buf->dtb_size == size);
 			kmem_free(buf->dtb_tomax, size);
+			allocated++;
 		}
 
 		buf->dtb_tomax = NULL;
 		buf->dtb_xamot = NULL;
 		buf->dtb_size = 0;
 	} while ((cp = cp->cpu_next) != cpu_list);
+
+	*factor = desired / (allocated > 0 ? allocated : 1);
 
 	return (ENOMEM);
 }
@@ -12260,7 +12270,7 @@ dtrace_dstate_init(dtrace_dstate_t *dstate, size_t size)
 	if (size < (min = dstate->dtds_chunksize + sizeof (dtrace_dynhash_t)))
 		size = min;
 
-	if ((base = kmem_zalloc(size, KM_NOSLEEP)) == NULL)
+	if ((base = kmem_zalloc(size, KM_NOSLEEP | KM_NORMALPRI)) == NULL)
 		return (ENOMEM);
 
 	dstate->dtds_size = size;
@@ -12622,7 +12632,7 @@ dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 {
 	dtrace_optval_t *opt = state->dts_options, size;
 	processorid_t cpu;
-	int flags = 0, rval;
+	int flags = 0, rval, factor, divisor = 1;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	ASSERT(MUTEX_HELD(&cpu_lock));
@@ -12652,7 +12662,7 @@ dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 			flags |= DTRACEBUF_INACTIVE;
 	}
 
-	for (size = opt[which]; size >= sizeof (uint64_t); size >>= 1) {
+	for (size = opt[which]; size >= sizeof (uint64_t); size /= divisor) {
 		/*
 		 * The size must be 8-byte aligned.  If the size is not 8-byte
 		 * aligned, drop it down by the difference.
@@ -12670,7 +12680,7 @@ dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 			return (E2BIG);
 		}
 
-		rval = dtrace_buffer_alloc(buf, size, flags, cpu);
+		rval = dtrace_buffer_alloc(buf, size, flags, cpu, &factor);
 
 		if (rval != ENOMEM) {
 			opt[which] = size;
@@ -12679,6 +12689,9 @@ dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 
 		if (opt[DTRACEOPT_BUFRESIZE] == DTRACEOPT_BUFRESIZE_MANUAL)
 			return (rval);
+
+		for (divisor = 2; divisor < factor; divisor <<= 1)
+			continue;
 	}
 
 	return (ENOMEM);
@@ -12778,7 +12791,8 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 		goto out;
 	}
 
-	spec = kmem_zalloc(nspec * sizeof (dtrace_speculation_t), KM_NOSLEEP);
+	spec = kmem_zalloc(nspec * sizeof (dtrace_speculation_t),
+	    KM_NOSLEEP | KM_NORMALPRI);
 
 	if (spec == NULL) {
 		rval = ENOMEM;
@@ -12789,7 +12803,8 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 	state->dts_nspeculations = (int)nspec;
 
 	for (i = 0; i < nspec; i++) {
-		if ((buf = kmem_zalloc(bufsize, KM_NOSLEEP)) == NULL) {
+		if ((buf = kmem_zalloc(bufsize,
+		    KM_NOSLEEP | KM_NORMALPRI)) == NULL) {
 			rval = ENOMEM;
 			goto err;
 		}
