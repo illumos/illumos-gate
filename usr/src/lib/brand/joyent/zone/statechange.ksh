@@ -213,8 +213,8 @@ setup_net()
 
 
 		# Get the static IP for the vnic from the zone config file, but only
-        # if there's not an IP from the zone properties
-		hostname_file="/zones/$ZONENAME/root/etc/hostname.$nic"
+		# if there's not an IP from the zone properties
+		hostname_file="$ZONEPATH/root/etc/hostname.$nic"
 		if [[ -z "${zone_ip}" ]] && [ -e $hostname_file ]; then
 			zone_ip=`nawk \
 			    '{if ($1 ~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)
