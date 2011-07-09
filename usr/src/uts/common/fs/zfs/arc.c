@@ -2922,7 +2922,7 @@ top:
 		 * should delay this I/O if this zone is using more than its I/O
 		 * priority allows.
 		 */
-		zfs_zone_io_throttle(ZFS_ZONE_IOP_READ, size);
+		zfs_zone_io_throttle(ZFS_ZONE_IOP_READ);
 
 		if (*arc_flags & ARC_WAIT)
 			return (zio_wait(rzio));

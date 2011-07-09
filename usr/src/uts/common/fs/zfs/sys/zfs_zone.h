@@ -42,7 +42,7 @@ typedef enum {
 	ZFS_ZONE_IOP_LOGICAL_WRITE,
 } zfs_zone_iop_type_t;
 
-extern void zfs_zone_io_throttle(zfs_zone_iop_type_t, uint64_t);
+extern void zfs_zone_io_throttle(zfs_zone_iop_type_t);
 
 extern void zfs_zone_zio_init(zio_t *);
 extern void zfs_zone_zio_start(zio_t *);

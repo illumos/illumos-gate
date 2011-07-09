@@ -62,6 +62,7 @@ dtrace_getfp(void)
 
 #if defined(lint) || defined(__lint)
 
+/*ARGSUSED*/
 uint64_t
 dtrace_getvmreg(uint32_t reg, volatile uint16_t *flags)
 { return (0); }

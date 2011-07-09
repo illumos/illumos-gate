@@ -2535,7 +2535,6 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 	dladm_handle_t dh;
 	dladm_status_t status;
 	datalink_id_t linkid;
-	char errmsg[DLADM_STRSIZE];
 
 	in_alt_root = zonecfg_in_alt_root();
 	if (in_alt_root)

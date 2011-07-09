@@ -129,7 +129,7 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 			cyctime.cyt_when += gethrtime();
 
 		hrt2ts(cyctime.cyt_when, &it->it_itime.it_value);
-		cyclic_reprogram(cyc, cyctime.cyt_when);
+		(void) cyclic_reprogram(cyc, cyctime.cyt_when);
 		return (0);
 	}
 

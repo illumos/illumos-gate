@@ -1170,6 +1170,7 @@ main(int argc, char **argv)
 				break;
 			}
 			fatal("Unsupported conversion format \"%s\"", optarg);
+			/*NOTREACHED*/
 		case 'p':
 			change_passphrase = 1;
 			break;

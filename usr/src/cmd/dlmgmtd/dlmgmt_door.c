@@ -62,6 +62,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "dlmgmt_impl.h"
 
 typedef void dlmgmt_door_handler_t(void *, void *, size_t *, zoneid_t,
@@ -1349,11 +1350,10 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 			 */
 			int fd;
 
-			while ((fd = open(ZONE_LOCK,
-			    O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR))
-			    < 0)
-				sleep(1);
-        		close(fd);
+			while ((fd = open(ZONE_LOCK, O_WRONLY |
+			    O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)) < 0)
+				(void) sleep(1);
+        		(void) close(fd);
 
 			dlmgmt_table_lock(B_TRUE);
 			dlmgmt_db_fini(zonehalt->ld_zoneid);

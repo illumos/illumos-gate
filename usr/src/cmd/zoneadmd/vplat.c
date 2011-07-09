@@ -3134,28 +3134,6 @@ remove_datalink_protect(zlog_t *zlogp, zoneid_t zoneid)
 }
 
 static int
-unconfigure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
-{
-	int dlnum = 0;
-
-	/*
-	 * The kernel shutdown callback for the dls module should have removed
-	 * all datalinks from this zone.  If any remain, then there's a
-	 * problem.
-	 */
-	if (zone_list_datalink(zoneid, &dlnum, NULL) != 0) {
-		zerror(zlogp, B_TRUE, "unable to list network interfaces");
-		return (-1);
-	}
-	if (dlnum != 0) {
-		zerror(zlogp, B_FALSE,
-		    "datalinks remain in zone after shutdown");
-		return (-1);
-	}
-	return (0);
-}
-
-static int
 tcp_abort_conn(zlog_t *zlogp, zoneid_t zoneid,
     const struct sockaddr_storage *local, const struct sockaddr_storage *remote)
 {

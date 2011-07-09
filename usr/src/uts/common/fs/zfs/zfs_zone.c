@@ -33,7 +33,7 @@
  */
 
 void
-zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
+zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 {
 }
 
@@ -872,7 +872,7 @@ zfs_zone_zio_init(zio_t *zp)
  * retrieve the data to be read through dmu_read_uio.
  */
 void
-zfs_zone_io_throttle(zfs_zone_iop_type_t type, uint64_t size)
+zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 {
 	zone_t *zonep = curzone;
 	hrtime_t unow;

@@ -552,7 +552,6 @@ dladm_zname2info(dladm_handle_t handle, const char *zonename, const char *link,
 	datalink_id_t			linkid;
 	dladm_status_t			status;
 	size_t				sz = sizeof (retval);
-	zoneid_t			curr_zoneid;
 
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);

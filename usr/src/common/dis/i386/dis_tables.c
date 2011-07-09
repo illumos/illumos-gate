@@ -3520,6 +3520,7 @@ just_mem:
 
 	case VMx:
 		if (mode == 3) {
+#ifdef DIS_TEXT
 			char *vminstr;
 
 			switch (r_m) {
@@ -3539,9 +3540,12 @@ just_mem:
 				goto error;
 			}
 
-#ifdef DIS_TEXT
 			(void) strncpy(x->d86_mnem, vminstr, OPLEN);
+#else
+			if (r_m < 1 || r_m > 4)
+				goto error;
 #endif
+
 			NOMEM;
 			break;
 		}

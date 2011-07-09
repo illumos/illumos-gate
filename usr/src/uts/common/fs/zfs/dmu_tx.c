@@ -220,7 +220,7 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	if (len == 0)
 		return;
 
-	zfs_zone_io_throttle(ZFS_ZONE_IOP_LOGICAL_WRITE, len);
+	zfs_zone_io_throttle(ZFS_ZONE_IOP_LOGICAL_WRITE);
 
 	min_bs = SPA_MINBLOCKSHIFT;
 	max_bs = SPA_MAXBLOCKSHIFT;

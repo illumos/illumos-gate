@@ -6822,13 +6822,16 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 		switch (ret) {
 		case SCF_ERROR_DELETED:
 			err = ENODEV;
+			break;
 		case SCF_ERROR_CONNECTION_BROKEN:
 			warn(gettext("Lost repository connection\n"));
 			err = ECONNABORTED;
+			break;
 		case SCF_ERROR_NOT_FOUND:
 			warn(gettext("Instance \"%s\" disappeared out from "
 			    "under us.\n"), inst->sc_name);
 			err = ENOENT;
+			break;
 		default:
 			bad_error("scf_service_get_instance", ret);
 		}
@@ -6851,9 +6854,11 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 			switch (ret) {
 			case SCF_ERROR_DELETED:
 				err = ENODEV;
+				break;
 			case SCF_ERROR_CONNECTION_BROKEN:
 				warn(gettext("Lost repository connection\n"));
 				err = ECONNABORTED;
+				break;
 			default:
 				bad_error("scf_service_get_instance", ret);
 			}
