@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -484,7 +484,6 @@ static bd_ops_t sda_bd_ops = {
 	NULL,			/* sync_cache */
 	sda_mem_bd_read,
 	sda_mem_bd_write,
-	NULL			/* dump */
 };
 
 void
