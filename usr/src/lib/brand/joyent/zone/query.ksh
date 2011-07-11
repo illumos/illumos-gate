@@ -1,3 +1,4 @@
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -18,39 +19,34 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2010, 2011 Joyent, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2011, Oracle and/or its affiliates. All rights reserved.
 #
 
-PROGS =		jattach jdetach jinstall juninstall pinstall prestate \
-		poststate statechange query
-XMLDOCS=	config.xml platform.xml common.ksh
-USERFILES=
-TEMPLATES =	Joyent.xml
-CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+PATH=/usr/bin:/usr/sbin
+export PATH
 
-include $(SRC)/cmd/Makefile.cmd
-include ../Makefile.joyent
+. /usr/lib/brand/shared/common.ksh
 
-.KEEP_STATE:
+zonename=$1
+zonepath=$2
+cmd=$3
 
-all:	$(PROGS)
+if [ $3 == "env" ]; then
+	#
+	# zoneadmd reads one (arbitrary length) line of input from the query
+	# hook.  If there is more than one environment variable to pass back,
+	# delimit each one with tabs.  zoneadmd will split the line at the tabs
+	# and set each key/value pair in its environment.
+	#
+	# Currently, only _ZONEADMD_ZPOOL is used to set the %P substitution
+	# for the brand configuration.
+	#
+	entry=$(svccfg -s smartdc/init listprop '*/zpool')
+	if [ -n "$entry" ]; then
+		val=${entry##* * }
+		[ -n "$val" ] && echo "_ZONEADMD_ZPOOL=/${val}\c"
+	fi
+fi
 
-POFILES =	$(PROGS:%=%.po) common.po
-POFILE =	joyent.po
-
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
-
-install: $(PROGS) $(XMLDOCS) $(ROOTPROGS) $(ROOTXMLDOCS) \
-	$(ROOTTEMPLATES) $(ETCUSER)
-
-lint:
-
-clean:
-	-$(RM) $(PROGS) $(POFILES) $(POFILE)
-
-include $(SRC)/cmd/Makefile.targ
+exit $ZONE_SUBPROC_OK

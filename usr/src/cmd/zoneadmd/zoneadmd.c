@@ -1745,6 +1745,46 @@ out:
 }
 
 /*
+ * Run the query hook with the 'env' parameter.  It should return a
+ * string of tab-delimited key-value pairs, each of which should be set
+ * in the environment.
+ *
+ * Because the env_vars string values become part of the environment, the
+ * string is static and we don't free it.
+ */
+static int
+set_brand_env(zlog_t *zlogp)
+{
+	int ret = 0;
+	static char *env_vars = NULL;
+	char buf[2 * MAXPATHLEN];
+
+	if (query_hook[0] == '\0' || env_vars != NULL)
+		return (0);
+
+	if (snprintf(buf, sizeof (buf), "%s env", query_hook) > sizeof (buf))
+		return (-1);
+
+	if (do_subproc(zlogp, buf, &env_vars, B_FALSE) != 0)
+		return (-1);
+
+	if (env_vars != NULL) {
+		char *sp;
+
+		sp = strtok(env_vars, "\t");
+		while (sp != NULL) {
+			if (putenv(sp) != 0) {
+				ret = -1;
+				break;
+			}
+			sp = strtok(NULL, "\t");
+		}
+	}
+
+	return (ret);
+}
+
+/*
  * Setup the brand's pre and post state change callbacks, as well as the
  * query callback, if any of these exist.
  */
@@ -1979,6 +2019,11 @@ main(int argc, char *argv[])
 		return (1);
 	}
 	priv_freeset(privset);
+
+	if (set_brand_env(zlogp) != 0) {
+		zerror(zlogp, B_FALSE, "Unable to setup brand's environment");
+		return (1);
+	}
 
 	if (mkzonedir(zlogp) != 0)
 		return (1);

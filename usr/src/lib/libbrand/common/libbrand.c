@@ -319,6 +319,7 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
     const char *curr_zone)
 {
 	int dst, src;
+	static char *env_pool = NULL;
 
 	/*
 	 * Walk through the characters, substituting values as needed.
@@ -334,6 +335,13 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
 		switch (sbuf[++src]) {
 		case '%':
 			dst += strlcpy(dbuf + dst, "%", dbuf_size - dst);
+			break;
+		case 'P':
+			if (env_pool == NULL)
+				env_pool = getenv("_ZONEADMD_ZPOOL");
+			if (env_pool == NULL)
+				break;
+			dst += strlcpy(dbuf + dst, env_pool, dbuf_size - dst);
 			break;
 		case 'R':
 			if (zonepath == NULL)
