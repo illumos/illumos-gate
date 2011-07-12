@@ -731,6 +731,7 @@ dtj_chewrec(const dtrace_probedata_t *data, const dtrace_recdesc_t *rec,
 
 	switch (act) {
 	case DTRACEACT_DIFEXPR:
+	case DTRACEACT_TRACEMEM:
 		if (rec->dtrd_size == 0) {
 			/*
 			 * The current record is not a D action, but a program
@@ -1075,6 +1076,7 @@ dtj_bufhandler(const dtrace_bufdata_t *bufdata, void *arg)
 
 	switch (act) {
 	case DTRACEACT_DIFEXPR:
+	case DTRACEACT_TRACEMEM:
 		/* trace() action */
 		break;
 	case DTRACEACT_PRINTF:

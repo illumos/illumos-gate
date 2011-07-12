@@ -1748,14 +1748,19 @@ file path=opt/SUNWdtrt/tst/common/trace/tst.qstring.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/tst.string.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_ARG.badsize.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_LEN.toofew.d mode=0444
-file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_LEN.toomany.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_ADDR.badaddr.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_ARGS.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_DYNSIZE.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_SIZE.negsize.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_SIZE.zerosize.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.dynsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.dynsize.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/tst.rootvp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.smallsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.smallsize.d.out mode=0444
 file \
     path=opt/SUNWdtrt/tst/common/translators/err.D_DECL_TYPERED.BadTransDecl.d \
     mode=0444
