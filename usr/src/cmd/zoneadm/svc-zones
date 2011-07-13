@@ -21,10 +21,13 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent Inc. All rights reserved.
+
+set -o xtrace
 
 . /lib/svc/share/smf_include.sh
 
-ZPOOL=`svcprop -p config/zpool $SMF_FMRI 2>/dev/null`
+ZPOOL=`svcprop -p config/zpool svc:/system/smartdc/init:default 2>/dev/null`
 ZPOOL=${ZPOOL:-zones}
 
 MANFDS=$ZPOOL/manifests
