@@ -105,8 +105,8 @@ script 2>&1 | tee test.out
 
 #
 # It should be true that our probe was not reaped after the provider was made
-# defunct: the speculative tracing action prevents reaping of any ECB in the
-# enabling.
+# defunct: the active ring buffer in the earlier enabling prevents reaping of
+# any of the earlier enabling's ECBs.
 # 
 status=0
 
