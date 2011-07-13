@@ -20,9 +20,11 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
+#include <sys/zfs_zone.h>
 #include <sys/spa_impl.h>
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
@@ -479,6 +481,8 @@ vdev_disk_io_start(zio_t *zio)
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
 
+	zfs_zone_zio_start(zio);
+
 	/* ldi_strategy() will return non-zero only on programming errors */
 	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);
 
@@ -489,6 +493,8 @@ static void
 vdev_disk_io_done(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
+
+	zfs_zone_zio_done(zio);
 
 	/*
 	 * If the device returned EIO, then attempt a DKIOCSTATE ioctl to see if

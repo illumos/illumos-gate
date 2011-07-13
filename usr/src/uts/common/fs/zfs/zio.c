@@ -2358,8 +2358,6 @@ zio_vdev_io_start(zio_t *zio)
 		}
 	}
 
-	zfs_zone_zio_start(zio);
-
 	return (vd->vdev_ops->vdev_op_io_start(zio));
 }
 
