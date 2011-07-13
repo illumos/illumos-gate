@@ -106,8 +106,9 @@
 #define	DT_VERS_1_6_3	DT_VERSION_NUMBER(1, 6, 3)
 #define	DT_VERS_1_7	DT_VERSION_NUMBER(1, 7, 0)
 #define	DT_VERS_1_7_1	DT_VERSION_NUMBER(1, 7, 1)
-#define	DT_VERS_LATEST	DT_VERS_1_7_1
-#define	DT_VERS_STRING	"Sun D 1.7.1"
+#define	DT_VERS_1_8	DT_VERSION_NUMBER(1, 8, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_8
+#define	DT_VERS_STRING	"Sun D 1.8"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -125,6 +126,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_6_3,	/* D API 1.6.3 */
 	DT_VERS_1_7,	/* D API 1.7 */
 	DT_VERS_1_7_1,	/* D API 1.7.1 */
+	DT_VERS_1_8,	/* D API 1.8 */
 	0
 };
 
@@ -379,6 +381,10 @@ static const dt_ident_t _dtrace_globals[] = {
 { "timestamp", DT_IDENT_SCALAR, 0, DIF_VAR_TIMESTAMP,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uint64_t" },
+{ "tolower", DT_IDENT_FUNC, 0, DIF_SUBR_TOLOWER, DT_ATTR_STABCMN, DT_VERS_1_8,
+	&dt_idops_func, "string(const char *)" },
+{ "toupper", DT_IDENT_FUNC, 0, DIF_SUBR_TOUPPER, DT_ATTR_STABCMN, DT_VERS_1_8,
+	&dt_idops_func, "string(const char *)" },
 { "trace", DT_IDENT_ACTFUNC, 0, DT_ACT_TRACE, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void(@)" },
 { "tracemem", DT_IDENT_ACTFUNC, 0, DT_ACT_TRACEMEM,
