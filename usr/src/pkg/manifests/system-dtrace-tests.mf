@@ -748,6 +748,8 @@ file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.copyoutbadarg.d \
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.mobadarg.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.raisebadarg.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.toupper.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.allocanoarg.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.badbreakpoint.d \
@@ -774,6 +776,12 @@ file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.panicbadarg.d \
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.progenyofbad2.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.stopbadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.tolowertoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.toupper.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.touppertoomany.d \
+    mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_STRINGOF_TYPE.badstringof.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_VAR_UNDEF.badvar.d mode=0444
@@ -840,6 +848,8 @@ file path=opt/SUNWdtrt/tst/common/funcs/tst.substrminate.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.substrminate.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.system.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.system.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.toupper.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/err.D_ADDROF_LVAL.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/err.D_EMPTY.empty.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/tst.clauses.d mode=0444
