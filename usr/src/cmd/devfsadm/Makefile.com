@@ -66,7 +66,6 @@ LINK_OBJS_CMN =			\
 	fssnap_link.o           \
 	sgen_link.o		\
 	smp_link.o		\
-	md_link.o		\
 	dtrace_link.o		\
 	vscan_link.o		\
 	zfs_link.o		\
