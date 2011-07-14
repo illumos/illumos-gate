@@ -38,7 +38,7 @@ use Cwd 'abs_path';
 
 $PNAME = $0;
 $PNAME =~ s:.*/::;
-$OPTSTR = 'abd:fghi:jlnqsx:';
+$OPTSTR = 'abd:fFghi:jlnqsx:';
 $USAGE = "Usage: $PNAME [-abfFghjlnqs] [-d dir] [-i isa] "
     . "[-x opt[=arg]] [file | dir ...]\n";
 ($MACH = `uname -p`) =~ s/\W*\n//;
@@ -258,8 +258,8 @@ sub run_tests {
 	my($failed) = $errs;
 	my($total) = 0;
 
-	die "$PNAME: $dtrace not found\n" unless (-x "$dtrace");
-	logmsg($dtrace . "\n");
+	die "$PNAME: $dtrace not found; aborting\n" unless (-x "$dtrace");
+	logmsg("executing tests using $dtrace ...\n");
 
 	load_exceptions($exceptions_path);
 
@@ -569,7 +569,7 @@ if (!$opt_F) {
 	
 	for my $dep (@dependencies) {
 		if (!inpath($dep)) {
-			die "$PNAME: '$dep' not found (use -F to force run)";
+			die "$PNAME: '$dep' not found (use -F to force run)\n";
 		}
 	}
 }
@@ -591,7 +591,7 @@ if ($opt_j || $opt_n || $opt_i) {
 	push(@dtrace_cmds, $jdtrace_path) if ($opt_j);
 	push(@dtrace_cmds, "/usr/sbin/$opt_i/dtrace") if ($opt_i);
 } else {
-	@dtrace_cmds = ($dtrace_path, $jdtrace_path);
+	@dtrace_cmds = ($dtrace_path);
 }
 
 if ($opt_d) {
