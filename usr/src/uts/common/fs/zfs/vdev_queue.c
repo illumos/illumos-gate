@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -396,8 +397,6 @@ vdev_queue_io_done(zio_t *zio)
 	mutex_enter(&vq->vq_lock);
 
 	avl_remove(&vq->vq_pending_tree, zio);
-
-	zfs_zone_zio_done(zio);
 
 	for (int i = 0; i < zfs_vdev_ramp_rate; i++) {
 		zio_t *nio = vdev_queue_io_to_issue(vq, zfs_vdev_max_pending);
