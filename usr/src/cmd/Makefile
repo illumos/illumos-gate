@@ -242,7 +242,6 @@ COMMON_SUBDIRS=		\
 	look		\
 	ls		\
 	luxadm		\
-	lvm		\
 	mach		\
 	machid		\
 	mail		\
@@ -621,7 +620,6 @@ MSGSUBDIRS=		\
 	logins		\
 	ls		\
 	luxadm		\
-	lvm		\
 	mailx		\
 	mesg		\
 	mkdir		\
