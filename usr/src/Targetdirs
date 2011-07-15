@@ -1902,9 +1902,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lsendfile.ln \
 	/usr/lib/$(MACH64)/llib-lsocket.ln \
 	/usr/lib/$(MACH64)/llib-lsysevent.ln \
-	/usr/lib/$(MACH64)/llib-ltermcap \
 	/usr/lib/$(MACH64)/llib-ltermcap.ln \
-	/usr/lib/$(MACH64)/llib-ltermlib \
 	/usr/lib/$(MACH64)/llib-ltermlib.ln \
 	/usr/lib/$(MACH64)/llib-lthread.ln \
 	/usr/lib/$(MACH64)/llib-lthread_db.ln \
