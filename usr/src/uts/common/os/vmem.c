@@ -1599,7 +1599,7 @@ vmem_destroy(vmem_t *vmp)
 
 	leaked = vmem_size(vmp, VMEM_ALLOC);
 	if (leaked != 0)
-		cmn_err(CE_WARN, "vmem_destroy('%s'): leaked %lu %s",
+		cmn_err(CE_WARN, "!vmem_destroy('%s'): leaked %lu %s",
 		    vmp->vm_name, leaked, (vmp->vm_cflags & VMC_IDENTIFIER) ?
 		    "identifiers" : "bytes");
 
