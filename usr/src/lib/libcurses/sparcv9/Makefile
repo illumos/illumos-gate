@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
@@ -30,15 +29,6 @@ include ../../Makefile.lib.64
 
 .KEEP_STATE:
 
-$(ROOTLIBDIR64)/$(LIBLINKS) := INS.liblink64 = \
-	-$(RM) $@; \
-	cd $(ROOTLIBDIR64); \
-	$(RM) libtermlib.so$(VERS) libtermcap.so$(VERS);\
-	$(RM) libtermlib.so libtermcap.so; \
-	$(SYMLINK) $(LIBLINKS)$(VERS) $(LIBLINKS); \
-	$(SYMLINK) libcurses.so$(VERS) libtermlib.so$(VERS); \
-	$(SYMLINK) libcurses.so$(VERS) libtermcap.so$(VERS); \
-	$(SYMLINK) libtermcap.so$(VERS) libtermcap.so; \
-	$(SYMLINK) libtermlib.so$(VERS) libtermlib.so
+all: $(LIBS)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

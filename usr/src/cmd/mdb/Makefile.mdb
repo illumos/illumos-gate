@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -90,7 +91,7 @@ CPPFLAGS += -D_MDB -I. -I../.. -I../../../common
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
-LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
+LDLIBS += -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
 
 #
 # -erroff=E_INCONS_ARG_DECL2 works around a problem where lint gets confused

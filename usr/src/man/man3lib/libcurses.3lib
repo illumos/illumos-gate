@@ -1,8 +1,22 @@
 '\" te
+.\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .TH libcurses 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
 .SH NAME
 libcurses, libtermcap, libtermlib \- screen handling and optimization library
@@ -15,10 +29,16 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
 .SH DESCRIPTION
 .sp
 .LP
-Functions in the \fBlibcurses\fR library provide a terminal-independent method
-of updating character screens with reasonable optimization. The
-\fBlibtermcap\fR and \fBlibtermlib\fR libraries are identical to
-\fBlibcurses\fR and are maintained for backward compatibility.
+Functions in the \fBlibcurses\fR library provide a terminal-independent
+method of updating character screens with reasonable optimization.
+.LP
+The \fBlibtermcap\fR library is a "filter" on \fBlibcurses\fR
+that provides the traditional BSD-style termcap functions,
+and does so in a way that allows the consuming library or
+application to link with an alternate curses library.
+.LP
+The \fBlibtermlib\fR library is identical to \fBlibcurses\fR and
+is maintained for backward compatibility.
 .sp
 .LP
 See \fBlibcurses\fR(3XCURSES) for information about the curses library that
@@ -26,12 +46,11 @@ conforms to X/Open Curses, Issue 4, Version 2.
 .SH INTERFACES
 .sp
 .LP
-The shared objects \fBlibcurses.so.1\fR, \fBlibtermcap.so.1\fR, and
+The shared objects \fBlibcurses.so.1\fR and
 \fBlibtermlib.so.1\fR provide the public interfaces defined below. See
 \fBIntro\fR(3) for additional information on shared object interfaces.
 .sp
 
-.sp
 .TS
 tab();
 lw(2.75i) lw(2.75i) 
@@ -213,6 +232,24 @@ lw(2.75i) lw(2.75i)
 \fBwsyncdown\fR\fBwsyncup\fR
 \fBwtimeout\fR\fBwtouchln\fR
 \fBwvline\fR
+.TE
+
+.LP
+The shared object \fBlibtermcap.so.1\fR provides the traditional
+BSD-style interfaces defined below:
+.sp
+
+.TS
+tab();
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+\fBtgetent\fR
+\fBtgetflag\fR
+\fBtgetnum\fR
+\fBtgetstr\fR
+\fBtgoto\fR
+\fBtputs\fR
 .TE
 
 .SH FILES
