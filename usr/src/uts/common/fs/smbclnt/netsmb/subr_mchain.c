@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -109,9 +110,6 @@
  * hurt transports that support larger frames.
  * 4K fits nicely in 3 Ethernet frames (3 * 1500)
  * leaving about 500 bytes for protocol headers.
- *
- * XXX: Would Ethernet drivers be happier
- * (more efficient) if we used 1K here?
  */
 #define	MLEN	4096
 
@@ -543,14 +541,36 @@ mb_put_mem(struct mbchain *mbp, const void *vsrc, int size, int type)
 int
 mb_put_mbuf(struct mbchain *mbp, mblk_t *m)
 {
-	mblk_t *mb;
+	mblk_t *nm, *tail_mb;
+	size_t size;
 
 	/* See: linkb(9f) */
-	for (mb = mbp->mb_cur; mb->b_cont; mb = mb->b_cont)
-		;
-	mb->b_cont = m;
-	mbp->mb_cur = m;
-	mbp->mb_count += msgdsize(m);
+	tail_mb = mbp->mb_cur;
+	while (tail_mb->b_cont != NULL)
+		tail_mb = tail_mb->b_cont;
+
+	/*
+	 * Avoid small frags:  Only link if the size of the
+	 * new mbuf is larger than the space left in the last
+	 * mblk of the chain (tail), otherwise just copy.
+	 */
+	while (m != NULL) {
+		size = MBLKL(m);
+		if (size > MBLKTAIL(tail_mb)) {
+			/* Link */
+			tail_mb->b_cont = m;
+			mbp->mb_cur = m;
+			mbp->mb_count += msgdsize(m);
+			return (0);
+		}
+		/* Copy */
+		bcopy(m->b_rptr, tail_mb->b_wptr, size);
+		tail_mb->b_wptr += size;
+		mbp->mb_count += size;
+		nm = unlinkb(m);
+		freeb(m);
+		m = nm;
+	}
 
 	return (0);
 }

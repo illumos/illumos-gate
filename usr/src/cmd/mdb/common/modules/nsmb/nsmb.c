@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,9 +31,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#include "smb_conn.h"
-#include "smb_rq.h"
-#include "smb_pass.h"
+#include <netsmb/smb_conn.h>
+#include <netsmb/smb_rq.h>
+#include <netsmb/smb_pass.h>
 
 #define	OPT_VERBOSE	0x0001	/* Be [-v]erbose in dcmd's */
 #define	OPT_RECURSE	0x0002	/* recursive display */

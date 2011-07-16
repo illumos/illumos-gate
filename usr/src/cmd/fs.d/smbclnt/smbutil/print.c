@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -150,7 +151,7 @@ again:
 	 * Have the printer share connection.
 	 * Print the file.
 	 */
-	snprintf(titlebuf, sizeof (titlebuf), "%s_%s",
+	snprintf(titlebuf, sizeof (titlebuf), "%s %s",
 	    ctx->ct_user, filename);
 
 	error = print_file(ctx, titlebuf, file);
@@ -185,13 +186,15 @@ static int
 print_file(smb_ctx_t *ctx, char *title, int file)
 {
 	off_t offset;
-	int error, rcnt, wcnt;
+	int rcnt, wcnt;
 	int setup_len = 0;		/* No printer setup data */
 	int mode = MODE_GRAPHICS;	/* treat as raw data */
-	int fh = -1;
+	int error = 0;
+	int pfd = -1;
 
-	error = smb_printer_open(ctx, setup_len, mode, title, &fh);
-	if (error) {
+	pfd = smb_open_printer(ctx, title, setup_len, mode);
+	if (pfd < 0) {
+		error = errno;
 		smb_error("could not open print job", error);
 		return (error);
 	}
@@ -207,7 +210,7 @@ print_file(smb_ctx_t *ctx, char *title, int file)
 		if (rcnt == 0)
 			break;
 
-		wcnt = smb_fh_write(ctx, fh, offset, rcnt, databuf);
+		wcnt = smb_fh_write(pfd, offset, rcnt, databuf);
 		if (wcnt < 0) {
 			error = errno;
 			smb_error("error writing spool file\n", error);
@@ -221,6 +224,6 @@ print_file(smb_ctx_t *ctx, char *title, int file)
 		offset += wcnt;
 	}
 
-	(void) smb_printer_close(ctx, fh);
+	(void) smb_fh_close(pfd);
 	return (error);
 }

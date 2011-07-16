@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2010,2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -321,8 +321,8 @@ dump_ctype(void)
 			ct[rl.runetype_ext_nranges - 1].map = ctn->ctype;
 			last_ct = ctn;
 		}
-		if (ctn->toupper == 0) {
-			last_up = NULL;
+		if (ctn->tolower == 0) {
+			last_lo = NULL;
 		} else if ((last_lo != NULL) &&
 		    (last_lo->tolower + 1 == ctn->tolower)) {
 			lo[rl.maplower_ext_nranges-1].max = wc;

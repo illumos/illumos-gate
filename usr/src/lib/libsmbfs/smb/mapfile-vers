@@ -18,6 +18,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -66,7 +67,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ctx_flags2;
 	smb_ctx_free;
 	smb_ctx_get_ssn;
-	smb_ctx_get_ssnkey;
 	smb_ctx_get_tree;
 	smb_ctx_gethandle;
 	smb_ctx_init;
@@ -97,6 +97,7 @@ SYMBOL_VERSION SUNWprivate {
 #
 # Functions to support named pipes
 	smb_fh_close;
+	smb_fh_getssnkey;
 	smb_fh_open;
 	smb_fh_read;
 	smb_fh_write;
@@ -111,9 +112,8 @@ SYMBOL_VERSION SUNWprivate {
 	smb_iod_work;
 	smb_lib_init;
 	smb_netshareenum;	# will move to libnetapi
+	smb_open_printer;
 	smb_open_rcfile;
-	smb_printer_open;
-	smb_printer_close;
 	smb_simplecrypt;
 	smb_simpledecrypt;
 	smb_strerror;
@@ -141,10 +141,14 @@ SYMBOL_VERSION SUNWprivate {
 #
 	smbfs_default_dom_usr;
 	smbfs_keychain_add;
+	smbfs_keychain_addhash;
 	smbfs_keychain_chk;
 	smbfs_keychain_del;
 	smbfs_keychain_del_everyone;
 	smbfs_keychain_del_owner;
+
+	smbfs_set_default_domain;
+	smbfs_set_default_user;
 
 	smbutil_std_opts;
     local:

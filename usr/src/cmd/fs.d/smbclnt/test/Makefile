@@ -19,38 +19,40 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-#
-# MAPFILE HEADER START
-#
-# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
-# Object versioning must comply with the rules detailed in
-#
-#	usr/src/lib/README.mapfiles
-#
-# You should not be making modifications here until you've read the most current
-# copy of that file. If you need help, contact a gatekeeper for guidance.
-#
-# MAPFILE HEADER END
-#
+FSTYPE=		smbfs
+LIBPROG=	testnp
+ROOTFS_PROG=	$(LIBPROG)
 
-$mapfile_version 2
+include		../../Makefile.fstype
 
-SYMBOL_VERSION SUNWprivate {
-    global:
-	smbrdr_close_pipe;
-	smbrdr_disconnect;
-	smbrdr_dump_netuse;
-	smbrdr_dump_ofiles;
-	smbrdr_dump_sessions;
-	smbrdr_echo;
-	smbrdr_get_ssnkey;
-	smbrdr_logon;
-	smbrdr_open_pipe;
-	smbrdr_readx;
-	smbrdr_transact;
-    local:
-	*;
-};
+OBJS=	$(LIBPROG).o
+SRCS=	$(LIBPROG).c $(FSLIBSRC)
+
+LDLIBS += -lsmbfs
+
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
+
+CLOBBERFILES	+= $(LIBPROG)
+
+# uncomment these for dbx debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
+
+all:	$(ROOTFS_PROG)
+
+install:	$(ROOTLIBFSTYPEPROG)
+
+lint:	lint_SRCS
+
+clean:     
+	$(RM) $(OBJS)
+
+.KEEP_STATE:

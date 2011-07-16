@@ -766,8 +766,6 @@ usr/lib/smbsrv/llib-lsmb
 usr/lib/smbsrv/llib-lsmb.ln
 usr/lib/smbsrv/llib-lsmbns
 usr/lib/smbsrv/llib-lsmbns.ln
-usr/lib/smbsrv/llib-lsmbrdr
-usr/lib/smbsrv/llib-lsmbrdr.ln
 #
 #
 # Private/Internal 64-bit libraries of smbsrv. Do not ship.
@@ -821,6 +819,7 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
 usr/lib/fs/smbfs/chacl
 usr/lib/fs/smbfs/lsacl
+usr/lib/fs/smbfs/testnp
 #
 # FC related files
 kernel/kmdb/fcip		i386

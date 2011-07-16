@@ -212,24 +212,20 @@ struct drmach_shutdown_mbox {
 };
 struct drmach_shutdown_mbox	*drmach_shutdown_asm_mbox;
 
-static int drmach_fini(void);
+static int		drmach_fini(void);
 static sbd_error_t	*drmach_device_new(drmach_node_t *,
 				drmach_board_t *, drmach_device_t **);
 static sbd_error_t	*drmach_cpu_new(drmach_device_t *);
 static sbd_error_t	*drmach_mem_new(drmach_device_t *);
 static sbd_error_t	*drmach_io_new(drmach_device_t *);
-static sbd_error_t *drmach_board_release(drmachid_t);
-static sbd_error_t *drmach_board_status(drmachid_t, drmach_status_t *);
-static sbd_error_t *drmach_cpu_release(drmachid_t);
-static sbd_error_t *drmach_cpu_status(drmachid_t, drmach_status_t *);
-static sbd_error_t *drmach_io_release(drmachid_t);
-static sbd_error_t *drmach_io_status(drmachid_t, drmach_status_t *);
-static sbd_error_t *drmach_mem_release(drmachid_t);
-static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
-
-
-
-
+static sbd_error_t	*drmach_board_release(drmachid_t);
+static sbd_error_t	*drmach_board_status(drmachid_t, drmach_status_t *);
+static sbd_error_t	*drmach_cpu_release(drmachid_t);
+static sbd_error_t	*drmach_cpu_status(drmachid_t, drmach_status_t *);
+static sbd_error_t	*drmach_io_release(drmachid_t);
+static sbd_error_t	*drmach_io_status(drmachid_t, drmach_status_t *);
+static sbd_error_t	*drmach_mem_release(drmachid_t);
+static sbd_error_t	*drmach_mem_status(drmachid_t, drmach_status_t *);
 
 extern struct cpu	*SIGBCPU;
 

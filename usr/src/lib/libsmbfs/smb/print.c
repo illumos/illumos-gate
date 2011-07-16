@@ -1,4 +1,5 @@
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, Boris Popov
  * All rights reserved.
  *
@@ -41,82 +42,61 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <pwd.h>
 #include <grp.h>
 #include <unistd.h>
+#include <libintl.h>
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
+
 #include "private.h"
 
 int
-smb_printer_open(struct smb_ctx *ctx, int setuplen, int mode,
-	const char *ident, int *fhp)
+smb_open_printer(struct smb_ctx *ctx, const char *title,
+	int setuplen, int mode)
 {
-	struct smb_rq *rqp;
-	struct mbdata *mbp;
-	int error, flags2, uc;
-	uint16_t fh;
-	uint8_t wc;
+	smbioc_printjob_t ioc;
+	int err, tlen, new_fd;
+	int32_t from_fd;
 
-	flags2 = smb_ctx_flags2(ctx);
-	if (flags2 == -1)
-		return (EIO);
-	uc = flags2 & SMB_FLAGS2_UNICODE;
+	tlen = strlen(title);
+	if (tlen >= SMBIOC_MAX_NAME)
+		return (EINVAL);
 
-	error = smb_rq_init(ctx, SMB_COM_OPEN_PRINT_FILE, &rqp);
-	if (error)
-		return (error);
-	mbp = smb_rq_getrequest(rqp);
-	smb_rq_wstart(rqp);
-	mb_put_uint16le(mbp, setuplen);
-	mb_put_uint16le(mbp, mode);
-	smb_rq_wend(rqp);
-	smb_rq_bstart(rqp);
-	mb_put_uint8(mbp, SMB_DT_ASCII);
-	mb_put_string(mbp, ident, uc);
-	smb_rq_bend(rqp);
-	error = smb_rq_simple(rqp);
-	if (error)
-		goto out;
-
-	mbp = smb_rq_getreply(rqp);
-	error = md_get_uint8(mbp, &wc);
-	if (error || wc < 1) {
-		error = EBADRPC;
-		goto out;
+	/*
+	 * Will represent this SMB-level open as a new
+	 * open device handle.  Get one, then duplicate
+	 * the driver session and tree bindings.
+	 */
+	new_fd = smb_open_driver();
+	if (new_fd < 0)
+		return (errno);
+	from_fd = ctx->ct_dev_fd;
+	if (ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
+		err = errno;
+		goto errout;
 	}
-	md_get_uint16le(mbp, &fh);
-	*fhp = fh;
-	error = 0;
 
-out:
-	smb_rq_done(rqp);
-	return (error);
-}
+	/*
+	 * Do the SMB-level open with the new dev handle.
+	 */
+	bzero(&ioc, sizeof (ioc));
+	ioc.ioc_setuplen = setuplen;
+	ioc.ioc_prmode = mode;
+	strlcpy(ioc.ioc_title, title, SMBIOC_MAX_NAME);
 
-/*
- * Similar to smb_fh_close
- */
-int
-smb_printer_close(struct smb_ctx *ctx, int fh)
-{
-	struct smb_rq *rqp;
-	struct mbdata *mbp;
-	int error;
+	if (ioctl(new_fd, SMBIOC_PRINTJOB, &ioc) == -1) {
+		err = errno;
+		goto errout;
+	}
 
-	error = smb_rq_init(ctx, SMB_COM_CLOSE_PRINT_FILE, &rqp);
-	if (error)
-		return (error);
-	mbp = smb_rq_getrequest(rqp);
-	smb_rq_wstart(rqp);
-	mb_put_uint16le(mbp, (uint16_t)fh);
-	smb_rq_wend(rqp);
-	mb_put_uint16le(mbp, 0);	/* byte count */
+	return (new_fd);
 
-	error = smb_rq_simple(rqp);
-	smb_rq_done(rqp);
-
-	return (error);
+errout:
+	close(new_fd);
+	errno = err;
+	return (-1);
 }

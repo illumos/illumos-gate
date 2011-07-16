@@ -238,7 +238,6 @@ static void		drmach_mem_dispose(drmachid_t);
 static sbd_error_t	*drmach_mem_release(drmachid_t);
 static sbd_error_t	*drmach_mem_status(drmachid_t, drmach_status_t *);
 
-
 /* options for the second argument in drmach_add_remove_cpu() */
 #define	HOTADD_CPU	1
 #define	HOTREMOVE_CPU	2

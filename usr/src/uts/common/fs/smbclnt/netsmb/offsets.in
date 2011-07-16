@@ -20,6 +20,7 @@
 \
 
 \
+\ Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 \ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
@@ -57,11 +58,10 @@ smbioc_ossn
 	ssn_srvname
 
 smbioc_oshare
-	sh_pwlen
+	sh_use
+	sh_type
 	sh_name
 	sh_pass
-	sh_type_req
-	sh_type_ret
 
 smbioc_tcon
 	tc_flags
@@ -114,7 +114,7 @@ smbioc_rq	SIZEOF_SMBIOC_RQ
 smbioc_t2rq	SIZEOF_SMBIOC_T2RQ
 	ioc_setup
 	ioc_setupcnt
-	ioc_name
+	ioc_name	IOC_T2_NAME
 	ioc_tparamcnt
 	ioc_tdatacnt
 	ioc_rparamcnt
@@ -138,6 +138,19 @@ smbioc_rw	SIZEOF_SMBIOC_RW
 	ioc_cnt
 	_ioc_offset
 	_ioc_base
+
+smbioc_ntcreate	SIZEOF_NTCREATE
+	ioc_req_acc
+	ioc_efattr
+	ioc_share_acc
+	ioc_open_disp
+	ioc_creat_opts
+	ioc_name	IOC_NTCR_NAME
+
+smbioc_printjob		SIZEOF_PRINTJOB
+	ioc_setuplen
+	ioc_prmode
+	ioc_title
 
 smbioc_pk	SIZEOF_SMBIOC_PK
 	pk_uid

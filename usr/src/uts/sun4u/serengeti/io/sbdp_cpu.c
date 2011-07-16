@@ -98,7 +98,6 @@ extern caddr_t	sbdp_shutdown_va;
 static int	sbdp_prom_get_cpu(void *arg, int changed);
 static void	sbdp_cpu_shutdown_self(void);
 
-
 int
 sbdp_disconnect_cpu(sbdp_handle_t *hp, dev_info_t *dip, processorid_t cpuid)
 {

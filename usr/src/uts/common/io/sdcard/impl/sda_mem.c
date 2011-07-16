@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -141,6 +142,9 @@ sda_mem_bd_read(void *arg, bd_xfer_t *xfer)
 	uint8_t		cmd;
 	uint16_t	flags;
 
+	if (xfer->x_flags & BD_XFER_POLL) {
+		return (EIO);
+	}
 	if (xfer->x_nblks > 1) {
 		cmd = CMD_READ_MULTI;
 		flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_READ |
@@ -160,6 +164,9 @@ sda_mem_bd_write(void *arg, bd_xfer_t *xfer)
 	uint8_t		cmd;
 	uint16_t	flags;
 
+	if (xfer->x_flags & BD_XFER_POLL) {
+		return (EIO);
+	}
 	if ((slot->s_flags & SLOTF_WRITABLE) == 0) {
 		return (EROFS);
 	}

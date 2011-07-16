@@ -1,5 +1,5 @@
 /*
- * Copyright 2010, Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011, Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994 Powerdog Industries.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -339,8 +339,15 @@ label:
 					ptr++;
 			break;
 
-		case 'd':
 		case 'e':
+			/*
+			 * The %e format has a space before single digits
+			 * which we need to skip.
+			 */
+			if (isspace(*buf))
+				buf++;
+			/* FALLTHROUGH */
+		case 'd':
 			/*
 			 * The %e specifier is explicitly documented as not
 			 * being zero-padded but there is no harm in allowing

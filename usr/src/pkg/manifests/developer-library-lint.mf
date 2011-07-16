@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -50,7 +51,6 @@ file path=lib/$(ARCH64)/llib-lc_db.ln
 file path=lib/$(ARCH64)/llib-lcontract.ln
 file path=lib/$(ARCH64)/llib-lcryptoutil.ln
 file path=lib/$(ARCH64)/llib-lctf.ln
-file path=lib/$(ARCH64)/llib-lcurses
 file path=lib/$(ARCH64)/llib-lcurses.ln
 file path=lib/$(ARCH64)/llib-ldevice.ln
 file path=lib/$(ARCH64)/llib-ldevid.ln
@@ -84,6 +84,7 @@ file path=lib/$(ARCH64)/llib-lsecdb.ln
 file path=lib/$(ARCH64)/llib-lsendfile.ln
 file path=lib/$(ARCH64)/llib-lsocket.ln
 file path=lib/$(ARCH64)/llib-lsysevent.ln
+file path=lib/$(ARCH64)/llib-ltermcap.ln
 file path=lib/$(ARCH64)/llib-lthread.ln
 file path=lib/$(ARCH64)/llib-ltsnet.ln
 file path=lib/$(ARCH64)/llib-ltsol.ln
@@ -175,6 +176,8 @@ file path=lib/llib-lsocket
 file path=lib/llib-lsocket.ln
 file path=lib/llib-lsysevent
 file path=lib/llib-lsysevent.ln
+file path=lib/llib-ltermcap
+file path=lib/llib-ltermcap.ln
 file path=lib/llib-lthread
 file path=lib/llib-lthread.ln
 file path=lib/llib-ltsnet
@@ -337,14 +340,9 @@ legacy pkg=SUNWarcr desc="lint libraries for software development" \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=lib/$(ARCH64)/llib-lposix4.ln target=./llib-lrt.ln
-link path=lib/$(ARCH64)/llib-ltermcap target=./llib-lcurses
-link path=lib/$(ARCH64)/llib-ltermcap.ln target=./llib-lcurses.ln
-link path=lib/$(ARCH64)/llib-ltermlib target=./llib-lcurses
 link path=lib/$(ARCH64)/llib-ltermlib.ln target=./llib-lcurses.ln
 link path=lib/llib-lposix4 target=./llib-lrt
 link path=lib/llib-lposix4.ln target=./llib-lrt.ln
-link path=lib/llib-ltermcap target=./llib-lcurses
-link path=lib/llib-ltermcap.ln target=./llib-lcurses.ln
 link path=lib/llib-ltermlib target=./llib-lcurses
 link path=lib/llib-ltermlib.ln target=./llib-lcurses.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-lcurses.ln \
@@ -360,7 +358,7 @@ link path=usr/ccs/lib/$(ARCH64)/llib-lmenu.ln \
 link path=usr/ccs/lib/$(ARCH64)/llib-lpanel.ln \
     target=../../../lib/$(ARCH64)/llib-lpanel.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-ltermcap.ln \
-    target=../../../../lib/$(ARCH64)/llib-lcurses.ln
+    target=../../../../lib/$(ARCH64)/llib-ltermcap.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-ltermlib.ln \
     target=../../../../lib/$(ARCH64)/llib-lcurses.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-ly.ln \
@@ -387,8 +385,8 @@ link path=usr/ccs/lib/llib-lmenu target=../../lib/llib-lmenu
 link path=usr/ccs/lib/llib-lmenu.ln target=../../lib/llib-lmenu.ln
 link path=usr/ccs/lib/llib-lpanel target=../../lib/llib-lpanel
 link path=usr/ccs/lib/llib-lpanel.ln target=../../lib/llib-lpanel.ln
-link path=usr/ccs/lib/llib-ltermcap target=../../../lib/llib-lcurses
-link path=usr/ccs/lib/llib-ltermcap.ln target=../../../lib/llib-lcurses.ln
+link path=usr/ccs/lib/llib-ltermcap target=../../../lib/llib-ltermcap
+link path=usr/ccs/lib/llib-ltermcap.ln target=../../../lib/llib-ltermcap.ln
 link path=usr/ccs/lib/llib-ltermlib target=../../../lib/llib-lcurses
 link path=usr/ccs/lib/llib-ltermlib.ln target=../../../lib/llib-lcurses.ln
 link path=usr/ccs/lib/values-Xa.o target=../../lib/values-Xa.o
@@ -409,8 +407,6 @@ link path=usr/lib/$(ARCH64)/llib-lcontract.ln \
     target=../../../lib/$(ARCH64)/llib-lcontract.ln
 link path=usr/lib/$(ARCH64)/llib-lctf.ln \
     target=../../../lib/$(ARCH64)/llib-lctf.ln
-link path=usr/lib/$(ARCH64)/llib-lcurses \
-    target=../../../lib/$(ARCH64)/llib-lcurses
 link path=usr/lib/$(ARCH64)/llib-lcurses.ln \
     target=../../../lib/$(ARCH64)/llib-lcurses.ln
 link path=usr/lib/$(ARCH64)/llib-ldevice.ln \
@@ -467,12 +463,8 @@ link path=usr/lib/$(ARCH64)/llib-lsocket.ln \
     target=../../../lib/$(ARCH64)/llib-lsocket.ln
 link path=usr/lib/$(ARCH64)/llib-lsysevent.ln \
     target=../../../lib/$(ARCH64)/llib-lsysevent.ln
-link path=usr/lib/$(ARCH64)/llib-ltermcap \
-    target=../../../lib/$(ARCH64)/llib-lcurses
 link path=usr/lib/$(ARCH64)/llib-ltermcap.ln \
-    target=../../../lib/$(ARCH64)/llib-lcurses.ln
-link path=usr/lib/$(ARCH64)/llib-ltermlib \
-    target=../../../lib/$(ARCH64)/llib-lcurses
+    target=../../../lib/$(ARCH64)/llib-ltermcap.ln
 link path=usr/lib/$(ARCH64)/llib-ltermlib.ln \
     target=../../../lib/$(ARCH64)/llib-lcurses.ln
 link path=usr/lib/$(ARCH64)/llib-lthread.ln \
@@ -557,8 +549,8 @@ link path=usr/lib/llib-lsocket target=../../lib/llib-lsocket
 link path=usr/lib/llib-lsocket.ln target=../../lib/llib-lsocket.ln
 link path=usr/lib/llib-lsysevent target=../../lib/llib-lsysevent
 link path=usr/lib/llib-lsysevent.ln target=../../lib/llib-lsysevent.ln
-link path=usr/lib/llib-ltermcap target=../../lib/llib-lcurses
-link path=usr/lib/llib-ltermcap.ln target=../../lib/llib-lcurses.ln
+link path=usr/lib/llib-ltermcap target=../../lib/llib-ltermcap
+link path=usr/lib/llib-ltermcap.ln target=../../lib/llib-ltermcap.ln
 link path=usr/lib/llib-ltermlib target=../../lib/llib-lcurses
 link path=usr/lib/llib-ltermlib.ln target=../../lib/llib-lcurses.ln
 link path=usr/lib/llib-lthread target=../../lib/llib-lthread

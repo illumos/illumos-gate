@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 
 include ../Makefile.master
@@ -85,6 +86,7 @@ SUBDIRS += \
 	libdtrace		\
 	libdtrace_jni		\
 	libcurses		\
+	libtermcap		\
 	libgen			\
 	libgss			\
 	libpam			\
@@ -387,6 +389,7 @@ HDRSUBDIRS=		\
 	libcpc		\
 	libctf		\
 	libcurses	\
+	libtermcap	\
 	libcryptoutil	\
 	libdevice	\
 	libdevid	\
@@ -621,6 +624,7 @@ libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 libproject:	libpool libproc libsecdb
+libtermcap:	libcurses
 libtsnet:	libnsl libtsol libsecdb
 libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
