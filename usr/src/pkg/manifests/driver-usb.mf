@@ -52,7 +52,7 @@ dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
 dir path=sbin group=sys
 dir path=usr group=sys
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man7m
 dir path=usr/share/man/man9f

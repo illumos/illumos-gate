@@ -44,7 +44,7 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/dat group=sys
 driver name=daplt perms="* 0644 root sys"
 file path=etc/init.d/dodatadm.udaplt group=sys mode=0744 \

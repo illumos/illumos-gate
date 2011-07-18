@@ -229,8 +229,8 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo/plugins
 # Some directories common to both global and non-global zones:
 #
 dir path=usr/sbin variant.opensolaris.zone=__NODEFAULT
-dir path=usr/share group=sys variant.opensolaris.zone=__NODEFAULT
-dir path=usr/share/lib group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share/lib variant.opensolaris.zone=__NODEFAULT
 dir path=usr/share/lib/xml group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=usr/share/lib/xml/dtd group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=usr/share/man/man1m

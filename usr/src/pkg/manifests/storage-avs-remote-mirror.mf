@@ -119,4 +119,3 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/cluster/lib/dscfg/start/10rdc target=../../../sbin/rdc
 link path=usr/cluster/lib/dscfg/stop/15rdc target=../../../sbin/rdc
-depend fmri=driver/storage/sv type=require

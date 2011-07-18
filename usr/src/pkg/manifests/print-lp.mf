@@ -54,8 +54,8 @@ dir path=usr/lib/lp/local group=lp
 dir path=usr/lib/lp/model group=lp
 dir path=usr/lib/print group=lp
 dir path=usr/sbin
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/terminfo
 dir path=usr/share/lib/terminfo/4
 dir path=usr/share/lib/terminfo/5

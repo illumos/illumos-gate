@@ -41,8 +41,8 @@ dir path=usr/include
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/inet
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/java group=sys
 dir path=usr/share/lib/java/javadoc group=other
 dir path=usr/share/lib/java/javadoc/dnssd group=other
