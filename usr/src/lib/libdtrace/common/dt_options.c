@@ -1030,9 +1030,39 @@ dtrace_setopt(dtrace_hdl_t *dtp, const char *opt, const char *val)
 			if (dtp->dt_active)
 				return (dt_set_errno(dtp, EDT_ACTIVE));
 
+			/*
+			 * If our options had been previously ioctl'd down,
+			 * clear dt_optset to indicate that a run-time option
+			 * has since been set.
+			 */
+			dtp->dt_optset = B_FALSE;
+
 			return (op->o_func(dtp, val, op->o_option));
 		}
 	}
 
 	return (dt_set_errno(dtp, EDT_BADOPTNAME));
+}
+
+int
+dtrace_setopts(dtrace_hdl_t *dtp)
+{
+	void *dof;
+	int err;
+
+	if (dtp->dt_optset)
+		return (0);
+
+	if ((dof = dtrace_getopt_dof(dtp)) == NULL)
+		return (-1); /* dt_errno has been set for us */
+
+	err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof);
+	dtrace_dof_destroy(dtp, dof);
+
+	if (err == -1)
+		return (-1);
+
+	dtp->dt_optset = B_TRUE;
+
+	return (0);
 }

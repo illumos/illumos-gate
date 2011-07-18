@@ -170,6 +170,16 @@ dtrace_go(dtrace_hdl_t *dtp)
 		return (dt_set_errno(dtp, EINVAL));
 
 	/*
+	 * In most cases, we will have already ioctl'd down our options DOF
+	 * by this point -- but if a libdtrace does a dtrace_setopt() after
+	 * calling dtrace_program_exec() but before calling dtrace_go(),
+	 * dt_optset will be cleared and we need to ioctl down the options
+	 * DOF now.
+	 */
+	if (dtrace_setopts(dtp) != 0)
+		return (-1);
+
+	/*
 	 * If a dtrace:::ERROR program and callback are registered, enable the
 	 * program before we start tracing.  If this fails for a vector open
 	 * with ENOTTY, we permit dtrace_go() to succeed so that vector clients
