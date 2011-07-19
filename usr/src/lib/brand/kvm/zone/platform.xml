@@ -41,6 +41,8 @@
 	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="/usr" directory="/usr"
 	    opt="ro,nodevices" type="lofs" />
+	<global_mount special="/smartdc" directory="/smartdc"
+	    opt="ro,nodevices" type="lofs" />
 
 	<!-- Local filesystems to mount when booting the zone -->
 	<mount special="/proc" directory="/proc" type="proc" />
@@ -62,6 +64,7 @@
 	<device match="fd" />
 	<device match="ipnet" />
 	<device match="kstat" />
+	<device match="kvm" />
 	<device match="lo0" />
 	<device match="lofictl" />
 	<device match="lofi" />

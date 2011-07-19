@@ -34,6 +34,9 @@ ZONENAME=""
 ZONEPATH=""
 # Default to 10GB diskset quota
 ZQUOTA=10
+ZVOL_NAME=`/usr/bin/uuid -v 4`
+
+# The install requires a template zone.
 
 while getopts "R:t:U:q:z:" opt
 do
@@ -50,9 +53,20 @@ do
 done
 shift OPTIND-1
 
+ZROOT=$ZONEPATH/root
+mkdir -p ${ZROOT}
+mkdir -p ${ZONEPATH}/config
+chmod 755 ${ZROOT} ${ZONEPATH}/config
+
 if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
 	print -u2 "Brand error: No zone path or name"
 	exit $ZONE_SUBPROC_USAGE
 fi
+
+# The dataset quota must be a number.
+case $ZQUOTA in *[!0-9]*)
+	print -u2 "Brand error: The quota $ZQUOTA is not a number"
+	exit $ZONE_SUBPROC_USAGE;;
+esac
 
 exit $ZONE_SUBPROC_OK
