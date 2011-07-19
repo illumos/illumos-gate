@@ -488,7 +488,7 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 	 * get past the end of the container dataset plus the trailing "/"
 	 */
 	str = str + (strlen(be_container_ds) + 1);
-	if (be_defaults.be_deflt_bename_starts_with != '\0') {
+	if (be_defaults.be_deflt_rpool_container) {
 		/* just skip if invalid */
 		if (!be_valid_be_name(str))
 			return (BE_SUCCESS);
