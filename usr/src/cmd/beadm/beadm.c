@@ -58,9 +58,7 @@
 
 static int be_do_activate(int argc, char **argv);
 static int be_do_create(int argc, char **argv);
-static int be_do_create_snapshot(int argc, char **argv);
 static int be_do_destroy(int argc, char **argv);
-static int be_do_destroy_snapshot(int argc, char **argv);
 static int be_do_list(int argc, char **argv);
 static int be_do_mount(int argc, char **argv);
 static int be_do_unmount(int argc, char **argv);
@@ -108,9 +106,7 @@ typedef struct be_command {
 static const be_command_t be_command_tbl[] = {
 	{ "activate",		be_do_activate },
 	{ "create",		be_do_create },
-	{ "create_snap",	be_do_create_snapshot },
 	{ "destroy",		be_do_destroy },
-	{ "destroy_snap",	be_do_destroy_snapshot },
 	{ "list",		be_do_list },
 	{ "mount",		be_do_mount },
 	{ "unmount",		be_do_unmount },
@@ -136,10 +132,8 @@ usage(void)
 	    "\t\t[-e nonActiveBe | beName@snapshot] beName\n"
 	    "\tbeadm create [-d BE_desc]\n"
 	    "\t\t[-o property=value] ... [-p zpool] beName@snapshot\n"
-	    "\tbeadm create_snap [-p policy] beName [snapshot]\n"
 	    "\tbeadm destroy [-Ffs] beName \n"
 	    "\tbeadm destroy [-F] beName@snapshot \n"
-	    "\tbeadm destroy_snap beName snapshot\n"
 	    "\tbeadm list [[-a] | [-d] [-s]] [-H] [beName]\n"
 	    "\tbeadm mount [-s ro|rw] beName [mountpoint]\n"
 	    "\tbeadm unmount [-f] beName\n"
@@ -946,107 +940,6 @@ out2:
 }
 
 static int
-be_do_create_snapshot(int argc, char **argv)
-{
-	nvlist_t	*be_attrs;
-	int		err = 1;
-	int		c;
-	char		*obe_name = NULL;
-	char		*snap_name = NULL;
-	char		*policy = NULL;
-
-	while ((c = getopt(argc, argv, "p:")) != -1) {
-		switch (c) {
-		case 'p':
-			policy = optarg;
-			break;
-		default:
-			usage();
-			return (1);
-		}
-	}
-
-	argc -= optind;
-	argv += optind;
-
-	if (argc < 1 || argc > 2) {
-		usage();
-		return (1);
-	}
-
-	obe_name = argv[0];
-
-	if (argc > 1) {
-		/* Snapshot name provided */
-		snap_name = argv[1];
-	}
-
-	if (be_nvl_alloc(&be_attrs) != 0)
-		return (1);
-
-
-	if (be_nvl_add_string(be_attrs, BE_ATTR_ORIG_BE_NAME, obe_name) != 0)
-		goto out;
-
-	if (policy != NULL && be_nvl_add_string(be_attrs,
-	    BE_ATTR_POLICY, policy) != 0)
-		goto out;
-
-	if (snap_name != NULL && be_nvl_add_string(be_attrs,
-	    BE_ATTR_SNAP_NAME, snap_name) != 0)
-		goto out;
-
-	err = be_create_snapshot(be_attrs);
-
-	switch (err) {
-	case BE_SUCCESS:
-		if (!snap_name) {
-			/*
-			 * We requested an auto named snapshot; find out
-			 * the snapshot name that was created for us.
-			 */
-			if (nvlist_lookup_string(be_attrs, BE_ATTR_SNAP_NAME,
-			    &snap_name) != 0) {
-				(void) fprintf(stderr, _("failed to get %s "
-				    "attribute\n"), BE_ATTR_SNAP_NAME);
-				err = 1;
-				break;
-			}
-
-			(void) printf(_("Auto named snapshot: %s\n"),
-			    snap_name);
-		}
-		(void) printf(_("Created successfully\n"));
-		break;
-	case BE_ERR_BE_NOENT:
-		(void) fprintf(stderr, _("%s does not exist or appear "
-		    "to be a valid BE.\nPlease check that the name of "
-		    "the BE provided is correct.\n"), obe_name);
-		break;
-	case BE_ERR_SS_EXISTS:
-		(void) fprintf(stderr, _("BE %s snapshot %s already exists.\n"
-		    "Please choose a different snapshot name.\n"), obe_name,
-		    snap_name);
-		break;
-	case BE_ERR_PERM:
-	case BE_ERR_ACCESS:
-		(void) fprintf(stderr, _("Unable to create snapshot %s.\n"),
-		    snap_name);
-		(void) fprintf(stderr, _("You have insufficient privileges to "
-		    "execute this command.\n"));
-		break;
-	default:
-		(void) fprintf(stderr, _("Unable to create snapshot %s.\n"),
-		    snap_name);
-		(void) fprintf(stderr, "%s\n", be_err_to_str(err));
-	}
-
-out:
-	nvlist_free(be_attrs);
-	return (err);
-}
-
-static int
 be_do_destroy(int argc, char **argv)
 {
 	nvlist_t	*be_attrs;
@@ -1155,100 +1048,6 @@ be_do_destroy(int argc, char **argv)
 		break;
 	default:
 		(void) fprintf(stderr, _("Unable to destroy %s.\n"), be_name);
-		(void) fprintf(stderr, "%s\n", be_err_to_str(err));
-	}
-
-out:
-	nvlist_free(be_attrs);
-	return (err);
-}
-
-static int
-be_do_destroy_snapshot(int argc, char **argv)
-{
-	nvlist_t	*be_attrs;
-	boolean_t	suppress_prompt = B_FALSE;
-	int		err = 1;
-	char		c;
-	char		*obe_name;
-	char		*snap_name;
-	char		*sn;
-	int		sz;
-
-	while ((c = getopt(argc, argv, "F")) != -1) {
-		switch (c) {
-		case 'F':
-			suppress_prompt = B_TRUE;
-			break;
-		default:
-			usage();
-			return (1);
-		}
-	}
-
-	argc -= optind;
-	argv += optind;
-
-	if (argc != 2) {
-		usage();
-		return (1);
-	}
-
-	obe_name = argv[0];
-	snap_name = argv[1];
-
-	sz = asprintf(&sn, "%s@%s", obe_name, snap_name);
-	if (sz < 0) {
-		(void) fprintf(stderr, _("internal error: "
-		    "out of memory\n"));
-		return (1);
-	}
-
-	if (!suppress_prompt && !confirm_destroy(sn)) {
-		(void) printf(_("%s has not been destroyed.\n"), sn);
-		free(sn);
-		return (0);
-	}
-
-	free(sn);
-
-
-	if (be_nvl_alloc(&be_attrs) != 0)
-		return (1);
-
-
-	if (be_nvl_add_string(be_attrs, BE_ATTR_ORIG_BE_NAME, obe_name) != 0)
-		goto out;
-
-	if (be_nvl_add_string(be_attrs, BE_ATTR_SNAP_NAME, snap_name) != 0)
-		goto out;
-
-	err = be_destroy_snapshot(be_attrs);
-
-	switch (err) {
-	case BE_SUCCESS:
-		(void) printf(_("Destroyed successfully\n"));
-		break;
-	case BE_ERR_BE_NOENT:
-		(void) fprintf(stderr, _("%s does not exist or appear "
-		    "to be a valid BE.\nPlease check that the name of "
-		    "the BE provided is correct.\n"), obe_name);
-		break;
-	case BE_ERR_SS_NOENT:
-		(void) fprintf(stderr, _("%s does not exist or appear "
-		    "to be a valid snapshot.\nPlease check that the name of "
-		    "the snapshot provided is correct.\n"), snap_name);
-		break;
-	case BE_ERR_PERM:
-	case BE_ERR_ACCESS:
-		(void) fprintf(stderr, _("Unable to destroy snapshot %s.\n"),
-		    snap_name);
-		(void) fprintf(stderr, _("You have insufficient privileges to "
-		    "execute this command.\n"));
-		break;
-	default:
-		(void) fprintf(stderr, _("Unable to destroy snapshot %s.\n"),
-		    snap_name);
 		(void) fprintf(stderr, "%s\n", be_err_to_str(err));
 	}
 
