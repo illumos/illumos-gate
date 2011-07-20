@@ -53,10 +53,11 @@ do
 done
 shift OPTIND-1
 
-ZROOT=$ZONEPATH/root
+ZROOT=${ZONEPATH}/root
 mkdir -p ${ZROOT}
+mkdir -p ${ZROOT}/var/vms
 mkdir -p ${ZONEPATH}/config
-chmod 755 ${ZROOT} ${ZONEPATH}/config
+chmod 755 ${ZROOT} ${ZROOT}/var/vms ${ZONEPATH}/config
 
 if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
 	print -u2 "Brand error: No zone path or name"
