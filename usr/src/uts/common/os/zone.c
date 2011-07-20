@@ -5909,6 +5909,10 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	case ZONE_ATTR_INITNAME:
 		err = zone_set_initname(zone, (const char *)buf);
 		break;
+	case ZONE_ATTR_INITNORESTART:
+		zone->zone_restart_init = B_FALSE;
+		err = 0;
+		break;
 	case ZONE_ATTR_BOOTARGS:
 		err = zone_set_bootargs(zone, (const char *)buf);
 		break;

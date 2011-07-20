@@ -103,6 +103,7 @@ extern "C" {
 #define	ZONE_ATTR_NETWORK	17
 #define	ZONE_ATTR_DID		18
 #define	ZONE_ATTR_PMCAP_PAGEOUT	19
+#define	ZONE_ATTR_INITNORESTART	20
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768

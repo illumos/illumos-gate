@@ -915,6 +915,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
 	int err;
+	boolean_t restart_init;
 
 	if (brand_prestatechg(zlogp, zstate, Z_BOOT, debug) != 0)
 		return (-1);
@@ -970,6 +971,9 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 		brand_close(bh);
 		goto bad;
 	}
+
+	/* See if this zone's brand should restart init if it dies. */
+	restart_init = brand_restartinit(bh);
 
 	brand_close(bh);
 
@@ -1034,6 +1038,12 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 
 	if (zone_setattr(zoneid, ZONE_ATTR_BOOTARGS, nbootargs, 0) == -1) {
 		zerror(zlogp, B_TRUE, "could not set zone boot arguments");
+		goto bad;
+	}
+
+	if (!restart_init && zone_setattr(zoneid, ZONE_ATTR_INITNORESTART,
+	    NULL, 0) == -1) {
+		zerror(zlogp, B_TRUE, "could not set zone init-no-restart");
 		goto bad;
 	}
 

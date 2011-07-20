@@ -33,6 +33,7 @@
 	<modname></modname>
 
 	<initname>/startvm</initname>
+	<restartinit>false</restartinit>
 	<login_cmd>/usr/bin/login -z %Z %u</login_cmd>
 	<forcedlogin_cmd>/usr/bin/login -z %Z -f %u</forcedlogin_cmd>
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
