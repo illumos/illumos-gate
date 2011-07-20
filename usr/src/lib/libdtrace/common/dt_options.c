@@ -1056,7 +1056,9 @@ dtrace_setopts(dtrace_hdl_t *dtp)
 	if ((dof = dtrace_getopt_dof(dtp)) == NULL)
 		return (-1); /* dt_errno has been set for us */
 
-	err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof);
+	if ((err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof)) == -1)
+		(void) dt_set_errno(dtp, errno);
+
 	dtrace_dof_destroy(dtp, dof);
 
 	if (err == -1)

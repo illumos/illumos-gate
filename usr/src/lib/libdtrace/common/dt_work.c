@@ -176,8 +176,10 @@ dtrace_go(dtrace_hdl_t *dtp)
 	 * dt_optset will be cleared and we need to ioctl down the options
 	 * DOF now.
 	 */
-	if (dtrace_setopts(dtp) != 0)
+	if (dtrace_setopts(dtp) != 0 &&
+	    (dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL)) {
 		return (-1);
+	}
 
 	/*
 	 * If a dtrace:::ERROR program and callback are registered, enable the
@@ -187,8 +189,8 @@ dtrace_go(dtrace_hdl_t *dtp)
 	 * though they do not provide support for the DTRACEIOC_ENABLE ioctl.
 	 */
 	if (dtp->dt_errprog != NULL &&
-	    dtrace_program_exec(dtp, dtp->dt_errprog, NULL) == -1 && (
-	    dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL))
+	    dtrace_program_exec(dtp, dtp->dt_errprog, NULL) == -1 &&
+	    (dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL))
 		return (-1); /* dt_errno has been set for us */
 
 	if (dt_ioctl(dtp, DTRACEIOC_GO, &dtp->dt_beganon) == -1) {
