@@ -109,7 +109,7 @@ typedef struct __va_list_element {
 
 #endif	/* processor */
 
-#elif (defined(__GNUC__) && ((__GNUC__ == 2 && __GNUC_MINOR >= 96) || \
+#elif (defined(__GNUC__) && ((__GNUC__ == 2 && __GNUC_MINOR__ >= 96) || \
 	(__GNUC__ >= 3))) && !defined(__lint)	/* ---------------- protocol */
 
 #define	__GNUC_VA_LIST

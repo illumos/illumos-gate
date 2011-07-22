@@ -145,9 +145,9 @@ char *__builtin_va_arg_incr();
 #define	__va_copy(to, from)	__va_void(((to) = (from)))
 #define	__va_end(list)		__va_void(0)
 
-#elif defined(__GNUC__)	&& ((__GNUC__ == 2 && __GNUC_MINOR >= 96) || \
+#elif defined(__GNUC__)	&& ((__GNUC__ == 2 && __GNUC_MINOR__ >= 96) || \
 	(__GNUC__ >= 3))		/* ------------------------ protocol */
-#if (__GNUC__ < 3) || ((__GNUC__ == 3) && (__GNUC_MINOR < 3))
+#if (__GNUC__ < 3) || ((__GNUC__ == 3) && (__GNUC_MINOR__ < 3))
 #define	__va_start(list, name)	__builtin_stdarg_start(list, name)
 #else
 #define	__va_start(list, name)	__builtin_va_start(list, name)
