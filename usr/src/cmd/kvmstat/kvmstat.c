@@ -229,7 +229,21 @@ kstat_instances_read(kstat_ctl_t *kcp, kstat_instance_t *instances,
 	for (ksi = instances; ksi != NULL; ksi = ksi->ksi_next) {
 		kstat_t *ksp = ksi->ksi_ksp;
 
+		if (ksp == NULL)
+			continue;
+
 		if (kstat_read(kcp, ksp, NULL) == -1) {
+			if (errno == ENXIO) {
+				/*
+				 * Our kstat has been removed since the update;
+				 * NULL it out to prevent us from trying to read
+				 * it again (and to indicate that it should not
+				 * be displayed) and drive on.
+				 */
+				ksi->ksi_ksp = NULL;
+				continue;
+			}
+
 			fatal("failed to read kstat %s:%d",
 			    ksi->ksi_name, ksi->ksi_instance);
 		}
@@ -300,7 +314,7 @@ kstat_instances_print(kstat_instance_t *instances, kstat_field_t *fields,
 	}
 
 	for (ksi = instances; ksi != NULL; ksi = ksi->ksi_next) {
-		if (ksi->ksi_snaptime[1] == 0)
+		if (ksi->ksi_snaptime[1] == 0 || ksi->ksi_ksp == NULL)
 			continue;
 
 		for (i = 0; i < nfields; i++) {
