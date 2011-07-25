@@ -195,10 +195,14 @@ struct zone_fstab {
 	char		zone_fs_raw[MAXPATHLEN];	/* device to fsck */
 };
 
-struct zone_nwif_attrtab {
-	char	zone_nwif_attr_name[MAXNAMELEN];
-	char	zone_nwif_attr_value[MAXNAMELEN];
-	struct zone_nwif_attrtab *zone_nwif_attr_next;
+/*
+ * Generic resource attribute list.
+ * Key/value resource that can be attached to net or device.
+ */
+struct zone_res_attrtab {
+	char	zone_res_attr_name[MAXNAMELEN];
+	char	zone_res_attr_value[MAXNAMELEN];
+	struct zone_res_attrtab *zone_res_attr_next;
 };
 
 struct zone_nwiftab {
@@ -209,11 +213,12 @@ struct zone_nwiftab {
 	char	zone_nwif_vlan_id[ZONE_INT32SZ];	/* excl-ip only */
 	char	zone_nwif_gnic[LIFNAMSIZ];		/* excl-ip only */
 	char	zone_nwif_defrouter[INET6_ADDRSTRLEN];
-	struct zone_nwif_attrtab *zone_nwif_attrp;
+	struct zone_res_attrtab *zone_nwif_attrp;
 };
 
 struct zone_devtab {
 	char	zone_dev_match[MAXPATHLEN];
+	struct zone_res_attrtab *zone_dev_attrp;
 };
 
 struct zone_rctlvaltab {
@@ -351,18 +356,22 @@ extern	int 	zonecfg_find_mounts(char *, int(*)(const struct mnttab *,
     void *), void *);
 
 /*
+ * Resource key/value attributes (properties).
+ */
+extern	int	zonecfg_add_res_attr(struct zone_res_attrtab **,
+    struct zone_res_attrtab *);
+extern	void	zonecfg_free_res_attr_list(struct zone_res_attrtab *);
+extern	int	zonecfg_remove_res_attr(struct zone_res_attrtab **,
+    struct zone_res_attrtab *);
+
+/*
  * Network interface configuration.
  */
 extern	int	zonecfg_add_nwif(zone_dochandle_t, struct zone_nwiftab *);
-extern	int	zonecfg_add_nwif_attr(struct zone_nwiftab *,
-    struct zone_nwif_attrtab *);
 extern	int	zonecfg_delete_nwif(zone_dochandle_t, struct zone_nwiftab *);
-extern	void	zonecfg_free_nwif_attr_list(struct zone_nwif_attrtab *);
 extern	int	zonecfg_modify_nwif(zone_dochandle_t, struct zone_nwiftab *,
     struct zone_nwiftab *);
 extern	int	zonecfg_lookup_nwif(zone_dochandle_t, struct zone_nwiftab *);
-extern	int	zonecfg_remove_nwif_attr(struct zone_nwiftab *,
-    struct zone_nwif_attrtab *);
 
 /*
  * Hostid emulation configuration.

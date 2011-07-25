@@ -1768,15 +1768,6 @@ zonecfg_free_rctl_value_list(struct zone_rctlvaltab *valtab)
 	free(valtab);
 }
 
-void
-zonecfg_free_nwif_attr_list(struct zone_nwif_attrtab *valtab)
-{
-	if (valtab == NULL)
-		return;
-	zonecfg_free_nwif_attr_list(valtab->zone_nwif_attr_next);
-	free(valtab);
-}
-
 static boolean_t
 match_prop(xmlNodePtr cur, const xmlChar *attr, char *user_prop)
 {
@@ -2243,26 +2234,27 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 
 	tabptr->zone_nwif_attrp = NULL;
 	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
-		struct zone_nwif_attrtab *valptr;
+		struct zone_res_attrtab *valptr;
 
-		valptr = (struct zone_nwif_attrtab *)malloc(
-		    sizeof (struct zone_nwif_attrtab));
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
 		if (valptr == NULL)
 			return (Z_NOMEM);
 
-		valptr->zone_nwif_attr_name[0] =
-		    valptr->zone_nwif_attr_value[0] = '\0';
-		if (zonecfg_add_nwif_attr(tabptr, valptr) != Z_OK) {
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_nwif_attrp), valptr)
+		    != Z_OK) {
 			free(valptr);
 			break;
 		}
 
-		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_nwif_attr_name,
-		    sizeof (valptr->zone_nwif_attr_name)) != Z_OK))
+		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK))
 			break;
 		if ((fetchprop(val, DTD_ATTR_VALUE,
-		    valptr->zone_nwif_attr_value,
-		    sizeof (valptr->zone_nwif_attr_value)) != Z_OK))
+		    valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK))
 			break;
 	}
 
@@ -2273,7 +2265,7 @@ static int
 zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr newnode, cur = handle->zone_dh_cur, valnode;
-	struct zone_nwif_attrtab *valptr;
+	struct zone_res_attrtab *valptr;
 	int err;
 
 	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_NET, NULL);
@@ -2310,15 +2302,15 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		return (err);
 
 	for (valptr = tabptr->zone_nwif_attrp; valptr != NULL;
-	    valptr = valptr->zone_nwif_attr_next) {
+	    valptr = valptr->zone_res_attr_next) {
 		valnode = xmlNewTextChild(newnode, NULL, DTD_ELEM_NETATTR,
 		    NULL);
 		err = newprop(valnode, DTD_ATTR_NAME,
-		    valptr->zone_nwif_attr_name);
+		    valptr->zone_res_attr_name);
 		if (err != Z_OK)
 			return (err);
 		err = newprop(valnode, DTD_ATTR_VALUE,
-		    valptr->zone_nwif_attr_value);
+		    valptr->zone_res_attr_value);
 		if (err != Z_OK)
 			return (err);
 	}
@@ -2415,41 +2407,50 @@ zonecfg_modify_nwif(
 	return (Z_OK);
 }
 
-int
-zonecfg_add_nwif_attr(struct zone_nwiftab *tabptr,
-    struct zone_nwif_attrtab *valtabptr)
+void
+zonecfg_free_res_attr_list(struct zone_res_attrtab *valtab)
 {
-	struct zone_nwif_attrtab *last, *old, *new;
+	if (valtab == NULL)
+		return;
+	zonecfg_free_res_attr_list(valtab->zone_res_attr_next);
+	free(valtab);
+}
 
-	last = tabptr->zone_nwif_attrp;
-	for (old = last; old != NULL; old = old->zone_nwif_attr_next)
+int
+zonecfg_add_res_attr(struct zone_res_attrtab **headptr,
+    struct zone_res_attrtab *valtabptr)
+{
+	struct zone_res_attrtab *last, *old, *new;
+
+	last = *headptr;
+	for (old = last; old != NULL; old = old->zone_res_attr_next)
 		last = old;	/* walk to the end of the list */
 	new = valtabptr;	/* alloc'd by caller */
-	new->zone_nwif_attr_next = NULL;
+	new->zone_res_attr_next = NULL;
 	if (last == NULL)
-		tabptr->zone_nwif_attrp = new;
+		*headptr = new;
 	else
-		last->zone_nwif_attr_next = new;
+		last->zone_res_attr_next = new;
 	return (Z_OK);
 }
 
 int
-zonecfg_remove_nwif_attr(struct zone_nwiftab *tabptr,
-    struct zone_nwif_attrtab *valtabptr)
+zonecfg_remove_res_attr(struct zone_res_attrtab **headptr,
+    struct zone_res_attrtab *valtabptr)
 {
-	struct zone_nwif_attrtab *last, *this, *next;
+	struct zone_res_attrtab *last, *this, *next;
 
-	last = tabptr->zone_nwif_attrp;
-	for (this = last; this != NULL; this = this->zone_nwif_attr_next) {
-		if (strcmp(this->zone_nwif_attr_name,
-		    valtabptr->zone_nwif_attr_name) == 0 &&
-		    strcmp(this->zone_nwif_attr_value,
-		    valtabptr->zone_nwif_attr_value) == 0) {
-			next = this->zone_nwif_attr_next;
-			if (this == tabptr->zone_nwif_attrp)
-				tabptr->zone_nwif_attrp = next;
+	last = *headptr;
+	for (this = last; this != NULL; this = this->zone_res_attr_next) {
+		if (strcmp(this->zone_res_attr_name,
+		    valtabptr->zone_res_attr_name) == 0 &&
+		    strcmp(this->zone_res_attr_value,
+		    valtabptr->zone_res_attr_value) == 0) {
+			next = this->zone_res_attr_next;
+			if (this == *headptr)
+				*headptr = next;
 			else
-				last->zone_nwif_attr_next = next;
+				last->zone_res_attr_next = next;
 			free(this);
 			return (Z_OK);
 		} else
@@ -2607,7 +2608,7 @@ zonecfg_set_hostid(zone_dochandle_t handle, const char *hostidp)
 int
 zonecfg_lookup_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr cur, firstmatch;
+	xmlNodePtr cur, val, firstmatch;
 	int err;
 	char match[MAXPATHLEN];
 
@@ -2652,13 +2653,40 @@ zonecfg_lookup_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 	    sizeof (tabptr->zone_dev_match))) != Z_OK)
 		return (err);
 
+	tabptr->zone_dev_attrp = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		struct zone_res_attrtab *valptr;
+
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_dev_attrp), valptr)
+		    != Z_OK) {
+			free(valptr);
+			break;
+		}
+
+		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK))
+			break;
+		if ((fetchprop(val, DTD_ATTR_VALUE,
+		    valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK))
+			break;
+	}
+
 	return (Z_OK);
 }
 
 static int
 zonecfg_add_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	xmlNodePtr newnode, cur = handle->zone_dh_cur, valnode;
+	struct zone_res_attrtab *valptr;
 	int err;
 
 	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_DEVICE, NULL);
@@ -2666,6 +2694,21 @@ zonecfg_add_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
 	if ((err = newprop(newnode, DTD_ATTR_MATCH,
 	    tabptr->zone_dev_match)) != Z_OK)
 		return (err);
+
+	for (valptr = tabptr->zone_dev_attrp; valptr != NULL;
+	    valptr = valptr->zone_res_attr_next) {
+		valnode = xmlNewTextChild(newnode, NULL, DTD_ELEM_NETATTR,
+		    NULL);
+		err = newprop(valnode, DTD_ATTR_NAME,
+		    valptr->zone_res_attr_name);
+		if (err != Z_OK)
+			return (err);
+		err = newprop(valnode, DTD_ATTR_VALUE,
+		    valptr->zone_res_attr_value);
+		if (err != Z_OK)
+			return (err);
+	}
+
 
 	return (Z_OK);
 }
@@ -4865,7 +4908,7 @@ int
 zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr cur, val;
-	struct zone_nwif_attrtab *valptr;
+	struct zone_res_attrtab *valptr;
 	int err;
 
 	if (handle == NULL)
@@ -4928,23 +4971,24 @@ zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 
 	tabptr->zone_nwif_attrp = NULL;
 	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
-		valptr = (struct zone_nwif_attrtab *)malloc(
-		    sizeof (struct zone_nwif_attrtab));
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
 		if (valptr == NULL)
 			return (Z_NOMEM);
 
-		valptr->zone_nwif_attr_name[0] =
-		    valptr->zone_nwif_attr_value[0] = '\0';
-		if (zonecfg_add_nwif_attr(tabptr, valptr) != Z_OK) {
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_nwif_attrp), valptr)
+		    != Z_OK) {
 			free(valptr);
 			break;
 		}
 
-		if (fetchprop(val, DTD_ATTR_NAME, valptr->zone_nwif_attr_name,
-		    sizeof (valptr->zone_nwif_attr_name)) != Z_OK)
+		if (fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK)
 			break;
-		if (fetchprop(val, DTD_ATTR_VALUE, valptr->zone_nwif_attr_value,
-		    sizeof (valptr->zone_nwif_attr_value)) != Z_OK)
+		if (fetchprop(val, DTD_ATTR_VALUE, valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK)
 			break;
 	}
 
@@ -4967,7 +5011,7 @@ zonecfg_setdevent(zone_dochandle_t handle)
 int
 zonecfg_getdevent(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr cur;
+	xmlNodePtr cur, val;
 	int err;
 
 	if (handle == NULL)
@@ -4988,6 +5032,31 @@ zonecfg_getdevent(zone_dochandle_t handle, struct zone_devtab *tabptr)
 	    sizeof (tabptr->zone_dev_match))) != Z_OK) {
 		handle->zone_dh_cur = handle->zone_dh_top;
 		return (err);
+	}
+
+	tabptr->zone_dev_attrp = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		struct zone_res_attrtab *valptr;
+
+		valptr = (struct zone_res_attrtab *)malloc(
+		    sizeof (struct zone_res_attrtab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+
+		valptr->zone_res_attr_name[0] =
+		    valptr->zone_res_attr_value[0] = '\0';
+		if (zonecfg_add_res_attr(&(tabptr->zone_dev_attrp), valptr)
+		    != Z_OK) {
+			free(valptr);
+			break;
+		}
+
+		if ((fetchprop(val, DTD_ATTR_NAME, valptr->zone_res_attr_name,
+		    sizeof (valptr->zone_res_attr_name)) != Z_OK))
+			break;
+		if ((fetchprop(val, DTD_ATTR_VALUE, valptr->zone_res_attr_value,
+		    sizeof (valptr->zone_res_attr_value)) != Z_OK))
+			break;
 	}
 
 	handle->zone_dh_cur = cur->next;

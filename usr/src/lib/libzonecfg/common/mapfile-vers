@@ -53,7 +53,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_add_fs_option;
 	zonecfg_add_admin;
 	zonecfg_add_nwif;
-	zonecfg_add_nwif_attr;
+	zonecfg_add_res_attr;
 	zonecfg_add_pkg;
 	zonecfg_add_pset;
 	zonecfg_add_rctl;
@@ -106,7 +106,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_fini_handle;
 	zonecfg_fix_obsolete;
 	zonecfg_free_fs_option_list;
-	zonecfg_free_nwif_attr_list;
+	zonecfg_free_res_attr_list;
 	zonecfg_free_rctl_value_list;
 	zonecfg_get_aliased_rctl;
 	zonecfg_get_attach_handle;
@@ -182,7 +182,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_ping_zoneadmd;
 	zonecfg_release_lock_file;
 	zonecfg_remove_fs_option;
-	zonecfg_remove_nwif_attr;
+	zonecfg_remove_res_attr;
 	zonecfg_remove_rctl_value;
 	zonecfg_remove_userauths;
 	zonecfg_reverse_scratch;

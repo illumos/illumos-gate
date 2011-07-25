@@ -145,6 +145,9 @@ boolean_t bringup_failure_recovery = B_FALSE; /* ignore certain failures */
 
 #define	DEFAULT_LOCALE	"C"
 
+#define	RSRC_NET	"net"
+#define	RSRC_DEV	"device"
+
 static const char *
 z_cmd_name(zone_cmd_t zcmd)
 {
@@ -738,18 +741,23 @@ mount_early_fs(void *data, const char *spec, const char *dir,
  *	_ZONECFG;{resource name};{identifying attr. name};{property name}
  */
 static void
-set_zonecfg_env(char *phys, char *name, char *val)
+set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 {
 	char nm[MAXNAMELEN];
 
-	(void) snprintf(nm, sizeof (nm), "_ZONECFG;net;%s;%s", phys, name);
+	(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s_%s", rsrc, attr, name);
+
+	p = nm;
+	while ((p = strchr(p, '-')) != NULL)
+		*p++ = '_';
 
 	(void) setenv(nm, val, 1);
 }
 
 /*
- * Export zonecfg network settings into environment for the boot and state
- * change hooks.
+ * Export zonecfg network and device properties into environment for the boot
+ * and state change hooks.
+ * If debug is true, export the brand hook debug env. variable as well.
  *
  * We could export more of the config in the future, as necessary.
  */
@@ -759,6 +767,9 @@ setup_subproc_env()
 	int res;
 	zone_dochandle_t handle;
 	struct zone_nwiftab ntab;
+	struct zone_devtab dtab;
+	char net_resources[MAXNAMELEN * 2];
+	char dev_resources[MAXNAMELEN * 2];
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		exit(Z_NOMEM);
@@ -770,29 +781,61 @@ setup_subproc_env()
 		goto done;
 
 	while (zonecfg_getnwifent(handle, &ntab) == Z_OK) {
-		struct zone_nwif_attrtab *np;
+		struct zone_res_attrtab *rap;
 		char *phys;
 
 		phys = ntab.zone_nwif_physical;
 
-		set_zonecfg_env(phys, "physical",
-		    ntab.zone_nwif_physical);
+		(void) strlcat(net_resources, phys, sizeof (net_resources));
+		(void) strlcat(net_resources, " ", sizeof (net_resources));
 
-		set_zonecfg_env(phys, "address", ntab.zone_nwif_address);
-		set_zonecfg_env(phys, "allowed-address",
+		set_zonecfg_env(RSRC_NET, phys, "physical", phys);
+
+		set_zonecfg_env(RSRC_NET, phys, "address",
+		    ntab.zone_nwif_address);
+		set_zonecfg_env(RSRC_NET, phys, "allowed-address",
 		    ntab.zone_nwif_allowed_address);
-		set_zonecfg_env(phys, "defrouter", ntab.zone_nwif_defrouter);
-		set_zonecfg_env(phys, "global-nic", ntab.zone_nwif_gnic);
-		set_zonecfg_env(phys, "mac-addr", ntab.zone_nwif_mac);
-		set_zonecfg_env(phys, "vlan-id", ntab.zone_nwif_vlan_id);
+		set_zonecfg_env(RSRC_NET, phys, "defrouter",
+		    ntab.zone_nwif_defrouter);
+		set_zonecfg_env(RSRC_NET, phys, "global-nic",
+		    ntab.zone_nwif_gnic);
+		set_zonecfg_env(RSRC_NET, phys, "mac-addr", ntab.zone_nwif_mac);
+		set_zonecfg_env(RSRC_NET, phys, "vlan-id",
+		    ntab.zone_nwif_vlan_id);
 
-		for (np = ntab.zone_nwif_attrp; np != NULL;
-		    np = np->zone_nwif_attr_next)
-			set_zonecfg_env(phys, np->zone_nwif_attr_name,
-			    np->zone_nwif_attr_value);
+		for (rap = ntab.zone_nwif_attrp; rap != NULL;
+		    rap = rap->zone_res_attr_next)
+			set_zonecfg_env(RSRC_NET, phys, rap->zone_res_attr_name,
+			    rap->zone_res_attr_value);
 	}
 
 	(void) zonecfg_endnwifent(handle);
+
+	if ((res = zonecfg_setdevent(handle)) != Z_OK)
+		goto done;
+
+	while (zonecfg_getdevent(handle, &dtab) == Z_OK) {
+		struct zone_res_attrtab *rap;
+		char *match;
+
+		match = dtab.zone_dev_match;
+
+		(void) strlcat(dev_resources, match, sizeof (dev_resources));
+		(void) strlcat(dev_resources, " ", sizeof (dev_resources));
+
+		for (rap = dtab.zone_dev_attrp; rap != NULL;
+		    rap = rap->zone_res_attr_next)
+			set_zonecfg_env(RSRC_DEV, match,
+			    rap->zone_res_attr_name, rap->zone_res_attr_value);
+	}
+
+	(void) zonecfg_enddevent(handle);
+
+	if (debug)
+		(void) setenv("_ZONEADMD_brand_debug", "1", 1);
+	else
+		(void) setenv("_ZONEADMD_brand_debug", "", 1);
+
 	res = Z_OK;
 
 done:
