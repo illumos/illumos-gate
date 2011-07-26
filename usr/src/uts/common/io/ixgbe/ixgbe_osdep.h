@@ -66,6 +66,8 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 
 #define	false		B_FALSE
 #define	true		B_TRUE
+#define	FALSE		B_FALSE
+#define	TRUE		B_TRUE
 
 #define	IXGBE_READ_PCIE_WORD 	ixgbe_read_pci_cfg
 #define	IXGBE_WRITE_PCIE_WORD 	ixgbe_write_pci_cfg
@@ -93,15 +95,10 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define	IXGBE_READ_REG_ARRAY(a, reg, index)	\
 	IXGBE_READ_REG(a, ((reg) + ((index) << 2)))
 
-#define	IXGBE_WRITE_REG64(hw, reg, value)	\
-	do {								\
-		IXGBE_WRITE_REG(hw, reg, (u32) value);			\
-		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32));	\
-		_NOTE(CONSTCOND)					\
-	} while (0)
-
 #define	msec_delay_irq	msec_delay
 #define	IXGBE_HTONL	htonl
+#define	IXGBE_NTOHL	ntohl
+#define	IXGBE_NTOHS	ntohs
 
 #define	UNREFERENCED_PARAMETER(x)	_NOTE(ARGUNUSED(x))
 
