@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * This file contains all the routines used when modifying on-disk SPA state.
@@ -610,7 +613,7 @@ static taskq_t *
 spa_taskq_create(spa_t *spa, const char *name, enum zti_modes mode,
     uint_t value)
 {
-	uint_t flags = TASKQ_PREPOPULATE;
+	uint_t flags = 0;
 	boolean_t batch = B_FALSE;
 
 	switch (mode) {
