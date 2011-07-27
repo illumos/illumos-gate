@@ -26,20 +26,19 @@
 #ifndef	_ERR_H
 #define	_ERR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <sys/ccompile.h>
 
 /* Program exit and warning calls */
-void err(int, const char *, ...);
-void verr(int, const char *, va_list);
-void errx(int, const char *, ...);
-void verrx(int, const char *, va_list);
+void err(int, const char *, ...) __NORETURN;
+void verr(int, const char *, va_list) __NORETURN;
+void errx(int, const char *, ...) __NORETURN;
+void verrx(int, const char *, va_list) __NORETURN;
 void warn(const char *, ...);
 void vwarn(const char *, va_list);
 void warnx(const char *, ...);
