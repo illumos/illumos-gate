@@ -4772,32 +4772,35 @@ static void
 ztest_run_zdb(char *pool)
 {
 	int status;
+	char zdbpath[MAXPATHLEN];
 	char zdb[MAXPATHLEN + MAXNAMELEN + 20];
 	char zbuf[1024];
-	char *bin;
-	char *ztest;
-	char *isa;
+	char *bin, *ztest, *isa;
 	int isalen;
 	FILE *fp;
 
-	(void) realpath(getexecname(), zdb);
+	if (getenv("ZDB_PATH") != NULL) {
+		(void) strncpy(zdbpath, getenv("ZDB_PATH"), sizeof (zdbpath));
+	} else {
+		(void) realpath(getexecname(), zdb);
 
-	/* zdb lives in /usr/sbin, while ztest lives in /usr/bin */
-	bin = strstr(zdb, "/usr/bin/");
-	ztest = strstr(bin, "/ztest");
-	isa = bin + 8;
-	isalen = ztest - isa;
-	isa = strdup(isa);
-	/* LINTED */
-	(void) sprintf(bin,
-	    "/usr/sbin%.*s/zdb -bcc%s%s -U %s %s",
-	    isalen,
-	    isa,
+		/* zdb lives in /usr/sbin, while ztest lives in /usr/bin */
+		bin = strstr(zdb, "/usr/bin/");
+		ztest = strstr(bin, "/ztest");
+		isa = bin + 8;
+		isalen = ztest - isa;
+		isa = strdup(isa);
+		/* LINTED */
+		(void) sprintf(zdbpath, "/usr/sbin%.*s/zdb", isalen, isa);
+		free(isa);
+	}
+
+	(void) snprintf(zdb, sizeof (zdb), "%s -bcc%s%s -U %s %s",
+	    zdbpath,
 	    zopt_verbose >= 3 ? "s" : "",
 	    zopt_verbose >= 4 ? "v" : "",
 	    spa_config_path,
 	    pool);
-	free(isa);
 
 	if (zopt_verbose >= 5)
 		(void) printf("Executing %s\n", strstr(zdb, "zdb "));
