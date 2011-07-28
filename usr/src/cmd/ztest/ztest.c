@@ -4786,10 +4786,15 @@ ztest_run_zdb(char *pool)
 
 		/* zdb lives in /usr/sbin, while ztest lives in /usr/bin */
 		bin = strstr(zdb, "/usr/bin/");
-		ztest = strstr(bin, "/ztest");
-		isa = bin + 8;
-		isalen = ztest - isa;
-		isa = strdup(isa);
+		if (bin != NULL) {
+			ztest = strstr(bin, "/ztest");
+			isa = bin + 8;
+			isalen = ztest - isa;
+			isa = strdup(isa);
+		} else {
+			isalen = 0;
+			isa = strdup("");
+		}
 		/* LINTED */
 		(void) sprintf(zdbpath, "/usr/sbin%.*s/zdb", isalen, isa);
 		free(isa);
