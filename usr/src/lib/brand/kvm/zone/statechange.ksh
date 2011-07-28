@@ -191,7 +191,8 @@ setup_net()
 		fi
 
 		# Enable full antispoof
-		spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
+        spoof_opts="mac-nospoof"
+		#spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
 		dladm set-linkprop -t -z $ZONENAME -p \
 		    "protection=${spoof_opts}" ${nic}
 		if (( $? != 0 )); then
