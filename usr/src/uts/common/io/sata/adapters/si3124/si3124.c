@@ -25,7 +25,7 @@
 
 
 /*
- * SiliconImage 3124/3132 sata controller driver
+ * SiliconImage 3124/3132/3531 sata controller driver
  */
 
 /*
@@ -37,10 +37,10 @@
  * I. General notes
  *
  * Even though the driver is named as si3124, it is actually meant to
- * work with both 3124 and 3132 controllers.
+ * work with SiI3124, SiI3132 and SiI3531 controllers.
  *
  * The current file si3124.c is the main driver code. The si3124reg.h
- * holds the register definitions from SiI 3124/3132 data sheets. The
+ * holds the register definitions from SiI 3124/3132/3531 data sheets. The
  * si3124var.h holds the driver specific definitions which are not
  * directly derived from data sheets.
  *
@@ -562,10 +562,25 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		si_ctlp->sictl_devid =
 		    pci_config_get16(si_ctlp->sictl_pci_conf_handle,
 		    PCI_CONF_DEVID);
-		if (si_ctlp->sictl_devid == SI3132_DEV_ID) {
-			si_ctlp->sictl_num_ports = SI3132_MAX_PORTS;
-		} else {
-			si_ctlp->sictl_num_ports = SI3124_MAX_PORTS;
+		switch (si_ctlp->sictl_devid) {
+			case SI3124_DEV_ID:
+				si_ctlp->sictl_num_ports = SI3124_MAX_PORTS;
+				break;
+
+			case SI3132_DEV_ID:
+				si_ctlp->sictl_num_ports = SI3132_MAX_PORTS;
+				break;
+
+			case SI3531_DEV_ID:
+				si_ctlp->sictl_num_ports = SI3531_MAX_PORTS;
+				break;
+
+			default:
+				/*
+				 * Driver should not have attatched if device
+				 * ID is not already known and is supported.
+				 */
+				goto err_out;
 		}
 
 		attach_state |= ATTACH_PROGRESS_CONF_HANDLE;

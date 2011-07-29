@@ -314,6 +314,7 @@ typedef struct si_prb {
 
 #define	SI3124_DEV_ID	0x3124
 #define	SI3132_DEV_ID	0x3132
+#define	SI3531_DEV_ID	0x3531
 
 #define	PM_CSR(devid)	 ((devid == SI3124_DEV_ID) ? 0x68 : 0x58)
 
