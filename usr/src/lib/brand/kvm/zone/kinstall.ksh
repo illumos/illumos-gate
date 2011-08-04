@@ -53,7 +53,19 @@ do
 done
 shift OPTIND-1
 
+if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
+	print -u2 "Brand error: No zone path or name"
+	exit $ZONE_SUBPROC_USAGE
+fi
+
 ZROOT=${ZONEPATH}/root
+dname=${ZONEPATH%/*}
+bname=${ZONEPATH##*/}
+
+zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
+    read mp PDS_NAME
+[ -z "$PDS_NAME" ] && \
+    print -u2 "Brand error: missing parent ZFS dataset for $dname"
 
 if [ ! -d ${ZONEPATH}/config ]; then
     mkdir -p ${ZONEPATH}/config
@@ -70,15 +82,13 @@ if [ ! -d ${ZROOT}/tmp ]; then
     chmod 1777 ${ZROOT}/tmp
 fi
 
-if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
-	print -u2 "Brand error: No zone path or name"
-	exit $ZONE_SUBPROC_USAGE
-fi
 
 # The dataset quota must be a number.
 case $ZQUOTA in *[!0-9]*)
 	print -u2 "Brand error: The quota $ZQUOTA is not a number"
 	exit $ZONE_SUBPROC_USAGE;;
 esac
+
+final_setup
 
 exit $ZONE_SUBPROC_OK

@@ -23,3 +23,22 @@
 # Use is subject to license terms.
 #
 
+final_setup()
+{
+    ZRAM=$(zonecfg -z ${ZONENAME} info attr name=ram | \
+        grep "value: " | cut -d ':' -f2 | tr -d ' ')
+
+    if [[ -z ${ZRAM} ]]; then
+        echo "Unable to find RAM value for VM"
+	exit $ZONE_SUBPROC_FATAL
+    fi
+
+    CORE_QUOTA=$(((${ZRAM} * 2) + 256))
+
+    # Convert quota to MB and use 10% of that value for the zone core dump
+    # dataset.
+    if [ ! -d $ZONEPATH/cores ]; then
+        zfs create -o quota=${CORE_QUOTA}m -o compression=gzip \
+           $PDS_NAME/$bname/cores
+    fi
+}
