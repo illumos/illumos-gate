@@ -26,21 +26,21 @@ for i in upper lower alpha space cntrl graph print punct digit xdigit blank \
 	toupper tolower; do
 	# sed can't match both range patterns on the same line so we just make
 	# it look like valid multiline class by duplicating the definition
-	sed -E "/^$i.*>$/ {
+	sed "/^$i.*>$/ {
 		s,$,;/,
 		h
-		s,^$i(.*>);/$,\1,
+		s,^$i\(.*>\);/$,\1,
 		H
 		x
 	}" $@ |\
-	sed -E -n "/^$i/,/(>|\))$/ {
+	sed -n "/^$i/,/\([>)]\)$/ {
 		s,^$i,,
-		s,(>|\))$,\1;/,
+		"'s,\([>)]\)$,\1;/,'"
 		/^$/d
 		p
 	}" |\
 	sort -u |\
-	sed -E "1 s,^,$i,;$ s,(>|\));/,\1,"
+	sed "1 s,^,$i,;$ s,\([>)]\);/,\1,"
 done
 
 printf "\nEND LC_CTYPE\n"
