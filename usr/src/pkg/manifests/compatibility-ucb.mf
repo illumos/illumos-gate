@@ -69,7 +69,6 @@ file path=usr/share/man/man1b/lprm.1b
 file path=usr/share/man/man1b/lptest.1b
 file path=usr/share/man/man1b/mail.1b
 file path=usr/share/man/man1b/mkstr.1b
-file path=usr/share/man/man1b/plot.1b
 file path=usr/share/man/man1b/printenv.1b
 file path=usr/share/man/man1b/ps.1b
 file path=usr/share/man/man1b/reset.1b

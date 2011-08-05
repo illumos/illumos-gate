@@ -401,7 +401,6 @@ DIRS= \
 	/usr/share/man/man3xcurses \
 	/usr/share/man/man3xnet \
 	/usr/share/man/man4 \
-	/usr/share/man/man4b \
 	/usr/share/man/man5 \
 	/usr/share/man/man7 \
 	/usr/share/man/man7d \

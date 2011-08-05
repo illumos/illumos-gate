@@ -372,7 +372,6 @@ file path=usr/share/man/man1/ul.1
 file path=usr/share/man/man1/vgrind.1
 file path=usr/share/man/man1/whatis.1
 file path=usr/share/man/man1m/catman.1m
-file path=usr/share/man/man4b/plot.4b
 file path=usr/share/man/man5/eqnchar.5
 file path=usr/share/man/man5/man.5
 file path=usr/share/man/man5/mansun.5

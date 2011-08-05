@@ -37,7 +37,6 @@ MANFILES=	basename.1b \
 		lptest.1b	\
 		mail.1b		\
 		mkstr.1b	\
-		plot.1b		\
 		printenv.1b	\
 		ps.1b		\
 		rusage.1b	\
