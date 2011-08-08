@@ -79,6 +79,7 @@
 #include <sys/zvol.h>
 #include <sys/dumphdr.h>
 #include <sys/zil_impl.h>
+#include <sys/sdt.h>
 
 #include "zfs_namecheck.h"
 
@@ -1307,6 +1308,8 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 	rl_t *rl;
 	int error = 0;
 
+	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 0);
+
 	zv = zfsdev_get_soft_state(minor, ZSST_ZVOL);
 	if (zv == NULL)
 		return (ENXIO);
@@ -1340,6 +1343,10 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 		}
 	}
 	zfs_range_unlock(rl);
+
+	DTRACE_PROBE4(zvol__uio__done, dev_t, dev, uio_t *, uio, int, 0, int,
+	    error);
+
 	return (error);
 }
 
@@ -1353,6 +1360,8 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	rl_t *rl;
 	int error = 0;
 	boolean_t sync;
+
+	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 1);
 
 	zv = zfsdev_get_soft_state(minor, ZSST_ZVOL);
 	if (zv == NULL)
@@ -1399,6 +1408,10 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	zfs_range_unlock(rl);
 	if (sync)
 		zil_commit(zv->zv_zilog, ZVOL_OBJ);
+
+	DTRACE_PROBE4(zvol__uio__done, dev_t, dev, uio_t *, uio, int, 1, int,
+	    error);
+
 	return (error);
 }
 
