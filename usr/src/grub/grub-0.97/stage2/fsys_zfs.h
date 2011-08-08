@@ -95,26 +95,7 @@ typedef	unsigned int size_t;
 #define	BSWAP_64(x)	((BSWAP_32(x) << 32) | BSWAP_32((x) >> 32))
 #define	P2ROUNDUP(x, align)	(-(-(x) & -(align)))
 
-/*
- * XXX Match these macro up with real zfs once we have nvlist support so that we
- * can support large sector disks.
- */
-#define	UBERBLOCK_SIZE		(1ULL << UBERBLOCK_SHIFT)
-#undef	offsetof
-#define	offsetof(t, m)   ((int)&(((t *)0)->m))
-#define	VDEV_UBERBLOCK_SHIFT	UBERBLOCK_SHIFT
-#define	VDEV_UBERBLOCK_OFFSET(n) \
-offsetof(vdev_label_t, vl_uberblock[(n) << VDEV_UBERBLOCK_SHIFT])
-
 typedef struct uberblock uberblock_t;
-
-/* XXX Uberblock_phys_t is no longer in the kernel zfs */
-typedef struct uberblock_phys {
-	uberblock_t	ubp_uberblock;
-	char		ubp_pad[UBERBLOCK_SIZE - sizeof (uberblock_t) -
-				sizeof (zio_eck_t)];
-	zio_eck_t	ubp_zec;
-} uberblock_phys_t;
 
 /*
  * Macros to get fields in a bp or DVA.
