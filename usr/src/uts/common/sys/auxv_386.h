@@ -70,7 +70,7 @@ extern "C" {
 #define	AV_386_XSAVE		0x10000000 /* Intel XSAVE/XRSTOR insns */
 #define	AV_386_AVX		0x20000000 /* Intel AVX insns */
 #define	AV_386_VMX		0x40000000 /* Intel VMX support */
-#define	AV_386_AMD_SVM		0x20000000 /* AMD SVM support */
+#define	AV_386_AMD_SVM		0x80000000 /* AMD SVM support */
 
 #define	FMT_AV_386							\
 	"\020"								\
