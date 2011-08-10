@@ -25,6 +25,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
 
 #ifndef	_SYS_RM_PLATTER_H
 #define	_SYS_RM_PLATTER_H
@@ -111,7 +114,7 @@ typedef	struct rm_platter {
  */
 struct cpu_tables {
 	char		ct_stack[DEFAULTSTKSZ];
-	struct tss	ct_tss;
+	tss_t		ct_tss;
 };
 
 /*

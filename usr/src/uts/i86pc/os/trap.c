@@ -31,6 +31,10 @@
 /*		All Rights Reserved   				*/
 /*								*/
 
+/*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -1983,7 +1987,7 @@ static void
 dump_tss(void)
 {
 	const char tss_fmt[] = "tss.%s:\t0x%p\n";  /* Format string */
-	struct tss *tss = CPU->cpu_tss;
+	tss_t *tss = CPU->cpu_tss;
 
 	printf(tss_fmt, "tss_rsp0", (void *)tss->tss_rsp0);
 	printf(tss_fmt, "tss_rsp1", (void *)tss->tss_rsp1);
@@ -2004,7 +2008,7 @@ static void
 dump_tss(void)
 {
 	const char tss_fmt[] = "tss.%s:\t0x%p\n";  /* Format string */
-	struct tss *tss = CPU->cpu_tss;
+	tss_t *tss = CPU->cpu_tss;
 
 	printf(tss_fmt, "tss_link", (void *)(uintptr_t)tss->tss_link);
 	printf(tss_fmt, "tss_esp0", (void *)(uintptr_t)tss->tss_esp0);

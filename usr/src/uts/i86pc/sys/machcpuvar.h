@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
 
 #ifndef	_SYS_MACHCPUVAR_H
 #define	_SYS_MACHCPUVAR_H
@@ -103,7 +106,7 @@ struct	machcpu {
 	user_desc_t	*mcpu_gdt;	/* GDT */
 	gate_desc_t	*mcpu_idt;	/* current IDT */
 
-	struct tss	*mcpu_tss;	/* TSS */
+	tss_t		*mcpu_tss;	/* TSS */
 
 	kmutex_t	mcpu_ppaddr_mutex;
 	caddr_t		mcpu_caddr1;	/* per cpu CADDR1 */

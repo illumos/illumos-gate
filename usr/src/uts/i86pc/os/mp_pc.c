@@ -25,6 +25,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
 
 /*
  * Welcome to the world of the "real mode platter".
@@ -169,7 +172,7 @@ rmp_gdt_init(rm_platter_t *rm)
 static void *
 mach_cpucontext_alloc_tables(struct cpu *cp)
 {
-	struct tss *ntss;
+	tss_t *ntss;
 	struct cpu_tables *ct;
 
 	/*

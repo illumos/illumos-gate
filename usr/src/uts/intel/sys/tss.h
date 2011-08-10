@@ -6,8 +6,6 @@
 #ifndef	_SYS_TSS_H
 #define	_SYS_TSS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -54,6 +52,9 @@ extern "C" {
  *	from: @(#)tss.h	5.4 (Berkeley) 1/18/91
  * $FreeBSD: src/sys/i386/include/tss.h,v 1.13 2002/09/23 05:04:05 peter Exp $
  */
+/*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
 
 /*
  * Maximum I/O address that will be in TSS bitmap
@@ -63,14 +64,18 @@ extern "C" {
 #ifndef _ASM
 
 /*
- * Task state segment (tss). Holds the processor state assoicated with
- * a task.
+ * Task state segment (tss). Holds the processor state assoicated with a task.
+ *
+ * Historically, this header only exposed a struct tss that was relevant to the
+ * specific Intel architecture that we were deploying on. However, the tss
+ * structures are defined by the Intel Architecture and other consumers would
+ * like to use them. Rather than requiring them to duplicate all of this
+ * information, we instead expose each version under different names but in a
+ * backwards compatible manner.
  */
 
-#if defined(__amd64)
-
 #pragma	pack(4)
-struct tss {
+struct tss64 {
 	uint32_t	tss_rsvd0;	/* reserved, ignored */
 	uint64_t	tss_rsp0; 	/* stack pointer CPL = 0 */
 	uint64_t	tss_rsp1; 	/* stack pointer CPL = 1 */
@@ -89,9 +94,7 @@ struct tss {
 };
 #pragma	pack()
 
-#elif defined(__i386)
-
-struct tss {
+struct tss32 {
 	uint16_t	tss_link;	/* 16-bit prior TSS selector */
 	uint16_t	tss_rsvd0;	/* reserved, ignored */
 	uint32_t	tss_esp0;
@@ -131,6 +134,39 @@ struct tss {
 	uint16_t	tss_rsvd11;	/* reserved, ignored */
 	uint16_t	tss_bitmapbase;	/* io permission bitmap base address */
 };
+
+struct tss16 {
+	uint16_t	tss_link;
+	uint16_t	tss_sp0;
+	uint16_t	tss_ss0;
+	uint16_t	tss_sp1;
+	uint16_t	tss_ss1;
+	uint16_t	tss_sp2;
+	uint16_t	tss_ss2;
+	uint16_t	tss_ip;
+	uint16_t	tss_flag;
+	uint16_t	tss_ax;
+	uint16_t	tss_cx;
+	uint16_t	tss_dx;
+	uint16_t	tss_bx;
+	uint16_t	tss_sp;
+	uint16_t	tss_bp;
+	uint16_t	tss_si;
+	uint16_t	tss_di;
+	uint16_t	tss_es;
+	uint16_t	tss_cs;
+	uint16_t	tss_ss;
+	uint16_t	tss_ds;
+	uint16_t	tss_ldt;
+};
+
+#if defined(__amd64)
+
+typedef	struct tss64	tss_t;
+
+#elif defined(__i386)
+
+typedef	struct tss32	tss_t;
 
 #endif	/* __i386 */
 
