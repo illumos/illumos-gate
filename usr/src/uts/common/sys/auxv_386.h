@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_AUXV_386_H
@@ -69,16 +70,18 @@ extern "C" {
 #define	AV_386_PCLMULQDQ	0x8000000 /* Intel PCLMULQDQ insn */
 #define	AV_386_XSAVE		0x10000000 /* Intel XSAVE/XRSTOR insns */
 #define	AV_386_AVX		0x20000000 /* Intel AVX insns */
+#define	AV_386_VMX		0x40000000 /* Intel VMX support */
+#define	AV_386_AMD_SVM		0x80000000 /* AMD SVM support */
 
 #define	FMT_AV_386							\
-	"\20"								\
-	"\36avx\35xsave"						\
-	"\34pclmulqdq\33aes"						\
-	"\32movbe\31sse4.2"						\
-	"\30sse4.1\27ssse3\26amd_lzcnt\25popcnt"			\
-	"\24amd_sse4a\23tscp\22ahf\21cx16"				\
-	"\17sse3\15sse2\14sse\13fxsr\12amd3dx\11amd3d"	\
-	"\10amdmmx\7mmx\6cmov\5amdsysc\4sep\3cx8\2tsc\1fpu"
+	"\020"								\
+	"\040svm\037vmx\036avx\035xsave"				\
+	"\034pclmulqdq\033aes"						\
+	"\032movbe\031sse4.2"						\
+	"\030sse4.1\027ssse3\026amd_lzcnt\025popcnt"			\
+	"\024amd_sse4a\023tscp\022ahf\021cx16"				\
+	"\017sse3\015sse2\014sse\013fxsr\012amd3dx\011amd3d"		\
+	"\010amdmmx\07mmx\06cmov\05amdsysc\04sep\03cx8\02tsc\01fpu"
 
 #ifdef __cplusplus
 }
