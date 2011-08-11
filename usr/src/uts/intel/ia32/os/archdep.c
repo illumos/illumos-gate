@@ -962,9 +962,24 @@ bind_hwcap(void)
 	auxv_hwcap |= AV_386_AHF;
 #endif
 
-	if (auxv_hwcap_include || auxv_hwcap_exclude)
-		cmn_err(CE_CONT, "?user ABI extensions: %b\n",
-		    auxv_hwcap, FMT_AV_386);
+	if (auxv_hwcap_include || auxv_hwcap_exclude) {
+		/*
+		 * The below assignment is regrettably required to get lint
+		 * to accept the validity of our format string.  The format
+		 * string is in fact valid, but whatever intelligence in lint
+		 * understands the cmn_err()-specific %b appears to have an
+		 * off-by-one error:  it (mistakenly) complains about bit
+		 * number 32 (even though this is explicitly permitted).
+		 * Normally, one would will away such warnings with a "LINTED"
+		 * directive, but for reasons unclear and unknown, lint
+		 * refuses to be assuaged in this case.  Fortunately, lint
+		 * doesn't pretend to have solved the Halting Problem --
+		 * and as soon as the format string is programmatic, it
+		 * knows enough to shut up.
+		 */
+		const char *fmt = "?user ABI extensions: %b\n";
+		cmn_err(CE_CONT, fmt, auxv_hwcap, FMT_AV_386);
+	}
 
 #if defined(_SYSCALL32_IMPL)
 	auxv_hwcap32 = (auxv_hwcap32_include | cpu_hwcap_flags) &
@@ -986,9 +1001,13 @@ bind_hwcap(void)
 	auxv_hwcap32 |= AV_386_AHF;
 #endif
 
-	if (auxv_hwcap32_include || auxv_hwcap32_exclude)
-		cmn_err(CE_CONT, "?32-bit user ABI extensions: %b\n",
-		    auxv_hwcap32, FMT_AV_386);
+	if (auxv_hwcap32_include || auxv_hwcap32_exclude) {
+		/*
+		 * See the block comment in the cmn_err() of auxv_hwcap, above.
+		 */
+		const char *fmt = "?32-bit user ABI extensions: %b\n";
+		cmn_err(CE_CONT, fmt, auxv_hwcap32, FMT_AV_386);
+	}
 #endif
 }
 
