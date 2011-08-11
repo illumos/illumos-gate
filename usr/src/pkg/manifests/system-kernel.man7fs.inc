@@ -9,15 +9,22 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man7fs/ctfs.7fs
 file path=usr/share/man/man7fs/dcfs.7fs
 file path=usr/share/man/man7fs/dev.7fs
 file path=usr/share/man/man7fs/devfs.7fs
+file path=usr/share/man/man7fs/fd.7fs
 file path=usr/share/man/man7fs/hsfs.7fs
 file path=usr/share/man/man7fs/lofs.7fs
 file path=usr/share/man/man7fs/objfs.7fs
 file path=usr/share/man/man7fs/sharefs.7fs
+file path=usr/share/man/man7fs/stderr.7fs
+file path=usr/share/man/man7fs/stdin.7fs
+file path=usr/share/man/man7fs/stdout.7fs
 file path=usr/share/man/man7fs/tmpfs.7fs
 file path=usr/share/man/man7fs/ufs.7fs

@@ -1,9 +1,14 @@
-.TH HOSTS_OPTIONS 5
+'\" t
+.\"
+.\" Modified for Solaris to to add the Solaris stability classification,
+.\" and to add a note about source availability.
+.\" 
+.TH HOSTS_OPTIONS 4
 .SH NAME
 hosts_options \- host access control language extensions
 .SH DESCRIPTION
 This document describes optional extensions to the language described
-in the hosts_access(5) document. The extensions are enabled at program
+in the hosts_access(4) document. The extensions are enabled at program
 build time. For example, by editing the Makefile and turning on the 
 PROCESS_OPTIONS compile-time option.
 .PP
@@ -12,7 +17,7 @@ The extensible language uses the following format:
 .ti +3
 daemon_list : client_list : option : option ...
 .PP
-The first two fields are described in the hosts_access(5) manual page.
+The first two fields are described in the hosts_access(4) manual page.
 The remainder of the rules is a list of zero or more options.  Any ":"
 characters within options should be protected with a backslash.
 .PP
@@ -56,7 +61,7 @@ Notice the leading dot on the domain name patterns.
 .SH RUNNING OTHER COMMANDS
 .IP "spawn shell_command"
 Execute, in a child process, the specified shell command, after
-performing the %<letter> expansions described in the hosts_access(5)
+performing the %<letter> expansions described in the hosts_access(4)
 manual page.  The command is executed with stdin, stdout and stderr
 connected to the null device, so that it won\'t mess up the
 conversation with the client host. Example:
@@ -78,7 +83,7 @@ the data sent by the remote host.
 .IP "twist shell_command"
 Replace the current process by an instance of the specified shell
 command, after performing the %<letter> expansions described in the
-hosts_access(5) manual page.  Stdin, stdout and stderr are connected to
+hosts_access(4) manual page.  Stdin, stdout and stderr are connected to
 the client process. This option must appear at the end of a rule.
 .sp
 To send a customized bounce message to the client instead of
@@ -128,7 +133,7 @@ Look for a file in `/some/directory' with the same name as the daemon
 process (for example in.telnetd for the telnet service), and copy its
 contents to the client. Newline characters are replaced by
 carriage-return newline, and %<letter> sequences are expanded (see
-the hosts_access(5) manual page).
+the hosts_access(4) manual page).
 .sp
 The tcp wrappers source code distribution provides a sample makefile
 (Banners.Makefile) for convenient banner maintenance.
@@ -160,7 +165,7 @@ When a syntax error is found in an access control rule, the error
 is reported to the syslog daemon; further options will be ignored,
 and service is denied.
 .SH SEE ALSO
-hosts_access(5), the default access control language
+hosts_access(4), the default access control language
 .SH AUTHOR
 .na
 .nf
@@ -170,3 +175,18 @@ Eindhoven University of Technology
 Den Dolech 2, P.O. Box 513, 
 5600 MB Eindhoven, The Netherlands
 \" @(#) hosts_options.5 1.10 94/12/28 17:42:28
+.\" Begin Sun update
+.SH ATTRIBUTES
+See
+.BR attributes (5)
+for descriptions of the following attributes:
+.sp
+.TS
+box;
+cbp-1 | cbp-1
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+=
+Interface Stability	Committed
+.TE 
+.\" End Sun update

@@ -1,4 +1,9 @@
-.TH HOSTS_ACCESS 5
+'\" t
+.\"
+.\" Modified for Solaris to to add the Solaris stability classification,
+.\" and to add a note about source availability.
+.\" 
+.TH HOSTS_ACCESS 4
 .SH NAME
 hosts_access \- format of host access control files
 .SH DESCRIPTION
@@ -9,7 +14,7 @@ impatient reader is encouraged to skip to the EXAMPLES section for a
 quick introduction.
 .PP
 An extended version of the access control language is described in the
-\fIhosts_options\fR(5) document. The extensions are turned on at
+\fIhosts_options\fR(4) document. The extensions are turned on at
 program build time by building with -DPROCESS_OPTIONS.
 .PP
 In the following text, \fIdaemon\fR is the the process name of a
@@ -141,7 +146,7 @@ Shell commands should not rely on the PATH setting of the inetd.
 Instead, they should use absolute path names, or they should begin with
 an explicit PATH=whatever statement.
 .PP
-The \fIhosts_options\fR(5) document describes an alternative language
+The \fIhosts_options\fR(4) document describes an alternative language
 that uses the shell command field in a different and incompatible way.
 .SH % EXPANSIONS
 The following expansions are available within shell commands:
@@ -180,7 +185,7 @@ Patterns like these can be used when the machine has different internet
 addresses with different internet hostnames.  Service providers can use
 this facility to offer FTP, GOPHER or WWW archives with internet names
 that may even belong to different organizations. See also the `twist'
-option in the hosts_options(5) document. Some systems (Solaris,
+option in the hosts_options(4) document. Some systems (Solaris,
 FreeBSD) can have more than one internet address on one physical
 interface; with other systems you may have to resort to SLIP or PPP
 pseudo interfaces that live in a dedicated network address space.
@@ -365,8 +370,8 @@ that shouldn\'t.  All problems are reported via the syslog daemon.
 .fi
 .SH SEE ALSO
 .nf
-tcpd(8) tcp/ip daemon wrapper program.
-tcpdchk(8), tcpdmatch(8), test programs.
+tcpd(1M) tcp/ip daemon wrapper program.
+tcpdchk(1M), tcpdmatch(1M), test programs.
 .SH BUGS
 If a name server lookup times out, the host name will not be available
 to the access control software, even though the host is registered.
@@ -382,3 +387,19 @@ Eindhoven University of Technology
 Den Dolech 2, P.O. Box 513, 
 5600 MB Eindhoven, The Netherlands
 \" @(#) hosts_access.5 1.20 95/01/30 19:51:46
+.\" Begin Sun update
+.SH ATTRIBUTES
+See
+.BR attributes (5)
+for descriptions of the following attributes:
+.sp
+.TS
+box;
+cbp-1 | cbp-1
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+=
+Interface Stability	Committed
+.TE 
+Source for tcp_wrappers is available in the SUNWtcpdS package.
+.\" End Sun update
