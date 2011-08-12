@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -2695,6 +2697,7 @@ exec_method(instance_t *instance, instance_method_t method, method_info_t *mi,
 	char 		**env;
 	const char	*errf;
 	int		serrno;
+	sigset_t	mtset;
 	basic_cfg_t	*cfg = instance->config->basic;
 
 	if (method == IM_START) {
@@ -2713,6 +2716,12 @@ exec_method(instance_t *instance, instance_method_t method, method_info_t *mi,
 	(void) sigset(SIGHUP, SIG_DFL);
 	(void) sigset(SIGTERM, SIG_DFL);
 	(void) sigset(SIGINT, SIG_DFL);
+
+	/*
+	 * Ensure that other signals are unblocked
+	 */
+	(void) sigemptyset(&mtset);
+	(void) sigprocmask(SIG_SETMASK, &mtset, (sigset_t *)NULL);
 
 	/*
 	 * Setup exec arguments. Do this before the fd setup below, so our
