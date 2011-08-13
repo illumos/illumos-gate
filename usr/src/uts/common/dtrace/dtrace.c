@@ -2760,6 +2760,22 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return (dtrace_getreg(lwp->lwp_regs, ndx));
 	}
 
+	case DIF_VAR_VMREGS: {
+		uint64_t rval;
+
+		if (!dtrace_priv_kernel(state))
+			return (0);
+
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
+
+		rval = dtrace_getvmreg(ndx,
+		    &cpu_core[CPU->cpu_id].cpuc_dtrace_flags);
+
+		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+
+		return (rval);
+	}
+
 	case DIF_VAR_CURTHREAD:
 		if (!dtrace_priv_kernel(state))
 			return (0);

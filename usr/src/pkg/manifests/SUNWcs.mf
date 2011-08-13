@@ -824,6 +824,7 @@ file path=usr/bin/kbd mode=0555
 file path=usr/bin/keylogin mode=0555
 file path=usr/bin/keylogout mode=0555
 file path=usr/bin/kmfcfg mode=0555
+file path=usr/bin/kvmstat mode=0555
 file path=usr/bin/line mode=0555
 file path=usr/bin/listdgrp mode=0555
 file path=usr/bin/listusers mode=0555

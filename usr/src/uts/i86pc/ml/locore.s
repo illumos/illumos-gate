@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
@@ -1144,28 +1147,34 @@ cmntrap()
 
 .dtrace_induced:
 	cmpw	$KCS_SEL, REGOFF_CS(%rbp)	/* test CS for user-mode trap */
-	jne	2f				/* if from user, panic */
+	jne	3f				/* if from user, panic */
 
 	cmpl	$T_PGFLT, REGOFF_TRAPNO(%rbp)
-	je	0f
+	je	1f
 
 	cmpl	$T_GPFLT, REGOFF_TRAPNO(%rbp)
-	jne	3f				/* if not PF or GP, panic */
+	je	0f
+
+	cmpl	$T_ILLINST, REGOFF_TRAPNO(%rbp)
+	je	0f
+
+	jne	4f				/* if not PF, GP or UD, panic */
 
 	/*
 	 * If we've taken a GPF, we don't (unfortunately) have the address that
 	 * induced the fault.  So instead of setting the fault to BADADDR,
 	 * we'll set the fault to ILLOP.
 	 */
+0:
 	orw	$CPU_DTRACE_ILLOP, %cx
 	movw	%cx, CPUC_DTRACE_FLAGS(%rax)
-	jmp	1f
-0:
+	jmp	2f
+1:
 	orw	$CPU_DTRACE_BADADDR, %cx
 	movw	%cx, CPUC_DTRACE_FLAGS(%rax)	/* set fault to bad addr */
 	movq	%r15, CPUC_DTRACE_ILLVAL(%rax)
 					    /* fault addr is illegal value */
-1:
+2:
 	movq	REGOFF_RIP(%rbp), %rdi
 	movq	%rdi, %r12
 	call	dtrace_instr_size
@@ -1174,11 +1183,11 @@ cmntrap()
 	INTR_POP
 	IRET
 	/*NOTREACHED*/
-2:
+3:
 	leaq	dtrace_badflags(%rip), %rdi
 	xorl	%eax, %eax
 	call	panic
-3:
+4:
 	leaq	dtrace_badtrap(%rip), %rdi
 	xorl	%eax, %eax
 	call	panic
