@@ -56,8 +56,6 @@
 	<privilege set="default" name="contract_event" />
 	<privilege set="default" name="contract_identity" />
 	<privilege set="default" name="contract_observer" />
-	<privilege set="default" name="dtrace_proc" />
-	<privilege set="default" name="dtrace_user" />
 	<privilege set="default" name="file_chown" />
 	<privilege set="default" name="file_chown_self" />
 	<privilege set="default" name="file_dac_execute" />
