@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2354,6 +2355,8 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
 
 		tcp->tcp_ka_interval = tcps->tcps_keepalive_interval;
 		tcp->tcp_ka_abort_thres = tcps->tcps_keepalive_abort_interval;
+		tcp->tcp_ka_cnt = 0;
+		tcp->tcp_ka_rinterval = 0;
 
 		/*
 		 * Default value of tcp_init_cwnd is 0, so no need to set here
