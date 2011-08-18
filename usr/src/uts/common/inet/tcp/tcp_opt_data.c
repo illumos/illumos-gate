@@ -718,7 +718,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		 */
 		case TCP_KEEPIDLE:
 			*i1 *= 1000;
-			/* fall through */
+			/* FALLTHRU */
 
 		case TCP_KEEPALIVE_THRESHOLD:
 			if (checkonly)
