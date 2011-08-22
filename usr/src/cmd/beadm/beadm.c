@@ -495,12 +495,12 @@ print_fmt_nodes(const char *be_name, enum be_fmt be_fmt, boolean_t parsable,
 	struct hdr_info *hdr = NULL;
 	be_node_list_t	*cur_be;
 
-	if (!parsable) {
-		hdr = hdrs + be_fmt;
-		init_hdr_cols(be_fmt, hdr);
-		count_widths(be_fmt, hdr, nodes);
+	hdr = hdrs + be_fmt;
+	init_hdr_cols(be_fmt, hdr);
+	count_widths(be_fmt, hdr, nodes);
+
+	if (!parsable)
 		print_hdr(hdr);
-	}
 
 	for (cur_be = nodes; cur_be != NULL; cur_be = cur_be->be_next_node) {
 		char active[3] = "-\0";
