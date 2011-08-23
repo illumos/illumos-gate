@@ -31,7 +31,7 @@ VERS =		$(MAJOR)$(MINOR)
 OBJECTS =	hosts_access.o options.o shell_cmd.o rfc931.o eval.o \
 		hosts_ctl.o refuse.o percent_x.o clean_exit.o \
 		fromhost.o fix_options.o socket.o tli.o workarounds.o \
-		update.o misc.o diag.o percent_m.o
+		update.o misc.o diag.o percent_m.o libvars.o
 
 include ../../Makefile.lib
 
