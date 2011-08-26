@@ -79,7 +79,7 @@ zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
 
 # zoneadm already created the dataset but we want to use a clone, so first
 # remove the one zoneadm created.
-zfs destroy $PDS_NAME/$bname
+zfs destroy $PDS_NAME/$bname >/dev/null 2>&1
 
 zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
 zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \

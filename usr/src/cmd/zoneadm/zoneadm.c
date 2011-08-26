@@ -2911,6 +2911,7 @@ install_func(int argc, char *argv[])
 	int status;
 	boolean_t do_postinstall = B_FALSE;
 	boolean_t brand_help = B_FALSE;
+	boolean_t do_dataset = B_TRUE;
 	char opts[128];
 
 	if (target_zone == NULL) {
@@ -2986,6 +2987,12 @@ install_func(int argc, char *argv[])
 			}
 			/* Ignore unknown options - may be brand specific. */
 			break;
+		case 'x':
+			if (strcmp(optarg, "nodataset") == 0) {
+				do_dataset = B_FALSE;
+				continue; /* internal arg, don't pass thru */
+			}
+			break;
 		default:
 			/* Ignore unknown options - may be brand specific. */
 			break;
@@ -3038,7 +3045,8 @@ install_func(int argc, char *argv[])
 			goto done;
 		}
 
-		create_zfs_zonepath(zonepath);
+		if (do_dataset)
+			create_zfs_zonepath(zonepath);
 	}
 
 	status = do_subproc(cmdbuf);
