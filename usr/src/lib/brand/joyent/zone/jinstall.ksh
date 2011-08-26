@@ -78,12 +78,17 @@ zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
     print -u2 "Brand error: missing parent ZFS dataset for $dname"
 
 # zoneadm already created the dataset but we want to use a clone, so first
-# remove the one zoneadm created. 
+# remove the one zoneadm created.
 zfs destroy $PDS_NAME/$bname
 
 zfs snapshot $PDS_NAME/${TMPLZONE}@${bname}
 zfs clone -o quota=${ZQUOTA}g $PDS_NAME/${TMPLZONE}@${bname} \
     $PDS_NAME/$bname
+
+if [ ! -d ${ZONEPATH}/config ]; then
+    mkdir -p ${ZONEPATH}/config
+    chmod 755 ${ZONEPATH}/config
+fi
 
 final_setup
 
