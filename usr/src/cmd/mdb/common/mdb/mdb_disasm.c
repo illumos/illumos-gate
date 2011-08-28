@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 #include <mdb/mdb_disasm_impl.h>
 #include <mdb/mdb_modapi.h>
@@ -416,8 +419,16 @@ libdisasm_create(mdb_disasm_t *dp, const char *name,
 	return (0);
 }
 
-
 #if defined(__i386) || defined(__amd64)
+static int
+ia16_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "ia16",
+	    "Intel 16-bit disassembler",
+	    DIS_X86_SIZE16));
+}
+
 static int
 ia32_create(mdb_disasm_t *dp)
 {
@@ -546,9 +557,11 @@ defdis_create(mdb_disasm_t *dp)
 mdb_dis_ctor_f *const mdb_dis_builtins[] = {
 	defdis_create,
 #if defined(__amd64)
+	ia16_create,
 	ia32_create,
 	amd64_create,
 #elif defined(__i386)
+	ia16_create,
 	ia32_create,
 #elif defined(__sparc)
 	sparc1_create,

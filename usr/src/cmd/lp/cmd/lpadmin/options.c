@@ -571,10 +571,10 @@ void			options (argc, argv)
 				stroptsw[1] = optsw;
 
 				if (strchr(OPT_LIST, optopt))
-					LP_ERRMSG1 (ERROR, E_LP_OPTARG, 
+					LP_ERRMSG1 (ERROR, E_LP_OPTARG,
 					    stroptsw);
 				else
-					LP_ERRMSG1 (ERROR, E_LP_OPTION, 
+					LP_ERRMSG1 (ERROR, E_LP_OPTION,
 					    stroptsw);
 				done (1);
 			}

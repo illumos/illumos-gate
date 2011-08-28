@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: smb_dev.c,v 1.21 2004/12/13 00:25:18 lindak Exp $
  */
 
 /*
@@ -63,7 +61,6 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/thread.h>
-#include <sys/mkdev.h>
 #include <sys/types.h>
 #include <sys/zone.h>
 
@@ -76,26 +73,16 @@
 #include <netsmb/smb_dev.h>
 #include <netsmb/smb_pass.h>
 
+#define	NSMB_MIN_MINOR	1
+#define	NSMB_MAX_MINOR	L_MAXMIN32
+
 /* for version checks */
 const uint32_t nsmb_version = NSMB_VERSION;
 
-/*
- * Userland code loops through minor #s 0 to 1023, looking for one which opens.
- * Intially we create minor 0 and leave it for anyone.  Minor zero will never
- * actually get used - opening triggers creation of another (but private) minor,
- * which userland code will get to and mark busy.
- */
-#define	SMBMINORS 1024
 static void *statep;
 static major_t nsmb_major;
-static minor_t nsmb_minor = 1;
-
-#define	NSMB_MAX_MINOR  (1 << 8)
-#define	NSMB_MIN_MINOR   (NSMB_MAX_MINOR + 1)
-
-#define	ILP32	1
-#define	LP64	2
-
+static minor_t last_minor = NSMB_MIN_MINOR;
+static dev_info_t *nsmb_dip;
 static kmutex_t  dev_lck;
 
 /* Zone support */
@@ -182,11 +169,6 @@ _init(void)
 
 	/* Can initialize some mutexes also. */
 	mutex_init(&dev_lck, NULL, MUTEX_DRIVER, NULL);
-	/*
-	 * Create a major name and number.
-	 */
-	nsmb_major = ddi_name_to_major(NSMB_NAME);
-	nsmb_minor = 0;
 
 	/* Connection data structures. */
 	(void) smb_sm_init();
@@ -274,10 +256,10 @@ nsmb_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		*result = 0;
+		*result = nsmb_dip;
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = 0;
+		*result = NULL;
 		break;
 	default:
 		ret = DDI_FAILURE;
@@ -288,47 +270,33 @@ nsmb_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	smb_dev_t *sdp;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
+
 	/*
-	 * only one instance - but we clone using the open routine
+	 * We only support only one "instance".  Note that
+	 * "instances" are different from minor units.
+	 * We get one (unique) minor unit per open.
 	 */
 	if (ddi_get_instance(dip) > 0)
 		return (DDI_FAILURE);
 
-	mutex_enter(&dev_lck);
-
-	/*
-	 * This is the Zero'th minor device which is created.
-	 */
-	if (ddi_soft_state_zalloc(statep, 0) == DDI_FAILURE) {
-		cmn_err(CE_WARN, "nsmb_attach: soft state alloc");
-		goto attach_failed;
-	}
 	if (ddi_create_minor_node(dip, "nsmb", S_IFCHR, 0, DDI_PSEUDO,
 	    NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "nsmb_attach: create minor");
-		goto attach_failed;
-	}
-	if ((sdp = ddi_get_soft_state(statep, 0)) == NULL) {
-		cmn_err(CE_WARN, "nsmb_attach: get soft state");
-		ddi_remove_minor_node(dip, NULL);
-		goto attach_failed;
+		return (DDI_FAILURE);
 	}
 
-	sdp->sd_dip = dip;
-	sdp->sd_seq = 0;
-	sdp->sd_smbfid = -1;
-	mutex_exit(&dev_lck);
+	/*
+	 * We need the major number a couple places,
+	 * i.e. in smb_dev2share()
+	 */
+	nsmb_major = ddi_name_to_major(NSMB_NAME);
+
+	nsmb_dip = dip;
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
-
-attach_failed:
-	ddi_soft_state_free(statep, 0);
-	mutex_exit(&dev_lck);
-	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/
@@ -341,7 +309,7 @@ nsmb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (ddi_get_instance(dip) > 0)
 		return (DDI_FAILURE);
 
-	ddi_soft_state_free(statep, 0);
+	nsmb_dip = NULL;
 	ddi_remove_minor_node(dip, NULL);
 
 	return (DDI_SUCCESS);
@@ -467,82 +435,50 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 	return (err);
 }
 
+/*
+ * This does "clone" open, meaning it automatically
+ * assigns an available minor unit for each open.
+ */
 /*ARGSUSED*/
 static int
 nsmb_open(dev_t *dev, int flags, int otyp, cred_t *cr)
 {
-	major_t new_major;
-	smb_dev_t *sdp, *sdv;
+	smb_dev_t *sdp;
+	minor_t m;
 
 	mutex_enter(&dev_lck);
-	for (; ; ) {
-		minor_t start = nsmb_minor;
-		do {
-			if (nsmb_minor >= MAXMIN32) {
-				if (nsmb_major == getmajor(*dev))
-					nsmb_minor = NSMB_MIN_MINOR;
-				else
-					nsmb_minor = 0;
-			} else {
-				nsmb_minor++;
-			}
-			sdv = ddi_get_soft_state(statep, nsmb_minor);
-		} while ((sdv != NULL) && (nsmb_minor != start));
-		if (nsmb_minor == start) {
-			/*
-			 * The condition we need to solve here is  all the
-			 * MAXMIN32(~262000) minors numbers are reached. We
-			 * need to create a new major number.
-			 * zfs uses getudev() to create a new major number.
-			 */
-			if ((new_major = getudev()) == (major_t)-1) {
-				cmn_err(CE_WARN,
-				    "nsmb: Can't get unique major "
-				    "device number.");
-				mutex_exit(&dev_lck);
-				return (-1);
-			}
-			nsmb_major = new_major;
-			nsmb_minor = 0;
-		} else {
-			break;
+
+	for (m = last_minor + 1; m != last_minor; m++) {
+		if (m > NSMB_MAX_MINOR)
+			m = NSMB_MIN_MINOR;
+
+		if (ddi_get_soft_state(statep, m) == NULL) {
+			last_minor = m;
+			goto found;
 		}
 	}
 
-	/*
-	 * This is called by mount or open call.
-	 * The open() routine is passed a pointer to a device number so
-	 * that  the  driver  can  change the minor number. This allows
-	 * drivers to dynamically  create minor instances of  the  dev-
-	 * ice.  An  example of this might be a  pseudo-terminal driver
-	 * that creates a new pseudo-terminal whenever it   is  opened.
-	 * A driver that chooses the minor number dynamically, normally
-	 * creates only one  minor  device  node  in   attach(9E)  with
-	 * ddi_create_minor_node(9F) then changes the minor number com-
-	 * ponent of *devp using makedevice(9F)  and  getmajor(9F)  The
-	 * driver needs to keep track of available minor numbers inter-
-	 * nally.
-	 * Stuff the structure smb_dev.
-	 * return.
-	 */
+	/* No available minor units. */
+	mutex_exit(&dev_lck);
+	return (ENXIO);
 
-	if (ddi_soft_state_zalloc(statep, nsmb_minor) == DDI_FAILURE) {
+found:
+	/* NB: dev_lck still held */
+	if (ddi_soft_state_zalloc(statep, m) == DDI_FAILURE) {
 		mutex_exit(&dev_lck);
 		return (ENXIO);
 	}
-	if ((sdp = ddi_get_soft_state(statep, nsmb_minor)) == NULL) {
+	if ((sdp = ddi_get_soft_state(statep, m)) == NULL) {
 		mutex_exit(&dev_lck);
 		return (ENXIO);
 	}
+	*dev = makedevice(nsmb_major, m);
+	mutex_exit(&dev_lck);
 
-	sdp->sd_seq = nsmb_minor;
 	sdp->sd_cred = cr;
 	sdp->sd_smbfid = -1;
 	sdp->sd_flags |= NSMBFL_OPEN;
 	sdp->zoneid = crgetzoneid(cr);
-	mutex_exit(&dev_lck);
-
-	*dev = makedevice(nsmb_major, nsmb_minor);
 
 	return (0);
 }

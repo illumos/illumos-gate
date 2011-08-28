@@ -32,6 +32,7 @@ extern "C" {
 
 #define	SI3124_MAX_PORTS		4
 #define	SI3132_MAX_PORTS		2
+#define	SI3531_MAX_PORTS		1
 #define	SI_MAX_PORTS			SI3124_MAX_PORTS
 
 #define	SI_LOGBUF_LEN			512
@@ -164,7 +165,7 @@ typedef struct si_ctl_state {
 	int sictl_num_ports;	/* number of controller ports */
 	si_port_state_t *sictl_ports[SI_MAX_PORTS];
 
-	int sictl_devid; /* whether it is 3124 or 3132 */
+	int sictl_devid; /* device id of the controller */
 	int sictl_flags; /* some important state of controller */
 	int sictl_power_level;
 

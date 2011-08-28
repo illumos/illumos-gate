@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -218,9 +220,6 @@ static struct ctlr_info *find_vbd_ctlr_info(struct dk_cinfo *dkinfo);
 static struct disk_info *find_vbd_disk_info(struct dk_cinfo *dkinfo);
 
 static char		*get_sun_disk_name(
-				char		*disk_name,
-				struct scsi_inquiry *inquiry);
-static char		*get_generic_disk_name(
 				char		*disk_name,
 				struct scsi_inquiry *inquiry);
 static char		*strcopy(
@@ -2081,7 +2080,7 @@ get_sun_disk_name(
 }
 
 
-static char *
+char *
 get_generic_disk_name(
 	char			*disk_name,
 	struct scsi_inquiry	*inquiry)

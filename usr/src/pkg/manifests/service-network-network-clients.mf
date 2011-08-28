@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/network-clients@$(PKGVERS)
@@ -78,6 +79,8 @@ license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rcp \
     license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rcp
 license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rsh \
     license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rsh
+license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.whois \
+    license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.whois
 license usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE
 link path=usr/bin/remsh target=./rsh

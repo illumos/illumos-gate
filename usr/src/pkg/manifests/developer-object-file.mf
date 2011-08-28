@@ -40,8 +40,8 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/elfedit
 dir path=usr/lib/elfedit/$(ARCH64)
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/ccs
 dir path=usr/share/man/man1
 file path=usr/bin/$(ARCH64)/ar mode=0555

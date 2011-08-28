@@ -282,7 +282,6 @@ typedef struct smb_dev {
 	int		sd_level;	/* SMBL_VC, ... */
 	int		sd_vcgenid;	/* Generation of share or VC */
 	int		sd_poll;	/* Future use */
-	int		sd_seq;		/* Kind of minor number/instance no */
 	int		sd_flags;	/* State of connection */
 #define	NSMBFL_OPEN		0x0001
 #define	NSMBFL_IOD		0x0002

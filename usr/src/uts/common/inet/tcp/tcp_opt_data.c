@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -116,6 +117,12 @@ opdes_t	tcp_opt_arr[] = {
 
 { TCP_KEEPALIVE_THRESHOLD, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0,
 	sizeof (int), 0	},
+
+{ TCP_KEEPIDLE, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
+{ TCP_KEEPCNT, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
+{ TCP_KEEPINTVL, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 
 { TCP_KEEPALIVE_ABORT_THRESHOLD, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0,
 	sizeof (int), 0	},
@@ -403,6 +410,25 @@ tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 		case TCP_KEEPALIVE_THRESHOLD:
 			*i1 = tcp->tcp_ka_interval;
 			return (sizeof (int));
+
+		/*
+		 * TCP_KEEPIDLE expects value in seconds, but
+		 * tcp_ka_interval is in milliseconds.
+		 */
+		case TCP_KEEPIDLE:
+			*i1 = tcp->tcp_ka_interval / 1000;
+			return (sizeof (int));
+		case TCP_KEEPCNT:
+			*i1 = tcp->tcp_ka_cnt;
+			return (sizeof (int));
+
+		/*
+		 * TCP_KEEPINTVL expects value in seconds, but
+		 * tcp_ka_rinterval is in milliseconds.
+		 */
+		case TCP_KEEPINTVL:
+			*i1 = tcp->tcp_ka_rinterval / 1000;
+			return (sizeof (int));
 		case TCP_KEEPALIVE_ABORT_THRESHOLD:
 			*i1 = tcp->tcp_ka_abort_thres;
 			return (sizeof (int));
@@ -682,6 +708,18 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			}
 			tcp->tcp_init_cwnd = val;
 			break;
+
+		/*
+		 * TCP_KEEPIDLE is in seconds but TCP_KEEPALIVE_THRESHOLD
+		 * is in milliseconds. TCP_KEEPIDLE is introduced for
+		 * compatibility with other Unix flavors.
+		 * We can fall through TCP_KEEPALIVE_THRESHOLD logic after
+		 * converting the input to milliseconds.
+		 */
+		case TCP_KEEPIDLE:
+			*i1 *= 1000;
+			/* FALLTHRU */
+
 		case TCP_KEEPALIVE_THRESHOLD:
 			if (checkonly)
 				break;
@@ -708,6 +746,66 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				}
 			}
 			break;
+
+		/*
+		 * tcp_ka_abort_thres = tcp_ka_rinterval * tcp_ka_cnt.
+		 * So setting TCP_KEEPCNT or TCP_KEEPINTVL can affect all the
+		 * three members - tcp_ka_abort_thres, tcp_ka_rinterval and
+		 * tcp_ka_cnt.
+		 */
+		case TCP_KEEPCNT:
+			if (checkonly)
+				break;
+
+			if (*i1 == 0) {
+				return (EINVAL);
+			} else if (tcp->tcp_ka_rinterval == 0) {
+				if ((tcp->tcp_ka_abort_thres / *i1) <
+				    tcp->tcp_rto_min ||
+				    (tcp->tcp_ka_abort_thres / *i1) >
+				    tcp->tcp_rto_max)
+					return (EINVAL);
+
+				tcp->tcp_ka_rinterval =
+				    tcp->tcp_ka_abort_thres / *i1;
+			} else {
+				if ((*i1 * tcp->tcp_ka_rinterval) <
+				    tcps->tcps_keepalive_abort_interval_low ||
+				    (*i1 * tcp->tcp_ka_rinterval) >
+				    tcps->tcps_keepalive_abort_interval_high)
+					return (EINVAL);
+				tcp->tcp_ka_abort_thres =
+				    (*i1 * tcp->tcp_ka_rinterval);
+			}
+			tcp->tcp_ka_cnt = *i1;
+			break;
+		case TCP_KEEPINTVL:
+			/*
+			 * TCP_KEEPINTVL is specified in seconds, but
+			 * tcp_ka_rinterval is in milliseconds.
+			 */
+
+			if (checkonly)
+				break;
+
+			if ((*i1 * 1000) < tcp->tcp_rto_min ||
+			    (*i1 * 1000) > tcp->tcp_rto_max)
+				return (EINVAL);
+
+			if (tcp->tcp_ka_cnt == 0) {
+				tcp->tcp_ka_cnt =
+				    tcp->tcp_ka_abort_thres / (*i1 * 1000);
+			} else {
+				if ((*i1 * tcp->tcp_ka_cnt * 1000) <
+				    tcps->tcps_keepalive_abort_interval_low ||
+				    (*i1 * tcp->tcp_ka_cnt * 1000) >
+				    tcps->tcps_keepalive_abort_interval_high)
+					return (EINVAL);
+				tcp->tcp_ka_abort_thres =
+				    (*i1 * tcp->tcp_ka_cnt * 1000);
+			}
+			tcp->tcp_ka_rinterval = *i1 * 1000;
+			break;
 		case TCP_KEEPALIVE_ABORT_THRESHOLD:
 			if (!checkonly) {
 				if (*i1 <
@@ -718,6 +816,8 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 					return (EINVAL);
 				}
 				tcp->tcp_ka_abort_thres = *i1;
+				tcp->tcp_ka_cnt = 0;
+				tcp->tcp_ka_rinterval = 0;
 			}
 			break;
 		case TCP_CORK:

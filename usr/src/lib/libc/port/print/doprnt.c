@@ -573,6 +573,9 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 					/* arglst[1] is the second arg, etc */
 
 	int	starflg = 0;	/* set to 1 if * format specifier seen */
+	struct lconv *locptr = localeconv();
+	char	decimal_point = *locptr->decimal_point;
+
 	/*
 	 * Initialize args and sargs to the start of the argument list.
 	 * We don't know any portable way to copy an arbitrary C object
@@ -1343,7 +1346,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 
 			/* put in a decimal point if needed */
 			if (prec != 0 || (flagword & FSHARP))
-				*p++ = _numeric[0];
+				*p++ = decimal_point;
 
 			/* create the rest of the mantissa */
 			rz = prec;
@@ -1449,7 +1452,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 
 			/* Put in a decimal point if needed */
 			if (prec != 0 || (flagword & FSHARP))
-				*p++ = _numeric[0];
+				*p++ = decimal_point;
 
 			/* Create the rest of the mantissa */
 			rz = prec;
@@ -1574,7 +1577,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 
 				/* Decide whether we need a decimal point */
 				if ((flagword & FSHARP) || prec > 0)
-					*p++ = _numeric[0];
+					*p++ = decimal_point;
 
 				/* Digits (if any) after the decimal point */
 				nn = min(prec, MAXFCVT);

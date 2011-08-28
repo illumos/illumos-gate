@@ -5,7 +5,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH si3124 7D "17 August 2007" "SunOS 5.11" "Devices"
 .SH NAME
-si3124 \- SiliconImage 3124/3132 SATA controller driver
+si3124 \- SiliconImage 3124/3132/3531 SATA controller driver
 .SH SYNOPSIS
 .LP
 .nf
@@ -16,7 +16,7 @@ si3124 \- SiliconImage 3124/3132 SATA controller driver
 .sp
 .LP
 The \fBsi3124\fR driver is a \fBSATA\fR framework-compliant HBA driver that
-supports Silicon Image 3124 and 3132 \fBSATA\fR controllers. Note that while
+supports Silicon Image 3124, 3132 and 3531 \fBSATA\fR controllers. Note that while
 the Silicon Image controllers supports standard \fBSATA\fR features including
 SATA-II disks, NCQ, hotplug, port multiplier and ATAPI disks, the \fBsi3124\fR
 driver currently does not support NCQ, port multiplier or ATAPI features.

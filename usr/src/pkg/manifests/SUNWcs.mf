@@ -237,12 +237,12 @@ dir path=usr/sadm/sysadm/bin
 dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/doc group=other
 dir path=usr/share/doc/ksh
 dir path=usr/share/doc/ksh/images
 dir path=usr/share/doc/ksh/images/callouts
-dir path=usr/share/lib group=sys
+dir path=usr/share/lib
 dir path=usr/share/lib/mailx
 dir path=usr/share/lib/pub
 dir path=usr/share/lib/tabset
@@ -824,6 +824,7 @@ file path=usr/bin/kbd mode=0555
 file path=usr/bin/keylogin mode=0555
 file path=usr/bin/keylogout mode=0555
 file path=usr/bin/kmfcfg mode=0555
+file path=usr/bin/kvmstat mode=0555
 file path=usr/bin/line mode=0555
 file path=usr/bin/listdgrp mode=0555
 file path=usr/bin/listusers mode=0555

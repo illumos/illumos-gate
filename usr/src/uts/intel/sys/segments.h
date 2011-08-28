@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
 
 #ifndef	_SYS_SEGMENTS_H
 #define	_SYS_SEGMENTS_H
@@ -662,10 +665,10 @@ extern user_desc_t	ucs32_on;
 extern user_desc_t	ucs32_off;
 #endif  /* __amd64 */
 
-extern struct tss *ktss0;
+extern tss_t *ktss0;
 
 #if defined(__i386)
-extern struct tss *dftss0;
+extern tss_t *dftss0;
 #endif	/* __i386 */
 
 extern void div0trap(), dbgtrap(), nmiint(), brktrap(), ovflotrap();

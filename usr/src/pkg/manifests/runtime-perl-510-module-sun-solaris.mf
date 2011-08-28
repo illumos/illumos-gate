@@ -34,7 +34,6 @@ set name=pkg.summary value="Perl 5.10.0 Sun::Solaris Modules"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/Perl
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/perl5
@@ -153,5 +152,4 @@ file path=usr/share/man/man3perl/Ucred.3perl
 license cr_Sun license=cr_Sun
 license usr/src/cmd/perl/THIRDPARTYLICENSE \
     license=usr/src/cmd/perl/THIRDPARTYLICENSE
-depend fmri=runtime/perl-510 type=require
 depend fmri=runtime/perl-510/extra type=require

@@ -48,8 +48,8 @@ dir path=usr/lib/mdb/raw/$(ARCH64) group=sys
 dir path=usr/sbin
 dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/java group=sys
 dir path=usr/share/lib/java/javadoc group=other
 dir path=usr/share/lib/java/javadoc/dtrace group=other

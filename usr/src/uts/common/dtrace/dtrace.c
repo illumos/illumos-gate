@@ -144,6 +144,7 @@ int		dtrace_err_verbose;
 hrtime_t	dtrace_deadman_interval = NANOSEC;
 hrtime_t	dtrace_deadman_timeout = (hrtime_t)10 * NANOSEC;
 hrtime_t	dtrace_deadman_user = (hrtime_t)30 * NANOSEC;
+hrtime_t	dtrace_unregister_defunct_reap = (hrtime_t)60 * NANOSEC;
 
 /*
  * DTrace External Variables
@@ -460,11 +461,13 @@ static dtrace_probe_t *dtrace_probe_lookup_id(dtrace_id_t id);
 static void dtrace_enabling_provide(dtrace_provider_t *);
 static int dtrace_enabling_match(dtrace_enabling_t *, int *);
 static void dtrace_enabling_matchall(void);
+static void dtrace_enabling_reap(void);
 static dtrace_state_t *dtrace_anon_grab(void);
 static uint64_t dtrace_helper(int, dtrace_mstate_t *,
     dtrace_state_t *, uint64_t, uint64_t);
 static dtrace_helpers_t *dtrace_helpers_create(proc_t *);
 static void dtrace_buffer_drop(dtrace_buffer_t *);
+static int dtrace_buffer_consumed(dtrace_buffer_t *, hrtime_t when);
 static intptr_t dtrace_buffer_reserve(dtrace_buffer_t *, size_t, size_t,
     dtrace_state_t *, dtrace_mstate_t *);
 static int dtrace_state_option(dtrace_state_t *, dtrace_optid_t,
@@ -2755,6 +2758,22 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		}
 
 		return (dtrace_getreg(lwp->lwp_regs, ndx));
+	}
+
+	case DIF_VAR_VMREGS: {
+		uint64_t rval;
+
+		if (!dtrace_priv_kernel(state))
+			return (0);
+
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
+
+		rval = dtrace_getvmreg(ndx,
+		    &cpu_core[CPU->cpu_id].cpuc_dtrace_flags);
+
+		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+
+		return (rval);
 	}
 
 	case DIF_VAR_CURTHREAD:
@@ -7084,7 +7103,7 @@ dtrace_unregister(dtrace_provider_id_t id)
 {
 	dtrace_provider_t *old = (dtrace_provider_t *)id;
 	dtrace_provider_t *prev = NULL;
-	int i, self = 0;
+	int i, self = 0, noreap = 0;
 	dtrace_probe_t *probe, *first = NULL;
 
 	if (old->dtpv_pops.dtps_enable ==
@@ -7141,14 +7160,31 @@ dtrace_unregister(dtrace_provider_id_t id)
 			continue;
 
 		/*
-		 * We have at least one ECB; we can't remove this provider.
+		 * If we are trying to unregister a defunct provider, and the
+		 * provider was made defunct within the interval dictated by
+		 * dtrace_unregister_defunct_reap, we'll (asynchronously)
+		 * attempt to reap our enablings.  To denote that the provider
+		 * should reattempt to unregister itself at some point in the
+		 * future, we will return a differentiable error code (EAGAIN
+		 * instead of EBUSY) in this case.
 		 */
+		if (dtrace_gethrtime() - old->dtpv_defunct >
+		    dtrace_unregister_defunct_reap)
+			noreap = 1;
+
 		if (!self) {
 			mutex_exit(&dtrace_lock);
 			mutex_exit(&mod_lock);
 			mutex_exit(&dtrace_provider_lock);
 		}
-		return (EBUSY);
+
+		if (noreap)
+			return (EBUSY);
+
+		(void) taskq_dispatch(dtrace_taskq,
+		    (task_func_t *)dtrace_enabling_reap, NULL, TQ_SLEEP);
+
+		return (EAGAIN);
 	}
 
 	/*
@@ -7239,7 +7275,7 @@ dtrace_invalidate(dtrace_provider_id_t id)
 	mutex_enter(&dtrace_provider_lock);
 	mutex_enter(&dtrace_lock);
 
-	pvp->dtpv_defunct = 1;
+	pvp->dtpv_defunct = dtrace_gethrtime();
 
 	mutex_exit(&dtrace_lock);
 	mutex_exit(&dtrace_provider_lock);
@@ -10143,6 +10179,7 @@ dtrace_buffer_switch(dtrace_buffer_t *buf)
 	caddr_t tomax = buf->dtb_tomax;
 	caddr_t xamot = buf->dtb_xamot;
 	dtrace_icookie_t cookie;
+	hrtime_t now = dtrace_gethrtime();
 
 	ASSERT(!(buf->dtb_flags & DTRACEBUF_NOSWITCH));
 	ASSERT(!(buf->dtb_flags & DTRACEBUF_RING));
@@ -10158,6 +10195,8 @@ dtrace_buffer_switch(dtrace_buffer_t *buf)
 	buf->dtb_drops = 0;
 	buf->dtb_errors = 0;
 	buf->dtb_flags &= ~(DTRACEBUF_ERROR | DTRACEBUF_DROPPED);
+	buf->dtb_interval = now - buf->dtb_switched;
+	buf->dtb_switched = now;
 	dtrace_interrupt_enable(cookie);
 }
 
@@ -10563,6 +10602,36 @@ dtrace_buffer_polish(dtrace_buffer_t *buf)
 		    buf->dtb_size - buf->dtb_offset);
 		bzero(buf->dtb_tomax, buf->dtb_xamot_offset);
 	}
+}
+
+/*
+ * This routine determines if data generated at the specified time has likely
+ * been entirely consumed at user-level.  This routine is called to determine
+ * if an ECB on a defunct probe (but for an active enabling) can be safely
+ * disabled and destroyed.
+ */
+static int
+dtrace_buffer_consumed(dtrace_buffer_t *bufs, hrtime_t when)
+{
+	int i;
+
+	for (i = 0; i < NCPU; i++) {
+		dtrace_buffer_t *buf = &bufs[i];
+
+		if (buf->dtb_size == 0)
+			continue;
+
+		if (buf->dtb_flags & DTRACEBUF_RING)
+			return (0);
+
+		if (!buf->dtb_switched && buf->dtb_offset != 0)
+			return (0);
+
+		if (buf->dtb_switched - buf->dtb_interval < when)
+			return (0);
+	}
+
+	return (1);
 }
 
 static void
@@ -11052,6 +11121,85 @@ retry:
 	mutex_exit(&dtrace_lock);
 	dtrace_probe_provide(NULL, all ? NULL : prv);
 	mutex_enter(&dtrace_lock);
+}
+
+/*
+ * Called to reap ECBs that are attached to probes from defunct providers.
+ */
+static void
+dtrace_enabling_reap(void)
+{
+	dtrace_provider_t *prov;
+	dtrace_probe_t *probe;
+	dtrace_ecb_t *ecb;
+	hrtime_t when;
+	int i;
+
+	mutex_enter(&cpu_lock);
+	mutex_enter(&dtrace_lock);
+
+	for (i = 0; i < dtrace_nprobes; i++) {
+		if ((probe = dtrace_probes[i]) == NULL)
+			continue;
+
+		if (probe->dtpr_ecb == NULL)
+			continue;
+
+		prov = probe->dtpr_provider;
+
+		if ((when = prov->dtpv_defunct) == 0)
+			continue;
+
+		/*
+		 * We have ECBs on a defunct provider:  we want to reap these
+		 * ECBs to allow the provider to unregister.  The destruction
+		 * of these ECBs must be done carefully:  if we destroy the ECB
+		 * and the consumer later wishes to consume an EPID that
+		 * corresponds to the destroyed ECB (and if the EPID metadata
+		 * has not been previously consumed), the consumer will abort
+		 * processing on the unknown EPID.  To reduce (but not, sadly,
+		 * eliminate) the possibility of this, we will only destroy an
+		 * ECB for a defunct provider if, for the state that
+		 * corresponds to the ECB:
+		 *
+		 *  (a)	There is no speculative tracing (which can effectively
+		 *	cache an EPID for an arbitrary amount of time).
+		 *
+		 *  (b)	The principal buffers have been switched twice since the
+		 *	provider became defunct.
+		 *
+		 *  (c)	The aggregation buffers are of zero size or have been
+		 *	switched twice since the provider became defunct.
+		 *
+		 * We use dts_speculates to determine (a) and call a function
+		 * (dtrace_buffer_consumed()) to determine (b) and (c).  Note
+		 * that as soon as we've been unable to destroy one of the ECBs
+		 * associated with the probe, we quit trying -- reaping is only
+		 * fruitful in as much as we can destroy all ECBs associated
+		 * with the defunct provider's probes.
+		 */
+		while ((ecb = probe->dtpr_ecb) != NULL) {
+			dtrace_state_t *state = ecb->dte_state;
+			dtrace_buffer_t *buf = state->dts_buffer;
+			dtrace_buffer_t *aggbuf = state->dts_aggbuffer;
+
+			if (state->dts_speculates)
+				break;
+
+			if (!dtrace_buffer_consumed(buf, when))
+				break;
+
+			if (!dtrace_buffer_consumed(aggbuf, when))
+				break;
+
+			dtrace_ecb_disable(ecb);
+			ASSERT(probe->dtpr_ecb != ecb);
+			dtrace_ecb_destroy(ecb);
+		}
+	}
+
+	mutex_exit(&dtrace_lock);
+	mutex_exit(&cpu_lock);
 }
 
 /*

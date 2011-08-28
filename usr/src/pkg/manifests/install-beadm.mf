@@ -36,7 +36,7 @@ dir path=usr/lib/python2.6
 dir path=usr/lib/python2.6/vendor-packages
 dir path=usr/lib/python2.6/vendor-packages/beadm
 dir path=usr/sbin
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man1m
 file path=sbin/beadm mode=0555

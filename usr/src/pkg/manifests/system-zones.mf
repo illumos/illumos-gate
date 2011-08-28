@@ -49,8 +49,8 @@ dir path=usr/lib/brand/ipkg group=bin
 dir path=usr/lib/brand/shared group=sys
 dir path=usr/lib/zones
 dir path=usr/sbin
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
 dir path=usr/share/man

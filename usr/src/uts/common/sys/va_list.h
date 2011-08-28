@@ -31,8 +31,6 @@
 #ifndef	_SYS_VA_LIST_H
 #define	_SYS_VA_LIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * An application should not include this header directly.  Instead it
  * should be included only through the inclusion of other Sun headers.

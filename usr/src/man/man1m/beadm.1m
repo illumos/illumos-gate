@@ -46,6 +46,16 @@ beadm \- utility for managing zfs boot environments
 \fBbeadm\fR \fBactivate\fR \fIbeName\fR
 .fi
 
+.LP
+.nf
+\fBbeadm\fR \fBrollback\fR \fIbeName\fR \fIsnapshot\fR
+.fi
+
+.LP
+.nf
+\fBbeadm\fR \fBrollback\fR \fIbeName@snapshot\fR
+.fi
+
 .SH DESCRIPTION
 The \fBbeadm\fR command is the user interface for managing zfs Boot
 Environments (BEs). This utility is intended to be used by System
@@ -118,6 +128,12 @@ Destroy a snapshot of a BE.
 .ie t \(bu
 .el -
 Rename an existing, inactive BE.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el -
+Roll back a BE to an existing snapshot of a BE.
 .RE
 .RS +4
 .TP
@@ -400,6 +416,18 @@ Renames the boot environment named \fIbeName\fR to \fInewBeName\fR.
 .ne 2
 .mk
 .na
+\fBbeadm\fR \fBrollback\fR \fIbeName\fR \fIsnapshot\fR | \fIbeName@snapshot\fR
+.ad
+.sp .6
+.RS 4n
+Roll back the boot environment named \fIbeName\fR to existing snapshot
+of the boot environment named \fIbeName@snapshot\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fBbeadm\fR \fBactivate\fR \fIbeName\fR
 .ad
 .sp .6
@@ -553,7 +581,17 @@ and provide a description for it.
 .sp
 
 .LP
-\fBExample 14\fR: List all existing boot environments.
+\fBExample 14\fR: Roll back the BE named BE1 to snapshot BE1@now.
+.sp
+.in +2
+.nf
+\fB# beadm rollback BE1 BE1@now\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 15\fR: List all existing boot environments.
 
 .sp
 .in +2
@@ -570,7 +608,7 @@ BE5 NR     /          7.25G  static 2008-09-09 16:53
 .sp
 
 .LP
-\fBExample 14\fR: List all existing boot environmets and list all dataset and
+\fBExample 16\fR: List all existing boot environmets and list all dataset and
 snapshot information about those bootenvironments.
 
 .sp
@@ -602,7 +640,7 @@ BE5
 .in -2
 .sp
 
-\fBExample 15\fR: List all dataset and snapshot information about BE5
+\fBExample 17\fR: List all dataset and snapshot information about BE5
 
 .sp
 .in +2
@@ -623,7 +661,7 @@ BE5
 .sp
 
 .LP
-\fBExample 16\fR: List machine parsable information about all boot
+\fBExample 18\fR: List machine parsable information about all boot
 environments.
 
 .sp

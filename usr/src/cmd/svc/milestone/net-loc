@@ -202,9 +202,11 @@ do_dns () {
 			    dns-nameservice-search`
 			;;
 		'dhcp')
-			DNS_DOMAIN=`get_dhcpinfo DNSdmain`
+			DNS_SEARCH=`get_dhcpinfo DNSdmain`
 			DNS_SERVERS=`get_dhcpinfo DNSserv`
-			# No DNS search info for IPv4
+			# Use first search list entry as default domain
+			set -- $DNS_SEARCH
+			DNS_DOMAIN=$1
 			;;
 		'*')
 			echo "Unrecognized DNS configsrc ${configsrc}; ignoring"

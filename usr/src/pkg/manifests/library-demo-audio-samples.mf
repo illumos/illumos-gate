@@ -31,7 +31,7 @@ set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/demo
 dir path=usr/demo/SOUND
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/audio
 dir path=usr/share/audio/samples
 dir path=usr/share/audio/samples/au

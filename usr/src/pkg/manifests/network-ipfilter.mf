@@ -47,7 +47,7 @@ dir path=usr/lib/ipf/$(ARCH64) group=sys
 dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/ipfilter
 dir path=usr/share/ipfilter/examples
 dir path=usr/share/man
