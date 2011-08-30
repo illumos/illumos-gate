@@ -23,10 +23,12 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 include 	./Makefile.lp
 
-SUBDIRS =	filter crontab terminfo lib cmd model
+SUBDIRS =	filter crontab lib cmd model
 
 MSGSUBDIRS =	filter lib cmd model
 

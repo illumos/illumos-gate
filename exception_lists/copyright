@@ -18,8 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 syntax: glob
@@ -49,6 +49,8 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_policy.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_realm.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_services.h
 usr/src/cmd/smbsrv/smbd/eventlog.dll
+usr/src/cmd/terminfo/termcap.src
+usr/src/cmd/terminfo/terminfo.src
 usr/src/common/bzip2/LICENSE
 usr/src/common/bzip2/Solaris.README.txt
 usr/src/common/bzip2/bzlib.h
