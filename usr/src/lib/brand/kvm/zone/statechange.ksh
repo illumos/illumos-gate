@@ -97,6 +97,12 @@ setup_net()
 		blocked_outgoing_ports=$(eval \
 		    echo \$_ZONECFG_net_${nic}_blocked_outgoing_ports)
 		zone_ip=$(eval echo \$_ZONECFG_net_${nic}_ip)
+		allow_ip_spoof=$(eval \
+		    echo \$_ZONECFG_net_${nic}_allow_ip_spoofing)
+		allow_mac_spoof=$(eval \
+		    echo \$_ZONECFG_net_${nic}_allow_mac_spoofing)
+		allow_restricted_traffic=$(eval \
+		    echo \$_ZONECFG_net_${nic}_allow_restricted_traffic)
 
 		# If address set, must be a shared stack zone
 		[[ -n $address ]] && exit 0
@@ -190,18 +196,49 @@ setup_net()
 			    "set mac-addr=$mac_addr; end; exit"
 		fi
 
-		# Enable full antispoof
-		spoof_opts="ip-nospoof,mac-nospoof,restricted,dhcp-nospoof"
-		dladm set-linkprop -t -z $ZONENAME -p \
-		    "protection=${spoof_opts}" ${nic}
-		if (( $? != 0 )); then
-			echo "error setting VNIC protection $nic $spoof_opts"
-			logger -p daemon.err "zone $ZONENAME error setting " \
-			    "VNIC protection $nic $spoof_opts"
-			exit 1
+		# Set up antispoof options
+
+		# XXX For backwards compatibility, special handling for
+		# zone named "dhcpd".  Remove this check once property
+		# is added to zone.
+		if [[ $ZONENAME == "dhcpd" ]] || [[ $dhcp_server == "1" ]]; then
+			enable_dhcp="true"
+			# This needs to be off for dhcp server zones
+			allow_ip_spoof=1
 		fi
 
-		if [[ -n "${zone_ip}" ]]; then
+		comma=""
+		if [[ $allow_mac_spoof != "1" ]]; then
+			spoof_opts="${spoof_opts}${comma}mac-nospoof"
+			comma=","
+		fi
+		if [[ $allow_ip_spoof != "1" ]]; then
+			echo "   not 1"
+			spoof_opts="${spoof_opts}${comma}ip-nospoof"
+			ip_spoof_enabled="true"
+			comma=","
+		fi
+		if [[ $allow_restricted_traffic != "1" ]]; then
+			spoof_opts="${spoof_opts}${comma}restricted"
+			comma=","
+		fi
+		if [[ -z "${enable_dhcp}" ]]; then
+			spoof_opts="${spoof_opts}${comma}dhcp-nospoof"
+			comma=","
+		fi
+
+		if [[ -n ${spoof_opts} ]]; then
+			dladm set-linkprop -t -z $ZONENAME -p \
+			"protection=${spoof_opts}" ${nic}
+			if (( $? != 0 )); then
+				echo "error setting VNIC protection $nic $spoof_opts"
+				    logger -p daemon.err "zone $ZONENAME error setting " \
+				    "VNIC protection $nic $spoof_opts"
+			exit 1
+			fi
+		fi
+
+		if [[ -n "${zone_ip}" ]] && [[ -n "${ip_spoof_enabled}" ]]; then
 			dladm set-linkprop -t -z $ZONENAME \
 			    -p "allowed-ips=${zone_ip}" ${nic}
 			if (( $? != 0 )); then
