@@ -65,8 +65,9 @@ show_kernel()
 
 show_zone_up_down()
 {
-	/usr/sbin/dtrace -n '
+	exec /usr/sbin/dtrace -n '
 	#pragma D option quiet
+        #pragma D option bufsize=16k
 
 	inline string ZONENAME = "'$ZONENAME'";
 
@@ -102,7 +103,7 @@ show_zone_up_down()
 
 show_all_zone_up_down()
 {
-	/usr/sbin/dtrace -n '
+	exec /usr/sbin/dtrace -n '
 	#pragma D option quiet
 
 	/*
@@ -133,7 +134,7 @@ show_zone_trans()
 {
 	echo "State Transitions:"
 
-	/usr/sbin/dtrace -n '
+	exec /usr/sbin/dtrace -n '
 	#pragma D option quiet
 
 	fbt::zone_create:entry
