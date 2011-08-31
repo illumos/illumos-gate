@@ -206,12 +206,12 @@ setup_net()
 		fi
 
 		comma=""
+		spoof_opts=""
 		if [[ $allow_mac_spoof != "1" ]]; then
 			spoof_opts="${spoof_opts}${comma}mac-nospoof"
 			comma=","
 		fi
 		if [[ $allow_ip_spoof != "1" ]]; then
-			echo "   not 1"
 			spoof_opts="${spoof_opts}${comma}ip-nospoof"
 			ip_spoof_enabled="true"
 			comma=","
