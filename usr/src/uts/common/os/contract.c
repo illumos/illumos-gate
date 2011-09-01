@@ -2078,12 +2078,9 @@ cte_copy(ct_equeue_t *q, ct_equeue_t *newq)
 			if (first == NULL)
 				first = e;
 			/*
-			 * In cte_publish_all() ct_evtlock is used to
-			 * ensure events are properly delivered.  However,
-			 * during adoption we have a totally different locking
-			 * order. Thus its possible for a race to occur and
-			 * we could get an event inserted multiple times unless
-			 * we double check for that case.
+			 * It is possible for adoption to race with an owner's
+			 * cte_publish_all(); we must only enqueue events that
+			 * have not already been enqueued.
 			 */
 			if (!list_link_active((list_node_t *)
 			    ((uintptr_t)e + newq->ctq_events.list_offset))) {
@@ -2238,11 +2235,22 @@ cte_queue_drain(ct_equeue_t *q, int ack)
  * cte_publish_all.
  */
 static void
-cte_publish(ct_equeue_t *q, ct_kevent_t *e, timespec_t *tsp)
+cte_publish(ct_equeue_t *q, ct_kevent_t *e, timespec_t *tsp, boolean_t mayexist)
 {
 	ASSERT(MUTEX_HELD(&q->ctq_lock));
 
 	q->ctq_atime = *tsp;
+
+	/*
+	 * If this event may already exist on this queue, check to see if it
+	 * is already there and return if so.
+	 */
+	if (mayexist && list_link_active((list_node_t *)((uintptr_t)e +
+	    q->ctq_events.list_offset))) {
+		mutex_exit(&q->ctq_lock);
+		cte_rele(e);
+		return;
+	}
 
 	/*
 	 * Don't publish if the event is informative and there aren't
@@ -2331,14 +2339,14 @@ cte_publish_all(contract_t *ct, ct_kevent_t *e, nvlist_t *data, nvlist_t *gdata)
 			ct->ct_evcnt++;
 	}
 	mutex_exit(&ct->ct_lock);
-	cte_publish(&ct->ct_events, e, &ts);
+	cte_publish(&ct->ct_events, e, &ts, B_FALSE);
 
 	/*
 	 * CTEL_BUNDLE - Next deliver to the contract type's bundle
 	 * queue.
 	 */
 	mutex_enter(&ct->ct_type->ct_type_events.ctq_lock);
-	cte_publish(&ct->ct_type->ct_type_events, e, &ts);
+	cte_publish(&ct->ct_type->ct_type_events, e, &ts, B_FALSE);
 
 	/*
 	 * CTEL_PBUNDLE - Finally, if the contract has an owner,
@@ -2355,7 +2363,14 @@ cte_publish_all(contract_t *ct, ct_kevent_t *e, nvlist_t *data, nvlist_t *gdata)
 		q = ct->ct_owner->p_ct_equeue[ct->ct_type->ct_type_index];
 		mutex_enter(&q->ctq_lock);
 		mutex_exit(&ct->ct_lock);
-		cte_publish(q, e, &ts);
+
+		/*
+		 * It is possible for this code to race with adoption; we
+		 * publish the event indicating that the event may already
+		 * be enqueued because adoption beat us to it (in which case
+		 * cte_pubish() does nothing).
+		 */
+		cte_publish(q, e, &ts, B_TRUE);
 	} else {
 		mutex_exit(&ct->ct_lock);
 		cte_rele(e);
