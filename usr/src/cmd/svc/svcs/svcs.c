@@ -3707,14 +3707,12 @@ again:
 
 	if (scf_handle_bind(h) == -1) {
 		if (g_zonename != NULL) {
-			uu_warn(gettext("Could not bind to repository "
+			if (show_zones)
+				goto nextzone;
+
+			uu_die(gettext("Could not bind to repository "
 			    "server for zone %s: %s\n"), g_zonename,
 			    scf_strerror(scf_error()));
-
-			if (!show_zones)
-				return (UU_EXIT_FATAL);
-
-			goto nextzone;
 		}
 
 		uu_die(gettext("Could not bind to repository server: %s.  "
