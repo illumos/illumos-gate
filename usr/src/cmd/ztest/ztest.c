@@ -4795,7 +4795,6 @@ ztest_run_zdb(char *pool)
 			isalen = 0;
 			isa = strdup("");
 		}
-		/* LINTED */
 		(void) sprintf(zdbpath, "/usr/sbin%.*s/zdb", isalen, isa);
 		free(isa);
 	}
