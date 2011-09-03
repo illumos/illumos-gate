@@ -64,7 +64,6 @@ CAFILES = ABAecom_sub.,_Am._Bankers_Assn._Root_CA.pem	\
 	DigiCert_Assured_ID_Root_CA.pem	\
 	DigiCert_Global_Root_CA.pem	\
 	DigiCert_High_Assurance_EV_Root_CA.pem	\
-	DigiNotar_Root_CA.pem	\
 	Digital_Signature_Trust_Co._Global_CA_1.pem	\
 	Digital_Signature_Trust_Co._Global_CA_2.pem	\
 	Digital_Signature_Trust_Co._Global_CA_3.pem	\
