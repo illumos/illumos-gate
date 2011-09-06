@@ -56,6 +56,7 @@ state=$4
 cmd=$5
 
 LOCKFILE=/etc/dladm/zone.lck
+SNAPSHOT_DIR=root/checkpoints
 
 #
 # Create a lock file which we use to serialize datalink operations across zones.
@@ -324,18 +325,44 @@ setup_fs()
 {
 	[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
 	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
-	[ ! -d $ZONEPATH/root/checkpoints ] && \
-	    mkdir -m755 $ZONEPATH/root/checkpoints
+	[ ! -d $ZONEPATH/$SNAPSHOT_DIR ] && mkdir -m755 $ZONEPATH/$SNAPSHOT_DIR
 	if [ ! -d $ZONEPATH/ccs ]; then
 		mkdir -m755 $ZONEPATH/ccs
 		(cd /usr/ccs; tar cbf 512 - *) | \
 		    (cd $ZONEPATH/ccs; tar xbf 512 -)
 	fi
 
-	# Force zone snapshots to get mounted
-	ls $ZONEPATH/.zfs/snapshot/* >/dev/null 2>&1
-
 	uname -v > $ZONEPATH/lastbooted
+}
+
+setup_snapshots()
+{
+	#
+	# Because the top-level directory of each ZFS snapshot contains some
+	# internal information, mount the /root directory of each snapshot
+	# separately.
+	#
+	for snap in $(ls -1 $ZONEPATH/.zfs/snapshot); do
+		snapdir=$ZONEPATH/$SNAPSHOT_DIR/${snap}
+		mkdir -p ${snapdir}
+		mount -F lofs -o ro,setuid,nodevices \
+		    $ZONEPATH/.zfs/snapshot/${snap}/root ${snapdir}
+	done
+}
+
+cleanup_snapshots()
+{
+	#
+	# Each ZFS snapshot is mounted separately, so find all mounted
+	# snapshots for this zone, and unmount them.
+	#
+	snaps=$(ls -1 $ZONEPATH/$SNAPSHOT_DIR)
+
+	for snap in ${snaps}; do
+		snapdir=$ZONEPATH/$SNAPSHOT_DIR/${snap}
+		umount ${snapdir}
+		rmdir ${snapdir}
+	done
 }
 
 #
@@ -369,7 +396,10 @@ load_sdc_sysinfo
 load_sdc_config
 
 [[ "$subcommand" == "pre" && $cmd == 0 ]] && setup_fs
-[[ "$subcommand" == "pre" && $cmd == 4 ]] && cleanup_net
+[[ "$subcommand" == "post" && $cmd == 0 ]] && setup_snapshots
+[[ "$subcommand" == "pre" && $cmd == 4 ]] && cleanup_snapshots
+
 [[ "$subcommand" == "post" && $cmd == 0 ]] && setup_net
+[[ "$subcommand" == "pre" && $cmd == 4 ]] && cleanup_net
 
 exit 0
