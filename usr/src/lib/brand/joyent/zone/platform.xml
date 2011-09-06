@@ -45,8 +45,6 @@
 	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="/usr" directory="/usr"
 	    opt="ro,nodevices" type="lofs" />
-	<global_mount special="%R/.zfs/snapshot" directory="/checkpoints"
-	    opt="ro,nodevices" type="lofs" />
 	<global_mount special="%R/local" directory="/usr/local"
 	    opt="nodevices" type="lofs" />
 	<global_mount special="%R/ccs" directory="/usr/ccs"
