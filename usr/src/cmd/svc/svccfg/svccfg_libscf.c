@@ -6772,7 +6772,7 @@ connaborted:
  * checking the state of the EMI instance. If it is online it bails out
  * and makes sure that it doesn't run again. In this case, we're going
  * to do something similar, only if the state is online, then we're
- * going to 
+ * going to actually verify.
  *
  * Returns 0 on success or returns an errno.
  */
@@ -6861,6 +6861,40 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 				break;
 			default:
 				bad_error("scf_service_get_instance", ret);
+			}
+
+			return (err);
+		}
+
+		ts.tv_sec = pg_timeout / NANOSEC;
+		ts.tv_nsec = pg_timeout % NANOSEC;
+
+		(void) nanosleep(&ts, NULL);
+	}
+
+	/*
+	 * svcadm also expects that the SCF_PROPERTY_STATE property is present.
+	 * So in addition to the property group being present, we need to wait
+	 * for the property to be there in some form.
+	 */
+	while ((ret = scf_pg_get_property(imp_pg, SCF_PROPERTY_STATE,
+	    imp_prop)) != 0) {
+
+		ret = scf_error();
+		if (ret != SCF_ERROR_NOT_FOUND) {
+			warn(gettext("Failed to get property %s from the "
+			    "restarter property group of instance %s\n"),
+			    SCF_PROPERTY_STATE, inst->sc_name);
+			switch (ret) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				warn(gettext("Lost repository connection\n"));
+				err = ECONNABORTED;
+				break;
+			case SCF_ERROR_DELETED:
+				err = ENODEV;
+				break;
+			default:
+				bad_error("scf_pg_get_property", ret);
 			}
 
 			return (err);
@@ -8274,7 +8308,8 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 			for (inst = uu_list_first(insts);
 			    inst != NULL;
 			    inst = uu_list_next(insts, inst)) {
-				if (lscf_instance_verify(imp_scope, svc, inst) != 0)
+				if (lscf_instance_verify(imp_scope, svc,
+				    inst) != 0)
 					goto progress;
 			}
 		}
