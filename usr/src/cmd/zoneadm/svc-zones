@@ -30,12 +30,11 @@ set -o xtrace
 ZPOOL=`svcprop -p config/zpool svc:/system/smartdc/init:default 2>/dev/null`
 ZPOOL=${ZPOOL:-zones}
 
-MANFDS=$ZPOOL/manifests
-GZDIR=/lib/svc/manifest
-DESTDIR=/$MANFDS
-CONFIG=/usr/lib/brand/joyent/manifests
+MAN_CONFIG=/usr/lib/brand/joyent/manifests
+MAN_SRCDIR=/lib/svc/manifest
+MAN_DESTDIR=/$ZPOOL/manifests
 
-SMFDIRS="\
+MAN_DIRS="\
 	application \
 	milestone \
 	network \
@@ -60,26 +59,35 @@ SMFDIRS="\
 	system/svc"
 
 #
-# If we're running off of a live-image, setup a zone-specific manifest
-# dataset that we can mount on the zone's /lib/svc/manifest directory.
+# If we're running off of a live-image, setup a zone-specific collection of
+# manifest files which are mounted in a zone's /lib/svc/manifest directory.
 #
-# Regenerate the manifest data each time the image boots, so that its
-# always in sync with the running image (and any fixes included there).
+# Regenerate the manifest data each time this service starts, so that it's
+# always in sync with the running platform (and any fixes included there).
 #
 setup_manifests()
 {
 	echo "Initializing manifest dir."
-	zfs list -H -o name $MANFDS >/dev/null 2>&1 
-	[ $? -eq 0 ] && zfs destroy $MANFDS
-	zfs create $MANFDS
 
-	# Create the directory hierarchy under the destination directory.
-	for i in $SMFDIRS
+	#
+	# Create the directory hierarchy under the destination directory for SMF
+	# manifests.  This directory used to be a separate ZFS dataset, so if
+	# such a dataset exists, destroy it.  There's no reason for the manifest
+	# directory to be in its own dataset.
+	#
+	rm -rf $MAN_DESTDIR/*
+	zfs list -H -o name $ZPOOL/manifests >/dev/null 2>&1
+	[ $? -eq 0 ] && zfs destroy $ZPOOL/manifests
+
+	rm -rf $MAN_DESTDIR
+	mkdir -m755 $MAN_DESTDIR
+
+	for dir in $MAN_DIRS
 	do
-		mkdir -m755 $DESTDIR/$i
+		mkdir -m755 $MAN_DESTDIR/$dir
 	done
 
-	if [[ ! -f $CONFIG ]]; then
+	if [[ ! -f $MAN_CONFIG ]]; then
 		echo "Missing zone SMF manifest list."
 		return
 	fi
@@ -88,7 +96,7 @@ setup_manifests()
 	# Process the SMF SVC configuration list to setup the zone-specific
 	# SMF svcs.
 	#
-	nawk -v base=$GZDIR -v dest=$DESTDIR '{
+	nawk -v base=$MAN_SRCDIR -v dest=$MAN_DESTDIR '{
 		# Ignore comments and empty lines.
 		if (substr($1, 1, 1) == "#" || length($1) == 0)
 			next
@@ -130,7 +138,7 @@ setup_manifests()
 		}
 		close(f)
 		close(of)
-	}' $CONFIG
+	}' $MAN_CONFIG
 }
 
 #
