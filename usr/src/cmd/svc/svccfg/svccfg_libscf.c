@@ -6876,6 +6876,9 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 	 * svcadm also expects that the SCF_PROPERTY_STATE property is present.
 	 * So in addition to the property group being present, we need to wait
 	 * for the property to be there in some form.
+	 *
+	 * Note that a property group is a frozen snapshot in time. To properly
+	 * get beyond this, you have to refresh the property group each time.
 	 */
 	while ((ret = scf_pg_get_property(imp_pg, SCF_PROPERTY_STATE,
 	    imp_prop)) != 0) {
@@ -6904,6 +6907,25 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 		ts.tv_nsec = pg_timeout % NANOSEC;
 
 		(void) nanosleep(&ts, NULL);
+
+		ret = scf_instance_get_pg(imp_inst, SCF_PG_RESTARTER, imp_pg);
+		if (ret != SCF_SUCCESS) {
+			warn(gettext("Failed to get restarter property "
+			    "group for instance: %s\n"), inst->sc_name);
+			switch (ret) {
+			case SCF_ERROR_DELETED:
+				err = ENODEV;
+				break;
+			case SCF_ERROR_CONNECTION_BROKEN:
+				warn(gettext("Lost repository connection\n"));
+				err = ECONNABORTED;
+				break;
+			default:
+				bad_error("scf_service_get_instance", ret);
+			}
+
+			return (err);
+		}
 	}
 
 	/*
