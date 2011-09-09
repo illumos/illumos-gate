@@ -622,6 +622,7 @@ static int
 unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 {
 	int error = 0;
+	int fail = 0;
 	FILE *mnttab;
 	struct mnttab *mnts;
 	uint_t nmnt;
@@ -711,16 +712,31 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 					stuck = B_FALSE;
 				} else {
 					/*
-					 * The first failure indicates a
-					 * mount we won't be able to get
-					 * rid of automatically, so we
-					 * bail.
+					 * We may hit a failure here if there
+					 * is an app in the GZ with an open
+					 * pipe into the zone (commonly into
+					 * the zone's /var/run).  This type
+					 * of app will notice the closed
+					 * connection and cleanup, but it may
+					 * take a while and we have no easy
+					 * way to notice that.  To deal with
+					 * this case, we will wait and retry
+					 * a few times before we give up.
 					 */
-					error++;
-					zerror(zlogp, B_FALSE,
-					    "unable to unmount '%s'", path);
-					free_mnttable(mnts, nmnt);
-					goto out;
+					if (fail++ < 15) {
+						zerror(zlogp, B_FALSE,
+						    "unable to unmount '%s', "
+						    "retrying in 1 second",
+						    path);
+						(void) sleep(1);
+					} else {
+						error++;
+						zerror(zlogp, B_FALSE,
+						    "unable to unmount '%s'",
+						    path);
+						free_mnttable(mnts, nmnt);
+						goto out;
+					}
 				}
 			}
 			/*
