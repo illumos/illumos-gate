@@ -3927,7 +3927,7 @@ tcp_iss_init(tcp_t *tcp)
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
 
-	tcps->tcps_iss_incr_extra += (ISS_INCR >> 1);
+	tcps->tcps_iss_incr_extra += (tcps->tcps_iss_incr >> 1);
 	tcp->tcp_iss = tcps->tcps_iss_incr_extra;
 	switch (tcps->tcps_strong_iss) {
 	case 2:
@@ -3950,7 +3950,8 @@ tcp_iss_init(tcp_t *tcp)
 		tcp->tcp_iss += (gethrtime() >> ISS_NSEC_SHT) + tcp_random();
 		break;
 	default:
-		tcp->tcp_iss += (uint32_t)gethrestime_sec() * ISS_INCR;
+		tcp->tcp_iss += (uint32_t)gethrestime_sec() *
+		    tcps->tcps_iss_incr;
 		break;
 	}
 	tcp->tcp_valid_bits = TCP_ISS_VALID;
