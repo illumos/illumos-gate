@@ -358,4 +358,14 @@ usr/src/uts/common/gssapi/mechs/krb5/krb5/os/toffset.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seed.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seqnum.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/val_cred.c
+usr/src/uts/common/io/ixgbe/ixgbe_82598.c
+usr/src/uts/common/io/ixgbe/ixgbe_82599.c
+usr/src/uts/common/io/ixgbe/ixgbe_api.c
+usr/src/uts/common/io/ixgbe/ixgbe_api.h
+usr/src/uts/common/io/ixgbe/ixgbe_common.c
+usr/src/uts/common/io/ixgbe/ixgbe_common.h
+usr/src/uts/common/io/ixgbe/ixgbe_osdep.h
+usr/src/uts/common/io/ixgbe/ixgbe_phy.c
+usr/src/uts/common/io/ixgbe/ixgbe_phy.h
+usr/src/uts/common/io/ixgbe/ixgbe_type.h
 usr/src/uts/sparc/nsmb/ioc_check.ref
