@@ -10,3 +10,4 @@ PLATFORM	= i86pc
 ROOT_BOOT_GRUB	= $(ROOT)/boot/grub
 ROOT_PLAT_GRUB	= $(ROOT)/platform/$(PLATFORM)/boot/grub
 ROOT_SRC	= $(ROOT)/usr/share/src/grub
+ROOT_USR_SBIN	= $(ROOT)/usr/sbin
