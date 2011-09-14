@@ -72,8 +72,7 @@ ZROOT=$ZONEPATH/root
 # Get the dataset of the parent directory of the zonepath.
 dname=${ZONEPATH%/*}
 bname=${ZONEPATH##*/}
-zfs list -H -t filesystem -o mountpoint,name | egrep "^$dname	" | \
-    read mp PDS_NAME
+PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
 [ -z "$PDS_NAME" ] && \
     print -u2 "Brand error: missing parent ZFS dataset for $dname"
 
