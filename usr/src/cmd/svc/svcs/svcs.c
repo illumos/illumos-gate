@@ -3681,6 +3681,24 @@ again:
 		assert(opt_zone == NULL || zids == NULL);
 
 		if (opt_zone == NULL) {
+			zone_status_t status;
+
+			if (zone_getattr(zids[zent], ZONE_ATTR_STATUS,
+			    &status, sizeof (status)) < 0 ||
+			    status != ZONE_IS_RUNNING) {
+				/*
+				 * If this zone is not running or we cannot
+				 * get its status, we do not want to attempt
+				 * to bind an SCF handle to it, lest we
+				 * accidentally interfere with a zone that
+				 * is not yet running by looking up a door
+				 * to its svc.configd (which could potentially
+				 * block a mount with an EBUSY).
+				 */
+				zent++;
+				goto nextzone;
+			}
+
 			if (getzonenamebyid(zids[zent++],
 			    zonename, sizeof (zonename)) < 0) {
 				uu_warn(gettext("could not get name for "
