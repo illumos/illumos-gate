@@ -214,6 +214,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zonecfg_set_root;
 	zonecfg_set_sched;
 	zonecfg_set_swinv;
+	zonecfg_set_uuid;
 	zonecfg_set_zonepath;
 	zonecfg_strerror;
 	zonecfg_str_to_bytes;

@@ -45,7 +45,7 @@
 	<verify_cfg></verify_cfg>
 	<verify_adm></verify_adm>
 	<postclone></postclone>
-	<postinstall>/usr/lib/brand/kvm/pinstall -z %z -R %R</postinstall>
+	<postinstall></postinstall>
 	<attach>/usr/lib/brand/kvm/kattach -z %z -R %R</attach>
 	<detach>/usr/lib/brand/kvm/kdetach -z %z -R %R</detach>
 	<clone></clone>

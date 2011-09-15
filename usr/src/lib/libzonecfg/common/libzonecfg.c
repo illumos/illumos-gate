@@ -6226,6 +6226,30 @@ zonecfg_get_uuid(const char *zonename, uuid_t uuid)
 }
 
 /*
+ * Changes a zone's UUID to the given value. Returns an error if the UUID is
+ * malformed or if the zone cannot be located.
+ */
+int
+zonecfg_set_uuid(const char *zonename, const char *zonepath,
+    const char *uuid)
+{
+	int err;
+	struct zoneent ze;
+
+	bzero(&ze, sizeof (ze));
+	ze.zone_state = -1;	/* Preserve existing state in index */
+	(void) strlcpy(ze.zone_name, zonename, sizeof (ze.zone_name));
+	(void) strlcpy(ze.zone_path, zonepath, sizeof (ze.zone_path));
+	if (uuid_parse((char *)uuid, ze.zone_uuid) == -1)
+		return (Z_INVALID_PROPERTY);
+
+	if ((err = putzoneent(&ze, PZE_MODIFY)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+/*
  * File-system convenience functions.
  */
 boolean_t

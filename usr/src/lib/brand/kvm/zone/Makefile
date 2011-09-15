@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-PROGS =		kattach kdetach kinstall kuninstall pinstall prestate \
+PROGS =		kattach kdetach kinstall kuninstall prestate \
 		poststate statechange
 XMLDOCS=	config.xml platform.xml common.ksh
 USERFILES=

@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-PROGS =		jattach jdetach jinstall juninstall pinstall prestate \
+PROGS =		jattach jdetach jinstall juninstall prestate \
 		poststate statechange query
 XMLDOCS=	config.xml platform.xml common.ksh
 USERFILES=

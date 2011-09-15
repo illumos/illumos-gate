@@ -419,6 +419,12 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 
 			if (ze->zone_path[0] != '\0')
 				zone_path = ze->zone_path;
+
+			/* If new UUID provided, replace it */
+			if (!uuid_is_null(ze->zone_uuid)) {
+				uuid_unparse(ze->zone_uuid, uuidstr);
+				zone_uuid = uuidstr;
+			}
 			break;
 
 		case PZE_REMOVE:
