@@ -60,11 +60,11 @@ fi
 
 ORIGIN=`zfs get -H -ovalue  origin $PDS_NAME/$bname`
 
-zfs destroy -r $PDS_NAME/$bname/cores
-zfs destroy -r $PDS_NAME/$bname
+zfs destroy -rF $PDS_NAME/$bname/cores
+zfs destroy -rF $PDS_NAME/$bname
 (( $? != 0 )) && (echo "processes in zone: " && fuser $ZONEPATH)
 
-[ "$ORIGIN" != "-" ] && zfs destroy $ORIGIN
+[ "$ORIGIN" != "-" ] && zfs destroy -F $ORIGIN
 
 rm -rf $ZONEPATH
 
@@ -73,7 +73,7 @@ rm -rf $ZONEPATH
 DD=`zonecfg -z $ZONENAME info dataset | nawk '{if ($1 == "name:") print $2}'`
 for i in $DD
 do
-	zfs destroy -r $i >/dev/null 2>&1
+	zfs destroy -rF $i >/dev/null 2>&1
 done
 
 exit $ZONE_SUBPROC_OK
