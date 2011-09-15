@@ -211,8 +211,8 @@ get_usage(zfs_help_t idx)
 		    "\tcreate [-ps] [-b blocksize] [-o property=value] ... "
 		    "-V <size> <volume>\n"));
 	case HELP_DESTROY:
-		return (gettext("\tdestroy [-rRf] <filesystem|volume>\n"
-		    "\tdestroy [-rRd] <snapshot>\n"));
+		return (gettext("\tdestroy [-rRfF] <filesystem|volume>\n"
+		    "\tdestroy [-rRdF] <snapshot>\n"));
 	case HELP_GET:
 		return (gettext("\tget [-rHp] [-d max] "
 		    "[-o \"all\" | field[,...]] [-s source[,...]]\n"
@@ -856,12 +856,13 @@ badusage:
 }
 
 /*
- * zfs destroy [-rRf] <fs, vol>
+ * zfs destroy [-rRfF] <fs, vol>
  * zfs destroy [-rRd] <snap>
  *
  *	-r	Recursively destroy all children
  *	-R	Recursively destroy all dependents, including clones
  *	-f	Force unmounting of any dependents
+ *	-F	Continue retrying on seeing EBUSY
  *	-d	If we can't destroy now, mark for deferred destruction
  *
  * Destroys the given dataset.  By default, it will unmount any filesystems,
@@ -871,6 +872,7 @@ badusage:
 typedef struct destroy_cbdata {
 	boolean_t	cb_first;
 	int		cb_force;
+	boolean_t	cb_wait;
 	int		cb_recurse;
 	int		cb_error;
 	int		cb_needforce;
@@ -944,28 +946,46 @@ static int
 destroy_callback(zfs_handle_t *zhp, void *data)
 {
 	destroy_cbdata_t *cbp = data;
+	struct timespec ts;
+	int err = 0;
+
+	ts.tv_sec = 0;
+	ts.tv_nsec = 500 * (NANOSEC / MILLISEC);
 
 	/*
 	 * Ignore pools (which we've already flagged as an error before getting
 	 * here).
 	 */
 	if (strchr(zfs_get_name(zhp), '/') == NULL &&
-	    zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) {
-		zfs_close(zhp);
-		return (0);
-	}
+	    zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
+		goto out;
+
+	if ((err = zfs_unmount(zhp, NULL, cbp->cb_force ? MS_FORCE : 0)) != 0)
+		goto out;
+
+	if (cbp->cb_wait)
+		libzfs_print_on_error(g_zfs, B_FALSE);
 
 	/*
-	 * Bail out on the first error.
+	 * Unless instructed to retry on EBUSY, bail out on the first error.
+	 * When retrying, try every 500ms until either succeeding or seeing a
+	 * non-EBUSY error code.
 	 */
-	if (zfs_unmount(zhp, NULL, cbp->cb_force ? MS_FORCE : 0) != 0 ||
-	    zfs_destroy(zhp, cbp->cb_defer_destroy) != 0) {
-		zfs_close(zhp);
-		return (-1);
+	while ((err = zfs_destroy(zhp, cbp->cb_defer_destroy)) != 0) {
+		if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
+			(void) nanosleep(&ts, NULL);
+			continue;
+		}
+		(void) fprintf(stderr, "%s: %s\n", libzfs_error_action(g_zfs),
+		    libzfs_error_description(g_zfs));
+		break;
 	}
 
+	libzfs_print_on_error(g_zfs, B_TRUE);
+
+out:
 	zfs_close(zhp);
-	return (0);
+	return (err);
 }
 
 static int
@@ -1014,7 +1034,7 @@ zfs_do_destroy(int argc, char **argv)
 	zfs_type_t type = ZFS_TYPE_DATASET;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "dfrR")) != -1) {
+	while ((c = getopt(argc, argv, "dfFrR")) != -1) {
 		switch (c) {
 		case 'd':
 			cb.cb_defer_destroy = B_TRUE;
@@ -1022,6 +1042,9 @@ zfs_do_destroy(int argc, char **argv)
 			break;
 		case 'f':
 			cb.cb_force = 1;
+			break;
+		case 'F':
+			cb.cb_wait = B_TRUE;
 			break;
 		case 'r':
 			cb.cb_recurse = 1;
