@@ -230,7 +230,8 @@ enum {
 	VEX_RRM,        /* VEX  VEX.vvvv, mod_reg              -> mod_rm */
 	VEX_RMX,        /* VEX  VEX.vvvv, mod_rm               -> mod_reg */
 	VMx,		/* vmcall/vmlaunch/vmresume/vmxoff */
-	VMxo		/* VMx instruction with optional prefix */
+	VMxo,		/* VMx instruction with optional prefix */
+	SVM		/* AMD SVM instructions */
 };
 
 /*
@@ -498,7 +499,7 @@ const instable_t dis_op0F00[8] = {
  */
 const instable_t dis_op0F01[8] = {
 
-/*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6), TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",MO,6),
+/*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6),	TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",SVM,6),
 /*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS),
 };
 
@@ -3546,6 +3547,44 @@ just_mem:
 				goto error;
 #endif
 
+			NOMEM;
+			break;
+		}
+		/*FALLTHROUGH*/
+	case SVM:
+		if (mode == 3) {
+#if DIS_TEXT
+			char *vinstr;
+
+			switch (r_m) {
+			case 0:
+				vinstr = "vmrun";
+				break;
+			case 1:
+				vinstr = "vmmcall";
+				break;
+			case 2:
+				vinstr = "vmload";
+				break;
+			case 3:
+				vinstr = "vmsave";
+				break;
+			case 4:
+				vinstr = "stgi";
+				break;
+			case 5:
+				vinstr = "clgi";
+				break;
+			case 6:
+				vinstr = "skinit";
+				break;
+			case 7:
+				vinstr = "invlpga";
+				break;
+			}
+
+			(void) strncpy(x->d86_mnem, vinstr, OPLEN);
+#endif
 			NOMEM;
 			break;
 		}
