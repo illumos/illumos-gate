@@ -27,6 +27,7 @@
 #include <sys/ddi.h>
 #include <sys/modctl.h>
 #include <sys/cred.h>
+#include <sys/disp.h>
 #include <sys/ioccom.h>
 #include <sys/policy.h>
 #include <sys/cmn_err.h>
@@ -91,6 +92,23 @@ int	smb_tcon_timeout = (30 * 1000);
 int	smb_opipe_timeout = (30 * 1000);
 
 int	smb_threshold_debug = 0;
+
+/*
+ * Thread priorities used in smbsrv.  Our threads spend most of their time
+ * blocked on various conditions.  However, if the system gets heavy load,
+ * the scheduler has to choose an order to run these.  We want the order:
+ * (a) timers, (b) notifications, (c) workers, (d) receivers (and etc.)
+ * where notifications are oplock and change notify work.  Aside from this
+ * relative ordering, smbsrv threads should run with a priority close to
+ * that of normal user-space threads (thus minclsyspri below), just like
+ * NFS and other "file service" kinds of processing.
+ */
+int smbsrv_base_pri	= MINCLSYSPRI;
+int smbsrv_listen_pri	= MINCLSYSPRI;
+int smbsrv_receive_pri	= MINCLSYSPRI;
+int smbsrv_worker_pri	= MINCLSYSPRI + 1;
+int smbsrv_notify_pri	= MINCLSYSPRI + 2;
+int smbsrv_timer_pri	= MINCLSYSPRI + 5;
 
 
 /*
