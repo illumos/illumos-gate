@@ -22,8 +22,7 @@
 # uts/intel/md_trans/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the md_trans module
 #
@@ -62,6 +61,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+#
+# Depends on md & ufs
+#
+LDFLAGS         += -dy -N drv/md -N fs/ufs
 
 #
 #	Default build targets.

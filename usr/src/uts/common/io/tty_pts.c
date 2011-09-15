@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -133,8 +134,6 @@ DDI_DEFINE_STREAM_OPS(ptsl_ops, nulldev, nulldev,
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/modctl.h>
-
-char _depends_on[] = "drv/ptc";
 
 /*
  * Module linkage information for the kernel.

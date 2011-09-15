@@ -22,8 +22,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the sysctrl driver
 #	kernel module.
@@ -65,6 +64,11 @@ CFLAGS += $(CCVERBOSE)
 # Turn on doubleword alignment for 64 bit registers
 #
 CFLAGS += -dalign
+
+#
+# Define dependency on fhc
+#
+LDFLAGS += -dy -N drv/fhc
 
 #
 #	Default build targets.

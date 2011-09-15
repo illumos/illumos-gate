@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -78,10 +79,8 @@
  */
 #if (defined(__fibre))
 #define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver"
-char _depends_on[]	= "misc/scsi misc/cmlb drv/fcp";
 #else /* !__fibre */
 #define	SD_MODULE_NAME	"SCSI Disk Driver"
-char _depends_on[]	= "misc/scsi misc/cmlb";
 #endif /* !__fibre */
 
 /*

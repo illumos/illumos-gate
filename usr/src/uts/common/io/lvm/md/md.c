@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -75,9 +76,6 @@
 #include <sys/priv_names.h>
 #include <sys/modhash.h>
 
-#ifndef	lint
-char 		_depends_on[] = "strmod/rpcmod";
-#endif	/* lint */
 int		md_init_debug	= 0;	/* module binding debug */
 
 /*

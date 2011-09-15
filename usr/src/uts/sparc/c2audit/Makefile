@@ -23,6 +23,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the c2audit driver kernel module.
 #
@@ -58,6 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+#
+# Define dependency on sockfs
+#
+LDFLAGS         += -dy -N fs/sockfs
 
 #
 # For now, disable these lint checks; maintainers should endeavor

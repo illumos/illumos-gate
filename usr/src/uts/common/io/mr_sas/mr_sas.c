@@ -42,6 +42,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -166,8 +167,6 @@ static struct dev_ops mrsas_ops = {
 	mrsas_quiesce		/* quiesce */
 #endif	/* __sparc */
 };
-
-char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* module type - driver */

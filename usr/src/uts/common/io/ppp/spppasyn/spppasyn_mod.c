@@ -1,6 +1,20 @@
 /*
  * spppasyn_mod.c - modload support for PPP AHDLC STREAMS module
  *
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Use is subject to license terms.
+ *
+ * CONTRIBUTOR MAKES NO REPRESENTATION OR WARRANTIES ABOUT THE SUITABILITY
+ * OF THE SOFTWARE, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ * TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE, OR NON-INFRINGEMENT.  CONTRIBUTOR SHALL NOT BE LIABLE
+ * FOR ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING, MODIFYING OR
+ * DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES
+ *
+ * Permission to use, copy, modify, and distribute this software and its
+ * documentation is hereby granted, provided that the above copyright
+ * notice appears in all copies.
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -41,8 +55,6 @@
  * $Id: ppp_mod.c,v 1.3 1999/02/26 10:53:28 paulus Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -53,7 +65,6 @@
 /*
  * Globals for PPP AHDLC loadable module wrapper
  */
-char _depends_on[] = "drv/sppp";	/* we need some helper routines */
 extern struct streamtab spppasyn_tab;
 extern const char spppasyn_module_description[];
 

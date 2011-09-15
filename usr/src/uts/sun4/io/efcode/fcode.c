@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 
@@ -127,10 +128,6 @@ static struct modlinkage modlinkage = {
 	&modldrv,
 	NULL
 };
-
-#ifndef	lint
-char _depends_on[] = "misc/fcodem";
-#endif
 
 int
 _init(void)

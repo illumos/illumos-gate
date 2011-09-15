@@ -22,15 +22,12 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/modctl.h>
 #include <sys/errno.h>
-
-char _depends_on[] = "strmod/rpcmod misc/kgssapi";
 
 /*
  * Module linkage information for the kernel.

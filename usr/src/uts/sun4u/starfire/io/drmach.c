@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/debug.h>
@@ -293,14 +294,6 @@ static struct {
 
 /* utility */
 #define	MBYTE	(1048576ull)
-
-/*
- * This is necessary because the CPU support needs
- * to call cvc_assign_iocpu.
- */
-#ifndef lint
-char _depends_on[] = "drv/cvc";
-#endif  /* lint */
 
 /*
  * drmach autoconfiguration data structures and interfaces

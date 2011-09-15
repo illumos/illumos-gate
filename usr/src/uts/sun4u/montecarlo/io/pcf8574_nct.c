@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -177,8 +178,6 @@ static struct modlinkage pcf8574_modlinkage = {
 	&pcf8574_modldrv,
 	0
 };
-
-/* char _depends_on[] = "misc/i2c_svc drv/scsb"; */
 
 int
 _init(void)

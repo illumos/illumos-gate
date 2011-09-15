@@ -23,8 +23,7 @@
 # uts/intel/md_notify/Makefile
 # Copyright (c) 1999, 2000 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the lvm notify module
 #
@@ -55,6 +54,11 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# Depends on md
+#
+LDFLAGS         += -dy -N drv/md
 
 #
 #	Default build targets.

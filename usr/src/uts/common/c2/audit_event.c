@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -76,9 +77,6 @@
 #include <netinet/in.h>
 #include <sys/ddi.h>
 #include <sys/port_impl.h>
-
-
-char	_depends_on[] = "fs/sockfs";
 
 static au_event_t	aui_fchownat(au_event_t);
 static au_event_t	aui_fchmodat(au_event_t);

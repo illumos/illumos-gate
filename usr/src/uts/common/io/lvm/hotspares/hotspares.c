@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -52,7 +51,6 @@
 
 md_ops_t		hotspares_md_ops;
 #ifndef	lint
-char			_depends_on[] = "drv/md";
 md_ops_t		*md_interface_ops = &hotspares_md_ops;
 #endif
 

@@ -22,8 +22,7 @@
 # uts/i86pc/cpr/Makefile
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the cpr misc kernel module.
 #
@@ -55,9 +54,11 @@ ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
-#	Override defaults
+#	bootdev required as per previous inline commenting referencing symbol
+#	i_devname_to_promname(), which may only be necessary on SPARC. Removing
+#	this symbol may be sufficient to remove depedency.
 #
-LDFLAGS		+= -dy -N misc/acpica
+LDFLAGS		+= -dy -N misc/acpica -N misc/bootdev
 
 #
 #	Define targets

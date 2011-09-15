@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -102,8 +103,6 @@ static struct modlmisc modlmisc = {
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
-
-char _depends_on[] = "misc/klmmod";
 
 kmem_cache_t *nfs_xuio_cache;
 int nfs_loaned_buffers = 0;

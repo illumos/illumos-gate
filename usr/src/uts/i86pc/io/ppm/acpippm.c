@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -139,8 +140,6 @@ static kmutex_t  appm_lock;
 /*
  * S3 stuff:
  */
-char _depends_on[] = "misc/acpica";
-
 extern int acpi_enter_sleepstate(s3a_t *);
 extern int acpi_exit_sleepstate(s3a_t *);
 

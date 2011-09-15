@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -75,7 +76,6 @@
 
 md_ops_t		raid_md_ops;
 #ifndef lint
-char			_depends_on[] = "drv/md";
 md_ops_t		*md_interface_ops = &raid_md_ops;
 #endif	/* lint */
 

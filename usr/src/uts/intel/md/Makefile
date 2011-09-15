@@ -22,8 +22,7 @@
 # uts/intel/md/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the md driver
 #
@@ -70,6 +69,11 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+#
+# Depends on rpcmod
+#
+LDFLAGS         += -dy -N strmod/rpcmod
 
 #
 #	Default build targets.

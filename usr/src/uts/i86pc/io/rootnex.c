@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  */
 
 /*
@@ -165,10 +166,6 @@ typedef maddr_t rootnex_addr_t;
 #else
 typedef paddr_t rootnex_addr_t;
 #define	ROOTNEX_PADDR_TO_RBASE(pa)	(pa)
-#endif
-
-#if !defined(__xpv)
-char _depends_on[] = "misc/iommulib misc/acpica";
 #endif
 
 static struct cb_ops rootnex_cb_ops = {

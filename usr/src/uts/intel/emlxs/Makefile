@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 # This makefile drives the production of the emlxs driver kernel module.
 #
@@ -73,8 +74,12 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/emlxs
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/impl
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 
+#
+#	misc/fctl required because #ifdef MODSYM_LOAD code
+#	triggered by -DS11; uses DDI calls to load FCA symbols
+#
 LDFLAGS		+= -dy -Nmisc/md5 -Nmisc/sha1
-LDFLAGS		+= -Nmisc/bignum
+LDFLAGS		+= -Nmisc/bignum -Nmisc/fctl
 
 #
 # For now, disable these lint checks; maintainers should endeavor

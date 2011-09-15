@@ -362,7 +362,7 @@ extern pri_t minclsyspri;
  *	the attach routine must make sure that everything needed is present
  *	including real hardware.  The sequence of events is:
  *		attempt to load all adapter drivers
- *		attempt to load Card Services (which _depends_on pcmcia)
+ *		attempt to load Card Services
  *		initialize logical sockets
  *		report the nexus exists
  */
