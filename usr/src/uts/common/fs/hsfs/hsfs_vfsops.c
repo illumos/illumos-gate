@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -159,8 +160,6 @@ static struct modlfs modlfs = {
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlfs, NULL
 };
-
-char _depends_on[] = "fs/specfs";
 
 extern void hsched_init_caches(void);
 extern void hsched_fini_caches(void);

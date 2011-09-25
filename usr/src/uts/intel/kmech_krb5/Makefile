@@ -22,8 +22,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 
 #	This makefile drives the production of the gl_kmech_krb5 kernel module.
@@ -54,6 +53,11 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# Defined kgssapi and md5 as depdencies
+#
+LDFLAGS += -dy -N misc/kgssapi -N misc/md5
 
 #
 # For now, disable these lint checks; maintainers should endeavor

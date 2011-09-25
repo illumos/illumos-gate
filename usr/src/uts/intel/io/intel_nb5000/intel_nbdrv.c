@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -43,8 +44,6 @@
 #include <sys/fm/protocol.h>
 #include "nb_log.h"
 #include "nb5000.h"
-
-char _depends_on[] = "drv/smbios";
 
 nvlist_t *inb_mc_nvl;
 krwlock_t inb_mc_lock;

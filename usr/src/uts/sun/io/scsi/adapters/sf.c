@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -211,9 +212,6 @@ static struct dev_ops sf_ops = {
 	NULL,			/* power management */
 	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
-
-/* to ensure this module gets loaded in memory when we do */
-char _depends_on[] = "misc/scsi";
 
 #define	SF_NAME	"FC-AL FCP Nexus Driver"	/* Name of the module. */
 static	char	sf_version[] = "1.72 08/19/2008"; /* version of the module */

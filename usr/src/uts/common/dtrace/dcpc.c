@@ -339,9 +339,13 @@ dcpc_destroy(void *arg, dtrace_id_t id, void *parg)
 
 /*ARGSUSED*/
 static int
-dcpc_usermode(void *arg, dtrace_id_t id, void *parg)
+dcpc_mode(void *arg, dtrace_id_t id, void *parg)
 {
-	return (CPU->cpu_cpcprofile_pc == 0);
+	if (CPU->cpu_cpcprofile_pc == 0) {
+		return (DTRACE_MODE_NOPRIV_DROP | DTRACE_MODE_USER);
+	} else {
+		return (DTRACE_MODE_NOPRIV_DROP | DTRACE_MODE_KERNEL);
+	}
 }
 
 static void
@@ -1013,7 +1017,7 @@ static dtrace_pops_t dcpc_pops = {
     NULL,
     NULL,
     NULL,
-    dcpc_usermode,
+    dcpc_mode,
     dcpc_destroy
 };
 

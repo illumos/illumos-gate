@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 
@@ -106,8 +107,6 @@ struct streamtab	cvcrinfo = {
 DDI_DEFINE_STREAM_OPS(cvcrops, nulldev, nulldev, cvcr_attach,
     cvcr_detach, nodev, cvcr_info, (D_MTPERQ | D_MP), &cvcrinfo,
     ddi_quiesce_not_supported);
-
-char _depends_on[] = "drv/cvc";
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */

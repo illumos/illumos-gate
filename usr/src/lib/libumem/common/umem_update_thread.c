@@ -27,6 +27,8 @@
 #include "umem_base.h"
 #include "vmem_base.h"
 
+#include <sys/ccompile.h>
+
 #include <signal.h>
 
 /*ARGSUSED*/

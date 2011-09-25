@@ -20,8 +20,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the emul64 kernel
 #	driver to testing hotplugging operations
@@ -60,6 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+#
+# Define dependency on scsi
+#
+LDFLAGS         += -dy -N misc/scsi
 
 #
 # For now, disable these lint checks; maintainers should endeavor

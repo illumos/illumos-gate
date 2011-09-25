@@ -168,6 +168,7 @@ usr/src/uts/common/gssapi/mechs/krb5/include/krb5.h
 usr/src/uts/common/gssapi/mechs/krb5/include/old.h
 usr/src/uts/common/gssapi/mechs/krb5/include/raw.h
 usr/src/uts/common/gssapi/mechs/krb5/include/rsa-md4.h
+usr/src/uts/common/io/ixgbe/ixgbe_common.h
 usr/src/lib/libkmsagent/common/ApplianceParameters.h
 usr/src/lib/libkmsagent/common/AutoMutex.h
 usr/src/lib/libkmsagent/common/ClientSoapFaultCodes.h

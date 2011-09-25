@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 
 #
@@ -150,7 +151,7 @@ LHEAD =	$(ECHO) "\n$@";
 
 # Note: egrep returns "failure" if there are no matches, which is
 # exactly the opposite of what we need.
-LGREP.2 =	if egrep -v ' (_init|_fini|_info|_depends_on) '; then false; else true; fi
+LGREP.2 =	if egrep -v ' (_init|_fini|_info) '; then false; else true; fi
 
 LTAIL =
 

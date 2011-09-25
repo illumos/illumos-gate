@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -65,8 +66,6 @@ static struct modlmisc modlmisc = {
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
-
-char _depends_on[] = "misc/bootdev";	/* i_devname_to_promname() */
 
 int cpr_reusable_mode;
 

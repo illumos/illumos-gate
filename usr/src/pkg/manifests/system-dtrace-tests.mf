@@ -128,6 +128,7 @@ file path=opt/SUNWdtrt/bin/badioctl mode=0555
 file path=opt/SUNWdtrt/bin/chkargs mode=0555
 file path=opt/SUNWdtrt/bin/dstyle mode=0555
 file path=opt/SUNWdtrt/bin/dtest mode=0555
+file path=opt/SUNWdtrt/bin/dtfailures mode=0555
 file path=opt/SUNWdtrt/bin/exception.lst mode=0444
 file path=opt/SUNWdtrt/bin/jdtrace mode=0555
 file path=opt/SUNWdtrt/lib/java/jdtrace.jar
@@ -747,6 +748,8 @@ file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.copyoutbadarg.d \
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.mobadarg.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.raisebadarg.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_ARG.toupper.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.allocanoarg.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.badbreakpoint.d \
@@ -773,6 +776,12 @@ file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.panicbadarg.d \
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.progenyofbad2.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.stopbadarg.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.tolowertoomany.d \
+    mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.toupper.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.touppertoomany.d \
+    mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_STRINGOF_TYPE.badstringof.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/err.D_VAR_UNDEF.badvar.d mode=0444
@@ -819,6 +828,8 @@ file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntop.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.inet_ntop.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostr.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostr.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostrbase.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.lltostrbase.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.mutex_owned.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.mutex_owner.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.mutex_type_adaptive.d mode=0444
@@ -839,6 +850,8 @@ file path=opt/SUNWdtrt/tst/common/funcs/tst.substrminate.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.substrminate.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.system.d mode=0444
 file path=opt/SUNWdtrt/tst/common/funcs/tst.system.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.tolower.d mode=0444
+file path=opt/SUNWdtrt/tst/common/funcs/tst.toupper.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/err.D_ADDROF_LVAL.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/err.D_EMPTY.empty.d mode=0444
 file path=opt/SUNWdtrt/tst/common/grammar/tst.clauses.d mode=0444
@@ -1299,7 +1312,10 @@ file path=opt/SUNWdtrt/tst/common/printf/tst.widths1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.wp.d mode=0444
 file path=opt/SUNWdtrt/tst/common/printf/tst.wp.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/privs/tst.func_access.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.noprivdrop.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.noprivrestrict.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/privs/tst.op_access.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/privs/tst.tick.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/privs/tst.unpriv_funcs.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probeqtn.d mode=0444
 file path=opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probestar.d \
@@ -1528,6 +1544,8 @@ file path=opt/SUNWdtrt/tst/common/sizeof/err.D_IDENT_BADREF.SizeofAssoc.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/sizeof/err.D_IDENT_UNDEF.UnknownSymbol.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/sizeof/err.D_SIZEOF_TYPE.badstruct.d \
+    mode=0444
 file path=opt/SUNWdtrt/tst/common/sizeof/err.D_SIZEOF_TYPE.d mode=0444
 file path=opt/SUNWdtrt/tst/common/sizeof/err.D_SYNTAX.SizeofBadType.d \
     mode=0444
@@ -1742,14 +1760,19 @@ file path=opt/SUNWdtrt/tst/common/trace/tst.qstring.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/trace/tst.string.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_ARG.badsize.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_LEN.toofew.d mode=0444
-file path=opt/SUNWdtrt/tst/common/tracemem/err.D_PROTO_LEN.toomany.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_ADDR.badaddr.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_ARGS.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_DYNSIZE.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_SIZE.negsize.d \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/err.D_TRACEMEM_SIZE.zerosize.d \
     mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.dynsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.dynsize.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/tracemem/tst.rootvp.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.smallsize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/tracemem/tst.smallsize.d.out mode=0444
 file \
     path=opt/SUNWdtrt/tst/common/translators/err.D_DECL_TYPERED.BadTransDecl.d \
     mode=0444

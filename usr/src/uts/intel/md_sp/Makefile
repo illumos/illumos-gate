@@ -22,8 +22,7 @@
 # uts/intel/md_sp/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the md_sp module
 #
@@ -63,6 +62,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
+#
+# Depends on md
+#
+LDFLAGS         += -dy -N drv/md
 
 #
 #	Default build targets.

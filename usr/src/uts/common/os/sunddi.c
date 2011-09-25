@@ -7332,24 +7332,6 @@ ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
 	if (*handlep == NULL)
 		return (DDI_FAILURE);
 
-/* SPARC mappings are always cacheable, as SPARC guarantees cache coherency. */
-#ifndef __sparc
-	/* Transform attributes into correct cache flags. */
-	if ((flags & IOMEM_DATA_MASK) == 0) {
-		switch (accattrp->devacc_attr_dataorder) {
-		case DDI_STRICTORDER_ACC:
-			flags |= IOMEM_DATA_UNCACHED;
-			break;
-		case DDI_MERGING_OK_ACC:
-			flags |= IOMEM_DATA_UC_WR_COMBINE;
-			break;
-		default:
-			flags |= IOMEM_DATA_CACHED;
-			break;
-		}
-	}
-#endif
-
 	/* check if the cache attributes are supported */
 	if (i_ddi_check_cache_attr(flags) == B_FALSE)
 		return (DDI_FAILURE);

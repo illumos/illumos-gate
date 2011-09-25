@@ -23,8 +23,7 @@
 # uts/sparc/notify/Makefile
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the SLVM's notify misc module.
 #
@@ -60,6 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
+
+#
+# Define dependency on md
+#
+LDFLAGS += -dy -N drv/md
 
 #
 #	Default build targets.

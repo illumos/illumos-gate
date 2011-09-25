@@ -23,11 +23,14 @@
  * Use is subject to license terms.
  */
 
+#include <sys/ccompile.h>
+
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+
 #include "nscd_db.h"
 #include "nscd_log.h"
 #include "nscd_switch.h"

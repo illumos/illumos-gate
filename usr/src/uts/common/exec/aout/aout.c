@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -64,8 +63,6 @@ extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 extern int elf32core(vnode_t *, proc_t *, cred_t *, rlim64_t, int,
     core_content_t);
-
-char _depends_on[] = "exec/elfexec";
 
 static struct execsw nesw = {
 	aout_nmagicstr,

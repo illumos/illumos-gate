@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -55,7 +56,6 @@
 
 md_ops_t		stripe_md_ops;
 #ifndef	lint
-char			_depends_on[] = "drv/md";
 md_ops_t		*md_interface_ops = &stripe_md_ops;
 #endif
 

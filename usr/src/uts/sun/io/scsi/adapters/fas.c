@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 
@@ -381,8 +382,6 @@ static struct dev_ops fas_ops = {
 	NULL,			/* power */
 	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
-
-char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */

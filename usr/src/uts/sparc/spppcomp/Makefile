@@ -23,8 +23,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the spppcomp STREAMS 
 #	kernel module.
@@ -67,6 +66,11 @@ CPPFLAGS	+= -DINTERNAL_BUILD -DSOL2 -DMUX_FRAME
 # 
 INC_PATH	+= -I$(UTSBASE)/common/io/ppp/common
 CFLAGS		+= $(CCVERBOSE)
+
+#
+# Define dependency on sppp
+#
+LDFLAGS += -dy -N drv/sppp
 
 CLEANLINTFILES  += $(LINT64_FILES)
 

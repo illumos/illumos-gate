@@ -23,12 +23,11 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the fas driver kernel module.
 #
 #	sparc architecture dependent
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -62,6 +61,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement 
 # 
 CFLAGS += $(CCVERBOSE)
+
+#
+# Defines dependency on scsi
+#
+LDFLAGS += -dy -N misc/scsi
 
 #
 # For now, disable these lint checks; maintainers should endeavor

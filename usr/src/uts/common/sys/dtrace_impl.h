@@ -929,7 +929,8 @@ typedef struct dtrace_mstate {
  * Access flag used by dtrace_mstate.dtms_access.
  */
 #define	DTRACE_ACCESS_KERNEL	0x1		/* the priv to read kmem */
-
+#define	DTRACE_ACCESS_PROC	0x2		/* the priv for proc state */
+#define	DTRACE_ACCESS_ARGS	0x4		/* the priv to examine args */
 
 /*
  * DTrace Activity

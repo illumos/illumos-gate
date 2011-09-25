@@ -73,6 +73,7 @@
 #include <rpcsvc/daemon_utils.h>
 #include <priv_utils.h>
 #include <libscf.h>
+#include <sys/ccompile.h>
 
 #ifdef PORTMAP
 extern void pmap_service(struct svc_req *, SVCXPRT *xprt);

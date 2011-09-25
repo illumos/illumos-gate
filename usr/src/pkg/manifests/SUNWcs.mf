@@ -20,7 +20,7 @@
 #
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2010,2011 Nexenta Systems, Inc.  All rights reserved.
 
 <include SUNWcs.man1.inc>
 <include SUNWcs.man1m.inc>
@@ -246,14 +246,6 @@ dir path=usr/share/lib
 dir path=usr/share/lib/mailx
 dir path=usr/share/lib/pub
 dir path=usr/share/lib/tabset
-dir path=usr/share/lib/terminfo
-dir path=usr/share/lib/terminfo/3
-dir path=usr/share/lib/terminfo/A
-dir path=usr/share/lib/terminfo/a
-dir path=usr/share/lib/terminfo/s
-dir path=usr/share/lib/terminfo/u
-dir path=usr/share/lib/terminfo/v
-dir path=usr/share/lib/terminfo/x
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
 dir path=usr/share/lib/xml/style group=sys
@@ -1503,64 +1495,6 @@ file path=usr/share/lib/tabset/vt100
 file path=usr/share/lib/tabset/wyse-adds
 file path=usr/share/lib/tabset/xerox1720
 file path=usr/share/lib/termcap
-file path=usr/share/lib/terminfo/A/AT386-DOS
-file path=usr/share/lib/terminfo/A/AT386-DOS-M
-file path=usr/share/lib/terminfo/a/ansi
-file path=usr/share/lib/terminfo/a/ansi+arrows
-file path=usr/share/lib/terminfo/a/ansi+cup
-file path=usr/share/lib/terminfo/a/ansi+erase
-file path=usr/share/lib/terminfo/a/ansi+idc
-file path=usr/share/lib/terminfo/a/ansi+idl
-file path=usr/share/lib/terminfo/a/ansi+idl1
-file path=usr/share/lib/terminfo/a/ansi+inittabs
-file path=usr/share/lib/terminfo/a/ansi+local
-file path=usr/share/lib/terminfo/a/ansi+local1
-file path=usr/share/lib/terminfo/a/ansi+pp
-file path=usr/share/lib/terminfo/a/ansi+rca
-file path=usr/share/lib/terminfo/a/ansi+rep
-file path=usr/share/lib/terminfo/a/ansi+sgr
-file path=usr/share/lib/terminfo/a/ansi+sgrbold
-file path=usr/share/lib/terminfo/a/ansi+sgrdim
-file path=usr/share/lib/terminfo/a/ansi+sgrso
-file path=usr/share/lib/terminfo/a/ansi+sgrul
-file path=usr/share/lib/terminfo/a/ansi+tabs
-file path=usr/share/lib/terminfo/a/at386
-file path=usr/share/lib/terminfo/a/at386-m
-file path=usr/share/lib/terminfo/s/screen
-file path=usr/share/lib/terminfo/s/screen-w
-file path=usr/share/lib/terminfo/s/sun
-file path=usr/share/lib/terminfo/s/sun-1
-file path=usr/share/lib/terminfo/s/sun-12
-file path=usr/share/lib/terminfo/s/sun-17
-file path=usr/share/lib/terminfo/s/sun-24
-file path=usr/share/lib/terminfo/s/sun-34
-file path=usr/share/lib/terminfo/s/sun-48
-file path=usr/share/lib/terminfo/s/sun-cmd
-file path=usr/share/lib/terminfo/s/sun-color
-file path=usr/share/lib/terminfo/s/sun-e
-file path=usr/share/lib/terminfo/s/sun-e-s
-file path=usr/share/lib/terminfo/s/sun-na
-file path=usr/share/lib/terminfo/s/sun-s
-file path=usr/share/lib/terminfo/u/unknown
-file path=usr/share/lib/terminfo/v/vs100
-file path=usr/share/lib/terminfo/v/vs100s
-file path=usr/share/lib/terminfo/v/vt100
-file path=usr/share/lib/terminfo/v/vt100-bot-s
-file path=usr/share/lib/terminfo/v/vt100-nam
-file path=usr/share/lib/terminfo/v/vt100-nam-w
-file path=usr/share/lib/terminfo/v/vt100-nav
-file path=usr/share/lib/terminfo/v/vt100-nav-w
-file path=usr/share/lib/terminfo/v/vt100-np
-file path=usr/share/lib/terminfo/v/vt100-s
-file path=usr/share/lib/terminfo/v/vt100-w
-file path=usr/share/lib/terminfo/v/vt100am
-file path=usr/share/lib/terminfo/v/vt100nam
-file path=usr/share/lib/terminfo/v/vt100s
-file path=usr/share/lib/terminfo/v/vt100w
-file path=usr/share/lib/terminfo/v/vt132
-file path=usr/share/lib/terminfo/v/vt220
-file path=usr/share/lib/terminfo/x/xtermc
-file path=usr/share/lib/terminfo/x/xtermm
 file path=usr/share/lib/unittab
 file path=usr/share/lib/xml/dtd/adt_record.dtd.1
 file path=usr/share/lib/xml/dtd/kmfpolicy.dtd
@@ -2225,48 +2159,6 @@ hardlink path=usr/sbin/tapes target=./devfsadm
 hardlink path=usr/sbin/unshare target=../../usr/sbin/sharemgr
 hardlink path=usr/sbin/update_drv target=../../usr/lib/isaexec
 hardlink path=usr/sbin/whodo target=../../usr/lib/isaexec
-hardlink path=usr/share/lib/terminfo/3/386AT \
-    target=../../../../../usr/share/lib/terminfo/a/at386
-hardlink path=usr/share/lib/terminfo/3/386AT-M \
-    target=../../../../../usr/share/lib/terminfo/a/at386-m
-hardlink path=usr/share/lib/terminfo/3/386at \
-    target=../../../../../usr/share/lib/terminfo/a/at386
-hardlink path=usr/share/lib/terminfo/3/386at-m \
-    target=../../../../../usr/share/lib/terminfo/a/at386-m
-hardlink path=usr/share/lib/terminfo/A/AT386 \
-    target=../../../../../usr/share/lib/terminfo/a/at386
-hardlink path=usr/share/lib/terminfo/A/AT386-M \
-    target=../../../../../usr/share/lib/terminfo/a/at386-m
-hardlink path=usr/share/lib/terminfo/s/sun-nic \
-    target=../../../../../usr/share/lib/terminfo/s/sun-e
-hardlink path=usr/share/lib/terminfo/s/sun-s-e \
-    target=../../../../../usr/share/lib/terminfo/s/sun-e-s
-hardlink path=usr/share/lib/terminfo/s/sun1 \
-    target=../../../../../usr/share/lib/terminfo/s/sun
-hardlink path=usr/share/lib/terminfo/s/sun2 \
-    target=../../../../../usr/share/lib/terminfo/s/sun
-hardlink path=usr/share/lib/terminfo/s/sune \
-    target=../../../../../usr/share/lib/terminfo/s/sun-e
-hardlink path=usr/share/lib/terminfo/v/vt100-am \
-    target=../../../../../usr/share/lib/terminfo/v/vt100
-hardlink path=usr/share/lib/terminfo/v/vt100-s-bot \
-    target=../../../../../usr/share/lib/terminfo/v/vt100-bot-s
-hardlink path=usr/share/lib/terminfo/v/vt100-s-top \
-    target=../../../../../usr/share/lib/terminfo/v/vt100-s
-hardlink path=usr/share/lib/terminfo/v/vt100-top-s \
-    target=../../../../../usr/share/lib/terminfo/v/vt100-s
-hardlink path=usr/share/lib/terminfo/v/vt100-w-am \
-    target=../../../../../usr/share/lib/terminfo/v/vt100-w
-hardlink path=usr/share/lib/terminfo/v/vt100-w-nam \
-    target=../../../../../usr/share/lib/terminfo/v/vt100-nam-w
-hardlink path=usr/share/lib/terminfo/v/vt100-w-nav \
-    target=../../../../../usr/share/lib/terminfo/v/vt100-nav-w
-hardlink path=usr/share/lib/terminfo/x/xterm \
-    target=../../../../../usr/share/lib/terminfo/v/vs100
-hardlink path=usr/share/lib/terminfo/x/xterm-color \
-    target=../../../../../usr/share/lib/terminfo/x/xtermc
-hardlink path=usr/share/lib/terminfo/x/xterms \
-    target=../../../../../usr/share/lib/terminfo/v/vs100s
 hardlink path=usr/share/lib/zoneinfo/Africa/Asmera \
     target=../../../../../usr/share/lib/zoneinfo/Africa/Asmara
 hardlink path=usr/share/lib/zoneinfo/Africa/Timbuktu \
@@ -2764,3 +2656,7 @@ depend fmri=runtime/perl-584 type=require
 # The loadkeys binary needs the keytables.
 #
 depend fmri=system/data/keyboard/keytables type=require
+#
+# Depend on terminfo data.
+#
+depend fmri=system/data/terminfo type=require

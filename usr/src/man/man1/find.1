@@ -1,21 +1,45 @@
 '\" te
-.\" Copyright 1989 AT&T Copyright (c) 
-.\" 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at 
 .\" http://www.opengroup.org/bookstore/.
-.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
-.\"  This notice shall appear on any product containing this material.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH find 1 "15 Aug 2008" "SunOS 5.11" "User Commands"
+.\" The Institute of Electrical and Electronics Engineers and The Open Group,
+.\" have given us permission to reprint portions of their documentation.
+.\" In the following statement, the phrase "this text" refers to portions of
+.\" the system documentation. Portions of this text are reprinted and
+.\" reproduced in electronic form in the Sun OS Reference Manual, from
+.\" IEEE Std 1003.1, 2004 Edition, Standard for Information Technology --
+.\" Portable Operating System Interface (POSIX), The Open Group Base
+.\" Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of
+.\" Electrical and Electronics Engineers, Inc and The Open Group. In the event
+.\" of any discrepancy between these versions and the original IEEE and
+.\" The Open Group Standard, the original IEEE and The Open Group Standard
+.\" is the referee document. The original Standard can be obtained online
+.\" at http://www.opengroup.org/unix/online.html.
+.\" This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development
+.\" and Distribution License (the "License").  You may not use this file except
+.\" in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the specific
+.\" language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and
+.\" include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable,
+.\" add the following below this CDDL HEADER, with the fields enclosed by
+.\" brackets "[]" replaced with your own identifying information:
+.\" Portions Copyright [yyyy] [name of copyright owner]
+.TH find 1 "5 Sep 2011" "SunOS 5.11" "User Commands"
 .SH NAME
 find \- find files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/find\fR [\fB-H\fR | \fB-L\fR] \fIpath\fR... \fIexpression\fR
+\fB/usr/bin/find\fR [\fB-E\fR] [\fB-H\fR | \fB-L\fR] \fIpath\fR... \fIexpression\fR
 .fi
 
 .LP
@@ -42,6 +66,18 @@ directory that is an ancestor of the last file encountered.
 .sp
 .LP
 The following options are supported:
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-E\fR\fR
+.ad
+.RS 6n
+.rt  
+Interpret regular expressions followed by \fB-regex\fR and \fB-iregex\fR
+primaries as extended regular expressions.
+.RE
+
 .sp
 .ne 2
 .mk
@@ -73,7 +109,7 @@ be those of the file referenced by the link, and not the link itself. See
 .sp
 .LP
 Specifying more than one of the mutually-exclusive options \fB-H\fR and
-\fB-L\fRis not considered an error. The last option specified determines the
+\fB-L\fR is not considered an error. The last option specified determines the
 behavior of the utility.
 .SH OPERANDS
 .sp
@@ -279,8 +315,31 @@ True if the filesystem to which the file belongs is of type \fItype\fR.
 .RS 17n
 .rt  
 True if the file belongs to the group \fIgname\fR. If \fIgname\fR is numeric
-and does not appear in the \fB/etc/group\fR file, or in the
-\fBNIS\fR/\fBNIS+\fR tables, it is taken as a group \fBID\fR.
+and there's no such group name, it is taken as a group \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-groupacl\fR \fIgname\fR\fR
+.ad
+.RS 17n
+.rt  
+True if the file's ACL contains an entry for the group \fIgname\fR.
+If \fIgname\fR is numeric and there's no such group name, it is taken
+as a group \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-iname\fR \fIpattern\fR\fR
+.ad
+.RS 17n
+.rt
+Like \fB-name\fR, but the match is case insensitive.
 .RE
 
 .sp
@@ -292,6 +351,17 @@ and does not appear in the \fB/etc/group\fR file, or in the
 .RS 17n
 .rt  
 True if the file has inode number \fIn\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-iregex\fR \fIpattern\fR\fR
+.ad
+.RS 17n
+.rt
+Like \fB-regex\fR, but the match is case insensitive.
 .RE
 
 .sp
@@ -392,6 +462,35 @@ Formatting is done internally, without executing the \fBls\fR program.
 .ne 2
 .mk
 .na
+\fB\fB-maxdepth\fR \fIn\fR\fR
+.ad
+.RS 17n
+.rt
+Always true; descend at most \fIn\fR directory levels below the command
+line arguments. If any \fB-maxdepth\fR primary is specified, it
+applies to the entire expression even if it would not normally be
+evaluated. \fB-maxdepth 0\fR limits the whole search to
+the command line arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-mindepth\fR \fIn\fR\fR
+.ad
+.RS 17n
+.rt
+Always true; do not apply any tests or actions at levels less
+than \fIn\fR. If any \fB-mindepth\fR primary is specified, it applies to the
+entire expression even if it would not normally be evaluated.
+\fB-mindepth 1\fR processes all but the command line arguments.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fB\fB-mmin\fR \fIn\fR\fR
 .ad
 .RS 17n
@@ -474,8 +573,7 @@ True if the current file has been modified more recently than the argument
 .ad
 .RS 17n
 .rt  
-True if the file belongs to a group not in the \fB/etc/group\fR file, or in the
-\fBNIS\fR/\fBNIS+\fR tables.
+True if the file belongs to non-existing group.
 .RE
 
 .sp
@@ -486,8 +584,7 @@ True if the file belongs to a group not in the \fB/etc/group\fR file, or in the
 .ad
 .RS 17n
 .rt  
-True if the file belongs to a user not in the \fB/etc/passwd\fR file, or in the
-\fBNIS\fR/\fBNIS+\fR tables.
+True if the file belongs to non-existing user.
 .RE
 
 .sp
@@ -590,6 +687,18 @@ Always true. Causes the current pathname to be printed.
 .ne 2
 .mk
 .na
+\fB\fB-print0\fR\fR
+.ad
+.RS 17n
+.rt  
+Always true. Causes the current pathname to be printed, terminated by an ASCII
+NUL character (character code 0) instead of a newline.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
 \fB\fB-prune\fR\fR
 .ad
 .RS 17n
@@ -597,6 +706,18 @@ Always true. Causes the current pathname to be printed.
 Always yields true. Does not examine any directories or files in the directory
 structure below the \fIpattern\fR just matched. (See EXAMPLES). If \fB-depth\fR
 is specified, \fB-prune\fR has no effect.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-regex\fR \fIpattern\fR\fB
+.ad
+.RS 17n
+.rt
+True if the full path of the file matches \fIpattern\fR using regular
+expressions.
 .RE
 
 .sp
@@ -634,8 +755,20 @@ pipe), or socket, respectively.
 .RS 17n
 .rt  
 True if the file belongs to the user \fIuname\fR. If \fIuname\fR is numeric and
-does not appear as a login name in the \fB/etc/passwd\fR file, or in the
-\fBNIS\fR/\fBNIS+\fR tables, it is taken as a user \fBID\fR.
+there's no such user name, it is taken as a user \fBID\fR.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB-useracl\fR \fIuname\fR\fR
+.ad
+.RS 17n
+.rt  
+True if the file's ACL contains an entry for the user \fIuname\fR.
+If \fIuname\fR is numeric and there's no such user name, it is
+taken as a user \fBID\fR.
 .RE
 
 .sp
@@ -1019,9 +1152,9 @@ StandardSee \fBstandards\fR(5).
 .sp
 .LP
 \fBchmod\fR(1), \fBcpio\fR(1), \fBsh\fR(1), \fBtest\fR(1), \fBls\fR(1B),
-\fBacl\fR(2), \fBstat\fR(2), \fBumask\fR(2), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBfsattr\fR(5), \fBlargefile\fR(5), \fBlocale\fR(5),
-\fBstandards\fR(5)
+\fBacl\fR(5), \fBregex\fR(5), \fBstat\fR(2), \fBumask\fR(2),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBfsattr\fR(5), \fBlargefile\fR(5),
+\fBlocale\fR(5), \fBstandards\fR(5)
 .SH WARNINGS
 .sp
 .LP

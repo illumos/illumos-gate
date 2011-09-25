@@ -694,19 +694,29 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 * privilege to set the initial cwnd to be larger
 			 * than allowed by RFC 3390.
 			 */
-			if (val <= MIN(4, MAX(2, 4380 / tcp->tcp_mss))) {
-				tcp->tcp_init_cwnd = val;
-				break;
+			if (val > MIN(4, MAX(2, 4380 / tcp->tcp_mss))) {
+				if ((reterr = secpolicy_ip_config(cr, B_TRUE))
+				    != 0) {
+					*outlenp = 0;
+					return (reterr);
+				}
+				if (val > tcp_max_init_cwnd) {
+					*outlenp = 0;
+					return (EINVAL);
+				}
 			}
-			if ((reterr = secpolicy_ip_config(cr, B_TRUE)) != 0) {
-				*outlenp = 0;
-				return (reterr);
-			}
-			if (val > tcp_max_init_cwnd) {
-				*outlenp = 0;
-				return (EINVAL);
-			}
+
 			tcp->tcp_init_cwnd = val;
+
+			/*
+			 * If the socket is connected, AND no outbound data
+			 * has been sent, reset the actual cwnd values.
+			 */
+			if (tcp->tcp_state == TCPS_ESTABLISHED &&
+			    tcp->tcp_iss == tcp->tcp_snxt - 1) {
+				tcp->tcp_cwnd =
+				    MIN(tcp->tcp_rwnd, val * tcp->tcp_mss);
+			}
 			break;
 
 		/*

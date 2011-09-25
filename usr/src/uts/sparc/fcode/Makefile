@@ -23,8 +23,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the fcode driver kernel module
 #
@@ -74,6 +73,11 @@ CFLAGS += $(CCVERBOSE)
 # Turn on doubleword alignment for 64 bit registers
 #
 CFLAGS += -dalign
+
+#
+# Define dependency on fcodem
+#
+LDFLAGS += -dy -N misc/fcodem
 
 #
 #	Default build targets.

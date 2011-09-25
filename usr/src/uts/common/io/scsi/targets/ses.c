@@ -23,6 +23,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/modctl.h>
@@ -179,7 +180,6 @@ static const char *fail_msg = "%stransport failed: reason '%s': %s";
 /*
  * autoconfiguration routines.
  */
-char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops,

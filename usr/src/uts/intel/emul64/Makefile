@@ -20,8 +20,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the emul64 kernel
 #	driver to testing hotplugging operations
@@ -67,6 +66,11 @@ CFLAGS += $(CCVERBOSE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+#
+# Depends on scsi
+#
+LDFLAGS += -dy -N misc/scsi
 
 #
 #	Default build targets.

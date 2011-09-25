@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 
@@ -382,14 +383,6 @@ static fc_fca_tran_t emlxs_fca_tran = {
 	emlxs_notify
 };
 #endif	/* EMLXS_MODREV2 */
-
-/*
- * This is needed when the module gets loaded by the kernel
- * so ddi library calls get resolved.
- */
-#ifndef MODSYM_SUPPORT
-char   _depends_on[] = "misc/fctl";
-#endif /* MODSYM_SUPPORT */
 
 /*
  * state pointer which the implementation uses as a place to
