@@ -93,6 +93,7 @@ COMMON_MANFILES = 	aac.7d		\
 	 	 	pcata.7d	\
 	 	 	pcic.7d		\
 	 	 	pcmcia.7d	\
+			pcn.7d		\
 	 	 	pcwl.7d		\
 	 	 	physmem.7d	\
 	 	 	pm.7d		\
