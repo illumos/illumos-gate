@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -34,6 +35,7 @@ GENUNIX_SRCS =		\
 	combined.c	\
 	contract.c	\
 	cpupart.c	\
+	cred.c		\
 	ctxop.c		\
 	cyclic.c	\
 	damap.c		\
