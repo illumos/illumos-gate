@@ -93,7 +93,6 @@ COMMON_MANFILES = 	aac.7d		\
 	 	 	pcata.7d	\
 	 	 	pcic.7d		\
 	 	 	pcmcia.7d	\
-			pcn.7d		\
 	 	 	pcwl.7d		\
 	 	 	physmem.7d	\
 	 	 	pm.7d		\
@@ -217,6 +216,7 @@ i386_MANFILES =	ahci.7d		\
 		npe.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\
+		pcn.7d		\
 		radeon.7d	\
 		ral.7d		\
 		rtw.7d		\
