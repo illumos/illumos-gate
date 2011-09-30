@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * **********************************************************************
  *									*
  * Module Name:								*
@@ -677,6 +681,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		rnumber = ICH_FLASH_REG_SET;
 
 		/* get flash size */
@@ -880,6 +885,10 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	/* pch can do jumbo frames up to 4K */
 	case e1000_pchlan:
 		Adapter->max_mtu = MAXIMUM_MTU_4K;
+		break;
+	/* pch2 can do jumbo frames up to 9K */
+	case e1000_pch2lan:
+		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
 	case e1000_82571:
@@ -1438,6 +1447,8 @@ e1000g_init(struct e1000g *Adapter)
 	} else if (hw->mac.type == e1000_ich10lan) {
 		pba = E1000_PBA_10K;
 	} else if (hw->mac.type == e1000_pchlan) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch2lan) {
 		pba = E1000_PBA_26K;
 	} else {
 		/*
@@ -4547,7 +4558,7 @@ e1000g_pch_limits(struct e1000g *Adapter)
 	struct e1000_hw *hw = &Adapter->shared;
 
 	/* only applies to PCH silicon type */
-	if (hw->mac.type != e1000_pchlan)
+	if (hw->mac.type != e1000_pchlan && hw->mac.type != e1000_pch2lan)
 		return;
 
 	/* only applies to frames larger than ethernet default */
@@ -6400,6 +6411,7 @@ e1000g_get_driver_control(struct e1000_hw *hw)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
 		    ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
@@ -6434,6 +6446,7 @@ e1000g_release_driver_control(struct e1000_hw *hw)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
 		    ctrl_ext & ~E1000_CTRL_EXT_DRV_LOAD);
