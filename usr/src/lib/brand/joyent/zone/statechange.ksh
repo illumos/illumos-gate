@@ -254,7 +254,8 @@ setup_net()
 			fi
 		fi
 
-		if [[ -n "${zone_ip}" ]] && [[ -n "${ip_spoof_enabled}" ]]; then
+		if [[ -n "${zone_ip}" ]] && [[ -n "${ip_spoof_enabled}" ]] && \
+			    [[ "${zone_ip}" != "dhcp" ]]; then
 			dladm set-linkprop -t -z $ZONENAME \
 			    -p "allowed-ips=${zone_ip}" ${nic}
 			if (( $? != 0 )); then
