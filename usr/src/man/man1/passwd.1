@@ -439,9 +439,7 @@ returned by \fBdomainname\fR(1M).
 .ad
 .RS 17n
 .rt  
-Changes the login shell. For the \fBfiles\fR repository, this only works for
-the superuser. Normal users can change the \fBldap\fR, \fBnis\fR, or
-\fBnisplus\fR repositories. The choice of shell is limited by the requirements
+Changes the login shell. The choice of shell is limited by the requirements
 of \fBgetusershell\fR(3C). If the user currently has a shell that is not
 allowed by \fBgetusershell\fR, only root can change it.
 .RE
@@ -1198,6 +1196,12 @@ failed login count.
 .LP
 Changing a password reactivates an account deactivated for inactivity for the
 length of the inactivity period.
+.sp
+.LP
+If \fB/etc/shells\fR is present, and is corrupted, it may provide an attack
+vector that would compromise the system.  The \fBgetusershell\fR(3c) library
+call has a pre-vetted list of shells, so /etc/shells should be used with
+caution.
 .sp
 .LP
 Input terminal processing might interpret some key sequences and not pass them
