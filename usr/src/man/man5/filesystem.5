@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH filesystem 5 "24 Aug 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH FILESYSTEM 5 "Aug 24, 2009"
 .SH NAME
 filesystem \- File system organization
 .SH SYNOPSIS
@@ -81,7 +81,6 @@ The root file system contains files that are unique to each machine. It
 contains the following directories:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fR
 .ad
@@ -92,7 +91,6 @@ Root of the overall file system name space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev\fR\fR
 .ad
@@ -104,7 +102,6 @@ the kernel and hardware configuration of the machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/cfg\fR\fR
 .ad
@@ -115,7 +112,6 @@ Symbolic links to physical \fBap_ids.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/cpu\fR\fR
 .ad
@@ -126,7 +122,6 @@ Provides configuration and capability information about the processor type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/cua\fR\fR
 .ad
@@ -137,7 +132,6 @@ Device files for \fBuucp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk\fR\fR
 .ad
@@ -148,7 +142,6 @@ Block disk devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dtrace\fR\fR
 .ad
@@ -159,7 +152,6 @@ Pseudo-devices used by the DTrace framework.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dtrace/provider\fR\fR
 .ad
@@ -171,7 +163,6 @@ framework.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/fbs\fR\fR
 .ad
@@ -182,7 +173,6 @@ Frame buffer device files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/fd\fR\fR
 .ad
@@ -193,7 +183,6 @@ File descriptors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/md\fR\fR
 .ad
@@ -204,7 +193,6 @@ Logical volume management meta-disk devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/net\fR\fR
 .ad
@@ -215,7 +203,6 @@ Network data-link interface devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/printers\fR\fR
 .ad
@@ -226,7 +213,6 @@ USB printer device files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/pts\fR\fR
 .ad
@@ -237,7 +223,6 @@ Pseudo-terminal devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk\fR\fR
 .ad
@@ -248,7 +233,6 @@ Raw disk devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt\fR\fR
 .ad
@@ -259,7 +243,6 @@ Raw tape devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sad\fR\fR
 .ad
@@ -270,7 +253,6 @@ Entry points for the \fBSTREAMS\fR Administrative driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sound\fR\fR
 .ad
@@ -281,7 +263,6 @@ Audio device and audio device control files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/swap\fR\fR
 .ad
@@ -292,7 +273,6 @@ Default swap device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/term\fR\fR
 .ad
@@ -303,7 +283,6 @@ Terminal devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/devices\fR\fR
 .ad
@@ -314,7 +293,6 @@ Physical device files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc\fR\fR
 .ad
@@ -329,7 +307,6 @@ applications is \fB/etc/opt/\fR\fIpackagename\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/X11\fR\fR
 .ad
@@ -340,7 +317,6 @@ Xorg Xserver (X11) configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/acct\fR\fR
 .ad
@@ -351,7 +327,6 @@ Accounting system configuration information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/apache\fR\fR
 .ad
@@ -362,7 +337,6 @@ Apache configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/apoc\fR\fR
 .ad
@@ -374,7 +348,6 @@ access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/bonobo-activation\fR\fR
 .ad
@@ -385,7 +358,6 @@ GNOME XML configuration file for identifying CORBA servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cron.d\fR\fR
 .ad
@@ -396,7 +368,6 @@ Configuration information for \fBcron\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dat\fR\fR
 .ad
@@ -407,7 +378,6 @@ Contains a list of interface adapters supported by uDAPL service providers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default\fR\fR
 .ad
@@ -418,7 +388,6 @@ Defaults information for various programs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/devices\fR\fR
 .ad
@@ -429,7 +398,6 @@ Contains device-related data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs\fR\fR
 .ad
@@ -440,7 +408,6 @@ Configuration information for shared file systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dhcp\fR\fR
 .ad
@@ -451,7 +418,6 @@ Dynamic Host Configuration Protocol (\fBDHCP\fR) configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dmi\fR\fR
 .ad
@@ -462,7 +428,6 @@ Solstice Enterprise Agents configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dt\fR\fR
 .ad
@@ -473,7 +438,6 @@ Desktop configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/flash\fR\fR
 .ad
@@ -484,7 +448,6 @@ Solaris Flash Archive configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/fm\fR\fR
 .ad
@@ -495,7 +458,6 @@ Fault manager configuration files. For more information, see \fBfmd\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/fonts\fR\fR
 .ad
@@ -506,7 +468,6 @@ Font configuration information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/fs\fR\fR
 .ad
@@ -518,7 +479,6 @@ Binaries organized by file system types for operations required before
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ftpd\fR\fR
 .ad
@@ -529,7 +489,6 @@ Binaries organized by file system types for operations required before
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gconf\fR\fR
 .ad
@@ -541,7 +500,6 @@ settings)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gimp\fR\fR
 .ad
@@ -552,7 +510,6 @@ GNU Image Manipulation Program (GIMP) configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gnome\fR\fR
 .ad
@@ -563,7 +520,6 @@ GNOME Desktop configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gnome-vfs-2.0\fR\fR
 .ad
@@ -574,7 +530,6 @@ Files for customizing GNOME 2.0 desktop menus.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gnopernicus-1.0\fR\fR
 .ad
@@ -586,7 +541,6 @@ screen reader.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gss\fR\fR
 .ad
@@ -598,7 +552,6 @@ configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gtk\fR\fR
 .ad
@@ -609,7 +562,6 @@ GTK+ configuration files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gtk-2.0\fR\fR
 .ad
@@ -620,7 +572,6 @@ GTK+ Pixbuf loaders and Input Method modules
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/imq\fR\fR
 .ad
@@ -631,7 +582,6 @@ Sun Java System Message Queue security configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet\fR\fR
 .ad
@@ -642,7 +592,6 @@ Configuration files for Internet services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/init.d\fR\fR
 .ad
@@ -653,7 +602,6 @@ Shell scripts for transitioning between run levels.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5\fR\fR
 .ad
@@ -664,7 +612,6 @@ Kerberos configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lib\fR\fR
 .ad
@@ -675,7 +622,6 @@ Shared libraries needed during booting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/llc2\fR\fR
 .ad
@@ -686,7 +632,6 @@ Logical link control (\fBllc2\fR) driver configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lp\fR\fR
 .ad
@@ -697,7 +642,6 @@ Configuration information for the printer subsystem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lvm\fR\fR
 .ad
@@ -708,7 +652,6 @@ Solaris Logical Volume Manager configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail\fR\fR
 .ad
@@ -719,7 +662,6 @@ Mail subsystem configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nca\fR\fR
 .ad
@@ -730,7 +672,6 @@ Solaris Network Cache and Accelerator (\fBNCA\fR) configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/net\fR\fR
 .ad
@@ -741,7 +682,6 @@ Configuration information for transport independent network services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfs\fR\fR
 .ad
@@ -752,7 +692,6 @@ NFS server logging configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/opt\fR\fR
 .ad
@@ -763,7 +702,6 @@ Configuration information for optional packages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/pango\fR\fR
 .ad
@@ -774,7 +712,6 @@ Pango configuration and module information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/patch\fR\fR
 .ad
@@ -785,7 +722,6 @@ Configuration files for patch management.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp\fR\fR
 .ad
@@ -796,7 +732,6 @@ Solaris \fBPPP\fR configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rc0.d\fR\fR
 .ad
@@ -807,7 +742,6 @@ Scripts for entering or leaving run level 0. See \fBinit\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rc1.d\fR\fR
 .ad
@@ -818,7 +752,6 @@ Scripts for entering or leaving run level 1. See \fBinit\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rc2.d\fR\fR
 .ad
@@ -829,7 +762,6 @@ Scripts for entering or leaving run level 2. See \fBinit\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rc3.d\fR\fR
 .ad
@@ -840,7 +772,6 @@ Scripts for entering or leaving run level 3. See \fBinit\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rcS.d\fR\fR
 .ad
@@ -851,7 +782,6 @@ Scripts for bringing the system up in single user mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rcm\fR\fR
 .ad
@@ -862,7 +792,6 @@ Directory for reconfiguration manager (RCM) custom scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rpcsec\fR\fR
 .ad
@@ -873,7 +802,6 @@ This directory might contain an \fBNIS+\fR authentication configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf\fR\fR
 .ad
@@ -884,7 +812,6 @@ Service Access Facility files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sasl\fR\fR
 .ad
@@ -895,7 +822,6 @@ Simple Authentication and Security Layer (SASL) server configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security\fR\fR
 .ad
@@ -907,7 +833,6 @@ Extensions).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sfw\fR\fR
 .ad
@@ -919,7 +844,6 @@ subsystems from \fB/usr/sfw\fR that are not shared among systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sfw/samba\fR\fR
 .ad
@@ -930,7 +854,6 @@ Samba configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/skel\fR\fR
 .ad
@@ -941,7 +864,6 @@ Default profile scripts for new user accounts. See \fBuseradd\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sma\fR\fR
 .ad
@@ -952,7 +874,6 @@ Systems Management Agent (SMA) configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/smartcard\fR\fR
 .ad
@@ -963,7 +884,6 @@ Solaris Smart Card configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/snmp\fR\fR
 .ad
@@ -974,7 +894,6 @@ Solstice Enterprise Agents configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sound\fR\fR
 .ad
@@ -985,7 +904,6 @@ Sound Events configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh\fR\fR
 .ad
@@ -996,7 +914,6 @@ Secure Shell configuration files. See \fBssh\fR(1)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/svc\fR\fR
 .ad
@@ -1007,7 +924,6 @@ SMF service repository.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sysevent\fR\fR
 .ad
@@ -1018,7 +934,6 @@ SMF service repository.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/\fIsubsystem\fR\fR\fR
 .ad
@@ -1032,7 +947,6 @@ The analogous location for add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/tm\fR\fR
 .ad
@@ -1043,7 +957,6 @@ Trademark files; contents displayed at boot time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/usb\fR\fR
 .ad
@@ -1054,7 +967,6 @@ Trademark files; contents displayed at boot time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp\fR\fR
 .ad
@@ -1065,7 +977,6 @@ Trademark files; contents displayed at boot time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/xml\fR\fR
 .ad
@@ -1076,7 +987,6 @@ Extensible Markup Language (XML) catalog.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/zones\fR\fR
 .ad
@@ -1087,7 +997,6 @@ Solaris Zones configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/export\fR\fR
 .ad
@@ -1098,7 +1007,6 @@ Default root of the shared file system tree.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/home\fR\fR
 .ad
@@ -1109,7 +1017,6 @@ Default root of a subtree for user directories.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel\fR\fR
 .ad
@@ -1124,7 +1031,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv\fR\fR
 .ad
@@ -1135,7 +1041,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9\fR\fR
 .ad
@@ -1146,7 +1051,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64\fR\fR
 .ad
@@ -1157,7 +1061,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/dtrace\fR\fR
 .ad
@@ -1168,7 +1071,6 @@ Kernel modules representing components in the DTrace framework.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/genunix\fR\fR
 .ad
@@ -1179,7 +1081,6 @@ Platform-independent kernel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/amd64/genunix\fR\fR
 .ad
@@ -1190,7 +1091,6 @@ Platform-independent kernel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/\fIsubsystem\fR/amd64\fR\fR
 .ad
@@ -1203,7 +1103,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/\fIsubsystem\fR/sparcv9\fR\fR
 .ad
@@ -1216,7 +1115,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/svc/manifest\fR\fR
 .ad
@@ -1229,7 +1127,6 @@ is \fB/opt/packagename/lib/svc/manifest\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/mnt\fR\fR
 .ad
@@ -1241,7 +1138,6 @@ which file systems can be temporarily mounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/net\fR\fR
 .ad
@@ -1252,7 +1148,6 @@ Temporary mount point for file systems that are mounted by the automounter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/opt\fR\fR
 .ad
@@ -1263,7 +1158,6 @@ Root of a subtree for add-on application packages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform\fR\fR
 .ad
@@ -1276,7 +1170,6 @@ The semantics of the series of directories is equivalent to \fB/\fR (root).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR \fB-i\fR\fB\fR\fB`\fR\fB/kernel\fR\fR
 .ad
@@ -1290,7 +1183,6 @@ software and for add-on system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR \fB-m\fR\fB\fR\fB`\fR\fB/kernel\fR\fR
 .ad
@@ -1302,7 +1194,6 @@ location for bundled Solaris software and for add-on system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR
 \fB-i\fR\fB\fR\fB`\fR\fB/kernel/\fIsubsystem\fR/amd64\fR\fR
@@ -1315,7 +1206,6 @@ installation location for bundled Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR
 \fB-i\fR\fB\fR\fB`\fR\fB/kernel/\fIsubsystem\fR/sparcv9\fR\fR
@@ -1328,7 +1218,6 @@ installation location for bundled Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR
 \fB-i\fR\fB\fR\fB`\fR\fB/kernel/sparcv9/unix\fR\fR
@@ -1340,7 +1229,6 @@ installation location for bundled Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR
 \fB-i\fR\fB\fR\fB`\fR\fB/kernel/unix\fR\fR
@@ -1353,7 +1241,6 @@ SPARC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR \fB-i\fR\fB\fR\fB`\fR\fB/lib\fR\fR
 .ad
@@ -1366,7 +1253,6 @@ for add-on system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/\fR\fB`\fR\fBuname\fR \fB-i\fR\fB\fR\fB`\fR\fB/sbin\fR\fR
 .ad
@@ -1379,7 +1265,6 @@ Solaris software and for add-on system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc\fR\fR
 .ad
@@ -1390,7 +1275,6 @@ Root of a subtree for the process file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/sbin\fR\fR
 .ad
@@ -1404,7 +1288,6 @@ Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/system\fR\fR
 .ad
@@ -1415,7 +1298,6 @@ Mount point for the contract (CTFS) and object (OBJFS) file systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp\fR\fR
 .ad
@@ -1426,7 +1308,6 @@ Temporary files; cleared during the boot operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr\fR\fR
 .ad
@@ -1438,7 +1319,6 @@ system, below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var\fR\fR
 .ad
@@ -1453,7 +1333,6 @@ is \fB/var/opt/\fR\fIpackagename\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm\fR\fR
 .ad
@@ -1464,7 +1343,6 @@ System logging and accounting files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/apache\fR\fR
 .ad
@@ -1475,7 +1353,6 @@ Scripts, icons, logs, and cache pages for Apache web server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/appserver\fR\fR
 .ad
@@ -1486,7 +1363,6 @@ Sun Java System Application Server administrative domain files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/audit\fR\fR
 .ad
@@ -1497,7 +1373,6 @@ Default location for Solaris Audit log files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/cores\fR\fR
 .ad
@@ -1508,7 +1383,6 @@ Directory provided for global core files storage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/crash\fR\fR
 .ad
@@ -1519,7 +1393,6 @@ Default depository for kernel crash dumps.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/cron\fR\fR
 .ad
@@ -1530,7 +1403,6 @@ Log files for \fBcron\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/dmi\fR\fR
 .ad
@@ -1542,7 +1414,6 @@ run-time components.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/dt\fR\fR
 .ad
@@ -1553,7 +1424,6 @@ run-time components.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/fm\fR\fR
 .ad
@@ -1564,7 +1434,6 @@ Fault manager state files. For more information, see \fBfmd\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/imq\fR\fR
 .ad
@@ -1575,7 +1444,6 @@ Message queue broker instance configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ftp\fR\fR
 .ad
@@ -1586,7 +1454,6 @@ Message queue broker instance configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/inet\fR\fR
 .ad
@@ -1597,7 +1464,6 @@ IPv6 router state files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5\fR\fR
 .ad
@@ -1608,7 +1474,6 @@ Database and log files for Kerberos.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ld\fR\fR
 .ad
@@ -1619,7 +1484,6 @@ Configuration files for runtime linker.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ldap\fR\fR
 .ad
@@ -1630,7 +1494,6 @@ LDAP client configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/lib\fR\fR
 .ad
@@ -1641,7 +1504,6 @@ Directory for variable state information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/log\fR\fR
 .ad
@@ -1652,7 +1514,6 @@ System log files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/lp\fR\fR
 .ad
@@ -1663,7 +1524,6 @@ Line printer subsystem logging information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mail\fR\fR
 .ad
@@ -1674,7 +1534,6 @@ Directory where users' mail is kept.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mysql\fR\fR
 .ad
@@ -1685,7 +1544,6 @@ Dynamic database directory for MySQL Database Management System.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/news\fR\fR
 .ad
@@ -1696,7 +1554,6 @@ Community service messages. This is not the same as USENET-style news.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/nfs\fR\fR
 .ad
@@ -1707,7 +1564,6 @@ NFS server log files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/nis\fR\fR
 .ad
@@ -1718,7 +1574,6 @@ NIS+ databases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ntp\fR\fR
 .ad
@@ -1729,7 +1584,6 @@ Network Time Protocol (\fBNTP\fR) server state directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/opt\fR\fR
 .ad
@@ -1741,7 +1595,6 @@ An approved installation location for add-on system software and applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/patchsrv\fR\fR
 .ad
@@ -1752,7 +1605,6 @@ Patch management log files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/preserve\fR\fR
 .ad
@@ -1763,7 +1615,6 @@ Backup files for \fBvi\fR(1) and \fBex\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run\fR\fR
 .ad
@@ -1775,7 +1626,6 @@ contents of this directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/sadm\fR\fR
 .ad
@@ -1786,7 +1636,6 @@ Databases maintained by the software package management utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/sadm/system/logs\fR\fR
 .ad
@@ -1800,7 +1649,6 @@ software and applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/saf\fR\fR
 .ad
@@ -1811,7 +1659,6 @@ Service access facility logging and accounting files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/samba\fR\fR
 .ad
@@ -1822,7 +1669,6 @@ Log and lock files for Samba.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/sma_snmp\fR\fR
 .ad
@@ -1833,7 +1679,6 @@ Systems Management Agent (SMA) security and MIB component information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/snmp\fR\fR
 .ad
@@ -1844,7 +1689,6 @@ SNMP status and configuration information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool\fR\fR
 .ad
@@ -1856,7 +1700,6 @@ Contains directories for files used in printer spooling, mail delivery,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/clientmqueue\fR\fR
 .ad
@@ -1867,7 +1710,6 @@ Contains directories for files used in printer spooling, mail delivery,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/cron\fR\fR
 .ad
@@ -1878,7 +1720,6 @@ Contains directories for files used in printer spooling, mail delivery,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/locks\fR\fR
 .ad
@@ -1889,7 +1730,6 @@ Spooling lock files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/lp\fR\fR
 .ad
@@ -1900,7 +1740,6 @@ Line printer spool files. See \fBlp\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/mqueue\fR\fR
 .ad
@@ -1911,7 +1750,6 @@ Mail queued for delivery.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/pkg\fR\fR
 .ad
@@ -1922,7 +1760,6 @@ Spooled packages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/print\fR\fR
 .ad
@@ -1933,7 +1770,6 @@ LP print service client-side request staging area.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/samba\fR\fR
 .ad
@@ -1944,7 +1780,6 @@ Samba print queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucp\fR\fR
 .ad
@@ -1955,7 +1790,6 @@ Queued \fBuucp\fR(1C) jobs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucppublic\fR\fR
 .ad
@@ -1966,7 +1800,6 @@ Files deposited by \fBuucp\fR(1C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/statmon\fR\fR
 .ad
@@ -1977,7 +1810,6 @@ Network status monitor files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/svc/log\fR\fR
 .ad
@@ -1988,7 +1820,6 @@ SMF log files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/svc/manifest\fR\fR
 .ad
@@ -2000,7 +1831,6 @@ system software and applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/svc/manifest/site\fR\fR
 .ad
@@ -2011,7 +1841,6 @@ Site-local SMF service manifests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/tmp\fR\fR
 .ad
@@ -2042,7 +1871,6 @@ property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/uucp\fR\fR
 .ad
@@ -2053,7 +1881,6 @@ property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp\fR\fR
 .ad
@@ -2086,7 +1913,6 @@ accidentally change any shared files.
 The \fB/usr\fR file system contains the following subdirectories:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/4lib\fR\fR
 .ad
@@ -2097,7 +1923,6 @@ The \fB/usr\fR file system contains the following subdirectories:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/5bin\fR\fR
 .ad
@@ -2108,7 +1933,6 @@ Symbolic link to the \fB/usr/bin\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/SUNWale\fR\fR
 .ad
@@ -2119,7 +1943,6 @@ Configuration files for Asian Lanuguage Environment (ALE).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/X\fR\fR
 .ad
@@ -2130,7 +1953,6 @@ Symbolic link to the \fB/usr/openwin\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/X11\fR\fR
 .ad
@@ -2141,7 +1963,6 @@ Xorg Xserver (X11) executables and documentation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/adm\fR\fR
 .ad
@@ -2152,7 +1973,6 @@ Symbolic link to the \fB/var/adm\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/apache\fR\fR
 .ad
@@ -2163,7 +1983,6 @@ Apache executables, loadable modules, and documentation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/appserver\fR\fR
 .ad
@@ -2174,7 +1993,6 @@ Sun Java System Application Server software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/benchmarks\fR\fR
 .ad
@@ -2185,7 +2003,6 @@ Directory for benchmarks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin\fR\fR
 .ad
@@ -2201,7 +2018,6 @@ add-on system software or for applications is \fB/opt/\fIpackagename\fR/bin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/amd64\fR\fR
 .ad
@@ -2217,7 +2033,6 @@ add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/sparcv9\fR\fR
 .ad
@@ -2233,7 +2048,6 @@ add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/amd64\fR\fR
 .ad
@@ -2248,7 +2062,6 @@ software or for applications is \fB/opt/\fIpackagename\fR/bin/amd64\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/\fIsubsystem\fR\fR\fR
 .ad
@@ -2263,7 +2076,6 @@ is \fB/opt/\fIpackagename\fR/bin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/bin\fR\fR
 .ad
@@ -2278,7 +2090,6 @@ is \fB/opt/\fIpackagename\fR/bin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/bin/amd64\fR\fR
 .ad
@@ -2294,7 +2105,6 @@ add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/bin/sparcv9\fR\fR
 .ad
@@ -2310,7 +2120,6 @@ is \fB/opt/\fIpackagename\fR/bin/sparcv9\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ccs\fR\fR
 .ad
@@ -2321,7 +2130,6 @@ C compilation system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ccs/bin\fR\fR
 .ad
@@ -2332,7 +2140,6 @@ C compilation commands and system utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ccs/lib\fR\fR
 .ad
@@ -2343,7 +2150,6 @@ Symbolic link to \fB/usr/lib\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/demo\fR\fR
 .ad
@@ -2354,7 +2160,6 @@ Demo programs and data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dict\fR\fR
 .ad
@@ -2366,7 +2171,6 @@ dictionary file used by the \fBUNIX\fR spell program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt\fR\fR
 .ad
@@ -2377,7 +2181,6 @@ root of a subtree for CDE software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt/bin\fR\fR
 .ad
@@ -2388,7 +2191,6 @@ Primary location for CDE system utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt/include\fR\fR
 .ad
@@ -2399,7 +2201,6 @@ Header files for CDE software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt/lib\fR\fR
 .ad
@@ -2410,7 +2211,6 @@ Libraries for CDE software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt/share/man\fR\fR
 .ad
@@ -2421,7 +2221,6 @@ On-line reference manual pages for CDE software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/games\fR\fR
 .ad
@@ -2432,7 +2231,6 @@ An empty directory, a remnant of the SunOS 4.0/4.1 software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/gnome\fR\fR
 .ad
@@ -2445,7 +2243,6 @@ compatibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include\fR\fR
 .ad
@@ -2456,7 +2253,6 @@ Include headers (for C programs).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/j2se\fR\fR
 .ad
@@ -2467,7 +2263,6 @@ Java 2 SDK executables, loadable modules, and documentation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/java\fI*\fR\fR\fR
 .ad
@@ -2478,7 +2273,6 @@ Directories containing Java programs and libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/jdk\fI*\fR\fR\fR
 .ad
@@ -2489,7 +2283,6 @@ Java Platform virtual machine and core class libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/kernel\fR\fR
 .ad
@@ -2501,7 +2294,6 @@ filesystem. An approved installation location for bundled Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/kvm\fR\fR
 .ad
@@ -2513,7 +2305,6 @@ platform-specific binaries and libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib\fR\fR
 .ad
@@ -2527,7 +2318,6 @@ applications is \fB/opt/\fIpackagename\fR/lib\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/32\fR\fR
 .ad
@@ -2538,7 +2328,6 @@ Symbolic link to \fB/usr/lib\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64\fR\fR
 .ad
@@ -2550,7 +2339,6 @@ x86 platforms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/acct\fR\fR
 .ad
@@ -2561,7 +2349,6 @@ Accounting scripts and binaries. See \fBacct\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/adb\fR\fR
 .ad
@@ -2572,7 +2359,6 @@ Accounting scripts and binaries. See \fBacct\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/amd64\fR\fR
 .ad
@@ -2586,7 +2372,6 @@ software or for applications is \fB/opt/\fIpackagename\fR/lib/amd64\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/autofs\fR\fR
 .ad
@@ -2597,7 +2382,6 @@ Contains the \fBautomountd\fR executable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cfgadm\fR\fR
 .ad
@@ -2608,7 +2392,6 @@ Contains \fBcfgadm\fR hardware-specific driver plugins.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/class\fR\fR
 .ad
@@ -2620,7 +2403,6 @@ Scheduling-class-specific directories containing executables for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/crypto\fR\fR
 .ad
@@ -2631,7 +2413,6 @@ Contains the kernel-level cryptographic framework daemon (\fBkcfd\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/devfsadm\fR\fR
 .ad
@@ -2642,7 +2423,6 @@ Contains \fBdevfsadm\fR, the daemon version of \fBdevfsadm\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/dict\fR\fR
 .ad
@@ -2653,7 +2433,6 @@ Database files for \fBspell\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/dns\fR\fR
 .ad
@@ -2664,7 +2443,6 @@ Contains DNS resolver libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/dtrace\fR\fR
 .ad
@@ -2675,7 +2453,6 @@ Contains \fBdtrace\fR D source files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/flash\fR\fR
 .ad
@@ -2686,7 +2463,6 @@ Contains Solaris flash archive deployment scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/fm\fR\fR
 .ad
@@ -2697,7 +2473,6 @@ Contains \fBfmd\fR, the fault manager daemon and the fault manager library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/font\fR\fR
 .ad
@@ -2708,7 +2483,6 @@ Contains \fBfmd\fR, the fault manager daemon and the fault manager library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/fs\fR\fR
 .ad
@@ -2720,7 +2494,6 @@ directly by the user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/gss\fR\fR
 .ad
@@ -2731,7 +2504,6 @@ Secure services-related libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/iconv\fR\fR
 .ad
@@ -2742,7 +2514,6 @@ Conversion tables for \fBiconv\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/inet\fR\fR
 .ad
@@ -2753,7 +2524,6 @@ Contains many network-related daemons and libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ipf\fR\fR
 .ad
@@ -2764,7 +2534,6 @@ Contains \fBIPFILTER.LICENCE\fR and \fBipftest\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ipqosconf\fR\fR
 .ad
@@ -2775,7 +2544,6 @@ IPQoS configuration utility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/krb5\fR\fR
 .ad
@@ -2786,7 +2554,6 @@ Contains the Kerberos database propagation program and libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ld\fR\fR
 .ad
@@ -2797,7 +2564,6 @@ Contains the map files for the \fBld\fR link editor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ldap\fR\fR
 .ad
@@ -2808,7 +2574,6 @@ Contains LDAP client configuration utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libp\fR\fR
 .ad
@@ -2819,7 +2584,6 @@ Profiled libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/llc2\fR\fR
 .ad
@@ -2830,7 +2594,6 @@ Contains logical link control (\fBllc2\fR) driver configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale\fR\fR
 .ad
@@ -2841,7 +2604,6 @@ Localization databases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp\fR\fR
 .ad
@@ -2852,7 +2614,6 @@ Line printer subsystem databases and back-end executables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/netsvc\fR\fR
 .ad
@@ -2863,7 +2624,6 @@ Internet network services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/nfs\fR\fR
 .ad
@@ -2874,7 +2634,6 @@ Auxiliary NFS-related programs and daemons.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/nis\fR\fR
 .ad
@@ -2885,7 +2644,6 @@ Contains NIS+ administrative commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/picl\fR\fR
 .ad
@@ -2896,7 +2654,6 @@ Platform Information and Control Library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/pool\fR\fR
 .ad
@@ -2908,7 +2665,6 @@ associated libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/power\fR\fR
 .ad
@@ -2919,7 +2675,6 @@ Power management daemon, \fBpowerd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/print\fR\fR
 .ad
@@ -2930,7 +2685,6 @@ Contains \fBlp\fR conversion scripts and the \fBin.lpd\fR daemon.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/rcap\fR\fR
 .ad
@@ -2941,7 +2695,6 @@ Resource cap enforcement daemon, \fBrcapd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/rcm\fR\fR
 .ad
@@ -2953,7 +2706,6 @@ and RCM scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/refer\fR\fR
 .ad
@@ -2964,7 +2716,6 @@ Auxiliary programs for \fBrefer\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/rmmount\fR\fR
 .ad
@@ -2975,7 +2726,6 @@ Removable media mounter shared objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/sa\fR\fR
 .ad
@@ -2986,7 +2736,6 @@ Scripts and commands for the system activity report package. See \fBsar\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/saf\fR\fR
 .ad
@@ -2997,7 +2746,6 @@ Auxiliary programs and daemons related to the service access facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/sasl\fR\fR
 .ad
@@ -3008,7 +2756,6 @@ Simple Authentication and Security Layer (SASL) plug-in modules.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/secure\fR\fR
 .ad
@@ -3019,7 +2766,6 @@ Default trusted libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/security\fR\fR
 .ad
@@ -3030,7 +2776,6 @@ Solaris security plug-in modules.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/smartcard\fR\fR
 .ad
@@ -3041,7 +2786,6 @@ IFD handler libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/smedia\fR\fR
 .ad
@@ -3052,7 +2796,6 @@ Removable media device server daemon, \fBrpc.smserverd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/sparcv9\fR\fR
 .ad
@@ -3066,7 +2809,6 @@ software or for applications is \fB/opt/\fIpackagename\fR/lib/sparcv9\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/spell\fR\fR
 .ad
@@ -3078,7 +2820,6 @@ present when the Binary Compatibility Package is installed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ssh\fR\fR
 .ad
@@ -3089,7 +2830,6 @@ Contains the Secure Shell daemon (\fBsshd\fR) and supporting programs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/\fIsubsystem\fR\fR\fR
 .ad
@@ -3104,7 +2844,6 @@ analogous location for add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/\fIsubsystem\fR/amd64\fR\fR
 .ad
@@ -3119,7 +2858,6 @@ is \fB/opt/\fIpackagename\fR/lib/amd64\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/\fIsubsystem\fR/sparcv9\fR\fR
 .ad
@@ -3134,7 +2872,6 @@ is \fB/opt/\fIpackagename\fR/lib/sparcv9\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/lib\fR\fR
 .ad
@@ -3148,7 +2885,6 @@ applications is \fB/opt/\fIpackagename\fR/lib\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/lib/amd64\fR\fR
 .ad
@@ -3163,7 +2899,6 @@ is \fB/opt/\fIpackagename\fR/lib/amd64\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/lib/sparcv9\fR\fR
 .ad
@@ -3178,7 +2913,6 @@ is \fB/opt/\fIpackagename\fR/lib/sparcv9\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/sysevent\fR\fR
 .ad
@@ -3190,7 +2924,6 @@ Contains the system event notification daemon (\fBsyseventd\fR) and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/uucp\fR\fR
 .ad
@@ -3201,7 +2934,6 @@ Auxiliary programs and daemons for \fBuucp\fR(1C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/webconsole\fR\fR
 .ad
@@ -3212,7 +2944,6 @@ Sun Java web console programs and scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/zones\fR\fR
 .ad
@@ -3223,7 +2954,6 @@ Zone administration daemon (\fBzoneamd\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/local\fR\fR
 .ad
@@ -3239,7 +2969,6 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/mail\fR\fR
 .ad
@@ -3250,7 +2979,6 @@ Symbolic link to the \fB/var/mail\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/man\fR\fR
 .ad
@@ -3261,7 +2989,6 @@ Symbolic link to the \fB/usr/share/man\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/net/servers\fR\fR
 .ad
@@ -3273,7 +3000,6 @@ listener. See \fBlisten\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/news\fR\fR
 .ad
@@ -3284,7 +3010,6 @@ Symbolic link to the \fB/var/news\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/old\fR\fR
 .ad
@@ -3295,7 +3020,6 @@ Programs that are being phased out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/openwin\fR\fR
 .ad
@@ -3306,7 +3030,6 @@ Installation or mount point for the OpenWindows software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/perl5\fR\fR
 .ad
@@ -3317,7 +3040,6 @@ Perl 5 programs and documentation
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform\fR\fR
 .ad
@@ -3332,7 +3054,6 @@ except for subdirectories which do not provide utility under one or the other
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fB`\fR\fBuname\fR
 \fB-i\fR\fB\fR\fB`\fR\fB/include\fR\fR
@@ -3348,7 +3069,6 @@ system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fB`\fR\fBuname\fR \fB-i\fR\fB\fR\fB`\fR\fB/lib\fR\fR
 .ad
@@ -3361,7 +3081,6 @@ system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fB`\fR\fBuname\fR
 \fB-i\fR\fB\fR\fB`\fR\fB/lib/\fIsubsystem\fR/amd64\fR\fR
@@ -3375,7 +3094,6 @@ software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fB`\fR\fBuname\fR \fB-i\fR\fB\fR\fB`\fR\fB/sbin\fR\fR
 .ad
@@ -3388,7 +3106,6 @@ and for add-on system software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/preserve\fR\fR
 .ad
@@ -3399,7 +3116,6 @@ Symbolic link to the \fB/var/preserve\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/proc\fR\fR
 .ad
@@ -3410,7 +3126,6 @@ Directory for the \fBproc\fR tools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/pub\fR\fR
 .ad
@@ -3422,7 +3137,6 @@ and character processing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sadm\fR\fR
 .ad
@@ -3433,7 +3147,6 @@ System administration files and directories.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sadm/bin\fR\fR
 .ad
@@ -3445,7 +3158,6 @@ Binaries for the Form and Menu Language Interpreter (\fBFMLI\fR) scripts. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sadm/install\fR\fR
 .ad
@@ -3456,7 +3168,6 @@ Executables and scripts for package management.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin\fR\fR
 .ad
@@ -3470,7 +3181,6 @@ applications is \fB/opt/\fIpackagename\fR/sbin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin/install.d\fR\fR
 .ad
@@ -3481,7 +3191,6 @@ Custom Jumpstart scripts and executables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin/sparc7\fR and \fBsparc9\fR\fR
 .ad
@@ -3492,7 +3201,6 @@ Custom Jumpstart scripts and executables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin/amd64\fR\fR
 .ad
@@ -3503,7 +3211,6 @@ Custom Jumpstart scripts and executables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sbin/\fIsubsystem\fR\fR\fR
 .ad
@@ -3518,7 +3225,6 @@ add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/\fIsubsystem\fR/sbin\fR\fR
 .ad
@@ -3533,7 +3239,6 @@ add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/sfw\fR\fR
 .ad
@@ -3544,7 +3249,6 @@ add-on system software or for applications is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share\fR\fR
 .ad
@@ -3556,7 +3260,6 @@ bundled Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/aclocal\fR\fR
 .ad
@@ -3567,7 +3270,6 @@ Open source \fBm4\fR files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/applications\fR\fR
 .ad
@@ -3578,7 +3280,6 @@ Open source desktop applications files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/audio\fR\fR
 .ad
@@ -3589,7 +3290,6 @@ Sample audio files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/glib-2.0\fR\fR
 .ad
@@ -3600,7 +3300,6 @@ Makefile for \fBglib\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/gnome\fR\fR
 .ad
@@ -3611,7 +3310,6 @@ GNOME desktop and application data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/gtk-2.0\fR\fR
 .ad
@@ -3622,7 +3320,6 @@ GTK+ application data and demos
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/gtk-doc\fR\fR
 .ad
@@ -3634,7 +3331,6 @@ mostly includes desktop interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/icons\fR\fR
 .ad
@@ -3645,7 +3341,6 @@ Sun Java Desktop icons.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/idl\fR\fR
 .ad
@@ -3656,7 +3351,6 @@ Open source Interface Definition Language (IDL) files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/intltool\fR\fR
 .ad
@@ -3667,7 +3361,6 @@ XML translation tools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/ipfilter\fR\fR
 .ad
@@ -3678,7 +3371,6 @@ Open source IP Filter sample files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/javadoc\fR\fR
 .ad
@@ -3689,7 +3381,6 @@ Help files for Message Queue broker and Smart Card applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib\fR\fR
 .ad
@@ -3701,7 +3392,6 @@ bundled Solaris software.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/dict\fR\fR
 .ad
@@ -3712,7 +3402,6 @@ Contains word list for \fBspell\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/keytables\fR\fR
 .ad
@@ -3723,7 +3412,6 @@ Keyboard layout description tables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/mailx\fR\fR
 .ad
@@ -3734,7 +3422,6 @@ Help files for \fBmailx\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/nterm\fR\fR
 .ad
@@ -3745,7 +3432,6 @@ Help files for \fBmailx\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/pub\fR\fR
 .ad
@@ -3756,7 +3442,6 @@ Character set data files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tabset\fR\fR
 .ad
@@ -3767,7 +3452,6 @@ Tab setting escape sequences.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo\fR\fR
 .ad
@@ -3778,7 +3462,6 @@ Terminal description files for \fBterminfo\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac\fR\fR
 .ad
@@ -3790,7 +3473,6 @@ Macro packages and related files for text processing tools, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/zoneinfo\fR\fR
 .ad
@@ -3801,7 +3483,6 @@ Time zone information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man\fR\fR
 .ad
@@ -3814,7 +3495,6 @@ or for applications is \fB/opt/\fIpackagename\fR/man\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/omf\fR\fR
 .ad
@@ -3825,7 +3505,6 @@ GNOME Scrollkeeper database files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/pixmaps\fR\fR
 .ad
@@ -3836,7 +3515,6 @@ Sun Java graphics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/scrollkeeper\fR\fR
 .ad
@@ -3847,7 +3525,6 @@ GNOME Scrollkeeper templates and \fBxslt\fR files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/sgml\fR\fR
 .ad
@@ -3858,7 +3535,6 @@ Open source SGML files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/sounds\fR\fR
 .ad
@@ -3869,7 +3545,6 @@ Sound files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/src\fR\fR
 .ad
@@ -3880,7 +3555,6 @@ Source code for kernel, utilities, and libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/themes\fR\fR
 .ad
@@ -3891,7 +3565,6 @@ GNOME 2.0 Desktop themes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/webconsole\fR\fR
 .ad
@@ -3902,7 +3575,6 @@ Sun Web Console status files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/xml\fR\fR
 .ad
@@ -3913,7 +3585,6 @@ GNOME Scrollkeeper DTD files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/snadm\fR\fR
 .ad
@@ -3924,7 +3595,6 @@ Files related to system and network administration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/spool\fR\fR
 .ad
@@ -3935,7 +3605,6 @@ Symbolic link to the \fB/var/spool\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/src\fR\fR
 .ad
@@ -3946,7 +3615,6 @@ Symbolic link to the \fB/usr/share/src\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/tmp\fR\fR
 .ad
@@ -3957,7 +3625,6 @@ Symbolic link to the \fB/var/tmp\fR directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ucb\fR\fR
 .ad
@@ -3968,7 +3635,6 @@ Berkeley compatibility package binaries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ucbinclude\fR\fR
 .ad
@@ -3979,7 +3645,6 @@ Berkeley compatibility package headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/ucblib\fR\fR
 .ad
@@ -3990,7 +3655,6 @@ Berkeley compatibility package libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/xpg4\fR\fR
 .ad
@@ -4001,7 +3665,6 @@ Directory for POSIX-compliant utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/xpg6\fR\fR
 .ad

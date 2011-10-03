@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Exacct::Object 3PERL "1 Dec 2002" "SunOS 5.11" "Perl Library Functions"
+.TH EXACCT::OBJECT 3PERL "Dec 1, 2002"
 .SH NAME
 Exacct::Object \- exacct object manipulation
 .SH SYNOPSIS
@@ -44,12 +44,10 @@ None.
 .SS "Class methods"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdump($object, $filehandle)\fR\fR
 .ad
 .RS 30n
-.rt  
 This method dumps formatted text representation of a Perl exacct object to the
 supplied file handle. If no file handle is specified, the text representation
 is dumped to \fBSTDOUT\fR. See EXAMPLES below for sample output.
@@ -58,12 +56,10 @@ is dumped to \fBSTDOUT\fR. See EXAMPLES below for sample output.
 .SS "Object methods"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype()\fR\fR
 .ad
 .RS 27n
-.rt  
 This method returns the type field of the Perl exacct object. The value of the
 type field is returned as a dual-typed scalar and is either \fBEO_ITEM\fR,
 \fBEO_GROUP\fR, or \fBEO_NONE\fR.
@@ -71,24 +67,20 @@ type field is returned as a dual-typed scalar and is either \fBEO_ITEM\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcatalog()\fR\fR
 .ad
 .RS 27n
-.rt  
 This method returns the catalog field of the Perl exacct object. The value is
 returned as a \fBSun::Solaris::Exacct::Catalog\fR object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmatch_catalog($catalog)\fR\fR
 .ad
 .RS 27n
-.rt  
 This method matches the passed catalog tag against the object. True is returned
 of a match occurs.  Otherwise false is returned. This method has the same
 behavior as the underlying \fBea_match_object_catalog\fR(3EXACCT) function.
@@ -96,12 +88,10 @@ behavior as the underlying \fBea_match_object_catalog\fR(3EXACCT) function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvalue()\fR\fR
 .ad
 .RS 27n
-.rt  
 This method returns the value of the Perl exacct object. In the case of an
 Item, this object will normally be a Perl scalar, either a number or string.
 For raw Items, the buffer contained inside the object is returned as a Perl
@@ -134,23 +124,19 @@ By default nothing is exported from this module. The following tags can be used
 to selectively import constants and functions defined in this module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:CONSTANTS\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBEO_ERROR\fR, \fBEO_NONE\fR, \fBEO_ITEM\fR, and \fBEO_GROUP\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:ALL\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB:CONSTANTS\fR
 .RE
 
@@ -198,13 +184,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

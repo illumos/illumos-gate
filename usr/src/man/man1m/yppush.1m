@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH yppush 1M "26 Aug 1999" "SunOS 5.11" "System Administration Commands"
+.TH YPPUSH 1M "Aug 26, 1999"
 .SH NAME
 yppush \- force propagation of changed NIS map
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/netsvc/yp/yppush\fR [\fB-v\fR] [\fB-h\fR \fIhost\fR] [\fB-d\fR \fIdomain\fR] 
+\fB/usr/lib/netsvc/yp/yppush\fR [\fB-v\fR] [\fB-h\fR \fIhost\fR] [\fB-d\fR \fIdomain\fR]
      [\fB-p\fR \fI#parallel-xfrs\fR] \fImapname\fR
 .fi
 
@@ -42,45 +42,37 @@ service.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdomain\fR\fR
 .ad
 .RS 21n
-.rt  
 Specifies a \fIdomain\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost\fR\fR
 .ad
 .RS 21n
-.rt  
 Propagates only to the named \fIhost\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fI#parallel-xfrs\fR\fR
 .ad
 .RS 21n
-.rt  
 Allows the specified number of map transfers to occur in parallel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 21n
-.rt  
 Verbose.  This prints messages when each server is called, and for each
 response. If this flag is omitted, only error messages are printed.
 .RE
@@ -88,7 +80,6 @@ response. If this flag is omitted, only error messages are printed.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp\fR\fR
 .ad
@@ -99,7 +90,6 @@ Directory where \fBNIS\fR configuration files reside.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/\fIdomain\fR/ypservers.\|{\fIdir\fR,\fI pag\|\fR}\fR\fR
 .ad

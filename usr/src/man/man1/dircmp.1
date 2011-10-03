@@ -2,14 +2,14 @@
 .\" Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dircmp 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH DIRCMP 1 "Feb 1, 1995"
 .SH NAME
 dircmp \- directory comparison
 .SH SYNOPSIS
@@ -32,12 +32,10 @@ common to both directories have the same contents.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 8n
-.rt  
 Compares the contents of files with the same name in both directories and
 output a list telling what must be changed in the two files to bring them into
 agreement. The list format is described in \fBdiff\fR(1).
@@ -45,23 +43,19 @@ agreement. The list format is described in \fBdiff\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 8n
-.rt  
 Suppresses messages about identical files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIn\fR\fR
 .ad
 .RS 8n
-.rt  
 Changes the width of the output line to \fIn\fR characters. The default width
 is  \fB72\fR.
 .RE
@@ -72,7 +66,6 @@ is  \fB72\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdir1\fR\fR
 .ad
@@ -81,7 +74,6 @@ The following operands are supported:
 \fB\fIdir2\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a directory to be compared.
 .RE
 
@@ -102,23 +94,19 @@ that affect the execution of \fBdircmp\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred. (Differences in directory contents are not considered
 errors.)
 .RE

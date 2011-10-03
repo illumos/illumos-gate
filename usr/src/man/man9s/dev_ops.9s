@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dev_ops 9S "16 Sep 2008" "SunOS 5.11" "Data Structures for Drivers"
+.TH DEV_OPS 9S "Sep 16, 2008"
 .SH NAME
 dev_ops \- device operations structure
 .SH SYNOPSIS
@@ -28,134 +28,110 @@ Following are the device functions provided in the device operations structure.
 All fields must be set at compile time.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_rev\fR\fR
 .ad
 .RS 17n
-.rt  
 Driver build version. Set this to \fBDEVO_REV\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_refcnt\fR\fR
 .ad
 .RS 17n
-.rt  
 Driver reference count. Set this to \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_getinfo\fR\fR
 .ad
 .RS 17n
-.rt  
 Get device driver information (see \fBgetinfo\fR(9E)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_identify\fR\fR
 .ad
 .RS 17n
-.rt  
 This entry point is obsolete. Set to \fBnulldev\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_probe\fR\fR
 .ad
 .RS 17n
-.rt  
 Probe device. See \fBprobe\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_attach\fR\fR
 .ad
 .RS 17n
-.rt  
 Attach driver to \fBdev_info\fR. See \fBattach\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_detach\fR\fR
 .ad
 .RS 17n
-.rt  
 Detach/prepare driver to unload. See \fBdetach\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_reset\fR\fR
 .ad
 .RS 17n
-.rt  
 Reset device. (Not supported in this release.) Set this to \fBnodev\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_cb_ops\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to \fBcb_ops\fR(9S) structure for leaf drivers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_bus_ops\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to bus operations structure for nexus drivers. Set this to \fINULL\fR
 if this is for a leaf driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_power\fR\fR
 .ad
 .RS 17n
-.rt  
 Power a device attached to system. See \fBpower\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevo_quiesce\fR\fR
 .ad
 .RS 17n
-.rt  
 Quiesce a device attached to system (see \fBquiesce\fR(9E) for more
 information). This can be set to \fBddi_quiesce_not_needed()\fR if the driver
 does not need to implement quiesce.

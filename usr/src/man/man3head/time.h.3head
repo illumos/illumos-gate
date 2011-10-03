@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH time.h 3HEAD "5 Feb 2008" "SunOS 5.11" "Headers"
+.TH TIME.H 3HEAD "Feb 5, 2008"
 .SH NAME
 time.h, time \- time types
 .SH SYNOPSIS
@@ -47,47 +47,39 @@ not available.
 The <\fBtime.h\fR> header defines the following symbolic names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL\fR\fR
 .ad
 .RS 28n
-.rt  
 Null pointer constant.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCKS_PER_SEC\fR\fR
 .ad
 .RS 28n
-.rt  
 A number used to convert the value returned by the \fBclock()\fR function into
 seconds. See \fBclock\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_PROCESS_CPUTIME_ID\fR\fR
 .ad
 .RS 28n
-.rt  
 The identifier of the CPU-time clock associated with the process making a
 \fBclock()\fR or \fBtimer*()\fR function call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_THREAD_CPUTIME_ID\fR\fR
 .ad
 .RS 28n
-.rt  
 The identifier of the CPU-time clock associated with the thread making a
 \fBclock()\fR or \fBtimer*()\fR function call.
 .RE
@@ -121,35 +113,29 @@ struct timespec it_value     /* timer expiration */
 The following manifest constants are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_REALTIME\fR\fR
 .ad
 .RS 19n
-.rt  
 The identifier of the system-wide realtime clock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIMER_ABSTIME\fR\fR
 .ad
 .RS 19n
-.rt  
 Flag indicating time is absolute. For functions taking timer objects, this
 refers to the clock associated with the timer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLOCK_MONOTONIC\fR\fR
 .ad
 .RS 19n
-.rt  
 The identifier for the system-wide monotonic clock, which is defined as a clock
 whose value cannot be set with \fBclock_settime()\fR and that cannot have
 backward clock jumps. The maximum possible clock jump is
@@ -206,15 +192,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

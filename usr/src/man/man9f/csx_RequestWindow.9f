@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_RequestWindow 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_REQUESTWINDOW 9F "Jul 19, 1996"
 .SH NAME
 csx_RequestWindow, csx_ReleaseWindow \- request or release window resources
 .SH SYNOPSIS
@@ -29,34 +29,28 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwh\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBwindow_handle_t\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwr\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to a \fBwin_req_t\fR structure.
 .RE
 
@@ -91,7 +85,7 @@ uint32_t      Socket;                  /* socket number */
 uint32_t      Attributes;              /* window flags */
 uint32_t      Base.base;               /* requested window */
                                         /*   base address */
-acc_handle_t  Base.handle;             /* returned handle for 
+acc_handle_t  Base.handle;             /* returned handle for
                                         /*   base of window */
 uint32_t      Size;                    /* window size requested */
                                         /*   or granted */
@@ -106,28 +100,23 @@ uint32_t      ReqOffset;               /* required window offest */
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSocket\fR\fR
 .ad
 .RS 26n
-.rt  
 Not used in Solaris, but for portability with other Card Services
 implementations, it should be set to the logical socket number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAttributes\fR\fR
 .ad
 .RS 26n
-.rt  
 This field is bit-mapped and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_MEMORY_TYPE_IO\fR\fR
 .ad
@@ -138,7 +127,6 @@ Points to I/O space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_MEMORY_TYPE_CM\fR\fR
 .ad
@@ -149,7 +137,6 @@ Points to common memory space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_MEMORY_TYPE_AM\fR\fR
 .ad
@@ -161,7 +148,6 @@ must be set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ENABLE\fR\fR
 .ad
@@ -172,7 +158,6 @@ The client must set this bit to enable the window.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_BIG_ENDIAN\fR\fR
 .ad
@@ -183,7 +168,6 @@ Describes device as big-endian.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_LITTLE_ENDIAN\fR\fR
 .ad
@@ -201,7 +185,6 @@ hardware platform byte swapping capabilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_NEVER_SWAP\fR\fR
 .ad
@@ -216,7 +199,6 @@ provided by the following \fBAttributes\fR bits, only one of which may be
 specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STRICT_ORDER\fR\fR
 .ad
@@ -228,7 +210,6 @@ ordering is the default behavior.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_UNORDERED_OK\fR\fR
 .ad
@@ -241,7 +222,6 @@ followed by a load).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_MERGING_OK\fR\fR
 .ad
@@ -256,7 +236,6 @@ re-ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_LOADCACHING_OK\fR\fR
 .ad
@@ -269,7 +248,6 @@ implies merging and re-ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STORECACHING_OK\fR\fR
 .ad
@@ -293,23 +271,19 @@ set in the \fBAttributes\fR field when the client must specify card offsets to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBase.base\fR\fR
 .ad
 .RS 26n
-.rt  
 This field must be set to \fB0\fR on calling \fBcsx_RequestWindow()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBase.handle\fR\fR
 .ad
 .RS 26n
-.rt  
 On successful return from \fBcsx_RequestWindow()\fR, the \fBBase.handle\fR
 field contains an access handle corresponding to the first byte of the
 allocated memory window which the client must use when accessing the \fBPC
@@ -320,12 +294,10 @@ value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSize\fR\fR
 .ad
 .RS 26n
-.rt  
 On calling \fBcsx_RequestWindow()\fR, the \fBSize\fR field is the size in bytes
 of the memory window requested. \fBSize\fR may be zero to indicate that Card
 Services should provide the smallest sized window available. On successful
@@ -335,12 +307,10 @@ size of the window allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwin_params.AccessSpeed\fR\fR
 .ad
 .RS 26n
-.rt  
 This field specifies the access speed of the window if the client is requesting
 a memory window. The \fBAccessSpeed\fR field bit definitions use the format of
 the extended speed byte of the Device \fBID \fRtuple. If the mantissa is
@@ -352,23 +322,22 @@ are a binary code representing a speed from the following table:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBCode\fR\fBSpeed\fR
+box;
+l | l
+l | l .
+\fBCode\fR	\fBSpeed\fR
 _
-0(Reserved - do not use).
+0	(Reserved - do not use).
 _
-1250 nsec
+1	250 nsec
 _
-2200 nsec
+2	200 nsec
 _
-3150 nsec
+3	150 nsec
 _
-4100 nse
+4	100 nse
 _
-5-7(Reserved\(emdo not use.)
+5-7	(Reserved\(emdo not use.)
 .TE
 
 .sp
@@ -383,12 +352,10 @@ generate the appropriate \fBAccessSpeed\fR values rather than manually
 perturbing the \fBAccessSpeed\fR field.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwin_params.IOAddrLines\fR\fR
 .ad
 .RS 26n
-.rt  
 If the client is requesting an \fBI/O \fRwindow, the \fBIOAddrLines\fR field is
 the number of \fBI/O \fRaddress lines decoded by the \fBPC \fRCard in the
 specified socket. Access to the \fBI/O \fRwindow is not enabled until
@@ -397,12 +364,10 @@ specified socket. Access to the \fBI/O \fRwindow is not enabled until
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBReqOffset\fR\fR
 .ad
 .RS 26n
-.rt  
 This field is a Solaris-specific extension that can be used by clients to
 generate optimum window offsets passed to \fBcsx_MapMemPage\fR(9F).
 .RE
@@ -410,89 +375,73 @@ generate optimum window offsets passed to \fBcsx_MapMemPage\fR(9F).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_ATTRIBUTE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBAttributes\fR are invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_SPEED\fR\fR
 .ad
 .RS 27n
-.rt  
 Speed is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_SIZE\fR\fR
 .ad
 .RS 27n
-.rt  
 Window size is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_OUT_OF_RESOURCE\fR\fR
 .ad
 .RS 27n
-.rt  
 Unable to allocate window.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

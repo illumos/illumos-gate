@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH attributes 5 "29 Jul 2007" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH ATTRIBUTES 5 "Jul 29, 2007"
 .SH NAME
 attributes, architecture, availability, CSI, stability, MT-Level, standard \-
 attributes of interfaces
@@ -18,21 +18,20 @@ interfaces.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "Architecture"
@@ -223,21 +222,19 @@ levels.
 
 .sp
 .TS
-tab();
-cw(1.1i) cw(1.1i) cw(3.3i) 
-lw(1.1i) lw(1.1i) lw(3.3i) 
-.
-ReleaseVersionSignificance
+c c c
+l l l .
+Release	Version	Significance
 _
-Majorx.0T{
+Major	x.0	T{
 Likely to contain major feature additions; adhere to different,  possibly incompatible standard revisions; and though unlikely, could change, drop, or replace Committed interfaces. Initial product releases are usually 1.0.
 T}
 _
-Minorx.yT{
+Minor	x.y	T{
 Compared to an x.0 or earlier release (y!=0), it is likely to contain: feature additions, compatible changes to Committed interfaces, or likely incompatible changes to Uncommitted or Volatile interfaces.
 T}
 _
-Microx.y.zT{
+Micro	x.y.z	T{
 Intended to be interface compatible with the previous release (z!=0), but likely to add bug fixes, performance enhancements, and support for additional hardware. Incompatible changes to Volatile interfaces are possible.
 T}
 .TE
@@ -258,17 +255,15 @@ the appropriate subsection below.
 
 .sp
 .TS
-tab();
-cw(1.1i) cw(1.1i) cw(3.3i) 
-lw(1.1i) lw(1.1i) lw(3.3i) 
-.
-StabilityReleaseComments
+c c c
+l l l .
+Stability	Release	Comments
 _
-CommittedMajor (x.0)Incompatibilities are exceptional.
+Committed	Major (x.0)	Incompatibilities are exceptional.
 _
-UncommittedMinor (x.y)Incompatibilities are common.
+Uncommitted	Minor (x.y)	Incompatibilities are common.
 _
-VolatileMicro (x.y.z)Incompatibilities are common.
+Volatile	Micro (x.y.z)	Incompatibilities are common.
 .TE
 
 .sp
@@ -288,7 +283,6 @@ for interfaces provided by the Solaris product. The only source of stability
 level information is Solaris manual pages.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCommitted\fR\fR
 .ad
@@ -316,7 +310,6 @@ Obsolete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUncommitted\fR\fR
 .ad
@@ -365,7 +358,6 @@ on these interfaces may not work in future minor releases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVolatile\fR\fR
 .ad
@@ -401,7 +393,6 @@ release.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNot-an-Interface\fR\fR
 .ad
@@ -419,7 +410,6 @@ indicates that the potential for confusion was not identified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPrivate\fR\fR
 .ad
@@ -441,7 +431,6 @@ or the fact that the interface is inordinately visible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBObsolete\fR\fR
 .ad
@@ -513,22 +502,20 @@ between the old and new classification schemes.
 
 .sp
 .TS
-tab();
-cw(1.1i) cw(1.1i) cw(3.3i) 
-lw(1.1i) lw(1.1i) lw(3.3i) 
-.
-OldNewComments
+c c c
+l l l .
+Old	New	Comments
 _
-StandardCommittedT{
+Standard	Committed	T{
 An entry in the attributes table for the Standard attribute type should appear.
 T}
-StableCommittedName change.
-EvolvingUncommittedActual commitments match.
-UnstableUncommittedName change.
-ExternalVolatileT{
+Stable	Committed	Name change.
+Evolving	Uncommitted	Actual commitments match.
+Unstable	Uncommitted	Name change.
+External	Volatile	T{
 Name change with expansion of allowed usage.
 T}
-Obsolete(Obsolete)Was a classification, now a modifier.
+Obsolete	(Obsolete)	Was a classification, now a modifier.
 .TE
 
 .sp
@@ -550,7 +537,6 @@ multiple threads. Manual pages containing functions that are of multiple or
 differing levels describe this in their \fBNOTES\fR or \fBUSAGE\fR section.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSafe\fR\fR
 .ad
@@ -571,7 +557,6 @@ using the \fBclose\fR(2) interface safely.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUnsafe\fR\fR
 .ad
@@ -588,7 +573,6 @@ function name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMT-Safe\fR\fR
 .ad
@@ -609,7 +593,6 @@ mean anything from being single threaded to being any degree of multithreaded.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAsync-Signal-Safe\fR\fR
 .ad
@@ -627,7 +610,6 @@ handler that might acquire the same lock from being called.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMT-Safe with Exceptions\fR\fR
 .ad
@@ -639,7 +621,6 @@ the exceptions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSafe with Exceptions\fR\fR
 .ad
@@ -651,7 +632,6 @@ the exceptions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFork-Safe\fR\fR
 .ad
@@ -690,7 +670,6 @@ depended on whether or not the application was linked with \fB-lpthread\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCancel-Safety\fR\fR
 .ad

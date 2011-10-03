@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_setcred 3PAM "10 Jan 2008" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_SETCRED 3PAM "Jan 10, 2008"
 .SH NAME
 pam_setcred \- modify or delete user credentials for an authentication service
 .SH SYNOPSIS
@@ -32,56 +32,46 @@ The user is specified by a prior call to \fBpam_start()\fR or
 the first four flags are mutually exclusive:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_ESTABLISH_CRED\fR\fR
 .ad
 .RS 25n
-.rt  
 Set user credentials for an authentication service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DELETE_CRED\fR\fR
 .ad
 .RS 25n
-.rt  
 Delete user credentials associated with an authentication service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_REINITIALIZE_CRED\fR\fR
 .ad
 .RS 25n
-.rt  
 Reinitialize user credentials.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_REFRESH_CRED\fR\fR
 .ad
 .RS 25n
-.rt  
 Extend lifetime of user credentials.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SILENT\fR\fR
 .ad
 .RS 25n
-.rt  
 Authentication service should not generate any messages.
 .RE
 
@@ -96,46 +86,38 @@ the error return values described in \fBpam\fR(3PAM) the following values may
 be returned upon error:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CRED_UNAVAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 Underlying authentication service can not retrieve user credentials
 unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CRED_EXPIRED\fR\fR
 .ad
 .RS 20n
-.rt  
 User credentials expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 20n
-.rt  
 User unknown to underlying authentication service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CRED_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Failure setting user credentials.
 .RE
 
@@ -147,15 +129,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Committed
+Interface Stability	 Committed
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

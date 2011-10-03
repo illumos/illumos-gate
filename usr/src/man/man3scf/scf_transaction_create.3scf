@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_transaction_create 3SCF "28 Aug 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_TRANSACTION_CREATE 3SCF "Aug 28, 2007"
 .SH NAME
 scf_transaction_create, scf_transaction_handle, scf_transaction_reset,
 scf_transaction_reset_all, scf_transaction_destroy,
@@ -15,7 +15,7 @@ Configuration Facility
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_transaction_t *\fR\fBscf_transaction_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
@@ -92,24 +92,20 @@ atomically, whereby either all of the updates occur or none of them do. An
 \fBscf_transaction_t\fR is always in one of the following states:
 .sp
 .ne 2
-.mk
 .na
 \fBreset\fR
 .ad
 .RS 13n
-.rt  
 The initial state. A successful return of \fBscf_transaction_start()\fR moves
 the transaction to the started state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstarted\fR
 .ad
 .RS 13n
-.rt  
 The transaction has started. The \fBscf_transaction_property_delete()\fR,
 \fBscf_transaction_property_new()\fR, \fBscf_transaction_property_change()\fR,
 and \fBscf_transaction_property_change_type()\fR functions can be used to set
@@ -120,12 +116,10 @@ state.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcommitted\fR
 .ad
 .RS 13n
-.rt  
 A call to \fBscf_transaction_commit()\fR (whether or not it is successful)
 moves the transaction to the committed state. Modifying, resetting, or
 destroying the entries and values associated with a transaction will move it to
@@ -134,12 +128,10 @@ the invalid state.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinvalid\fR
 .ad
 .RS 13n
-.rt  
 The \fBscf_transaction_reset()\fR and \fBscf_transaction_reset_all()\fR
 functions return the transaction to the reset state.
 .RE
@@ -179,7 +171,6 @@ associated with a transaction. These functions affect commit and failure as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscf_transaction_property_delete()\fR\fR
 .ad
@@ -191,7 +182,6 @@ fails if \fIprop_name\fR does not name a property in the property group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscf_transaction_property_new()\fR\fR
 .ad
@@ -204,7 +194,6 @@ property in the property group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscf_transaction_property_change()\fR\fR
 .ad
@@ -218,7 +207,6 @@ type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscf_transaction_property_change_type()\fR\fR
 .ad
@@ -277,34 +265,28 @@ recent, and -1 on failure.
 The \fBscf_transaction_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The value of the \fIhandle\fR argument is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
 .RS 30n
-.rt  
 There is not enough memory to allocate an \fBscf_transaction_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The server does not have adequate resources for a new transaction handle.
 .RE
 
@@ -313,12 +295,10 @@ The server does not have adequate resources for a new transaction handle.
 The \fBscf_transaction_handle()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle associated with \fItran\fR has been destroyed.
 .RE
 
@@ -327,7 +307,6 @@ The handle associated with \fItran\fR has been destroyed.
 The \fBscf_transaction_start()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -338,7 +317,6 @@ The repository backend refused the modification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_READONLY\fR\fR
 .ad
@@ -349,7 +327,6 @@ The repository backend refused modification because it is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -360,7 +337,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -371,7 +347,6 @@ The property group has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -382,7 +357,6 @@ The transaction and property group are not derived from the same handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_IN_USE\fR\fR
 .ad
@@ -395,7 +369,6 @@ can be used to return the transaction to the \fBreset\fR state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -406,7 +379,6 @@ The server does not have the resources to complete the request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -417,7 +389,6 @@ The handle was never bound or has been unbound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -428,7 +399,6 @@ The property group specified by \fIpg\fR is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -444,7 +414,6 @@ The \fBscf_transaction_property_delete()\fR,
 and \fBscf_transaction_property_change_type()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -456,7 +425,6 @@ chose for the operation denied access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -467,7 +435,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -478,7 +445,6 @@ The property group the transaction is changing has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -489,7 +455,6 @@ The transaction and entry are not derived from the same handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_IN_USE\fR\fR
 .ad
@@ -500,7 +465,6 @@ The property already has an entry in the transaction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -511,7 +475,6 @@ An internal error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -522,7 +485,6 @@ The \fIprop_name\fR argument is not a valid property name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -533,7 +495,6 @@ The server does not have the resources to complete the request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -544,7 +505,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -555,7 +515,6 @@ The transaction has not been started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
 .ad
@@ -571,23 +530,19 @@ The \fBscf_transaction_property_delete()\fR,
 \fBscf_transaction_property_change_type()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_EXISTS\fR\fR
 .ad
 .RS 23n
-.rt  
 The object already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
 .RS 23n
-.rt  
 The property group does not contain a property named \fIprop_name\fR.
 .RE
 
@@ -598,12 +553,10 @@ The \fBscf_transaction_property_new()\fR ,
 \fBscf_transaction_property_change_type()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIprop_name\fR argument is not not a valid property name, or the
 \fItype\fR argument is an invalid type.
 .RE
@@ -613,23 +566,19 @@ The \fIprop_name\fR argument is not not a valid property name, or the
 The \fBscf_transaction_property_new()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_EXISTS\fR\fR
 .ad
 .RS 23n
-.rt  
 The property group already contains a property named \fIprop_name\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
 .RS 23n
-.rt  
 Nothing of that name was found.
 .RE
 
@@ -638,12 +587,10 @@ Nothing of that name was found.
 The \fBscf_transaction_property_change()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
 .ad
 .RS 27n
-.rt  
 The property \fIprop_name\fR is not of type \fItype\fR.
 .RE
 
@@ -652,7 +599,6 @@ The property \fIprop_name\fR is not of type \fItype\fR.
 The \fBscf_transaction_commit()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_READONLY\fR\fR
 .ad
@@ -663,7 +609,6 @@ The repository backend is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -674,7 +619,6 @@ The repository backend refused the modification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -685,7 +629,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -696,7 +639,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -707,7 +649,6 @@ The transaction is in an invalid state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -718,7 +659,6 @@ The property group the transaction is acting on has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -729,7 +669,6 @@ The transaction has not been started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -740,7 +679,6 @@ The user does not have sufficient privileges to modify the property group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -761,13 +699,13 @@ The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 tx = scf_transaction_create(handle);
 e1 = scf_entry_create(handle);
 v1 = scf_value_create(handle);
- 
+
 do {
      if (scf_pg_update(pg) == -1)
           goto fail;
      if (scf_transaction_start(tx, pg) == -1)
           goto fail;
- 
+
      /* set up transaction entries */
      if (scf_transaction_property_change(tx, e1, "property",
         SCF_TYPE_BOOLEAN) == -1) {
@@ -777,17 +715,17 @@ do {
      scf_value_set_boolean(v1, 1);
      scf_entry_add_value(e1, v1);
 
-      
+
      result = scf_transaction_commit(tx);
- 
+
      scf_transaction_reset(tx);
 } while (result == 0);
- 
+
 if (result < 0)
      goto fail;
- 
+
 /* success */
- 
+
    cleanup:
 scf_transaction_destroy(tx);
 scf_entry_destroy(e1);
@@ -803,15 +741,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -2,14 +2,14 @@
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cp 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.TH CP 1 "Oct 30, 2007"
 .SH NAME
 cp \- copy files
 .SH SYNOPSIS
@@ -91,24 +91,20 @@ The following options are supported for both \fB/usr/bin/cp\fR and
 \fB/usr/xpg4/bin/cp\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Unlink. If a file descriptor for a destination file cannot be obtained, this
 option attempts to unlink the destination file and proceed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 6n
-.rt  
 Takes actions based on the type and contents of the file referenced by any
 symbolic link specified as a \fIsource_file\fR operand.
 .sp
@@ -120,12 +116,10 @@ preserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Interactive. \fBcp\fR prompts for confirmation whenever the copy would
 overwrite an existing \fItarget\fR. An affirmative response means that the copy
 should proceed. Any other answer prevents \fBcp\fR from overwriting
@@ -134,12 +128,10 @@ should proceed. Any other answer prevents \fBcp\fR from overwriting
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Takes actions based on the type and contents of the file referenced by any
 symbolic link specified as a \fIsource_file\fR operand or any symbolic links
 encountered during traversal of a file hierarchy.
@@ -150,12 +142,10 @@ traversal of a file hierarchy are not preserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Preserve. The \fBcp\fR utility duplicates not only the contents of
 \fIsource_file\fR, but also attempts to preserve its ACL, access and
 modification times, extended attributes, extended system attributes, file mode,
@@ -174,12 +164,10 @@ a \fBnon-zero\fR exit status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 6n
-.rt  
 Takes actions on any symbolic link specified as a \fIsource_file\fR operand or
 any symbolic link encountered during traversal of a file hierarchy.
 .sp
@@ -189,12 +177,10 @@ hierarchy are preserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Recursive. \fBcp\fR copies the directory and all its files, including any
 subdirectories and their files to \fItarget\fR. Unless the \fB-H\fR, \fB-L\fR,
 or \fB-P\fR option is specified, the \fB-L\fR option is used as the default
@@ -203,35 +189,29 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Same as \fB-r\fR, except pipes are replicated, not read from.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-@\fR\fR
 .ad
 .RS 6n
-.rt  
 Preserves extended attributes. \fBcp\fR attempts to copy all of the source
 file's extended attributes along with the file data to the destination file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-/\fR\fR
 .ad
 .RS 6n
-.rt  
 Preserves extended attributes and extended system attributes. Along with the
 file's data, the \fBcp\fR utility attempts to copy extended attributes and
 extended system attributes from each source file, and extended system
@@ -291,46 +271,38 @@ preserved.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsource_file\fR\fR
 .ad
 .RS 15n
-.rt  
 A pathname of a regular file to be copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsource_dir\fR\fR
 .ad
 .RS 15n
-.rt  
 A pathname of a directory to be copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItarget_file\fR\fR
 .ad
 .RS 15n
-.rt  
 A pathname of an existing or non-existing file, used for the output when a
 single file is copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItarget\fR\fR
 .ad
 .RS 15n
-.rt  
 A pathname of a directory to contain the copied files.
 .RE
 
@@ -433,7 +405,7 @@ $ ls -/c file1
 -rw-r--r--   1 foo    staff          0 Oct 29 20:04 file1
                 {AH-----m--}
 
-$ cp -/ file1 /tmp         
+$ cp -/ file1 /tmp
 cp: Failed to copy extended system attributes from file1 to /tmp/file1
 
 
@@ -466,23 +438,19 @@ expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All files were copied successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -495,15 +463,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SS "/usr/xpg4/bin/cp"
@@ -511,15 +478,14 @@ Interface StabilityCommitted
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

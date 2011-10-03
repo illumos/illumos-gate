@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ks_update 9E "27 May 1994" "SunOS 5.11" "Driver Entry Points"
+.TH KS_UPDATE 9E "May 27, 1994"
 .SH NAME
 ks_update \- dynamically update kstats
 .SH SYNOPSIS
@@ -26,43 +26,35 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIksp\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a \fBkstat\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrw\fR \fR
 .ad
 .RS 8n
-.rt  
 Read/Write flag. Possible values are
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_READ\fR \fR
 .ad
 .RS 16n
-.rt  
 Update \fBkstat\fR structure statistics from the driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_WRITE\fR \fR
 .ad
 .RS 16n
-.rt  
 Update driver statistics from the kstat structure.
 .RE
 
@@ -115,34 +107,28 @@ consistent data) and will prevent the \fBkstat\fR from being removed.
 \fBks_update()\fR should return
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 11n
-.rt  
 For success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR \fR
 .ad
 .RS 11n
-.rt  
 If \fBKSTAT_WRITE\fR is not allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR \fR
 .ad
 .RS 11n
-.rt  
 For any other error.
 .RE
 

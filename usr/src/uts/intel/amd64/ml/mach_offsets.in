@@ -108,7 +108,7 @@ regs	REGSIZE
 boot_syscalls
 	bsvc_putchar	BOOTSVCS_PUTCHAR
 
-tss64
+tss_t
 	tss_rsp0
 	tss_rsp1
 	tss_rsp2

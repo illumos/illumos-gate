@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_setprop 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_SETPROP 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_setprop \- set a SASL property
 .SH SYNOPSIS
@@ -28,56 +28,46 @@ about any external negotiated security layer like TLS.
 \fBsasl_setprop()\fR uses the following flags.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_AUTH_EXTERNAL\fR\fR
 .ad
 .RS 22n
-.rt  
 External authentication ID that is a pointer of type \fBconst char\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_SSF_EXTERNAL\fR\fR
 .ad
 .RS 22n
-.rt  
 External SSF active of type \fBsasl_ssf_t\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_DEFUSERREALM\fR\fR
 .ad
 .RS 22n
-.rt  
 User realm that is a pointer of type \fBconst char\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_SEC_PROPS\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBsasl_security_properties_t\fR, that can be freed after the call
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_IPLOCALPORT\fR\fR
 .ad
 .RS 22n
-.rt  
 A string that describes the local ip and port in the form \fBa.b.c.d:p\fR or
 \fB[e:f:g:h:i:j:k:l]:port\fR or one of the older forms, \fBa.b.c.d;p\fR or
 \fBe:f:g:j:i:j:k:l;port\fR
@@ -85,12 +75,10 @@ A string that describes the local ip and port in the form \fBa.b.c.d:p\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_IPREMOTEPORT\fR\fR
 .ad
 .RS 22n
-.rt  
 A string that describes the remote ip and port in the form \fBa.b.c.d:p\fR or
 \fB[e:f:g:h:i:j:k:l]:port\fR or one of the older forms, \fBa.b.c.d;p\fR or
 \fBe:f:g:j:i:j:k:l;port\fR
@@ -99,34 +87,28 @@ A string that describes the remote ip and port in the form \fBa.b.c.d:p\fR or
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 11n
-.rt  
 The SASL connection context
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpropnum\fR\fR
 .ad
 .RS 11n
-.rt  
 The identifier for the property requested
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvalue\fR\fR
 .ad
 .RS 11n
-.rt  
 Contains a pointer to the data. The application must ensure that the data type
 is correct, or the application can crash.
 .RE
@@ -138,12 +120,10 @@ is correct, or the application can crash.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_setprop()\fR was successful.
 .RE
 
@@ -158,15 +138,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

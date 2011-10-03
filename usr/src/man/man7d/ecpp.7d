@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ecpp 7D "9 Oct 2004" "SunOS 5.11" "Devices"
+.TH ECPP 7D "Oct 9, 2004"
 .SH NAME
 ecpp \- IEEE 1284 compliant parallel port driver
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/types.h> 
+#include <sys/types.h>
 .fi
 
 .LP
 .nf
-#include <sys/ecppio.h> 
+#include <sys/ecppio.h>
 .fi
 
 .LP
@@ -131,12 +131,10 @@ The following \fBioctl(2)\fR calls are supported for backward compatibility and
 are not recommended for new applications:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECPPIOC_GETPARMS\fR\fR
 .ad
 .RS 20n
-.rt  
 Get current transfer parameters. The argument is a pointer to a struct
 \fBecpp_transfer_parms\fR. See below for a description of the elements of this
 structure. If no parameters have been configured since the device was opened,
@@ -146,12 +144,10 @@ above for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECPPIOC_SETPARMS\fR\fR
 .ad
 .RS 20n
-.rt  
 Set transfer parameters. The argument is a pointer to a struct
 \fBecpp_transfer_parms\fR. If a parameter is out of range, \fBEINVAL\fR is
 returned. If the peripheral or host device cannot support the requested mode,
@@ -187,12 +183,10 @@ change the mode back to the original mode with \fBECPPIOC_SETPARMS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECPPIOC_GETDEVID\fR\fR
 .ad
 .RS 20n
-.rt  
 This ioctl gets the \fIIEEE 1284\fR device ID from the peripheral in specified
 mode. Currently, the device ID can be retrieved only in Nibble mode. A pointer
 to the structure defined in \fB<sys/ecppsys.h>\fR must be passed as an
@@ -229,12 +223,10 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBPPIOC_TESTIO\fR\fR
 .ad
 .RS 20n
-.rt  
 Tests the forward transfer readiness of a peripheral operating in Centronics or
 Compatibility mode.
 .sp
@@ -260,12 +252,10 @@ the ioctls specified in \fBbpp\fR(7D).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBPPIOC_GETERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Get last error status. The argument is a pointer to a \fBstruct
 bpp_error_status\fR defined in \fB<sys/bpp_io.h>\fR header file. The error
 status structure is:
@@ -275,7 +265,7 @@ status structure is:
 struct bpp_error_status {
    char    timeout_occurred; /* 1=timeout */
    char    bus_error;        /* not used */
-   uchar_t pin_status;       /* status of pins which 
+   uchar_t pin_status;       /* status of pins which
                              /* could cause error */
 };
 .fi
@@ -311,24 +301,20 @@ link to \fBECPP_NIBBLE_MODE\fR. If the current mode is \fBECPP_CENTRONICS\fR or
 current mode.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECPPIOC_GETREGS\fR\fR
 .ad
 .RS 19n
-.rt  
 Read register values. The argument is a pointer to a \fBstruct ecpp_regs\fR.
 See below for a description of this structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECPPIOC_SETREGS\fR\fR
 .ad
 .RS 19n
-.rt  
 Set \fBecpp\fR register values. The argument is a pointer to a \fBstruct
 ecpp_regs\fR. See below for a description of this structure. If a parameter is
 out of range, \fBEINVAL\fR is returned.
@@ -358,30 +344,25 @@ bits are reserved. Reading reserved bits always return 1. An attempt to write
 .SH DEVICE SPECIAL FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/lp\fIN\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 Solaris x86 only. (Backwards compatibility with former \fBlp\fR(7D) devices.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/printers/\fIN\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 1284 compliant parallel port device special files appears in both namespaces.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/ecpp\fR\fR
 .ad
@@ -392,7 +373,6 @@ Solaris x86 only. (Backwards compatibility with former \fBlp\fR(7D) devices.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/sparcv9/ecpp\fR\fR
 .ad
@@ -403,7 +383,6 @@ Solaris x86 only. (Backwards compatibility with former \fBlp\fR(7D) devices.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/amd64/ecpp\fR\fR
 .ad
@@ -414,7 +393,6 @@ Solaris x86 only. (Backwards compatibility with former \fBlp\fR(7D) devices.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/ecpp.conf\fR\fR
 .ad
@@ -425,7 +403,6 @@ driver configuration file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/sparcv9/ecpp.conf\fR\fR
 .ad
@@ -436,7 +413,6 @@ driver configuration file for 64-bit SPARC
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/amd64/ecpp.conf\fR\fR
 .ad
@@ -448,36 +424,30 @@ driver configuration file for 64-bit x86
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The device is opened for write-only access and a read is attempted, or the
 device is opened for read-only access and a write is attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The device has been opened and another open is attempted. An attempt has been
 made to unload the driver while one of the units is open.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A \fBECPPIOC_SETPARMS\fR \fBioctl()\fR is attempted with an out-of-range value
 in the \fBecpp_transfer_parms\fR structure. A \fBECPPIOC_SETREGS\fR
 \fBioctl()\fR is attempted with an invalid value in the \fBecpp_regs\fR
@@ -488,24 +458,20 @@ argument.An invalid command argument is received during \fBmodload\fR(1M) or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The driver encountered a bus error when attempting an access. A read or write
 did not complete properly, due to a peripheral error or a transfer timeout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The driver has received an open request for a unit for which the attach failed.
 The driver has received a write request for a unit which has an active
 peripheral error.
@@ -519,17 +485,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems 
+Architecture	PCI-based systems
 _
-ISA-based systems (x86)
+	ISA-based systems (x86)
 _
-Interface stabilityEvolving
+Interface stability	Evolving
 .TE
 
 .SH SEE ALSO
@@ -547,7 +512,6 @@ Interface stabilityEvolving
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fBParallel port controller not supported\fR
 .ad

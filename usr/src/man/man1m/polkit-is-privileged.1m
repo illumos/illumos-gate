@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH polkit-is-privileged 1M "22 Aug 2006" "SunOS 5.11" "System Administration Commands"
+.TH POLKIT-IS-PRIVILEGED 1M "Aug 22, 2006"
 .SH NAME
 polkit-is-privileged \- check PolicyKit privileges
 .SH SYNOPSIS
@@ -28,7 +28,6 @@ Currently, the only consumer of PolicyKit is \fBhald\fR(1M).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB--help\fR\fR
 .ad
@@ -39,7 +38,6 @@ Display list of options and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprivilege\fR, \fB--privilege\fR \fIprivilege\fR\fR
 .ad
@@ -50,7 +48,6 @@ Name of privilege associated with user. Command tests for this privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIresource\fR, \fB--resource\fR \fIresource\fR\fR
 .ad
@@ -62,7 +59,6 @@ resource.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser\fR, \fB--user\fR \fIuser\fR\fR
 .ad
@@ -73,7 +69,6 @@ User name or user id that is tested for.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -84,7 +79,6 @@ Verbose mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB--version\fR\fR
 .ad
@@ -101,13 +95,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

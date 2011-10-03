@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH close 9E "24 Apr 2008" "SunOS 5.11" "Driver Entry Points"
+.TH CLOSE 9E "Apr 24, 2008"
 .SH NAME
 close \- relinquish access to a device
 .SH SYNOPSIS
@@ -50,23 +50,19 @@ for block devices.
 .SS "Block and Character"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 11n
-.rt  
 Device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 11n
-.rt  
 File status flag, as set by the  \fBopen\fR(2) or modified by the
 \fBfcntl\fR(2) system calls. The flag is for information only\(emthe file
 should always be closed completely. Possible values are:   \fBFEXCL\fR,
@@ -76,46 +72,38 @@ should always be closed completely. Possible values are:   \fBFEXCL\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIotyp\fR\fR
 .ad
 .RS 11n
-.rt  
 Parameter supplied so that the driver can determine how many times a device was
 opened and for what reasons.  The flags assume the  \fBopen()\fR routine may be
 called many times, but the  \fBclose()\fR routine should only be called on the
 last  \fBclose()\fR of a device.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOTYP_BLK\fR\fR
 .ad
 .RS 12n
-.rt  
 Close was through block interface for the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOTYP_CHR\fR\fR
 .ad
 .RS 12n
-.rt  
 Close was through the raw/character interface for the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOTYP_LYR\fR\fR
 .ad
 .RS 12n
-.rt  
 Close a layered process (a higher-level driver called the \fBclose()\fR routine
 of the device).
 .RE
@@ -124,24 +112,20 @@ of the device).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI*cred_p\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the  user credential structure.
 .RE
 
 .SS "STREAMS"
 .sp
 .ne 2
-.mk
 .na
 \fB\fI*q\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to  \fBqueue\fR(9S) structure used to reference the read side of the
 driver.  (A queue is the central node of a collection of structures and
 routines pointed to by a queue.)
@@ -149,23 +133,19 @@ routines pointed to by a queue.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 11n
-.rt  
 File status flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI*cred_p\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the  user credential structure.
 .RE
 

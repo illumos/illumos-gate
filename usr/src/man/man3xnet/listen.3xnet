@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH listen 3XNET "10 Jun 2002" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH LISTEN 3XNET "Jun 10, 2002"
 .SH NAME
 listen \- listen for socket connections and limit the queue of incoming
 connections
@@ -57,57 +57,47 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBlisten()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDESTADDRREQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is not bound to a local address, and the protocol does not support
 listening on an unbound socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR is already connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument does not refer to a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket protocol does not support \fBlisten()\fR.
 .RE
 
@@ -116,34 +106,28 @@ The socket protocol does not support \fBlisten()\fR.
 The \fBlisten()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 The calling process does not have the appropriate privileges.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIsocket\fR has been shut down.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 Insufficient resources are available in the system to complete the call.
 .RE
 
@@ -155,15 +139,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

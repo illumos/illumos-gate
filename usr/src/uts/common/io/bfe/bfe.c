@@ -2122,7 +2122,7 @@ bfe_error_handler(bfe_t *bfe, int intr_mask)
 	}
 
 	/* Descriptor Error */
-	if (intr_mask & BFE_ISTAT_DSCE && halt == 0) {
+	if (intr_mask & BFE_ISTAT_DSCE) {
 		bfe_error(bfe->bfe_dip, "Descriptor Error. Restarting Chip");
 		goto action;
 	}

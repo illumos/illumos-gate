@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scadm 1M "20 Dec 2005" "SunOS 5.11" "System Administration Commands"
+.TH SCADM 1M "Dec 20, 2005"
 .SH NAME
 scadm \- administer System Controller (SC)
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/platform/\fIplatform-name\fR/sbin/scadm\fR \fIsubcommand\fR [\fIoption\fR] 
+\fB/usr/platform/\fIplatform-name\fR/sbin/scadm\fR \fIsubcommand\fR [\fIoption\fR]
      [\fIargument\fR]...
 .fi
 
@@ -45,7 +45,6 @@ are separated from the command by a SPACE.
 The following subcommands are supported
 .sp
 .ne 2
-.mk
 .na
 \fBconsolehistory\fR
 .ad
@@ -91,7 +90,6 @@ and exit with non-zero status.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdate\fR
 .ad
@@ -112,7 +110,6 @@ scadm date
 
 .sp
 .ne 2
-.mk
 .na
 \fBdownload\fR
 .ad
@@ -138,7 +135,6 @@ scadm download [boot] \fIfile\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBfruhistory\fR
 .ad
@@ -184,7 +180,6 @@ and exit with non-zero status.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhelp\fR
 .ad
@@ -205,7 +200,6 @@ scadm help
 
 .sp
 .ne 2
-.mk
 .na
 \fBloghistory\fR
 .ad
@@ -236,7 +230,6 @@ scadm loghistory [-a]
 
 .sp
 .ne 2
-.mk
 .na
 \fBresetrsc\fR
 .ad
@@ -259,7 +252,6 @@ scadm resetrsc [\fB-s\fR]
 
 .sp
 .ne 2
-.mk
 .na
 \fBsend_event\fR
 .ad
@@ -284,7 +276,6 @@ scadm send_event [\fB-c\fR] "\fImessage\fR"
 
 .sp
 .ne 2
-.mk
 .na
 \fBset\fR
 .ad
@@ -310,7 +301,6 @@ scadm set \fIvariable value\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBshow\fR
 .ad
@@ -332,7 +322,6 @@ scadm show [\fIvariable\fR]
 
 .sp
 .ne 2
-.mk
 .na
 \fBshownetwork\fR
 .ad
@@ -344,7 +333,7 @@ The format for the \fBshownetwork\fR subcommand is:
 .sp
 .in +2
 .nf
-scadm shownetwork 
+scadm shownetwork
 .fi
 .in -2
 .sp
@@ -353,7 +342,6 @@ scadm shownetwork
 
 .sp
 .ne 2
-.mk
 .na
 \fBuseradd\fR
 .ad
@@ -375,7 +363,6 @@ scadm useradd \fIusername\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBuserdel\fR
 .ad
@@ -396,7 +383,6 @@ scadm userdel \fIusername\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBuserpassword\fR
 .ad
@@ -419,7 +405,6 @@ scadm userpassword \fIusername\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBuserperm\fR
 .ad
@@ -440,7 +425,6 @@ scadm userperm \fIusername\fR [aucr]
 
 .sp
 .ne 2
-.mk
 .na
 \fBusershow\fR
 .ad
@@ -462,7 +446,6 @@ scadm usershow \fIusername\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBversion\fR
 .ad
@@ -492,7 +475,6 @@ separated from the subcommand by a SPACE.
 The \fBresetrsc\fR subcommand supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -508,7 +490,6 @@ reset, for a soft reset.
 The \fBsend_event\fR subcommand supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -522,7 +503,6 @@ Send a critical event. Without the \fB-c\fR, \fB-send_event\fR sends a warning.
 The \fBversion\fR subcommand supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -537,7 +517,6 @@ The \fBconsolehistory\fR, \fBfruhistory\fR, and \fBloghistory\fR subcommands
 support the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -565,7 +544,6 @@ they are separated from each other by a SPACE.
 The \fBdownload\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fBboot\fR
 .ad
@@ -577,7 +555,6 @@ programmed without any arguments
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -611,7 +588,6 @@ or
 The \fBsend_event\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB"\fImessage\fR"\fR
 .ad
@@ -626,7 +602,6 @@ in quotation marks.
 The \fBset\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvariable\fR\fR
 .ad
@@ -637,7 +612,6 @@ Set SC configuration \fIvariable\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
@@ -651,7 +625,6 @@ Set SC configuration variable to \fIvalue\fR.
 The \fBshow\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvariable\fR\fR
 .ad
@@ -665,7 +638,6 @@ Display the value of that particular variable.
 The \fBuseradd\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -679,7 +651,6 @@ Add new SC account \fIusername\fR.
 The \fBuserdel\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -693,7 +664,6 @@ Remove SC account \fIusername\fR.
 The \fBuserperm\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-aucr\fR\fR
 .ad
@@ -705,7 +675,6 @@ permissions are disabled and read only access is assigned.
 The following are the definitions for permissions:
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
@@ -716,7 +685,6 @@ Allow user to administer or change the SC configuration variables
 
 .sp
 .ne 2
-.mk
 .na
 \fBu\fR
 .ad
@@ -727,7 +695,6 @@ Allow user to use the user commands to modify SC accounts
 
 .sp
 .ne 2
-.mk
 .na
 \fBc\fR
 .ad
@@ -738,7 +705,6 @@ Allow user to connect to console.
 
 .sp
 .ne 2
-.mk
 .na
 \fBr\fR
 .ad
@@ -751,7 +717,6 @@ Allow user to reset SC and to power on and off the host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -765,7 +730,6 @@ Change permissions on SC account \fIusername\fR.
 The \fB-usershow\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -780,7 +744,6 @@ specified, all accounts are displayed.
 The \fBuserpassword\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -794,7 +757,6 @@ Set SC password for \fIusername\fR.
 The \fBuserperm\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -1072,7 +1034,6 @@ scadm version \fB-v\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -1083,7 +1044,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
@@ -1100,13 +1060,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

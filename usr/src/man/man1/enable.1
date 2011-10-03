@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH enable 1 "5 Jun 2006" "SunOS 5.11" "User Commands"
+.TH ENABLE 1 "Jun 5, 2006"
 .SH NAME
 enable, disable \- enable/disable LP printers
 .SH SYNOPSIS
@@ -44,12 +44,10 @@ client systems when IPP is being used to communicate between client and server.
 The following options are supported for use with \fBdisable\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 15n
-.rt  
 Cancels any requests that are currently printing on \fIprinter\fR. This option
 cannot be used with the \fB-W\fR option. If the printer is remote, the \fB-c\fR
 option is silently ignored.
@@ -57,12 +55,10 @@ option is silently ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR\fR
 .ad
 .RS 15n
-.rt  
 Waits until the request currently being printed is finished before disabling
 \fIprinter\fR. This option cannot be used with the \fB-c\fR option. If the
 printer is remote, the \fB-W\fR option is silently ignored.
@@ -70,12 +66,10 @@ printer is remote, the \fB-W\fR option is silently ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR [\fIreason\fR]\fR
 .ad
 .RS 15n
-.rt  
 Assigns a \fIreason\fR for the disabling of the printer(s). This \fIreason\fR
 applies to all printers specified. This \fIreason\fR is reported by
 \fBlpstat\fR \fB-p\fR. Enclose \fIreason\fR in quotes if it contains blanks.
@@ -89,12 +83,10 @@ The default reason is \fBunknown reason\fR for the existing printer, and
 The following operand is supported for both \fBenable\fR and \fBdisable\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprinter\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the printer to be enabled or disabled. Specify \fIprinter\fR using
 atomic or URI-style (\fIscheme\fR\fB://\fR\fIendpoint\fR) names. See
 \fBprinters.conf\fR(4) regarding the naming conventions for destinations.
@@ -106,79 +98,65 @@ atomic or URI-style (\fIscheme\fR\fB://\fR\fIendpoint\fR) names. See
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS+\fR version of \fB/etc/printers.conf\fR
 .RE
 
@@ -190,15 +168,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkginfo 4 "24 Mar 2006" "SunOS 5.11" "File Formats"
+.TH PKGINFO 4 "Mar 24, 2006"
 .SH NAME
 pkginfo \- package characteristics file
 .SH DESCRIPTION
@@ -39,7 +39,6 @@ support of the zones (multiple Solaris environments) feature. See
 The following paramaters are mandatory:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBARCH\fR\fR
 .ad
@@ -70,7 +69,6 @@ groups (\fBuname -m\fR) are \fBsun4u\fR for the \fBSPARC\fR instruction set and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCATEGORY\fR\fR
 .ad
@@ -84,7 +82,6 @@ limited in length to 16 characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNAME\fR\fR
 .ad
@@ -101,7 +98,6 @@ it, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPKG\fR\fR
 .ad
@@ -120,7 +116,6 @@ company's stock symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVERSION\fR\fR
 .ad
@@ -149,7 +144,6 @@ necessary.
 The following parameters are optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBASEDIR\fR\fR
 .ad
@@ -163,7 +157,6 @@ directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLASSES\fR\fR
 .ad
@@ -177,7 +170,6 @@ by the request script.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESC\fR\fR
 .ad
@@ -193,7 +185,6 @@ the package.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMAIL\fR\fR
 .ad
@@ -205,7 +196,6 @@ reported (maximum length of 256 \fBASCII\fR characters).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOTLINE\fR\fR
 .ad
@@ -217,7 +207,6 @@ or bugs can be reported (maximum length of 256 \fBASCII\fR characters).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINTONLY\fR\fR
 .ad
@@ -229,7 +218,6 @@ any non-null value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBISTATES\fR\fR
 .ad
@@ -245,7 +233,6 @@ parameter are \fBs\fR, \fBS\fR, \fB1\fR, \fB2\fR, and \fB3\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAXINST\fR\fR
 .ad
@@ -262,7 +249,6 @@ including multiple versions coexisting on a software server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBORDER\fR\fR
 .ad
@@ -275,7 +261,6 @@ field are placed on the medium using the standard ordering procedures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPSTAMP\fR\fR
 .ad
@@ -290,7 +275,6 @@ string "\fIYYYYMMDDHHMMSS\fR" (year, month, date, hour, minutes, seconds).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSTATES\fR\fR
 .ad
@@ -306,7 +290,6 @@ parameter are \fBs\fR, \fBS\fR, \fB1\fR, \fB2\fR, and \fB3\fR See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_ISA\fR\fR
 .ad
@@ -320,7 +303,6 @@ default \fBISA\fR (instruction set architecture) is set to the value of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_LOC\fR\fR
 .ad
@@ -347,9 +329,9 @@ where
 <\fIlocale_name\fR>::= <\fIlanguage\fR>[_<\fIterritory\fR>]\e
 [.<\fIcodeset\fR>]
 <\fIlanguage\fR>::= the set of names from ISO 639
-<\fIterritory\fR>::= the set of territories specified 
+<\fIterritory\fR>::= the set of territories specified
 in ISO 3166
-<\fIcodeset\fR>::= is a string corresponding to the coded 
+<\fIcodeset\fR>::= is a string corresponding to the coded
 character set
 .fi
 .in -2
@@ -364,7 +346,6 @@ is not recognized by the add-on software utility Software Manager.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKG_DIR\fR\fR
 .ad
@@ -378,7 +359,6 @@ should never be set manually from within a \fBpkginfo\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKG_ALLZONES\fR\fR
 .ad
@@ -482,7 +462,6 @@ package to fail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKG_HOLLOW\fR\fR
 .ad
@@ -580,7 +559,6 @@ has no meaning. It is a package construction error to set
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKG_THISZONE\fR\fR
 .ad
@@ -626,7 +604,6 @@ non-global zones.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKGLIST\fR\fR
 .ad
@@ -655,7 +632,6 @@ keyword is not recognized by the add-on software utility Software Manager.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKGTYPE\fR\fR
 .ad
@@ -676,7 +652,6 @@ the case for the majority of Solaris add-on software. See the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKGVERS\fR\fR
 .ad
@@ -698,7 +673,6 @@ releases, use \fBSUNW_PKGVERS="\fI1.0\fR"\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PRODNAME\fR\fR
 .ad
@@ -712,7 +686,6 @@ examples of currently used \fBSUNW_PRODNAME\fR values are: \fB"SunOS"\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PRODVERS\fR\fR
 .ad
@@ -729,7 +702,6 @@ so should be the \fBSUNW_PRODVERS\fR parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBULIMIT\fR\fR
 .ad
@@ -742,7 +714,6 @@ installation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVENDOR\fR\fR
 .ad
@@ -754,7 +725,6 @@ of 256 \fBASCII\fR characters).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVSTOCK\fR\fR
 .ad
@@ -776,7 +746,6 @@ The following environment variables are available only to package class action
 scripts and to checkinstall, preinstall, postinstall scripts.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUNW_PKG_INSTALL_ZONENAME\fR\fR
 .ad
@@ -798,7 +767,6 @@ environment variable \fB${\fR\fBSUNW_PKG_INSTALL_ZONENAME\fR\fB}\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPKG_INIT_INSTALL\fR\fR
 .ad
@@ -822,22 +790,22 @@ environment variables.
 .in +2
 .nf
 if [ $PKG_INIT_INSTALL != "" ] ; then
-        # Package being installed as part of initial 
+        # Package being installed as part of initial
         # installation of Solaris.
 
 elif [ $SUNW_PKG_INSTALL_ZONENAME != "" ] ; then
 
     if [ $SUNW_PKG_INSTALL_ZONENAME != "global" ] ; then
-         # Package being installed as part of initial installation 
+         # Package being installed as part of initial installation
          # of non-global zone $SUNW_PKG_INSTALL_ZONENAME
     else
-         # Package being installed as part of initial installation 
+         # Package being installed as part of initial installation
          # of a global zone.
     fi
 
 else
-    # Package not being installed as part of initial installation of 
-    # Solaris and package not being installed as part of initial 
+    # Package not being installed as part of initial installation of
+    # Solaris and package not being installed as part of initial
     # installation of non-global zone.
 fi
 .fi
@@ -880,55 +848,54 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee entries below
+Interface Stability	See entries below
 _
-PKG valueEvolving
+PKG value	Evolving
 _
-VERSION valueEvolving
+VERSION value	Evolving
 _
-NAME valueEvolving
+NAME value	Evolving
 _
-DESC valueEvolving
+DESC value	Evolving
 _
-ARCH valueEvolving
+ARCH value	Evolving
 _
-CATEGORY valueEvolving
+CATEGORY value	Evolving
 _
-BASEDIR valueEvolving
+BASEDIR value	Evolving
 _
-ISTATES valueEvolving
+ISTATES value	Evolving
 _
-RSTATES valueEvolving
+RSTATES value	Evolving
 _
-MAXINST valueEvolving
+MAXINST value	Evolving
 _
-SUNW_PKG_ALLZONESEvolving
+SUNW_PKG_ALLZONES	Evolving
 _
-SUNW_PKG_HOLLOWEvolving
+SUNW_PKG_HOLLOW	Evolving
 _
-SUNW_PKG_THISZONEEvolving
+SUNW_PKG_THISZONE	Evolving
 _
-SUNW_PRODNAMEEvolving
+SUNW_PRODNAME	Evolving
 _
-SUNW_PRODVERSEvolving
+SUNW_PRODVERS	Evolving
 _
-SUNW_PKGVERSEvolving
+SUNW_PKGVERS	Evolving
 _
-SUNW_PKGTYPEUnstable
+SUNW_PKGTYPE	Unstable
 _
-SUNW_LOCEvolving
+SUNW_LOC	Evolving
 _
-SUNW_PKGLISTEvolving
+SUNW_PKGLIST	Evolving
 _
-SUNW_PKG_DIREvolving
+SUNW_PKG_DIR	Evolving
 _
-PKG_INIT_INSTALLUnstable
+PKG_INIT_INSTALL	Unstable
 .TE
 
 .SH SEE ALSO

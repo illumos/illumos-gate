@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH runat 1 "22 Jun 2001" "SunOS 5.11" "User Commands"
+.TH RUNAT 1 "Jun 22, 2001"
 .SH NAME
 runat \- execute command in extended attribute name space
 .SH SYNOPSIS
@@ -33,23 +33,19 @@ be prepared in any way, before invoking the \fBrunat\fR command.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 12n
-.rt  
 Any file, including a directory, that can support extended attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR \fR
 .ad
 .RS 12n
-.rt  
 The command to be executed in an attribute directory.
 .RE
 
@@ -135,56 +131,46 @@ Recommended methods for performing basic attribute operations:
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisplay\fR
 .ad
 .RS 22n
-.rt  
 \fBrunat \fIfile\fR ls [\fIoptions\fR]\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBread\fR
 .ad
 .RS 22n
-.rt  
 \fBrunat \fIfile\fR cat \fIattribute\fR\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcreate/modify\fR
 .ad
 .RS 22n
-.rt  
 \fBrunat \fIfile\fR cp \fIabsolute-file-path\fR \fIattribute\fR\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelete\fR
 .ad
 .RS 22n
-.rt  
 \fBrunat \fIfile\fR rm \fIattribute\fR\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpermission changes\fR
 .ad
 .RS 22n
-.rt  
 .sp
 .in +2
 .nf
@@ -199,12 +185,10 @@ runat \fIfile\fR chown \fIowner attribute\fR\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBinteractive shell\fR
 .ad
 .RS 22n
-.rt  
 .LP
 .nf
 \fBrunat \fIfile\fR /bin/sh\fR or set your $SHELL to /bin/sh and \fBrunat \fIfile\fR\fR
@@ -274,12 +258,10 @@ example% \fB/bin/pwd\fR
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
 .RS 9n
-.rt  
 Specifies the command shell to be invoked by \fBrunat\fR.
 .RE
 
@@ -289,24 +271,20 @@ Specifies the command shell to be invoked by \fBrunat\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB125\fR \fR
 .ad
 .RS 8n
-.rt  
 The attribute directory of the file referenced by the \fIfile\fR argument
 cannot be accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR \fR
 .ad
 .RS 8n
-.rt  
 The exec of the provided \fIcommand\fR argument failed.
 .RE
 
@@ -322,15 +300,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

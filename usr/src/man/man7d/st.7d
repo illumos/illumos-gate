@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH st 7D "22 Oct 2008" "SunOS 5.11" "Devices"
+.TH ST 7D "Oct 22, 2008"
 .SH NAME
 st \- driver for SCSI tape devices
 .SH SYNOPSIS
@@ -145,7 +145,7 @@ where
 .sp
 .in +2
 .nf
-<triplet> := <vid+pid>, <pretty print>, <data-property-name> 
+<triplet> := <vid+pid>, <pretty print>, <data-property-name>
 .fi
 .in -2
 .sp
@@ -183,7 +183,7 @@ or
 .sp
 .in +2
 .nf
- 
+
 .fi
 .in -2
 
@@ -225,20 +225,18 @@ following generic types are recommended:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBMT_ISQIC\fR0x32
-\fBMT_ISREEL\fR0x33
-\fBMT_ISDAT\fR0x34
-\fBMT_IS8MM\fR0x35
-\fBMT_ISOTHER\fR0x36
-\fBMT_ISTAND25G\fR0x37
-\fBMT_ISDLT\fR0x38
-\fBMT_ISSTK9840\fR0x39
-\fBMT_ISBMDLT1\fR0x3A
-\fBMT_LTO\fR0x3B
+l l
+l l .
+\fBMT_ISQIC\fR	0x32
+\fBMT_ISREEL\fR	0x33
+\fBMT_ISDAT\fR	0x34
+\fBMT_IS8MM\fR	0x35
+\fBMT_ISOTHER\fR	0x36
+\fBMT_ISTAND25G\fR	0x37
+\fBMT_ISDLT\fR	0x38
+\fBMT_ISSTK9840\fR	0x39
+\fBMT_ISBMDLT1\fR	0x3A
+\fBMT_LTO\fR	0x3B
 .TE
 
 .sp
@@ -257,36 +255,33 @@ density code).
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBST_VARIABLE\fR0x0001
-\fBST_QIC\fR0x0002
-\fBST_REEL\fR0x0004
-\fBST_BSF\fR0x0008
-\fBST_BSR\fR0x0010
-\fBST_LONG_ERASE\fR0x0020
-\fBST_AUTODEN_OVERRIDE\fR0x0040
-\fBST_NOBUF\fR0x0080
-\fBST_KNOWS_EOD\fR0x0200
-\fBST_UNLOADABLE\fR0x0400
-\fBST_SOFT_ERROR_REPORTING\fR0x0800
-\fBST_LONG_TIMEOUTS\fR0x1000
-\fBST_NO_RECSIZE_LIMIT\fR0x8000
-\fBST_MODE_SEL_COMP\fR0x10000
-\fBST_NO_RESERVE_RELEASE\fR0x20000
-\fBST_READ_IGNORE_ILI\fR0x40000
-\fBST_READ_IGNORE_EOFS\fR0x80000
-\fBST_SHORT_FILEMARKS\fR0x100000
-\fBST_EJECT_TAPE_ON_CHANGER_FAILURE\fR0x200000
-\fBST_RETRY_ON_RECOVERED_DEFERRED_ERROR\fR0x400000
-\fBST_WORMABLE\fR0x1000000
+l l
+l l .
+\fBST_VARIABLE\fR	0x0001
+\fBST_QIC\fR	0x0002
+\fBST_REEL\fR	0x0004
+\fBST_BSF\fR	0x0008
+\fBST_BSR\fR	0x0010
+\fBST_LONG_ERASE\fR	0x0020
+\fBST_AUTODEN_OVERRIDE\fR	0x0040
+\fBST_NOBUF\fR	0x0080
+\fBST_KNOWS_EOD\fR	0x0200
+\fBST_UNLOADABLE\fR	0x0400
+\fBST_SOFT_ERROR_REPORTING\fR	0x0800
+\fBST_LONG_TIMEOUTS\fR	0x1000
+\fBST_NO_RECSIZE_LIMIT\fR	0x8000
+\fBST_MODE_SEL_COMP\fR	0x10000
+\fBST_NO_RESERVE_RELEASE\fR	0x20000
+\fBST_READ_IGNORE_ILI\fR	0x40000
+\fBST_READ_IGNORE_EOFS\fR	0x80000
+\fBST_SHORT_FILEMARKS\fR	0x100000
+\fBST_EJECT_TAPE_ON_CHANGER_FAILURE\fR	0x200000
+\fBST_RETRY_ON_RECOVERED_DEFERRED_ERROR\fR	0x400000
+\fBST_WORMABLE\fR	0x1000000
 .TE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_VARIABLE\fR\fR
 .ad
@@ -297,7 +292,6 @@ The flag indicates the tape device supports variable length record sizes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_QIC\fR\fR
 .ad
@@ -308,7 +302,6 @@ The flag indicates a Quarter Inch Cartridge (QIC) tape device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_REEL\fR\fR
 .ad
@@ -319,7 +312,6 @@ The flag indicates a 1/2\(miinch reel tape device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_BSF\fR\fR
 .ad
@@ -331,7 +323,6 @@ If flag is set, the device supports backspace over EOF marks (bsf - see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_BSR\fR\fR
 .ad
@@ -347,7 +338,6 @@ record.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_LONG_ERASE\fR\fR
 .ad
@@ -358,7 +348,6 @@ The flag indicates the tape device needs a longer time than normal to erase.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_AUTODEN_OVERRIDE\fR\fR
 .ad
@@ -370,7 +359,6 @@ density automatically without issuing a "mode-select"/"mode-sense command."
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_NOBUF\fR\fR
 .ad
@@ -384,7 +372,6 @@ data has been written to the tape.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_KNOWS_EOD\fR\fR
 .ad
@@ -397,7 +384,6 @@ Otherwise, file skipping happens one file at a time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_UNLOADABLE\fR\fR
 .ad
@@ -410,7 +396,6 @@ is, the driver will return the correct inquiry string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_SOFT_ERROR_REPORTING\fR\fR
 .ad
@@ -423,7 +408,6 @@ drives support this feature.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_LONG_TIMEOUTS\fR\fR
 .ad
@@ -435,7 +419,6 @@ than usual for normal operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_NO_RECSIZE_LIMIT\fR \fR
 .ad
@@ -454,7 +437,6 @@ READ BLOCK LIMITS command and the dma-max property set by the Host Bus Adapter
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_MODE_SEL_COMP\fR\fR
 .ad
@@ -477,7 +459,6 @@ device densities, compression is disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_NO_RESERVE_RELEASE\fR\fR
 .ad
@@ -491,7 +472,6 @@ release on close. If an attempt to use a ioctl of \fBMTRESERVE\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_READ_IGNORE_ILI\fR\fR
 .ad
@@ -512,7 +492,6 @@ error of \fBENOMEM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_READ_IGNORE_EOFS\fR\fR
 .ad
@@ -533,7 +512,6 @@ filemarks between files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_SHORT_FILEMARKS\fR\fR
 .ad
@@ -548,7 +526,6 @@ writing filemarks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_EJECT_TAPE_ON_CHANGER_FAILURE\fR\fR
 .ad
@@ -578,7 +555,6 @@ Key
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_RETRY_ON_RECOVERED_DEFERRED_ERROR\fR\fR
 .ad
@@ -592,7 +568,6 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBST_WORMABLE\fR\fR
 .ad
@@ -698,24 +673,20 @@ or by the next read, write, or other ioctl operation. If no error has occurred
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The driver is opened for write access and the tape is write-protected or the
 tape unit is reserved by another host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The tape drive is in use by another process. Only one process can use the tape
 drive at a time. The driver will allow a grace period for the other process to
 finish before reporting this error.
@@ -723,24 +694,20 @@ finish before reporting this error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The number of bytes read or written is not a multiple of the physical record
 size (fixed-length tape devices only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 During opening, the tape device is not ready because either no tape is in the
 drive, or the drive is not on-line. Once open, this error is returned if the
 requested I/O transfer could not be completed.
@@ -748,35 +715,29 @@ requested I/O transfer could not be completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR\fR
 .ad
 .RS 10n
-.rt  
 This indicates that the tape device does not support the requested ioctl
 function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 During opening, the tape device does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 This indicates that the record size on the tape drive is more than the
 requested size during read operation.
 .RE
@@ -895,7 +856,6 @@ reel if one reads past the two file marks which mark the end of recorded media.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/st.conf\fR\fR
 .ad
@@ -906,7 +866,6 @@ driver configuration file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/mtio.h\fR\fR
 .ad
@@ -917,7 +876,6 @@ structures and definitions for mag tape io control commands
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/scsi/targets/stdef.h\fR\fR
 .ad
@@ -928,7 +886,6 @@ definitions for \fBSCSI\fR tape drives
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt/[0\(mi 127][l,m,h,u,c][b][n]\fR\fR
 .ad
@@ -944,15 +901,13 @@ For 1/2" reel tape devices (HP-88780), the densities are:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBl\fR800 BPI density
-\fBm\fR1600 BPI density
-\fBh\fR6250 BPI density
-\fBc\fRdata compression
-\fB \fR(not supported on all modules)
+l l
+l l .
+\fBl\fR	800 BPI density
+\fBm\fR	1600 BPI density
+\fBh\fR	6250 BPI density
+\fBc\fR	data compression
+\fB \fR	(not supported on all modules)
 .TE
 
 For 8mm tape devices (Exabyte 8200/8500/8505):
@@ -960,13 +915,11 @@ For 8mm tape devices (Exabyte 8200/8500/8505):
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBl\fRStandard 2 Gbyte format
-\fBm\fR5 Gbyte format (8500, 8505 only)
-\fBh,c\fR5 Gbyte compressed format (8505 only)
+l l
+l l .
+\fBl\fR	Standard 2 Gbyte format
+\fBm\fR	5 Gbyte format (8500, 8505 only)
+\fBh,c\fR	5 Gbyte compressed format (8505 only)
 .TE
 
 For 4mm \fBDAT\fR tape devices (Archive Python):
@@ -974,12 +927,10 @@ For 4mm \fBDAT\fR tape devices (Archive Python):
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBl\fRStandard format
-\fBm,h,c\fRdata compression
+l l
+l l .
+\fBl\fR	Standard format
+\fBm,h,c\fR	data compression
 .TE
 
 For all QIC (other than QIC-24) tape devices:
@@ -987,13 +938,11 @@ For all QIC (other than QIC-24) tape devices:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBl,m,h,c\fRdensity of the tape cartridge type
-(not all devices can read and
-write all formats)
+l l
+l l .
+\fBl,m,h,c\fR	density of the tape cartridge type
+	(not all devices can read and
+	write all formats)
 .TE
 
 For QIC-24 tape devices (Emulex MT\(mi02):
@@ -1001,12 +950,10 @@ For QIC-24 tape devices (Emulex MT\(mi02):
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBl\fRQIC-11 Format
-\fBm,h,c\fRQIC-24 Format
+l l
+l l .
+\fBl\fR	QIC-11 Format
+\fBm,h,c\fR	QIC-24 Format
 .TE
 
 .RE
@@ -1041,7 +988,7 @@ The st driver diagnostics are described below:
 Error for Command: <scsi_cmd_name()> Error Level:<error_class>
 Requested Block: <blkno>  Error Block: <err_blkno>
 Vendor: <name>: Serial Number: <inq_serial>
-Sense Key: <es_key> ASC: 0x<es_add_code> (scsi_asc_ascq_name()>), ASCQ: 
+Sense Key: <es_key> ASC: 0x<es_add_code> (scsi_asc_ascq_name()>), ASCQ:
 0x<es_qual_code>, FRU: 0x<ex_fru_code>
 .fi
 .in -2
@@ -1087,7 +1034,7 @@ The \fBst.conf\fR diagnostics are described below:
 .sp
 .in +2
 .nf
-<con-name> <field-in-err> <problem-with-field>  
+<con-name> <field-in-err> <problem-with-field>
 .fi
 .in -2
 
@@ -1119,7 +1066,7 @@ Recovery by resets failed
 .sp
 .LP
 After a transport error, the driver attempted to recover by issuing a device
-reset and then a bus reset if device reset 	failed. These recoveries failed.
+reset and then a bus reset if device reset failed. These recoveries failed.
 .sp
 .in +2
 .nf
@@ -1284,7 +1231,7 @@ on an open.
 .sp
 .in +2
 .nf
-Failed to restore the last <file/block> position: 
+Failed to restore the last <file/block> position:
 In this state, tape will be loaded at BOT during next open
 .fi
 .in -2
@@ -1317,7 +1264,7 @@ DAT soft error reset failed
 .sp
 .LP
 After DAT soft error reporting, the counters within the device that accumulate
-this sense data need to be re-set. 	 This operation failed.
+this sense data need to be re-set. This operation failed.
 .sp
 .in +2
 .nf
@@ -1381,8 +1328,8 @@ system was in power management suspend. The operation will not be retried.
 .sp
 .in +2
 .nf
-Write Data Buffering has been deprecated. Your applications should 
-continue to work normally. However, they should be ported to use 
+Write Data Buffering has been deprecated. Your applications should
+continue to work normally. However, they should be ported to use
 Asynchronous I/O.
 .fi
 .in -2

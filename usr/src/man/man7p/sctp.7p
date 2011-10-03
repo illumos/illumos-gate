@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sctp 7P "30 Jul 2009" "SunOS 5.11" "Protocols"
+.TH SCTP 7P "Jul 30, 2009"
 .SH NAME
 sctp, SCTP \- Stream Control Transmission Protocol
 .SH SYNOPSIS
@@ -165,7 +165,6 @@ level is the protocol number for SCTP, available from
 \fBgetprotobyname\fR(3SOCKET).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_NODELAY\fR\fR
 .ad
@@ -176,7 +175,6 @@ Turn on/off any Nagle-like algorithm (similar to \fBTCP_NODELAY\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_RCVBUF\fR\fR
 .ad
@@ -187,7 +185,6 @@ Set the receive buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_SNDBUF\fR\fR
 .ad
@@ -198,7 +195,6 @@ Set the send buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_AUTOCLOSE\fR\fR
 .ad
@@ -211,7 +207,6 @@ that no associations should be closed automatically.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_EVENTS\fR\fR
 .ad
@@ -222,7 +217,6 @@ Specify various notifications and ancillary data the user wants to receive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_STATUS\fR\fR
 .ad
@@ -233,7 +227,6 @@ Retrieve current status information about an SCTP association.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCTP_GET_ASSOC_STATS\fR\fR
 .ad
@@ -362,69 +355,57 @@ Protocol (SCTP) Checksum Change\fR, September 2002.
 A socket operation may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTONOSUPPORT\fR\fR
 .ad
 .RS 19n
-.rt  
 The socket type is other than \fBSOCK_STREAM\fR and \fBSOCK_SEQPACKET\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 19n
-.rt  
 An association was dropped due to excessive retransmissions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNREFUSED\fR\fR
 .ad
 .RS 19n
-.rt  
 The remote peer refused establishing an association.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 19n
-.rt  
 A \fBbind()\fR operation was attempted on a socket with a network address/port
 pair that has already been bound to another socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 19n
-.rt  
 A \fBbind()\fR operation was attempted on a socket with an invalid network
 address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 19n
-.rt  
 A \fBbind()\fR operation was attempted on a socket with a "reserved" port
 number and the effective user ID of the process was not the privileged user.
 .RE

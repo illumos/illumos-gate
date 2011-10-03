@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mq_send 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH MQ_SEND 3C "Feb 5, 2008"
 .SH NAME
 mq_send, mq_timedsend, mq_reltimedsend_np \- send a message to a message queue
 .SH SYNOPSIS
@@ -117,58 +117,48 @@ The \fBmq_send()\fR, \fBmq_timedsend()\fR, and \fBmq_reltimedsend_np()\fR
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR \fR
 .ad
 .RS 13n
-.rt  
 The  \fBO_NONBLOCK\fR flag is set in the message queue description associated
 with \fImqdes\fR, and the specified message queue is full.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR \fR
 .ad
 .RS 13n
-.rt  
 The \fImqdes\fR argument is not a valid message queue descriptor open for
 writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR \fR
 .ad
 .RS 13n
-.rt  
 A signal interrupted the function call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The value of \fImsg_prio\fR was outside the valid range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The process or thread would have blocked, and the timeout parameter specified a
 nanoseconds field value less than zero or greater than or equal to 1,000
 million.
@@ -176,24 +166,20 @@ million.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMSGSIZE\fR \fR
 .ad
 .RS 13n
-.rt  
 The specified message length, \fImsg_len\fR, exceeds the message size attribute
 of the message queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fBO_NONBLOCK\fR flag was not set when the message queue was opened, but
 the timeout expired before the message could be added to the queue.
 .RE
@@ -206,17 +192,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

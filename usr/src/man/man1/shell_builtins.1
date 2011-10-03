@@ -1,11 +1,11 @@
 '\" te
-.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved. 
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH shell_builtins 1 "20 Nov 2007" "SunOS 5.11" "User Commands"
+.TH SHELL_BUILTINS 1 "Nov 20, 2007"
 .SH NAME
 shell_builtins, case, for, foreach, function, if, repeat, select, switch,
 until, while \- shell command interpreter built-in commands
@@ -33,97 +33,95 @@ They are described on their respective manual pages.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-CommandShell
+c c
+l l .
+Command	Shell
 _
-\fB++**alias\fRcsh, ksh, ksh93
-\fBbg\fRcsh, ksh, ksh93, sh
-\fB+*break\fRcsh, ksh, ksh93, sh
-\fBbuiltin\fRksh93
-\fBcase\fRcsh, ksh, ksh93, sh
-\fBcat\fRksh93
-\fBcd\fRcsh, ksh, ksh93, sh
-\fBchdir\fRcsh, sh
-\fBchown\fRksh93
-\fBcommand\fRksh93
-\fB+*continue\fRcsh, ksh, ksh93, sh
-\fBdirs\fRcsh
-\fBdisown\fRksh93
-\fBecho\fRcsh, ksh, ksh93, sh
-\fB+*eval\fRcsh, ksh, ksh93, sh
-\fB+*exec\fRcsh, ksh, ksh93, sh
-\fB+*exit\fRcsh, ksh, ksh93, sh
-\fB++**export\fRksh, ksh93, sh
-\fBfalse\fRksh, ksh93
-\fBfc\fRksh, ksh93
-\fBfg\fRcsh, ksh, ksh93, sh
-\fBfor\fRksh, ksh93, sh
-\fBforeach\fRcsh
-\fBfunction\fRksh, ksh93
-\fBgetconf\fRksh93
-\fBgetopts\fRksh, ksh93, sh
-\fBglob\fRcsh
-\fBgoto\fRcsh
-\fBhash\fRksh, ksh93, sh
-\fBhashstat\fRcsh
-\fBhead\fRksh93
-\fBhist\fRksh93
-\fBhistory\fRcsh
-\fBif\fRcsh, ksh, ksh93, sh
-\fBjobs\fRcsh, ksh, ksh93, sh
-\fBkill\fRcsh, ksh, ksh93, sh
-\fBlet\fRksh, ksh93,
-\fBlimit\fRcsh
-\fBlogin\fRcsh, ksh, ksh93, sh
-\fBlogout\fRcsh
-\fBmkdir\fRksh93
-\fBnice\fRcsh
-\fB+*newgrp\fRksh, ksh93, sh
-\fBnohup\fRcsh
-\fBnotify\fRcsh
-\fBonintr\fRcsh
-\fBpopd\fRcsh
-\fBprint\fRksh, ksh93
-\fBprintf\fRksh93
-\fBpushd\fRcsh
-\fBpwd\fRksh, ksh93, sh
-\fBread\fRksh, ksh93, sh
-\fB++**readonly\fRksh, ksh93, sh
-\fBrehash\fRcsh
-\fBrepeat\fRcsh
-\fB+*return\fRksh, ksh93, sh
-\fBselect\fRksh, ksh93
-\fB+set\fRcsh, ksh, ksh93, sh
-\fBsetenv\fRcsh
-\fBshift\fRcsh, ksh, ksh93, sh
-\fBsleep\fRksh93
-\fBsource\fRcsh
-\fBstop\fRcsh, ksh, ksh93, sh
-\fBsuspend\fRcsh, ksh, sh
-\fBswitch\fRcsh
-\fBtee\fRksh93
-\fBtest\fRksh, ksh93, sh
-\fBtime\fRcsh
-\fB*times\fRksh, ksh93, sh
-\fB*+trap\fRksh, ksh93, sh
-\fBtrue\fRksh, ksh93
-\fBtype\fRksh, ksh93, sh
-\fB++**typeset\fRksh, ksh93
-\fBulimit\fRksh, ksh93, sh
-\fBumask\fRcsh, ksh, ksh93, sh
-\fB+unalias\fRcsh, ksh, ksh93
-\fBunhash\fRcsh
-\fBuniq\fRksh93
-\fBunlimit\fRcsh
-\fB+unset\fRcsh, ksh, ksh93, sh
-\fBunsetenv\fRcsh
-\fBuntil\fRksh, ksh93, sh
-\fB*wait\fRcsh, ksh, ksh93, sh
-\fBwhence\fRksh, ksh93
-\fBwhile\fRcsh, ksh, ksh93, sh
+\fB++**alias\fR	csh, ksh, ksh93
+\fBbg\fR	csh, ksh, ksh93, sh
+\fB+*break\fR	csh, ksh, ksh93, sh
+\fBbuiltin\fR	ksh93
+\fBcase\fR	csh, ksh, ksh93, sh
+\fBcat\fR	ksh93
+\fBcd\fR	csh, ksh, ksh93, sh
+\fBchdir\fR	csh, sh
+\fBchown\fR	ksh93
+\fBcommand\fR	ksh93
+\fB+*continue\fR	csh, ksh, ksh93, sh
+\fBdirs\fR	csh
+\fBdisown\fR	ksh93
+\fBecho\fR	csh, ksh, ksh93, sh
+\fB+*eval\fR	csh, ksh, ksh93, sh
+\fB+*exec\fR	csh, ksh, ksh93, sh
+\fB+*exit\fR	csh, ksh, ksh93, sh
+\fB++**export\fR	ksh, ksh93, sh
+\fBfalse\fR	ksh, ksh93
+\fBfc\fR	ksh, ksh93
+\fBfg\fR	csh, ksh, ksh93, sh
+\fBfor\fR	ksh, ksh93, sh
+\fBforeach\fR	csh
+\fBfunction\fR	ksh, ksh93
+\fBgetconf\fR	ksh93
+\fBgetopts\fR	ksh, ksh93, sh
+\fBglob\fR	csh
+\fBgoto\fR	csh
+\fBhash\fR	ksh, ksh93, sh
+\fBhashstat\fR	csh
+\fBhead\fR	ksh93
+\fBhist\fR	ksh93
+\fBhistory\fR	csh
+\fBif\fR	csh, ksh, ksh93, sh
+\fBjobs\fR	csh, ksh, ksh93, sh
+\fBkill\fR	csh, ksh, ksh93, sh
+\fBlet\fR	ksh, ksh93,
+\fBlimit\fR	csh
+\fBlogin\fR	csh, ksh, ksh93, sh
+\fBlogout\fR	csh
+\fBmkdir\fR	ksh93
+\fBnice\fR	csh
+\fB+*newgrp\fR	ksh, ksh93, sh
+\fBnohup\fR	csh
+\fBnotify\fR	csh
+\fBonintr\fR	csh
+\fBpopd\fR	csh
+\fBprint\fR	ksh, ksh93
+\fBprintf\fR	ksh93
+\fBpushd\fR	csh
+\fBpwd\fR	ksh, ksh93, sh
+\fBread\fR	ksh, ksh93, sh
+\fB++**readonly\fR	ksh, ksh93, sh
+\fBrehash\fR	csh
+\fBrepeat\fR	csh
+\fB+*return\fR	ksh, ksh93, sh
+\fBselect\fR	ksh, ksh93
+\fB+set\fR	csh, ksh, ksh93, sh
+\fBsetenv\fR	csh
+\fBshift\fR	csh, ksh, ksh93, sh
+\fBsleep\fR	ksh93
+\fBsource\fR	csh
+\fBstop\fR	csh, ksh, ksh93, sh
+\fBsuspend\fR	csh, ksh, sh
+\fBswitch\fR	csh
+\fBtee\fR	ksh93
+\fBtest\fR	ksh, ksh93, sh
+\fBtime\fR	csh
+\fB*times\fR	ksh, ksh93, sh
+\fB*+trap\fR	ksh, ksh93, sh
+\fBtrue\fR	ksh, ksh93
+\fBtype\fR	ksh, ksh93, sh
+\fB++**typeset\fR	ksh, ksh93
+\fBulimit\fR	ksh, ksh93, sh
+\fBumask\fR	csh, ksh, ksh93, sh
+\fB+unalias\fR	csh, ksh, ksh93
+\fBunhash\fR	csh
+\fBuniq\fR	ksh93
+\fBunlimit\fR	csh
+\fB+unset\fR	csh, ksh, ksh93, sh
+\fBunsetenv\fR	csh
+\fBuntil\fR	ksh, ksh93, sh
+\fB*wait\fR	csh, ksh, ksh93, sh
+\fBwhence\fR	ksh, ksh93
+\fBwhile\fR	csh, ksh, ksh93, sh
 .TE
 
 .SS "Bourne Shell, sh, Special Commands"
@@ -137,23 +135,19 @@ is the default output location. When Job Control is enabled, additional
 In addition to these built-in reserved command words, \fBsh\fR also uses:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR\fR
 .ad
 .RS 15n
-.rt  
 No effect; the command does nothing. A zero exit code is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Read and execute commands from \fIfilename\fR and return. The search path
 specified by \fBPATH\fR is used to find the directory containing
 \fIfilename\fR.
@@ -167,12 +161,10 @@ as any component of a pipeline except the last, it is executed in a subshell.
 In addition to these built-in reserved command words, \fBcsh\fR also uses:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR\fR
 .ad
 .RS 5n
-.rt  
 Null command. This command is interpreted, but performs no action.
 .RE
 
@@ -215,23 +207,19 @@ splitting and file name generation are not performed.
 In addition to these built-in reserved command words, \fBksh\fR also uses:
 .sp
 .ne 2
-.mk
 .na
 \fB* \fB:\fR [ \fIarg\fR .\|.\|. ]\fR
 .ad
 .RS 29n
-.rt  
 The command only expands parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB* \fB\&.\fR\fIfile\fR [ \fIarg\fR .\|.\|. ]\fR
 .ad
 .RS 29n
-.rt  
 Read the complete \fIfile\fR then execute the commands. The commands are
 executed in the current shell environment. The search path specified by
 \fBPATH\fR is used to find the directory containing \fIfile\fR. If any
@@ -291,23 +279,19 @@ field splitting and file name generation are not performed.
 In addition to these built-in reserved command words, \fBksh93\fR also uses:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR [ \fIarg\fR .\|.\|. ]\fR
 .ad
 .RS 27n
-.rt  
 The command only expands parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.\fR\fIname\fR [ \fIarg\fR .\|.\|. ]\fR
 .ad
 .RS 27n
-.rt  
 If \fIname\fR is a function defined with the function \fIname\fR reserved word
 syntax, the function is executed in the current environment (as if it had been
 defined with the \fBname()\fR syntax.) Otherwise if \fIname\fR refers to a

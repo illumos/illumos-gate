@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tsalarm 7D "16 Mar 2004" "SunOS 5.11" "Devices"
+.TH TSALARM 7D "Mar 16, 2004"
 .SH NAME
 tsalarm \- Alarm device driver
 .SH SYNOPSIS
@@ -42,7 +42,6 @@ The following ioctls are supported by  the \fB/dev/lom\fR and
 \fB/dev/tsalarm:ctl\fR devices:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSIOCALCTL - Turn an alarm on or off.\fR\fR
 .ad
@@ -58,7 +57,6 @@ an invalid alarm_no or invalid alarm_state is provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSIOCALSTATE - Get the state of the alarms.\fR\fR
 .ad
@@ -154,12 +152,10 @@ typedef struct {
 An \fBopen()\fR will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fBENXIO\fR
 .ad
 .RS 9n
-.rt  
 The driver is not installed in the system.
 .RE
 
@@ -168,34 +164,28 @@ The driver is not installed in the system.
 An \fBioctl()\fR will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fBEFAULT\fR
 .ad
 .RS 10n
-.rt  
 There was a hardware failure during the specified operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 The alarm number specified is not valid or an invalid value was supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENXIO\fR
 .ad
 .RS 10n
-.rt  
 The driver is not installed in the system or the monitor callback routine could
 not be scheduled.
 .RE
@@ -210,7 +200,7 @@ How to set an alarm:
      #include <fcntl.h>
      #include <stdio.h>
      #include <lom_io.h>
-    
+
      #define LOM_DEVICE "/dev/lom"
 
      int
@@ -241,7 +231,6 @@ How to set an alarm:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/lom\fR\fR
 .ad
@@ -252,7 +241,6 @@ LOM device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/tsalarm:ctl\fR\fR
 .ad
@@ -263,7 +251,6 @@ Alarm control device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/platform/kernel/drv/sparcv9/tsalarm\fR\fR
 .ad
@@ -274,7 +261,6 @@ Device driver module.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/SUNW,Netra-240/kernel/drv/tsalarm.conf\fR\fR
 .ad
@@ -291,13 +277,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 .TE
 
 .SH SEE ALSO

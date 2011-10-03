@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH monitor 1M "24 Jul 2003" "SunOS 5.11" "System Administration Commands"
+.TH MONITOR 1M "Jul 24, 2003"
 .SH NAME
 monitor \- SPARC system PROM monitor
 .SH SYNOPSIS
@@ -96,47 +96,39 @@ The following commands can be used at the OpenBoot monitor to access the
 \fBNVRAM\fR parameters.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprintenv\fR\fR
 .ad
 .RS 18n
-.rt  
 Used to list the \fBNVRAM\fR parameters, along with their default values and
 current values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetenv\fR\fI pn pv\fR\fR
 .ad
 .RS 18n
-.rt  
 Used to set or modify a parameter.  The \fIpn\fR represents the parameter name,
 and \fIpv\fR represents the parameter value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset-default\fR \fIpn\fR\fR
 .ad
 .RS 18n
-.rt  
 Used to set an individual parameter back to its default value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset-defaults\fR\fR
 .ad
 .RS 18n
-.rt  
 Used to reset all parameters to their default values.  (Note that
 \fB\&'set-defaults'\fR only affects parameters that have assigned default
 values.)
@@ -149,7 +141,6 @@ Newer OpenBoot monitors contain user interfaces that support the storage and
 listing of keys for later use by client programs.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-security-keys\fR\fR
 .ad
@@ -160,7 +151,6 @@ Lists the names of keys currently stored on a machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset-security-key\fR \fIkeyname\fR [ \fIkeydata\fR ]\fR
 .ad
@@ -183,34 +173,28 @@ run, if present, sending its results messages to the system's serial port A.
 Not all of the commands shown are available on all workstations.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest-all\fR\fR
 .ad
 .RS 17n
-.rt  
 Run the diagnostic tests on each device which has provided a self-test.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest\fR \fBfloppy\fR\fR
 .ad
 .RS 17n
-.rt  
 Run diagnostics on the system's floppy device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest\fR \fB/memory\fR\fR
 .ad
 .RS 17n
-.rt  
 Run the main memory tests.  If the \fBNVRAM\fR parameter \fB\&'diag-switch?'\fR
 is set to true, then all of main memory is tested.  If the parameter is false
 then only the amount of memory specified in the \fB\&'selftest-#megs'\fR
@@ -219,46 +203,38 @@ then only the amount of memory specified in the \fB\&'selftest-#megs'\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest\fR \fBnet\fR\fR
 .ad
 .RS 17n
-.rt  
 Test the network connection for the on-board network controller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwatch-net\fR\fR
 .ad
 .RS 17n
-.rt  
 Monitor the network attached to the on-board net controller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwatch-net-all\fR\fR
 .ad
 .RS 17n
-.rt  
 Monitor the network attached to the on-board net controller, as well as the
 network controllers installed in SBus slots.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwatch-clock\fR\fR
 .ad
 .RS 17n
-.rt  
 Test the system's clock function.
 .RE
 
@@ -269,156 +245,128 @@ The following commands are available for displaying information about the
 system.  Not all commands are available on all workstations.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbanner\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the power-on banner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.enet-addr\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the system's Ethernet address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.idprom\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the formatted contents of the \fBIDPROM.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodule-info\fR\fR
 .ad
 .RS 18n
-.rt  
 Display information about the system's processor(s).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprobe-scsi\fR\fR
 .ad
 .RS 18n
-.rt  
 Identify the devices attached to the on-board \fBSCSI\fR controller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprobe-scsi-all\fR\fR
 .ad
 .RS 18n
-.rt  
 Identify the devices attached to the on-board \fBSCSI\fR controller as well as
 those devices which are attached to SBus \fBSCSI\fR controllers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-disks\fR\fR
 .ad
 .RS 18n
-.rt  
 Display a list of the device paths for installed \fBSCSI\fR disk controllers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-displays\fR\fR
 .ad
 .RS 18n
-.rt  
 Display a list of the device paths for installed display devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-nets\fR\fR
 .ad
 .RS 18n
-.rt  
 Display a list of the device paths for installed Ethernet controllers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-sbus\fR\fR
 .ad
 .RS 18n
-.rt  
 Display list of installed SBus devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-tapes\fR\fR
 .ad
 .RS 18n
-.rt  
 Display a list of the device paths for installed \fBSCSI\fR tape controllers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-ttys\fR\fR
 .ad
 .RS 18n
-.rt  
 Display a list of the device paths for tty devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.traps\fR\fR
 .ad
 .RS 18n
-.rt  
 Display a list of the SPARC trap types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.version\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the version and date of the OpenBoot PROM.
 .RE
 
@@ -437,35 +385,29 @@ allowed when one of the security modes has been set.  Not all commands are
 available on all workstations.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStop (L1)\fR\fR
 .ad
 .RS 17n
-.rt  
 Bypass the Power-On Self Test (POST).  This is only effective if the system has
 been placed into the diagnostic mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStop-A (L1-A)\fR\fR
 .ad
 .RS 17n
-.rt  
 Abort the current operation and return to the monitor's default prompt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStop-D (L1-D)\fR\fR
 .ad
 .RS 17n
-.rt  
 Set the system's \fB\&'diag-switch?'\fR \fBNVRAM\fR parameter to
 \fB\&'true'\fR, which places the system in diagnostic mode.  POST diagnostics,
 if present, are run, and the messages are displayed by way of the system's
@@ -474,12 +416,10 @@ serial port A.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStop-F (L1-F)\fR\fR
 .ad
 .RS 17n
-.rt  
 Enter the OpenBoot monitor before the monitor has probed the system for
 devices.  Issue the \fB\&'fexit'\fR command to continue with system
 initialization.
@@ -487,12 +427,10 @@ initialization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStop-N (L1-N)\fR\fR
 .ad
 .RS 17n
-.rt  
 Causes the \fBNVRAM\fR parameters to be reset to their default values.  Note
 that not all parameters have default values.
 .RE
@@ -504,200 +442,164 @@ The following commands can be used while the monitor is displaying the \fBok\fR
 prompt.  Not all of these editing commands are available on all workstations.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-A\fR\fR
 .ad
 .RS 10n
-.rt  
 Place the cursor at the start of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-B\fR\fR
 .ad
 .RS 10n
-.rt  
 Move the cursor backward one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESC-B\fR\fR
 .ad
 .RS 10n
-.rt  
 Move the cursor backward one word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-D\fR\fR
 .ad
 .RS 10n
-.rt  
 Erase the character that the cursor is currently highlighting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESC-D\fR\fR
 .ad
 .RS 10n
-.rt  
 Erase the portion of word from the cursor's present position to the end of the
 word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-E\fR\fR
 .ad
 .RS 10n
-.rt  
 Place the cursor at the end of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-F\fR\fR
 .ad
 .RS 10n
-.rt  
 Move the cursor forward one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESC-F\fR\fR
 .ad
 .RS 10n
-.rt  
 Move the cursor forward one word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-H\fR\fR
 .ad
 .RS 10n
-.rt  
 Erase the character preceding the cursor (also use Delete or Back Space)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESC-H\fR\fR
 .ad
 .RS 10n
-.rt  
 Erase the portion of the word which precedes the cursor (use also \fBCTRL-W)\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-K\fR\fR
 .ad
 .RS 10n
-.rt  
 Erase from the cursor's present position to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-L\fR\fR
 .ad
 .RS 10n
-.rt  
 Show the command history list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-N\fR\fR
 .ad
 .RS 10n
-.rt  
 Recall the next command from the command history list
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-P\fR\fR
 .ad
 .RS 10n
-.rt  
 Recall a previous command from the command history list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-Q\fR\fR
 .ad
 .RS 10n
-.rt  
 Quote the next character (used to type a control character).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-R\fR\fR
 .ad
 .RS 10n
-.rt  
 Retype the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-U\fR\fR
 .ad
 .RS 10n
-.rt  
 Erase from the cursor's present position to the beginning of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTRL-Y\fR\fR
 .ad
 .RS 10n
-.rt  
 Insert the contents of the memory buffer into the line, in front (to the left)
 of the cursor.
 .RE
@@ -731,7 +633,6 @@ The following commands are available systems with older  \fBSunMON\fR-based
 PROM:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR|\fB\(mi\fR\fR
 .ad
@@ -743,7 +644,6 @@ location.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^C\fR\fI source destination n\fR\fR
 .ad
@@ -755,7 +655,6 @@ address to the \fIdestination\fR address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^I \fR\fIprogram\fR\fR
 .ad
@@ -766,7 +665,6 @@ address to the \fIdestination\fR address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^T \fR\fIvirtual_address\fR\fR
 .ad
@@ -778,7 +676,6 @@ mapped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR [ \fB!\fR ] [ \fIdevice\fR [
 \fB(\fR\fIc\fR\fB,\fR\fIu\fR\fB,\fR\fIp\|\fR\fB)\fR\fI\fR ] ] [ \fIpathname\fR
@@ -791,7 +688,6 @@ mapped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR[\fB?\fR]\fR
 .ad
@@ -805,120 +701,98 @@ disk, or from an Ethernet controller. `\fBb?\fR' displays all boot devices and
 their \fIdevice\fRs.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 18n
-.rt  
 one of
 .sp
 .ne 2
-.mk
 .na
 \fB\fBle\fR\fR
 .ad
 .RS 6n
-.rt  
 Lance Ethernet
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBie\fR\fR
 .ad
 .RS 6n
-.rt  
 Intel Ethernet
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsd\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBSCSI\fR disk, CDROM
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBst\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBSCSI\fR 1/4" or 1/2" tape
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd\fR\fR
 .ad
 .RS 6n
-.rt  
 Diskette
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBid\fR\fR
 .ad
 .RS 6n
-.rt  
 IPI disk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmt\fR\fR
 .ad
 .RS 6n
-.rt  
 Tape Master 9-track 1/2" tape
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxd\fR\fR
 .ad
 .RS 6n
-.rt  
 Xylogics 7053 disk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxt\fR\fR
 .ad
 .RS 6n
-.rt  
 Xylogics 1/2" tape
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxy\fR\fR
 .ad
 .RS 6n
-.rt  
 Xylogics 440/450 disk
 .RE
 
@@ -926,56 +800,46 @@ Xylogics 440/450 disk
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc\fR\fR
 .ad
 .RS 18n
-.rt  
 A controller number (\fB0\fR if only one controller),
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIu\fR\fR
 .ad
 .RS 18n
-.rt  
 A unit number (\fB0\fR if only one driver), and
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIp\fR\fR
 .ad
 .RS 18n
-.rt  
 A partition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 18n
-.rt  
 A pathname for a program such as \fB/stand/diag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarguments_list\fR\fR
 .ad
 .RS 18n
-.rt  
 A list of up to seven arguments to pass to the program being booted.
 .RE
 
@@ -983,7 +847,6 @@ A list of up to seven arguments to pass to the program being booted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc [\fR\fIvirtual_address\fR\fB]\fR\fR
 .ad
@@ -996,7 +859,6 @@ restored to the values shown by the \fBd\fR, and \fBr\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd [\fR\fIwindow_number\fR\fB]\fR\fR
 .ad
@@ -1045,12 +907,10 @@ status register along with 32 floating-point registers are also shown.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwindow_number\fR\fR
 .ad
 .RS 17n
-.rt  
 Display the indicated \fIwindow_number\fR, which can be any value between
 \fB0\fR and \fB6\fR, inclusive.  If no window is specified and the \fBPSR's\fR
 current window pointer contains a valid window number, registers from the
@@ -1062,7 +922,6 @@ Otherwise, registers from window 0 are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR [\fIvirtual_address\fR]\|[\fIaction\fR] .\|.\|.\fR
 .ad
@@ -1075,7 +934,6 @@ interpreted in the address space defined by the \fBs\fR command. See the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fI virtual_address1 virtual_address2 pattern \fR [\fIsize\|\fR]\fR
 .ad
@@ -1086,34 +944,28 @@ Fill the bytes, words, or long words from \fIvirtual_address1\fR (lower) to
 \fBsize\fR argument can take one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 byte format (the default)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 word format
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 long word format
 .RE
 
@@ -1125,7 +977,6 @@ For example, the following command fills the address block from \fB0x1000\fR to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR [\fIvector\|\fR] [\fIargument\|\fR]\fR
 .ad
@@ -1151,23 +1002,19 @@ The default routine, defined by the monitor, prints the user-supplied
 can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%x\fR\fR
 .ad
 .RS 6n
-.rt  
 hexadecimal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%d\fR\fR
 .ad
 .RS 6n
-.rt  
 decimal
 .RE
 
@@ -1175,7 +1022,6 @@ decimal
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg0\fR\fR
 .ad
@@ -1187,7 +1033,6 @@ of the system being interrupted,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg4\fR\fR
 .ad
@@ -1199,7 +1044,6 @@ a result of the system being interrupted,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
@@ -1212,7 +1056,6 @@ pressing \fBRETURN.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi \fR[\fIcache_data_offset\fR\|] [\fIaction\fR\|]\|.\|.\|.\fR
 .ad
@@ -1225,7 +1068,6 @@ cache data addresses.  See the \fBa\fR command for a description of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBj\fR [\fIcache_tag_offset\fR\|] [\fIaction\|\fR]\|.\|.\|.\fR
 .ad
@@ -1238,7 +1080,6 @@ of \fIaction\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk [\fR\fIreset_level\fR\fB]\fR\fR
 .ad
@@ -1247,35 +1088,29 @@ of \fIaction\fR.
 Reset the system, where \fIreset_level\fR is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Reset \fBVMEbus,\fR interrupt registers, video monitor (Sun-4 systems). This is
 the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Software reset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Power-on reset. Resets and clears the memory. Runs the \fBEPROM-based\fR
 diagnostic self test, which can take several minutes, depending upon how much
 memory is being tested.
@@ -1285,7 +1120,6 @@ memory is being tested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkb\fR\fR
 .ad
@@ -1296,7 +1130,6 @@ Display the system banner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\|\fR [\fIvirtual_address\fR\|]\|[\fIaction\fR]\|.\|.\|.\fR
 .ad
@@ -1309,7 +1142,6 @@ command (below).  See the \fBa\fR command for a description of \fIaction\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\|\fR [\fIvirtual_address\fR\|]\|[\fIaction\fR\|]\|.\|.\|.\fR
 .ad
@@ -1322,18 +1154,16 @@ the \fBa\fR command for a description of \fIaction\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBne\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBni\fR\fR
 .ad
@@ -1344,7 +1174,6 @@ Disable, enable, or invalidate the cache, respectively.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\|\fR [\fIvirtual_address\fR\|]\|[action\fI]\|.\|.\|.\fR\fR
 .ad
@@ -1357,7 +1186,6 @@ the \fBa\fR command for a description of \fIaction\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\|\fR [\fIvirtual_address\fR\|]\|[\fIaction\fR].\|.\|.\fR
 .ad
@@ -1370,7 +1198,6 @@ description of \fIaction\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\|\fR [\fIeeprom_offset\fR\|]\|[\fIaction\fR\|].\|.\|.\fR
 .ad
@@ -1388,7 +1215,6 @@ the \fBa\fR command for a description of \fIaction\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\|\fR [\fIregister_number\|\fR]\fR
 .ad
@@ -1406,111 +1232,91 @@ Display and/or modify one or more of the \fBIU\fR or \fBFPU\fR registers. A
 hexadecimal \fIregister_number\fR can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x00\fR\(mi\fB0x0f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(0,i0)\(miwindow(0,i7), window(0,i0)\(emwindow(0,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x16\fR\(mi\fB0x1f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(1,i0)\(miwindow(1,i7), window(1,i0)\(emwindow(1,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x20\fR\(mi\fB0x2f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(2,i0)\(miwindow(2,i7), window(2,i0)\(emwindow(2,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x30\fR\(mi\fB0x3f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(3,i0)\(miwindow(3,i7), window(3,i0)\(emwindow(3,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x40\fR\(mi\fB0x4f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(4,i0)\(miwindow(4,i7), window(4,i0)\(emwindow(4,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x50\fR\(mi\fB0x5f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(5,i0)\(miwindow(5,i7), window(5,i0)\(emwindow(5,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x60\fR\(mi\fB0x6f\fR\fR
 .ad
 .RS 16n
-.rt  
 window(6,i0)\(miwindow(6,i7), window(6,i0)\(emwindow(6,i7)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x70\fR\(mi\fB0x77\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBg0, g1, g2, g3, g4, g5, g6, g7\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x78\fR\(mi\fB0x7d\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBPSR,\fR \fBPC,\fR \fBnPC,\fR \fBWIM,\fR \fBTBR,\fR \fBY.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x7e\fR\(mi\fB0x9e\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBFSR,\fR f0\(mif31
 .RE
 
@@ -1522,34 +1328,28 @@ If a \fIregister_type\fR is given, the first register of the indicated type is
 displayed. \fIregister_type\fR can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 5n
-.rt  
 floating-point
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 global
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 special
 .RE
 
@@ -1562,7 +1362,6 @@ invalid, window 0 is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs [\fR\fIasi\fR\fB])\fR\fR
 .ad
@@ -1573,122 +1372,100 @@ displays the current Address Space Identifier.  The \fIasi\fR value can be one
 of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x2\fR\fR
 .ad
 .RS 7n
-.rt  
 control space
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x3\fR\fR
 .ad
 .RS 7n
-.rt  
 segment table
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x4\fR\fR
 .ad
 .RS 7n
-.rt  
 Page table
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x8\fR\fR
 .ad
 .RS 7n
-.rt  
 user instruction
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0x9\fR\fR
 .ad
 .RS 7n
-.rt  
 supervisor instruction
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0xa\fR\fR
 .ad
 .RS 7n
-.rt  
 user data
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0xb\fR\fR
 .ad
 .RS 7n
-.rt  
 supervisor data
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0xc\fR\fR
 .ad
 .RS 7n
-.rt  
 flush segment
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0xd\fR\fR
 .ad
 .RS 7n
-.rt  
 flush page
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0xe\fR\fR
 .ad
 .RS 7n
-.rt  
 flush context
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0xf\fR\fR
 .ad
 .RS 7n
-.rt  
 cache data
 .RE
 
@@ -1696,7 +1473,6 @@ cache data
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR [ \fBecho\fR ]\fR
 .ad
@@ -1707,7 +1483,6 @@ cache data
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR [ \fIport\fR ] [ \fIoptions\fR ] [ \fIbaud_rate\fR ]\fR
 .ad
@@ -1718,7 +1493,6 @@ cache data
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR [ \fBu\fR ] [ \fIvirtual_address\fR ]\fR
 .ad
@@ -1732,67 +1506,55 @@ With the \fBu\fR argument (\fBuu\fR.\|.\|.), set the I/O device to be the
 \fIvirtual_address\fR of a \fBUART\fR device currently mapped.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR\fR
 .ad
 .RS 13n
-.rt  
  Can be either \fBe\fR to enable input to be echoed to the output device, or
 \fBne\fR, to indicate that input is not echoed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIport\fR\fR
 .ad
 .RS 13n
-.rt  
 Assign the indicated \fIport\fR to be the current I/O device. \fIport\fR can be
 one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 serial port A
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 serial port B
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk\fR\fR
 .ad
 .RS 5n
-.rt  
 the workstation keyboard
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 the workstation screen
 .RE
 
@@ -1800,87 +1562,71 @@ the workstation screen
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbaud_rate\fR\fR
 .ad
 .RS 13n
-.rt  
 Any legal baud rate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptions\fR\fR
 .ad
 .RS 11n
-.rt  
 can be any combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 6n
-.rt  
 input
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 6n
-.rt  
 output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBUART\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 6n
-.rt  
 echo input to output
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBne\fR\fR
 .ad
 .RS 6n
-.rt  
 do not echo input
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 6n
-.rt  
 reset indicated serial port (\fBa\fR and \fBb\fR ports only)
 .RE
 
@@ -1894,7 +1640,6 @@ options, it is assigned for output only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fI virtual_address1 virtual_address2 \fR [\fBsize\fR]\fR
 .ad
@@ -1904,34 +1649,28 @@ Display the contents of \fIvirtual_address1\fR (lower) \fIvirtual_address2\fR
 (higher) in the format specified by \fBsize\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 byte format (the default)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 word format
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 long word format
 .RE
 
@@ -1946,7 +1685,6 @@ space from address  \fB0x1000\fR to  \fB0x2000\fR in word format:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\|\fR [\fIvirtual_address\|\fR]\|[\fIargument\|\fR]\fR
 .ad
@@ -1966,23 +1704,19 @@ The default routine, defined by the monitor, prints the user-supplied
 can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%x\fR\fR
 .ad
 .RS 6n
-.rt  
 hexadecimal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%d\fR\fR
 .ad
 .RS 6n
-.rt  
 decimal
 .RE
 
@@ -1990,7 +1724,6 @@ decimal
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
@@ -2003,7 +1736,6 @@ keyboard, and boot device paths.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBy\|c\fR\fI context_number\fR\fR
 .ad
@@ -2014,7 +1746,6 @@ keyboard, and boot device paths.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBy\|p|s\|\fR\fI context_number virtual_address\fR\fR
 .ad
@@ -2023,35 +1754,29 @@ keyboard, and boot device paths.
 Flush the indicated context, context page, or context segment.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 flush context \fIcontext_number\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 flush the page beginning at \fIvirtual_address\fR within context
 \fIcontext_number\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 flush the segment beginning at \fIvirtual_address\fR within context
 \fIcontext_number\fR
 .RE
@@ -2066,13 +1791,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 .TE
 
 .SH SEE ALSO

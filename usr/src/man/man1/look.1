@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH look 1 "29 Mar 1994" "SunOS 5.11" "User Commands"
+.TH LOOK 1 "Mar 29, 1994"
 .SH NAME
 look \- find words in the system dictionary or lines in a sorted list
 .SH SYNOPSIS
@@ -27,36 +27,30 @@ If no  \fIfilename\fR is specified, \fBlook\fR uses
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 7n
-.rt  
 Dictionary order. Only letters, digits,  \fBTAB\fR and \fBSPACE\fR characters
 are used in comparisons.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 7n
-.rt  
 Fold case. Upper case letters are not distinguished from lower case in
 comparisons.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fIc\fR\fR
 .ad
 .RS 7n
-.rt  
 Set termination character. All characters to the right of \fIc\fR in
 \fIstring\fR are ignored.
 .RE
@@ -64,12 +58,10 @@ Set termination character. All characters to the right of \fIc\fR in
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/dict/words\fR\fR
 .ad
 .RS 29n
-.rt  
 spelling list
 .RE
 

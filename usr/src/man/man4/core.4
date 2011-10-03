@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH core 4 "13 May 2008" "SunOS 5.11" "File Formats"
+.TH CORE 4 "May 13, 2008"
 .SH NAME
 core \- process core file
 .SH DESCRIPTION
@@ -149,12 +149,10 @@ The old \fBNOTE\fR segment contains the following entries. Each has entry name
 \fB"CORE"\fR and presents the contents of a system structure:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprpsinfo_t\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_PRPSINFO\fR. This entry contains information of interest to
 the \fBps\fR(1) command, such as process status, \fBCPU\fR usage, \fBnice\fR
 value, controlling terminal, user-ID, process-ID, the name of the executable,
@@ -164,12 +162,10 @@ and so forth. The \fBprpsinfo_t\fR structure is defined in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar\fR array\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_PLATFORM\fR. This entry contains a string describing the
 specific model of the hardware platform on which this core file was created.
 This information is the same as provided by \fBsysinfo\fR(2) when invoked with
@@ -178,12 +174,10 @@ the command \fBSI_PLATFORM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauxv_t\fR array\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_AUXV\fR. This entry contains the array of \fBauxv_t\fR
 structures that was passed by the operating system as startup information to
 the dynamic linker. Auxiliary vector information is defined in
@@ -198,12 +192,10 @@ Following these entries, for each active (non-zombie) light-weight process
 the LWP, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprstatus_t\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_PRSTATUS\fR. This structure contains things of interest to
 a debugger from the operating system, such as the general registers, signal
 dispositions, state, reason for stopping, process-ID, and so forth. The
@@ -212,12 +204,10 @@ dispositions, state, reason for stopping, process-ID, and so forth. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprfpregset_t\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_PRFPREG\fR. This entry is present only if the \fBLWP\fR
 used the floating-point hardware. It contains the floating-point registers. The
 \fBprfpregset_t\fR structure is defined in <\fBsys/procfs_isa.h\fR>.
@@ -225,12 +215,10 @@ used the floating-point hardware. It contains the floating-point registers. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgwindows_t\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_GWINDOWS\fR. This entry is present only on a SPARC machine
 and only if the system was unable to flush all of the register windows to the
 stack. It contains all of the unspilled register windows. The \fBgwindows_t\fR
@@ -239,12 +227,10 @@ structure is defined in <\fBsys/regset.h\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprxregset_t\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBn_type\fR: \fBNT_PRXREG\fR. This entry is present only if the machine has
 extra register state associated with it. It contains the extra register state.
 The \fBprxregset_t\fR structure is defined in <\fBsys/procfs_isa.h\fR>.
@@ -256,12 +242,10 @@ The new \fBNOTE\fR segment contains the following entries. Each has entry name
 "\fBCORE\fR" and presents the contents of a system structure:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsinfo_t\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_PSINFO\fR. This structure contains information of interest
 to the \fBps\fR(1) command, such as process status, \fBCPU\fR usage, \fBnice\fR
 value, controlling terminal, user-ID, process-ID, the name of the executable,
@@ -270,12 +254,10 @@ and so forth. The \fBpsinfo_t\fR structure is defined in <\fBsys/procfs.h\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpstatus_t\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_PSTATUS\fR. This structure contains things of interest to a
 debugger from the operating system, such as pending signals, state, process-ID,
 and so forth. The \fBpstatus_t\fR structure is defined in <\fBsys/procfs.h\fR>.
@@ -283,12 +265,10 @@ and so forth. The \fBpstatus_t\fR structure is defined in <\fBsys/procfs.h\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar\fR array\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_PLATFORM\fR. This entry contains a string describing the
 specific model of the hardware platform on which this core file was created.
 This information is the same as provided by \fBsysinfo\fR(2) when invoked with
@@ -297,12 +277,10 @@ the command \fBSI_PLATFORM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauxv_t\fR array\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_AUXV\fR. This entry contains the array of \fBauxv_t\fR
 structures that was passed by the operating system as startup information to
 the dynamic linker. Auxiliary vector information is defined in
@@ -311,12 +289,10 @@ the dynamic linker. Auxiliary vector information is defined in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstruct utsname\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_UTSNAME\fR. This structure contains the system information
 that would have been returned to the process if it had performed a
 \fBuname\fR(2) system call prior to dumping core. The \fButsname\fR structure
@@ -325,12 +301,10 @@ is defined in <\fBsys/utsname.h\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprcred_t\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_PRCRED\fR. This structure contains the process credentials,
 including the real, saved, and effective user and group IDs. The \fBprcred_t\fR
 structure is defined in <\fBaasys/procfs.h\fR>. Following the structure is an
@@ -343,12 +317,10 @@ items following the structure; otherwise, there is no additional data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar array\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_ZONENAME\fR. This entry contains a string which describes
 the name of the zone in which the process was running. See \fBzones\fR(5). The
 information is the same as provided by \fBgetzonenamebyid\fR(3C) when invoked
@@ -357,12 +329,10 @@ with the numerical ID returned by \fBgetzoneid\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstruct ssd\fR array\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_LDT\fR. This entry is present only on an 32-bit x86 machine
 and only if the process has set up a Local Descriptor Table (LDT). It contains
 an array of structures of type \fBstruct ssd\fR, each of which was typically
@@ -373,12 +343,10 @@ of the current thread information structure in a multithreaded process. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcore_content_t\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBn_type\fR: \fBNT_CONTENT\fR. This optional entry indicates which parts of
 the process image are specified to be included in the core file. See
 \fBcoreadm\fR(1M).
@@ -394,12 +362,10 @@ is a non-detached LWP that has terminated but has not yet been reaped by
 another LWP in the same process.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlwpsinfo_t\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBn_type\fR: \fBNT_LWPSINFO\fR. This structure contains information of
 interest to the \fBps\fR(1) command, such as \fBLWP\fR status, \fBCPU\fR usage,
 \fBnice\fR value, \fBLWP-ID\fR, and so forth. The \fBlwpsinfo_t\fR structure is
@@ -409,12 +375,10 @@ LWP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlwpstatus_t\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBn_type\fR: \fBNT_LWPSTATUS\fR. This structure contains things of interest to
 a debugger from the operating system, such as the general registers, the
 floating point registers, state, reason for stopping, \fBLWP-ID\fR, and so
@@ -423,12 +387,10 @@ forth. The \fBlwpstatus_t\fR structure is defined in <\fBsys/procfs.h>\fR>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgwindows_t\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBn_type\fR: \fBNT_GWINDOWS\fR. This entry is present only on a SPARC machine
 and only if the system was unable to flush all of the register windows to the
 stack. It contains all of the unspilled register windows. The \fBgwindows_t\fR
@@ -437,12 +399,10 @@ structure is defined in \fB<sys/regset.h>\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprxregset_t\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBn_type\fR: \fBNT_PRXREG\fR. This entry is present only if the machine has
 extra register state associated with it. It contains the extra register state.
 The \fBprxregset_t\fR structure is defined in \fB<sys/procfs_isa.h>\fR\&.
@@ -450,12 +410,10 @@ The \fBprxregset_t\fR structure is defined in \fB<sys/procfs_isa.h>\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasrset_t\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBn_type\fR: \fBNT_ASRS\fR. This entry is present only on a SPARC V9 machine
 and only if the process is a 64-bit process. It contains the ancillary state
 registers for the \fBLWP.\fR The \fBasrset_t\fR structure is defined in

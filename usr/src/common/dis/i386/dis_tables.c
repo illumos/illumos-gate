@@ -230,7 +230,8 @@ enum {
 	VEX_RRM,        /* VEX  VEX.vvvv, mod_reg              -> mod_rm */
 	VEX_RMX,        /* VEX  VEX.vvvv, mod_rm               -> mod_reg */
 	VMx,		/* vmcall/vmlaunch/vmresume/vmxoff */
-	VMxo		/* VMx instruction with optional prefix */
+	VMxo,		/* VMx instruction with optional prefix */
+	SVM		/* AMD SVM instructions */
 };
 
 /*
@@ -498,7 +499,7 @@ const instable_t dis_op0F00[8] = {
  */
 const instable_t dis_op0F01[8] = {
 
-/*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6), TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",MO,6),
+/*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6),	TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",SVM,6),
 /*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS),
 };
 
@@ -1882,7 +1883,7 @@ const instable_t dis_distable[16][16] = {
 /* [2,0] */	TNS("andb",RMw),	TS("and",RMw),		TNS("andb",MRw),	TS("and",MRw),
 /* [2,4] */	TNS("andb",IA),		TS("and",IA),		TNSx("%es:",OVERRIDE),	TNSx("daa",NORM),
 /* [2,8] */	TNS("subb",RMw),	TS("sub",RMw),		TNS("subb",MRw),	TS("sub",MRw),
-/* [2,C] */	TNS("subb",IA),		TS("sub",IA),		TNSx("%cs:",OVERRIDE),	TNSx("das",NORM),
+/* [2,C] */	TNS("subb",IA),		TS("sub",IA),		TNS("%cs:",OVERRIDE),	TNSx("das",NORM),
 }, {
 /* [3,0] */	TNS("xorb",RMw),	TS("xor",RMw),		TNS("xorb",MRw),	TS("xor",MRw),
 /* [3,4] */	TNS("xorb",IA),		TS("xor",IA),		TNSx("%ss:",OVERRIDE),	TNSx("aaa",NORM),
@@ -3550,6 +3551,47 @@ just_mem:
 			break;
 		}
 		/*FALLTHROUGH*/
+<<<<<<< HEAD
+=======
+	case SVM:
+		if (mode == 3) {
+#if DIS_TEXT
+			char *vinstr;
+
+			switch (r_m) {
+			case 0:
+				vinstr = "vmrun";
+				break;
+			case 1:
+				vinstr = "vmmcall";
+				break;
+			case 2:
+				vinstr = "vmload";
+				break;
+			case 3:
+				vinstr = "vmsave";
+				break;
+			case 4:
+				vinstr = "stgi";
+				break;
+			case 5:
+				vinstr = "clgi";
+				break;
+			case 6:
+				vinstr = "skinit";
+				break;
+			case 7:
+				vinstr = "invlpga";
+				break;
+			}
+
+			(void) strncpy(x->d86_mnem, vinstr, OPLEN);
+#endif
+			NOMEM;
+			break;
+		}
+		/*FALLTHROUGH*/
+>>>>>>> ed22c7109fc5dd9e1b7a5d0333bdc7ad2718e2ab
 	case MONITOR_MWAIT:
 		if (mode == 3) {
 			if (r_m == 0) {

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH it_portal_create 3ISCSIT "1 Oct 2008" "SunOS 5.11" "iSCSI Management Library Functions"
+.TH IT_PORTAL_CREATE 3ISCSIT "Oct 1, 2008"
 .SH NAME
 it_portal_create, it_portal_delete \- create and delete iSCSI portals
 .SH SYNOPSIS
@@ -25,45 +25,37 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-liscsit\fR [ \fIlibrary\fR\&.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcfg\fR\fR
 .ad
 .RS 18n
-.rt  
 a pointer to the iSCSI configuration structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItpg\fR\fR
 .ad
 .RS 18n
-.rt  
 a pointer to the \fBit_tpg_t\fR structure representing the target portal group
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIportal\fR\fR
 .ad
 .RS 18n
-.rt  
 a pointer to the \fBit_portal_t\fR structure representing the portal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIportal_ip_port\fR\fR
 .ad
 .RS 18n
-.rt  
 a string containing an appropriatedly formatted IP address:port. Both IPv4 and
 IPv6 addresses are permitted. IPv6 addresses should be enclosed in square
 brackets ('[', ']').
@@ -95,34 +87,28 @@ on failure.
 The \fBit_portal_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 The portal was already configured for another portal group.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Resources could not be allocated.
 .RE
 
@@ -134,15 +120,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

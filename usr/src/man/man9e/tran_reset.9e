@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_reset 9E "17 Aug 2005" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_RESET 9E "Aug 17, 2005"
 .SH NAME
 tran_reset \- reset a SCSI bus or target
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR \fR
 .ad
 .RS 10n
-.rt  
 Pointer to the \fBscsi_address\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR \fR
 .ad
 .RS 10n
-.rt  
 The level of reset required.
 .RE
 
@@ -59,34 +55,28 @@ device, or a \fBSCSI\fR logical unit as specified by \fIlevel\fR.
 \fIlevel\fR must be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRESET_ALL\fR \fR
 .ad
 .RS 17n
-.rt  
 Reset the \fBSCSI\fR bus.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRESET_TARGET\fR \fR
 .ad
 .RS 17n
-.rt  
 Reset the target specified by \fIap\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRESET_LUN\fR \fR
 .ad
 .RS 17n
-.rt  
 Reset the logical unit specified by \fIap\fR.
 .RE
 
@@ -122,23 +112,19 @@ of the \fBlun_reset\fR capability in its \fBtran_getcap\fR(9E) routine.
 \fBtran_reset()\fR should return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 6n
-.rt  
 on success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 on failure.
 .RE
 

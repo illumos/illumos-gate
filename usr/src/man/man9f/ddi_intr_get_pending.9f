@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_get_pending 9F "07Apr 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_GET_PENDING 9F "Apr 7, 2005"
 .SH NAME
 ddi_intr_get_pending \- get pending bit for a given interrupt
 .SH SYNOPSIS
@@ -24,23 +24,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 12n
-.rt  
 DDI interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpendingp\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the pending capability returned for this handle
 .RE
 
@@ -65,45 +61,37 @@ If the \fBDDI_INTR_FLAG_PENDING\fR capability is not supported,
 The \fBddi_intr_get_pending()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 On encountering invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 On any implementation specific failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 On device not supporting operation.
 .RE
 
@@ -120,13 +108,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

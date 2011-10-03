@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sctp_sendmsg 3SOCKET "22 Aug 2007" "SunOS 5.11" "Sockets Library Functions"
+.TH SCTP_SENDMSG 3SOCKET "Aug 22, 2007"
 .SH NAME
 sctp_sendmsg \- send message from an SCTP socket
 .SH SYNOPSIS
@@ -31,56 +31,46 @@ In addition to specifying \fImsg\fR as the message buffer and \fIlen\fR as the
 length of the buffer, the following parameters can be set:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIto\fR\fR
 .ad
 .RS 14n
-.rt  
 Destination address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItolen\fR\fR
 .ad
 .RS 14n
-.rt  
 Length of the destination address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIppid\fR\fR
 .ad
 .RS 14n
-.rt  
 Application-specified payload protocol identifier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstream_no\fR\fR
 .ad
 .RS 14n
-.rt  
 Target stream for the message
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItimetolive\fR\fR
 .ad
 .RS 14n
-.rt  
 Time period in milliseconds after which the message expires if transmission for
 the message has not been started. A value of \fB0\fR indicates that the message
 does not expire. When the \fBMSG_PR_SCTP\fR flag is set the message expires,
@@ -90,12 +80,10 @@ within the \fItimetolive\fR period.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext\fR\fR
 .ad
 .RS 14n
-.rt  
 Value returned when an error occurs in sending a message
 .RE
 
@@ -105,24 +93,20 @@ The \fIflags\fR parameter is formed from the bitwise OR of zero or more of the
 following flags:
 .sp
 .ne 2
-.mk
 .na
 \fBMSG_UNORDERED\fR
 .ad
 .RS 17n
-.rt  
 This flag requests un-ordered delivery of the message. If this flag is clear
 the message is considered an ordered send.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMSG_ABORT\fR
 .ad
 .RS 17n
-.rt  
 When set, this flag causes the specified association to abort by sending an
 ABORT to the peer. The flag is used only for one-to-many style SCTP socket
 associations.
@@ -130,24 +114,20 @@ associations.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMSG_EOF\fR
 .ad
 .RS 17n
-.rt  
 When set, this flag invokes a graceful shutdown on a specified association. The
 flag is used only for one-to-many style SCTP socket associations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBMSG_PR_SCTP\fR
 .ad
 .RS 17n
-.rt  
 This flag indicates that the message is treated as partially reliable. The
 message expires unless the entire message is successfully transmitted within
 the time period specified in the \fItimetolive\fR parameter.
@@ -174,111 +154,91 @@ number of bytes sent. The function returns \fB-1\fR if an error occurs.
 The \fBsctp_sendmsg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIs\fR argument is an invalid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIs\fR argument is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBMSG_OOB\fR is set as a \fIflag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBMSG_ABORT\fR or \fBMSG_EOF\fR is set on a one-to-one style SCTP socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPIPE\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is shutting down and no more writes are allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is non-blocking and the transmit queue is full.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 16n
-.rt  
 There is no established association.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 Control message length is incorrect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 Specified destination address does not belong to the association.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 16n
-.rt  
 Address family of the specified destination address is other than \fBAF_INET\fR
 or \fBAF_INET6\fR.
 .RE
@@ -291,15 +251,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

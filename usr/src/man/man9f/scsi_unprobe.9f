@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_unprobe 9F "27 Sep 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_UNPROBE 9F "Sep 27, 2002"
 .SH NAME
 scsi_unprobe, scsi_unslave \- free resources allocated during initial probing
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
 
 
@@ -29,12 +29,10 @@ obsolete. Use \fBscsi_unprobe()\fR instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR \fR
 .ad
 .RS 9n
-.rt  
 Pointer to a \fBscsi_device\fR(9S) structure.
 .RE
 

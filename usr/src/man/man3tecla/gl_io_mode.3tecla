@@ -9,7 +9,7 @@
 .\" copyright notice(s) and this permission notice appear in all copies of
 .\" the Software and that both the above copyright notice(s) and this
 .\" permission notice appear in supporting documentation.
-.\" 
+.\"
 .\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 .\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 .\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -19,13 +19,13 @@
 .\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
 .\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 .\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-.\" 
+.\"
 .\" Except as contained in this notice, the name of a copyright holder
 .\" shall not be used in advertising or otherwise to promote the sale, use
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH gl_io_mode 3TECLA "1 Jun 2004" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.TH GL_IO_MODE 3TECLA "Jun 1, 2004"
 .SH NAME
 gl_io_mode, gl_raw_io, gl_normal_io, gl_tty_signals, gl_abandon_line,
 gl_handle_signal, gl_pending_io \- use \fBgl_get_line()\fR from an external
@@ -33,7 +33,7 @@ event loop
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libtecla.h>
 
 \fBint\fR \fBgl_io_mode\fR(\fBGetLine *\fR\fIgl\fR, \fBGlIOMode\fR \fImode\fR);
@@ -79,24 +79,20 @@ argument of \fBgl_io_mode()\fR specifies the new I/O mode and must be one of
 the following.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGL_NORMAL_MODE\fR\fR
 .ad
 .RS 18n
-.rt  
 Select the normal blocking-I/O mode. In this mode \fBgl_get_line()\fR does not
 return until either an error occurs of the user finishes entering a new line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGL_SERVER_MODE\fR\fR
 .ad
 .RS 18n
-.rt  
 Select non-blocking server I/O mode. In this mode, since non-blocking terminal
 I/O is used, the entry of each new input line typically requires many calls to
 \fBgl_get_line()\fR from an external I/O-driven event loop.
@@ -117,23 +113,19 @@ which type of I/O \fBgl_get_line()\fR is waiting for, the application calls the
 enumerated values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLP_READ\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBgl_get_line()\fR is waiting to write a character to the terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLP_WRITE\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBgl_get_line()\fR is waiting to read a character from the keyboad.
 .RE
 
@@ -226,12 +218,10 @@ signals to assign specified signal handlers to groups of signals. The arguments
 of this function are as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIterm_handler\fR\fR
 .ad
 .RS 16n
-.rt  
 This is the signal handler that is used to trap signals that by default
 terminate any process that receives them (for example, \fBSIGINT\fR or
 \fBSIGTERM\fR).
@@ -239,24 +229,20 @@ terminate any process that receives them (for example, \fBSIGINT\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsusp_handler\fR\fR
 .ad
 .RS 16n
-.rt  
 This is the signal handler that is used to trap signals that by default suspend
 any process that receives them, (for example, \fBSIGTSTP\fR or \fBSIGTTOU\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcont_handler\fR\fR
 .ad
 .RS 16n
-.rt  
 This is the signal handler that is used to trap signals that are usually sent
 when a process resumes after being suspended (usually \fBSIGCONT\fR). Beware
 that there is nothing to stop a user from sending one of these signals at other
@@ -265,12 +251,10 @@ times.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize_handler\fR\fR
 .ad
 .RS 16n
-.rt  
 This signal handler is used to trap signals that are sent to processes when
 their controlling terminals are resized by the user (for example,
 \fBSIGWINCH\fR).
@@ -571,15 +555,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

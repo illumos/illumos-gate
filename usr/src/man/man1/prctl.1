@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prctl 1 "25 Aug 2009" "SunOS 5.11" "User Commands"
+.TH PRCTL 1 "Aug 25, 2009"
 .SH NAME
 prctl \- get or set the resource controls of running processes, tasks, and
 projects
 .SH SYNOPSIS
 .LP
 .nf
-\fBprctl\fR [\fB-P\fR] [\fB-t\fR [basic | privileged | system]] 
-     [\fB-n\fR \fIname\fR [\fB-srx\fR] [\fB-v\fR \fIvalue\fR] [\fB-e\fR | \fB-d\fR \fIaction\fR] [\fB-p\fR \fIpid\fR]] 
+\fBprctl\fR [\fB-P\fR] [\fB-t\fR [basic | privileged | system]]
+     [\fB-n\fR \fIname\fR [\fB-srx\fR] [\fB-v\fR \fIvalue\fR] [\fB-e\fR | \fB-d\fR \fIaction\fR] [\fB-p\fR \fIpid\fR]]
      [\fB-i\fR \fIidtype\fR] \fIid\fR...
 .fi
 
@@ -37,7 +37,6 @@ it is considered a modify operation.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR | \fB-e\fR \fIaction\fR\fR
 .ad
@@ -54,24 +53,20 @@ is added as if \fB-s\fR were specified.
 \fBActions:\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 17n
-.rt  
 This action is only available with \fB-d\fR. It disables all actions. This
 fails on resource control values that have the \fBdeny\fR global flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny\fR\fR
 .ad
 .RS 17n
-.rt  
 Indicates that the resource control attempts to deny granting the resource to
 the process, task, project, or zone on a request for resources in excess of the
 resource control value. \fBdeny\fR actions can not be enabled if the resource
@@ -81,24 +76,20 @@ disabled if the resource control has the \fBdeny\fR global flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsignal\fR\fR
 .ad
 .RS 17n
-.rt  
 This action is only available with \fB-d\fR. It deactivates the \fBsignal\fR
 action.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsignal\fR=\fIsignum\fR\fR
 .ad
 .RS 17n
-.rt  
 In the \fBsignal=\fR\fIsignum\fR action, \fIsignum\fR is a signal number (or
 string representation of a signal). Setting a \fBsignal\fR action on a resource
 control with the \fBno-local-action\fR global flag fails. A limited set of
@@ -109,7 +100,6 @@ signals can be sent. See \fBNOTES\fR for additional details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIidtype\fR\fR
 .ad
@@ -133,7 +123,6 @@ project and zone to which that task is a member.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR\fR
 .ad
@@ -145,7 +134,6 @@ unspecified, all resource controls are retrieved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpid\fR\fR
 .ad
@@ -160,7 +148,6 @@ controls on a task, project, or zone, the \fB-p\fR option is required if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -171,7 +158,6 @@ Display resource control values in space delimited format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -183,7 +169,6 @@ Replaces the first resource control value (matching with the \fB-t\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -208,7 +193,6 @@ value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [ \fBbasic\fR | \fBprivileged\fR | \fBsystem\fR ]\fR
 .ad
@@ -225,7 +209,6 @@ including \fBsystem\fR, are displayed if no type is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIvalue\fR\fR
 .ad
@@ -243,7 +226,6 @@ value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -265,12 +247,10 @@ the invocation is considered a get operation.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 6n
-.rt  
 The \fBID\fR of the entity (\fBprocess\fR, \fBtask\fR, \fBproject\fR, or
 \fBzone\fR) to interrogate. If the invoking user's credentials are unprivileged
 and the entity being interrogated possesses different credentials, the
@@ -526,46 +506,38 @@ The cap can be lowered to 50% using:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Fatal error encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/pid/*\fR\fR
 .ad
 .RS 15n
-.rt  
 Process information and control files
 .RE
 
@@ -577,13 +549,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

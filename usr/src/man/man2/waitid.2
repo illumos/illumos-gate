@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH waitid 2 "9 Jun 2004" "SunOS 5.11" "System Calls"
+.TH WAITID 2 "Jun 9, 2004"
 .SH NAME
 waitid \- wait for child process to change state
 .SH SYNOPSIS
@@ -57,68 +57,56 @@ The \fIoptions\fR argument is used to specify which state changes
 any of the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCONTINUED\fR\fR
 .ad
 .RS 14n
-.rt  
 Return the status for any child that was stopped and has been continued.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWEXITED\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait for process(es) to exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOHANG\fR\fR
 .ad
 .RS 14n
-.rt  
 Return immediately.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOWAIT\fR\fR
 .ad
 .RS 14n
-.rt  
 Keep the process in a waitable state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWSTOPPED\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait for and return the process status of any child that has  stopped upon
 receipt of a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWTRAPPED\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait for traced process(es) to become trapped or reach a breakpoint (see
 \fBptrace\fR(3C)).
 .RE
@@ -152,47 +140,39 @@ have changed state if \fBinfo->si_pid\fR is \fB0\fR.
 The \fBwaitid()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHILD\fR\fR
 .ad
 .RS 10n
-.rt  
 The set of processes specified by \fIidtype\fR and \fIid\fR does not contain
 any unwaited processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIinfop\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBwaitid()\fR function was interrupted due to the receipt of a signal by
 the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An invalid value was specified for \fIoptions\fR, or \fIidtype\fR and \fIid\fR
 specify an invalid set of processes.
 .RE
@@ -212,15 +192,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

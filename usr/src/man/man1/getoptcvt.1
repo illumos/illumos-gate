@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getoptcvt 1 "7 Jan 2000" "SunOS 5.11" "User Commands"
+.TH GETOPTCVT 1 "Jan 7, 2000"
 .SH NAME
 getoptcvt \- convert to getopts to parse command options
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ getoptcvt \- convert to getopts to parse command options
 
 .LP
 .nf
-\fB/usr/lib/getoptcvt\fR 
+\fB/usr/lib/getoptcvt\fR
 .fi
 
 .SH DESCRIPTION
@@ -77,12 +77,10 @@ positional parameters and check for options that are valid for that command
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Makes the converted script portable to earlier releases of the UNIX system.
 \fB/usr/lib/getoptcvt\fR modifies the shell script in \fIfilename\fR so that
 when the resulting shell script is executed, it determines at run time whether
@@ -140,24 +138,20 @@ that affect the execution of \fBgetopts\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPTIND\fR \fR
 .ad
 .RS 11n
-.rt  
 This variable is used by \fBgetoptcvt\fR as the index of the next argument to
 be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPTARG\fR \fR
 .ad
 .RS 11n
-.rt  
 This variable is used by \fBgetoptcvt\fR to store the argument if an option is
 using arguments.
 .RE
@@ -168,23 +162,19 @@ using arguments.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 An option, specified or unspecified by \fIoptstring\fR, was found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 The end of options was encountered or an error occurred.
 .RE
 
@@ -196,12 +186,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-CSIenabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+CSI	enabled
 .TE
 
 .SH SEE ALSO

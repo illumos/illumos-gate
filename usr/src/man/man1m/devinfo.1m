@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devinfo 1M "8 May 1997" "SunOS 5.11" "System Administration Commands"
+.TH DEVINFO 1M "May 8, 1997"
 .SH NAME
 devinfo \- print device specific information
 .SH SYNOPSIS
@@ -25,12 +25,10 @@ disk devices on standard out. The command can only be used by the superuser.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the following device information:
 .RS +4
 .TP
@@ -72,12 +70,10 @@ Number of device partitions with a block size greater than zero
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the following device partition information:
 .RS +4
 .TP
@@ -125,35 +121,29 @@ information. If the device cannot be opened, an error message is reported.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Device name.
 .RE
 
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Operation failed.
 .RE
 

@@ -3,20 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH postprint 1 "9 Sep 1996" "SunOS 5.11" "User Commands"
+.TH POSTPRINT 1 "Sep 9, 1996"
 .SH NAME
 postprint \- PostScript translator for text files
 .SH SYNOPSIS
 .LP
 .nf
-\fBpostprint\fR [\fB-c\fR \fInum\fR] [\fB-f\fR \fIname\fR] [\fB-l\fR \fInum\fR] [\fB-m\fR \fInum\fR] [\fB-n\fR \fInum\fR] 
-     [\fB-o\fR \fIlist\fR] [\fB-p\fR \fImode\fR] [\fB-r\fR \fInum\fR] [\fB-s\fR \fInum\fR] [\fB-t\fR \fI num\fR] 
+\fBpostprint\fR [\fB-c\fR \fInum\fR] [\fB-f\fR \fIname\fR] [\fB-l\fR \fInum\fR] [\fB-m\fR \fInum\fR] [\fB-n\fR \fInum\fR]
+     [\fB-o\fR \fIlist\fR] [\fB-p\fR \fImode\fR] [\fB-r\fR \fInum\fR] [\fB-s\fR \fInum\fR] [\fB-t\fR \fI num\fR]
      [\fB-x\fR \fInum\fR] [\fB-y\fR \fInum\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/lib/lp/postscript/postprint\fR 
+\fB/usr/lib/lp/postscript/postprint\fR
 .fi
 
 .SH DESCRIPTION
@@ -28,23 +28,19 @@ if \fB\(mi\fR is one of the input \fIfiles\fR, the standard input is read.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fInum\fR copies of each page. By default, only one copy is printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI name\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fIfiles\fR using font \fIname\fR. Any PostScript font can be used,
 although the best results will be obtained only with constant width fonts. The
 default font is Courier.
@@ -52,12 +48,10 @@ default font is Courier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Set the length of a page to \fInum\fR lines. By default, \fInum\fR is \fB66\fR.
 Setting \fInum\fR to  \fB0\fR is allowed, and will cause \fBpostprint\fR to
 guess a value, based on the point size that's being used.
@@ -65,12 +59,10 @@ guess a value, based on the point size that's being used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Magnify each logical page by the factor \fInum\fR. Pages are scaled uniformly
 about the origin, which is located near the upper left corner of each page. The
 default magnification is  \fB1.0\fR.
@@ -78,24 +70,20 @@ default magnification is  \fB1.0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fInum\fR logical pages on each piece of paper, where \fInum\fR can be
 any positive integer. By default, \fInum\fR is set to  \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fI list\fR\fR
 .ad
 .RS 11n
-.rt  
 Print pages whose numbers are given in the comma-separated \fIlist\fR. The
 \fIlist\fR contains single numbers \fIN\fR and ranges \fIN1 \fR\(mi\fI N2\fR. A
 missing \fIN1\fR means the lowest numbered page, a missing \fIN2\fR means the
@@ -110,24 +98,20 @@ of paper.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI mode\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fIfiles\fR in either portrait or landscape \fImode\fR. Only the first
 character of \fImode\fR is significant. The default \fImode\fR is portrait.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Selects carriage return behavior. Carriage returns are ignored if \fInum\fR is
 \fB0\fR, cause a return to column 1 if \fInum\fR is  \fB1\fR, and generate a
 newline if \fInum\fR is  \fB2\fR. The default \fInum\fR is  \fB0\fR.
@@ -135,12 +119,10 @@ newline if \fInum\fR is  \fB2\fR. The default \fInum\fR is  \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Print \fIfiles\fR using point size \fInum\fR. When printing in landscape mode
 \fInum\fR is scaled by a factor that depends on the imaging area of the device.
 The default size for portrait mode is  \fB10\fR. Note that increasing point
@@ -150,24 +132,20 @@ use the \fB\(mil0\fR option to scale the number of lines per page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Assume tabs are set every \fInum\fR columns, starting with the first column. By
 default, tabs are set every  \fB8\fR columns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Translate the origin \fInum\fR inches along the positive x axis. The default
 coordinate system has the origin fixed near the upper left corner of the page,
 with positive x to the right and positive y down the page. Positive \fInum\fR
@@ -176,12 +154,10 @@ moves everything to the right. The default offset is  \fB0.25\fR inches.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fI num\fR\fR
 .ad
 .RS 11n
-.rt  
 Translate the origin \fInum\fR inches along the positive y axis. Positive
 \fInum\fR moves text up the page. The default offset is  \fB\(mi0.25\fR inches.
 .RE
@@ -226,30 +202,25 @@ To print three logical pages on each physical page in portrait mode:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp/postscript/forms.ps\fR\fR
 .ad
@@ -260,7 +231,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lp/postscript/ps.requests\fR\fR
 .ad

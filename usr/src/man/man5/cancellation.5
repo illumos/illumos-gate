@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cancellation 5 "4 Oct 2005" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH CANCELLATION 5 "Oct 4, 2005"
 .SH NAME
 cancellation \- overview of concepts related to POSIX thread cancellation
 .SH DESCRIPTION
@@ -18,20 +18,19 @@ cancellation \- overview of concepts related to POSIX thread cancellation
 
 .sp
 .TS
-tab() box;
-cw(2.18i) |cw(3.32i) 
-lw(2.18i) |lw(3.32i) 
-.
-FUNCTIONACTION
+box;
+c | c
+l | l .
+FUNCTION	ACTION
 _
-\fBpthread_cancel()\fRCancels thread execution.
-\fBpthread_setcancelstate()\fRSets the cancellation \fIstate\fR of a thread.
-\fBpthread_setcanceltype()\fRSets the cancellation \fItype\fR of a thread.
-\fBpthread_testcancel()\fRT{
+\fBpthread_cancel()\fR	Cancels thread execution.
+\fBpthread_setcancelstate()\fR	Sets the cancellation \fIstate\fR of a thread.
+\fBpthread_setcanceltype()\fR	Sets the cancellation \fItype\fR of a thread.
+\fBpthread_testcancel()\fR	T{
 Creates a cancellation point in the calling thread.
 T}
-\fBpthread_cleanup_push()\fRPushes a cleanup handler routine.
-\fBpthread_cleanup_pop()\fRPops a cleanup handler routine.
+\fBpthread_cleanup_push()\fR	Pushes a cleanup handler routine.
+\fBpthread_cleanup_pop()\fR	Pops a cleanup handler routine.
 .TE
 
 .SS "Cancellation"
@@ -227,22 +226,21 @@ at absolutely every point in the program.
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-.
+box;
+c | c | c
+l | l | l .
 Cancellation Type/State Table
-TypeState
-Enabled (Default)Disabled
+Type	State
+	Enabled (Default)	Disabled
 _
-Deferred (Default)T{
+Deferred (Default)	T{
 Cancellation occurs when the target thread reaches a cancellation point and a cancel is pending. (Default)
-T}T{
+T}	T{
 All cancellation requests to the target thread are held pending.
 T}
-AsynchronousT{
+Asynchronous	T{
 Receipt of a \fBpthread_cancel()\fR call causes immediate cancellation.
-T}T{
+T}	T{
 All cancellation requests to the target thread are held pending; as soon as cancellation is re-enabled, pending cancellations are executedimmediately.
 T}
 .TE
@@ -321,23 +319,23 @@ the  process (since it is the last thread in the process).
 .nf
 #include <pthread.h>
 #include <sched.h>
-extern "C" void thr_yield(void); 
- 
+extern "C" void thr_yield(void);
+
 extern "C" void printf(...);
- 
+
 struct X {
-        int x;   
+        int x;
         X(int i){x = i; printf("X(%d) constructed.\en", i);}
         ~X(){ printf("X(%d) destroyed.\en", x);}
 };
- 
+
 void
 free_res(void *i)
 {
         printf("Freeing `%d`\en",i);
 }
 
-char* f2(int i)  
+char* f2(int i)
 {
         try {
         X dummy(i);
@@ -346,8 +344,8 @@ char* f2(int i)
                pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
             pthread_testcancel();
         }
-        f2(i+1); 
-        pthread_cleanup_pop(0);  
+        f2(i+1);
+        pthread_cleanup_pop(0);
         }
         catch (int) {
         printf("Error: In handler.\en");
@@ -355,7 +353,7 @@ char* f2(int i)
         return "f2";
 }
 
-void *   
+void *
 thread2(void *tid)
 {
         void *sts;
@@ -363,14 +361,14 @@ thread2(void *tid)
         printf("I am new thread :%d\en", pthread_self());
 
         pthread_cancel((pthread_t)tid);
- 
+
         pthread_join((pthread_t)tid, &sts);
- 
+
         printf("main thread cancelled due to %d\en", sts);
- 
+
         return (sts);
 }
- 
+
 main()
 {
         pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
@@ -389,13 +387,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

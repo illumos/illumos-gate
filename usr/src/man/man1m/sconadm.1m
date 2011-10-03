@@ -3,24 +3,24 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sconadm 1M "27 Feb 2006" "SunOS 5.11" "System Administration Commands"
+.TH SCONADM 1M "Feb 27, 2006"
 .SH NAME
 sconadm \- register system information
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/sconadm\fR register \fB-a\fR 
-     [\fB-e\fR softwareUpdate | \fB-E\fR softwareUpdate] 
-     [\fB-h\fR \fIhostname\fR] [\fB-l\fR \fIlogfile\fR] [\fB-N\fR] 
-     [\fB-p\fR \fIproxy_host\fR[:\fIproxy_port\fR]] 
-     [\fB-r\fR \fIregistration_profile\fR] [\fB-u\fR \fIusername\fR] 
+\fB/usr/sbin/sconadm\fR register \fB-a\fR
+     [\fB-e\fR softwareUpdate | \fB-E\fR softwareUpdate]
+     [\fB-h\fR \fIhostname\fR] [\fB-l\fR \fIlogfile\fR] [\fB-N\fR]
+     [\fB-p\fR \fIproxy_host\fR[:\fIproxy_port\fR]]
+     [\fB-r\fR \fIregistration_profile\fR] [\fB-u\fR \fIusername\fR]
      [\fB-x\fR \fIproxy_username\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/sconadm\fR proxy [\fB-l\fR \fIlogfile\fR] 
-     [\fB-p\fR \fIproxy_host\fR[:\fIproxy_port\fR]] 
+\fB/usr/sbin/sconadm\fR proxy [\fB-l\fR \fIlogfile\fR]
+     [\fB-p\fR \fIproxy_host\fR[:\fIproxy_port\fR]]
      [\fB-r\fR \fIregistration_profile\fR] [\fB-x\fR \fIproxy_username\fR]
 .fi
 
@@ -51,113 +51,93 @@ part of a listing of processes on a system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 30n
-.rt  
 Accept "Terms of Use and Binary Code License". Absence of this option means
 that you do not accept the license.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR softwareUpdate\fR
 .ad
 .RS 30n
-.rt  
 Enable client to be managed at the Sun-hosted Update Connection Service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR softwareUpdate\fR
 .ad
 .RS 30n
-.rt  
 Disable client's ability to be managed at the Sun-hosted Update Connection
 Service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhostname\fR\fR
 .ad
 .RS 30n
-.rt  
 Hostname of the machine you want to register.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlogfile\fR\fR
 .ad
 .RS 30n
-.rt  
 Pathname of log file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
 .RS 30n
-.rt  
 Never register.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproxy_host\fR[:\fIproxy_port\fR]\fR
 .ad
 .RS 30n
-.rt  
 Proxy host name and optional proxy port number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIregistration_profile\fR\fR
 .ad
 .RS 30n
-.rt  
 Pathname to a registration profile.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIusername\fR\fR
 .ad
 .RS 30n
-.rt  
 User name (a Sun Online Account).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIproxy_username\fR\fR
 .ad
 .RS 30n
-.rt  
 User name on the proxy host.
 .RE
 
@@ -441,30 +421,25 @@ Run the command:
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/breg/data/RegistrationProfile.properties\fR\fR
 .ad
@@ -481,13 +456,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

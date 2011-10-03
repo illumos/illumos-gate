@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldap 1 "28 Aug 2006" "SunOS 5.11" "User Commands"
+.TH LDAP 1 "Aug 28, 2006"
 .SH NAME
 ldap \- LDAP as a naming repository
 .SH DESCRIPTION
@@ -77,52 +77,51 @@ the use of \fBserviceSearchDescriptors\fR. For more information, see
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-.
-DatabaseObject ClassContainer
+box;
+c | c | c
+l | l | l .
+Database	Object Class	Container
 _
-passwdposixAccountou=people,dc=... 
-shadowAccount
+passwd	posixAccount	ou=people,dc=...
+	shadowAccount	
 _
-groupposixGroupou=Group,dc=...
+group	posixGroup	ou=Group,dc=...
 _
-servicesipServiceou=Services,dc=...
+services	ipService	ou=Services,dc=...
 _
-protocolsipProtocolou=Protocols,dc=...
+protocols	ipProtocol	ou=Protocols,dc=...
 _
-rpconcRpcou=Rpc,dc=...
+rpc	oncRpc	ou=Rpc,dc=...
 _
-hostsipHostou=Hosts,dc=...
-ipnodesipHostou=Hosts,dc=...
+hosts	ipHost	ou=Hosts,dc=...
+ipnodes	ipHost	ou=Hosts,dc=...
 _
-ethersieee802Deviceou=Ethers,dc=...
+ethers	ieee802Device	ou=Ethers,dc=...
 _
-bootparamsbootableDeviceou=Ethers,dc=...
+bootparams	bootableDevice	ou=Ethers,dc=...
 _
-networksipNetworkou=Networks,dc=...
-netmasksipNetwork ou=Networks,dc=... 
+networks	ipNetwork	ou=Networks,dc=...
+netmasks	ipNetwork 	ou=Networks,dc=...
 _
-netgroupnisNetgroupou=Netgroup,dc=...
+netgroup	nisNetgroup	ou=Netgroup,dc=...
 _
-aliasesmailGroupou=Aliases,dc=...
+aliases	mailGroup	ou=Aliases,dc=...
 _
-publickeynisKeyObject 
+publickey	nisKeyObject 	
 _
-genericnisObjectnisMapName=...,dc=...
+generic	nisObject	nisMapName=...,dc=...
 _
-printersprinterServiceou=Printers,dc=... 
+printers	printerService	ou=Printers,dc=...
 _
-auth_attrSolarisAuthAttrou=SolarisAuthAttr,dc=...
+auth_attr	SolarisAuthAttr	ou=SolarisAuthAttr,dc=...
 _
-prof_attrSolarisProfAttrou=SolarisProfAttr,dc=...
+prof_attr	SolarisProfAttr	ou=SolarisProfAttr,dc=...
 _
-exec_attrSolarisExecAttrou=SolarisProfAttr,dc=...
+exec_attr	SolarisExecAttr	ou=SolarisProfAttr,dc=...
 _
-user_attrSolarisUserAttrou=people,dc=...
+user_attr	SolarisUserAttr	ou=people,dc=...
 _
-audit_userSolarisAuditUserou=people,dc=...
+audit_user	SolarisAuditUser	ou=people,dc=...
 .TE
 
 .sp
@@ -222,53 +221,44 @@ different databases in the \fBnsswitch.conf\fR file.
 The following is a list of the user commands related to LDAP:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidsconfig\fR(1M)\fR
 .ad
 .RS 18n
-.rt  
 Prepares a SunOne Directory Server to be ready to support Solaris LDAP clients.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldapaddent\fR(1M)\fR
 .ad
 .RS 18n
-.rt  
 Creates LDAP entries from corresponding \fB/etc\fR files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldapclient\fR(1M)\fR
 .ad
 .RS 18n
-.rt  
 Initializes LDAP clients, or generates a configuration profile to be stored in
 the directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldaplist\fR(1)\fR
 .ad
 .RS 18n
-.rt  
 Lists the contents of the LDAP naming space.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ldap/ldap_client_cred\fR\fR
 .ad
@@ -277,7 +267,6 @@ Lists the contents of the LDAP naming space.
 \fB\fB/var/ldap/ldap_client_file\fR\fR
 .ad
 .RS 30n
-.rt  
 Files that contain the LDAP configuration of the client. Do not manually modify
 these files. Their content is not guaranteed to be human readable. Use
 \fBldapclient\fR(1M) to update them.
@@ -285,35 +274,29 @@ these files. Their content is not guaranteed to be human readable. Use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 30n
-.rt  
 Configuration file for the name-service switch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.ldap\fR\fR
 .ad
 .RS 30n
-.rt  
 Sample configuration file for the name-service switch configured with LDAP and
 files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/pam.conf\fR\fR
 .ad
 .RS 30n
-.rt  
 PAM framework configuration file.
 .RE
 

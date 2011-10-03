@@ -9,22 +9,28 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 include ../../Makefile.master
 
 MANSECT = 	3
 
-MANSOFILES =	intro.3
+MANSOFILES =	intro.3 \
+		libwrap.3
+
 MANFILES = 	Intro.3 \
+		hosts_access.3 \
 		$(MANSOFILES)
 
-intro.3 := SOSRC = man3/Intro.3
+intro.3		:= SOSRC = man3/Intro.3
+
+libwrap.3	:= SOSRC = man3/hosts_access.3
 
 .KEEP_STATE:
 
 include ../Makefile.man
 
 install: $(ROOTMANFILES)
-
-

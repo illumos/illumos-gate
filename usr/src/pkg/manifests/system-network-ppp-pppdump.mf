@@ -34,7 +34,7 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/inet
 dir path=usr/lib/inet/ppp
-dir path=usr/share group=sys
+dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man1m
 file path=usr/bin/pppdump mode=0555

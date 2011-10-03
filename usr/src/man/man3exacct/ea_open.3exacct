@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ea_open 3EXACCT "29 Nov 2001" "SunOS 5.11" "Extended Accounting File Access Library Functions"
+.TH EA_OPEN 3EXACCT "Nov 29, 2001"
 .SH NAME
 ea_open, ea_close \- open or close exacct files
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ] 
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <exacct.h>
 
 \fBint\fR \fBea_open\fR(\fBea_file_t *\fR\fIef\fR, \fBchar *\fR\fIname\fR, \fBchar *\fR\fIcreator\fR, \fBint\fR \fIaflags\fR,
@@ -54,12 +54,10 @@ return the extended accounting error value describing the error.
 The \fBea_open()\fR and \fBea_close()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_SYSCALL_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 A system call invoked by the function failed. The \fBerrno\fR variable contains
 the error value set by the underlying call.
 .RE
@@ -69,23 +67,19 @@ the error value set by the underlying call.
 The \fBea_open()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_CORRUPT_FILE\fR\fR
 .ad
 .RS 20n
-.rt  
 The file referred to by \fIname\fR is not a valid \fBexacct\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_NO_CREATOR\fR\fR
 .ad
 .RS 20n
-.rt  
 In the case of file creation, the \fIcreator\fR argument was \fINULL\fR.  In
 the case of opening an existing file, a \fIcreator\fR argument was not NULL and
 does not match the \fIcreator\fR item of the \fBexacct\fR file.
@@ -93,12 +87,10 @@ does not match the \fIcreator\fR item of the \fBexacct\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_UNKN_VERSION\fR\fR
 .ad
 .RS 20n
-.rt  
 The file referred to by \fIname\fR uses an \fBexacct\fR file version that
 cannot be processed by this library.
 .RE
@@ -139,15 +131,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.46i) |cw(3.04i) 
-lw(2.46i) |lw(3.04i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

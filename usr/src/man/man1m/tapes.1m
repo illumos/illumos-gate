@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tapes 1M "8 Nov 2002" "SunOS 5.11" "System Administration Commands"
+.TH TAPES 1M "Nov 8, 2002"
 .SH NAME
 tapes \- creates /dev entries for tape drives attached to the system
 .SH SYNOPSIS
@@ -102,12 +102,10 @@ node type string \fBDDI_NT_TAPE\fR when calling\fBddi_create_minor_node\fR(9F).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIroot_dir\fR\fR
 .ad
 .RS 15n
-.rt  
 Causes \fBtapes\fR to presume that the \fB/dev/rmt\fR directory tree is found
 under \fIroot_dir\fR, not directly under \fB/\fR.
 .RE
@@ -137,10 +135,10 @@ This example demonstrates creating tape device nodes from within the
 struct tape_minor_info {
     char *minor_name;
     int   minor_mode;
-}; 
-/*  
+};
+/*
  * create all combinations of logical tapes
-*/ 
+*/
 static struct tape_minor_info example_tape[] = {
    {"",    0},                     /* default tape */
    {"l",   MT_DENSITY1},
@@ -155,10 +153,10 @@ static struct tape_minor_info example_tape[] = {
    {"c",   MT_DENSITY4},
    {"cb",  MT_DENSITY4 | MT_BSD},
    {"cbn", MT_DENSITY4| MT_BSD | MT_NOREWIND},
-   {NULL,  0}, 
-};   
+   {NULL,  0},
+};
 
-int 
+int
 xktapeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
    int instance;
@@ -169,7 +167,7 @@ xktapeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
    for (mdp = example_tape; mdp->minor_name != NULL; mdp++) {
             ddi_create_minor_node(dip, mdp->minor_name, S_IFCHR,
                  (MTMINOR(instance) | mdp->minor_mode), DDI_NT_TAPE, 0);
- } 
+ }
 .fi
 .in -2
 
@@ -242,23 +240,19 @@ devices in \fB/devices\fR).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt/*\fR\fR
 .ad
 .RS 14n
-.rt  
 logical tape devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/devices/*\fR\fR
 .ad
 .RS 14n
-.rt  
 tape device nodes
 .RE
 

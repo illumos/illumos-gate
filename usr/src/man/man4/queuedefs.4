@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH queuedefs 4 "1 Mar 1994" "SunOS 5.11" "File Formats"
+.TH QUEUEDEFS 4 "Mar 1, 1994"
 .SH NAME
 queuedefs \- queue description file for at, batch, and cron
 .SH SYNOPSIS
@@ -26,12 +26,10 @@ format of the lines are as follows:
 The fields in this line are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIq\fR\fR
 .ad
 .RS 9n
-.rt  
 The name of the queue. \fBa\fR is the default queue for jobs started by
 \fBat\fR(1); \fBb\fR is the default queue for jobs started by \fBbatch\fR (see
 \fBat\fR(1)); \fBc\fR is the default queue for jobs run from a \fBcrontab\fR(1)
@@ -40,12 +38,10 @@ file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInjob\fR\fR
 .ad
 .RS 9n
-.rt  
 The maximum number of jobs that can be run simultaneously in that queue; if
 more than \fInjob\fR jobs are ready to run, only the first \fInjob\fR jobs will
 be run, and the others will be run as jobs that are currently running
@@ -54,24 +50,20 @@ terminate.  The default value is  \fB100\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnice\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fBnice\fR(1) value to give to all jobs in that queue that are not run with
 a user \fBID\fR of super-user.  The default value is \fB2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInwait\fR\fR
 .ad
 .RS 9n
-.rt  
 The number of seconds to wait before rescheduling a job that was deferred
 because more than \fInjob\fR jobs were running in that job's queue, or because
 the system-wide limit of jobs executing has been reached.  The default value is
@@ -116,12 +108,10 @@ will wait 60 seconds before trying again to run it.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cron.d/queuedefs\fR\fR
 .ad
 .RS 25n
-.rt  
 queue description file for  \fBat\fR, \fBbatch\fR, and  \fBcron\fR.
 .RE
 

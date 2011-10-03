@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH au_preselect 3BSM "31 Mar 2005" "SunOS 5.11" "Security and Auditing Library Functions"
+.TH AU_PRESELECT 3BSM "Mar 31, 2005"
 .SH NAME
 au_preselect \- preselect an audit event
 .SH SYNOPSIS
@@ -36,34 +36,28 @@ by \fImask_p\fR.
 The following are the valid values of \fIsorf\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAU_PRS_SUCCESS\fR\fR
 .ad
 .RS 18n
-.rt  
 Compare the event class with the success portion of the preselection mask.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAU_PRS_FAILURE\fR\fR
 .ad
 .RS 18n
-.rt  
 Compare the event class with the failure portion of the preselection mask.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAU_PRS_BOTH\fR\fR
 .ad
 .RS 18n
-.rt  
 Compare the event class with both the success and failure portions of the
 preselection mask.
 .RE
@@ -78,23 +72,19 @@ value of \fIflag\fR determines where \fBau_preselect()\fR obtains audit event
 information. The following are the valid values of \fIflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAU_PRS_REREAD\fR\fR
 .ad
 .RS 19n
-.rt  
 Get audit event information by searching the \fBaudit_event\fR(4) database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAU_PRS_USECACHE\fR\fR
 .ad
 .RS 19n
-.rt  
 Get audit event information from internal cache created upon the initial
 invocation. This option is much faster.
 .RE
@@ -109,23 +99,19 @@ database, \(mi1 is returned.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_class\fR\fR
 .ad
 .RS 29n
-.rt  
 file mapping audit class number to audit class names and descriptions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_event\fR\fR
 .ad
 .RS 29n
-.rt  
 file mappint audit even number to audit event names and associates
 .RE
 
@@ -137,15 +123,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

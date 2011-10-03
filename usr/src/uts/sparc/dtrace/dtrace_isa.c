@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/dtrace_impl.h>
 #include <sys/atomic.h>

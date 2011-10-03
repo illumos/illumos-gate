@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 1995 IEEE.  All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH signal.h 3HEAD "5 Feb 2008" "SunOS 5.11" "Headers"
+.TH SIGNAL.H 3HEAD "Feb 5, 2008"
 .SH NAME
 signal.h, signal \- base signals
 .SH SYNOPSIS
@@ -123,64 +123,62 @@ The signals currently defined by <\fBsignal.h\fR> are as follows:
 
 .sp
 .TS
-tab();
-cw(1.38i) cw(.49i) cw(.86i) cw(2.78i) 
-lw(1.38i) lw(.49i) lw(.86i) lw(2.78i) 
-.
-NameValueDefaultEvent
-\fBSIGHUP\fR1ExitHangup (see \fBtermio\fR(7I)) 
-\fBSIGINT\fR2ExitInterrupt (see \fBtermio\fR(7I)) 
-\fBSIGQUIT\fR3CoreQuit (see \fBtermio\fR(7I)) 
-\fBSIGILL\fR4CoreIllegal Instruction
-\fBSIGTRAP\fR5CoreTrace or Breakpoint Trap
-\fBSIGABRT\fR6CoreAbort
-\fBSIGEMT\fR7CoreEmulation Trap
-\fBSIGFPE\fR8CoreArithmetic Exception
-\fBSIGKILL\fR9ExitKilled
-\fBSIGBUS\fR10CoreBus Error
-\fBSIGSEGV\fR11CoreSegmentation Fault
-\fBSIGSYS\fR12CoreBad System Call
-\fBSIGPIPE\fR13ExitBroken Pipe
-\fBSIGALRM\fR14ExitAlarm Clock
-\fBSIGTERM\fR15ExitTerminated
-\fBSIGUSR1\fR16ExitUser Signal 1
-\fBSIGUSR2\fR17ExitUser Signal 2
-\fBSIGCHLD\fR18IgnoreChild Status Changed
-\fBSIGPWR\fR19IgnorePower Fail or Restart
-\fBSIGWINCH\fR20IgnoreWindow Size Change
-\fBSIGURG\fR21IgnoreUrgent Socket Condition
-\fBSIGPOLL\fR22ExitPollable Event (see \fBstreamio\fR(7I)) 
-\fBSIGSTOP\fR23StopStopped (signal)
-\fBSIGTSTP\fR24StopStopped (user) (see \fBtermio\fR(7I)) 
-\fBSIGCONT\fR25IgnoreContinued
-\fBSIGTTIN\fR26StopStopped (tty input) (see \fBtermio\fR(7I)) 
-\fBSIGTTOU\fR27StopStopped (tty output) (see \fBtermio\fR(7I)) 
-\fBSIGVTALRM\fR28ExitVirtual Timer Expired
-\fBSIGPROF\fR29ExitProfiling Timer Expired
-\fBSIGXCPU\fR30CoreT{
-CPU time limit exceeded (see \fBgetrlimit\fR(2)) 
+c c c c
+l l l l .
+Name	Value	Default	Event
+\fBSIGHUP\fR	1	Exit	Hangup (see \fBtermio\fR(7I))
+\fBSIGINT\fR	2	Exit	Interrupt (see \fBtermio\fR(7I))
+\fBSIGQUIT\fR	3	Core	Quit (see \fBtermio\fR(7I))
+\fBSIGILL\fR	4	Core	Illegal Instruction
+\fBSIGTRAP\fR	5	Core	Trace or Breakpoint Trap
+\fBSIGABRT\fR	6	Core	Abort
+\fBSIGEMT\fR	7	Core	Emulation Trap
+\fBSIGFPE\fR	8	Core	Arithmetic Exception
+\fBSIGKILL\fR	9	Exit	Killed
+\fBSIGBUS\fR	10	Core	Bus Error
+\fBSIGSEGV\fR	11	Core	Segmentation Fault
+\fBSIGSYS\fR	12	Core	Bad System Call
+\fBSIGPIPE\fR	13	Exit	Broken Pipe
+\fBSIGALRM\fR	14	Exit	Alarm Clock
+\fBSIGTERM\fR	15	Exit	Terminated
+\fBSIGUSR1\fR	16	Exit	User Signal 1
+\fBSIGUSR2\fR	17	Exit	User Signal 2
+\fBSIGCHLD\fR	18	Ignore	Child Status Changed
+\fBSIGPWR\fR	19	Ignore	Power Fail or Restart
+\fBSIGWINCH\fR	20	Ignore	Window Size Change
+\fBSIGURG\fR	21	Ignore	Urgent Socket Condition
+\fBSIGPOLL\fR	22	Exit	Pollable Event (see \fBstreamio\fR(7I))
+\fBSIGSTOP\fR	23	Stop	Stopped (signal)
+\fBSIGTSTP\fR	24	Stop	Stopped (user) (see \fBtermio\fR(7I))
+\fBSIGCONT\fR	25	Ignore	Continued
+\fBSIGTTIN\fR	26	Stop	Stopped (tty input) (see \fBtermio\fR(7I))
+\fBSIGTTOU\fR	27	Stop	Stopped (tty output) (see \fBtermio\fR(7I))
+\fBSIGVTALRM\fR	28	Exit	Virtual Timer Expired
+\fBSIGPROF\fR	29	Exit	Profiling Timer Expired
+\fBSIGXCPU\fR	30	Core	T{
+CPU time limit exceeded (see \fBgetrlimit\fR(2))
 T}
-\fBSIGXFSZ\fR31CoreT{
-File size limit exceeded (see \fBgetrlimit\fR(2)) 
+\fBSIGXFSZ\fR	31	Core	T{
+File size limit exceeded (see \fBgetrlimit\fR(2))
 T}
-\fBSIGWAITING\fR32IgnoreReserved
-\fBSIGLWP\fR33IgnoreReserved
-\fBSIGFREEZE\fR34IgnoreCheck point Freeze
-\fBSIGTHAW\fR35IgnoreCheck point Thaw
-\fBSIGCANCEL\fR36IgnoreReserved for threading support
-\fBSIGLOST\fR37ExitT{
-Resource lost (for example, record-lock lost) 
+\fBSIGWAITING\fR	32	Ignore	Reserved
+\fBSIGLWP\fR	33	Ignore	Reserved
+\fBSIGFREEZE\fR	34	Ignore	Check point Freeze
+\fBSIGTHAW\fR	35	Ignore	Check point Thaw
+\fBSIGCANCEL\fR	36	Ignore	Reserved for threading support
+\fBSIGLOST\fR	37	Exit	T{
+Resource lost (for example, record-lock lost)
 T}
-\fBSIGXRES\fR38IgnoreT{
+\fBSIGXRES\fR	38	Ignore	T{
 Resource control exceeded (see \fBsetrctl\fR(2))
 T}
-\fBSIGJVM1\fR39IgnoreReserved for Java Virtual Machine 1
-\fBSIGJVM2\fR40IgnoreReserved for Java Virtual Machine 2
-\fBSIGRTMIN\fR\fB*\fRExitFirst real time signal
-(\fBSIGRTMIN\fR+1)*ExitSecond real time signal
-\fB\|.\|.\|.\fR
-(\fBSIGRTMAX\fR-1)*ExitSecond-to-last real time signal
-\fBSIGRTMAX\fR\fB*\fRExitLast real time signal 
+\fBSIGJVM1\fR	39	Ignore	Reserved for Java Virtual Machine 1
+\fBSIGJVM2\fR	40	Ignore	Reserved for Java Virtual Machine 2
+\fBSIGRTMIN\fR	\fB*\fR	Exit	First real time signal
+(\fBSIGRTMIN\fR+1)	*	Exit	Second real time signal
+\fB\|.\|.\|.\fR			
+(\fBSIGRTMAX\fR-1)	*	Exit	Second-to-last real time signal
+\fBSIGRTMAX\fR	\fB*\fR	Exit	Last real time signal
 .TE
 
 .sp
@@ -205,24 +203,20 @@ action for each signal is listed in the table above and is selected from the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fBExit\fR
 .ad
 .RS 10n
-.rt  
 When it gets the signal, the receiving process is to be terminated with all the
 consequences outlined in \fBexit\fR(2).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCore\fR
 .ad
 .RS 10n
-.rt  
 When it gets the signal, the receiving process is to be terminated with all the
 consequences outlined in \fBexit\fR(2). In addition, a ``core image'' of the
 process is constructed in the  current working directory.
@@ -230,24 +224,20 @@ process is constructed in the  current working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBStop\fR
 .ad
 .RS 10n
-.rt  
 When it gets the signal, the receiving process is to stop. When a process is
 stopped, all the threads within the process also stop executing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBIgnore\fR
 .ad
 .RS 10n
-.rt  
 When it gets the signal, the receiving process is to ignore it. This is
 identical to setting the disposition to \fBSIG_IGN\fR.
 .RE
@@ -298,20 +288,18 @@ defined value, either explicitly as a parameter to the function, or in a
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-TypeNameDescription
+c c c
+l l l .
+Type	Name	Description
 _
-\fBint\fR\fBsigev_notify\fRNotification type
-\fBint\fR\fBsigev_signo\fRSignal number
+\fBint\fR	\fBsigev_notify\fR	Notification type
+\fBint\fR	\fBsigev_signo\fR	Signal number
 _
-\fBunion sigval\fR\fBsigev_value\fRSignal value
+\fBunion sigval\fR	\fBsigev_value\fR	Signal value
 _
-\fBvoid(*)(union sigval)\fR\fBsigev_notify_function\fRNotification function
+\fBvoid(*)(union sigval)\fR	\fBsigev_notify_function\fR	Notification function
 _
-\fB(pthread_attr_t *)\fR\fBsigev_notify_attributes\fRNotification attributes
+\fB(pthread_attr_t *)\fR	\fBsigev_notify_attributes\fR	Notification attributes
 .TE
 
 .sp
@@ -322,14 +310,12 @@ following members:
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-TypeNameDescription
+c c c
+l l l .
+Type	Name	Description
 _
-\fBint\fR\fBsival_int\fRInteger signal value
-\fBvoid *\fR\fBsival_ptr\fRPointer signal value
+\fBint\fR	\fBsival_int\fR	Integer signal value
+\fBvoid *\fR	\fBsival_ptr\fR	Pointer signal value
 .TE
 
 .sp
@@ -339,35 +325,29 @@ an asynchronous event occurs. The \fBsigev_notify\fR member may be defined with
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGEV_NONE\fR\fR
 .ad
 .RS 16n
-.rt  
 No asynchronous notification is delivered when the event of interest occurs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGEV_SIGNAL\fR\fR
 .ad
 .RS 16n
-.rt  
 A queued signal, with its value equal to \fBsigev_signo\fR, is generated when
 the event of interest occurs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGEV_THREAD\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBsigev_notify_function\fR is called, with \fBsigev_value\fR as its
 argument, to perform notification when the asynchronous event occurs. The
 function is executed in an environment as if it were the start routine for a
@@ -380,12 +360,10 @@ blockable signals blocked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGEV_PORT\fR\fR
 .ad
 .RS 16n
-.rt  
 An asynchronous notification is delivered to an event port when the event of
 interest occurs. The \fBsigev_value.sival_ptr\fR member points to a
 \fBport_notify_t\fR structure defined in <\fBport.h\fR> (see
@@ -431,15 +409,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

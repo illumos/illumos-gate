@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpcbind 1M "1 Aug 2006" "SunOS 5.11" "System Administration Commands"
+.TH RPCBIND 1M "Aug 1, 2006"
 .SH NAME
 rpcbind \- universal addresses to RPC program number mapper
 .SH SYNOPSIS
@@ -83,12 +83,10 @@ The FMRI \fBsvc:network/rpc/bind\fR property group \fBconfig\fR contains the
 following property settings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable_tcpwrappers\fR\fR
 .ad
 .RS 22n
-.rt  
 Specifies that the TCP wrappers facility is used to control access to TCP
 services. The value \fBtrue\fR enables checking. The default value for
 \fBenable_tcpwrappers\fR is \fBfalse\fR. If the \fBenable_tcpwrappers\fR
@@ -105,12 +103,10 @@ by Sun, intrarelease incompatibilities are not uncommon. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose_logging\fR\fR
 .ad
 .RS 22n
-.rt  
 Specifies whether the TCP wrappers facility logs all calls orjust the denied
 calls. The default is \fBfalse\fR. This option has no effect if TCP wrappers
 are not enabled.
@@ -118,12 +114,10 @@ are not enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow_indirect\fR\fR
 .ad
 .RS 22n
-.rt  
 Specifies whether \fBrpcbind\fR allows indirect calls at all. By default,
 \fBrpcbind\fR allows most indirect calls, except to a number of standard
 services(\fBkeyserv\fR, \fBautomount\fR, \fBmount\fR, \fBnfs\fR, \fBrquota\fR,
@@ -138,12 +132,10 @@ NIS broadcast clients rely on this functionality on NIS servers.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Run in debug mode. In this mode, \fBrpcbind\fR does not fork when it starts. It
 prints additional information during operation, and aborts on certain errors.
 With this option, the name-to-address translation consistency checks are shown
@@ -152,12 +144,10 @@ in detail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 6n
-.rt  
 Do a warm start. If \fBrpcbind\fR aborts or terminates on \fBSIGINT\fR or
 \fB\fR\fBSIGTERM\fR, it writes the current list of registered services to
 \fB/var/run/portmap.file\fR and \fB/var/run/rpcbind.file\fR. Starting
@@ -185,24 +175,20 @@ The following sequence of commands allows remote access to \fBrpcbind\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/portmap.file\fR\fR
 .ad
 .RS 25n
-.rt  
 Stores the information for \fBRPC\fR services registered over IP based
 transports for warm start purposes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/rpcbind.file\fR\fR
 .ad
 .RS 25n
-.rt  
 Stores the information for all registered \fBRPC\fR services for warm start
 purposes.
 .RE
@@ -215,13 +201,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

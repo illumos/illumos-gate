@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dladm 1M "8 Mar 2011" "SunOS 5.11" "System Administration Commands"
+.TH DLADM 1M "Sep 23, 2009"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
@@ -27,12 +27,12 @@ dladm \- administer data links
 
 .LP
 .nf
-\fBdladm create-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-P\fR \fIpolicy\fR] [\fB-L\fR \fImode\fR] 
+\fBdladm create-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-P\fR \fIpolicy\fR] [\fB-L\fR \fImode\fR]
      [\fB-T\fR \fItime\fR] [\fB-u\fR \fIaddress\fR] \fB-l\fR \fIether-link1\fR [\fB-l\fR \fIether-link2\fR...] \fIaggr-link\fR
-\fBdladm modify-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-P\fR \fIpolicy\fR] [\fB-L\fR \fImode\fR] 
+\fBdladm modify-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-P\fR \fIpolicy\fR] [\fB-L\fR \fImode\fR]
      [\fB-T\fR \fItime\fR] [\fB-u\fR \fIaddress\fR] \fIaggr-link\fR
 \fBdladm delete-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fIaggr-link\fR
-\fBdladm add-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIether-link1\fR [\fB-l\fR \fIether-link2\fR...] 
+\fBdladm add-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIether-link1\fR [\fB-l\fR \fIether-link2\fR...]
      \fIaggr-link\fR
 \fBdladm remove-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIether-link1\fR [\fB-l\fR \fIether-link2\fR...]
      \fIaggr-link\fR
@@ -115,8 +115,8 @@ dladm \- administer data links
 
 .LP
 .nf
-\fBdladm create-vnic\fR [\fB-t\fR] \fB-l\fR \fIlink\fR [\fB-R\fR \fIroot-dir\fR] [\fB-m\fR \fIvalue\fR | auto | 
-     {factory \fB-n\fR \fIslot-identifier\fR]} | {random [\fB-r\fR \fIprefix\fR]}] 
+\fBdladm create-vnic\fR [\fB-t\fR] \fB-l\fR \fIlink\fR [\fB-R\fR \fIroot-dir\fR] [\fB-m\fR \fIvalue\fR | auto |
+     {factory \fB-n\fR \fIslot-identifier\fR]} | {random [\fB-r\fR \fIprefix\fR]}]
      [\fB-v\fR \fIvlan-id\fR] [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIvnic-link\fR
 \fBdladm delete-vnic\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIvnic-link\fR
 \fBdladm show-vnic\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]]
@@ -158,7 +158,6 @@ or receive packets from a network.
 Each \fBdladm\fR subcommand operates on one of the following objects:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlink\fR\fR
 .ad
@@ -175,7 +174,6 @@ Some subcommands operate only on certain types or classes of datalinks. For
 those cases, the following object names are used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBphys-link\fR\fR
 .ad
@@ -186,7 +184,6 @@ A physical datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvlan-link\fR\fR
 .ad
@@ -197,7 +194,6 @@ A VLAN datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaggr-link\fR\fR
 .ad
@@ -208,7 +204,6 @@ An aggregation datalink (or a key; see NOTES).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBether-link\fR\fR
 .ad
@@ -219,7 +214,6 @@ A physical Ethernet datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwifi-link\fR\fR
 .ad
@@ -230,7 +224,6 @@ A WiFi datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvnic-link\fR\fR
 .ad
@@ -243,7 +236,6 @@ machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiptun-link\fR\fR
 .ad
@@ -256,7 +248,6 @@ An IP tunnel link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev\fR\fR
 .ad
@@ -268,7 +259,6 @@ number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBetherstub\fR\fR
 .ad
@@ -282,7 +272,6 @@ hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbridge\fR\fR
 .ad
@@ -299,7 +288,6 @@ name, used for observability.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsecobj\fR\fR
 .ad
@@ -318,7 +306,6 @@ Each \fBdladm\fR subcommand has its own set of options. However, many of the
 subcommands have the following as a common option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -334,7 +321,6 @@ deletion, or renaming-should apply.
 The following subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-link\fR [\fB-P\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
 [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]][\fIlink\fR]\fR
@@ -346,7 +332,6 @@ datalinks or for the specified link \fIlink\fR. By default, the system is
 configured with one datalink for each known network device.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -358,7 +343,6 @@ of the fields listed below, or the special value \fBall\fR to display all
 fields. By default (without \fB-o\fR), \fBshow-link\fR displays all fields.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -369,7 +353,6 @@ The name of the datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLASS\fR\fR
 .ad
@@ -379,7 +362,6 @@ The class of the datalink. \fBdladm\fR distinguishes between the following
 classes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBphys\fR\fR
 .ad
@@ -391,7 +373,6 @@ this class of datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaggr\fR\fR
 .ad
@@ -403,7 +384,6 @@ detail for this class of datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvlan\fR\fR
 .ad
@@ -415,7 +395,6 @@ class of datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvnic\fR\fR
 .ad
@@ -429,7 +408,6 @@ detail for this class of datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMTU\fR\fR
 .ad
@@ -440,7 +418,6 @@ The maximum transmission unit size for the datalink being displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -452,7 +429,6 @@ The link state of the datalink. The state can be \fBup\fR, \fBdown\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBRIDGE\fR\fR
 .ad
@@ -463,7 +439,6 @@ The name of the bridge to which this link is assigned, if any.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOVER\fR\fR
 .ad
@@ -480,7 +455,6 @@ to display link statistics, the field name must be one of the fields listed
 below, or the special value \fBall\fR to display all fields
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -491,7 +465,6 @@ The name of the datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPACKETS\fR\fR
 .ad
@@ -502,7 +475,6 @@ Number of packets received on this link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRBYTES\fR\fR
 .ad
@@ -513,7 +485,6 @@ Number of bytes received on this link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIERRORS\fR\fR
 .ad
@@ -524,7 +495,6 @@ Number of input errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPACKETS\fR\fR
 .ad
@@ -535,7 +505,6 @@ Number of packets sent on this link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOBYTES\fR\fR
 .ad
@@ -546,7 +515,6 @@ Number of bytes received on this link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOERRORS\fR\fR
 .ad
@@ -559,7 +527,6 @@ Number of output errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -571,7 +538,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -582,7 +548,6 @@ Display the persistent link configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--statistics\fR\fR
 .ad
@@ -593,7 +558,6 @@ Display link statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval\fR, \fB--interval\fR=\fIinterval\fR\fR
 .ad
@@ -608,7 +572,6 @@ will be displayed only once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIlink\fR \fInew-link\fR\fR
 .ad
@@ -620,7 +583,6 @@ removed device with a new device. See the \fBEXAMPLES\fR section for specific
 examples of how this subcommand is used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -644,7 +606,6 @@ A link assigned to a zone can only be renamed while the zone is in the ready sta
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-phys\fR \fIphys-link\fR\fR
 .ad
@@ -657,7 +618,6 @@ the \fBEXAMPLES\fR section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-phys\fR [\fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
 [\fB-H\fR] [\fIphys-link\fR]\fR
@@ -669,7 +629,6 @@ physical link. Without \fB-P\fR, only physical links that are available on the
 running system are displayed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -679,7 +638,6 @@ Show hardware resource usage, as returned by the NIC driver. Output from
 \fB-H\fR displays the following elements:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -690,7 +648,6 @@ A physical device corresponding to a NIC driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGROUP\fR\fR
 .ad
@@ -701,7 +658,6 @@ A collection of rings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGROUPTYPE\fR\fR
 .ad
@@ -712,7 +668,6 @@ RX or TX. All rings in a group are of the same group type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRINGS\fR\fR
 .ad
@@ -724,7 +679,6 @@ different groups.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLIENTS\fR\fR
 .ad
@@ -737,7 +691,6 @@ MAC clients that are using the rings within a group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR, \fB--output\fR=\fIfield\fR\fR
 .ad
@@ -748,7 +701,6 @@ name must be one of the fields listed below, or the special value \fBall\fR, to
 display all fields. For each link, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -759,7 +711,6 @@ The name of the datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEDIA\fR\fR
 .ad
@@ -770,7 +721,6 @@ The media type provided by the physical datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -781,7 +731,6 @@ The state of the link. This can be \fBup\fR, \fBdown\fR, or \fBunknown\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED\fR\fR
 .ad
@@ -792,7 +741,6 @@ The current speed of the link, in megabits per second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDUPLEX\fR\fR
 .ad
@@ -805,7 +753,6 @@ cases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVICE\fR\fR
 .ad
@@ -818,7 +765,6 @@ The name of the physical device under this link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -830,7 +776,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -847,7 +792,6 @@ used to purge the link's configuration from the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm create-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-P\fR
 \fIpolicy\fR] [\fB-L\fR \fImode\fR] [\fB-T\fR \fItime\fR] [\fB-u\fR
@@ -869,7 +813,6 @@ specify a policy, \fBcreate-aggr\fR uses the default, the L4 policy, described
 under the \fB-P\fR option.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIether-link\fR, \fB--link\fR=\fIether-link\fR\fR
 .ad
@@ -887,7 +830,6 @@ accept \fB-d\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -899,7 +841,6 @@ the next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -910,7 +851,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpolicy\fR, \fB--policy\fR=\fIpolicy\fR\fR
 .ad
@@ -926,7 +866,6 @@ policy is a list of one or more layers specifiers separated by commas. A layer
 specifier is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL2\fR\fR
 .ad
@@ -938,7 +877,6 @@ of the packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL3\fR\fR
 .ad
@@ -950,7 +888,6 @@ of the packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL4\fR\fR
 .ad
@@ -988,7 +925,6 @@ destination \fBIP\fR addresses, the following policy can be used:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fImode\fR, \fB--lacp-mode\fR=\fImode\fR\fR
 .ad
@@ -1000,7 +936,6 @@ should operate. Supported values are \fBoff\fR, \fBactive\fR or \fBpassive\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItime\fR, \fB--lacp-timer\fR=\fItime\fR\fR
 .ad
@@ -1016,7 +951,6 @@ Specifies the \fBLACP\fR timer value. The supported values are \fBshort\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIaddress\fR, \fB--unicast\fR=\fIaddress\fR\fR
 .ad
@@ -1031,7 +965,6 @@ set of addresses of the component devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm modify-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-P\fR
 \fIpolicy\fR] [\fB-L\fR \fImode\fR] [\fB-T\fR \fItime\fR] [\fB-u\fR
@@ -1042,7 +975,6 @@ set of addresses of the component devices.
 Modify the parameters of the specified aggregation.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -1054,7 +986,6 @@ the next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -1065,7 +996,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpolicy\fR, \fB--policy\fR=\fIpolicy\fR\fR
 .ad
@@ -1077,7 +1007,6 @@ traffic. See \fBdladm create-aggr\fR for a description of valid policy values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fImode\fR, \fB--lacp-mode\fR=\fImode\fR\fR
 .ad
@@ -1089,7 +1018,6 @@ should operate. Supported values are \fBoff\fR, \fBactive\fR, or \fBpassive\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItime\fR, \fB--lacp-timer\fR=\fItime\fR\fR
 .ad
@@ -1105,7 +1033,6 @@ Specifies the \fBLACP\fR timer value. The supported values are \fBshort\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIaddress\fR, \fB--unicast\fR=\fIaddress\fR\fR
 .ad
@@ -1120,7 +1047,6 @@ set of addresses of the component devices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR]
 \fIaggr-link\fR\fR
@@ -1130,7 +1056,6 @@ set of addresses of the component devices.
 Deletes the specified aggregation.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -1142,7 +1067,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -1155,7 +1079,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm add-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
 \fIether-link1\fR [\fB--link\fR=\fIether-link2\fR...] \fIaggr-link\fR\fR
@@ -1165,7 +1088,6 @@ See "Options," above.
 Adds links to the specified aggregation.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIether-link\fR, \fB--link\fR=\fIether-link\fR\fR
 .ad
@@ -1177,7 +1099,6 @@ added by supplying multiple \fB-l\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -1189,7 +1110,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -1202,7 +1122,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm remove-aggr\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
 \fIether-link1\fR [\fB--l\fR=\fIether-link2\fR...] \fIaggr-link\fR\fR
@@ -1212,7 +1131,6 @@ See "Options," above.
 Removes links from the specified aggregation.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIether-link\fR, \fB--link\fR=\fIether-link\fR\fR
 .ad
@@ -1224,7 +1142,6 @@ be added by supplying multiple \fB-l\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -1236,7 +1153,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -1249,7 +1165,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-aggr\fR [\fB-PLx\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
 [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIaggr-link\fR]\fR
@@ -1262,7 +1177,6 @@ statistics, either for all aggregations or for the specified aggregation.
 By default (with no options), the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -1273,7 +1187,6 @@ The name of the aggregation link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLICY\fR\fR
 .ad
@@ -1285,7 +1198,6 @@ for a description of the possible values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBADDRPOLICY\fR\fR
 .ad
@@ -1299,7 +1211,6 @@ a fixed MAC address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLACPACTIVITY\fR\fR
 .ad
@@ -1312,7 +1223,6 @@ or \fBpassive\fR, as set by the \fB-l\fR option to \fBcreate-aggr\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLACPTIMER\fR\fR
 .ad
@@ -1324,7 +1234,6 @@ The LACP timer value of the aggregation as set by the \fB-T\fR option of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAGS\fR\fR
 .ad
@@ -1339,7 +1248,6 @@ be defined in the future.
 The \fBshow-aggr\fR command accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR, \fB--lacp\fR\fR
 .ad
@@ -1350,7 +1258,6 @@ underlying port. Most of the state information displayed by this option is
 defined by IEEE 802.3. With this option, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -1361,7 +1268,6 @@ The name of the aggregation link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPORT\fR\fR
 .ad
@@ -1372,7 +1278,6 @@ The name of one of the underlying aggregation ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAGGREGATABLE\fR\fR
 .ad
@@ -1383,7 +1288,6 @@ Whether the port can be added to the aggregation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSYNC\fR\fR
 .ad
@@ -1395,7 +1299,6 @@ aggregation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLL\fR\fR
 .ad
@@ -1406,7 +1309,6 @@ If \fByes\fR, collection of incoming frames is enabled on the associated port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDIST\fR\fR
 .ad
@@ -1418,7 +1320,6 @@ port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEFAULTED\fR\fR
 .ad
@@ -1430,7 +1331,6 @@ received LACP data from the LACP partner).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXPIRED\fR\fR
 .ad
@@ -1443,7 +1343,6 @@ If \fByes\fR, the receive state of the port is in the \fBEXPIRED\fR state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR, \fB--extended\fR\fR
 .ad
@@ -1453,7 +1352,6 @@ Display additional aggregation information including detailed information on
 each underlying port. With \fB-x\fR, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -1464,7 +1362,6 @@ The name of the aggregation link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPORT\fR\fR
 .ad
@@ -1475,7 +1372,6 @@ The name of one of the underlying aggregation ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED\fR\fR
 .ad
@@ -1486,7 +1382,6 @@ The speed of the link or port in megabits per second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDUPLEX\fR\fR
 .ad
@@ -1499,7 +1394,6 @@ cases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -1510,7 +1404,6 @@ The link state. This can be \fBup\fR, \fBdown\fR, or \fBunknown\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBADDRESS\fR\fR
 .ad
@@ -1521,7 +1414,6 @@ The MAC address of the link or port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPORTSTATE\fR\fR
 .ad
@@ -1535,7 +1427,6 @@ or \fBattached\fR state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -1550,7 +1441,6 @@ fields listed under \fB-L\fR, above, can be used with \fB-o\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -1562,7 +1452,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -1574,7 +1463,6 @@ running system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--statistics\fR\fR
 .ad
@@ -1585,7 +1473,6 @@ Displays aggregation statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval\fR, \fB--interval\fR=\fIinterval\fR\fR
 .ad
@@ -1600,7 +1487,6 @@ will be displayed only once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm create-bridge\fR [ \fB-P\fR \fIprotect\fR] [\fB-R\fR
 \fIroot-dir\fR] [ \fB-p\fR \fIpriority\fR] [ \fB-m\fR \fImax-age\fR] [ \fB-h\fR
@@ -1618,7 +1504,6 @@ Each bridge instance is separate, and there is no forwarding connection between
 bridges.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIprotect\fR, \fB--protect\fR=\fIprotect\fR\fR
 .ad
@@ -1631,7 +1516,6 @@ RBridges. The default value is \fBstp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -1642,7 +1526,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpriority\fR, \fB--priority\fR=\fIpriority\fR\fR
 .ad
@@ -1659,7 +1542,6 @@ downward to the next lower value that is divisible by 4096.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImax-age\fR, \fB--max-age\fR=\fImax-age\fR\fR
 .ad
@@ -1675,7 +1557,6 @@ constraints.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhello-time\fR, \fB--hello-time\fR=\fIhello-time\fR\fR
 .ad
@@ -1689,7 +1570,6 @@ default value is 2 seconds. Valid values are from 1 to 10 seconds. See the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIforward-delay\fR, \fB--forward-delay\fR=\fIforward-delay\fR\fR
 .ad
@@ -1718,7 +1598,6 @@ provides valid alternatives to the supplied values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIforce-protocol\fR,
 \fB--force-protocol\fR=\fIforce-protocol\fR\fR
@@ -1734,7 +1613,6 @@ or \fB2\fR for STP and RSTP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
 .ad
@@ -1756,7 +1634,6 @@ installed on the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm modify-bridge\fR [ \fB-P\fR \fIprotect\fR] [\fB-R\fR
 \fIroot-dir\fR] [ \fB-p\fR \fIpriority\fR] [ \fB-m\fR \fImax-age\fR] [ \fB-h\fR
@@ -1775,7 +1652,6 @@ Bridge parameter modification requires the \fBPRIV_SYS_DL_CONFIG\fR privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-bridge\fR [\fB-R\fR \fIroot-dir\fR] \fIbridge-name\fR\fR
 .ad
@@ -1793,7 +1669,6 @@ The \fB-R\fR (\fB--root-dir\fR) option is the same as for the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm add-bridge\fR [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIlink\fR
 [\fB-l\fR \fIlink\fR...] \fIbridge-name\fR\fR
@@ -1827,7 +1702,6 @@ The options are the same as for the \fBcreate-bridge\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm remove-bridge\fR [\fB-R\fR \fIroot-dir\fR] \fB-l\fR \fIlink\fR
 [\fB-l\fR \fIlink\fR...] \fIbridge-name\fR\fR
@@ -1845,7 +1719,6 @@ The options are the same as for the \fBcreate-bridge\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-bridge\fR [\fB-flt\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
 [[\fB-p\fR] \fB-o\fR \fIfield\fR,...] [\fIbridge-name\fR]\fR
@@ -1860,7 +1733,6 @@ all bridges. The other forms require a specified bridge.
 The show-bridge subcommand accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval\fR, \fB--interval\fR=\fIinterval\fR\fR
 .ad
@@ -1873,7 +1745,6 @@ will be displayed only once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--statistics\fR\fR
 .ad
@@ -1885,7 +1756,6 @@ links. This option cannot be used with the \fB-f\fR and \fB-t\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -1897,7 +1767,6 @@ below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -1912,7 +1781,6 @@ By default, the \fBshow-bridge\fR subcommand shows bridge configuration. The
 following fields can be shown:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBRIDGE\fR\fR
 .ad
@@ -1923,7 +1791,6 @@ The name of the bridge.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBADDRESS\fR\fR
 .ad
@@ -1934,7 +1801,6 @@ The Bridge Unique Identifier value (MAC address).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIORITY\fR\fR
 .ad
@@ -1946,7 +1812,6 @@ Configured priority value; set by \fB-p\fR with \fBcreate-bridge\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBMAXAGE\fR\fR
 .ad
@@ -1958,7 +1823,6 @@ Configured bridge maximum age; set by \fB-m\fR with \fBcreate-bridge\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBHELLOTIME\fR\fR
 .ad
@@ -1970,7 +1834,6 @@ Configured bridge hello time; set by \fB-h\fR with \fBcreate-bridge\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBFWDDELAY\fR\fR
 .ad
@@ -1982,7 +1845,6 @@ Configured forwarding delay; set by \fB-d\fR with \fBcreate-bridge\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFORCEPROTO\fR\fR
 .ad
@@ -1994,7 +1856,6 @@ and \fBmodify-bridge\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCTIME\fR\fR
 .ad
@@ -2005,7 +1866,6 @@ Time, in seconds, since last topology change.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCCOUNT\fR\fR
 .ad
@@ -2016,7 +1876,6 @@ Count of the number of topology changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCHANGE\fR\fR
 .ad
@@ -2027,7 +1886,6 @@ This indicates that a topology change was detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESROOT\fR\fR
 .ad
@@ -2038,7 +1896,6 @@ Bridge Identifier of the root node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBROOTCOST\fR\fR
 .ad
@@ -2049,7 +1906,6 @@ Cost of the path to the root node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBROOTPORT\fR\fR
 .ad
@@ -2060,7 +1916,6 @@ Port number used to reach the root node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAXAGE\fR\fR
 .ad
@@ -2071,7 +1926,6 @@ Maximum age value from the root node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHELLOTIME\fR\fR
 .ad
@@ -2082,7 +1936,6 @@ Hello time value from the root node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFWDDELAY\fR\fR
 .ad
@@ -2093,7 +1946,6 @@ Forward delay value from the root node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOLDTIME\fR\fR
 .ad
@@ -2109,7 +1961,6 @@ When the \fB-s\fR option is specified, the \fBshow-bridge\fR subcommand shows
 bridge statistics. The following fields can be shown:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBRIDGE\fR\fR
 .ad
@@ -2120,7 +1971,6 @@ Bridge name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDROPS\fR\fR
 .ad
@@ -2131,7 +1981,6 @@ Number of packets dropped due to resource problems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFORWARDS\fR\fR
 .ad
@@ -2142,7 +1991,6 @@ Number of packets forwarded from one link to another.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMBCAST\fR\fR
 .ad
@@ -2153,7 +2001,6 @@ Number of multicast and broadcast packets handled by the bridge.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRECV\fR\fR
 .ad
@@ -2164,7 +2011,6 @@ Number of packets received on all attached links.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSENT\fR\fR
 .ad
@@ -2175,7 +2021,6 @@ Number of packets sent on all attached links.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNKNOWN\fR\fR
 .ad
@@ -2191,7 +2036,6 @@ By default, when the \fB-o\fR option is not specified, only the \fBBRIDGE\fR,
 The \fBshow-bridge\fR subcommand also accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR, \fB--link\fR\fR
 .ad
@@ -2202,7 +2046,6 @@ to a single bridge instance. By using this option and without the \fB-s\fR
 option, the following fields can be displayed for each link:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -2213,7 +2056,6 @@ The link name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINDEX\fR\fR
 .ad
@@ -2224,7 +2066,6 @@ Port (link) index number on the bridge.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -2236,7 +2077,6 @@ State of the link. The state can be \fBdisabled\fR, \fBdiscarding\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUPTIME\fR\fR
 .ad
@@ -2247,7 +2087,6 @@ Number of seconds since the last reset or initialization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPERCOST\fR\fR
 .ad
@@ -2258,7 +2097,6 @@ Actual cost in use (1-65535).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPERP2P\fR\fR
 .ad
@@ -2269,7 +2107,6 @@ This indicates whether point-to-point (\fBP2P\fR) mode been detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPEREDGE\fR\fR
 .ad
@@ -2280,7 +2117,6 @@ This indicates whether edge mode has been detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESROOT\fR\fR
 .ad
@@ -2291,7 +2127,6 @@ The Root Bridge Identifier that has been seen on this port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESCOST\fR\fR
 .ad
@@ -2302,7 +2137,6 @@ Path cost to the network root node through the designated port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESBRIDGE\fR\fR
 .ad
@@ -2313,7 +2147,6 @@ Bridge Identifier for this port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESPORT\fR\fR
 .ad
@@ -2325,7 +2158,6 @@ this port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCACK\fR\fR
 .ad
@@ -2341,7 +2173,6 @@ When the \fB-l\fR option is specified, the \fB-s\fR option can be used to
 display the following fields for each link:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -2352,7 +2183,6 @@ Link name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGBPDU\fR\fR
 .ad
@@ -2363,7 +2193,6 @@ Number of configuration BPDUs received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCNBPDU\fR\fR
 .ad
@@ -2374,7 +2203,6 @@ Number of topology change BPDUs received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSTPBPDU\fR\fR
 .ad
@@ -2385,7 +2213,6 @@ Number of Rapid Spanning Tree BPDUs received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTXBPDU\fR\fR
 .ad
@@ -2396,7 +2223,6 @@ Number of BPDUs transmitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDROPS\fR\fR
 .ad
@@ -2407,7 +2233,6 @@ Number of packets dropped due to resource problems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRECV\fR\fR
 .ad
@@ -2418,7 +2243,6 @@ Number of packets received by the bridge.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXMIT\fR\fR
 .ad
@@ -2433,7 +2257,6 @@ When the \fB-o\fR option is not specified, only the \fBLINK\fR, \fBDROPS\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--forwarding\fR\fR
 .ad
@@ -2443,7 +2266,6 @@ Displays forwarding entries for a single bridge instance. With this option, the
 following fields can be shown for each forwarding entry:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEST\fR\fR
 .ad
@@ -2454,7 +2276,6 @@ Destination MAC address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAGE\fR\fR
 .ad
@@ -2465,7 +2286,6 @@ Age of entry in seconds and milliseconds. Omitted for local entries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAGS\fR\fR
 .ad
@@ -2477,7 +2297,6 @@ link or to a VNIC on one of the attached links.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOUTPUT\fR\fR
 .ad
@@ -2494,7 +2313,6 @@ When the \fB-o\fR option is not specified, the \fBDEST\fR, \fBAGE\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--trill\fR\fR
 .ad
@@ -2504,7 +2322,6 @@ Displays \fBTRILL\fR nickname entries for a single bridge instance. With this
 option, the following fields can be shown for each \fBTRILL\fR nickname entry:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNICK\fR\fR
 .ad
@@ -2515,7 +2332,6 @@ option, the following fields can be shown for each \fBTRILL\fR nickname entry:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAGS\fR\fR
 .ad
@@ -2526,7 +2342,6 @@ The \fBL\fR flag is shown if the nickname identifies the local system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -2537,7 +2352,6 @@ Link name for output when sending messages to this RBridge.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNEXTHOP\fR\fR
 .ad
@@ -2555,7 +2369,6 @@ When the \fB-o\fR option is not specified, the \fBNICK\fR, \fBFLAGS\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm create-vlan\fR [\fB-ft\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
 \fIether-link\fR \fB-v\fR \fIvid\fR [\fIvlan-link\fR]\fR
@@ -2579,7 +2392,6 @@ For example, if \fIether-link\fR is \fBbge1\fR and \fIvid\fR is 2, the name
 generated is \fBbge2001\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -2593,7 +2405,6 @@ resulting VLAN must be set to 1496 instead of 1500.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIether-link\fR\fR
 .ad
@@ -2604,7 +2415,6 @@ Specifies Ethernet link over which VLAN is created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -2616,7 +2426,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -2629,7 +2438,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-vlan\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR]
 \fIvlan-link\fR\fR
@@ -2641,7 +2449,6 @@ Delete the VLAN link specified.
 The \fBdelete-vlan\fRsubcommand accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -2653,7 +2460,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -2666,7 +2472,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-vlan\fR [\fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
 [\fIvlan-link\fR]\fR
@@ -2678,7 +2483,6 @@ Display VLAN configuration for all VLAN links or for the specified VLAN link.
 The \fBshow-vlan\fRsubcommand accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -2689,7 +2493,6 @@ name must be one of the fields listed below, or the special value \fBall\fR, to
 display all fields. For each VLAN link, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -2700,7 +2503,6 @@ The name of the VLAN link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVID\fR\fR
 .ad
@@ -2711,7 +2513,6 @@ The ID associated with the VLAN.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOVER\fR\fR
 .ad
@@ -2722,7 +2523,6 @@ The name of the physical link over which this VLAN is configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAGS\fR\fR
 .ad
@@ -2731,7 +2531,6 @@ The name of the physical link over which this VLAN is configured.
 A set of flags associated with the VLAN link. Possible flags are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
@@ -2742,7 +2541,6 @@ The VLAN was created using the \fB-f\fR option to \fBcreate-vlan\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
@@ -2760,7 +2558,6 @@ Additional flags might be defined in the future.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -2772,7 +2569,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -2786,7 +2582,6 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm scan-wifi\fR [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
 [\fIwifi-link\fR]\fR
@@ -2799,7 +2594,6 @@ specified \fIwifi-link\fR.
 By default, currently all fields but \fBBSSTYPE\fR are displayed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -2811,7 +2605,6 @@ display all fields. For each \fBWiFi\fR network found, the following fields can
 be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -2822,7 +2615,6 @@ The name of the link the \fBWiFi\fR network is on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESSID\fR\fR
 .ad
@@ -2833,7 +2625,6 @@ The \fBESSID\fR (name) of the \fBWiFi\fR network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBSSID\fR\fR
 .ad
@@ -2846,7 +2637,6 @@ token (for \fBIBSS\fR networks).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSEC\fR\fR
 .ad
@@ -2859,7 +2649,6 @@ for a WiFi network that requires WPA (Wi-Fi Protected Access).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMODE\fR\fR
 .ad
@@ -2870,7 +2659,6 @@ The supported connection modes: one or more of \fBa\fR, \fBb\fR, or \fBg\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTRENGTH\fR\fR
 .ad
@@ -2882,7 +2670,6 @@ The strength of the signal: one of \fBexcellent\fR, \fBvery good\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED\fR\fR
 .ad
@@ -2893,7 +2680,6 @@ The maximum speed of the \fBWiFi\fR network, in megabits per second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBSSTYPE\fR\fR
 .ad
@@ -2907,7 +2693,6 @@ Either \fBbss\fR for \fBBSS\fR (infrastructure) networks, or \fBibss\fR for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -2921,7 +2706,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm connect-wifi\fR [\fB-e\fR \fIessid\fR] [\fB-i\fR \fIbssid\fR]
 [\fB-k\fR \fIkey\fR,...] [\fB-s\fR \fBnone\fR | \fBwep\fR | \fBwpa\fR]
@@ -2949,7 +2733,6 @@ Once discovery is complete, the list of networks is filtered according to the
 value of the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIessid,\fR \fB--essid\fR=\fIessid\fR\fR
 .ad
@@ -2960,7 +2743,6 @@ Networks that do not have the same \fIessid\fR are filtered out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fBbss\fR|\fBibss\fR, \fB--bsstype\fR=\fBbss\fR|\fBibss\fR\fR
 .ad
@@ -2971,7 +2753,6 @@ Networks that do not have the same \fBbsstype\fR are filtered out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fBa\fR|\fBb\fR|\fBg\fR, \fB--mode\fR=\fBa\fR|\fBb\fR|\fBg\fR\fR
 .ad
@@ -2982,7 +2763,6 @@ Networks not appropriate for the specified 802.11 mode are filtered out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkey,...\fR, \fB--key\fR=\fIkey, ...\fR\fR
 .ad
@@ -2994,7 +2774,6 @@ Networks not appropriate for the specified keys are filtered out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fBnone\fR|\fBwep\fR|\fBwpa\fR,
 \fB--sec\fR=\fBnone\fR|\fBwep\fR|\fBwpa\fR\fR
@@ -3012,7 +2791,6 @@ In addition to the options described above, the following options also control
 the behavior of \fBconnect-wifi\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fBopen\fR|\fBshared\fR, \fB--auth\fR=\fBopen\fR|\fBshared\fR\fR
 .ad
@@ -3024,7 +2802,6 @@ Connect using the specified authentication mode. By default, \fBopen\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR, \fB--create-ibss\fR\fR
 .ad
@@ -3037,7 +2814,6 @@ specified \fBESSID\fR cannot be found. If no \fBESSID\fR is specified, then
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItime\fR, \fB--timeout\fR=\fItime\fR\fR
 .ad
@@ -3051,7 +2827,6 @@ shorter than the default might not succeed reliably.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkey,...\fR, \fB--key\fR=\fIkey,...\fR\fR
 .ad
@@ -3073,7 +2848,6 @@ first key being the active key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm disconnect-wifi\fR [\fB-a\fR] [\fIwifi-link\fR]\fR
 .ad
@@ -3085,7 +2859,6 @@ convenience, if only one \fBWiFi\fR link is connected, \fIwifi-link\fR can be
 omitted.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR, \fB--all-links\fR\fR
 .ad
@@ -3099,7 +2872,6 @@ scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-wifi\fR [[\fB-p\fR] \fB-o\fR \fIfield\fR,...]
 [\fIwifi-link\fR]\fR
@@ -3110,7 +2882,6 @@ Shows \fBWiFi\fR configuration information either for all \fBWiFi\fR links or
 for the specified link \fIwifi-link\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield,...\fR, \fB--output\fR=\fIfield\fR\fR
 .ad
@@ -3122,7 +2893,6 @@ display all fields. For each \fBWiFi\fR link, the following fields can be
 displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -3133,7 +2903,6 @@ The name of the link being displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATUS\fR\fR
 .ad
@@ -3146,7 +2915,6 @@ not connected. If the link is disconnected, all remaining fields have the value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESSID\fR\fR
 .ad
@@ -3157,7 +2925,6 @@ The \fBESSID\fR (name) of the connected \fBWiFi\fR network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBSSID\fR\fR
 .ad
@@ -3170,7 +2937,6 @@ token (for \fBIBSS\fR networks).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSEC\fR\fR
 .ad
@@ -3183,7 +2949,6 @@ requires WPA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMODE\fR\fR
 .ad
@@ -3194,7 +2959,6 @@ The supported connection modes: one or more of \fBa\fR, \fBb\fR, or \fBg\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTRENGTH\fR\fR
 .ad
@@ -3206,7 +2970,6 @@ The connection strength: one of \fBexcellent\fR, \fBvery good\fR, \fBgood\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED\fR\fR
 .ad
@@ -3217,7 +2980,6 @@ The connection speed, in megabits per second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTH\fR\fR
 .ad
@@ -3228,7 +2990,6 @@ Either \fBopen\fR or \fBshared\fR (see \fBconnect-wifi\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBSSTYPE\fR\fR
 .ad
@@ -3244,7 +3005,6 @@ displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -3258,7 +3018,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-ether\fR [\fB-x\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR,...]
 [\fIether-link\fR]\fR
@@ -3271,7 +3030,6 @@ specified physical Ethernet link.
 The \fBshow-ether\fR subcommand accepts the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR,..., \fB--output\fR=\fIfield\fR\fR
 .ad
@@ -3282,7 +3040,6 @@ name must be one of the fields listed below, or the special value \fBall\fR to
 display all fields. For each link, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -3293,7 +3050,6 @@ The name of the link being displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPTYPE\fR\fR
 .ad
@@ -3307,7 +3063,6 @@ capabilities advertised by the link-partner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -3318,7 +3073,6 @@ The state of the link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTO\fR\fR
 .ad
@@ -3329,7 +3083,6 @@ A \fByes\fR/\fBno\fR value indicating whether auto-negotiation is advertised.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED-DUPLEX\fR\fR
 .ad
@@ -3342,7 +3095,6 @@ Duplex values are encoded as \fBf\fR (full-duplex) or \fBh\fR (half-duplex).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAUSE\fR\fR
 .ad
@@ -3357,7 +3109,6 @@ bi-directional flow-control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREM_FAULT\fR\fR
 .ad
@@ -3372,7 +3123,6 @@ By default, all fields except \fBREM_FAULT\fR are displayed for the "current"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -3384,7 +3134,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR, \fB--extended\fR\fR
 .ad
@@ -3398,7 +3147,6 @@ Extended output is displayed for \fBPTYPE\fR values of \fBcurrent\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm set-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIlink\fR\fR
 .ad
@@ -3410,7 +3158,6 @@ device driver, and networking hardware. These properties can be retrieved using
 \fBshow-linkprop\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -3422,7 +3169,6 @@ reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -3433,7 +3179,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonenme\fR
 .ad
@@ -3464,7 +3209,6 @@ same value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm reset-linkprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] [\fB-p\fR \fIprop\fR,...] \fIlink\fR\fR
 .ad
@@ -3476,7 +3220,6 @@ all properties are reset. See \fBshow-linkprop\fR for a description of
 properties.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -3488,7 +3231,6 @@ Temporary resets last until the next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -3499,7 +3241,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonenme\fR
 .ad
@@ -3525,7 +3266,6 @@ the same value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-linkprop\fR [\fB-P\fR] [\fB-z\fR \fIzonename\fR] [[\fB-c\fR] \fB-o\fR \fIfield\fR[,...]][\fB-p\fR \fIprop\fR[,...]] [\fIlink\fR]\fR
 .ad
@@ -3537,7 +3277,6 @@ no properties are specified, all available link properties are displayed. For
 each property, the following fields are displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR\fR
 .ad
@@ -3548,7 +3287,6 @@ name must be one of the fields listed below, or the special value \fBall\fR to
 display all fields. For each link, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -3559,7 +3297,6 @@ The name of the datalink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROPERTY\fR\fR
 .ad
@@ -3570,7 +3307,6 @@ The name of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPERM\fR\fR
 .ad
@@ -3582,7 +3318,6 @@ or \fBrw\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVALUE\fR\fR
 .ad
@@ -3596,7 +3331,6 @@ use the system \fBDEFAULT\fR value (if any).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEFAULT\fR\fR
 .ad
@@ -3608,7 +3342,6 @@ The default value of the property. If the property has no default value,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOSSIBLE\fR\fR
 .ad
@@ -3630,7 +3363,6 @@ driver man page for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR, \fB--parseable\fR\fR
 .ad
@@ -3642,7 +3374,6 @@ required with this option. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -3653,7 +3384,6 @@ Display persistent link property information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonenme\fR
 .ad
@@ -3678,7 +3408,6 @@ properties following subcommand descriptions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm create-secobj\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-f\fR
 \fIfile\fR] \fB-c\fR \fIclass\fR \fIsecobj\fR\fR
@@ -3703,7 +3432,6 @@ This subcommand is only usable by users or roles that belong to the "Network
 Link Security" \fBRBAC\fR profile.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR, \fB--class\fR=\fIclass\fR\fR
 .ad
@@ -3714,7 +3442,6 @@ Link Security" \fBRBAC\fR profile.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -3726,7 +3453,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -3737,7 +3463,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR, \fB--file\fR=\fIfile\fR\fR
 .ad
@@ -3752,7 +3477,6 @@ section for an example of using this option to set a \fBWEP\fR key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-secobj\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR]
 \fIsecobj\fR[,...]\fR
@@ -3763,7 +3487,6 @@ Delete one or more specified secure objects. This subcommand is only usable by
 users or roles that belong to the "Network Link Security" \fBRBAC\fR profile.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -3775,7 +3498,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -3788,7 +3510,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-secobj\fR [\fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
 [\fIsecobj\fR,...]\fR
@@ -3806,7 +3527,6 @@ temporarily created.
 For security reasons, it is not possible to show the value of a secure object.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...] , \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -3817,7 +3537,6 @@ name must be one of the fields listed below. For displayed secure object, the
 following fields can be shown:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOBJECT\fR\fR
 .ad
@@ -3828,7 +3547,6 @@ The name of the secure object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLASS\fR\fR
 .ad
@@ -3841,7 +3559,6 @@ The class of the secure object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -3853,7 +3570,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -3866,7 +3582,6 @@ Display persistent secure object information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm create-vnic\fR [\fB-t\fR] \fB-l\fR \fIlink\fR [\fB-R\fR
 \fIroot-dir\fR] [\fB-m\fR \fIvalue\fR | auto | {factory [\fB-n\fR
@@ -3878,7 +3593,6 @@ Display persistent secure object information
 Create a VNIC with name \fIvnic-link\fR over the specified link.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -3890,7 +3604,6 @@ reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -3901,7 +3614,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
 .ad
@@ -3912,7 +3624,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIvalue\fR | \fIkeyword\fR, \fB--mac-address\fR=\fIvalue\fR |
 \fIkeyword\fR\fR
@@ -3925,7 +3636,6 @@ must be valid for the underlying NIC. The following special keywords can be
 used:
 .sp
 .ne 2
-.mk
 .na
 \fBfactory [\fB-n\fR \fIslot-identifier\fR],\fR
 .ad
@@ -3945,7 +3655,6 @@ addresses, their slot identifiers, and their availability.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -3966,7 +3675,6 @@ with the \fB-r\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fBauto\fR
 .ad
@@ -3979,7 +3687,6 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIvlan-id\fR\fR
 .ad
@@ -3992,7 +3699,6 @@ Enable VLAN tagging for this VNIC. The VLAN tag will have id \fIvlan-id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprop\fR=\fIvalue\fR,..., \fB--prop\fR
 \fIprop\fR=\fIvalue\fR,...\fR
@@ -4006,7 +3712,6 @@ A comma-separated list of properties to set to the specified values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-vnic\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fIvnic-link\fR\fR
 .ad
@@ -4015,7 +3720,6 @@ A comma-separated list of properties to set to the specified values.
 Deletes the specified VNIC.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -4027,7 +3731,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -4051,7 +3754,6 @@ Operate on a link that has been delegated to the specified zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-vnic\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIvnic-link\fR]\fR
 .ad
@@ -4061,7 +3763,6 @@ Show VNIC configuration information (the default) or statistics, for all VNICs,
 all VNICs on a link, or only the specified \fIvnic-link\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...] , \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -4073,7 +3774,6 @@ fields listed below, or the special value \fBall\fR to display all fields. By
 default (without \fB-o\fR), \fBshow-vnic\fR displays all fields.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -4084,7 +3784,6 @@ The name of the VNIC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOVER\fR\fR
 .ad
@@ -4095,7 +3794,6 @@ The name of the physical link over which this VNIC is configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSPEED\fR\fR
 .ad
@@ -4106,7 +3804,6 @@ The maximum speed of the VNIC, in megabits per second.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMACADDRESS\fR\fR
 .ad
@@ -4117,7 +3814,6 @@ MAC address of the VNIC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMACADDRTYPE\fR\fR
 .ad
@@ -4127,7 +3823,6 @@ MAC address type of the VNIC. \fBdladm\fR distinguishes among the following MAC
 address types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrandom\fR\fR
 .ad
@@ -4138,7 +3833,6 @@ A random address assigned to the VNIC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfactory\fR\fR
 .ad
@@ -4153,7 +3847,6 @@ A factory MAC address used by the VNIC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -4165,7 +3858,6 @@ required with \fB-p\fR. See "Parseable Output Format", below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -4176,7 +3868,6 @@ Display the persistent VNIC configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--statistics\fR\fR
 .ad
@@ -4187,7 +3878,6 @@ Displays VNIC statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval\fR, \fB--interval\fR=\fIinterval\fR\fR
 .ad
@@ -4200,7 +3890,6 @@ will be displayed only once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
 .ad
@@ -4224,7 +3913,6 @@ Operate on a link that has been delegated to the specified zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -4238,7 +3926,6 @@ Operate on a link that has been delegated to the specified zone.
 Create an etherstub with the specified name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -4250,7 +3937,6 @@ across reboots.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -4266,7 +3952,6 @@ switch between the VNICs created on top of the same etherstub.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
@@ -4280,7 +3965,6 @@ switch between the VNICs created on top of the same etherstub.
 Delete the specified etherstub.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -4292,7 +3976,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -4305,7 +3988,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-etherstub\fR [\fIetherstub\fR]\fR
 .ad
@@ -4317,7 +3999,6 @@ Show all configured etherstubs by default, or the specified etherstub if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm create-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-T\fR
 \fItype\fR [\fB-s\fR \fItsrc\fR] [\fB-d\fR \fItdst\fR] \fIiptun-link\fR\fR
@@ -4334,7 +4015,6 @@ subcommand creates a virtual link. The \fBifconfig\fR(1M) command is used to
 configure IP interfaces above the link.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -4346,7 +4026,6 @@ the next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -4357,7 +4036,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItype\fR, \fB--tunnel-type\fR=\fItype\fR\fR
 .ad
@@ -4367,7 +4045,6 @@ Specifies the type of tunnel to be created. The type must be one of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv4\fR\fR
 .ad
@@ -4381,7 +4058,6 @@ IPv6-over-IPv4 tunneling configurations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipv6\fR\fR
 .ad
@@ -4395,7 +4071,6 @@ IPv4-over-IPv6 and IPv6-over-IPv6 tunneling configurations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6to4\fR\fR
 .ad
@@ -4410,7 +4085,6 @@ plumbed on such a tunnel link to configure a 6to4 router.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItsrc\fR, \fB--tunnel-src\fR=\fItsrc\fR\fR
 .ad
@@ -4425,7 +4099,6 @@ important that any hostname used be included in \fB/etc/hosts\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fItdst\fR, \fB--tunnel-dst\fR=\fItdst\fR\fR
 .ad
@@ -4438,7 +4111,6 @@ Literal IP address or hostname corresponding to the tunnel destination.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm modify-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-s\fR
 \fItsrc\fR] [\fB-d\fR \fItdst\fR] \fIiptun-link\fR\fR
@@ -4448,7 +4120,6 @@ Literal IP address or hostname corresponding to the tunnel destination.
 Modify the parameters of the specified IP tunnel.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -4460,7 +4131,6 @@ until the next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -4471,7 +4141,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItsrc\fR, \fB--tunnel-src\fR=\fItsrc\fR\fR
 .ad
@@ -4483,7 +4152,6 @@ description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fItdst\fR, \fB--tunnel-dst\fR=\fItdst\fR\fR
 .ad
@@ -4497,7 +4165,6 @@ description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm delete-iptun\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR]
 \fIiptun-link\fR\fR
@@ -4507,7 +4174,6 @@ description.
 Delete the specified IP tunnel link.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -4519,7 +4185,6 @@ next reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -4532,7 +4197,6 @@ See "Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-iptun\fR [\fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
 [\fIiptun-link\fR]\fR
@@ -4542,7 +4206,6 @@ See "Options," above.
 Show IP tunnel link configuration for a single IP tunnel or all IP tunnels.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -4553,7 +4216,6 @@ Display the persistent IP tunnel configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -4565,7 +4227,6 @@ Display using a stable machine-parseable format. The -o option is required with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -4577,7 +4238,6 @@ display all fields. By default (without \fB-o\fR), \fBshow-iptun\fR displays
 all fields.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINK\fR\fR
 .ad
@@ -4588,7 +4248,6 @@ The name of the IP tunnel link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTYPE\fR\fR
 .ad
@@ -4599,7 +4258,6 @@ Type of tunnel as specified by the \fB-T\fR option of \fBcreate-iptun\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAGS\fR\fR
 .ad
@@ -4608,7 +4266,6 @@ Type of tunnel as specified by the \fB-T\fR option of \fBcreate-iptun\fR.
 A set of flags associated with the IP tunnel link. Possible flags are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
@@ -4629,7 +4286,6 @@ See \fBipsecconf\fR(1M) for more details on how to configure IPsec policy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
@@ -4645,7 +4301,6 @@ on implicit tunnel creation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOURCE\fR\fR
 .ad
@@ -4656,7 +4311,6 @@ The tunnel source address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDESTINATION\fR\fR
 .ad
@@ -4671,7 +4325,6 @@ The tunnel destination address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdladm show-usage\fR [\fB-a\fR] \fB-f\fR \fIfilename\fR [\fB-p\fR
 \fIplotfile\fR \fB-F\fR \fIformat\fR] [\fB-s\fR \fItime\fR] [\fB-e\fR
@@ -4685,7 +4338,6 @@ required. The default output will be the summary of network usage for the
 entire period of time in which extended accounting was enabled.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -4698,7 +4350,6 @@ the links that have already been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR, \fB--file\fR=\fIfilename\fR\fR
 .ad
@@ -4709,7 +4360,6 @@ Read extended accounting records of network usage from \fIfilename\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIformat\fR, \fB--format\fR=\fIformat\fR\fR
 .ad
@@ -4721,7 +4371,6 @@ option. As of this release, \fBgnuplot\fR is the only supported format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIplotfile\fR, \fB--plot\fR=\fIplotfile\fR\fR
 .ad
@@ -4733,7 +4382,6 @@ option, which is required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItime\fR, \fB--start\fR=\fItime\fR\fR
 .ad
@@ -4749,7 +4397,6 @@ Start and stop times for data display. Time is in the format
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlink\fR\fR
 .ad
@@ -4784,7 +4431,6 @@ you request only a single field.
 The following general link properties are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautopush\fR\fR
 .ad
@@ -4804,7 +4450,6 @@ The \fBautopush\fR property is preferred over the more general
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpus\fR\fR
 .ad
@@ -4833,7 +4478,6 @@ is not bound to any specific processor or processor set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlearn_limit\fR\fR
 .ad
@@ -4848,7 +4492,6 @@ The default value is \fB1000\fR. Valid values are greater or equal to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlearn_decay\fR\fR
 .ad
@@ -4863,7 +4506,6 @@ The default value is \fB200\fR. Valid values are greater or equal to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxbw\fR\fR
 .ad
@@ -4877,7 +4519,6 @@ Mbps. The default is no bandwidth limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpriority\fR\fR
 .ad
@@ -4889,7 +4530,6 @@ tokens \fBhigh\fR, \fBmedium\fR, or \fBlow\fR. The default is \fBhigh\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstp\fR\fR
 .ad
@@ -4904,7 +4544,6 @@ property. The default value is \fB1\fR, to enable STP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforward\fR\fR
 .ad
@@ -4918,7 +4557,6 @@ to enable bridge forwarding for configured VLANs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault_tag\fR\fR
 .ad
@@ -4933,7 +4571,6 @@ values values are from 0 to 4094.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstp_priority\fR\fR
 .ad
@@ -4946,7 +4583,6 @@ The default value is \fB128\fR. Valid values range from 0 to 255.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstp_cost\fR\fR
 .ad
@@ -4960,7 +4596,6 @@ for 100Mbps, \fB4\fR for 1Gbps, and \fB2\fR for 10Gbps. Valid values range from
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstp_edge\fR\fR
 .ad
@@ -4974,7 +4609,6 @@ ports automatically.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstp_p2p\fR\fR
 .ad
@@ -4989,7 +4623,6 @@ normal multipoint mode. The default value is \fBauto\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstp_mcheck\fR\fR
 .ad
@@ -5022,7 +4655,6 @@ The default value is 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone\fR\fR
 .ad
@@ -5043,7 +4675,6 @@ The following \fBWiFi\fR link properties are supported. Note that the ability
 to set a given property to a given value depends on the driver and hardware.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchannel\fR\fR
 .ad
@@ -5056,7 +4687,6 @@ of values varies by regulatory domain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpowermode\fR\fR
 .ad
@@ -5069,7 +4699,6 @@ Specifies the power management mode of the \fBWiFi\fR link. Possible values are
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBradio\fR\fR
 .ad
@@ -5081,7 +4710,6 @@ or \fBoff\fR. Default is \fBon\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspeed\fR\fR
 .ad
@@ -5180,7 +4808,6 @@ autonegotiation itself, and therefore cannot be impacted by Power Management.
 In addition, the following Ethernet properties are reported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspeed\fR\fR
 .ad
@@ -5191,7 +4818,6 @@ In addition, the following Ethernet properties are reported:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmtu\fR\fR
 .ad
@@ -5203,7 +4829,6 @@ The maximum client SDU (Send Data Unit) supported by the device. Valid range is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowctrl\fR\fR
 .ad
@@ -5213,7 +4838,6 @@ Establishes flow-control modes that will be advertised by the device. Valid
 input is one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno\fR\fR
 .ad
@@ -5224,7 +4848,6 @@ No flow control enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrx\fR\fR
 .ad
@@ -5235,7 +4858,6 @@ Receive, and act upon incoming pause frames.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtx\fR\fR
 .ad
@@ -5247,7 +4869,6 @@ pause frames.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbi\fR\fR
 .ad
@@ -5262,7 +4883,6 @@ capabilities allowed by the device and the link partner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtagmode\fR\fR
 .ad
@@ -5273,12 +4893,10 @@ inserted in packets being transmitted on the link. Two mode values can be
 assigned to this property:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnormal\fR\fR
 .ad
 .RS 12n
-.rt  
 Insert a VLAN tag in outgoing packets under the following conditions:
 .RS +4
 .TP
@@ -5296,12 +4914,10 @@ The user requested priority tagging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvlanonly\fR\fR
 .ad
 .RS 12n
-.rt  
 Insert a VLAN tag only when the outgoing packet belongs to a VLAN. If a tag is
 being inserted in this mode and the user has also requested a non-zero
 priority, the priority is honored and included in the VLAN tag.
@@ -5316,7 +4932,6 @@ The default value is \fBvlanonly\fR.
 The following IP tunnel link properties are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhoplimit\fR\fR
 .ad
@@ -5329,7 +4944,6 @@ is 64.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencaplimit\fR\fR
 .ad
@@ -5826,13 +5440,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .sp
@@ -5842,13 +5455,12 @@ Interface StabilityCommitted
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

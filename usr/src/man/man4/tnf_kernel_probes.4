@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnf_kernel_probes 4 "8 Nov1999" "SunOS 5.11" "File Formats"
+.TH TNF_KERNEL_PROBES 4 "Nov 8, 1999"
 .SH NAME
 tnf_kernel_probes \- TNF kernel probes
 .SH DESCRIPTION
@@ -32,32 +32,26 @@ members and may contain other probe-specific data members.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItag\fR\fR
 .ad
 .RS 14n
-.rt  
 Encodes  \fBTNF\fR references to two other records:
 .sp
 .ne 2
-.mk
 .na
 \fB\fItag\fR\fR
 .ad
 .RS 12n
-.rt  
 Describes the layout of the event record.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIschedule\fR\fR
 .ad
 .RS 12n
-.rt  
 Identifies the writing thread and also contains a 64-bit base time in
 nanoseconds.
 .RE
@@ -66,12 +60,10 @@ nanoseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime_delta\fR\fR
 .ad
 .RS 14n
-.rt  
 A 32-bit time offset from the base time; the sum of the two times is the actual
 time of the event.
 .RE
@@ -92,34 +84,28 @@ time of the event.
 Thread creation event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fItid\fR\fR
 .ad
 .RS 12n
-.rt  
 The thread identifier for the new thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 12n
-.rt  
 The process identifier for the new thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstart_pc\fR\fR
 .ad
 .RS 12n
-.rt  
 The kernel address of its start routine.
 .RE
 
@@ -137,24 +123,20 @@ The kernel address of its start routine.
 Thread microstate transition events.
 .sp
 .ne 2
-.mk
 .na
 \fB\fItid\fR\fR
 .ad
 .RS 9n
-.rt  
 Optional; if it is absent, the event is for the writing thread, otherwise the
 event is for the specified thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstate\fR\fR
 .ad
 .RS 9n
-.rt  
 Indicates the thread state:
 .RS +4
 .TP
@@ -224,34 +206,28 @@ Thread scheduling events.  These are triggered when a runnable thread is placed
 on a dispatch queue.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcpuid\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the cpu to which the queue is attached.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpriority\fR\fR
 .ad
 .RS 16n
-.rt  
 The (global) dispatch priority of the thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqueue_length\fR\fR
 .ad
 .RS 16n
-.rt  
 The current length of the cpu's dispatch queue.
 .RE
 
@@ -271,23 +247,19 @@ Thread blockage event.  This probe captures a partial stack backtrace when the
 current thread blocks.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreason\fR\fR
 .ad
 .RS 11n
-.rt  
 The address of the object on which the thread is blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsymbols\fR\fR
 .ad
 .RS 11n
-.rt  
 References a \fBTNF\fR array of kernel addresses representing the PCs on the
 stack at the time the thread blocks.
 .RE
@@ -306,12 +278,10 @@ stack at the time the thread blocks.
 System call entry event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsysnum\fR\fR
 .ad
 .RS 10n
-.rt  
 The system call number.  The writing thread implicitly enters the \fIsystem\fR
 microstate with this event.
 .RE
@@ -331,23 +301,19 @@ microstate with this event.
 System call exit event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrval1\fR and \fIrval2\fR\fR
 .ad
 .RS 19n
-.rt  
 The two return values of the system call
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrno\fR\fR
 .ad
 .RS 19n
-.rt  
 The error return.
 .RE
 
@@ -370,35 +336,29 @@ The writing thread implicitly enters the \fIuser\fR microstate with this event.
 Address-space fault event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 14n
-.rt  
 Gives the faulting virtual address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfault_type\fR\fR
 .ad
 .RS 14n
-.rt  
 Gives the fault type: invalid page, protection fault, software requested
 locking or unlocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaccess\fR\fR
 .ad
 .RS 14n
-.rt  
 Gives the desired access protection: read, write, execute or create. The values
 for these two members are defined in <\fBvm/seg_enum.h\fR>.
 .RE
@@ -431,12 +391,10 @@ thread.)
 Copy-on-write page fault event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 11n
-.rt  
 The virtual address at which the new page is mapped.
 .RE
 
@@ -453,12 +411,10 @@ The virtual address at which the new page is mapped.
 Zero-fill page fault event.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 11n
-.rt  
 The virtual address at which the new page is mapped.
 .RE
 
@@ -477,12 +433,10 @@ Page unmapping event.  This probe marks the unmapping of a file system page
 from the system.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvnode\fR and \fIoffset\fR\fR
 .ad
 .RS 20n
-.rt  
 Identifies the file and offset of the page being unmapped.
 .RE
 
@@ -502,23 +456,19 @@ Identifies the file and offset of the page being unmapped.
 Pagein start event.  This event signals the initiation of pagein I/O.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvnode\fRand\fIoffset\fR\fR
 .ad
 .RS 18n
-.rt  
 Identifyies the file and offset to be paged in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the number of bytes to be paged in.
 .RE
 
@@ -538,45 +488,37 @@ Specifies the number of bytes to be paged in.
 Pageout completion event.  This event signals the completion of pageout I/O.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvnode\fR\fR
 .ad
 .RS 19n
-.rt  
 Identifies the file of the pageout request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_pageout\fR\fR
 .ad
 .RS 19n
-.rt  
 The number of pages written out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_freed\fR\fR
 .ad
 .RS 19n
-.rt  
 The number of pages freed after being written out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_reclaimed\fR\fR
 .ad
 .RS 19n
-.rt  
 The number of pages reclaimed after being written out.
 .RE
 
@@ -596,23 +538,19 @@ Page daemon scan start event.  This event signals the beginning of one
 iteration of the page daemon.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_free\fR\fR
 .ad
 .RS 16n
-.rt  
 The number of free pages in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_needed\fR\fR
 .ad
 .RS 16n
-.rt  
 The number of pages desired free.
 .RE
 
@@ -631,23 +569,19 @@ Page daemon scan end event.  This event signals the end of one iteration of the
 page daemon.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_free\fR\fR
 .ad
 .RS 17n
-.rt  
 The number of free pages in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpages_scanned\fR\fR
 .ad
 .RS 17n
-.rt  
 The number of pages examined by the page daemon.  (Potentially more pages will
 be freed when any queued pageout requests complete.)
 .RE
@@ -668,23 +602,19 @@ Address space swapout event.  This event marks the swapping out of a process
 address space.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 14n
-.rt  
 Identifies the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpage_count\fR\fR
 .ad
 .RS 14n
-.rt  
 Reports the number of pages either freed or queued for pageout.
 .RE
 
@@ -705,45 +635,37 @@ Light-weight process swapout event.  This event marks the swapping out of an
 \fBLWP\fR and its stack.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 14n
-.rt  
 The  \fBLWP's\fR process identifier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlwpid\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBLWP\fR identifier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItid\fR \fImember\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBLWP's\fR kernel thread identifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpage_count\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of pages swapped out.
 .RE
 
@@ -764,45 +686,37 @@ Light-weight process swapin event.  This event marks the swapping in of an
 \fBLWP\fR and its stack.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBLWP's\fR process identifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlwpid\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBLWP\fR identifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItid\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBLWP's\fR kernel thread identifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpage_count\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of pages swapped in.
 .RE
 
@@ -825,56 +739,46 @@ Block I/O strategy event.  This event marks a call to the \fBstrategy\fR(9E)
 function of a block device driver.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Contains the major and minor numbers of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblock\fR\fR
 .ad
 .RS 10n
-.rt  
 The logical block number to be accessed on the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 10n
-.rt  
 The size of the I/O request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 10n
-.rt  
 The kernel address of the \fBbuf\fR(9S) structure associated with the transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBbuf\fR(9S) flags associated with the transfer.
 .RE
 
@@ -894,34 +798,28 @@ Buffered I/O completion event.  This event marks calls to the \fBbiodone\fR(9F)
 function.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Contains the major and minor numbers of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblock\fR\fR
 .ad
 .RS 10n
-.rt  
 The logical block number accessed on the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 10n
-.rt  
 The kernel address of the \fBbuf\fR(9S) structure associated with the transfer.
 .RE
 
@@ -942,45 +840,37 @@ Raw I/O start event.  This event marks entry into the \fBphysio\fR(9F)
 fufnction which performs unbuffered I/O.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Contains the major and minor numbers of the device of the transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 10n
-.rt  
 The logical offset on the device for the transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 10n
-.rt  
 The number of bytes to be transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrw\fR\fR
 .ad
 .RS 10n
-.rt  
 The direction of the transfer: read or write (see \fBbuf\fR(9S)).
 .RE
 
@@ -997,12 +887,10 @@ The direction of the transfer: read or write (see \fBbuf\fR(9S)).
 Raw I/O end event.  This event marks exit from the \fBphysio\fR(9F) fufnction.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 The major and minor numbers of the device of the transfer.
 .RE
 

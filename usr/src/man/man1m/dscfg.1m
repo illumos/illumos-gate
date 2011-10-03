@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dscfg 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH DSCFG 1M "Oct 2, 2007"
 .SH NAME
 dscfg \- configuration tool for Sun StorageTek Availability Suite software
 .SH SYNOPSIS
@@ -65,7 +65,6 @@ If no options are specified, \fBdscfg\fR displays the current local
 configuration location. The \fBdscfg\fR command supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -79,7 +78,6 @@ lock.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -90,7 +88,6 @@ Displays the usage message for the \fBdscfg\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -103,7 +100,6 @@ before proceeding.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIparser_config_file\fR\fR
 .ad
@@ -116,7 +112,6 @@ database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIconfig_file\fR\fR
 .ad
@@ -129,7 +124,6 @@ configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -147,7 +141,6 @@ The options below are for Sun Cluster-configured systems only. \fIgroup\fR can
 be either Sun Cluster device group or as '-' as local devices.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIgroup\fR\fR
 .ad
@@ -158,7 +151,6 @@ Display the location of cluster configuration database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\ \fIgroup\fR\ \fB-i\fR\fR
 .ad
@@ -171,7 +163,6 @@ options prompts you to confirm the deletion before proceeding.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\ \fIgroup\fR\ \fB-p\fR\ \fIparser_config_file\fR\fR
 .ad
@@ -184,7 +175,6 @@ entries that only associated with group specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \ \fIgroup\fR\ \fB-a\fR\ \fIconfig_file\fR\fR
 .ad
@@ -197,7 +187,6 @@ checking of the file. Use of this option invalidates the configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\ \fIgroup\fR\ \fB-l\fR\fR
 .ad
@@ -209,7 +198,6 @@ resource group specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \ \fIgroup\fR\ \fB-s\fR\ \fIconfig_file_location\fR\fR
 .ad
@@ -221,7 +209,6 @@ has to be DID device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIdevice_group\fR\fR
 .ad
@@ -234,34 +221,28 @@ the device group's status and return values are as follows,
 (use echo $? to retrieve the return value):
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 13n
-.rt  
 Device group is in Sun Cluster and is active on this node;
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Device group is in Sun Cluster but active on another node;
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 13n
-.rt  
 Device group is not in Sun Cluster.
 .RE
 
@@ -277,7 +258,6 @@ refer to the \fIAvailability Suite Troubleshooting Guide\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dscfg_format\fR\fR
 .ad
@@ -288,7 +268,6 @@ parser configuration file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dscfg_local\fR\fR
 .ad
@@ -299,7 +278,6 @@ configuration location for all entries with no cluster tags
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dscfg_cluster\fR\fR
 .ad
@@ -317,13 +295,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

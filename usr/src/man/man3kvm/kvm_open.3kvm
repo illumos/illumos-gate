@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kvm_open 3KVM "2 May 2002" "SunOS 5.11" "Kernel VM Library Functions"
+.TH KVM_OPEN 3KVM "May 2, 2002"
 .SH NAME
 kvm_open, kvm_close \- specify a kernel to examine
 .SH SYNOPSIS
@@ -56,23 +56,19 @@ The \fIflag\fR function is used to specify read or write access for
 \fIcorefile\fR and may have one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDONLY\fR\fR
 .ad
 .RS 12n
-.rt  
 open for reading
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDWR\fR\fR
 .ad
 .RS 12n
-.rt  
 open for reading and writing
 .RE
 
@@ -115,34 +111,28 @@ The \fBkvm_close()\fR function returns 0 on success and \(mi1 on failure.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kmem\fR\fR
 .ad
 .RS 14n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ksyms\fR\fR
 .ad
 .RS 14n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/mem\fR\fR
 .ad
 .RS 14n
-.rt  
 
 .RE
 
@@ -154,15 +144,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

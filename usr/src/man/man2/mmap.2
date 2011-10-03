@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright 1989 AT&T.  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mmap 2 "4 Feb 2009" "SunOS 5.11" "System Calls"
+.TH MMAP 2 "Feb 4, 2009"
 .SH NAME
 mmap \- map pages of memory
 .SH SYNOPSIS
@@ -74,45 +74,37 @@ one or more of the other flags in the following table, defined in the header
 <\fBsys/mman.h\fR>.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR\fR
 .ad
 .RS 14n
-.rt  
 Data can be read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR\fR
 .ad
 .RS 14n
-.rt  
 Data can be written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 Data can be executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_NONE\fR\fR
 .ad
 .RS 14n
-.rt  
 Data cannot be accessed.
 .RE
 
@@ -140,89 +132,73 @@ mapped data. The value of \fIflags\fR is the bitwise inclusive \fBOR\fR of
 these options, defined in <\fBsys/mman.h\fR>:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_SHARED\fR\fR
 .ad
 .RS 17n
-.rt  
 Changes are shared.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_PRIVATE\fR\fR
 .ad
 .RS 17n
-.rt  
 Changes are private.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_FIXED\fR\fR
 .ad
 .RS 17n
-.rt  
 Interpret \fIaddr\fR exactly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_NORESERVE\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not reserve swap space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_ANON\fR\fR
 .ad
 .RS 17n
-.rt  
 Map anonymous memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_ALIGN\fR\fR
 .ad
 .RS 17n
-.rt  
 Interpret \fIaddr\fR as required aligment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_TEXT\fR\fR
 .ad
 .RS 17n
-.rt  
 Map text.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_INITDATA\fR\fR
 .ad
 .RS 17n
-.rt  
 Map initialized data segment.
 .RE
 
@@ -378,7 +354,7 @@ If length > 4 Mbytes
         round to 4-Mbyte multiple
 elseif length > 512 Kbytes
         round to 512-Kbyte multiple
-else 
+else
         round to 64-Kbyte multiple
 .fi
 .in -2
@@ -471,7 +447,6 @@ Combine amounts over 1008 Kbytes into 4080-Kbyte chunks.
 The following is the output from a 32-bit program demonstrating this:
 .sp
 .ne 2
-.mk
 .na
 \fBmap 8192 bytes: \fB0xff390000\fR\fR
 .ad
@@ -486,7 +461,6 @@ The following is the output from a 32-bit program demonstrating this:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 512 Kbytes: \fB0xff180000\fR\fR
 .ad
@@ -501,7 +475,6 @@ The following is the output from a 32-bit program demonstrating this:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 496 Kbytes: \fB0xff000000\fR\fR
 .ad
@@ -516,7 +489,6 @@ The following is the output from a 32-bit program demonstrating this:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 1 Mbyte: \fB0xfee00000\fR\fR
 .ad
@@ -531,7 +503,6 @@ The following is the output from a 32-bit program demonstrating this:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 1008 Kbytes: \fB0xfeb80000\fR\fR
 .ad
@@ -546,7 +517,6 @@ The following is the output from a 32-bit program demonstrating this:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 4 Mbytes: \fB0xfe400000\fR\fR
 .ad
@@ -561,7 +531,6 @@ The following is the output from a 32-bit program demonstrating this:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 4080 Kbytes: \fB0xfd800000\fR\fR
 .ad
@@ -580,7 +549,6 @@ The following is the output of the same program compiled as a 64-bit
 application:
 .sp
 .ne 2
-.mk
 .na
 \fBmap 8192 bytes: \fB0xffffffff7f000000\fR\fR
 .ad
@@ -595,7 +563,6 @@ application:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 512 Kbytes: \fB0xffffffff7ee00000\fR\fR
 .ad
@@ -610,7 +577,6 @@ application:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 496 Kbytes: \fB0xffffffff7ec00000\fR\fR
 .ad
@@ -625,7 +591,6 @@ application:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 1 Mbyte: \fB0xffffffff7e900000\fR\fR
 .ad
@@ -640,7 +605,6 @@ application:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 1008 Kbytes: \fB0xffffffff7e600000\fR\fR
 .ad
@@ -655,7 +619,6 @@ application:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 4 Mbytes: \fB0xffffffff7e000000\fR\fR
 .ad
@@ -670,7 +633,6 @@ application:
 
 .sp
 .ne 2
-.mk
 .na
 \fBmap 4080 Kbytes: \fB0xffffffff7d400000\fR\fR
 .ad
@@ -702,12 +664,10 @@ and continuing for \fIlen\fR bytes may have been unmapped.
 The \fBmmap()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIfildes\fR file descriptor is not open for read, regardless of the
 protection specified; or \fIfildes\fR is not open for write and
 \fBPROT_WRITE\fR was specified for a \fBMAP_SHARED\fR type mapping.
@@ -715,12 +675,10 @@ protection specified; or \fIfildes\fR is not open for write and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 The mapping could not be locked in memory.
 .sp
 There was insufficient room to reserve swap space for the mapping.
@@ -728,24 +686,20 @@ There was insufficient room to reserve swap space for the mapping.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIfildes\fR file descriptor is not open (and \fBMAP_ANON\fR was not
 specified).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The arguments \fIaddr\fR (if \fBMAP_FIXED\fR was specified) or \fIoff\fR are
 not multiples of the page size as returned by \fBsysconf()\fR.
 .sp
@@ -768,36 +722,30 @@ The argument \fIlen\fR has a value equal to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of mapped regions would exceed an implementation-dependent limit
 (per process or per system).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENODEV\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIfildes\fR argument refers to an object for which \fBmmap()\fR is
 meaningless, such as a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fBMAP_FIXED\fR option was specified and the range [\fIaddr, addr + len\fR)
 exceeds that allowed for the address space of a process.
 .sp
@@ -813,24 +761,20 @@ calls to \fBmmap()\fR exceeds \fBRLIMIT_VMEM\fR (see  \fBgetrlimit\fR(2)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 13n
-.rt  
 The system does not support the combination of accesses requested in the
 \fIprot\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 13n
-.rt  
 Addresses in the range [\fIoff, off + len\fR) are invalid for the object
 specified by \fIfildes\fR.
 .sp
@@ -841,12 +785,10 @@ The \fBMAP_FIXED\fR option was specified in \fIflags\fR and the combination of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The file is a regular file and the value of \fIoff\fR plus \fIlen\fR exceeds
 the offset maximum establish in the open file description associated with
 \fIfildes\fR.
@@ -857,12 +799,10 @@ the offset maximum establish in the open file description associated with
 The \fBmmap()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The file to be mapped is already locked using advisory or mandatory record
 locking. See \fBfcntl\fR(2).
 .RE
@@ -933,15 +873,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH flowadm 1M "8 mar 2011" "SunOS 5.11" "System Administration Commands"
+.TH FLOWADM 1M "Feb 14, 2009"
 .SH NAME
 flowadm \- administer bandwidth resource control and priority for protocols,
 services, containers, and virtual machines
@@ -77,7 +77,6 @@ options. Options are described in the context of each subcommand.
 The following subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]\fR
 .ad
@@ -87,7 +86,6 @@ Show flow configuration information (the default) or statistics, either for all
 flows, all flows on a link, or for the specified \fIflow\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...]\fR
 .ad
@@ -98,7 +96,6 @@ name must be one of the fields listed below, or a special value \fBall\fR, to
 display all fields. For each flow found, the following fields can be displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflow\fR\fR
 .ad
@@ -109,7 +106,6 @@ The name of the flow.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlink\fR\fR
 .ad
@@ -120,7 +116,6 @@ The name of the link the flow is on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipaddr\fR\fR
 .ad
@@ -132,7 +127,6 @@ flow was defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtransport\fR\fR
 .ad
@@ -143,7 +137,6 @@ The name of the layer for protocol to be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport\fR\fR
 .ad
@@ -154,7 +147,6 @@ Local port of service for flow.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdsfield\fR\fR
 .ad
@@ -169,7 +161,6 @@ header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR, \fB--parseable\fR\fR
 .ad
@@ -180,7 +171,6 @@ Display using a stable machine-parseable format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -191,7 +181,6 @@ Display persistent flow property information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR, \fB--continuous\fR\fR
 .ad
@@ -203,7 +192,6 @@ that \fBprstat\fR(1M) displays CPU utilization by process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--statistics\fR\fR
 .ad
@@ -214,7 +202,6 @@ Displays flow statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval\fR, \fB--interval\fR=\fIinterval\fR\fR
 .ad
@@ -227,7 +214,6 @@ displayed once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
 .ad
@@ -252,7 +238,6 @@ Operate on a link that has been delegated to the specified zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
 .ad
@@ -269,7 +254,6 @@ supported), so that the selected traffic can be separated from others and can
 flow with minimal impact from other traffic.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -281,7 +265,6 @@ the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -293,7 +276,6 @@ persistent creation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonename\fR
 .ad
@@ -315,7 +297,6 @@ Specify the link to which the flow will be added.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIattr\fR=\fIvalue\fR[,...], \fB--attr\fR=\fIvalue\fR\fR
 .ad
@@ -326,7 +307,6 @@ A comma-separated list of attributes to be set to the specified values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR=\fIvalue\fR[,...]\fR
 .ad
@@ -339,7 +319,6 @@ A comma-separated list of properties to be set to the specified values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR {\fIlink\fR | \fIflow\fR}\fR
 .ad
@@ -348,7 +327,6 @@ A comma-separated list of properties to be set to the specified values.
 Remove an existing flow identified by its link or name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -360,7 +338,6 @@ the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -372,7 +349,6 @@ persistent removal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonename\fR
 .ad
@@ -397,7 +373,6 @@ specified, remove only that flow.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm set-flowprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR
 \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
@@ -409,7 +384,6 @@ complete list of properties can be retrieved using the \fBshow-flow\fR
 subcommand.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -421,7 +395,6 @@ the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -433,7 +406,6 @@ persistent setting of properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR=\fIvalue\fR[,...]\fR
 .ad
@@ -446,7 +418,6 @@ A comma-separated list of properties to be set to the specified values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm reset-flowprop\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-p\fR
 [\fIprop\fR=\fIvalue\fR[,...]] \fIflow\fR\fR
@@ -459,7 +430,6 @@ no properties are specified, all properties are reset. See the
 their default values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--temporary\fR\fR
 .ad
@@ -471,7 +441,6 @@ reboot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR, \fB--root-dir\fR=\fIroot-dir\fR\fR
 .ad
@@ -483,7 +452,6 @@ persistent setting of properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprop\fR=\fIvalue\fR[,...], \fB--prop\fR=\fIvalue\fR[,...]\fR
 .ad
@@ -496,7 +464,6 @@ A comma-separated list of properties to be reset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm show-flowprop\fR [\fB-cP\fR] [\fB-l\fR \fIlink\fR] [\fB-p\fR
 \fIprop\fR[,...]] [\fIflow\fR]\fR
@@ -511,7 +478,6 @@ available flow properties are displayed. For each property, the following
 fields are displayed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLOW\fR\fR
 .ad
@@ -522,7 +488,6 @@ The name of the flow.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROPERTY\fR\fR
 .ad
@@ -533,7 +498,6 @@ The name of the property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVALUE\fR\fR
 .ad
@@ -547,7 +511,6 @@ unknown. Persistent values that are not set or have been reset will be shown as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEFAULT\fR\fR
 .ad
@@ -559,7 +522,6 @@ The default value of the property. If the property has no default value,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOSSIBLE\fR\fR
 .ad
@@ -574,7 +536,6 @@ shown.
 Flow properties are documented in the "Flow Properties" section, below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR, \fB--parseable\fR\fR
 .ad
@@ -585,7 +546,6 @@ Display using a stable machine-parseable format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--persistent\fR\fR
 .ad
@@ -596,7 +556,6 @@ Display persistent flow property information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprop\fR[,...], \fB--prop\fR=\fIprop\fR[,...]\fR
 .ad
@@ -609,7 +568,6 @@ A comma-separated list of properties to show.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflowadm show-usage\fR [\fB-a\fR] [\fB-d\fR | {\fB-p\fR \fIplotfile\fR
 \fB-F\fR \fIformat\fR}] [\fB-s\fR \fItime\fR] [\fB-e\fR \fItime\fR]
@@ -623,7 +581,6 @@ required. The default output will be the summary of flow usage for the entire
 period of time in which extended accounting was enabled.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -636,7 +593,6 @@ the flows that have already been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -648,7 +604,6 @@ format \fIDD\fR/\fIMM\fR/\fIYYYY\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIformat\fR\fR
 .ad
@@ -660,7 +615,6 @@ option. As of this release, \fBgnuplot\fR is the only supported format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIplotfile\fR\fR
 .ad
@@ -672,7 +626,6 @@ a file of the format specified by the \fB-F\fR option, which is required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItime\fR, \fB-e\fR \fItime\fR\fR
 .ad
@@ -684,7 +637,6 @@ Start and stop times for data display. Time is in the format
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
@@ -695,7 +647,6 @@ Read extended accounting records of network flow usage from \fIfilename\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflow\fR\fR
 .ad
@@ -714,7 +665,6 @@ The flow operand that identify a flow in a \fBflowadm\fR command is a
 comma-separated list of one or more keyword, value pairs from the list below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocal_ip\fR[\fB/\fR\fIprefix_len\fR]\fR
 .ad
@@ -733,7 +683,6 @@ address is \fB/32\fR and for IPv6 is \fB/128\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremote_ip\fR[\fB/\fR\fIprefix_len\fR]\fR
 .ad
@@ -745,7 +694,6 @@ Identifies a network flow by the remote IP address. The syntax is the same as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtransport\fR={\fBtcp\fR|\fBudp\fR|\fBsctp\fR|\fBicmp\fR|\fBicmpv6\fR}\fR
 .ad
@@ -757,7 +705,6 @@ with local_port to identify the service that needs special attention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlocal_port\fR\fR
 .ad
@@ -768,7 +715,6 @@ Identifies a service specified by the local port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdsfield\fR[\fB:\fR\fIdsfield_mask\fR]\fR
 .ad
@@ -867,7 +813,6 @@ The following flow properties are supported. Note that the ability to set a
 given property to a given value depends on the driver and hardware.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxbw\fR\fR
 .ad
@@ -881,7 +826,6 @@ Mbps. The default is no bandwidth limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpriority\fR\fR
 .ad
@@ -1065,7 +1009,6 @@ Output the same information as above as a plotfile:
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -1076,7 +1019,6 @@ All actions were performed successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -1093,13 +1035,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

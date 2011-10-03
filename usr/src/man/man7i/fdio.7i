@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fdio 7I "26 April 2001" "SunOS 5.11" "Ioctl Requests"
+.TH FDIO 7I "Apr 26, 2001"
 .SH NAME
 fdio \- floppy disk control operations
 .SH SYNOPSIS
@@ -25,12 +25,10 @@ The following \fBioctl\fR(\|) requests are available on the Solaris floppy
 driver.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDDEFGEOCHAR\fR\fR
 .ad
 .RS 16n
-.rt  
 x86 based systems:  This \fBioctl\fR(\|) forces the floppy driver to restore
 the diskette and drive characteristics and geometry, and partition information
 to default values based on the device configuration.
@@ -38,12 +36,10 @@ to default values based on the device configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDGETCHANGE\fR\fR
 .ad
 .RS 16n
-.rt  
 The argument is a pointer to an \fBint.\fR This \fBioctl\fR(\|) returns the
 status of the diskette-changed signal from the floppy interface. The following
 defines are provided for cohesion.
@@ -59,7 +55,7 @@ on x86 based systems) instead of \fBFDGC_HISTORY.\fR
 /*
  * Used by FDGETCHANGE, returned state of the sense disk change bit.
  */
-#define FDGC_HISTORY  0x01	 /* disk has changed since insertion or 
+#define FDGC_HISTORY  0x01	 /* disk has changed since insertion or
                                   last FDGETCHANGE call */
 #define FDGC_CURRENT  0x02	 /* if set, indicates drive has floppy,
 >                                 otherwise, drive is empty */
@@ -70,12 +66,10 @@ on x86 based systems) instead of \fBFDGC_HISTORY.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDIOGCHAR\fR\fR
 .ad
 .RS 13n
-.rt  
 The argument is a pointer to an \fBfd_char\fR structure (described below). This
 \fBioctl\fR(\|) gets the characteristics of the floppy diskette from the floppy
 controller.
@@ -83,12 +77,10 @@ controller.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDIOSCHAR\fR\fR
 .ad
 .RS 13n
-.rt  
 The argument is a pointer to an \fBfd_char\fR structure (described below). This
 \fBioctl\fR(\|) sets the characteristics of the floppy diskette for the floppy
 controller. Typical values in the  \fBfd_char\fR structure for a high density
@@ -129,12 +121,10 @@ struct fd_char {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDGETDRIVECHAR\fR\fR
 .ad
 .RS 18n
-.rt  
 The argument to this \fBioctl\fR(\|) is a pointer to an \fBfd_drive\fR
 structure (described below). This \fBioctl\fR(\|) gets the characteristics of
 the floppy drive from the floppy controller.
@@ -142,12 +132,10 @@ the floppy drive from the floppy controller.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDSETDRIVECHAR\fR\fR
 .ad
 .RS 18n
-.rt  
 x86 based systems:  The argument to this \fBioctl\fR(\|) is a pointer to an
 \fBfd_drive\fR structure (described below). This \fBioctl\fR(\|) sets the
 characteristics of the floppy drive for the floppy controller. Only
@@ -182,45 +170,37 @@ struct fd_drive {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDGETSEARCH\fR\fR
 .ad
 .RS 15n
-.rt  
 Not available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDSETSEARCH\fR\fR
 .ad
 .RS 15n
-.rt  
 Not available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDEJECT\fR\fR
 .ad
 .RS 15n
-.rt  
 SPARC:  This \fBioctl\fR(\|) requests the floppy drive to eject the diskette.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDIOCMD\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to an \fBfd_cmd\fR structure (described below). This
 \fBioctl\fR(\|) allows access to the floppy diskette using the floppy device
 driver.  Only the \fBFDCMD_WRITE\fR, \fBFDCMD_READ\fR, and
@@ -250,7 +230,7 @@ assumed to be large enough to accommodate the transfer.
 .in +2
 .nf
 {
-/* 
+/*
 * Floppy commands
  */
 #define	FDCMD_WRITE	1
@@ -265,12 +245,10 @@ assumed to be large enough to accommodate the transfer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFDRAW\fR\fR
 .ad
 .RS 9n
-.rt  
 The argument is a pointer to an \fBfd_raw\fR structure (described below).
 This \fBioctl\fR(\|) allows direct control of the floppy drive using the floppy
 controller. Refer to the appropriate floppy-controller data sheet for full

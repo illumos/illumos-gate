@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_SetHandleOffset 9F "16 May 1997" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_SETHANDLEOFFSET 9F "May 16, 1997"
 .SH NAME
 csx_SetHandleOffset \- set current access handle offset
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR \fR
 .ad
 .RS 11n
-.rt  
 Access handle returned by \fBcsx_RequestIRQ\fR(9F) or \fBcsx_RequestIO\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR \fR
 .ad
 .RS 11n
-.rt  
 New access handle offset.
 .RE
 
@@ -51,12 +47,10 @@ This function sets the current offset for the access handle, \fIhandle\fR, to
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR \fR
 .ad
 .RS 15n
-.rt  
 Successful operation.
 .RE
 

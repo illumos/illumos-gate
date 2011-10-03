@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH newform 1 "21 Jul 1997" "SunOS 5.11" "User Commands"
+.TH NEWFORM 1 "Jul 21, 1997"
 .SH NAME
 newform \- change the format of a text file
 .SH SYNOPSIS
 .LP
 .nf
-\fBnewform\fR [\fB-s\fR] [\fB-i\fR\fItabspec\fR] [\fB-o\fR\fItabspec\fR] [\fB-b\fR\fIn\fR] [\fB-e\fR\fIn\fR] [\fB-p\fR\fIn\fR] 
+\fBnewform\fR [\fB-s\fR] [\fB-i\fR\fItabspec\fR] [\fB-o\fR\fItabspec\fR] [\fB-b\fR\fIn\fR] [\fB-e\fR\fIn\fR] [\fB-p\fR\fIn\fR]
      [\fB-a\fR\fIn\fR] [\fB-f\fR] [\fB-c\fR\fIchar\fR] [\fB-l\fR\fIn\fR] [\fIfilename\fR]...
 .fi
 
@@ -33,12 +33,10 @@ command line.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 14n
-.rt  
 Shears off leading characters on each line up to the first tab and places up to
 8 of the sheared characters at the end of the line. If more than 8 characters
 (not counting the first tab) are sheared, the eighth character is replaced by a
@@ -61,12 +59,10 @@ expanded to spaces, padded with spaces out to column 72 (or truncated to column
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fItabspec\fR \fR
 .ad
 .RS 14n
-.rt  
 Input tab specification: expands tabs to spaces, according to the tab
 specifications given. \fITabspec\fR recognizes all tab specification forms
 described in \fBtabs\fR(1). In addition, \fItabspec\fR may be \fB-\fR, in which
@@ -78,12 +74,10 @@ expects no tabs; if any are found, they are treated as \fB\(mi1\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fItabspec\fR \fR
 .ad
 .RS 14n
-.rt  
 Output tab specification: replaces spaces by tabs, according to the tab
 specifications given. The tab specifications are the same as for
 \fB-i\fR\fItabspec\fR. If no \fItabspec\fR is given, \fItabspec\fR defaults to
@@ -93,12 +87,10 @@ converted to tabs on output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fIn\fR \fR
 .ad
 .RS 14n
-.rt  
 Truncate \fIn\fR characters from the beginning of the line when the line length
 is greater than the effective line length (see \fB\(mil\fIn\fR\fR). Default is
 to truncate the number of characters necessary to obtain the effective line
@@ -111,24 +103,20 @@ follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-b\fR\fIn\fR except that characters are truncated from the end of
 the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 Prefix \fIn\fR characters (see \fB-c\fR\fIchar\fR) to the beginning of a line
 when the line length is less than the effective line length. Default is to
 prefix the number of characters necessary to obtain the effective line length.
@@ -136,23 +124,19 @@ prefix the number of characters necessary to obtain the effective line length.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB-p\fR\fIn\fR except characters are appended to the end of a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Write the tab specification format line on the standard output before any other
 lines are output. The tab specification format line which is printed will
 correspond to the format specified in the \fBlast\fR \fB-o\fR option. If no
@@ -162,24 +146,20 @@ default specification of \fB\(mi8\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fIchar\fR\fR
 .ad
 .RS 14n
-.rt  
 Change the prefix/append character to \fIchar\fR. Default character for
 \fIchar\fR is a space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 Set the effective line length to \fIn\fR characters. If \fIn\fR is not entered,
 \fB-l\fR defaults to 72. The default line length without the \fB-l\fR option is
 80 characters. Note:  Tabs and backspaces are considered to be one character
@@ -195,12 +175,10 @@ existing line in the file so that the \fB-b\fR option is activated.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR \fR
 .ad
 .RS 13n
-.rt  
 Input file
 .RE
 
@@ -210,23 +188,19 @@ Input file
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 6n
-.rt  
 Operation failed.
 .RE
 
@@ -240,7 +214,6 @@ Operation failed.
 All diagnostics are fatal.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBusage:\fR \fB \|.\|.\|.\fR \fR
 .ad
@@ -251,7 +224,6 @@ All diagnostics are fatal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB"not \fR\fB-s\fR\fB format"\fR\fR
 .ad
@@ -262,7 +234,6 @@ There was no tab on one line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB"can't open file"\fR\fR
 .ad
@@ -273,7 +244,6 @@ Self-explanatory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB"internal line too long"\fR\fR
 .ad
@@ -284,7 +254,6 @@ A line exceeds 512 characters after being expanded in the internal work buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB"tabspec in error" \fR\fR
 .ad
@@ -296,7 +265,6 @@ ascending.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB"tabspec indirection illegal" \fR\fR
 .ad

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wusbadm 1M "22 Apr 2009" "SunOS 5.11" "System Administration Commands"
+.TH WUSBADM 1M "Apr 22, 2009"
 .SH NAME
 wusbadm \- administer wireless USB hosts and devices
 .SH SYNOPSIS
@@ -65,7 +65,6 @@ its multiple records of association depends on the manufacturer.
 Each \fBwusbadm\fR subcommand operates on one of the following objects:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhost-id\fR\fR
 .ad
@@ -80,7 +79,6 @@ subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev-id\fR\fR
 .ad
@@ -106,7 +104,6 @@ each subcommand displays subcommand-specific usage information if you run it
 without any options or operands.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR [\fB-h\fR | \fB-d\fR] [\fB-o\fR \fIfield\fR[,...]]\fR
 .ad
@@ -118,7 +115,6 @@ devices and all fields. Each host and its devices will be displayed as a group.
 This subcommand supports the following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR[,...]\fR
 .ad
@@ -130,7 +126,6 @@ display all fields. By default (without \fB-o\fR), \fBlist\fR displays all
 fields.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBID\fR\fR
 .ad
@@ -141,7 +136,6 @@ The \fIhost-id\fR or \fIdev-id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTYPE\fR\fR
 .ad
@@ -159,7 +153,6 @@ forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE\fR\fR
 .ad
@@ -168,7 +161,6 @@ forth.
 There are the following states for the host:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenabled\fR\fR
 .ad
@@ -180,7 +172,6 @@ association, connecting devices, performing data communication, and so forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisabled\fR\fR
 .ad
@@ -194,7 +185,6 @@ driver detach.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnected\fR\fR
 .ad
@@ -207,7 +197,6 @@ after it is unplugged from the USB port on the system.
 There are the folllowing states for the device:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnected\fR\fR
 .ad
@@ -220,7 +209,6 @@ the association is complete and its radio is turned on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnected\fR\fR
 .ad
@@ -237,7 +225,6 @@ hardware problems, and so forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB--host\fR\fR
 .ad
@@ -248,7 +235,6 @@ List the wireless USB hosts only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR, \fB--device\fR\fR
 .ad
@@ -261,7 +247,6 @@ List the wireless USB devices only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBassociate\fR [\fB-h\fR \fIhost-id\fR] [[\fB-c\fR [\fB-f\fR]] | \fB-n\fR]
 [\fB-o\fR]\fR
@@ -274,7 +259,6 @@ step before a wireless USB device can be connected with a wireless USB host.
 There are two association models:
 .sp
 .ne 2
-.mk
 .na
 \fBCable association\fR
 .ad
@@ -288,7 +272,6 @@ the subsequent connections between the same host and the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNumeric association\fR
 .ad
@@ -310,7 +293,6 @@ list all of them, enabling a user to choose among them. This subcommand has the
 following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost-id\fR, \fB--host\fR \fIhost-id\fR\fR
 .ad
@@ -322,7 +304,6 @@ specified, this subcommand lists all enabled hosts for users to choose.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR, \fB--cable\fR\fR
 .ad
@@ -334,7 +315,6 @@ the host and runs the associate subcommand with this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR, \fB--numeric\fR\fR
 .ad
@@ -349,7 +329,6 @@ If neither of the preceding two association model  options (\fB-n\fR or
 following association model options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -361,7 +340,6 @@ the host and runs the associate subcommand with this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR, \fB--onetime\fR\fR
 .ad
@@ -377,7 +355,6 @@ need to perform another association for the next connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-dev\fR [[\fB-d\fR \fIdev-id\fR] | [\fB-h\fR
 \fIhost-id\fR]][\fB-f\fR]\fR
@@ -390,7 +367,6 @@ runs the \fBassociate\fR subcommand again, for the host and device. This
 subcommand has the following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR, \fB--device\fR=\fIdev-id\fR\fR
 .ad
@@ -402,7 +378,6 @@ Remove the association information of the wireless USB device specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost-id\fR, \fB--host\fR=\fIhost-id\fR\fR
 .ad
@@ -414,7 +389,6 @@ with the host specified by \fIhost-id\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -428,7 +402,6 @@ connected with the host, then this subcommand will force it to disconnect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-host\fR [\fB-h\fR \fIhost-id\fR] [\fB-f\fR]\fR
 .ad
@@ -444,7 +417,6 @@ can be restored. It is not recommended to remove a on-board host. This
 subcommand has the following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost-id\fR, \fB--host\fR=\fIhost-id\fR\fR
 .ad
@@ -455,7 +427,6 @@ Specifies the \fIhost-id\fR to be removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -469,7 +440,6 @@ devices connected with the host, then force them to disconnect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable-host\fR [\fB-h\fR \fIhost-id\fR]\fR
 .ad
@@ -479,7 +449,6 @@ Take the host to the enabled state. By default, the host is in the enabled
 state. This subcommand has the following option.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost-id\fR, \fB--host\fR=\fIhost-id\fR\fR
 .ad
@@ -492,7 +461,6 @@ Specifies the \fIhost-id\fR to be enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable-host\fR [\fB-h\fR \fIhost-id\fR] [\fB-f\fR]\fR
 .ad
@@ -504,7 +472,6 @@ brings the host back to the enabled state. This subcommand has the following
 options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost-id\fR, \fB--host\fR=\fIhost-id\fR\fR
 .ad
@@ -515,7 +482,6 @@ Specifies the \fIhost-id\fR to be disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -611,7 +577,6 @@ until they are associated again. Continue (yes/no)?
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -622,7 +587,6 @@ Successful operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -634,7 +598,6 @@ host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -654,13 +617,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

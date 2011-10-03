@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curs_inch 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH CURS_INCH 3CURSES "Dec 31, 1996"
 .SH NAME
 curs_inch, inch, winch, mvinch, mvwinch \- get a character and its attributes
 from a curses window
@@ -47,34 +47,28 @@ The following bit-masks can be AND-ed with characters returned by
 \fBwinch()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fBA_CHARTEXT\fR
 .ad
 .RS 16n
-.rt  
 Bit-mask to extract character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_ATTRIBUTES\fR
 .ad
 .RS 16n
-.rt  
 Bit-mask to extract attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA_COLOR\fR
 .ad
 .RS 16n
-.rt  
 Bit-mask to extract color-pair field information
 .RE
 
@@ -86,13 +80,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

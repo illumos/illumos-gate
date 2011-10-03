@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH plgrp 1 "8 Sep 2006" "SunOS 5.11" "User Commands"
+.TH PLGRP 1 "Sep 8, 2006"
 .SH NAME
 plgrp \- observe and affect home lgroup and lgroup affinities of threads
 .SH SYNOPSIS
@@ -24,7 +24,7 @@ plgrp \- observe and affect home lgroup and lgroup affinities of threads
 
 .LP
 .nf
-\fBplgrp\fR [\fB-F\fR] \fB-A\fR \fIlgroup_list\fR/\fInone\fR | \fIweak\fR |\fIstrong\fR [,...] \fIpid\fR 
+\fBplgrp\fR [\fB-F\fR] \fB-A\fR \fIlgroup_list\fR/\fInone\fR | \fIweak\fR |\fIstrong\fR [,...] \fIpid\fR
      [/\fIlwps\fR] ...
 .fi
 
@@ -107,7 +107,6 @@ selected at once by using the hyphen (\fB-\fR) and comma(\fB,\fR). For example,
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIlgroup_list\fR\fR
 .ad
@@ -119,7 +118,6 @@ specified \fIlgroup_list\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIlgroup_list\fR\fB/\fR\fInone\fR\fB|\fR\fIweak\fR\fB|\fR\fIstrong
 \fR\fB[,...]\fR\fR
@@ -135,7 +133,6 @@ given to set several affinities at once.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -151,7 +148,6 @@ this proc tool. See \fBWARNINGS\fR for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -163,7 +159,6 @@ specified, this is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR \fIlgroup_list\fR\fR
 .ad
@@ -182,23 +177,19 @@ to the \fBlgroups\fR in a round robin fashion.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlwps\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies thread. See \fBUSAGE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies process ID. See \fBUSAGE\fR.
 .RE
 
@@ -284,34 +275,28 @@ PID/LWPID    HOME       AFFINITY
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Syntax error. Nothing was changed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Non-fatal error or interrupt. Something might have changed.
 .RE
 
@@ -323,13 +308,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

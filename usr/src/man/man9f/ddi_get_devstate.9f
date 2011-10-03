@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_get_devstate 9F "13 August 1999" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_GET_DEVSTATE 9F "Aug 13, 1999"
 .SH NAME
 ddi_get_devstate \- Check device state
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 \fBddi_devstate_t\fR \fBddi_get_devstate\fR(\fBdev_info_t *\fR\fIdip\fR);
@@ -22,12 +22,10 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to the device's \fBdev_info\fR structure
 .RE
 
@@ -41,12 +39,10 @@ and any fault reports relating to it.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DEVSTATE_OFFLINE\fR\fR
 .ad
 .RS 25n
-.rt  
 The device is offline.  In this state, the device driver is not attached, nor
 will it be attached automatically. The device cannot be used until it is
 brought online.
@@ -54,23 +50,19 @@ brought online.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DEVSTATE_DOWN\fR\fR
 .ad
 .RS 25n
-.rt  
  The device is online but unusable due to a fault.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DEVSTATE_QUIESCED\fR\fR
 .ad
 .RS 25n
-.rt  
  The bus on which the device resides has been quiesced. This is not a fault,
 but no operations on the device should be performed while the bus remains
 quiesced.
@@ -78,24 +70,20 @@ quiesced.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DEVSTATE_DEGRADED\fR\fR
 .ad
 .RS 25n
-.rt  
  The device is online but only able to provide a partial or degraded service,
 due to a fault.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DEVSTATE_UP\fR\fR
 .ad
 .RS 25n
-.rt  
  The device is online and fully operational.
 .RE
 

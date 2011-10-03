@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fx_dptbl 4 "15 Oct 2002" "SunOS 5.11" "File Formats"
+.TH FX_DPTBL 4 "Oct 15, 2002"
 .SH NAME
 fx_dptbl \- fixed priority dispatcher parameter table
 .SH SYNOPSIS
@@ -45,12 +45,10 @@ A parameter structure consists of the following members. These are also
 described in the \fB/usr/include/sys/fx.h\fR header.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfx_globpri\fR\fR
 .ad
 .RS 14n
-.rt  
 The global scheduling priority associated with this priority level. The mapping
 between fixed-priority priority levels and global scheduling priorities is
 determined at boot time by the system configuration. \fBfx_globpri\fR can not
@@ -59,12 +57,10 @@ be changed with \fBdispadmin\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfx_quantum\fR\fR
 .ad
 .RS 14n
-.rt  
 The length of the time quantum allocated to processes at this level in ticks
 (\fBhz\fR). The time quantum value is only a default or starting value for
 processes at a particular level, as the time quantum of a fixed priority
@@ -368,10 +364,10 @@ fxdpent_t config_fx_dptbl[] = {
    FXGPUP0+59,   2,
    FXGPUP0+60    2,
 };
-   
 
 
-pri_t config_fx_maxumdpri = 
+
+pri_t config_fx_maxumdpri =
                 sizeof (config_fx_dptbl) / sizeof (fxdpent_t) - 1;
 
 /*

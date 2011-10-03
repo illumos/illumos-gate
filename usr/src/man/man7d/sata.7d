@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sata 7D "10 Sep 2009" "SunOS 5.11" "Devices"
+.TH SATA 7D "Sep 10, 2009"
 .SH NAME
 sata \- Solaris SATA framework
 .SH DESCRIPTION
@@ -34,23 +34,19 @@ SATA devices.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/sata\fR\fR
 .ad
 .RS 27n
-.rt  
 32-bit \fBELF\fR kernel module (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/amd64/sata\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit \fBELF\fR kernel module (x86).
 .RE
 
@@ -62,13 +58,12 @@ See \fBattributes\fR(5) for descriptions of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO
@@ -107,7 +102,7 @@ or:
 .sp
 .in +2
 .nf
-sata: NOTICE: <\fBcontroller/devices/.. path\fR>: 
+sata: NOTICE: <\fBcontroller/devices/.. path\fR>:
 .fi
 .in -2
 .sp
@@ -118,7 +113,6 @@ sata: NOTICE: <\fBcontroller/devices/.. path\fR>:
 issuing a diagnostic message shown below.
 .sp
 .ne 2
-.mk
 .na
 \fBSATA port X: link lost.\fR
 .ad
@@ -130,7 +124,6 @@ specified SATA device port has been lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA port X: link established.\fR
 .ad
@@ -142,7 +135,6 @@ specified SATA device port has been established.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA port X: device reset.\fR
 .ad
@@ -155,7 +147,6 @@ request from the host.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA port X failed.\fR
 .ad
@@ -168,7 +159,6 @@ cfgadm SATA hardware-specific commands (see \fBcfgadm_sata\fR(1M)).
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA port X error.\fR
 .ad
@@ -179,7 +169,6 @@ An error was detected in specified SATA device port operations.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA device detached at port X.\fR
 .ad
@@ -193,7 +182,6 @@ device port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA device detected at port X.\fR
 .ad
@@ -206,7 +194,6 @@ assumes that the new device is plugged to the specified SATA device port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA disk device at port X.\fR
 .ad
@@ -218,7 +205,6 @@ serial number, firmware revision number and the disk capabilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA CD/DVD (ATAPI) device at port X.\fR
 .ad
@@ -230,7 +216,6 @@ vendor, serial number, firmware revision number and the DVD capabilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA device at port X cannot be configured. Application(s) accessing
 previously attached device have to release it before newly inserted device can
@@ -245,7 +230,6 @@ device can be configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fBApplication(s) accessing previously attached SATA device have to release it
 before newly inserted device can be made accessible.\fR
@@ -260,7 +244,6 @@ cleanup later.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata: error recovery request for non-attached device at cport X.\fR
 .ad
@@ -271,7 +254,6 @@ When error recovery is requested, the device is not yet attached.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA device at port X is not power-managed.\fR
 .ad
@@ -283,7 +265,6 @@ SATA device won't be power-managed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSATA disk device at port X does not support LBA.\fR
 .ad
@@ -295,7 +276,6 @@ addressing and cannot be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot identify SATA device at port X - device is attached.\fR
 .ad
@@ -307,7 +287,6 @@ is attached to the SATA port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata: <HBA driver name><instance number>:hba attached failed.\fR
 .ad
@@ -319,7 +298,6 @@ configured and is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata: invalid ATAPI cdb length<command cdb length>.\fR
 .ad
@@ -330,7 +308,6 @@ The length of the command cdb is greater than that the device can support.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata: invalid sata_hba_tran version X for driver <HBA driver name>.\fR
 .ad
@@ -343,7 +320,6 @@ plugged to this SATA HBA ports) are not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_hba_attach: cannot create SATA attachment point for port X.\fR
 .ad
@@ -355,7 +331,6 @@ plugged to this port could not be not be configured and used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsata_create_target_node: cannot create target node for device at port X.\fR
 .ad

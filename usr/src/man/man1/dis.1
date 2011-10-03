@@ -10,13 +10,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dis 1 "24 Aug 2009" "SunOS 5.11" "User Commands"
+.TH DIS 1 "Aug 24, 2009"
 .SH NAME
 dis \- object code disassembler
 .SH SYNOPSIS
 .LP
 .nf
-\fBdis\fR [\fB-onqCLV\fR] [\fB-d\fR \fIsec\fR] [\fB-D\fR \fIsec\fR] [\fB-F\fR \fIfunction\fR] 
+\fBdis\fR [\fB-onqCLV\fR] [\fB-d\fR \fIsec\fR] [\fB-D\fR \fIsec\fR] [\fB-F\fR \fIfunction\fR]
      [\fB-l\fR \fIstring\fR] [\fB-t\fR \fIsec\fR] \fIfile\fR...
 .fi
 
@@ -36,47 +36,39 @@ Options are interpreted by the disassembler and can be specified in any order.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 15n
-.rt  
 Displays demangled C++ symbol names in the disassembly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIsec\fR\fR
 .ad
 .RS 15n
-.rt  
 Disassembles the named section as data, printing the offset of the data from
 the beginning of the section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIsec\fR\fR
 .ad
 .RS 15n
-.rt  
 Disassembles the named section as data, printing the actual address of the
 data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIfunction\fR\fR
 .ad
 .RS 15n
-.rt  
 Disassembles only the named function in each object file specified on the
 command line. The \fB-F\fR option can be specified multiple times on the
 command line.
@@ -84,12 +76,10 @@ command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIstring\fR\fR
 .ad
 .RS 15n
-.rt  
 Disassembles the archive file specified by \fIstring\fR. For example, one would
 issue the command \fBdis\fR \fB-l\fR \fBx\fR \fB-l\fR \fBz\fR to disassemble
 \fBlibx.a\fR and \fBlibz.a\fR, which are assumed to be in \fBLIBDIR\fR.
@@ -99,12 +89,10 @@ This option is obsolete and might be removed in a future release of Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 15n
-.rt  
 Invokes a lookup of C-language source labels in the symbol table for subsequent
 writing to standard output.
 .sp
@@ -113,57 +101,47 @@ This option is obsolete and might be removed in a future release of Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Displays all addresses numerically. Addresses are displayed using symbolic
 names by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints numbers in octal. The default is hexadecimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 15n
-.rt  
 Quiet mode.  Does not print any headers or function entry labels.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIsec\fR\fR
 .ad
 .RS 15n
-.rt  
 Disassembles the named section as text.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints, on standard error, the version number of the disassembler being
 executed.
 .sp
@@ -187,12 +165,10 @@ compiled with additional debugging information.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of an object file or an archive (see \fBar\fR(1)) of object files.
 .RE
 
@@ -204,12 +180,10 @@ that affect the execution of \fBdis\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLIBDIR\fR\fR
 .ad
 .RS 10n
-.rt  
 If this environment variable contains a value, use this as the path to search
 for the library. If the variable contains a null value, or is not set, it
 defaults to searching for the library under \fB/usr/lib\fR.
@@ -221,35 +195,29 @@ defaults to searching for the library under \fB/usr/lib\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib\fR\fR
 .ad
 .RS 12n
-.rt  
 default \fBLIBDIR\fR
 .RE
 
@@ -261,13 +229,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

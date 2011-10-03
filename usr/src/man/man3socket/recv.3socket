@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH recv 3SOCKET "20 Aug 2007" "SunOS 5.11" "Sockets Library Functions"
+.TH RECV 3SOCKET "Aug 20, 2007"
 .SH NAME
 recv, recvfrom, recvmsg \- receive a message from a socket
 .SH SYNOPSIS
@@ -69,36 +69,30 @@ The \fIflags\fR parameter is formed by an \fBOR\fR operation on one or more of
 the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_OOB\fR\fR
 .ad
 .RS 16n
-.rt  
 Read any \fBout-of-band\fR data present on the socket rather than the regular
 \fBin-band\fR data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_PEEK\fR\fR
 .ad
 .RS 16n
-.rt  
 Peek at the data present on the socket. The data is returned, but not consumed
 to allow a subsequent receive operation to see the same data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_WAITALL\fR\fR
 .ad
 .RS 16n
-.rt  
 Messages are blocked until the full amount of data requested is returned. The
 \fBrecv()\fR function can return a smaller amount of data if a signal is
 caught, the connection is terminated, \fBMSG_PEEK\fR is specified, or if an
@@ -107,12 +101,10 @@ error is pending for the socket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_DONTWAIT\fR\fR
 .ad
 .RS 16n
-.rt  
 Pending messages received on the connection are returned. If data is
 unavailable, the function does not block. This behavior is the equivalent to
 specifying \fBO_NONBLOCK\fR on the file descriptor of a socket, except that
@@ -136,113 +128,93 @@ The \fBrecv()\fR, \fBrecvfrom()\fR, and \fBrecvmsg()\fR functions return errors
 under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIs\fR file descriptor is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBMSG_OOB\fR flag is set and no out-of-band data is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 The operation is interrupted by the delivery of a signal before any data is
 available to be received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurs while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient user memory is available to complete operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 16n
-.rt  
 Insufficient \fBSTREAMS\fR resources are available for the operation to
 complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 \fIs\fR is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESTALE\fR\fR
 .ad
 .RS 16n
-.rt  
 A stale NFS file handle exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is marked non-blocking and the requested operation would block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNREFUSED\fR\fR
 .ad
 .RS 16n
-.rt  
 The requested connection was refused by the peer. For connected IPv4 and IPv6
 datagram sockets, this indicates that the system received an \fBICMP
 Destination Port Unreachable\fR message from the peer.
@@ -254,12 +226,10 @@ The \fBrecv()\fR and \fBrecvfrom()\fR functions fail under the following
 conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIlen\fR argument overflows a \fBssize_t\fR.
 .RE
 
@@ -268,12 +238,10 @@ The \fIlen\fR argument overflows a \fBssize_t\fR.
 The \fBrecvmsg()\fR function returns errors under the following conditions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBmsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by
 \fImsg\fR is less than or equal to \fB0\fR, or greater than \fB[IOV_MAX}\fR.
 See \fBIntro\fR(2) for a definition of \fB[IOV_MAX}\fR.
@@ -281,12 +249,10 @@ See \fBIntro\fR(2) for a definition of \fB[IOV_MAX}\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One of the \fIiov_len\fR values in the \fBmsg_iov\fR array member of the
 \fBmsghdr\fR structure pointed to by \fImsg\fR is negative, or the sum of the
 \fIiov_len\fR values in the \fBmsg_iov\fR array overflows a \fBssize_t\fR.
@@ -300,15 +266,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

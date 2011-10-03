@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH krb5envvar 5 "13 Feb 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH KRB5ENVVAR 5 "Feb 13, 2008"
 .SH NAME
 krb5envvar \- Kerberos environment variables
 .SH DESCRIPTION
@@ -14,7 +14,6 @@ different behavior in order to meet applications' needs. Environment variables
 used within the Kerberos mechanism are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKRB5_KTNAME\fR\fR
 .ad
@@ -58,7 +57,6 @@ write to without using extra command line arguments for file location.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKRB5CCNAME\fR\fR
 .ad
@@ -102,7 +100,6 @@ when making a temporary cache for the life of the invoking process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKRB5RCNAME\fR\fR
 .ad
@@ -190,7 +187,6 @@ replay attacks.
 
 .sp
 .ne 2
-.mk
 .na
 \fBKRB5_CONFIG\fR
 .ad
@@ -217,13 +213,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

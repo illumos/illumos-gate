@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * Multithreaded STREAMS Local Transport Provider.
@@ -777,7 +780,7 @@ static struct T_info_ack tl_clts_info_ack =
 		-2,		/* ETSDU_size -2 => not supported */
 		-2,		/* CDATA_size -2 => not supported */
 		-2,		/* DDATA_size  -2 => not supported */
-		-1,		/* ADDR_size -1 => unlimited */
+		-1,		/* ADDR_size -1 => infinite */
 		-1,		/* OPT_size */
 		0,		/* TIDU_size - fill at run time */
 		T_CLTS,		/* SERV_type */
@@ -839,6 +842,7 @@ static void tl_conn_res(mblk_t *, tl_endpt_t *);
 static void tl_discon_req(mblk_t *, tl_endpt_t *);
 static void tl_capability_req(mblk_t *, tl_endpt_t *);
 static void tl_info_req_ser(mblk_t *, tl_endpt_t *);
+static void tl_addr_req_ser(mblk_t *, tl_endpt_t *);
 static void tl_info_req(mblk_t *, tl_endpt_t *);
 static void tl_addr_req(mblk_t *, tl_endpt_t *);
 static void tl_connected_cots_addr_req(mblk_t *, tl_endpt_t *);
@@ -1853,6 +1857,10 @@ tl_wput(queue_t *wq, mblk_t *mp)
 		case T_INFO_REQ:
 			tl_proc = tl_info_req_ser;
 			break;
+		case T_ADDR_REQ:
+			tl_proc = tl_addr_req_ser;
+			break;
+
 		default:
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
 			    SL_TRACE|SL_ERROR,
@@ -4159,6 +4167,17 @@ done:
 	}
 }
 
+static void
+tl_addr_req_ser(mblk_t *mp, tl_endpt_t *tep)
+{
+	if (!tep->te_closing)
+		tl_addr_req(mp, tep);
+	else
+		freemsg(mp);
+
+	tl_serializer_exit(tep);
+	tl_refrele(tep);
+}
 
 static void
 tl_addr_req(mblk_t *mp, tl_endpt_t *tep)

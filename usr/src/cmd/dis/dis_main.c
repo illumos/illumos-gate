@@ -22,9 +22,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Jason King.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <getopt.h>
@@ -108,6 +108,7 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 	char buf[BUFSIZE];
 	char symbuf[BUFSIZE];
 	const char *symbol;
+	const char *last_symbol;
 	off_t symoffset;
 	int i;
 	int bytesperline;
@@ -125,22 +126,34 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 	if ((bytesperline = dis_max_instrlen(dhp)) > 6)
 		bytesperline = 6;
 
+	symbol = NULL;
+
 	while (addr < db.db_addr + db.db_size) {
 
 		if (dis_disassemble(dhp, addr, buf, BUFSIZE) != 0) {
+#if defined(__sparc)
 			/*
-			 * If we encounter an invalid opcode, we just
-			 * print "*** invalid opcode ***" at that first bad
-			 * instruction and continue with printing the rest
-			 * of the instruction stream as hex data,
-			 * We then find the next valid symbol in the section,
-			 * and disassemble from there.
+			 * Since sparc instructions are fixed size, we
+			 * always know the address of the next instruction
 			 */
+			(void) snprintf(buf, sizeof (buf),
+			    "*** invalid opcode ***");
+			db.db_nextaddr = addr + 4;
+
+#else
 			off_t next;
 
 			(void) snprintf(buf, sizeof (buf),
 			    "*** invalid opcode ***");
 
+			/*
+			 * On architectures with variable sized instructions
+			 * we have no way to figure out where the next
+			 * instruction starts if we encounter an invalid
+			 * instruction.  Instead we print the rest of the
+			 * instruction stream as hex until we reach the
+			 * next valid symbol in the section.
+			 */
 			if ((next = dis_tgt_next_symbol(tgt, addr)) == 0) {
 				db.db_nextaddr = db.db_addr + db.db_size;
 			} else {
@@ -150,6 +163,7 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 				else
 					db.db_nextaddr = addr + next;
 			}
+#endif
 		}
 
 		/*
@@ -168,12 +182,19 @@ dis_data(dis_tgt_t *tgt, dis_handle_t *dhp, uint64_t addr, void *data,
 		 * based on the maximum width that the current symbol can be.
 		 * This at least produces text aligned within each function.
 		 */
+		last_symbol = symbol;
 		symbol = dis_tgt_lookup(tgt, addr, &symoffset, 1, &symsize,
 		    &isfunc);
-		/* Get the maximum length for this symbol */
-		getsymname(addr, symbol, symsize, symbuf, sizeof (symbuf));
-		symwidth = MAX(strlen(symbuf), MINSYMWIDTH);
+		if (symbol == NULL) {
+			symbol = dis_find_section(tgt, addr, &symoffset);
+			symsize = symoffset;
+		}
 
+		if (symbol != last_symbol)
+			getsymname(addr, symbol, symsize, symbuf,
+			    sizeof (symbuf));
+
+		symwidth = MAX(symwidth, strlen(symbuf));
 		getsymname(addr, symbol, symoffset, symbuf, sizeof (symbuf));
 
 		/*
@@ -472,21 +493,23 @@ dis_file(const char *filename)
 			break;
 
 		case EM_SPARC32PLUS:
+		{
+			uint64_t flags = ehdr.e_flags & EF_SPARC_32PLUS_MASK;
+
 			if (ehdr.e_ident[EI_CLASS] != ELFCLASS32 ||
 			    ehdr.e_ident[EI_DATA] != ELFDATA2MSB) {
 				warn("invalid E_IDENT field for SPARC object");
 				return;
 			}
 
-			switch (ehdr.e_flags & EF_SPARC_32PLUS_MASK) {
-			case (EF_SPARC_32PLUS | EF_SPARC_SUN_US1 |
-			    EF_SPARC_SUN_US3):
-			case (EF_SPARC_32PLUS | EF_SPARC_SUN_US1):
+			if (flags != 0 &&
+			    (flags & (EF_SPARC_32PLUS | EF_SPARC_SUN_US1 |
+			    EF_SPARC_SUN_US3)) != EF_SPARC_32PLUS)
 				g_flags |= DIS_SPARC_V9 | DIS_SPARC_V9_SGI;
-			default:
+			else
 				g_flags |= DIS_SPARC_V9;
-			}
 			break;
+		}
 
 		case EM_SPARCV9:
 			if (ehdr.e_ident[EI_CLASS] != ELFCLASS64 ||

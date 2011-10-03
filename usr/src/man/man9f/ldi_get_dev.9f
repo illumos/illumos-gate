@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_get_dev 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_GET_DEV 9F "Jun 3, 2003"
 .SH NAME
 ldi_get_dev, ldi_get_otyp, ldi_get_devid, ldi_get_minor_name \- Extract
 information from a layered handle
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/sunldi.h> 
+#include <sys/sunldi.h>
 
 \fBint\fR \fBldi_get_dev\fR(\fBldi_handle_t lh\fR, \fBdev_t *\fR\fIdevp\fR);
 .fi
@@ -33,43 +33,35 @@ information from a layered handle
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR \fR
 .ad
 .RS 15n
-.rt  
 Layered handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIotyp\fR \fR
 .ad
 .RS 15n
-.rt  
 Indicates on which interface the driver was opened. Valid settings are:
 .sp
 .ne 2
-.mk
 .na
 \fBOTYP_BLK\fR
 .ad
 .RS 12n
-.rt  
 Open device block interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOTYP_CHR\fR
 .ad
 .RS 12n
-.rt  
 Open device character interface.
 .RE
 
@@ -77,34 +69,28 @@ Open device character interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR \fR
 .ad
 .RS 15n
-.rt  
 Pointer to a device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevid\fR \fR
 .ad
 .RS 15n
-.rt  
 Device ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_name\fR \fR
 .ad
 .RS 15n
-.rt  
 Minor device node name.
 .RE
 
@@ -139,23 +125,19 @@ The \fBldi_get_dev()\fR, \fBldi_get_otyp()\fR, \fBldi_get_devid()\fR, and
 In case of an error, the following values may be returned:
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 11n
-.rt  
 Invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOTSUP\fR
 .ad
 .RS 11n
-.rt  
 The operation is not supported for this device.
 .RE
 

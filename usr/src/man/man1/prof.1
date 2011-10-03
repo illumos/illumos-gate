@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prof 1 "25 Aug 2009" "SunOS 5.11" "User Commands"
+.TH PROF 1 "Aug 25, 2009"
 .SH NAME
 prof \- display profile data
 .SH SYNOPSIS
 .LP
 .nf
-\fBprof\fR [\fB-ChsVz\fR] [\fB-a\fR | c | n | t] [\fB-o\fR | x] [\fB-g\fR | l] [\fB-m\fR \fImdata\fR] 
+\fBprof\fR [\fB-ChsVz\fR] [\fB-a\fR | c | n | t] [\fB-o\fR | x] [\fB-g\fR | l] [\fB-m\fR \fImdata\fR]
      [\fIprog\fR]
 .fi
 
@@ -31,45 +31,37 @@ The mutually exclusive options \fB-a\fR, \fB-c\fR, \fB-n\fR, and \fB-t\fR
 determine the type of sorting of the output lines:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Sort by increasing symbol address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Sort by decreasing number of calls.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Sort lexically by symbol name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Sort by decreasing percentage of total time (default).
 .RE
 
@@ -79,23 +71,19 @@ The mutually exclusive options \fB-o\fR and  \fB-x\fR specify the printing of
 the address of each symbol monitored:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Print each symbol address (in octal) along with the symbol name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Print each symbol address (in hexadecimal) along with the symbol name.
 .RE
 
@@ -121,24 +109,20 @@ attributed to  \fBA\fR, making it appear as if more time had been spent in
 located.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 6n
-.rt  
 List the time spent in static (non-global) functions separately. The \fB-g\fR
 option function is the opposite of the  \fB-l\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Suppress printing statically declared functions.  If this option is given, time
 spent executing in a static function is allocated to the closest global
 function loaded before the static function in the executable.  This option is
@@ -151,69 +135,57 @@ with care.
 The following options may be used in any combination:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 12n
-.rt  
 Demangle C++ symbol names before printing them out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 12n
-.rt  
 Suppress the heading normally printed on the report. This is useful if the
 report is to be processed further.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImdata\fR\fR
 .ad
 .RS 12n
-.rt  
 Use file \fImdata\fR instead of \fBmon.out\fR as the input profile file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 12n
-.rt  
 Print a summary of several of the monitoring parameters and statistics on the
 standard error output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 12n
-.rt  
 Print  \fBprof\fR version information on the standard error output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 12n
-.rt  
 Include all symbols in the profile range, even if associated with zero number
 of calls and zero time.
 .RE
@@ -225,12 +197,10 @@ A single function may be split into subfunctions for profiling by means of the
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROFDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the file created by a profiled program is controlled by the
 environment variable \fBPROFDIR\fR. If \fBPROFDIR\fR is not set,  \fBmon.out\fR
 is produced in the directory current when the program terminates. If
@@ -243,23 +213,19 @@ prefix removed, and \fIpid\fR is the process ID of the program.  If
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmon.out\fR\fR
 .ad
 .RS 11n
-.rt  
 default profile file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa.out\fR\fR
 .ad
 .RS 11n
-.rt  
 default namelist (object) file
 .RE
 

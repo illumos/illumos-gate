@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mkfifo 1M "11 Aug 2009" "SunOS 5.11" "System Administration Commands"
+.TH MKFIFO 1M "Aug 11, 2009"
 .SH NAME
 mkfifo \- make FIFO special file
 .SH SYNOPSIS
@@ -56,12 +56,10 @@ of the created FIFO is \fBa=rw\fR minus the bits set in \fBumask\fR(1).
 The following option is supported for \fB/usr/bin/mkfifo\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImode\fR\fR
 .ad
 .RS 11n
-.rt  
 Set the file permission bits of the newly-created \fBFIFO\fR to the specified
 \fImode\fR value. The \fImode\fR option-argument will be the same as the
 \fImode\fR operand defined for the \fBchmod\fR(1) command. In
@@ -75,7 +73,6 @@ will be interpreted relative to an assumed initial mode of \fBa=rw\fR.
 The following option is supported for \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImode\fR\fR
 .ad
@@ -84,7 +81,6 @@ The following option is supported for \fBksh93\fR:
 \fB\fB--mode=\fR\fImode\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the mode of the created FIFO to \fImode\fR. The \fImode\fR option-argument
 is a symbolic or octal mode as in \fBchmod\fR(1). Relative modes assume an
 initial mode of \fBa=rw\fR.
@@ -96,12 +92,10 @@ initial mode of \fBa=rw\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of the \fBFIFO\fR special file to be created.
 .RE
 
@@ -122,23 +116,19 @@ that affect the execution of \fBmkfifo\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All the specified \fBFIFO\fR special files were created successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -150,13 +140,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

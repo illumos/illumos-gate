@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man4/Intro.4
 file path=usr/share/man/man4/TIMEZONE.4
@@ -40,7 +43,6 @@ file path=usr/share/man/man4/dumpdates.4
 file path=usr/share/man/man4/ethers.4
 file path=usr/share/man/man4/exec_attr.4
 file path=usr/share/man/man4/fbtab.4
-file path=usr/share/man/man4/fd.4
 file path=usr/share/man/man4/format.dat.4
 file path=usr/share/man/man4/fs.4
 file path=usr/share/man/man4/fspec.4

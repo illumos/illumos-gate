@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvlist_alloc 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NVLIST_ALLOC 9F "Jan 16, 2006"
 .SH NAME
 nvlist_alloc, nvlist_free, nvlist_size, nvlist_pack, nvlist_unpack, nvlist_dup,
 nv_alloc_init, nv_alloc_fini, nvlist_xalloc, nvlist_xpack, nvlist_xunpack,
@@ -11,7 +11,7 @@ nvlist_xdup, nvlist_merge \- Manage a name-value pair list
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/nvpair.h> 
+#include <sys/nvpair.h>
 
 List Manipulation:
 
@@ -53,7 +53,7 @@ List Manipulation:
 
 .LP
 .nf
-\fBint\fR \fBnvlist_xunpack\fR(\fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIbuflen\fR, \fBnvlist_t **\fR\fInvlp\fR, 
+\fBint\fR \fBnvlist_xunpack\fR(\fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIbuflen\fR, \fBnvlist_t **\fR\fInvlp\fR,
      \fBnv_alloc_t *\fR\fInva\fR);
 .fi
 
@@ -81,7 +81,7 @@ Pluggable Allocator Configuration:
 
 .LP
 .nf
-\fBint\fR \fBnv_alloc_init\fR(\fBnv_alloc_t *\fR\fInva\fR, 
+\fBint\fR \fBnv_alloc_init\fR(\fBnv_alloc_t *\fR\fInva\fR,
      \fBconst nv_alloc_ops_t *\fR \fInvo,\fR/* args */ ...);
 .fi
 
@@ -110,43 +110,35 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvlp\fR\fR
 .ad
 .RS 12n
-.rt  
 Address of a pointer to list of name-value pairs (\fBnvlist_t\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvflag\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify bit fields defining \fBnvlist_t\fR properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_UNIQUE_NAME\fR\fR
 .ad
 .RS 23n
-.rt  
 \fBnvpair\fR names are unique.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_UNIQUE_NAME_TYPE\fR\fR
 .ad
 .RS 23n
-.rt  
 Name-data type combination is unique
 .RE
 
@@ -154,112 +146,92 @@ Name-data type combination is unique
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkmflag\fR\fR
 .ad
 .RS 12n
-.rt  
 Kernel memory allocation policy, either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvl\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBnvlist_t\fR to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdst\fR\fR
 .ad
 .RS 12n
-.rt  
 Destination \fBnvlist_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to buffer to contain the encoded size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbufp\fR\fR
 .ad
 .RS 12n
-.rt  
 Address of buffer to pack \fBnvlist\fR into. Must be 8-byte aligned. If NULL,
 library will allocate memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 12n
-.rt  
 Buffer containing packed \fBnvlist_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuflen\fR\fR
 .ad
 .RS 12n
-.rt  
 Size of buffer \fIbufp\fR or \fIbuf\fR points to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIencoding\fR\fR
 .ad
 .RS 12n
-.rt  
 Encoding method for packing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvo\fR\fR
 .ad
 .RS 12n
-.rt  
 Pluggable allocator operations pointer (nv_alloc_ops_t).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInva\fR\fR
 .ad
 .RS 12n
-.rt  
 Points to a nv_alloc_t structure to be used for the specified \fBnvlist_t\fR.
 .RE
 
@@ -295,23 +267,19 @@ buffer large enough to pack \fInvl\fR. The \fIencoding\fR parameter specifies
 the method of encoding when packing \fInvl\fR. Supported encoding methods are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_ENCODE_NATIVE\fR\fR
 .ad
 .RS 20n
-.rt  
 Straight \fBbcopy()\fR as described in \fBbcopy\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNV_ENCODE_XDR\fR\fR
 .ad
 .RS 20n
-.rt  
 Use XDR encoding, suitable for sending to another host.
 .RE
 
@@ -510,34 +478,28 @@ For \fBnvlist_alloc()\fR, \fBnvlist_dup()\fR, \fBnvlist_xalloc()\fR, and
 \fBnvlist_xdup()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 invalid argument
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 insufficient memory
 .RE
 
@@ -547,56 +509,46 @@ For \fBnvlist_pack()\fR, \fBnvlist_unpack()\fR, \fBnvlist_xpack()\fR, and
 \fBnvlist_xunpack()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 11n
-.rt  
 success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 invalid argument
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 insufficient memory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 11n
-.rt  
 encode/decode error
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 encode/decode method not supported
 .RE
 
@@ -605,23 +557,19 @@ encode/decode method not supported
 For \fBnvlist_size()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 invalid argument
 .RE
 
@@ -645,41 +593,41 @@ responsible for allocation and de-allocation for the pre-allocated buffer.
    * using the fixed-buffer allocator.
    */
    #include <sys/nvpair.h>
-      
+
   /* initialize the nvpair allocator framework */
   static nv_alloc_t *
   init(char *buf, size_t size)
   {
        nv_alloc_t *nvap;
- 
+
        if ((nvap = kmem_alloc(sizeof(nv_alloc_t), KM_SLEEP)) == NULL)
            return (NULL);
- 
+
        if (nv_alloc_init(nvap, nv_fixed_ops, buf, size) == 0)
            return (nvap);
- 
+
        return (NULL);
    }
- 
+
    static void
    fini(nv_alloc_t *nvap)
    {
          nv_alloc_fini(nvap);
          kmem_free(nvap, sizeof(nv_alloc_t));
-   } 
+   }
     static int
     interrupt_context(nv_alloc_t *nva)
     {
        nvlist_t *nvl;
        int error;
- 
+
        if ((error = nvlist_xalloc(&nvl, NV_UNIQUE_NAME, nva)) != 0)
             return (-1);
- 
+
        if ((error = nvlist_add_int32(nvl, "name", 1234)) == 0)
             error = send_nvl(nvl);
-      
-       nvlist_free(nvl); 
+
+       nvlist_free(nvl);
        return (error);
       }
 .fi

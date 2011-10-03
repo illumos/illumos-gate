@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pm_busy_component 9F "21 July 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PM_BUSY_COMPONENT 9F "Jul 21, 2004"
 .SH NAME
 pm_busy_component, pm_idle_component \- control device component availability
 for Power Management
@@ -30,23 +30,19 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of the component to be power-managed.
 .RE
 
@@ -77,23 +73,19 @@ functions must be called from the same thread which entered \fBattach\fR(9E),
 The \fBpm_busy_component()\fR and \fBpm_idle_component()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Successfully set the indicated component busy or idle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Invalid component number \fIcomponent\fR or the device has no components.
 .RE
 
@@ -111,13 +103,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

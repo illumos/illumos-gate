@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH langinfo.h 3HEAD "30 Aug 2002" "SunOS 5.11" "Headers"
+.TH LANGINFO.H 3HEAD "Aug 30, 2002"
 .SH NAME
 langinfo.h, langinfo \- language information constants
 .SH SYNOPSIS
@@ -26,153 +26,151 @@ which \fBsetlocale\fR(3C) category each item is defined.
 
 .sp
 .TS
-tab();
-cw(1.42i) |cw(1.42i) |cw(2.66i) 
-lw(1.42i) |lw(1.42i) |lw(2.66i) 
-.
-ConstantCategoryMeaning
+c | c | c
+l | l | l .
+Constant	Category	Meaning
 _
-\fBCODESET\fR\fBLC_CTYPE\fRcodeset name
+\fBCODESET\fR	\fBLC_CTYPE\fR	codeset name
 _
-\fBD_T_FMT\fR\fBLC_TIME\fRstring for formatting date and time
+\fBD_T_FMT\fR	\fBLC_TIME\fR	string for formatting date and time
 _
-\fBD_FMT\fR\fBLC_TIME\fRdate format string
+\fBD_FMT\fR	\fBLC_TIME\fR	date format string
 _
-\fBT_FMT\fR\fBLC_TIME\fRtime format string
+\fBT_FMT\fR	\fBLC_TIME\fR	time format string
 _
-\fBT_FMT_AMPM\fR\fBLC_TIME\fRa.m. or p.m. time format string
+\fBT_FMT_AMPM\fR	\fBLC_TIME\fR	a.m. or p.m. time format string
 _
-\fBAM_STR\fR\fBLC_TIME\fRante-meridiem affix
+\fBAM_STR\fR	\fBLC_TIME\fR	ante-meridiem affix
 _
-\fBPM_STR\fR\fBLC_TIME\fRpost-meridiem affix
+\fBPM_STR\fR	\fBLC_TIME\fR	post-meridiem affix
 _
-\fBDAY_1\fR\fBLC_TIME\fRT{
+\fBDAY_1\fR	\fBLC_TIME\fR	T{
 name of the first day of the week (for example, Sunday)
 T}
 _
-\fBDAY_2\fR\fBLC_TIME\fRT{
+\fBDAY_2\fR	\fBLC_TIME\fR	T{
 name of the second day of the week (for example, Monday)
 T}
 _
-\fBDAY_3\fR\fBLC_TIME\fRT{
+\fBDAY_3\fR	\fBLC_TIME\fR	T{
 name of the third day of the week (for example, Tuesday)
 T}
 _
-\fBDAY_4\fR\fBLC_TIME\fRT{
+\fBDAY_4\fR	\fBLC_TIME\fR	T{
 name of the fourth day of the week (for example, Wednesday)
 T}
 _
-\fBDAY_5\fR\fBLC_TIME\fRT{
+\fBDAY_5\fR	\fBLC_TIME\fR	T{
 name of the fifth day of the week (for example, Thursday)
 T}
 _
-\fBDAY_6\fR\fBLC_TIME\fRT{
+\fBDAY_6\fR	\fBLC_TIME\fR	T{
 name of the sixth day of the week (for example, Friday)
 T}
 _
-\fBDAY_7\fR\fBLC_TIME\fRT{
+\fBDAY_7\fR	\fBLC_TIME\fR	T{
 name of the seventh day of the week (for example, Saturday)
 T}
 _
-\fBABDAY_1\fR\fBLC_TIME\fRT{
+\fBABDAY_1\fR	\fBLC_TIME\fR	T{
 abbreviated name of the first day of the week
 T}
 _
-\fBABDAY_2\fR\fBLC_TIME\fRT{
+\fBABDAY_2\fR	\fBLC_TIME\fR	T{
 abbreviated name of the second day of the week
 T}
 _
-\fBABDAY_3\fR\fBLC_TIME\fRT{
+\fBABDAY_3\fR	\fBLC_TIME\fR	T{
 abbreviated name of the third day of the week
 T}
 _
-\fBABDAY_4\fR\fBLC_TIME\fRT{
+\fBABDAY_4\fR	\fBLC_TIME\fR	T{
 abbreviated name of the fourth day of the week
 T}
 _
-\fBABDAY_5\fR\fBLC_TIME\fRT{
+\fBABDAY_5\fR	\fBLC_TIME\fR	T{
 abbreviated name of the fifth day of the week
 T}
 _
-\fBABDAY_6\fR\fBLC_TIME\fRT{
+\fBABDAY_6\fR	\fBLC_TIME\fR	T{
 abbreviated name of the seventh day of the week
 T}
 _
-\fBABDAY_7\fR\fBLC_TIME\fRT{
+\fBABDAY_7\fR	\fBLC_TIME\fR	T{
 abbreviated name of the seventh day of the week
 T}
 _
-\fBMON_1\fR\fBLC_TIME\fRname of the first month of the year
+\fBMON_1\fR	\fBLC_TIME\fR	name of the first month of the year
 _
-\fBMON_2\fR\fBLC_TIME\fRname of the second month
+\fBMON_2\fR	\fBLC_TIME\fR	name of the second month
 _
-\fBMON_3\fR\fBLC_TIME\fRname of the third month
+\fBMON_3\fR	\fBLC_TIME\fR	name of the third month
 _
-\fBMON_4\fR\fBLC_TIME\fRname of the fourth month
+\fBMON_4\fR	\fBLC_TIME\fR	name of the fourth month
 _
-\fBMON_5\fR\fBLC_TIME\fRname of the fifth month
+\fBMON_5\fR	\fBLC_TIME\fR	name of the fifth month
 _
-\fBMON_6\fR\fBLC_TIME\fRname of the sixth month
+\fBMON_6\fR	\fBLC_TIME\fR	name of the sixth month
 _
-\fBMON_7\fR\fBLC_TIME\fRname of the seventh month
+\fBMON_7\fR	\fBLC_TIME\fR	name of the seventh month
 _
-\fBMON_8\fR\fBLC_TIME\fRname of the eighth month
+\fBMON_8\fR	\fBLC_TIME\fR	name of the eighth month
 _
-\fBMON_9\fR\fBLC_TIME\fRname of the ninth month
+\fBMON_9\fR	\fBLC_TIME\fR	name of the ninth month
 _
-\fBMON_10\fR\fBLC_TIME\fRname of the tenth month
+\fBMON_10\fR	\fBLC_TIME\fR	name of the tenth month
 _
-\fBMON_11\fR\fBLC_TIME\fRname of the eleventh month
+\fBMON_11\fR	\fBLC_TIME\fR	name of the eleventh month
 _
-\fBMON_12\fR\fBLC_TIME\fRname of the twelfth month
+\fBMON_12\fR	\fBLC_TIME\fR	name of the twelfth month
 _
-\fBABMON_1\fR\fBLC_TIME\fRabbreviated name of the first month
+\fBABMON_1\fR	\fBLC_TIME\fR	abbreviated name of the first month
 _
-\fBABMON_2\fR\fBLC_TIME\fRabbreviated name of the second month
+\fBABMON_2\fR	\fBLC_TIME\fR	abbreviated name of the second month
 _
-\fBABMON_3\fR\fBLC_TIME\fRabbreviated name of the third month
+\fBABMON_3\fR	\fBLC_TIME\fR	abbreviated name of the third month
 _
-\fBABMON_4\fR\fBLC_TIME\fRabbreviated name of the fourth month
+\fBABMON_4\fR	\fBLC_TIME\fR	abbreviated name of the fourth month
 _
-\fBABMON_5\fR\fBLC_TIME\fRabbreviated name of the fifth month
+\fBABMON_5\fR	\fBLC_TIME\fR	abbreviated name of the fifth month
 _
-\fBABMON_6\fR\fBLC_TIME\fRabbreviated name of the sixth month
+\fBABMON_6\fR	\fBLC_TIME\fR	abbreviated name of the sixth month
 _
-\fBABMON_7\fR\fBLC_TIME\fRabbreviated name of the seventh month
+\fBABMON_7\fR	\fBLC_TIME\fR	abbreviated name of the seventh month
 _
-\fBABMON_8\fR\fBLC_TIME\fRabbreviated name of the eighth month
+\fBABMON_8\fR	\fBLC_TIME\fR	abbreviated name of the eighth month
 _
-\fBABMON_9\fR\fBLC_TIME\fRabbreviated name of the ninth month
+\fBABMON_9\fR	\fBLC_TIME\fR	abbreviated name of the ninth month
 _
-\fBABMON_10\fR\fBLC_TIME\fRabbreviated name of the tenth month
+\fBABMON_10\fR	\fBLC_TIME\fR	abbreviated name of the tenth month
 _
-\fBABMON_11\fR\fBLC_TIME\fRabbreviated name of the eleventh month
+\fBABMON_11\fR	\fBLC_TIME\fR	abbreviated name of the eleventh month
 _
-\fBABMON_12\fR\fB LC_TIME\fRabbreviated name of the twelfth month
+\fBABMON_12\fR	\fB LC_TIME\fR	abbreviated name of the twelfth month
 _
-\fBERA\fR\fBLC_TIME\fRera description segments
+\fBERA\fR	\fBLC_TIME\fR	era description segments
 _
-\fBERA_D_FMT\fR\fBLC_TIME\fRera date format string
+\fBERA_D_FMT\fR	\fBLC_TIME\fR	era date format string
 _
-\fBERA_D_T_FMT\fR\fBLC_TIME\fRera date and time format string
+\fBERA_D_T_FMT\fR	\fBLC_TIME\fR	era date and time format string
 _
-\fBERA_T_FMT\fR\fBLC_TIME\fRera time format string
+\fBERA_T_FMT\fR	\fBLC_TIME\fR	era time format string
 _
-\fBALT_DIGITS\fR\fBLC_TIME\fRalternative symbols for digits
+\fBALT_DIGITS\fR	\fBLC_TIME\fR	alternative symbols for digits
 _
-\fBRADIXCHAR\fR\fBLC_NUMERIC\fRradix character
+\fBRADIXCHAR\fR	\fBLC_NUMERIC\fR	radix character
 _
-\fBTHOUSEP\fR\fBLC_NUMERIC\fRseparator for thousands
+\fBTHOUSEP\fR	\fBLC_NUMERIC\fR	separator for thousands
 _
-\fBYESEXPR\fR\fBLC_MESSAGES\fRaffirmative response expression
+\fBYESEXPR\fR	\fBLC_MESSAGES\fR	affirmative response expression
 _
-\fBNOEXPR\fR\fBLC_MESSAGES\fRnegative response expression
+\fBNOEXPR\fR	\fBLC_MESSAGES\fR	negative response expression
 _
-\fBYESSTR\fR\fBLC_MESSAGES\fRaffirmative response for yes/no queries
+\fBYESSTR\fR	\fBLC_MESSAGES\fR	affirmative response for yes/no queries
 _
-\fBNOSTR\fR\fBLC_MESSAGES\fRnegative response ro yes/no queries
+\fBNOSTR\fR	\fBLC_MESSAGES\fR	negative response ro yes/no queries
 _
-\fBCRNCYSTR\fR\fBLC_MONETARY\fRT{
+\fBCRNCYSTR\fR	\fBLC_MONETARY\fR	T{
 local currency symbol, preceded by '-' if the symbol sould appear before the value, '+' if the symbol should appear after the value, or '.' if the symbol should replace the radix character
 T}
 .TE
@@ -212,13 +210,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

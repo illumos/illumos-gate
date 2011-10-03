@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mediator 7D "20 Jun 2008" "SunOS 5.11" "Devices"
+.TH MEDIATOR 7D "Jun 20, 2008"
 .SH NAME
 mediator \- support for HA configurations consisting of two strings of drives
 .SH DESCRIPTION
@@ -35,7 +35,6 @@ make the data accessible.
 The following definitions pertain to a mediator configuration:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdiskset\fR\fR
 .ad
@@ -47,7 +46,6 @@ exclusively (but not concurrently) by two hosts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVolume Manager\fR \fBstate\fR \fBdatabase\fR\fR
 .ad
@@ -59,7 +57,6 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmediator\fR \fBhost\fR\fR
 .ad
@@ -72,7 +69,6 @@ mediator quorum.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmediator\fR \fBquorum\fR\fR
 .ad
@@ -86,7 +82,6 @@ that there will be two mediator hosts, this number will normally be 2 ([(2/2) +
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreplica\fR\fR
 .ad
@@ -97,7 +92,6 @@ A single copy of the Volume Manager metadevice state database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreplica\fR \fBquorum\fR\fR
 .ad
@@ -178,12 +172,10 @@ following options to the \fBmetaset\fR command pertain only to administering
 mediator hosts.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fB-m\fR \fB\fImediator_host_list\fR\fR\fR
 .ad
 .RS 28n
-.rt  
 Adds mediator hosts to the named set.  A \fImediator_host_list\fR is the
 nodename of the mediator host to be added and up to 2 other aliases for the
 mediator host. The nodename and aliases for each mediator host are separated by
@@ -192,36 +184,30 @@ commas. Up to 3 mediator hosts can be specified for the named diskset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fB-m\fR \fB\fImediator_host_list\fR\fR\fR
 .ad
 .RS 28n
-.rt  
 Deletes mediator hosts from the named diskset. Mediator hosts are deleted from
 the diskset by specifying the nodename of mediator host to delete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 28n
-.rt  
 Displays an enumerated list of tags pertaining to ``tagged data'' that may be
 encountered during a take of the ownership of a diskset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fB-f\fR] \fB-y\fR\fR
 .ad
 .RS 28n
-.rt  
 Takes ownership of a diskset safely, unless \fB-f\fR is used, in which case the
 take is unconditional. If \fBmetaset\fR finds that another host owns the set,
 this host will not be allowed to take ownership of the set. If the set is not
@@ -244,12 +230,10 @@ see an enumerated list of tags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fB-f\fR] \fB-u\fR \fItagnumber\fR\fR
 .ad
 .RS 28n
-.rt  
 Once a tag has been selected, a subsequent take with  \fB-u\fR
 \fB\fItagnumber\fR\fR can be executed to select the data associated with the
 given \fItagnumber\fR.

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dminfo 1M "16 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH DMINFO 1M "Apr 16, 2008"
 .SH NAME
 dminfo \- report information about a device entry in a device maps file
 .SH SYNOPSIS
@@ -43,24 +43,20 @@ file.
 The following options are supported
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 18n
-.rt  
 Succeed if any of the requested entries are found. If used with \fB-v\fR, all
 entries that match the requested case(s) are printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdev\(mipath\fR\fR
 .ad
 .RS 18n
-.rt  
 Search by \fIdev\(mipath\fR. Search \fBdevice_maps\fR(4) for a device special
 pathname in the \fIdevice_list\fR field matching the \fIdev\(mipath\fR
 argument. This option cannot be used with \fB-n\fR, \fB-t\fR or \fB-u\fR.
@@ -68,24 +64,20 @@ argument. This option cannot be used with \fB-n\fR, \fB-t\fR or \fB-u\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIpathname\fR\fR
 .ad
 .RS 18n
-.rt  
 Use a device_maps file with \fIpathname\fR instead of
 \fB/etc/security/device_maps\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIdev\(miname\fR\fR
 .ad
 .RS 18n
-.rt  
 Search by \fIdev\(miname\fR. Search \fBdevice_maps\fR(4) for a
 \fIdevice_name\fR field matching \fIdev\(miname\fR. This option cannot be used
 with \fB-d\fR, \fB-t\fR or \fB-u\fR.
@@ -93,12 +85,10 @@ with \fB-d\fR, \fB-t\fR or \fB-u\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIdev\(mitype\fR\fR
 .ad
 .RS 18n
-.rt  
 Search by \fIdev\(mitype\fR. Search \fBdevice_maps\fR(4) for a
 \fIdevice_type\fR field matching the given \fIdev\(mitype\fR. This option
 cannot be used with \fB-d\fR, \fB-n\fR or \fB-u\fR.
@@ -106,12 +96,10 @@ cannot be used with \fB-d\fR, \fB-n\fR or \fB-u\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIdm\(mientry\fR\fR
 .ad
 .RS 18n
-.rt  
 Update the \fBdevice_maps\fR(4) file. This option is provided to add entries to
 the \fBdevice_maps\fR(4) file. The \fIdm\(mientry\fR must be a complete
 \fBdevice_maps\fR(4) file entry. The \fIdm\(mientry\fR has fields, as in the
@@ -123,12 +111,10 @@ duplicate. The default device maps file can be updated only by the super user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Verbose. Print the requested entry or entries, one line per entry, on the
 standard output. If no entries are specified, all are printed.
 .RE
@@ -136,34 +122,28 @@ standard output. If no entries are specified, all are printed.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 Request failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 Incorrect syntax.
 .RE
 

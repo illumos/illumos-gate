@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnfctl_probe_state_get 3TNF "1 Mar 2004" "SunOS 5.11" "TNF Library Functions"
+.TH TNFCTL_PROBE_STATE_GET 3TNF "Mar 1, 2004"
 .SH NAME
 tnfctl_probe_state_get, tnfctl_probe_enable, tnfctl_probe_disable,
 tnfctl_probe_trace, tnfctl_probe_untrace, tnfctl_probe_connect,
@@ -66,12 +66,10 @@ will pass these in to an apply iterator. The caller must also allocate
 members of \fIstate\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBid\fR\fR
 .ad
 .RS 26n
-.rt  
 The unique integer assigned to this probe. This number does not change over the
 lifetime of this probe. A \fIprobe_hndl\fR can be obtained by using the calls
 \fBtnfctl_apply()\fR, \fBtanfctl_apply_ids()\fR, or
@@ -80,12 +78,10 @@ lifetime of this probe. A \fIprobe_hndl\fR can be obtained by using the calls
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattr_string\fR\fR
 .ad
 .RS 26n
-.rt  
 A string that consists of  \fIattribute\fR \fIvalue\fR pairs separated by
 semicolons.  For the syntax of this string, see the  syntax of the
 \fBdetail\fR argument of the \fBTNF_PROBE\fR(3TNF) macro. The attributes
@@ -105,12 +101,10 @@ keys vm pageio io;file vm.c;line 25;"
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenabled\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBB_TRUE\fR if the probe is enabled, or  \fBB_FALSE\fR if the probe is
 disabled. Probes are disabled by default. Use \fBtnfctl_probe_enable()\fR or
 \fBtnfctl_probe_disable()\fR to change this state.
@@ -118,12 +112,10 @@ disabled. Probes are disabled by default. Use \fBtnfctl_probe_enable()\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtraced\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBB_TRUE\fR if the probe is traced, or \fBB_FALSE\fR if the probe is not
 traced. Probes in user processes are traced by default.  Kernel probes are
 untraced by default.  Use \fBtnfctl_probe_trace()\fR or
@@ -132,12 +124,10 @@ untraced by default.  Use \fBtnfctl_probe_trace()\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnew_probe\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBB_TRUE\fR if this is a new probe brought in since the last change in
 libraries. See  \fBdlopen\fR(3C) or \fBdlclose\fR(3C). Otherwise, the value of
 \fBnew_probe\fR will be \fBB_FALSE\fR. This field is not  meaningful for kernel
@@ -146,12 +136,10 @@ probe control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobj_name\fR\fR
 .ad
 .RS 26n
-.rt  
 The name of the shared object or executable in which the probe is  located.
 This string can be freed, so the client should make a copy of the string if it
 needs to be saved for use by other  \fBlibtnfctl\fR interfaces.  In kernel
@@ -160,12 +148,10 @@ mode, this string is always  \fINULL.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfunc_names\fR\fR
 .ad
 .RS 26n
-.rt  
 A null-terminated array of pointers to strings that contain the names of
 functions connected to this probe.  Whenever an enabled probe is encountered at
 runtime, these functions are executed. This array also will be freed by the
@@ -175,12 +161,10 @@ or \fBtnfctl_probe_disconnect_all()\fR to change this state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfunc_addrs\fR\fR
 .ad
 .RS 26n
-.rt  
 A null-terminated array of pointers to addresses of functions in the target
 image connected to this probe.  This array also will be freed by the library
 when the state of the probe changes.
@@ -188,12 +172,10 @@ when the state of the probe changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclient_registered_data\fR\fR
 .ad
 .RS 26n
-.rt  
 Data that was registered by the client for this probe by the creator function
 in \fBtnfctl_register_funcs\fR(3TNF).
 .RE
@@ -263,12 +245,10 @@ using any of the functions described here.
 The following error codes apply to  \fBtnfctl_probe_state_get()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INVALIDPROBE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fIprobe_hndl\fR is no longer valid. The library that the probe was in could
 have been dynamically closed by \fBdlclose\fR(3C).
 .RE
@@ -280,35 +260,29 @@ The following error codes apply to  \fBtnfctl_probe_enable()\fR,
 \fBtnfctl_probe_untrace()\fR, and \fBtnfctl_probe_disconnect_all()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INVALIDPROBE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fIprobe_hndl\fR is no longer valid. The library that the probe was in could
 have been dynamically closed by \fBdlclose\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BUFBROKEN\fR\fR
 .ad
 .RS 27n
-.rt  
 Cannot do probe operations because tracing is broken in the target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOBUF\fR\fR
 .ad
 .RS 27n
-.rt  
 Cannot do probe operations until a buffer is allocated. See
 \fBtnfctl_buffer_alloc\fR(3TNF). This error code  does not apply to kernel
 probe control.
@@ -319,46 +293,38 @@ probe control.
 The following error codes apply to  \fBtnfctl_probe_connect()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INVALIDPROBE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fIprobe_hndl\fR is no longer valid. The library that the probe was in could
 have been dynamically closed by \fBdlclose\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 27n
-.rt  
 The handle is a kernel handle, or  \fIfunc_name\fR could not be found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BUFBROKEN\fR\fR
 .ad
 .RS 27n
-.rt  
 Cannot do probe operations because tracing is broken in the target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOBUF\fR\fR
 .ad
 .RS 27n
-.rt  
 Cannot do probe operations until a buffer is allocated. See
 \fBtnfctl_buffer_alloc\fR(3TNF).
 .RE
@@ -371,13 +337,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe
+MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO

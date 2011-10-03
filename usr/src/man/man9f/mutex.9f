@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mutex 9F "21 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH MUTEX 9F "May 21, 2008"
 .SH NAME
 mutex, mutex_enter, mutex_exit, mutex_init, mutex_destroy, mutex_owned,
 mutex_tryenter \- mutual exclusion lock routines
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ksynch.h> 
+#include <sys/ksynch.h>
 
-\fBvoid\fR \fBmutex_init\fR(\fBkmutex_t *\fR\fImp\fR, \fBchar *\fR\fIname\fR, \fBkmutex_type_t\fR \fItype\fR, 
+\fBvoid\fR \fBmutex_init\fR(\fBkmutex_t *\fR\fImp\fR, \fBchar *\fR\fIname\fR, \fBkmutex_type_t\fR \fItype\fR,
      \fBvoid *\fR\fIarg\fR);
 .fi
 
@@ -48,46 +48,38 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR\fR
 .ad
 .RS 8n
-.rt  
 Pointer to a kernel mutex lock (\fBkmutex_t\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 8n
-.rt  
 Descriptive string. This is obsolete and should be \fINULL\fR. (Non-\fINULL\fR
 strings are legal, but they are a waste of kernel memory.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 8n
-.rt  
 Type of mutex lock.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 8n
-.rt  
 Type-specific argument for initialization routine.
 .RE
 

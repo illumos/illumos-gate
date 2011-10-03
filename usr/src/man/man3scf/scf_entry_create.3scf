@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_entry_create 3SCF "17 Jul 2008" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_ENTRY_CREATE 3SCF "Jul 17, 2008"
 .SH NAME
 scf_entry_create, scf_entry_handle, scf_entry_destroy,
 scf_entry_destroy_children, scf_entry_reset, scf_entry_add_value \- create and
@@ -11,7 +11,7 @@ manipulate transaction in the Service Configuration Facility
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_transaction_entry_t *\fR\fBscf_entry_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
@@ -93,23 +93,19 @@ it returns -1.
 The \fBscf_entry_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIhandle\fR argument is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
 .RS 30n
-.rt  
 There is not enough memory to allocate an \fBscf_transaction_entry_t\fR.
 .RE
 
@@ -118,12 +114,10 @@ There is not enough memory to allocate an \fBscf_transaction_entry_t\fR.
 The \fBscf_entry_handle()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle associated with entry has been destroyed.
 .RE
 
@@ -132,68 +126,56 @@ The handle associated with entry has been destroyed.
 The \fBscf_entry_add_value()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIvalue\fR and \fIentry\fR arguments are not derived from the same handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_IN_USE\fR\fR
 .ad
 .RS 30n
-.rt  
 The value has been added to another entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
 .RS 30n
-.rt  
 An internal error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIvalue\fR argument is not set, or the entry was added to the transaction
 using \fBscf_transaction_property_delete\fR(3SCF).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 30n
-.rt  
 The transaction entry is not associated with a transaction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
 .ad
 .RS 30n
-.rt  
 The type of the \fIvalue\fR argument does not match the type that was set using
 \fBscf_transaction_property_new()\fR, \fBscf_transaction_property_change()\fR,
 or \fBscf_transaction_property_change_type()\fR.
@@ -210,15 +192,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

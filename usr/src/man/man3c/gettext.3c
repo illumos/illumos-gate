@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gettext 3C "4 Jun 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH GETTEXT 3C "Jun 4, 2008"
 .SH NAME
 gettext, dgettext, dcgettext, ngettext, dngettext, dcngettext, textdomain,
 bindtextdomain, bind_textdomain_codeset \- message handling functions
@@ -33,7 +33,7 @@ bindtextdomain, bind_textdomain_codeset \- message handling functions
 
 .LP
 .nf
-#include <libintl.h> 
+#include <libintl.h>
 #include <locale.h>
 
 \fBchar *\fR\fBdcgettext\fR(\fBconst char *\fR\fIdomainname\fR, \fBconst char *\fR\fImsgid\fR,
@@ -69,7 +69,7 @@ extern int *_nl_domain_bindings;
 
 .LP
 .nf
-#include <libintl.h> 
+#include <libintl.h>
 #include <locale.h>
 
 \fBchar *\fR\fBdcngettext\fR(\fBconst char *\fR\fIdomainname\fR, \fBconst char *\fR\fImsgid1\fR,
@@ -263,7 +263,6 @@ GNU-compatible message catalogues.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale\fR\fR
 .ad
@@ -274,7 +273,6 @@ default path predicate for message domain files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES/\fR\fIdomainname\fR\fB\&.m
 o\fR\fR
@@ -287,7 +285,6 @@ system default location for file containing messages for  language
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_XXX/\fR\fIdomainname\fR\fB\&.mo\fR\
 fR
@@ -302,7 +299,6 @@ system default location for file containing messages for  language
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fIdirname\fR\fB/\fR\fIlocale\fR\fB/LC_MESSAGES/\fR\fIdomainname\fR\fB
 \&.mo\fR\fR
@@ -315,7 +311,6 @@ predicate \fIdirname\fR after a successful call to \fBbindtextdomain()\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fIdirname\fR\fB/\fR\fIlocale\fR\fB/LC_XXX/\fR\fIdomainname\fR\fB\&.mo
 \fR\fR
@@ -337,15 +332,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 _
-MT-LevelSafe with exceptions
+MT-Level	Safe with exceptions
 .TE
 
 .sp

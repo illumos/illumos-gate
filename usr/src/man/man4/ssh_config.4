@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ssh_config 4 "20 Apr 2009" "SunOS 5.11" "File Formats"
+.TH SSH_CONFIG 4 "Apr 20, 2009"
 .SH NAME
 ssh_config \- ssh configuration file
 .SH SYNOPSIS
@@ -75,7 +75,6 @@ The possible keywords and their meanings are listed in the following
 list.Keywords are case-insensitive and arguments are case-sensitive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBatchMode\fR\fR
 .ad
@@ -88,7 +87,6 @@ other batch jobs where you have no user to supply the password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBindAddress\fR\fR
 .ad
@@ -101,7 +99,6 @@ to \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCheckHostIP\fR\fR
 .ad
@@ -115,7 +112,6 @@ check is not executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCipher\fR\fR
 .ad
@@ -134,7 +130,6 @@ cryptographic weaknesses. The default is \fB3des\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCiphers\fR\fR
 .ad
@@ -161,7 +156,6 @@ cipher modes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClearAllForwardings\fR\fR
 .ad
@@ -177,7 +171,6 @@ in configuration files and is automatically set by \fBscp\fR(1) and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCompression\fR\fR
 .ad
@@ -189,7 +182,6 @@ Specifies whether to use compression. The argument must be \fByes\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCompressionLevel\fR\fR
 .ad
@@ -203,7 +195,6 @@ only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConnectionAttempts\fR\fR
 .ad
@@ -216,7 +207,6 @@ scripts if the connection sometimes fails. The default is 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBConnectTimeout\fR\fR
 .ad
@@ -230,7 +220,6 @@ connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDisableBanner\fR\fR
 .ad
@@ -248,7 +237,6 @@ version 2 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDynamicForward\fR\fR
 .ad
@@ -276,7 +264,6 @@ with enough privileges can forward privileged ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEscapeChar\fR\fR
 .ad
@@ -290,7 +277,6 @@ entirely (making the connection transparent for binary data).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFallBackToRsh\fR\fR
 .ad
@@ -304,7 +290,6 @@ session being unencrypted). The argument must be \fByes\fR or \fBno\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBForwardAgent\fR\fR
 .ad
@@ -324,7 +309,6 @@ agent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBForwardX11\fR\fR
 .ad
@@ -344,7 +328,6 @@ this.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBForwardX11Trusted\fR\fR
 .ad
@@ -364,7 +347,6 @@ restrictions imposed on untrusted clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGatewayPorts\fR\fR
 .ad
@@ -381,7 +363,6 @@ forwarded ports. The argument must be \fByes\fR or \fBno\fR. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGlobalKnownHostsFile\fR\fR
 .ad
@@ -392,7 +373,6 @@ Specifies a file to use instead of \fB/etc/ssh/ssh_known_hosts\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSSAPIAuthentication\fR\fR
 .ad
@@ -403,7 +383,6 @@ Enables/disables GSS-API user authentication. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSSAPIDelegateCredentials\fR\fR
 .ad
@@ -414,7 +393,6 @@ Enables/disables GSS-API credential forwarding. The default is \fBno\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSSAPIKeyExchange\fR\fR
 .ad
@@ -435,7 +413,6 @@ authorize the user's GSS principal name to the target user account.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHashKnownHosts\fR\fR
 .ad
@@ -451,7 +428,6 @@ but can be manually hashed using \fBssh-keygen\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHost\fR\fR
 .ad
@@ -468,7 +444,6 @@ matching).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostbasedAuthentication\fR\fR
 .ad
@@ -482,7 +457,6 @@ authentication. The argument must be \fByes\fR or \fBno\fR. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostKeyAlgorithms\fR\fR
 .ad
@@ -495,7 +469,6 @@ use in order of preference. The default for this option is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostKeyAlias\fR\fR
 .ad
@@ -509,7 +482,6 @@ on a single host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostName\fR\fR
 .ad
@@ -523,7 +495,6 @@ Numeric IP addresses are also permitted (both on the command line and in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIdentityFile\fR\fR
 .ad
@@ -540,7 +511,6 @@ configuration files; all these identities is tried in sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIgnoreIfUnknown\fR\fR
 .ad
@@ -557,7 +527,6 @@ capabilities of the \fBssh\fR(1) client on that host should match that file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKeepAlive\fR\fR
 .ad
@@ -576,7 +545,6 @@ and many users want it too. To disable keepalives, the value should be set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLocalForward\fR\fR
 .ad
@@ -600,7 +568,6 @@ from all interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogLevel\fR\fR
 .ad
@@ -615,7 +582,6 @@ default is \fBINFO\fR. \fBDEBUG\fR and \fBDEBUG1\fR are equivalent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMACs\fR\fR
 .ad
@@ -629,7 +595,6 @@ protection. Multiple algorithms must be comma-separated. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNoHostAuthenticationForLocalhost\fR\fR
 .ad
@@ -645,7 +610,6 @@ must be \fByes\fR or \fBno\fR. The default is to check the host key for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNumberOfPasswordPrompts\fR\fR
 .ad
@@ -658,7 +622,6 @@ The argument to this keyword must be an integer. The default is 3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPasswordAuthentication\fR\fR
 .ad
@@ -671,7 +634,6 @@ and 2. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPort\fR\fR
 .ad
@@ -682,7 +644,6 @@ Specifies the port number to connect on the remote host. The default is 22.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPreferredAuthentications\fR\fR
 .ad
@@ -697,7 +658,6 @@ The default for this option is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBProtocol\fR\fR
 .ad
@@ -711,7 +671,6 @@ version 2 and falls back to version 1 if version 2 is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBProxyCommand\fR\fR
 .ad
@@ -730,7 +689,6 @@ host being connected (defaulting to the name typed by the user).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPubkeyAuthentication\fR\fR
 .ad
@@ -743,7 +701,6 @@ applies to protocol version 2 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRekeyLimit\fR\fR
 .ad
@@ -758,7 +715,6 @@ depending on the cipher. This option applies to protocol version 2 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRemoteForward\fR\fR
 .ad
@@ -783,7 +739,6 @@ option is enabled. See \fBsshd_config\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRhostsAuthentication\fR\fR
 .ad
@@ -802,7 +757,6 @@ that \fBssh\fR be \fBsetuid\fR root and that \fBUsePrivilegedPort\fR be set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRhostsRSAAuthentication\fR\fR
 .ad
@@ -817,7 +771,6 @@ protocol version 1 and requires that \fBssh\fR be \fBsetuid\fR root and that
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServerAliveCountMax\fR\fR
 .ad
@@ -840,7 +793,6 @@ protocol version 2 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServerAliveInterval\fR\fR
 .ad
@@ -855,7 +807,6 @@ only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStrictHostKeyChecking\fR\fR
 .ad
@@ -875,7 +826,6 @@ The argument must be \fByes\fR or \fBno\fR or \fBask\fR. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUseOpenSSLEngine\fR\fR
 .ad
@@ -890,7 +840,6 @@ effect. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUsePrivilegedPort\fR\fR
 .ad
@@ -905,7 +854,6 @@ option to \fBno\fR turns off \fBRhostsAuthentication\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUser\fR\fR
 .ad
@@ -918,7 +866,6 @@ to enter the user name on the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUserKnownHostsFile\fR\fR
 .ad
@@ -929,7 +876,6 @@ Specifies a file to use instead of \fB$HOME/.ssh/known_hosts\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUseRsh\fR\fR
 .ad
@@ -944,7 +890,6 @@ possible that the host does not support the \fBssh\fR protocol. This causes
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXAuthLocation\fR\fR
 .ad

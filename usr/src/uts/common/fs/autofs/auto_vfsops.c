@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -107,11 +108,6 @@ static struct modlinkage modlinkage = {
 #endif
 	NULL
 };
-
-/*
- * There are not enough stubs for rpcmod so we must force load it
- */
-char _depends_on[] = "strmod/rpcmod misc/rpcsec fs/mntfs";
 
 /*
  * This is the module initialization routine.

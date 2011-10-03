@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat.conf 4 "18 Jun 2004" "SunOS 5.11" "File Formats"
+.TH DAT.CONF 4 "Jun 18, 2004"
 .SH NAME
 dat.conf \- DAT static registry
 .SH SYNOPSIS
@@ -40,7 +40,7 @@ The following shows the order of the fields in a \fBdat.conf\fR entry:
 .nf
 "\fIinterface_adapter_name\fR" "\fIAPI_version\fR" "\fIthreadsafe\fR | \fInonthreadsafe\fR" \e
 "\fIdefault\fR | \fInondefault\fR" "\fIservice_provider_library_pathname\fR" \e
-"\fIservice_provider_version\fR" "\fIservice _provider_instance_data\fR"\e 
+"\fIservice_provider_version\fR" "\fIservice _provider_instance_data\fR"\e
 "\fISolaris_specific_string\fR"
 .fi
 .in -2
@@ -50,7 +50,6 @@ The following shows the order of the fields in a \fBdat.conf\fR entry:
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterface_adapter_name\fR\fR
 .ad
@@ -63,7 +62,6 @@ on an IB partition/port combination of the HCA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIAPI_version\fR\fR
 .ad
@@ -75,7 +73,6 @@ Specifies the API version of the service provide library: For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIthreadsafe\fR | \fInonthreadsafe\fR\fR
 .ad
@@ -86,7 +83,6 @@ Specifies a threadsafe or non-threadsafe library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdefault\fR | \fInondefault\fR\fR
 .ad
@@ -99,7 +95,6 @@ offer several versions of the library. If so, one version is designated as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_provider_library_pathname\fR\fR
 .ad
@@ -110,7 +105,6 @@ Specifies the pathname of the library image.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_provider_version\fR\fR
 .ad
@@ -123,7 +117,6 @@ version numbers, for example, \fBSUNW1.0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice _provider_instance_data\fR\fR
 .ad
@@ -134,7 +127,6 @@ Specifies the service provider instance data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fISolaris_specific_string\fR\fR
 .ad
@@ -174,13 +166,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

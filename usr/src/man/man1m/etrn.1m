@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH etrn 1M "10 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH ETRN 1M "Aug 10, 2004"
 .SH NAME
 etrn \- start mail queue run
 .SH SYNOPSIS
@@ -34,12 +34,10 @@ commands.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 System boot special case. Make sure localhost is accepting SMTP connections
 before initiating the SMTP session with server-host.
 .sp
@@ -51,12 +49,10 @@ deliver queued mail. This check is performed automatically if no
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 The normal mode of operation for \fBetrn\fR is to do all of its work silently.
 The \fB-v\fR option makes it verbose, which causes \fBetrn\fR to display its
 conversations with the remote SMTP server.
@@ -157,23 +153,19 @@ email, with that host name as the argument.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/sendmail.cf\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBsendmail\fR configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/sendmail\fR\fR
 .ad
 .RS 25n
-.rt  
 Variables used by \fBsvc:/network/smtp:sendmail\fR
 .RE
 
@@ -185,13 +177,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

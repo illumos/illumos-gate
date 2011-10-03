@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
 syntax: glob
@@ -48,6 +48,9 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_list.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_policy.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_realm.h
 usr/src/cmd/krb5/ldap_util/kdb5_ldap_services.h
+usr/src/cmd/smbsrv/smbd/eventlog.dll
+usr/src/cmd/terminfo/termcap.src
+usr/src/cmd/terminfo/terminfo.src
 usr/src/common/bzip2/LICENSE
 usr/src/common/bzip2/Solaris.README.txt
 usr/src/common/bzip2/bzlib.h
@@ -328,6 +331,7 @@ usr/src/lib/krb5/ss/utils.c
 usr/src/lib/libkmsagent/common/SOAP/*.*
 usr/src/lib/librstp/common/*.[ch]
 usr/src/lib/librstp/common/[CRT]*
+usr/src/uts/intel/nsmb/ioc_check.ref
 usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/checksum_length.c
@@ -354,4 +358,14 @@ usr/src/uts/common/gssapi/mechs/krb5/krb5/os/toffset.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seed.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seqnum.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/val_cred.c
-usr/src/cmd/smbsrv/smbd/eventlog.dll
+usr/src/uts/common/io/ixgbe/ixgbe_82598.c
+usr/src/uts/common/io/ixgbe/ixgbe_82599.c
+usr/src/uts/common/io/ixgbe/ixgbe_api.c
+usr/src/uts/common/io/ixgbe/ixgbe_api.h
+usr/src/uts/common/io/ixgbe/ixgbe_common.c
+usr/src/uts/common/io/ixgbe/ixgbe_common.h
+usr/src/uts/common/io/ixgbe/ixgbe_osdep.h
+usr/src/uts/common/io/ixgbe/ixgbe_phy.c
+usr/src/uts/common/io/ixgbe/ixgbe_phy.h
+usr/src/uts/common/io/ixgbe/ixgbe_type.h
+usr/src/uts/sparc/nsmb/ioc_check.ref

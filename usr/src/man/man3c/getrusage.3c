@@ -1,11 +1,11 @@
 '\" te
 .\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright
 .\" (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH getrusage 3C "2 Jul 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH GETRUSAGE 3C "Jul 2, 2004"
 .SH NAME
 getrusage \- get information about resource utilization
 .SH SYNOPSIS
@@ -43,7 +43,7 @@ struct timeval  ru_utime;     /* user time used */
 struct timeval  ru_stime;     /* system time used */
 long            ru_maxrss;    /* maximum resident set size */
 long            ru_idrss;     /* integral resident set size */
-long            ru_minflt;    /* page faults not requiring physical 
+long            ru_minflt;    /* page faults not requiring physical
                                  I/O */
 long            ru_majflt;    /* page faults requiring physical I/O */
 long            ru_nswap;     /* swaps */
@@ -62,36 +62,30 @@ long            ru_nivcsw;    /* involuntary context switches */
 The structure members are interpreted as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_utime\fR\fR
 .ad
 .RS 15n
-.rt  
 The total amount of time spent executing in user mode. Time is given in seconds
 and microseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_stime\fR\fR
 .ad
 .RS 15n
-.rt  
 The total amount of time spent executing in system mode. Time is given in
 seconds and microseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_maxrss\fR\fR
 .ad
 .RS 15n
-.rt  
 The maximum resident set size.  Size is given in pages (the size of a page, in
 bytes, is given by the \fBgetpagesize\fR(3C) function). See the \fBNOTES\fR
 section of this page.
@@ -99,12 +93,10 @@ section of this page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_idrss\fR\fR
 .ad
 .RS 15n
-.rt  
 An "integral" value indicating the amount of memory in use by a process while
 the process is running. This value is the sum of the resident set sizes of the
 process running when a clock tick occurs. The value is given in pages times
@@ -114,24 +106,20 @@ section of this page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_minflt\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of page faults serviced which did not require any physical I/O
 activity. See the  \fBNOTES\fR section of this page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_majflt\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of page faults serviced which required physical I/O activity. This
 could include page ahead operations by the kernel. See the  \fBNOTES\fR section
 of this page.
@@ -139,80 +127,66 @@ of this page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_nswap\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of times a process was swapped out of main memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_inblock\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of times the file system had to perform input in servicing a
 \fBread\fR(2) request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_oublock\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of times the file system had to perform output in servicing a
 \fBwrite\fR(2) request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_msgsnd\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of messages sent over sockets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_msgrcv\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of messages received from sockets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_nsignals\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of signals delivered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_nvcsw\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of times a context switch resulted due to a process voluntarily
 giving up the processor before its time slice was completed (usually to await
 availability of a resource).
@@ -220,12 +194,10 @@ availability of a resource).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBru_nivcsw\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of times a context switch resulted due to a higher priority process
 becoming runnable or because the current process exceeded its time slice.
 .RE
@@ -241,24 +213,20 @@ Upon successful completion, \fBgetrusage()\fR returns \fB0\fR. Otherwise,
 The  \fBgetrusage()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The address specified by the \fIr_usage\fR argument is not in a valid portion
 of the process' address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBwho\fR parameter is not a valid value.
 .RE
 
@@ -270,13 +238,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vscanadm 1M "7 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH VSCANADM 1M "Jul 7, 2009"
 .SH NAME
 vscanadm \- vscan service configuration utility
 .SH SYNOPSIS
@@ -92,7 +92,6 @@ properties, which apply to the service and are not scan engine-specific.
 \fBvscanadm\fR recognizes the following subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm set\fR \fB-p\fR \fIproperty\fR=\fIvalue\fR [\fB-p\fR
 \fIproperty\fR=\fIvalue\fR]...\fR
@@ -102,12 +101,10 @@ properties, which apply to the service and are not scan engine-specific.
 Sets the values of \fBvscan\fR service general properties.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproperty\fR=\fIvalue\fR\fR
 .ad
 .RS 21n
-.rt  
 Specifies a property value
 .RE
 
@@ -115,7 +112,6 @@ Specifies a property value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm get\fR [\fB-p\fR \fIproperty\fR]...\fR
 .ad
@@ -125,12 +121,10 @@ Displays the values of \fBvscan\fR service general properties. If no properties
 are specified, all \fBvscan\fR service general properties are displayed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproperty\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a property value
 .RE
 
@@ -142,12 +136,10 @@ The following properties are available for the \fBvscanadm set\fR and
 \fBvscanadm get\fR subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax-size\fR\fR
 .ad
 .RS 19n
-.rt  
 The maximum size of files that should be virus scanned. Files exceeding
 \fImax-size\fR are not scanned. The \fImax-size-action\fR property determines
 whether access should be allowed or denied to files that exceed \fImax-size\fR.
@@ -172,35 +164,29 @@ equal to the maximum file size for the scan engine(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax-size-action\fR\fR
 .ad
 .RS 19n
-.rt  
 Specifies whether access will be allowed or denied to files larger than
 \fImax-size\fR. Files larger than \fImax-size\fR are not virus scanned. Valid
 values are:
 .sp
 .ne 2
-.mk
 .na
 \fBallow\fR
 .ad
 .RS 9n
-.rt  
 allow access to files larger than \fImax-size\fR (no virus scan). This is the
 default value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdeny\fR
 .ad
 .RS 9n
-.rt  
 deny access to files larger than \fImax-size\fR (no virus scan)
 .RE
 
@@ -208,7 +194,6 @@ deny access to files larger than \fImax-size\fR (no virus scan)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm import\fR \fB-p\fR \fIproperty\fR \fIfilename\fR\fR
 .ad
@@ -220,7 +205,6 @@ single line specifying the value of a single property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm export\fR \fB-p\fR \fIproperty\fR \fIfilename\fR\fR
 .ad
@@ -232,7 +216,6 @@ single line specifying the value of a single property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm validate\fR \fB-p\fR \fIproperty\fR \fIfilename\fR\fR
 .ad
@@ -248,12 +231,10 @@ The following properties are available for the \fBvscanadm import\fR,
 \fBvscanadm export\fR, and \fBvscanadm validate\fR subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtypes\fR\fR
 .ad
 .RS 9n
-.rt  
 A comma-separated list of file type extension matching rules. This list defines
 which types of files are scanned and which should be excluded during virus
 scanning. Each rule comprises the rule indicator [+|-], followed by a file type
@@ -283,7 +264,6 @@ the types list is "+*".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm add-engine\fR [\fB-p\fR \fIproperty\fR=\fIvalue\fR]...
 \fIengine_id\fR\fR
@@ -295,12 +275,10 @@ used for any scan engine properties that are not specified. The hostname
 defaults to the \fIengine_id\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproperty\fR=\fIvalue\fR\fR
 .ad
 .RS 21n
-.rt  
 Specifies a property value
 .RE
 
@@ -308,7 +286,6 @@ Specifies a property value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm remove-engine\fR \fIengine_id\fR\fR
 .ad
@@ -320,7 +297,6 @@ configuration property values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm set-engine\fR \fB-p\fR\fIproperty\fR=\fIvalue\fR [\fB-p\fR
 \fIproperty\fR=\fIvalue\fR]... \fIengine_id\fR\fR
@@ -331,12 +307,10 @@ Creates or updates the configuration property values for the scan engine
 identified by \fIengine_id\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproperty\fR=\fIvalue\fR\fR
 .ad
 .RS 21n
-.rt  
 Specifies a property value
 .RE
 
@@ -344,7 +318,6 @@ Specifies a property value
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm get-engine\fR [\fB-p\fR \fIproperty\fR=\fIvalue\fR]...
 [\fIengine_id\fR]\fR
@@ -358,12 +331,10 @@ configured scan engines. If no properties are specified, this subcommand
 displays all \fBvscan\fR service scan engine properties.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproperty\fR=\fIvalue\fR\fR
 .ad
 .RS 21n
-.rt  
 Specifies a property value
 .RE
 
@@ -376,12 +347,10 @@ The following properties are available for the \fBvscanadm add-engine\fR,
 get-engine\fR subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies whether the scan engine is enabled or disabled. Valid values are "on"
 (enabled) and "off" (disabled). The default is "on" (enabled). A scan engine
 cannot be enabled if its host property is invalid.
@@ -389,35 +358,29 @@ cannot be enabled if its host property is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost\fR\fR
 .ad
 .RS 18n
-.rt  
 Hostname or \fBIPv4\fR format \fBIP\fR address of the scan engine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBICAP\fR port number of the scan engine. The numeric value ranges from 0 to
 65535. The default \fBICAP\fR port is 1344.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax-connection\fR\fR
 .ad
 .RS 18n
-.rt  
 The maximum number of concurrent connections that may be established with a
 scan engine. The numeric value ranges from 1 to 512. This property defaults to
 8.
@@ -425,24 +388,20 @@ scan engine. The numeric value ranges from 1 to 512. This property defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm show\fR\fR
 .ad
 .RS 23n
-.rt  
 Displays the values of all \fBvscan\fR service general properties and scan
 engine properties.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvscanadm stats\fR [\fB-z\fR]\fR
 .ad
 .RS 23n
-.rt  
 Displays or resets the following \fBvscan\fR service statistics:
 .RS +4
 .TP
@@ -470,12 +429,10 @@ scan errors (including a per scan engine error count)
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 6n
-.rt  
 Resets \fBvscan\fR service statistics counters to zero
 .RE
 
@@ -629,23 +586,19 @@ enter
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
@@ -657,15 +610,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 _
-Utility output formatNot-An-Interface
+Utility output format	Not-An-Interface
 .TE
 
 .SH SEE ALSO
@@ -680,7 +632,6 @@ and statistics. To set property values or reset statistics, the following
 authorizations are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.value.vscan\fR\fR
 .ad
@@ -691,7 +642,6 @@ change the property values or reset statistics
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.manage.vscan\fR\fR
 .ad
@@ -706,7 +656,6 @@ To add or remove properties (\fBadd-engine\fR, \fBremove-engine\fR) the
 following authorizations are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.smf.modify.application\fR\fR
 .ad
@@ -717,7 +666,6 @@ add or remove property group
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolaris.manage.vscan\fR\fR
 .ad

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tunefs 1M "5 Dec 2003" "SunOS 5.11" "System Administration Commands"
+.TH TUNEFS 1M "Dec 5, 2003"
 .SH NAME
 tunefs \- tune an existing UFS file system
 .SH SYNOPSIS
 .LP
 .nf
-\fBtunefs\fR [\fB-a\fR \fImaxcontig\fR] [\fB-d\fR \fIrotdelay\fR] [\fB-e\fR \fImaxbpg\fR] 
+\fBtunefs\fR [\fB-a\fR \fImaxcontig\fR] [\fB-d\fR \fIrotdelay\fR] [\fB-e\fR \fImaxbpg\fR]
      [\fB-m\fR \fIminfree\fR] [\fB-o\fR space | time] \fIspecial\fR | \fIfilesystem\fR
 .fi
 
@@ -26,12 +26,10 @@ changed are indicated by the options given below.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fImaxcontig\fR\fR
 .ad
 .RS 21n
-.rt  
 The maximum number of logical blocks, belonging to one file, that is allocated
 contiguously. The default is calculated as follows:
 .sp
@@ -57,24 +55,20 @@ hardware supports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIrotdelay\fR\fR
 .ad
 .RS 21n
-.rt  
 This parameter is obsolete as of the Solaris 10 release. The value is always
 set to \fB0\fR, regardless of the input value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fImaxbpg\fR\fR
 .ad
 .RS 21n
-.rt  
 Indicates the maximum number of contiguous logical blocks any single file can
 allocate from a cylinder group before it is forced to begin allocating blocks
 from another cylinder group. Typically this value is set to approximately one
@@ -91,12 +85,10 @@ parameter should be set higher.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIminfree\fR\fR
 .ad
 .RS 21n
-.rt  
 Specifies the minimum free space threshold, or the percentage of space held
 back from normal users. This value can be set to \fB0\fR. However, up to a
 factor of three in throughput will be lost over the performance obtained at a
@@ -107,12 +99,10 @@ deleted to get under the higher threshold.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fI space\fR\||\|\fItime\fR\fR
 .ad
 .RS 21n
-.rt  
 The file system can either be instructed to try to minimize the \fBtime\fR
 spent allocating blocks, or to try to minimize the \fBspace\fR fragmentation on
 the disk. The default is \fItime\fR.

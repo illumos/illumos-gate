@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH printf 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH PRINTF 3UCB "Oct 30, 2007"
 .SH NAME
 printf, fprintf, sprintf, vprintf, vfprintf, vsprintf \- formatted output
 conversion
@@ -142,35 +142,29 @@ will be changed to zero.
 The flag characters and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 9n
-.rt  
 The result of the conversion will be left-justified within the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 9n
-.rt  
 The result of a signed conversion will always begin with a sign (\fB+\fR or
 \fB\(mi\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBblank\fR
 .ad
 .RS 9n
-.rt  
 If the first character of a signed conversion is not a sign, a blank will be
 prefixed to the result. This implies that if the blank and \fB+\fR flags both
 appear, the blank flag will be ignored.
@@ -178,12 +172,10 @@ appear, the blank flag will be ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 9n
-.rt  
 This flag specifies that the value is to be converted to an "alternate form."
 For \fBc\fR, \fBd\fR, \fBi\fR, \fBs\fR, and \fBu\fR conversions, the flag has
 no effect. For \fBo\fR conversion, it increases the precision to force the
@@ -201,12 +193,10 @@ follows it). For \fBg\fR and \fBG\fR conversions, trailing zeroes will
 The conversion characters and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR,\fBi\fR,\fBo\fR,\fBu\fR,\fBx\fR,\fBX\fR\fR
 .ad
 .RS 15n
-.rt  
 The integer \fIarg\fR is converted to signed decimal (\fBd\fR or \fBi\fR),
 unsigned octal (\fBo\fR), unsigned decimal (\fBu\fR), or unsigned hexadecimal
 notation (\fBx\fR and \fBX\fR), respectively; the letters \fBabcdef\fR are used
@@ -222,12 +212,10 @@ string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 15n
-.rt  
 The float or double \fIarg\fR is converted to decimal notation in the style
 [\fB\(mi\fR]\fIddd\fR\fB\&.\fR\fIddd\fR where the number of digits after the
 decimal point is equal to the precision specification. If the precision is
@@ -237,12 +225,10 @@ decimal point are printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR,\fBE\fR\fR
 .ad
 .RS 15n
-.rt  
 The float or double \fIarg\fR is converted in the style
 [\fB\(mi\fR]\fId\fR\fB\&.\fR\fIddd\fR\fBe\(+-\fR\fIddd\fR, where there is one
 digit before the decimal point and the number of digits after it is equal to
@@ -254,12 +240,10 @@ exponent always contains at least two digits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR,\fBG\fR\fR
 .ad
 .RS 15n
-.rt  
 The float or double \fIarg\fR is printed in style \fBf\fR or \fBe\fR (or in
 style \fBE\fR in the case of a \fBG\fR format code), with the precision
 specifying the number of significant digits. The style used depends on the
@@ -276,23 +260,19 @@ indeterminate values (infinity or not-a-number) as "Infinity" or "NaN"
 respectively.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 The character \fIarg\fR is printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 The \fIarg\fR is taken to be a string (character pointer) and characters from
 the string are printed until a \fINULL\fR character (\fB\e0\fR) is encountered
 or until the number of characters indicated by the precision specification is
@@ -303,12 +283,10 @@ for \fIarg\fR will yield undefined results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 5n
-.rt  
 Print a \fB%\fR; no argument is converted.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlpi 7P "7 Sep 2009" "SunOS 5.11" "Protocols"
+.TH DLPI 7P "Sep 7, 2009"
 .SH NAME
 dlpi \- Data Link Provider Interface
 .SH SYNOPSIS
@@ -45,7 +45,6 @@ to the DLPI standard, as detailed in this man page.
 .SH SOLARIS-SPECIFIC DLPI EXTENSIONS
 .sp
 .ne 2
-.mk
 .na
 \fBNotification Support\fR
 .ad
@@ -76,9 +75,9 @@ and must be zero or more of:
 .nf
 DL_NOTE_LINK_DOWN         Notify when link has gone down
 DL_NOTE_LINK_UP           Notify when link has come up
-DL_NOTE_PHYS_ADDR         Notify when address changes 
+DL_NOTE_PHYS_ADDR         Notify when address changes
 DL_NOTE_SDU_SIZE          Notify when MTU changes
-DL_NOTE_SPEED             Notify when speed changes 
+DL_NOTE_SPEED             Notify when speed changes
 DL_NOTE_PROMISC_ON_PHYS   Notify when DL_PROMISC_PHYS is set
 DL_NOTE_PROMISC_OFF_PHYS  Notify when DL_PROMISC_PHYS is cleared
 .fi
@@ -183,7 +182,6 @@ previous state).
 
 .sp
 .ne 2
-.mk
 .na
 \fBPassive Consumers of Aggregated Links\fR
 .ad
@@ -220,7 +218,7 @@ DL_BIND_REQ
 DL_ENABMULTI_REQ
 DL_PROMISCON_REQ
 DL_AGGR_REQ
-DL_UNAGGR_REQ                
+DL_UNAGGR_REQ
 DL_CONTROL_REQ
 DL_SET_PHYS_ADDR_REQ
 .fi
@@ -236,7 +234,6 @@ the links do not have any DLPI consumers or only \fBpassive\fR consumers.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRaw Mode\fR
 .ad
@@ -257,7 +254,6 @@ arguments. Once enabled, the stream remains in this mode until closed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNative Mode\fR
 .ad
@@ -280,7 +276,6 @@ requests generate responses with dl_mac_type set to the native DLPI type.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMargin\fR
 .ad
@@ -391,15 +386,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(5.5i) |cw(0i) 
-lw(5.5i) |lw(0i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 T{
 Interface Stability (Notification support/Passive mode behavior)
-T}Committed
+T}	Committed
 .TE
 
 .SH SEE ALSO

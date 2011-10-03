@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpicl 3LIB "5 Feb 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBPICL 3LIB "Feb 5, 2004"
 .SH NAME
 libpicl \- PICL library
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpicl\fR [ \fIlibrary\fR... ] 
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpicl\fR [ \fIlibrary\fR... ]
 #include <\fBpicl.h\fR>
 .fi
 
@@ -28,42 +28,36 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpicl_find_node\fR\fBpicl_get_first_prop\fR
-\fBpicl_get_frutree_parent\fR\fBpicl_get_next_by_col\fR
-\fBpicl_get_next_by_row\fR\fBpicl_get_next_prop\fR
-\fBpicl_get_node_by_path\fR\fBpicl_get_prop_by_name\fR
-\fBpicl_get_propinfo\fR\fBpicl_get_propinfo_by_name\fR
-\fBpicl_get_propval\fR\fBpicl_get_propval_by_name\fR
-\fBpicl_get_root\fR\fBpicl_initialize\fR
-\fBpicl_set_propval\fR\fBpicl_set_propval_by_name\fR
-\fBpicl_shutdown\fR\fBpicl_strerror\fR
-\fBpicl_wait\fR\fBpicl_walk_tree_by_class\fR
+l l
+l l .
+\fBpicl_find_node\fR	\fBpicl_get_first_prop\fR
+\fBpicl_get_frutree_parent\fR	\fBpicl_get_next_by_col\fR
+\fBpicl_get_next_by_row\fR	\fBpicl_get_next_prop\fR
+\fBpicl_get_node_by_path\fR	\fBpicl_get_prop_by_name\fR
+\fBpicl_get_propinfo\fR	\fBpicl_get_propinfo_by_name\fR
+\fBpicl_get_propval\fR	\fBpicl_get_propval_by_name\fR
+\fBpicl_get_root\fR	\fBpicl_initialize\fR
+\fBpicl_set_propval\fR	\fBpicl_set_propval_by_name\fR
+\fBpicl_shutdown\fR	\fBpicl_strerror\fR
+\fBpicl_wait\fR	\fBpicl_walk_tree_by_class\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libpicl.so.1\fR \fR
 .ad
 .RS 29n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libpicl.so.1\fR \fR
 .ad
 .RS 29n
-.rt  
 64-bit shared object
 .RE
 
@@ -75,15 +69,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

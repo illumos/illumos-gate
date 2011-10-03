@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipnat 7I "22 May 2008" "SunOS 5.11" "Ioctl Requests"
+.TH IPNAT 7I "May 22, 2008"
 .SH NAME
 ipnat \- IP Filter/NAT module interface
 .SH DESCRIPTION
@@ -61,24 +61,20 @@ only accept calls from 64-bit applications. Calls from 32-bit applications fail
 with \fBEINVAL\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSTLCK\fR\fR
 .ad
 .RS 13n
-.rt  
 Set or clear the NAT lock to prevent table updates attributable to packet
 flow-through.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGNATL\fR\fR
 .ad
 .RS 13n
-.rt  
 Search the NAT table for the rdr entry that matches the fields in the natlookup
 structure. The caller must populate the structure with the address/port
 information of the accepted TCP connection (nl_inip, nl_inport)  and the
@@ -103,7 +99,7 @@ cleared in the structure returned to the caller.
           i6addr_t  nl_inipaddr;
           i6addr_t  nl_outipaddr;
           i6addr_t  nl_realipaddr;
-          int       nl_v;          
+          int       nl_v;
           int       nl_flags;
           u_short   nl_inport;
           u_short   nl_outport;
@@ -116,7 +112,7 @@ cleared in the structure returned to the caller.
     #define nl_inip6      nl_inipaddr.in6
     #define nl_outip6     nl_outipaddr.in6
     #define nl_realip6    nl_realipaddr.in6
- 
+
      /*
       * Accepted values for nl_flags
       */
@@ -129,12 +125,10 @@ cleared in the structure returned to the caller.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSTPUT\fR\fR
 .ad
 .RS 13n
-.rt  
 Move a NAT mapping  structure from user space into the kernel. This ioctl is
 used by \fBipfs\fR(1M) to restore NAT sessions saved in
 \fB/var/db/ipf/ipnat.ipf\fR. The nat_save structure must have its ipn_nat and
@@ -377,12 +371,10 @@ int
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fBEPERM\fR
 .ad
 .RS 10n
-.rt  
 The device has been opened for reading only. To succeed, the ioctl call must be
 opened for both reading and writing. The call may be returned if it is
 privileged and the calling process did not assert  {\fBPRIV_SYS_NET_CONFIG\fR}
@@ -391,12 +383,10 @@ in the effective set.
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOMEM\fR
 .ad
 .RS 10n
-.rt  
 More memory was allocated than the kernel can provide. The call may also be
 returned if the application inserts a NAT entry that exceeds the hash bucket
 chain's maximum length.
@@ -404,46 +394,38 @@ chain's maximum length.
 
 .sp
 .ne 2
-.mk
 .na
 \fBEFAULT\fR
 .ad
 .RS 10n
-.rt  
 The calling process specified an invalid pointer in the ipfobj structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 The calling process detected a parameter or field set to an unacceptable value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEEXIST\fR
 .ad
 .RS 10n
-.rt  
 The calling process, via \fBSIOCSTPUT\fR, attempted to add a NAT entry that
 already exists in the NAT table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBESRCH\fR
 .ad
 .RS 10n
-.rt  
 The calling process called \fBSIOCSTPUT\fR before setting the SI_NEWFR flag and
 providing a pointer in the nat_fr  field that cannot  be found in the current
 rule set.
@@ -451,12 +433,10 @@ rule set.
 
 .sp
 .ne 2
-.mk
 .na
 \fBEACESS\fR
 .ad
 .RS 10n
-.rt  
 The calling process issued a \fBSIOCSTPUT\fR before issuing a SIOCSTLCK.
 .RE
 
@@ -468,13 +448,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

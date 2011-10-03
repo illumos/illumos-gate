@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ld_support 3ext "3 Nov 2006" "SunOS 5.11" "Extended Library Functions"
+.TH LD_SUPPORT 3EXT "Nov 3, 2006"
 .SH NAME
 ld_support, ld_atexit, ld_atexit64, ld_file, ld_file64, ld_input_done,
 ld_input_section, ld_input_section64, ld_open, ld_open64, ld_section,
@@ -38,49 +38,49 @@ ld_section64, ld_start, ld_start64, ld_version \- link-editor support functions
 
 .LP
 .nf
-\fBvoid\fR \fBld_input_section\fR(\fBconst char *\fR\fIname\fR, \fBElf32_Shdr **\fR\fIshdr\fR, 
+\fBvoid\fR \fBld_input_section\fR(\fBconst char *\fR\fIname\fR, \fBElf32_Shdr **\fR\fIshdr\fR,
      \fBElf32_Word\fR \fIsndx\fR, \fBElf_Data *\fR\fIdata\fR, \fBElf *\fR\fIelf\fR, \fBuint_t *\fR\fIflags\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_input_section64\fR(\fBconst char *\fR\fIname\fR, \fBElf64_Shdr **\fR\fIshdr\fR, 
+\fBvoid\fR \fBld_input_section64\fR(\fBconst char *\fR\fIname\fR, \fBElf64_Shdr **\fR\fIshdr\fR,
      \fBElf64_Word\fR \fIsndx\fR, \fBElf_Data *\fR\fIdata\fR, \fBElf *\fR\fIelf\fR, \fBuint_t *\fR\fIflags\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_open\fR(\fBconst char **\fR\fIpname\fR, \fBconst char **\fR\fIfname\fR, \fBint *\fR\fIfd\fR, 
+\fBvoid\fR \fBld_open\fR(\fBconst char **\fR\fIpname\fR, \fBconst char **\fR\fIfname\fR, \fBint *\fR\fIfd\fR,
      \fBint\fR \fIflags\fR, \fBElf **\fR\fIelf\fR, \fBElf *\fR\fIref\fR, \fBsize_t\fR \fIoff\fR, \fBElf_kind\fR \fIkind\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_open64\fR(\fBconst char **\fR\fIpname\fR, \fBconst char **\fR\fIfname\fR, \fBint *\fR\fIfd\fR, 
+\fBvoid\fR \fBld_open64\fR(\fBconst char **\fR\fIpname\fR, \fBconst char **\fR\fIfname\fR, \fBint *\fR\fIfd\fR,
      \fBint\fR \fIflags\fR, \fBElf **\fR\fIelf\fR, \fBElf *\fR\fIref\fR, \fBsize_t\fR \fIoff\fR, \fBElf_kind\fR \fIkind\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_section\fR(\fBconst char *\fR\fIname\fR, \fBElf32_Shdr\fR \fIshdr\fR, \fBElf32_Word\fR \fIsndx\fR, 
+\fBvoid\fR \fBld_section\fR(\fBconst char *\fR\fIname\fR, \fBElf32_Shdr\fR \fIshdr\fR, \fBElf32_Word\fR \fIsndx\fR,
      \fBElf_Data *\fR\fIdata\fR, \fBElf *\fR\fIelf\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_section64\fR(\fBconst char *\fR\fIname\fR, \fBElf64_Shdr\fR \fIshdr\fR, \fBElf64_Word\fR \fIsndx\fR, 
+\fBvoid\fR \fBld_section64\fR(\fBconst char *\fR\fIname\fR, \fBElf64_Shdr\fR \fIshdr\fR, \fBElf64_Word\fR \fIsndx\fR,
      \fBElf_Data *\fR\fIdata\fR, \fBElf *\fR\fIelf\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_start\fR(\fBconst char *\fR\fIname\fR, \fBconst Elf32_Half\fR \fItype\fR, 
+\fBvoid\fR \fBld_start\fR(\fBconst char *\fR\fIname\fR, \fBconst Elf32_Half\fR \fItype\fR,
      \fBconst char *\fR\fIcaller\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBld_start64\fR(\fBconst char *\fR\fIname\fR, \fBconst Elf64_Half\fR \fItype\fR, 
+\fBvoid\fR \fBld_start64\fR(\fBconst char *\fR\fIname\fR, \fBconst Elf64_Half\fR \fItype\fR,
      \fBconst char *\fR\fIcaller\fR);
 .fi
 

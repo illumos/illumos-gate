@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH plock 3C "22 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH PLOCK 3C "Mar 22, 2004"
 .SH NAME
 plock \- lock or unlock into memory process, text, or data
 .SH SYNOPSIS
@@ -27,45 +27,37 @@ super-user to use this call.
 The \fBplock()\fR function performs the function specified by \fIop\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROCLOCK\fR\fR
 .ad
 .RS 12n
-.rt  
 Lock text and data segments into memory (process lock).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTXTLOCK\fR\fR
 .ad
 .RS 12n
-.rt  
 Lock text segment into memory (text lock).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDATLOCK\fR\fR
 .ad
 .RS 12n
-.rt  
 Lock data segment into memory (data lock).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNLOCK\fR\fR
 .ad
 .RS 12n
-.rt  
 Remove locks.
 .RE
 
@@ -81,23 +73,19 @@ The \fBplock()\fR function fails and does not perform the requested operation
 if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Not enough memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIop\fR argument is equal to \fBPROCLOCK\fR and a process lock, a text
 lock, or a data lock already exists on the calling process; the \fIop\fR
 argument is equal to \fBTXTLOCK\fR and a text lock or a process lock already
@@ -109,12 +97,10 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_PROC_LOCK_MEMORY\fR} privilege is not asserted in the effective
 set of the calling process.
 .RE
@@ -132,13 +118,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

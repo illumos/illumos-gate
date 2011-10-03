@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prtvtoc 1M "25 Jul 2002" "SunOS 5.11" "System Administration Commands"
+.TH PRTVTOC 1M "Jul 25, 2002"
 .SH NAME
 prtvtoc \- report information about a disk geometry and partitioning
 .SH SYNOPSIS
@@ -28,58 +28,48 @@ of \fB/dev/dsk/c?t?d?s2\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 13n
-.rt  
 Report on the disk free space, including the starting block address of the free
 space, number of blocks, and unused partitions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 13n
-.rt  
 Omit the headers from the normal output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI mnttab\fR\fR
 .ad
 .RS 13n
-.rt  
 Use \fImnttab\fR as the list of mounted filesystems, in place of
 \fB/etc/mnttab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Omit all headers but the column header from the normal output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI vfstab\fR\fR
 .ad
 .RS 13n
-.rt  
 Use \fIvfstab\fR as the list of filesystem defaults, in place of
 \fB/etc/vfstab\fR.
 .RE
@@ -131,23 +121,21 @@ follows:
 
 .sp
 .TS
-tab();
-cw(2.5i) cw(3i) 
-lw(2.5i) lw(3i) 
-.
-\fIName\fR\fINumber\fR
-UNASSIGNED0x00
-BOOT0x01
-ROOT0x02
-SWAP0x03
-USR0x04
-BACKUP0x05
-STAND0x06
-VAR0x07
-HOME0x08
-ALTSCTR 0x09
-CACHE0x0a
-RESERVED0x0b
+c c
+l l .
+\fIName\fR	\fINumber\fR
+UNASSIGNED	0x00
+BOOT	0x01
+ROOT	0x02
+SWAP	0x03
+USR	0x04
+BACKUP	0x05
+STAND	0x06
+VAR	0x07
+HOME	0x08
+ALTSCTR	 0x09
+CACHE	0x0a
+RESERVED	0x0b
 .TE
 
 .sp
@@ -159,14 +147,12 @@ mounted, as follows:
 
 .sp
 .TS
-tab();
-lw(2.5i) lw(3i) 
-lw(2.5i) lw(3i) 
-.
-\fIName\fR\fINumber\fR
-MOUNTABLE, READ AND WRITE0x00
-NOT MOUNTABLE0x01
-MOUNTABLE, READ ONLY0x10
+l l
+l l .
+\fIName\fR	\fINumber\fR
+MOUNTABLE, READ AND WRITE	0x00
+NOT MOUNTABLE	0x01
+MOUNTABLE, READ ONLY	0x10
 .TE
 
 .LP

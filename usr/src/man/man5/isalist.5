@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH isalist 5 "20 Mar 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH ISALIST 5 "Mar 20, 2008"
 .SH NAME
 isalist \- the native instruction sets known to Solaris software
 .SH DESCRIPTION
@@ -32,12 +32,10 @@ of Sun's C 4.0 compiler is indicated. Other compilers might have similar
 options.
 .sp
 .ne 2
-.mk
 .na
 \fB1a. \fBsparc\fR\fR
 .ad
 .RS 27n
-.rt  
 Indicates the SPARC V8 instruction set, as defined in \fI\fR The SPARC
 Architecture Manual, Version 8, Prentice-Hall, Inc., 1992. Some instructions
 (such as integer multiply and divide, FSMULD, and all floating point operations
@@ -46,24 +44,20 @@ on quad operands) can be emulated by the kernel on certain systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB1b. \fBsparcv7\fR\fR
 .ad
 .RS 27n
-.rt  
 Same as sparc. This corresponds to code produced with the -xarch=v7 option of
 Sun's C 4.0 compiler.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2. \fBsparcv8-fsmuld\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparc, except that integer multiply and divide must be executed in
 hardware. This corresponds to code produced with the -xarch=v8a option of Sun's
 C 4.0 compiler.
@@ -71,24 +65,20 @@ C 4.0 compiler.
 
 .sp
 .ne 2
-.mk
 .na
 \fB3. \fBsparcv8\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparcv8-fsmuld, except that FSMULD must also be executed in hardware. This
 corresponds to code produced with the -xarch=v8 option of Sun's C 4.0 compiler.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4. \fBsparcv8plus\fR\fR
 .ad
 .RS 27n
-.rt  
 Indicates the SPARC V8 instruction set plus those instructions in the SPARC V9
 instruction set, as defined in \fI\fR The SPARC Architecture Manual, Version 9,
 Prentice-Hall, 1994, that can be used according to \fI\fR The V8+ Technical
@@ -98,12 +88,10 @@ of Sun's C 4.0 compiler.
 
 .sp
 .ne 2
-.mk
 .na
 \fB5a. \fBsparcv8plus+vis\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparcv8plus, with the addition of those UltraSPARC I Visualization
 Instructions that can be used according to \fI\fR The V8+ Technical
 Specification. This corresponds to code produced with the -xarch=v8plusa option
@@ -112,59 +100,49 @@ of Sun's C 4.0 compiler.
 
 .sp
 .ne 2
-.mk
 .na
 \fB5b. \fBsparcv8plus+fmuladd\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparcv8plus, with the addition of the Fujitsu SPARC64 floating
 multiply-add and multiply-subtract instructions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB6. \fBsparcv9\fR\fR
 .ad
 .RS 27n
-.rt  
 Indicates the SPARC V9 instruction set, as defined in \fI\fR The SPARC
 Architecture Manual, Version 9, Prentice-Hall, 1994.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB7a. \fBsparcv9+vis\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparcv9, with the addition of the UltraSPARC I Visualization Instructions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB7b. \fBsparcv9+vis2\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparcv9, with the addition of the UltraSPARC III Visualization
 Instructions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB7c. \fBsparcv9+fmuladd\fR\fR
 .ad
 .RS 27n
-.rt  
 Like sparcv9, with the addition of the Fujitsu SPARC64 floating multiply-add
 and multiply-subtract instructions.
 .RE
@@ -172,24 +150,20 @@ and multiply-subtract instructions.
 .SS "x86 Platforms"
 .sp
 .ne 2
-.mk
 .na
 \fB1. \fBi386\fR\fR
 .ad
 .RS 22n
-.rt  
 The Intel 80386 instruction set, as described in \fI\fR The i386 Microprocessor
 Programmer's Reference Manual.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2. \fBi486\fR\fR
 .ad
 .RS 22n
-.rt  
 The Intel 80486 instruction set, as described in \fI\fR The i486 Microprocessor
 Programmer's Reference Manual. (This is effectively i386, plus the CMPXCHG,
 BSWAP, and XADD instructions.)
@@ -197,12 +171,10 @@ BSWAP, and XADD instructions.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB3. \fBpentium\fR\fR
 .ad
 .RS 22n
-.rt  
 The Intel Pentium instruction set, as described in \fI\fR The Pentium Processor
 User's Manual. (This is effectively i486, plus the CPU_ID instruction, and any
 features that the CPU_ID instruction indicates are present.)
@@ -210,23 +182,19 @@ features that the CPU_ID instruction indicates are present.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB4. \fBpentium+mmx\fR\fR
 .ad
 .RS 22n
-.rt  
 Like pentium, with the MMX instructions guaranteed present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB5. \fBpentium_pro\fR\fR
 .ad
 .RS 22n
-.rt  
 The Intel PentiumPro instruction set, as described in \fI\fR The PentiumPro
 Family Developer's Manual. (This is effectively pentium, with the CMOVcc,
 FCMOVcc, FCOMI, and RDPMC instructions guaranteed present.)
@@ -234,23 +202,19 @@ FCMOVcc, FCOMI, and RDPMC instructions guaranteed present.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB6. \fBpentium_pro+mmx\fR\fR
 .ad
 .RS 22n
-.rt  
 Like pentium_pro, with the MMX instructions guaranteed present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB7. \fBamd64\fR\fR
 .ad
 .RS 22n
-.rt  
 The AMD Opteron instruction set, as described in the \fIAMD64 Architecture
 Programmer's Manual\fR.
 .RE

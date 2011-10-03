@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH expr 1B "6 Jun 2000" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH EXPR 1B "Jun 6, 2000"
 .SH NAME
 expr \- evaluate arguments as a logical, arithmetic, or string expression
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ are preceded by `\fB\e\fR\&'. The list is in order of increasing precedence,
 with equal precedence operators grouped within \fB{\|}\fR symbols.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpr\fR\fB \e| \fR\fIexpr\fR\fR
 .ad
@@ -43,7 +42,6 @@ not \fINULL\fR; otherwise, \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpr\fR\fB \e& \fR\fIexpr\fR\fR
 .ad
@@ -55,7 +53,6 @@ otherwise returns \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpr\fR { \fB=,\fR \e\fB,\fR \e , \fB\e<\fR,\fB \e<=\fR,\fB != \fR}
 \fIexpr\fR\fR
@@ -68,7 +65,6 @@ otherwise returns the result of a lexical comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpr\fR { \fB+\fR,\fB \(mi \fR} \fIexpr\fR\fR
 .ad
@@ -79,7 +75,6 @@ Addition or subtraction of integer-valued arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpr\fR { \fB\e\fR,\fB /\fR,\fB % \fR} \fBexpr\fR\fR
 .ad
@@ -90,7 +85,6 @@ Multiplication, division, or remainder of the integer-valued arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR\fB : \fR\fIregular-expression\fR\fR
 .ad
@@ -113,7 +107,6 @@ first argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubstr\fR \fIstring integer-1 integer-2\fR\fR
 .ad
@@ -130,7 +123,6 @@ tends to run forever in these cases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex\fR \fIstring character-list\fR\fR
 .ad
@@ -142,7 +134,6 @@ in \fIcharacter-list\fR matches a character in  \fIstring\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlength\fR \fIstring\fR\fR
 .ad
@@ -153,7 +144,6 @@ Returns the length (that is, the number of characters) of \fIstring\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB( expr )\fR\fR
 .ad
@@ -230,34 +220,28 @@ Returns the number of characters in \fB$VAR\fR.
 \fBexpr\fR returns the following exit codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 If the expression is neither  \fINULL\fR nor \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 If the expression \fIis\fR \fINULL\fR or \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 For invalid expressions.
 .RE
 
@@ -268,34 +252,28 @@ For invalid expressions.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsyntax\fR \fBerror\fR\fR
 .ad
 .RS 24n
-.rt  
 for operator/operand errors
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-numeric argument\fR\fR
 .ad
 .RS 24n
-.rt  
 if arithmetic is attempted on such a string
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdivision by zero\fR\fR
 .ad
 .RS 24n
-.rt  
 if an attempt to divide by zero is made
 .RE
 

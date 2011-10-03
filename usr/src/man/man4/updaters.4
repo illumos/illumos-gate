@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH updaters 4 "24 Oct 1996" "SunOS 5.11" "File Formats"
+.TH UPDATERS 4 "Oct 24, 1996"
 .SH NAME
 updaters \- configuration file for NIS updating
 .SH SYNOPSIS
@@ -30,67 +30,55 @@ through standard input. The information passed is described below (all items
 are followed by a \fBNEWLINE\fR except for 4 and 6):
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1.\fR\fR
 .ad
 .RS 6n
-.rt  
 Network name of client wishing to make the update (a string).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2.\fR\fR
 .ad
 .RS 6n
-.rt  
 Kind of update (an integer).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3.\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of bytes in key (an integer).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4.\fR\fR
 .ad
 .RS 6n
-.rt  
 Actual bytes of key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5.\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of bytes in data (an integer).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6.\fR\fR
 .ad
 .RS 6n
-.rt  
 Actual bytes of data.
 .RE
 
@@ -106,12 +94,10 @@ from making the change, it should exit with the status that matches a valid
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/yp/updaters\fR\fR
 .ad
 .RS 20n
-.rt  
 The makefile used for updating the  \fBNIS\fR databases.
 .RE
 

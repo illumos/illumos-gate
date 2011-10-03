@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH powertop 1M "19 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH POWERTOP 1M "May 19, 2009"
 .SH NAME
 powertop \- report and analyze events that affect power management
 .SH SYNOPSIS
@@ -68,7 +68,6 @@ regarding the current virtualized environment.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR [\fIprocessor_id\fR]\fR
 .ad
@@ -79,7 +78,6 @@ Specifies which CPU the tool should observe.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR [\fIcount\fR]\fR
 .ad
@@ -90,7 +88,6 @@ Dumps the results of \fIcount\fR analysis of system activity to the screen.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -101,7 +98,6 @@ Displays the command's usage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fIinterval\fR]\fR
 .ad
@@ -113,7 +109,6 @@ possible values are between 1 and 100; the default is 5 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -184,7 +179,6 @@ The following command runs PowerTOP and only displays data for CPU 3:
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -195,7 +189,6 @@ Successful operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -206,7 +199,6 @@ An error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -223,15 +215,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86, SPARC
+Architecture	x86, SPARC
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

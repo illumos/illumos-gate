@@ -12,7 +12,7 @@
 .\"
 .\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.TH audioctl 1 "18 Mar 2011" "SunOS 5.11" "User Commands"
+.TH AUDIOCTL 1 "Mar 18, 2011"
 .SH NAME
 audioctl - audio device control command line interface
 .SH SYNOPSIS
@@ -56,7 +56,6 @@ record gain.
 The \fRaudioctl\fB command supports the following subcommands.
 .sp
 .ne 2
-.mk
 .na
 \fBlist-devices\fR
 .ad
@@ -67,7 +66,6 @@ List all the audio devices on the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBshow-device\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] [\fBcontrol\fR ... ]
 .ad
@@ -80,7 +78,6 @@ will be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBshow-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR]
 .ad
@@ -94,7 +91,6 @@ the \fB-v\fR option is specified, then more detail will be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBset-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fB] \fIcontrol\fR \fIvalue\fR
 .ad
@@ -107,7 +103,6 @@ option is specified, then more verbose output be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsave-controls\fR [\fB-f\fR] [\fB-d\fR \fIdevice\fB] \fIfile\fR
 .ad
@@ -120,13 +115,12 @@ or modify an existing file unless \fB-f\fR (force) is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fBload-controls\fR [\fB-d\fR \fIdevice\fB] \fIfile\fR
 .ad
 .sp .6
 .RS 4n
-Load previously saved control settings from a \fIfile\fR 
+Load previously saved control settings from a \fIfile\fR
 into a \fIdevice\fR (or all audio devices if not
 specified).
 .RE
@@ -135,12 +129,10 @@ specified).
 .sp
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIODEV\fR\fR
 .ad
 .RS 12n
-.rt  
 The full path name of the default audio device to use if on
 is not specified on the command line.  If this variable is not set,
 \fB/dev/audio\fR is used.
@@ -155,13 +147,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 .LP
 The \fBaudioctl\fR command and its subcommands are Committed.  The

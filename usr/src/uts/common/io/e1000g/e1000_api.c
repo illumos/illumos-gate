@@ -24,7 +24,34 @@
  */
 
 /*
- * IntelVersion: 1.125 v3-1-10-1_2009-9-18_Release14-6
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "e1000_api.h"
@@ -257,6 +284,10 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_PCH_M_HV_LC:
 		mac->type = e1000_pchlan;
 		break;
+	case E1000_DEV_ID_PCH2_LV_LM:
+	case E1000_DEV_ID_PCH2_LV_V:
+		mac->type = e1000_pch2lan;
+		break;
 	default:
 		/* Should never have loaded on this device */
 		ret_val = -E1000_ERR_MAC_INIT;
@@ -344,6 +375,7 @@ e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		e1000_init_function_pointers_ich8lan(hw);
 		break;
 	default:

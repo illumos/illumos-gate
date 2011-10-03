@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_srq_create 3DAT "11 Sep 2006" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_SRQ_CREATE 3DAT "Sep 11, 2006"
 .SH NAME
 dat_srq_create \- create an instance of a shared receive queue
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -25,45 +25,37 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIia_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 A handle for an open instance of the IA to which the created SRQ belongs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpz_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 A handle for an instance of the Protection Zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrq_attr\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to a structure that contains Consumer-requested SRQ attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrq_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 A handle for the created instance of a Shared Receive Queue.
 .RE
 
@@ -107,57 +99,47 @@ the EP Recv Work Queue.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation failed due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 30n
-.rt  
 Either \fIia_handle\fR or \fIpz_handle\fR is an invalid DAT handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 30n
-.rt  
 One of the parameters is invalid. Either one of the requested SRQ attributes
 was invalid or a combination of attributes is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
 .ad
 .RS 30n
-.rt  
 The requested Model was not supported by the Provider.
 .RE
 
@@ -213,15 +195,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.2
+Interface Stability	Standard: uDAPL, 1.2
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

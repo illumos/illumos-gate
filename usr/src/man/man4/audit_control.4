@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audit_control 4 "16 Apr 2009" "SunOS 5.11" "File Formats"
+.TH AUDIT_CONTROL 4 "Apr 16, 2009"
 .SH NAME
 audit_control \- control information for system audit daemon
 .SH SYNOPSIS
@@ -87,23 +87,19 @@ plugin: \fIkeyword1\fR=\fIvalue1\fR;\fIkeyword2\fR=\fIvalue2\fR;
 The following keywords are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBname\fR\fR
 .ad
 .RS 9n
-.rt  
 The value is the pathname of the plugin. This specification is required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqsize\fR\fR
 .ad
 .RS 9n
-.rt  
 The value is the maximum number of records to queue for audit data sent to the
 plugin. If omitted, the current hiwater mark (see the \fB-getqctrl\fR of
 \fBauditconfig\fR(1M)) is used. When this maximum is reached, \fBauditd\fR will
@@ -113,12 +109,10 @@ either block or discard data, depending on the audit policy \fBcnt\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp_*\fR\fR
 .ad
 .RS 9n
-.rt  
 A keyword with the prefix \fBp_\fR is passed to the plugin defined by the value
 associated with the \fBname\fR attribute. These attributes are defined for each
 plugin. By convention, if the value associated with a \fBplugin\fR attribute is
@@ -159,7 +153,7 @@ user's entry in the \fBaudit_user\fR file are then subtracted from the total:
 .sp
 .in +2
 .nf
-user's process preselection mask = 
+user's process preselection mask =
    (flags: line + always audit flags) - never audit flags
 .fi
 .in -2
@@ -310,13 +304,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Obsolete Committed
+Interface Stability 	Obsolete Committed
 .TE
 
 .SH SEE ALSO

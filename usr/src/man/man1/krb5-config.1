@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH krb5-config 1 "24 Aug 2009" "SunOS 5.11" "User Commands"
+.TH KRB5-CONFIG 1 "Aug 24, 2009"
 .SH NAME
 krb5-config \- link against the installed Kerberos libraries
 .SH SYNOPSIS
 .LP
 .nf
-\fBkrb5-config\fR 
-     [\fB--all\fR | \fB--cflags\fR | \fB--exec-prefix\fR | \fB--help\fR | \fB--libs\fR \fIlibrary\fR | 
+\fBkrb5-config\fR
+     [\fB--all\fR | \fB--cflags\fR | \fB--exec-prefix\fR | \fB--help\fR | \fB--libs\fR \fIlibrary\fR |
       \fB--prefix\fR | \fB--vendor\fR | \fB--version\fR]
 .fi
 
@@ -25,45 +25,37 @@ compile and link programs against the installed Kerberos libraries.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--all\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the version, vendor, prefix and \fBexec-prefix\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--cflags\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the compiler flags with which Kerberos was built.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--exec-prefix\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the \fBexec-prefix\fR with which Kerberos was built.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--help\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the usage message.
 .sp
 This is the default.
@@ -71,23 +63,19 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--libs\fR \fIlibrary\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays compiler options required to link with \fIlibrary\fR.
 .sp
 The following \fIlibrary\fR values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkrb5\fR\fR
 .ad
 .RS 8n
-.rt  
 Kerberos 5 application
 .RE
 
@@ -95,34 +83,28 @@ Kerberos 5 application
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--prefix\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the prefix with which Kerberos was built.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--vendor\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the vendor of the installed Kerberos implementation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--version\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays the version of the installed Kerberos implementation.
 .RE
 
@@ -165,23 +147,19 @@ The following example shows the C compiler options needed to link against
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -193,13 +171,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

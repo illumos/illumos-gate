@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_alloc 9F "23 Apr 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_ALLOC 9F "Apr 23, 2008"
 .SH NAME
 ddi_intr_alloc, ddi_intr_free \- allocate or free interrupts for a given
 interrupt type
@@ -34,56 +34,46 @@ Solaris DDI specific (Solaris DDI).
 \fBddi_intr_alloc()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh_array\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to an array of DDI interrupt handles
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 12n
-.rt  
 Interrupt type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinum\fR\fR
 .ad
 .RS 12n
-.rt  
 Interrupt number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Number of interrupts requested. The \fIcount\fR should not exceed the total
 number of interrupts supported by the device, as returned by a call to
 \fBddi_intr_get_nintrs\fR(9F).
@@ -91,23 +81,19 @@ number of interrupts supported by the device, as returned by a call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIactualp\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the number of interrupts actually allocated
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbehavior\fR\fR
 .ad
 .RS 12n
-.rt  
 Flag to determine the allocation algorithm
 .RE
 
@@ -116,12 +102,10 @@ Flag to determine the allocation algorithm
 \fBddi_intr_free()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 5n
-.rt  
 DDI interrupt handle
 .RE
 
@@ -184,56 +168,46 @@ handle array.
 The \fBddi_intr_alloc()\fR and \fBddi_intr_free()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 21n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EAGAIN\fR\fR
 .ad
 .RS 21n
-.rt  
 Not enough interrupt resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 21n
-.rt  
 On encountering invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_NOTFOUND\fR\fR
 .ad
 .RS 21n
-.rt  
 On failure to find the interrupt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 21n
-.rt  
 On any implementation specific failure.
 .RE
 
@@ -250,13 +224,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

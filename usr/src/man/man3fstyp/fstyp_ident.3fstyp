@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fstyp_ident 3FSTYP "20 Jun 2006" "SunOS 5.11" "File System Type Identification Library Functions"
+.TH FSTYP_IDENT 3FSTYP "Jun 20, 2006"
 .SH NAME
 fstyp_ident \- identify file system attributes
 .SH SYNOPSIS
@@ -20,34 +20,28 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lfstyp\fR \fB -lnvpair \fR [ 
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 10n
-.rt  
 Opaque handle returned by \fBfstyp_init\fR(3FSTYP).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfstype\fR\fR
 .ad
 .RS 10n
-.rt  
 Opaque argument that specifies the file system type to be identified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIident\fR\fR
 .ad
 .RS 10n
-.rt  
 File system type returned if identification succeeds.
 .RE
 
@@ -76,15 +70,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acctcms 1M "22 Feb 1999" "SunOS 5.11" "System Administration Commands"
+.TH ACCTCMS 1M "Feb 22, 1999"
 .SH NAME
 acctcms \- command summary from process accounting records
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/acct/acctcms\fR [\fB-a\fR [\fB-o\fR] [\fB-p\fR]] [\fB-c\fR] [\fB-j\fR] [\fB-n\fR] [\fB-s\fR] 
+\fB/usr/lib/acct/acctcms\fR [\fB-a\fR [\fB-o\fR] [\fB-p\fR]] [\fB-c\fR] [\fB-j\fR] [\fB-n\fR] [\fB-s\fR]
      [\fB-t\fR] \fIfilename\fR...
 .fi
 
@@ -23,12 +23,10 @@ normally using an internal summary format.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Print output in \fBASCII\fR rather than in the internal summary format. The
 output includes command name, number of times executed, total kcore-minutes,
 total \fBCPU\fR minutes, total real minutes, mean size (in K), mean \fBCPU\fR
@@ -39,23 +37,19 @@ kcore-minutes.
 Use the following options only with the \fB-a\fR option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Output a (non-prime) offshift-time-only command summary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Output a prime-time-only command summary.
 .RE
 
@@ -67,56 +61,46 @@ into prime and non-prime.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Sort by total \fBCPU\fR time, rather than total kcore-minutes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR\fR
 .ad
 .RS 6n
-.rt  
 Combine all commands invoked only once under "***other".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Sort by number of command invocations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Any file names encountered hereafter are already in internal summary format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Process all records as total accounting records. The default internal summary
 format splits each field into prime and non-prime-time parts. This option
 combines the prime and non-prime time parts into a single field that is the

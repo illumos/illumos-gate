@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_GetPluginOidList 3MPAPI "15 Feb 2006" "SunOS 5.11" "Common Multipath Management Library Functions"
+.TH MP_GETPLUGINOIDLIST 3MPAPI "Feb 15, 2006"
 .SH NAME
 MP_GetPluginOidList \- get a list of the object IDs
 .SH SYNOPSIS
@@ -19,12 +19,10 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIppList\fR\fR
 .ad
 .RS 10n
-.rt  
 A pointer to a pointer to an object ID that has type \fBMP_OID_LIST\fR. With a
 successful return, this contains a pointer to an object ID that has type
 \fBMP_OID_LIST\fR that contains the object IDs of all of the plugins currently
@@ -44,7 +42,6 @@ list by calling \fBMP_FreeOidList\fR(3MPAPI).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
 .ad
@@ -56,7 +53,6 @@ written.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_SUCCESS\fR\fR
 .ad
@@ -67,7 +63,6 @@ The operation is successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_FAILED\fR\fR
 .ad
@@ -78,7 +73,6 @@ The plugin for the specified object ID  is not found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INSUFFICIENT_MEMORY\fR\fR
 .ad
@@ -95,17 +89,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 Standard: ANSI INCITS 412 Multipath Management API
 T}
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

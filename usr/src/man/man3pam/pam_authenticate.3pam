@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_authenticate 3PAM "27 Jan 2005" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_AUTHENTICATE 3PAM "Jan 27, 2005"
 .SH NAME
 pam_authenticate \- perform authentication within the PAM framework
 .SH SYNOPSIS
@@ -29,23 +29,19 @@ call to \fBpam_start()\fR or \fBpam_set_item()\fR.
 The following flags may be set in the \fIflags\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SILENT\fR\fR
 .ad
 .RS 29n
-.rt  
 Authentication service should not generate any messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
 .ad
 .RS 29n
-.rt  
 The authentication service should return  \fBPAM_AUTH_ERR\fR if the user has a
 null authentication token.
 .RE
@@ -58,56 +54,46 @@ error return values described in \fBpam\fR(3PAM), the following values may be
 returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 25n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CRED_INSUFFICIENT\fR\fR
 .ad
 .RS 25n
-.rt  
 Cannot access authentication data due to insufficient credentials.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHINFO_UNAVAIL\fR\fR
 .ad
 .RS 25n
-.rt  
 Underlying authentication service cannot retrieve authentication information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 25n
-.rt  
 User not known to the underlying authentication module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_MAXTRIES\fR\fR
 .ad
 .RS 25n
-.rt  
 An authentication service has maintained a retry count which has been reached.
 No further retries should be attempted.
 .RE
@@ -120,15 +106,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

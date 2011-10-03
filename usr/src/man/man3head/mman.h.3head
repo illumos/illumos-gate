@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mman.h 3HEAD "5 Feb 2008" "SunOS 5.11" "Headers"
+.TH MMAN.H 3HEAD "Feb 5, 2008"
 .SH NAME
 mman.h, mman \- memory management declarations
 .SH SYNOPSIS
@@ -57,45 +57,37 @@ For Memory Mapped Files and Shared Memory Objects options, the following
 protection options are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR\fR
 .ad
 .RS 14n
-.rt  
 Page can be read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR\fR
 .ad
 .RS 14n
-.rt  
 Page can be written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 Page can be executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_NONE\fR\fR
 .ad
 .RS 14n
-.rt  
 Page cannot be accessed.
 .RE
 
@@ -104,34 +96,28 @@ Page cannot be accessed.
 The following \fIflag\fR options are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_SHARED\fR\fR
 .ad
 .RS 15n
-.rt  
 Share changes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_PRIVATE\fR\fR
 .ad
 .RS 15n
-.rt  
 Changes are private.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAP_FIXED\fR\fR
 .ad
 .RS 15n
-.rt  
 Interpret \fBaddr\fR exactly.
 .RE
 
@@ -141,34 +127,28 @@ The flags immediately following are defined for \fBmsync()\fR. See
 \fBmsync\fR(3C).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_ASYNC\fR\fR
 .ad
 .RS 17n
-.rt  
 Perform asynchronous writes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_SYNC\fR\fR
 .ad
 .RS 17n
-.rt  
 Perform synchronous writes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_INVALIDATE\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalidate mappings.
 .RE
 
@@ -178,23 +158,19 @@ The symbolic constants immediately following are defined for the
 \fBmlockall()\fR function. See \fBmlockall\fR(3C).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCL_CURRENT\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock currently mapped pages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCL_FUTURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock pages that become mapped.
 .RE
 
@@ -214,15 +190,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

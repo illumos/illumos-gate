@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -28,8 +29,8 @@
 #define	_NETSMB_SMBFS_API_H
 
 /*
- * Define the API exported to our commands and to the
- * MS-style RPC-over-named-pipes library (mlrpc).
+ * Define the API exported to our commands and to
+ * libraries doing DCE-RPC over SMB named pipes.
  */
 
 #include <sys/types.h>
@@ -58,13 +59,14 @@ extern "C" {
  * Share type values for smb_ctx_new, _init
  * Based on NetUseAdd() USE_INFO_[12] _asg_type values
  * They also happen to match: STYPE_DISKTREE, etc.
+ * Note: these values appear on the wire.
  */
 typedef enum {
-	USE_WILDCARD = -1,
-	USE_DISKDEV,
-	USE_SPOOLDEV,
-	USE_CHARDEV,
-	USE_IPC
+	USE_DISKDEV = 0,	/* also STYPE_DISKTREE */
+	USE_SPOOLDEV,		/* also STYPE_PRINTQ */
+	USE_CHARDEV,		/* also STYPE_DEVICE */
+	USE_IPC,		/* also STYPE_IPC */
+	USE_WILDCARD		/* also STYPE_UNKNOWN */
 } smb_use_shtype_t;
 
 /*
@@ -115,7 +117,6 @@ int  smb_get_authentication(struct smb_ctx *);
 int  smb_ctx_flags2(struct smb_ctx *);
 int  smb_ctx_resolve(struct smb_ctx *);
 int  smb_ctx_get_ssn(struct smb_ctx *);
-int  smb_ctx_get_ssnkey(struct smb_ctx *, uchar_t *, size_t);
 int  smb_ctx_get_tree(struct smb_ctx *);
 
 int  smb_ctx_setauthflags(struct smb_ctx *, int);
@@ -138,20 +139,18 @@ int  smb_ctx_setpwhash(struct smb_ctx *, const uchar_t *, const uchar_t *);
 
 typedef void (*smb_ctx_close_hook_t)(struct smb_ctx *);
 void smb_ctx_set_close_hook(smb_ctx_close_hook_t);
-int  smb_fh_close(struct smb_ctx *ctx, int);
-int  smb_fh_open(struct smb_ctx *ctx, const char *, int, int *);
-int  smb_fh_read(struct smb_ctx *, int, off_t, size_t, char *);
-int  smb_fh_write(struct smb_ctx *, int, off_t, size_t, const char *);
-int  smb_fh_xactnp(struct smb_ctx *, int, int, const char *,
+int  smb_fh_close(int);
+int  smb_fh_open(struct smb_ctx *ctx, const char *, int);
+int  smb_fh_read(int, off_t, size_t, char *);
+int  smb_fh_write(int, off_t, size_t, const char *);
+int  smb_fh_xactnp(int, int, const char *,
 	int *, char *, int *);
+int  smb_fh_getssnkey(int, uchar_t *, size_t);
 
-int  smb_iod_start(struct smb_ctx *);
+int  smb_open_printer(struct smb_ctx *, const char *, int, int);
 
-int  smb_t2_request(struct smb_ctx *, int, uint16_t *, const char *,
-	int, void *, int, void *, int *, void *, int *, void *, int *);
-
-int  smb_printer_open(struct smb_ctx *, int, int, const char *, int *);
-int  smb_printer_close(struct smb_ctx *, int);
+void smbfs_set_default_domain(const char *);
+void smbfs_set_default_user(const char *);
 
 char *smb_strerror(int);
 

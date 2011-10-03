@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 MINCONN =	minconn.so
 PASSPROMPT = 	passprompt.so
@@ -68,13 +70,6 @@ $(LIBPPPPLUGIN):=	FILEMODE = 0544
 
 $(LIBPPPPLUGINDIR):=	FILEMODE = 0755
 
-# This is needed because install doesn't handle -g well.
-UTILDIR=	$(ROOT)/usr/share/src/ppputil
-ROOTSRC=	$(UTILDIR)/plugins
-SRCFILES=	Makefile minconn.c passprompt.c pppd.h
-ROOTSRCFILES=	$(SRCFILES:%=$(ROOTSRC)/%)
-$(ROOTSRCFILES):=	FILEMODE= 0444
-
 .KEEP_STATE:
 
 all:	$(LIBRARIES)
@@ -91,27 +86,13 @@ $(PPPOE): pics .WAIT $$(PICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)
 
-install: all $(LIBPPPPLUGINDIR) $(LIBPPPPLUGIN) install_src
+install: all $(LIBPPPPLUGINDIR) $(LIBPPPPLUGIN)
 
 $(LIBPPPPLUGINDIR):
 	$(INS.dir)
 
 $(LIBPPPPLUGINDIR)/%:	%
 	$(INS.file)
-
-$(UTILDIR) $(ROOTSRC):
-	$(INS.dir)
-
-$(ROOTSRC)/Makefile%: Makefile%.dist
-	$(INS.rename)
-
-$(ROOTSRC)/%.h: ../%.h
-	$(INS.file)
-
-$(ROOTSRC)/%: %
-	$(INS.file)
-
-install_src:	$(UTILDIR) .WAIT $(ROOTSRC) .WAIT $(ROOTSRCFILES)
 
 lint:
 	$(LINT.c) $(LINTSRCS) $(LDLIBS)

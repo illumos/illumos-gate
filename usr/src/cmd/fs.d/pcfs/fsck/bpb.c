@@ -20,11 +20,11 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2011 Gary Mills
+ *
  * Copyright (c) 1999,2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fsck_pcfs -- routines for manipulating the BPB (BIOS parameter block)
@@ -66,7 +66,7 @@ computeFileAreaSize(void)
 	 * Compute bytes/cluster for later reference
 	 */
 	BytesPerCluster =  TheBIOSParameterBlock.bpb.sectors_per_cluster *
-		TheBIOSParameterBlock.bpb.bytes_per_sector;
+	    TheBIOSParameterBlock.bpb.bytes_per_sector;
 
 	/*
 	 * First we'll find total number of sectors in the file area...
@@ -80,7 +80,7 @@ computeFileAreaSize(void)
 	overhead = TheBIOSParameterBlock.bpb.resv_sectors;
 
 	RootDirSize = TheBIOSParameterBlock.bpb.num_root_entries *
-		sizeof (struct pcdir);
+	    sizeof (struct pcdir);
 	overhead += RootDirSize / TheBIOSParameterBlock.bpb.bytes_per_sector;
 
 	if (TheBIOSParameterBlock.bpb.sectors_per_fat) {
@@ -88,13 +88,13 @@ computeFileAreaSize(void)
 		 * Good old FAT12 or FAT16
 		 */
 		overhead += TheBIOSParameterBlock.bpb.num_fats *
-			TheBIOSParameterBlock.bpb.sectors_per_fat;
+		    TheBIOSParameterBlock.bpb.sectors_per_fat;
 		/*
 		 * Compute this for later - when we actually pull in a copy
 		 * of the FAT
 		 */
 		FATSize = TheBIOSParameterBlock.bpb.sectors_per_fat *
-			TheBIOSParameterBlock.bpb.bytes_per_sector;
+		    TheBIOSParameterBlock.bpb.bytes_per_sector;
 	} else {
 		/*
 		 *  FAT32
@@ -109,13 +109,13 @@ computeFileAreaSize(void)
 		 *  believing what I am told.
 		 */
 		overhead += TheBIOSParameterBlock.bpb.num_fats *
-			TheBIOSParameterBlock.bpb32.big_sectors_per_fat;
+		    TheBIOSParameterBlock.bpb32.big_sectors_per_fat;
 		/*
 		 * Compute this for later - when we actually pull in a copy
 		 * of the FAT
 		 */
 		FATSize = TheBIOSParameterBlock.bpb32.big_sectors_per_fat *
-			TheBIOSParameterBlock.bpb.bytes_per_sector;
+		    TheBIOSParameterBlock.bpb.bytes_per_sector;
 	}
 
 	/*
@@ -124,7 +124,7 @@ computeFileAreaSize(void)
 	 */
 	dataSectors -= overhead;
 	TotalClusters = dataSectors /
-		TheBIOSParameterBlock.bpb.sectors_per_cluster;
+	    TheBIOSParameterBlock.bpb.sectors_per_cluster;
 
 	/*
 	 *  Also need to compute last cluster and offset of the first cluster
@@ -153,8 +153,8 @@ computeFileAreaSize(void)
 		    "bytes.\n"), TotalClusters,
 		    TheBIOSParameterBlock.bpb.sectors_per_cluster,
 		    (uint64_t)TotalClusters *
-			TheBIOSParameterBlock.bpb.sectors_per_cluster *
-			TheBIOSParameterBlock.bpb.bytes_per_sector);
+		    TheBIOSParameterBlock.bpb.sectors_per_cluster *
+		    TheBIOSParameterBlock.bpb.bytes_per_sector);
 		(void) fprintf(stderr,
 		    gettext("File system overhead of %d sectors.\n"), overhead);
 		(void) fprintf(stderr,
@@ -193,7 +193,7 @@ readBPB(int fd)
 	if (ltohs(ubpb.mb.signature) != BOOTSECSIG) {
 		mountSanityCheckFails();
 		(void) fprintf(stderr,
-			gettext("Bad signature on BPB. Giving up.\n"));
+		    gettext("Bad signature on BPB. Giving up.\n"));
 		exit(2);
 	}
 
@@ -201,9 +201,9 @@ readBPB(int fd)
 	swap_pack_grabbpb(&TheBIOSParameterBlock, &(ubpb.bs));
 #else
 	(void) memcpy(&(TheBIOSParameterBlock.bpb), &(ubpb.bs.bs_front.bs_bpb),
-		sizeof (TheBIOSParameterBlock.bpb));
+	    sizeof (TheBIOSParameterBlock.bpb));
 	(void) memcpy(&(TheBIOSParameterBlock.ebpb), &(ubpb.bs.bs_ebpb),
-		sizeof (TheBIOSParameterBlock.ebpb));
+	    sizeof (TheBIOSParameterBlock.ebpb));
 #endif
 	/*
 	 * In general, we would expect the bytes per sector to
@@ -220,8 +220,9 @@ readBPB(int fd)
 		    gettext("Bogus bytes per sector value.  Giving up.\n"));
 		exit(2);
 	}
-	if (!(is_z_a_power_of_x_le_y(2, 128,
-		TheBIOSParameterBlock.bpb.sectors_per_cluster))) {
+	if (!(ISP2(TheBIOSParameterBlock.bpb.sectors_per_cluster) &&
+	    IN_RANGE(TheBIOSParameterBlock.bpb.sectors_per_cluster,
+	    1, 128))) {
 		mountSanityCheckFails();
 		(void) fprintf(stderr,
 		    gettext("Bogus sectors per cluster value.  Giving up.\n"));
@@ -233,8 +234,8 @@ readBPB(int fd)
 		swap_pack_grab32bpb(&TheBIOSParameterBlock, &(ubpb.bs));
 #else
 		(void) memcpy(&(TheBIOSParameterBlock.bpb32),
-			&(ubpb.bs32.bs_bpb32),
-			sizeof (TheBIOSParameterBlock.bpb32));
+		    &(ubpb.bs32.bs_bpb32),
+		    sizeof (TheBIOSParameterBlock.bpb32));
 #endif
 		IsFAT32 = 1;
 	}
@@ -246,7 +247,7 @@ readBPB(int fd)
 			mountSanityCheckFails();
 			(void) fprintf(stderr,
 			    gettext("Bogus number of root entries.  "
-				"Giving up.\n"));
+			    "Giving up.\n"));
 			exit(2);
 		}
 	} else {
@@ -254,7 +255,7 @@ readBPB(int fd)
 			mountSanityCheckFails();
 			(void) fprintf(stderr,
 			    gettext("Bogus number of root entries.  "
-				"Giving up.\n"));
+			    "Giving up.\n"));
 			exit(2);
 		}
 	}

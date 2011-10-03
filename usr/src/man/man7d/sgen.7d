@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sgen 7D "29 Mar 2008" "SunOS 5.11" "Devices"
+.TH SGEN 7D "Mar 29, 2008"
 .SH NAME
 sgen \- Generic SCSI device driver
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include <sys/scsi/targets/sgendef.h>\fR 
+\fB#include <sys/scsi/targets/sgendef.h>\fR
 .fi
 
 .LP
 .nf
-\fBsgen@target,lun:<devtype>\fR 
+\fBsgen@target,lun:<devtype>\fR
 .fi
 
 .SH DESCRIPTION
@@ -105,12 +105,10 @@ larger systems with many \fBSCSI\fR controllers, carefully edit the
 .SH PROPERTIES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinquiry-config-list\fR\fR
 .ad
 .RS 23n
-.rt  
 The \fBinquiry-config-list\fR property is a list of pairs of strings that
 enumerates a list of specific devices to which the \fBsgen\fR driver will bind.
 Each pair of strings is referred to as <\fBvendorid\fR, \fBproductid\fR> in the
@@ -119,12 +117,10 @@ discussion below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvendorid\fR\fR
 .ad
 .RS 12n
-.rt  
  is used to match the Vendor ID reported by the device. The \fBSCSI\fR
 specification limits Vendor IDs to eight characters. Correspondingly, the
 length of this string should not exceed eight characters. As a special case,
@@ -136,12 +132,10 @@ in a case-insensitive manner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproductid\fR\fR
 .ad
 .RS 13n
-.rt  
  is used to match the product ID reported by the device. The \fBSCSI\fR
 specification limits product IDs to sixteen characters (unused characters are
 filled with the whitespace characters).  Correspondingly, the length  of
@@ -160,13 +154,11 @@ For example, to match some fictitious devices from ACME corp, the
 
 .sp
 .TS
-tab();
-lw(2.01i) lw(1.06i) lw(2.43i) 
-lw(2.01i) lw(1.06i) lw(2.43i) 
-.
-\fBinquiry-config-list = \fR\fB"ACME"\fR,\fB"UltraToast 3000"\fR,
-\fB"ACME"\fR,\fB"UltraToast 4000"\fR,
- \fB"ACME"\fR,\fB"UltraToast 5000"\fR;
+l l l
+l l l .
+\fBinquiry-config-list = \fR	\fB"ACME"\fR,	\fB"UltraToast 3000"\fR,
+	\fB"ACME"\fR,	\fB"UltraToast 4000"\fR,
+	 \fB"ACME"\fR,	\fB"UltraToast 5000"\fR;
 .TE
 
 .sp
@@ -177,10 +169,8 @@ To match "UltraToast 4000" devices, regardless of vendor,
 
 .sp
 .TS
-tab();
-lw(1.97i) lw(1.1i) lw(2.43i) 
-.
-\fBinquiry-config-list = \fR\fB"*",\fR \fB"UltraToast 4000"\fR;
+l l l .
+\fBinquiry-config-list = \fR	\fB"*",\fR	 \fB"UltraToast 4000"\fR;
 .TE
 
 .sp
@@ -191,10 +181,8 @@ To match every device from ACME in the "UltraToast" series (i.e UltraToast
 
 .sp
 .TS
-tab();
-lw(2.05i) lw(.91i) lw(2.53i) 
-.
-\fBinquiry-config-list = \fR \fB"ACME"\fR\fB "UltraToast";\fR
+l l l .
+\fBinquiry-config-list = \fR	 \fB"ACME"\fR	\fB "UltraToast";\fR
 .TE
 
 .sp
@@ -209,12 +197,10 @@ considered significant when matching. To remedy this situation, specify
 significant.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice-type-config-list\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fBdevice-type-config-list\fR property is a list of strings that enumerate
 a list of device types to which the \fBsgen\fR driver will bind. The valid
 device types correspond to those defined by the \fISCSI-3 SPC Draft Standard,
@@ -225,30 +211,28 @@ Rev. 11a\fR. These types are:
 
 .sp
 .TS
-tab();
-cw(1.75i) |cw(3.75i) 
-lw(1.75i) |lw(3.75i) 
-.
-Type NameInquiry Type ID
+c | c
+l | l .
+Type Name	Inquiry Type ID
 _
-direct 0x00
-sequential 0x01
-printer  0x02
-processor 0x03
-worm 0x04
-rodirect 0x05
-scanner  0x06 
-optical 0x07
-changer 0x08
-comm 0x09
-prepress1 0x0a
-prepress2 0x0b
-array_ctrl 0x0c
-ses 0x0d 
-rbc 0x0e
-ocrw 0x0f
-bridge 0x10
-type_unknown 0x1f
+direct	 0x00
+sequential	 0x01
+printer 	 0x02
+processor	 0x03
+worm	 0x04
+rodirect	 0x05
+scanner 	 0x06
+optical	 0x07
+changer	 0x08
+comm	 0x09
+prepress1	 0x0a
+prepress2	 0x0b
+array_ctrl	 0x0c
+ses	 0x0d
+rbc	 0x0e
+ocrw	 0x0f
+bridge	 0x10
+type_unknown	 0x1f
 .TE
 
 .sp
@@ -258,12 +242,10 @@ this, specify \fBtype_0x<typenum>\fR in the \fBsgen-config-list\fR. Case is not
 significant when specifying device type names.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsgen-diag\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fBsgen-diag\fR property sets the diagnostic output level. This property
 can be set globally and/or per target/lun pair. \fBsgen-diag\fR is an integer
 property, and can be set to 0, 1, 2 or 3. Illegal values will silently default
@@ -272,47 +254,39 @@ to 0. The meaning of each diagnostic level is as follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 No error reporting [default]
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Report driver configuration information, unusual conditions, and indicate when
 sense data has been returned from the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Trace the entry into and exit from routines inside the driver, and provide
 extended diagnostic data. No error reporting [default].
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Provide detailed output about command characteristics, driver state, and the
 contents of each CDB passed to the driver.
 .RE
@@ -325,23 +299,19 @@ ioctl.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsgen.conf\fR\fR
 .ad
 .RS 30n
-.rt  
 Driver configuration file. See CONFIGURATION  for more details.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/scsi/<devtype>/c\fIn\fRt\fIn\fRd\fIn\fR\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fBsgen\fR driver categorizes each device in a separate directory by its
 \fBSCSI\fR device type. The files inside the directory are named according to
 their controller number, target ID and LUN as follows:
@@ -364,24 +334,20 @@ which there is no other driver installed in the system. Additionally,  the
 \fBsgen\fR driver supports the following ioctls:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSGEN_IOC_READY\fR\fR
 .ad
 .RS 18n
-.rt  
 Send a \fBTEST UNIT READY\fR command to the device and return 0 upon success,
 non-zero upon failure. This ioctl accepts no arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSGEN_IOC_DIAG\fR\fR
 .ad
 .RS 18n
-.rt  
 Change the level of diagnostic reporting provided by the driver. This ioctl
 accepts a single integer argument between 0 and 3. The levels have the same
 meaning as in the \fBsgen-diag\fR property discussed in PROPERTIES above.
@@ -390,36 +356,30 @@ meaning as in the \fBsgen-diag\fR property discussed in PROPERTIES above.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The device was opened by another  thread or process using the O_EXCL flag, or
 the device is       currently open and O_EXCL is being requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 During opening, the device did not respond to a \fBTEST UNIT READY\fR
 \fBSCSI\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR\fR
 .ad
 .RS 10n
-.rt  
 Indicates that the device does  not  support the  requested ioctl function.
 .RE
 

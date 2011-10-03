@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_compare_name 3GSS "14 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_COMPARE_NAME 3GSS "Jan 14, 2003"
 .SH NAME
 gss_compare_name \- compare two internal-form names
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR] 
+\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_compare_name\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -33,45 +33,37 @@ identity.
 The parameter descriptions for \fBgss_compare_name()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 16n
-.rt  
 Mechanism-specific status code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname1\fR\fR
 .ad
 .RS 16n
-.rt  
 Internal-form name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname2\fR\fR
 .ad
 .RS 16n
-.rt  
 Internal-form name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname_equal\fR\fR
 .ad
 .RS 16n
-.rt  
 If non-zero, the names refer to same entity. If 0, the names refer to different
 entities. Strictly, the names are not known to refer to the same identity.
 .RE
@@ -82,45 +74,37 @@ entities. Strictly, the names are not known to refer to the same identity.
 The \fBgss_compare_name()\fR function may return the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 22n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_NAMETYPE\fR\fR
 .ad
 .RS 22n
-.rt  
 The two names were of incomparable types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_NAME\fR\fR
 .ad
 .RS 22n
-.rt  
 One or both of \fIname1\fR or \fIname2\fR was ill-formed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 22n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -134,13 +118,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

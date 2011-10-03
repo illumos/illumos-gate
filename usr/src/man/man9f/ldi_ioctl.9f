@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_ioctl 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_IOCTL 9F "Jun 3, 2003"
 .SH NAME
 ldi_ioctl \- send an ioctl to a device
 .SH SYNOPSIS
@@ -13,86 +13,72 @@ ldi_ioctl \- send an ioctl to a device
 
 
 
-\fBint\fR \fBldi_ioctl\fR(\fBldi_handle_t\fR \fIlh\fR, \fBint\fR \fIcmd\fR, \fBintptr_t\fR \fIarg\fR, \fBint\fR \fImode\fR, 
+\fBint\fR \fBldi_ioctl\fR(\fBldi_handle_t\fR \fIlh\fR, \fBint\fR \fIcmd\fR, \fBintptr_t\fR \fIarg\fR, \fBint\fR \fImode\fR,
      \fBcred_t  *\fR\fIcr\fR, \fBint *\fR\fIrvalp\fR);
 .fi
 
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR\fR
 .ad
 .RS 9n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcr\fR\fR
 .ad
 .RS 9n
-.rt  
 Pointer to a credential structure used to open a device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrvalp\fR\fR
 .ad
 .RS 9n
-.rt  
 Caller return value. (May be set by driver and is valid only if the
 \fBioctl()\fR succeeds).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd\fR\fR
 .ad
 .RS 9n
-.rt  
 Command argument. Interpreted by driver \fBioctl()\fR as the operation to be
 performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 9n
-.rt  
 Driver parameter. Argument interpretation is driver dependent and usually
 depends on the command type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 9n
-.rt  
 Bit field that contains:
 .sp
 .ne 2
-.mk
 .na
 \fBFKIOCTL\fR
 .ad
 .RS 11n
-.rt  
 Inform the target device that the ioctl originated from within the kernel.
 .RE
 
@@ -132,12 +118,10 @@ commands are also documented in \fBstreamio\fR(7I).
 The following streams ioctls are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBI_PLINK\fR
 .ad
 .RS 13n
-.rt  
 Behaves as documented in \fBstreamio\fR(7I). The layered handle \fIlh\fR should
 point to the streams multiplexer. The \fIarg\fR parameter should point to a
 layered handle for another streams driver.
@@ -145,12 +129,10 @@ layered handle for another streams driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBI_UNPLINK\fR
 .ad
 .RS 13n
-.rt  
 Behaves as documented in \fBstreamio\fR(7I)).  The layered handle \fIlh\fR
 should point to the streams multiplexer. The \fIarg\fR parameter is the
 multiplexor ID number returned by \fBI_PLINK\fR when the streams were linked.
@@ -165,23 +147,19 @@ are shown below. Otherwise any other error number may be returned by the
 device.
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 11n
-.rt  
 Invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOTSUP\fR
 .ad
 .RS 11n
-.rt  
 Operation is not supported for this device.
 .RE
 

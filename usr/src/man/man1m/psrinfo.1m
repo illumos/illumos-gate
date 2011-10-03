@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH psrinfo 1M "21 Feb 2004" "SunOS 5.11" "System Administration Commands"
+.TH PSRINFO 1M "Feb 21, 2004"
 .SH NAME
 psrinfo \- displays information about processors
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ a specific processor. See \fBOPERANDS\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI processor_id\fR\fR
 .ad
 .RS 19n
-.rt  
 Silent mode. Displays \fB1\fR if the specified processor is fully on-line.
 Displays \fB0\fR if the specified processor is non-interruptible, spare,
 off-line, faulted or powered off.
@@ -51,12 +49,10 @@ Use silent mode when using \fBpsrinfo\fR in shell scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 19n
-.rt  
 Display the number of physical processors in a system.
 .sp
 When combined with the \fB-v\fR option, reports additional information about
@@ -65,12 +61,10 @@ each physical processor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 19n
-.rt  
 Verbose mode. Displays additional information about the specified processors,
 including: processor type, floating point unit type and clock speed. If any of
 this information cannot be determined, \fBpsrinfo\fR displays \fBunknown\fR.
@@ -85,12 +79,10 @@ each physical processor.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocessor_id\fR\fR
 .ad
 .RS 16n
-.rt  
 The processor \fBID\fR of the processor about which information is to be
 displayed.
 .sp
@@ -113,7 +105,7 @@ verbose mode.
 .sp
 .in +2
 .nf
-\fBpsrinfo \fR\fB-v\fR 
+\fBpsrinfo \fR\fB-v\fR
 .fi
 .in -2
 .sp
@@ -160,10 +152,10 @@ the number of physical processors in the system:
 .sp
 .in +2
 .nf
-> psrinfo -p 0 512   # IDs 0 and 512 exist on the 
+> psrinfo -p 0 512   # IDs 0 and 512 exist on the
 1                    # same physical processor
 
-> psrinfo -p 0 1     # IDs 0 and 1 exist on different 
+> psrinfo -p 0 1     # IDs 0 and 1 exist on different
 2                    # physical processors
 .fi
 .in -2
@@ -181,23 +173,19 @@ specific to this example and is and not a general rule.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -209,7 +197,6 @@ An error occurred.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsrinfo:\fR \fBprocessor\fR \fB9:\fR \fBInvalid\fR \fBargument\fR\fR
 .ad

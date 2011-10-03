@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kprop 1M "14 Nov 2005" "SunOS 5.11" "System Administration Commands"
+.TH KPROP 1M "Nov 14, 2005"
 .SH NAME
 kprop \- Kerberos database propagation program
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/krb5/kprop\fR [\fB-d\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIport-number\fR] 
+\fB/usr/lib/krb5/kprop\fR [\fB-d\fR] [\fB-f\fR \fIfile\fR] [\fB-p\fR \fIport-number\fR]
      [\fB-r\fR \fIrealm\fR] [\fB-s\fR \fIkeytab\fR] [\fIhost\fR]
 .fi
 
@@ -51,57 +51,47 @@ The database to be propagated must be dumped to a file using
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Enable debug mode. Default is debug mode disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 18n
-.rt  
 File to be sent to the slave \fBKDC\fR. Default is the
 \fB/var/krb5/slave_datatrans\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport-number\fR\fR
 .ad
 .RS 18n
-.rt  
 Propagate \fIport-number\fR. Default is port \fB754\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
 .RS 18n
-.rt  
 Realm where propagation will occur. Default \fIrealm\fR is the local realm.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIkeytab\fR\fR
 .ad
 .RS 18n
-.rt  
 Location of the keytab. Default location is \fB/etc/krb5/krb5.keytab\fR.
 .RE
 
@@ -111,12 +101,10 @@ Location of the keytab. Default location is \fB/etc/krb5/krb5.keytab\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhost\fR\fR
 .ad
 .RS 8n
-.rt  
 Name of the slave \fBKDC\fR.
 .RE
 
@@ -141,34 +129,28 @@ file must contain an entry for the all the \fBKDC\fRs.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kpropd.acl\fR\fR
 .ad
 .RS 29n
-.rt  
 List of principals of all the KDCs; resides on each slave KDC.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
 .ad
 .RS 29n
-.rt  
 Keytab for Kerberos clients.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/slave_datatrans\fR\fR
 .ad
 .RS 29n
-.rt  
 Kerberos database propagated to the KDC slaves.
 .RE
 

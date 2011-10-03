@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH labelit_hsfs 1M "20 Mar 1992" "SunOS 5.11" "System Administration Commands"
+.TH LABELIT_HSFS 1M "Mar 20, 1992"
 .SH NAME
 labelit_hsfs \- provide and print labels for hsfs file systems
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/labelit\fR \fB-F\fR hsfs [\fIgeneric_options\fR] 
+\fB/usr/sbin/labelit\fR \fB-F\fR hsfs [\fIgeneric_options\fR]
      [\fB-o\fR \fIspecific_options\fR] \fIspecial\fR
 .fi
 
@@ -33,12 +33,10 @@ The \fIspecial\fR name should be the physical disk section (for example,
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Use one or more of the following  \fIname\fR=\fIvalue\fR pairs separated by
 commas (with no intervening spaces) to specify values for specific label
 fields. According to the ISO 9660 specification, only certain sets of
@@ -48,100 +46,82 @@ refers to the characters `A' through `Z', the digits `0' through `9', and the
 `0' through `9', space, and the following characters: !"%&'()*+,-./:;<=>?_.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabsfile=\fR\fR
 .ad
 .RS 13n
-.rt  
 Abstract file identifier, d-characters, 37 characters maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBapplid=\fR\fR
 .ad
 .RS 13n
-.rt  
 Application identifier, d-characters, 128 characters maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbibfile=\fR\fR
 .ad
 .RS 13n
-.rt  
 Bibliographic file identifier, d-characters, 37 characters maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcopyfile=\fR\fR
 .ad
 .RS 13n
-.rt  
 Copyright file identifier, d-characters, 128 maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprepid=\fR\fR
 .ad
 .RS 13n
-.rt  
 Data preparer identifier, d-characters, 128 maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpubid=\fR\fR
 .ad
 .RS 13n
-.rt  
 Publisher identifier, d-characters, 128 maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsysid=\fR\fR
 .ad
 .RS 13n
-.rt  
 System identifier, a-characters, 32 maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvolid=\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume identifier, d-characters, 32 maximum.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvolsetid=\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume set identifier, d-characters, 128 maximum.
 .RE
 

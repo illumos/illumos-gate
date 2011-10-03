@@ -24,8 +24,36 @@
  */
 
 /*
- * IntelVersion: 1.118 v3-1-10-1_2009-9-18_Release14-6
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef _E1000_DEFINES_H_
 #define	_E1000_DEFINES_H_
 
@@ -403,6 +431,8 @@
 #define	E1000_CTRL_FORCE_PHY_RESET	0x00008000
 /* enable link status from external LINK_0 and LINK_1 pins */
 #define	E1000_CTRL_EXT_LINK_EN		0x00010000
+#define	E1000_CTRL_LANPHYPC_OVERRIDE	0x00010000 /* SW control of LANPHYPC */
+#define	E1000_CTRL_LANPHYPC_VALUE	0x00020000 /* SW value of LANPHYPC */
 #define	E1000_CTRL_SWDPIN0	0x00040000 /* SWDPIN 0 value */
 #define	E1000_CTRL_SWDPIN1	0x00080000 /* SWDPIN 1 value */
 #define	E1000_CTRL_SWDPIN2	0x00100000 /* SWDPIN 2 value */
@@ -693,6 +723,7 @@
 #define	E1000_EXTCNF_CTRL_LCD_WRITE_ENABLE	0x00000001
 #define	E1000_EXTCNF_CTRL_OEM_WRITE_ENABLE	0x00000008
 #define	E1000_EXTCNF_CTRL_SWFLAG		0x00000020
+#define	E1000_EXTCNF_CTRL_GATE_PHY_CFG		0x00000080
 #define	E1000_EXTCNF_SIZE_EXT_PCIE_LENGTH_MASK	0x00FF0000
 #define	E1000_EXTCNF_SIZE_EXT_PCIE_LENGTH_SHIFT	16
 #define	E1000_EXTCNF_CTRL_EXT_CNF_POINTER_MASK	0x0FFF0000
@@ -1313,6 +1344,7 @@
 #define	BME1000_E_PHY_ID_R2	0x01410CB1
 #define	I82577_E_PHY_ID		0x01540050
 #define	I82578_E_PHY_ID		0x004DD040
+#define	I82579_E_PHY_ID		0x01540090
 #define	M88_VENDOR		0x0141
 
 /* M88E1000 Specific Registers */

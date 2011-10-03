@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.	If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sys-suspend 1 "10 Mar 2009" "SunOS 5.11" "User Commands"
+.TH SYS-SUSPEND 1 "Mar 10, 2009"
 .SH NAME
 sys-suspend \- suspend or shutdown the system and power off
 .SH SYNOPSIS
@@ -55,57 +55,47 @@ need to include these authorizations or include the Suspend profile.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdisplayname\fR\fR
 .ad
 .RS 18n
-.rt  
 Connect to the X server specified by \fIdisplayname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Force suspend. Causes a \fBpoweroff\fR(1M) to occur if the suspend fails.
 System state are not be saved, and a normal boot follows.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Change the default from suspend to shutdown.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not display messages or request user intervention.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Disable \fBlockscreen\fR. This flag disables the execution of \fBlockscreen\fR
 at resume time.
 .RE
@@ -118,13 +108,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

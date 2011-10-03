@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wracct 1M "13 July 2005" "SunOS 5.11" "System Administration Commands"
+.TH WRACCT 1M "Jul 13, 2005"
 .SH NAME
 wracct \- write extended accounting records for active processes and tasks
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/wracct\fR \fB-i\fR \fIid_list\fR [\fB-t\fR \fIrecord_type\fR] 
+\fB/usr/sbin/wracct\fR \fB-i\fR \fIid_list\fR [\fB-t\fR \fIrecord_type\fR]
      {process | task}
 .fi
 
@@ -40,12 +40,10 @@ a partial record, which reflects usage since task creation.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIid_list\fR\fR
 .ad
 .RS 18n
-.rt  
 Select the \fBID\fRs of the tasks or processes to write records for. Specify
 \fIid_list\fR as a comma- or space-separated list of IDs, presented as a single
 argument. For some shells, this requires appropriate quoting of the argument.
@@ -53,12 +51,10 @@ argument. For some shells, this requires appropriate quoting of the argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIrecord_type\fR\fR
 .ad
 .RS 18n
-.rt  
 Select type of record to write for the selected task or process. For tasks,
 \fIrecord_type\fR can be \fBpartial\fR or \fBinterval\fR. \fBpartial\fR is the
 default type, and the only type available for process records.
@@ -70,24 +66,20 @@ default type, and the only type available for process records.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprocess\fR\fR
 .ad
 .RS 11n
-.rt  
 Treat the given \fBID\fR as a process \fBID\fR for the purposes of constructing
 and writing an extended accounting record.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtask\fR\fR
 .ad
 .RS 11n
-.rt  
 Treat the given \fBID\fR as a task \fBID\fR for the purposes of constructing
 and writing an extended accounting record.
 .RE
@@ -127,68 +119,56 @@ Write an interval record for the task with \fBID 182\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Pertinent components of extended accounting facility are not active.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/exacct/task\fR\fR
 .ad
 .RS 24n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/exacct/proc\fR\fR
 .ad
 .RS 24n
-.rt  
 Extended accounting data files.
 .RE
 

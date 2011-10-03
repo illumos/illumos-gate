@@ -23,8 +23,8 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	This makefile drives the production of the ssd driver kernel module.
@@ -77,6 +77,12 @@ LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+
+#
+# Depends on scsi and cmlb
+# fcp included for fibre support
+#
+LDFLAGS         += -dy -N misc/scsi -N misc/cmlb -N drv/fcp
 
 #
 #	Default build targets.

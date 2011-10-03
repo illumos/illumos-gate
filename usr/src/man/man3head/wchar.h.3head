@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wchar.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH WCHAR.H 3HEAD "Sep 10, 2004"
 .SH NAME
 wchar.h, wchar \- wide-character handling
 .SH SYNOPSIS
@@ -22,47 +22,39 @@ wchar.h, wchar \- wide-character handling
 The <\fBwchar.h\fR> header defines the following types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwchar_t\fR\fR
 .ad
 .RS 13n
-.rt  
 As described in <\fBstddef.h\fR>.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwint_t\fR\fR
 .ad
 .RS 13n
-.rt  
 An integer type capable of storing any valid value of \fBwchar_t\fR or
 \fBWEOF\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwctype_t\fR\fR
 .ad
 .RS 13n
-.rt  
 A scalar type of a data object that can hold values which represent
 locale-specific character classification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmbstate_t\fR\fR
 .ad
 .RS 13n
-.rt  
 An object type other than an array type that can hold the conversion state
 information necessary to convert between sequences of (possibly multi-byte)
 characters and wide characters.  If a codeset is being used such that  an
@@ -72,34 +64,28 @@ results are unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILE\fR\fR
 .ad
 .RS 13n
-.rt  
 As described in <\fBstdio.h\fR>.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize_t\fR\fR
 .ad
 .RS 13n
-.rt  
 As described in <\fBstddef.h\fR>.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBva_list\fR\fR
 .ad
 .RS 13n
-.rt  
 As described in <\fBstdarg.h\fR>.
 .RE
 
@@ -114,46 +100,38 @@ names of these programming environments can be obtained using the
 The <\fBwchar.h\fR> header defines the following macros:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCHAR_MAX\fR\fR
 .ad
 .RS 13n
-.rt  
 The maximum value representable by an object of type \fBwchar_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCHAR_MIN\fR\fR
 .ad
 .RS 13n
-.rt  
 The minimum value representable by an object of type \fBwchar_t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWEOF\fR\fR
 .ad
 .RS 13n
-.rt  
 Constant expression of type \fBwint_t\fR that is returned by several WP
 functions to indicate end-of-file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL\fR\fR
 .ad
 .RS 13n
-.rt  
 As described in <\fBstddef.h\fR>.
 .RE
 
@@ -174,13 +152,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

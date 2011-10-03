@@ -1,19 +1,19 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH float.h 3HEAD "17 Dec 2003" "SunOS 5.11" "Headers"
+.TH FLOAT.H 3HEAD "Dec 17, 2003"
 .SH NAME
 float.h, float \- floating types
 .SH SYNOPSIS
 .LP
 .nf
-#include <\fBfloat.h\fR> 
+#include <\fBfloat.h\fR>
 .fi
 
 .SH DESCRIPTION
@@ -28,56 +28,46 @@ The following parameters are used to define the model for each floating-point
 type:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs\fR\fR
 .ad
 .RS 6n
-.rt  
 sign (\(+-1)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIb\fR\fR
 .ad
 .RS 6n
-.rt  
 base or radix of exponent representation (an integer >1)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIe\fR\fR
 .ad
 .RS 6n
-.rt  
 exponent (an integer between a minimum e(min) and a maximum e(max))
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIp\fR\fR
 .ad
 .RS 6n
-.rt  
 precision (the number of base-\fIb\fR digits in the significand)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIf\fR(\fIk\fR)\fR
 .ad
 .RS 6n
-.rt  
 non-negative integers less than \fIb\fR (the significand digits)
 .RE
 
@@ -112,56 +102,46 @@ The rounding mode for floating-point addition is characterized by the value of
 \fBFLT_ROUNDS\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 Indeterminable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Toward zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 To nearest.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Toward positive infinity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 6n
-.rt  
 Toward negative infinity.
 .RE
 
@@ -174,35 +154,29 @@ of evaluation formats is characterized by the architecture-dependent value of
 \fBFLT_EVAL_METHOD\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 Indeterminable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Evaluate all operations and constants just to the range and precision of the
 type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 Evaluate operations and constants of type float and double to the range and
 precision of the double type; evaluate long double operations and constants to
 the range and precision of the long double type.
@@ -210,12 +184,10 @@ the range and precision of the long double type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Evaluate all operations and constants to the range and precision of the long
 double type.
 .RE
@@ -413,13 +385,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

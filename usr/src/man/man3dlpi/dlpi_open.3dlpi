@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlpi_open 3DLPI "17 Nov 2008" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.TH DLPI_OPEN 3DLPI "Nov 17, 2008"
 .SH NAME
 dlpi_open \- open DLPI link
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ dlpi_open \- open DLPI link
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
 #include <libdlpi.h>
 
-\fBint\fR \fBdlpi_open\fR(\fBconst char *\fR\fIlinkname\fR, \fBdlpi_handle_t *\fR\fIdhp\fR, 
+\fBint\fR \fBdlpi_open\fR(\fBconst char *\fR\fIlinkname\fR, \fBdlpi_handle_t *\fR\fIdhp\fR,
      \fBuint_t\fR \fIflags\fR);
 .fi
 
@@ -52,12 +52,10 @@ The value of \fIflags\fR is constructed by a bitwise-inclusive-OR of the flags
 listed below, defined in \fB<libdlpi.h>\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_DEVIPNET\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify that the named DLPI device is an IP observability device (see
 \fBipnet\fR(7D)), and \fBdl_open()\fR will open the device from the
 \fB/dev/ipnet/\fR directory.
@@ -65,12 +63,10 @@ Specify that the named DLPI device is an IP observability device (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_IPNETINFO\fR\fR
 .ad
 .RS 18n
-.rt  
 This flag is applicable only when opening IP Observability devices (with
 \fBDLPI_DEVIPNET\fR or by opening the \fB/dev/lo0\fR device). This flag causes
 the \fBipnet\fR driver to prepend an \fBipnet\fR header to each received IP
@@ -79,12 +75,10 @@ packet. See \fBipnet\fR(7D) for the contents of this header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_NATIVE\fR\fR
 .ad
 .RS 18n
-.rt  
 Enable \fBDLPI\fR native mode (see \fBDLIOCNATIVE\fR in \fBdlpi\fR(7P)) on a
 \fBDLPI\fR link instance. Native mode persists until the \fBDLPI\fR handle is
 closed by \fBdlpi_close\fR(3DLPI).
@@ -92,12 +86,10 @@ closed by \fBdlpi_close\fR(3DLPI).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_PASSIVE\fR\fR
 .ad
 .RS 18n
-.rt  
 Enable \fBDLPI\fR passive mode (see \fBDL_PASSIVE_REQ\fR in \fBdlpi\fR(7P)) on
 a \fBDLPI\fR link instance. Passive mode persists until the \fBDLPI\fR handle
 is closed by \fBdlpi_close\fR(3DLPI).
@@ -105,12 +97,10 @@ is closed by \fBdlpi_close\fR(3DLPI).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_RAW\fR\fR
 .ad
 .RS 18n
-.rt  
 Enable \fBDLPI\fR raw mode (see \fBDLIOCRAW\fR in \fBdlpi\fR(7P)) on a
 \fBDLPI\fR link instance. Raw mode persists until the \fBDLPI\fR handle is
 closed by \fBdlpi_close\fR(3DLPI).
@@ -137,79 +127,65 @@ section is returned.
 The \fBdlpi_open()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EBADLINK\fR\fR
 .ad
 .RS 25n
-.rt  
 Bad \fBDLPI\fR link
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EIPNETINFONOTSUP\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fBDLPI_IPNETINFO\fR flag was set but the device opened does not support
 the \fBDLIOCIPNETINFO\fR ioctl.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ELINKNAMEINVAL\fR\fR
 .ad
 .RS 25n
-.rt  
 Invalid \fBDLPI\fR \fIlinkname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ENOLINK\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBDLPI\fR link does not exist
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ERAWNOTSUP\fR\fR
 .ad
 .RS 25n
-.rt  
 DLPI raw mode not supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ETIMEDOUT\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBDLPI\fR operation timed out
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_FAILURE\fR\fR
 .ad
 .RS 25n
-.rt  
 DLPI operation failed
 .RE
 
@@ -221,15 +197,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

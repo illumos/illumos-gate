@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH user_attr 4 "12 Dec 2008" "SunOS 5.11" "File Formats"
+.TH USER_ATTR 4 "Dec 12, 2008"
 .SH NAME
 user_attr \- extended user attributes database
 .SH SYNOPSIS
@@ -39,7 +39,6 @@ fields separated by colons (\fB:\fR). Line continuations using the backslash
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
@@ -50,7 +49,6 @@ The name of the user as specified in the \fBpasswd\fR(4) database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqualifier\fR\fR
 .ad
@@ -61,7 +59,6 @@ Reserved for future use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIres1\fR\fR
 .ad
@@ -72,7 +69,6 @@ Reserved for future use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIres2\fR\fR
 .ad
@@ -83,7 +79,6 @@ Reserved for future use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr\fR\fR
 .ad
@@ -95,7 +90,6 @@ keys may be specified. The following keys are currently interpreted by the
 system:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauths\fR\fR
 .ad
@@ -109,7 +103,6 @@ specified using the asterisk (\fB*\fR) character as a wildcard. For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprofiles\fR\fR
 .ad
@@ -124,7 +117,6 @@ are assigned, the profile shells do not allow the user to execute any commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroles\fR\fR
 .ad
@@ -138,7 +130,6 @@ to assume any role.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR\fR
 .ad
@@ -152,7 +143,6 @@ the user has logged in.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject\fR\fR
 .ad
@@ -165,7 +155,6 @@ information, see \fBgetdefaultproj\fR(3PROJECT).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultpriv\fR\fR
 .ad
@@ -177,7 +166,6 @@ See "Privileges Keywords," below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlimitpriv\fR\fR
 .ad
@@ -193,7 +181,6 @@ requiring privileges to malfunction. See "Privileges Keywords," below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlock_after_retries\fR\fR
 .ad
@@ -210,7 +197,6 @@ The following keys are available only if the system is configured with the
 Trusted Extensions feature:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidletime\fR\fR
 .ad
@@ -225,7 +211,6 @@ task specified in \fBidlecmd\fR. A zero in this field specifies that the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidlecmd\fR\fR
 .ad
@@ -242,7 +227,6 @@ launched in the current session). If unspecified, the default value,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclearance\fR\fR
 .ad
@@ -256,7 +240,6 @@ specified in \fBlabel_encodings\fR(4) (see \fBlabel_encodings\fR(4) and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmin_label\fR\fR
 .ad
@@ -325,7 +308,6 @@ authorizations.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
@@ -336,7 +318,6 @@ See \fBnsswitch.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/user_attr\fR\fR
 .ad
@@ -353,15 +334,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-AvailibilitySUNWcsr
+Availibility	SUNWcsr
 _
-Interface StabilitySee below
+Interface Stability	See below
 .TE
 
 .sp

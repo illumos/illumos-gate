@@ -1,6 +1,6 @@
 '\" te
 .\"  Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution. Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
-.TH newfs 1M "1 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.TH NEWFS 1M "Mar 1, 2007"
 .SH NAME
 newfs \- construct a UFS file system
 .SH SYNOPSIS
@@ -52,7 +52,6 @@ set \fInbpi\fR lower than 1 Mbyte on a multiterabyte UFS file system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
@@ -65,7 +64,6 @@ called here.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
@@ -77,7 +75,6 @@ to create a filesystem with the specified configuration parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
@@ -90,7 +87,6 @@ parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -106,7 +102,6 @@ the user-supplied value of \fIfragsize\fR or \fInbpi\fR is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -118,7 +113,6 @@ Verbose. \fBnewfs\fR prints out its actions, including the parameters passed to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImkfs-options\fR\fR
 .ad
@@ -127,7 +121,6 @@ Verbose. \fBnewfs\fR prints out its actions, including the parameters passed to
 Options that override the default parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIapc\fR\fR
 .ad
@@ -141,7 +134,6 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbsize\fR\fR
 .ad
@@ -154,7 +146,6 @@ block size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcgsize\fR\fR
 .ad
@@ -172,7 +163,6 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fImaxcontig\fR\fR
 .ad
@@ -205,7 +195,6 @@ You can subsequently change this parameter by using \fBtunefs\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIgap\fR\fR
 .ad
@@ -217,7 +206,6 @@ is always set to \fB0\fR, regardless of the input value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfragsize\fR\fR
 .ad
@@ -239,7 +227,6 @@ For file systems greater than 1 terabyte or for file systems created with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fInbpi\fR\fR
 .ad
@@ -262,8 +249,8 @@ Less than 1GB             2048
 Less than 2GB             4096
 Less than 3GB             6144
 3GB to 1 Tbyte            8192
-Greater than 1 Tbyte  
-   or created with -T     1048576 
+Greater than 1 Tbyte
+   or created with -T     1048576
 .fi
 .in -2
 .sp
@@ -274,7 +261,6 @@ The number of inodes can increase if the file system is expanded with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIfree\fR\fR
 .ad
@@ -293,7 +279,6 @@ This parameter can be subsequently changed using the \fBtunefs\fR(1M) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInrpos\fR\fR
 .ad
@@ -307,7 +292,6 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspace\fR\||\|\fItime\fR\fR
 .ad
@@ -322,7 +306,6 @@ This parameter can subsequently be changed with the \fBtunefs\fR(1M) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrpm\fR\fR
 .ad
@@ -338,7 +321,6 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsize\fR\fR
 .ad
@@ -350,7 +332,6 @@ partition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIntrack\fR\fR
 .ad
@@ -370,7 +351,6 @@ This option is not applicable for disks with EFI labels and is ignored.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw-device\fR\fR
 .ad
@@ -445,7 +425,7 @@ This command creates a 800-Gbyte file system on the volume,
 .nf
 # newfs -T /dev/md/rdsk/d99
 newfs: construct a new file system /dev/md/rdsk/d99: (y/n)? y
-   /dev/md/rdsk/d99: 1677754368 sectors in 45512 cylinders of 
+   /dev/md/rdsk/d99: 1677754368 sectors in 45512 cylinders of
    144 tracks, 256 sectors
    819216.0MB in 1821 cyl groups (25 c/g, 450.00MB/g, 448 i/g) .\|.\|.
 .fi
@@ -475,7 +455,6 @@ terabytes in this example:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -486,7 +465,6 @@ The operation was successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR, \fB10\fR\fR
 .ad
@@ -509,7 +487,6 @@ Other exit values may be returned by \fBmkfs\fR(1M), which is called by
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnewfs: No such file or directory\fR\fR
 .ad
@@ -520,7 +497,6 @@ The device specified does not exist, or a disk partition was not specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspecial\fR\fB: cannot open\fR\fR
 .ad

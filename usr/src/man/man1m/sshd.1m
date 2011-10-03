@@ -2,14 +2,14 @@
 .\" To view license terms, attribution, and copyright for OpenSSH, the default path is /var/sadm/pkg/SUNWsshdr/install/copyright. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the
 .\" installed location.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.TH sshd 1M "17 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH SSHD 1M "Mar 17, 2009"
 .SH NAME
 sshd \- secure shell daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fBsshd\fR [\fB-deiqtD46\fR] [\fB-b\fR \fIbits\fR] [\fB-f\fR \fIconfig_file\fR] 
-     [\fB-g\fR \fIlogin_grace_time\fR] [\fB-h\fR \fIhost_key_file\fR] 
+\fBsshd\fR [\fB-deiqtD46\fR] [\fB-b\fR \fIbits\fR] [\fB-f\fR \fIconfig_file\fR]
+     [\fB-g\fR \fIlogin_grace_time\fR] [\fB-h\fR \fIhost_key_file\fR]
      [\fB-k\fR \fIkey_gen_time\fR] [\fB-p\fR \fIport\fR] [\fB-V\fR \fIclient_protocol_id\fR]
 .fi
 
@@ -127,7 +127,6 @@ package for \fBSUNWsshdu\fR, the package containing \fBsshd\fR.
 The options for \fBsshd\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbits\fR\fR
 .ad
@@ -138,7 +137,6 @@ Specifies the number of bits in the server key (the default is 768).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -152,7 +150,6 @@ server. Multiple \fB-d\fR options increase the debugging level. Maximum is 3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -164,7 +161,6 @@ error instead of to the system log.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIconfiguration_file\fR\fR
 .ad
@@ -177,7 +173,6 @@ configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIlogin_grace_time\fR\fR
 .ad
@@ -190,7 +185,6 @@ seconds, the server disconnects and exits. A value of zero indicates no limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost_key_file\fR\fR
 .ad
@@ -207,7 +201,6 @@ algorithms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -223,7 +216,6 @@ reasonable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkey_gen_time\fR\fR
 .ad
@@ -239,7 +231,6 @@ indicates that the key will never be regenerated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
@@ -252,7 +243,6 @@ command-line flags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport\fR\fR
 .ad
@@ -264,7 +254,6 @@ Specifies the port on which the server listens for connections (the default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -276,7 +265,6 @@ authentication, and termination of each connection is logged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -289,7 +277,6 @@ might change.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -301,7 +288,6 @@ daemon. This allows easy monitoring of \fBsshd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-4\fR\fR
 .ad
@@ -312,7 +298,6 @@ Forces \fBsshd\fR to use IPv4 addresses only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
@@ -384,7 +369,6 @@ spaces are permitted, except within double quotes. The following option
 specifications are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfrom="\fIpattern-list\fR"\fR\fR
 .ad
@@ -406,7 +390,6 @@ servers and routers would have to be compromised, in addition to just the key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcommand="\fIcommand\fR"\fR\fR
 .ad
@@ -427,7 +410,6 @@ execution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenvironment="\fINAME\fR=\fIvalue\fR"\fR\fR
 .ad
@@ -442,7 +424,6 @@ the \fBPermitUserEnvironment\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-port-forwarding\fR\fR
 .ad
@@ -455,7 +436,6 @@ example, in connection with the \fBcommand\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-X11-forwarding\fR\fR
 .ad
@@ -467,7 +447,6 @@ forward requests by the client will return an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-agent-forwarding\fR\fR
 .ad
@@ -479,7 +458,6 @@ authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno-pty\fR\fR
 .ad
@@ -490,7 +468,6 @@ Prevents \fBtty\fR allocation (a request to allocate a \fBpty\fR will fail).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpermitopen="\fIhost\fR:\fIport\fR"\fR\fR
 .ad
@@ -585,7 +562,6 @@ the front.
 \fBssh\fR users:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDISPLAY\fR\fR
 .ad
@@ -603,7 +579,6 @@ cookies.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
@@ -614,7 +589,6 @@ Set to the path of the user's home directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLANG\fR, \fBLC_ALL\fR, \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
 \fBLC_MESSAGES\fR, \fBLC_MONETARY\fR, \fBLC_NUMERIC\fR, \fBLC_TIME\fR\fR
@@ -655,7 +629,6 @@ used for setting the user environment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOGNAME\fR\fR
 .ad
@@ -667,7 +640,6 @@ variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAIL\fR\fR
 .ad
@@ -678,7 +650,6 @@ Set to point to the user's mailbox.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_AUTH_SOCK\fR\fR
 .ad
@@ -690,7 +661,6 @@ agent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_CONNECTION\fR\fR
 .ad
@@ -703,7 +673,6 @@ address and server port number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_CLIENT\fR\fR
 .ad
@@ -716,7 +685,6 @@ number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSSH_TTY\fR\fR
 .ad
@@ -729,7 +697,6 @@ variable is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
@@ -741,7 +708,6 @@ Indicates the present timezone, if \fBTIMEZONE\fR is set in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHZ\fR\fR
 .ad
@@ -752,7 +718,6 @@ If set in \fB/etc/default/login\fR, the daemon sets it to the same value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
@@ -763,7 +728,6 @@ The user's shell, if \fBALTSHELL=YES\fR in \fB/etc/default/login\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
@@ -775,7 +739,6 @@ Set to the value of \fBPATH\fR or \fBSUPATH\fR (see \fBlogin\fR(1)) in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSER\fR\fR
 .ad
@@ -864,30 +827,25 @@ closenet,closenet.hut.fi,...,130.233.208.41 ssh-rsa AA..8= closenet.hut.fi
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/login\fR\fR
 .ad
@@ -984,7 +942,6 @@ login attempts per-connection using interactive user authentication methods
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/sshd_config\fR\fR
 .ad
@@ -997,7 +954,6 @@ world-readable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/ssh_host_key\fR\fR
 .ad
@@ -1018,7 +974,6 @@ start if this file is group/world-accessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/ssh_host_key.pub\fR\fR
 .ad
@@ -1041,7 +996,6 @@ created using \fBssh-keygen\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/sshd.pid\fR\fR
 .ad
@@ -1056,7 +1010,6 @@ to specify a file other than \fB/var/run/sshd.pid\fR. See \fBsshd_config\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/ssh_known_hosts\fR and \fB$HOME/.ssh/known_hosts\fR\fR
 .ad
@@ -1073,7 +1026,6 @@ world-readable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nologin\fR\fR
 .ad
@@ -1086,7 +1038,6 @@ connections are refused. The file should be world-readable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/authorized_keys\fR\fR
 .ad
@@ -1103,7 +1054,6 @@ file, as described in \fBssh-keygen\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.rhosts\fR\fR
 .ad
@@ -1120,7 +1070,6 @@ all users in the group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.shosts\fR\fR
 .ad
@@ -1133,7 +1082,6 @@ access using SSH only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts.equiv\fR\fR
 .ad
@@ -1163,7 +1111,6 @@ negative entries. This warning also applies to \fBrsh\fR/\fBrlogin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/moduli\fR\fR
 .ad
@@ -1174,7 +1121,6 @@ A private file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/shosts.equiv\fR\fR
 .ad
@@ -1187,7 +1133,6 @@ and \fBssh\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/environment\fR\fR
 .ad
@@ -1203,7 +1148,6 @@ disabled by default and is controlled by means of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.ssh/rc\fR\fR
 .ad
@@ -1252,7 +1196,6 @@ writable only by the user, and need not be readable by anyone else.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/sshrc\fR\fR
 .ad
@@ -1326,25 +1269,24 @@ Each SSHv2 \fBuserauth\fR type has its own PAM service name:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-SSHv2 UserauthPAM Service Name
+box;
+c | c
+l | l .
+SSHv2 Userauth	PAM Service Name
 _
-nonesshd-none
+none	sshd-none
 _
-passwordsshd-password
+password	sshd-password
 _
-keyboard-interactivesshd-kbdint
+keyboard-interactive	sshd-kbdint
 _
-pubkeysshd-pubkey
+pubkey	sshd-pubkey
 _
-hostbasedsshd-hostbased
+hostbased	sshd-hostbased
 _
-gssapi-with-micsshd-gssapi
+gssapi-with-mic	sshd-gssapi
 _
-gssapi-keyexsshd-gssapi
+gssapi-keyex	sshd-gssapi
 .TE
 
 .sp
@@ -1460,13 +1402,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .sp

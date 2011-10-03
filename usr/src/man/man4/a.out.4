@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH a.out 4 "24 Aug 2009" "SunOS 5.11" "File Formats"
+.TH A.OUT 4 "Aug 24, 2009"
 .SH NAME
 a.out \- Executable and Linking Format (ELF) files
 .SH SYNOPSIS
@@ -30,29 +30,28 @@ information, see the references given below.
 
 .sp
 .TS
-tab() box;
-cw(2.69i) |cw(2.81i) 
-lw(2.69i) |lw(2.81i) 
-.
-Linking ViewExecution View
+box;
+c | c
+l | l .
+Linking View	Execution View
 _
-ELF headerELF header
+ELF header	ELF header
 _
-Program header tableProgram header table
-\fIoptional\fR
+Program header table	Program header table
+\fIoptional\fR	
 _
-Section 1Segment 1
+Section 1	Segment 1
 _
-\&. . .
+\&. . .	
 _
-Section \fIn\fRSegment 2
+Section \fIn\fR	Segment 2
 _
-\&. . .
+\&. . .	
 _
-\&. . .\&. . .
+\&. . .	\&. . .
 _
-Section header tableSection header table
-\fIoptional\fR
+Section header table	Section header table
+	\fIoptional\fR
 .TE
 
 .sp

@@ -1,7 +1,7 @@
 '\" te
-.\"  Copyright 1989 AT&T Copyright (c) 1985 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution. 
+.\"  Copyright 1989 AT&T Copyright (c) 1985 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved
-.TH inetd.conf 4 "17 Dec 2004" "SunOS 5.11" "File Formats"
+.TH INETD.CONF 4 "Dec 17, 2004"
 .SH NAME
 inetd.conf \- Internet servers database
 .SH SYNOPSIS
@@ -48,12 +48,10 @@ sign) indicates the beginning of a comment; characters up to the end of the
 line are not interpreted by routines that search this file.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice-name\fR\fR
 .ad
 .RS 20n
-.rt  
 The name of a valid service listed in the \fBservices\fR file. For \fBRPC\fR
 services, the value of the \fIservice-name\fR field consists of the \fBRPC\fR
 service name or program number, followed by a '\fB/\fR' (slash) and either a
@@ -62,65 +60,53 @@ version number or a range of version numbers, for example, \fBrstatd/2-4\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIendpoint-type\fR\fR
 .ad
 .RS 20n
-.rt  
 Can be one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstream\fR\fR
 .ad
 .RS 13n
-.rt  
 for a stream socket
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdgram\fR\fR
 .ad
 .RS 13n
-.rt  
 for a datagram socket
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBraw\fR\fR
 .ad
 .RS 13n
-.rt  
 for a raw socket
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBseqpacket\fR\fR
 .ad
 .RS 13n
-.rt  
 for a sequenced packet socket
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtli\fR\fR
 .ad
 .RS 13n
-.rt  
 for all \fBTLI\fR endpoints
 .RE
 
@@ -128,12 +114,10 @@ for all \fBTLI\fR endpoints
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprotocol\fR\fR
 .ad
 .RS 20n
-.rt  
 A recognized protocol listed in the file \fB/etc/inet/protocols\fR. For servers
 capable of supporting \fBTCP\fR and \fBUDP\fR over IPv6, the following protocol
 types are also recognized:
@@ -168,12 +152,10 @@ for an \fBRPC\fR service using the Connection-Oriented Transport Service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwait-status\fR\fR
 .ad
 .RS 20n
-.rt  
 This field has values \fBwait\fR or \fBnowait\fR. This entry specifies whether
 the server that is invoked by \fBinetd\fR will take over the listening socket
 associated with the service, and whether once launched, \fBinetd\fR will
@@ -191,24 +173,20 @@ stream services can be designed to be either \fBwait\fR or \fBnowait\fR status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuid\fR\fR
 .ad
 .RS 20n
-.rt  
 The user \fBID\fR under which the server should run. This allows servers to run
 with access privileges other than those for root.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver-program\fR\fR
 .ad
 .RS 20n
-.rt  
 Either the pathname of a server program to be invoked by \fBinetd\fR to perform
 the requested service, or the value \fBinternal\fR if \fBinetd\fR itself
 provides the service.
@@ -216,12 +194,10 @@ provides the service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver-arguments\fR\fR
 .ad
 .RS 20n
-.rt  
 If a server must be invoked with command line arguments, the entire command
 line (including argument 0) must appear in this field (which consists of all
 remaining words in the entry). If the server expects \fBinetd\fR to pass it the
@@ -234,34 +210,28 @@ for services whose \fIwait-status\fR value is \fBnowait\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netconfig\fR\fR
 .ad
 .RS 23n
-.rt  
 network configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/protocols\fR\fR
 .ad
 .RS 23n
-.rt  
 Internet protocols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/services\fR\fR
 .ad
 .RS 23n
-.rt  
 Internet network services
 .RE
 

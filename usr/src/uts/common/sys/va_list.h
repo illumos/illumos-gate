@@ -31,8 +31,6 @@
 #ifndef	_SYS_VA_LIST_H
 #define	_SYS_VA_LIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * An application should not include this header directly.  Instead it
  * should be included only through the inclusion of other Sun headers.
@@ -109,7 +107,7 @@ typedef struct __va_list_element {
 
 #endif	/* processor */
 
-#elif (defined(__GNUC__) && ((__GNUC__ == 2 && __GNUC_MINOR >= 96) || \
+#elif (defined(__GNUC__) && ((__GNUC__ == 2 && __GNUC_MINOR__ >= 96) || \
 	(__GNUC__ >= 3))) && !defined(__lint)	/* ---------------- protocol */
 
 #define	__GNUC_VA_LIST

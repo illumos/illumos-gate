@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mixer 7I "21 May 2009" "SunOS 5.11" "Ioctl Requests"
+.TH MIXER 7I "May 21, 2009"
 .SH NAME
 mixer \- generic mixer device interface
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include\fR \fB<sys/soundcard.h>\fR 
+\fB#include\fR \fB<sys/soundcard.h>\fR
 .fi
 
 .SH DESCRIPTION
@@ -65,12 +65,10 @@ devices and mixers are available on the system, and then use
 about the audio devices or mixers, respectively.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOSS_GETVERSION\fR\fR
 .ad
 .RS 20n
-.rt  
 The argument is a pointer to an integer, which retrieves the version of the
 \fBOSS API\fR used. The value is encoded with the major version (currently 4)
 encoded in the most significant 16 bits, and a minor version encoded in the
@@ -79,12 +77,10 @@ lower 16 bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_SYSINFO\fR\fR
 .ad
 .RS 20n
-.rt  
 The argument is a pointer to an \fBoss_sysinfo\fR structure, which has the
 following definition:
 .sp
@@ -104,11 +100,11 @@ typedef struct oss_sysinfo {
  int numtimers;        /* NOT SUPPORTED, always 0 */
  int nummixers;        /* # of mixer devices */
 
- int openedmidi[8];    /* Mask of midi devices are 
+ int openedmidi[8];    /* Mask of midi devices are
                           busy */
- int numcards;         /* Number of sound cards in 
+ int numcards;         /* Number of sound cards in
                           the system */
- int numaudioengines;  /* Number of audio engines in 
+ int numaudioengines;  /* Number of audio engines in
                           the system */
  char license[16];     /* E.g. "GPL" or "CDDL" */
  char revision_info[256];  /* Reserved */
@@ -128,12 +124,10 @@ typically there is exactly one audio device and one mixer for each card.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_AUDIOINFO\fR\fR
 .ad
 .RS 20n
-.rt  
 The argument is a pointer to an \fBoss_audioinfo\fR structure, which has the
 following structure:
 .sp
@@ -152,15 +146,15 @@ typedef struct oss_audioinfo {
    int card_number;
    int port_number;  /* reserved */
    int mixer_dev;
-   int legacy_device; /* Obsolete field. 
+   int legacy_device; /* Obsolete field.
                          Replaced by devnode */
    int enabled;  /* reserved */
    int flags;  /* reserved */
    int min_rate;  /* Minimum sample rate */
    int max_rate;  /* Maximum sample rate */
-   int min_channels;  /* Minimum number 
+   int min_channels;  /* Minimum number
                          of channels */
-   int max_channels;  /* Maximum number 
+   int max_channels;  /* Maximum number
                          of channels */
    int binding;  /* reserved */
    int rate_source;  /* reserved */
@@ -170,7 +164,7 @@ typedef struct oss_audioinfo {
    char song_name[64];  /* reserved */
    char label[16];  /* reserved */
    int latency;  /* reserved */
-   char devnode[32];  /* Device special file 
+   char devnode[32];  /* Device special file
                          name (absolute path) */
    int next_play_engine;  /* reserved */
    int next_rec_engine;  /* reserved */
@@ -227,12 +221,10 @@ this file to access the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_CARDINFO\fR\fR
 .ad
 .RS 20n
-.rt  
 The argument is a pointer to a \fBstruct oss_card_info\fR, which has the
 following definition:
 .sp
@@ -271,12 +263,10 @@ The flag, intr_count, and ack_count fields are not used by this implementation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_MIXERINFO\fR\fR
 .ad
 .RS 20n
-.rt  
 The argument is a pointer to a \fBstruct oss_mixer_info\fR, which has the
 following definition:
 .sp
@@ -296,7 +286,7 @@ typedef struct oss_mixerinfo {
   int flags;/* Reserved */
   int nrext;
   int priority;
-  char devnode[32];/* Device special file name 
+  char devnode[32];/* Device special file name
                      (absolute path) */
   int legacy_device;/* Reserved */
   int filler[245];/* Reserved */
@@ -378,12 +368,10 @@ application should specify \fB-1\fR, although for compatibility the mixer
 allows the application to specify the mixer device number.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_MIX_NRMIX\fR\fR
 .ad
 .RS 23n
-.rt  
 The argument is a pointer to an integer, which receives the number of mixer
 devices in the system. Each can be queried by using its number with the
 \fBSNDCTL_MIXERINFO\fR ioctl. The same information is available using the
@@ -392,12 +380,10 @@ devices in the system. Each can be queried by using its number with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_MIX_NREXT\fR\fR
 .ad
 .RS 23n
-.rt  
 The argument is a pointer to an integer. On entry, the integer should contain
 the special value \fB-1\fR. On return the argument receives the number of mixer
 extensions (or mixer controls) supported by the mixer device. More details
@@ -406,12 +392,10 @@ about each extension can be obtained by \fBSNDCTL_MIX_EXTINFO\fR ioctl.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_MIX_EXTINFO\fR\fR
 .ad
 .RS 23n
-.rt  
 The argument is a pointer to an \fBoss_mixext\fR structure which is defined as
 follows:
 .sp
@@ -425,14 +409,14 @@ typedef struct oss_mixext {
    int minvalue;
    int flags;
    char id[16];  /* Mnemonic ID (internal use) */
-   int parent;   /* Entry# of parent 
+   int parent;   /* Entry# of parent
                     (-1 if root) */
    int dummy;   /* NOT SUPPORTED */
    int timestamp;
    char data[64];  /* Reserved */
-   unsigned char enum_present[32];  /* Mask 
-                                       of allowed 
-                                       enum 
+   unsigned char enum_present[32];  /* Mask
+                                       of allowed
+                                       enum
                                        values */
    int control_no;  /* Reserved */
    unsigned int desc;  /* NOT SUPPORTED */
@@ -465,7 +449,7 @@ MIXT_GROUP        Logical grouping of controls
 MXIT_ONOFF        Boolean value, 0 = off, 1 = on.
 MIXT_ENUM         Enumerated value, 0 to maxvalue.
 MIXT_MONOSLIDER   Monophonic slider, 0 to 255.
-MIXT_STEREOSLIDER Stereophonic slider, 0 to 255 
+MIXT_STEREOSLIDER Stereophonic slider, 0 to 255
                   (encoded as
                   lower two bytes in value.)
 MIXT_MARKER       Place holder, can ignore.
@@ -481,13 +465,13 @@ possible bits:
 MIXF_READABLE    Extension's value is readable.
 MIXF_WRITEABLE   Extension's value is modifiable.
 MIXF_POLL        Extension can self-update.
-MIXF_PCMVOL      Extension is for master 
+MIXF_PCMVOL      Extension is for master
                  PCM playback volume.
-MIXF_MAINVOL     Extension is for a typical 
+MIXF_MAINVOL     Extension is for a typical
                  analog volume
-MIXF_RECVOL      Extension is for master 
+MIXF_RECVOL      Extension is for master
                  record gain.
-MIXF_MONVOL      Extension is for a monitor 
+MIXF_MONVOL      Extension is for a monitor
                  source's gain.
 .fi
 .in -2
@@ -509,13 +493,13 @@ layout hints to applications. The following hints are available:
 .sp
 .in +2
 .nf
-MIXEXT_SCOPE_MASK    Mask of possible scope 
+MIXEXT_SCOPE_MASK    Mask of possible scope
                      values.
-MIXEXT_SCOPE_INPUT   Extension is an input 
+MIXEXT_SCOPE_INPUT   Extension is an input
                      control.
-MIXEXT_SCOPE_OUTPUT  Extension is an 
+MIXEXT_SCOPE_OUTPUT  Extension is an
                      output control.
-MIXEXT_SCOPE_MONITOR Extension relates to 
+MIXEXT_SCOPE_MONITOR Extension relates to
                      input monitoring.
 MIXEXT_SCOPE_OTHER   No scoping hint provided.
 .fi
@@ -530,12 +514,10 @@ changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_MIX_ENUMINFO\fR\fR
 .ad
 .RS 23n
-.rt  
 The argument is a pointer to an \fBoss_mixer_enuminfo\fR structure, which is
 defined as follows:
 .sp
@@ -565,7 +547,6 @@ pointing to an \fBASCIIZ\fR describing the enumeration value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDCTL_MIX_READ\fR\fR
 .ad
@@ -574,7 +555,6 @@ pointing to an \fBASCIIZ\fR describing the enumeration value.
 \fB\fBSNDCTL_MIX_WRITE\fR\fR
 .ad
 .RS 23n
-.rt  
 The argument is a pointer to an \fBoss_mixer_value\fR structure, defined as
 follows:
 .sp
@@ -584,11 +564,11 @@ typedef struct oss_mixer_value {
    int dev;
    int ctrl;
    int value;
-   int flags;  /* Reserved for future use. 
+   int flags;  /* Reserved for future use.
                   Initialize to 0 */
-   int timestamp;  /* Must be set to 
+   int timestamp;  /* Must be set to
                       oss_mixext.timestamp */
-   int filler[8];  /* Reserved for future use. 
+   int filler[8];  /* Reserved for future use.
                       Initialize to 0 */
 } oss_mixer_value;
 .fi
@@ -650,47 +630,39 @@ should not be used in new applications.
 An \fBioctl()\fR fails if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The parameter changes requested in the ioctl are invalid or are not supported
 by the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The device or extension referenced does not exist.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/mixer\fR\fR
 .ad
 .RS 16n
-.rt  
 Symbolic link to the pseudo mixer device for the system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sndstat\fR\fR
 .ad
 .RS 16n
-.rt  
 Sound status device
 .RE
 
@@ -702,15 +674,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(1.8i) |cw(3.7i) 
-lw(1.8i) |lw(3.7i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Stability LevelSee below.
+Stability Level	See below.
 .TE
 
 .sp

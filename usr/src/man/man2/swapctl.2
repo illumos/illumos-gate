@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH swapctl 2 "25 Sep 1997" "SunOS 5.11" "System Calls"
+.TH SWAPCTL 2 "Sep 25, 1997"
 .SH NAME
 swapctl \- manage swap space
 .SH SYNOPSIS
@@ -109,36 +109,30 @@ Under the following conditions, the function \fBswapctl()\fR fails and sets
 \fBerrno\fR to:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 Part of the range specified by \fBsr_start\fR and \fBsr_length\fR is already
 being used for swapping on the specified resource (\fBSC_ADD\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 Either \fIarg\fR, \fBsr_name\fR, or \fBste_path\fR points to an illegal
 address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The specified function value is not valid, the path specified is not a swap
 resource (\fBSC_REMOVE\fR), part of the range specified by \fBsr_start\fR and
 \fBsr_length\fR lies outside the resource specified (\fBSC_ADD\fR), or the
@@ -147,35 +141,29 @@ specified swap area is less than one page (\fBSC_ADD\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 The path specified for \fBSC_ADD\fR is a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating the pathname provided
 to \fBSC_ADD\fR or \fBSC_REMOVE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of a component of the path specified for \fBSC_ADD\fR or
 \fBSC_REMOVE\fR exceeds \fBNAME_MAX\fR characters or the length of the path
 exceeds \fBPATH_MAX\fR characters and \fB_POSIX_NO_TRUNC\fR is in effect.
@@ -183,23 +171,19 @@ exceeds \fBPATH_MAX\fR characters and \fB_POSIX_NO_TRUNC\fR is in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The pathname specified for \fBSC_ADD\fR or \fBSC_REMOVE\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 An insufficient number of \fBstruct\fR \fBswapent\fR structures were provided
 to \fBSC_LIST\fR, or there were insufficient system storage resources available
 during an \fBSC_ADD\fR or \fBSC_REMOVE\fR, or the system would not have enough
@@ -208,48 +192,40 @@ swap space after an \fBSC_REMOVE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 16n
-.rt  
 The pathname specified for \fBSC_ADD\fR or \fBSC_REMOVE\fR is not a file or
 block special device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 Pathname provided to \fBSC_ADD\fR or \fBSC_REMOVE\fR contained a component in
 the path prefix that was not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 The {\fBPRIV_SYS_MOUNT\fR} was not asserted in the effective set of the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The pathname specified for \fBSC_ADD\fR is a read-only file system.
 .RE
 
@@ -258,12 +234,10 @@ The pathname specified for \fBSC_ADD\fR is a read-only file system.
 Additionally, the \fBswapctl()\fR function will fail for 32-bit interfaces if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The amount of swap space configured on the machine is too large to be
 represented by a 32-bit quantity.
 .RE
@@ -304,7 +278,7 @@ again:
     }
     /* allocate swaptable for num+1 entries */
     if ((s = (swaptbl_t *)
-        malloc(num * sizeof(swapent_t) + 
+        malloc(num * sizeof(swapent_t) +
             sizeof(struct swaptable))) ==
         (void *) 0) {
         fprintf(stderr, "Malloc Failed\en");
@@ -320,7 +294,7 @@ again:
     for (i = 0; i < (num + 1); i++) {
         s->swt_ent[i].ste_path = strtab + (i * MAXSTRSIZE);
     }
-   
+
     s->swt_n = num + 1;
     if ((n = swapctl(SC_LIST, s)) < 0) {
         perror("swapctl");

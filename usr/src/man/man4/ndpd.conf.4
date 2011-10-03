@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ndpd.conf 4 "4 Jan 2007" "SunOS 5.11" "File Formats"
+.TH NDPD.CONF 4 "Jan 4, 2007"
 .SH NAME
 ndpd.conf \- configuration file for IPv6 router autoconfiguration
 .SH SYNOPSIS
@@ -79,46 +79,38 @@ sign) indicates the beginning of a comment. Characters up to the end of the
 line are not interpreted by routines that search this file.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIinterface\fR\fR\fR
 .ad
 .RS 24n
-.rt  
 The name of a network interface, for example, \fBeri0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIprefix\fR\fR\fR
 .ad
 .RS 24n
-.rt  
 An IPv6 address in standard hexadecimal notation, for example,
 \fBfec0:0:0:1::0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIprefix_length\fR\fR\fR
 .ad
 .RS 24n
-.rt  
 A number between 0 and 128.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIif-variable-name\fR\fR\fR
 .ad
 .RS 24n
-.rt  
 An interface variable. Below is the list of interface variables applicable to
 routers only along with their default values and units as discussed in \fIRFC
 2461\fR and \fIRFC 2462\fR. The \fBTmp\fR* variables apply to hosts and
@@ -147,12 +139,10 @@ AdvDefaultLifetime      1800       Seconds
 These variables are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvSendAdvertisements\fR\fR
 .ad
 .RS 26n
-.rt  
 Indicates whether the node should send out advertisements and respond to router
 solicitations. You need to explicitly configure this value to turn on router
 advertisement functions.
@@ -160,12 +150,10 @@ advertisement functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDupAddrDetectTransmits\fR\fR
 .ad
 .RS 26n
-.rt  
 Defines the number of consecutive Neighbor Solicitation messages that the
 Neighbor Discovery protocol should send during Duplicate Address Detection of
 the local node's address.
@@ -173,36 +161,30 @@ the local node's address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxRtrAdvInterval\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the maximum time to wait between sending unsolicited multicast
 advertisements.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMinRtrAdvInterval\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the minimum amount of time to wait between sending unsolicited
 multicast advertisements.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvManagedFlag\fR\fR
 .ad
 .RS 26n
-.rt  
 Indicates the value to be placed in the "Manage address configuration" flag in
 the Router Advertisement. This flag causes hosts to run DHCPv6 to acquire
 addresses and other configuration information. This flag causes hosts to run
@@ -212,60 +194,50 @@ is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvOtherConfigFlag\fR\fR
 .ad
 .RS 26n
-.rt  
 Indicates the value to be placed in the "Other stateful configuration"flag in
 the Router Advertisement.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvLinkMTU\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies an MTU value to be sent by the router. The default of zero indicates
 that the router does not specify MTU options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvReachableTime\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the value in the Reachable Time field in the advertisement messages
 sent by the router.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvRetransTimer\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the value in the Retrans Timer field in the advertisement messages
 sent by the router.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvCurHopLimit\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the value to be placed in the current hop limit field in the
 advertisement messages sent by the router. The default is the current diameter
 of the Internet.
@@ -273,12 +245,10 @@ of the Internet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvDefaultLifetime\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the default lifetime of the router advertisements.
 .RE
 
@@ -303,12 +273,10 @@ TmpMaxDesyncFactor      600        Seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStatefulAddrConf\fR\fR
 .ad
 .RS 24n
-.rt  
 Controls whether the system configures its IPv6 addresses by means of the
 Stateful Address Autoconfiguration mechanism, also known as DHCPv6, as
 described in RFC 3315. If enabled (the default), hosts automatically run DHCPv6
@@ -320,12 +288,10 @@ sets the prefix length as needed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStatelessAddrConf\fR\fR
 .ad
 .RS 24n
-.rt  
 Controls whether the system configures its IPv6 addresses by means of the
 Stateless Address Autoconfiguration mechanism described in \fIRFC 2462\fR. If
 enabled hosts (the default) autoconfigure addresses based on prefixes
@@ -338,58 +304,48 @@ configured manually.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTmpAddrsEnabled\fR\fR
 .ad
 .RS 24n
-.rt  
 Indicates whether a temporary address should be created for all interfaces or
 for a particular interface of a node.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTmpValidLifetime\fR\fR
 .ad
 .RS 24n
-.rt  
 Sets the valid lifetime for a temporary address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTmpPreferredLifetime\fR\fR
 .ad
 .RS 24n
-.rt  
 Sets the preferred lifetime of a temporary address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTmpRegenAdvance\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies the lead time in advance of address deprecation for generation of a
 new temporary address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTmpMaxDesyncFactor\fR\fR
 .ad
 .RS 24n
-.rt  
 Sets the upper bound on the DesyncFactor, which is a random value that is used
 to shorten the preferred lifetime so that clients do not regenerate an address
 at the same time.
@@ -399,104 +355,89 @@ at the same time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprefix-variable-name\fR\fR
 .ad
 .RS 24n
-.rt  
 A prefix variable as discussed in \fIRFC 2461 \fR and \fIRFC 2462\fR. The
 following lists the each interface variable and its default value and unit:
 .sp
 
 .sp
 .TS
-tab() box;
-cw(2.74i) |cw(1.4i) |cw(1.36i) 
-lw(2.74i) |lw(1.4i) |lw(1.36i) 
-.
-Variable NameDefaultUnit
+box;
+c | c | c
+l | l | l .
+Variable Name	Default	Unit
 _
-AdvValidLifetime2592000Seconds
+AdvValidLifetime	2592000	Seconds
 _
-AdvOnLinkFlagtrueBoolean
+AdvOnLinkFlag	true	Boolean
 _
-AdvPreferredLifetime604800Seconds
+AdvPreferredLifetime	604800	Seconds
 _
-AdvAutonomousFlagtrueBoolean
+AdvAutonomousFlag	true	Boolean
 _
-AdvValidExpirationnot setDate/Time
+AdvValidExpiration	not set	Date/Time
 _
-AdvPreferredExpiration not setDate/TIme
+AdvPreferredExpiration 	not set	Date/TIme
 .TE
 
 These variables are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvValidLifetime\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the valid lifetime of the prefix that is being configured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvOnLinkFlag\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the value to be placed in the on-link flag ("L-bit") field in the
 Prefix Information option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvPreferredLifetime\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the value to be placed in the Preferred Lifetime in the Prefix
 Information option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvAutonomousFlag\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the value to be placed in the Autonomous Flag field in the Prefix
 Information option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvValidExpiration\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the valid expiration date of the prefix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAdvPreferredExpiration\fR\fR
 .ad
 .RS 26n
-.rt  
 Specifies the preferred expiration date of the prefix.
 .RE
 
@@ -509,21 +450,19 @@ precedence over the corresponding \fBAdvValidLifetime\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 24n
-.rt  
 The value is a function of the unit. Boolean values are \fBtrue\fR,
 \fBfalse\fR, \fBon\fR, \fBoff\fR, \fB1\fR, or \fB0\fR.
 .sp
 Values in seconds can have characters appended for day (\fBd\fR), hour
-\fBh\fR), minute (\fBm\fR) and second	(\fBs\fR). The default is seconds. For
+\fBh\fR), minute (\fBm\fR) and second (\fBs\fR). The default is seconds. For
 example, \fB1h\fR means 1 hour. This is equivalent to the value \fB3600\fR.
 .sp
 Values in milliseconds can have characters appended for day (\fBd\fR),hour
-(\fBh\fR), minute (\fBm\fR) second (\fBs\fR),	and millisecond (\fBms\fR). The
+(\fBh\fR), minute (\fBm\fR) second (\fBs\fR), and millisecond (\fBms\fR). The
 default is milliseconds. For example, \fB1h\fR is equivalent to the value
 \fB3600000\fR.
 .sp
@@ -555,10 +494,10 @@ interfaces:
 .in +2
 .nf
 # Send router advertisements out all interfaces
-ifdefault AdvSendAdvertisements on 
+ifdefault AdvSendAdvertisements on
 prefixdefault AdvOnLinkFlag on AdvAutonomousFlag on
 
-# Advertise a (bogus) global prefix and a site 
+# Advertise a (bogus) global prefix and a site
 # local prefix on three interfaces using the default lifetimes
 prefix 2:0:0:9255::0/64      eri0
 prefix fec0:0:0:9255::0/64   eri0
@@ -579,13 +518,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

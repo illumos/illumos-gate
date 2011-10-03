@@ -2,14 +2,14 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH localeconv 3C "12 Dec 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH LOCALECONV 3C "Dec 12, 2003"
 .SH NAME
 localeconv \- get numeric formatting information
 .SH SYNOPSIS
@@ -79,47 +79,39 @@ members with type \fBchar\fR are non-negative numbers, any of which can be
 value is not available in the current locale. The members are the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *decimal_point\fR\fR
 .ad
 .RS 27n
-.rt  
 The decimal-point character used to format non-monetary quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *thousands_sep\fR\fR
 .ad
 .RS 27n
-.rt  
 The character used to separate groups of digits to the left of the
 decimal-point character in formatted non-monetary quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *grouping\fR\fR
 .ad
 .RS 27n
-.rt  
 A string whose elements taken as one-byte integer values indicate the size of
 each group of digits in formatted non-monetary quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *int_curr_symbol\fR\fR
 .ad
 .RS 27n
-.rt  
 The international currency symbol applicable to the current locale. The first
 three characters contain the alphabetic international currency symbol in
 accordance with those specified in the ISO 4217: 1995 standard. The fourth
@@ -129,116 +121,96 @@ separate the international currency symbol from the monetary quantity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *currency_symbol\fR\fR
 .ad
 .RS 27n
-.rt  
 The local currency symbol applicable to the current locale.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *mon_decimal_point\fR\fR
 .ad
 .RS 27n
-.rt  
 The decimal point used to format monetary quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *mon_thousands_sep\fR\fR
 .ad
 .RS 27n
-.rt  
 The separator for groups of digits to the left of the decimal point in
 formatted monetary quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *mon_grouping\fR\fR
 .ad
 .RS 27n
-.rt  
 A string whose elements taken as one-byte integer values indicate the size of
 each group of digits in formatted monetary quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *positive_sign\fR\fR
 .ad
 .RS 27n
-.rt  
 The string used to indicate a non-negative-valued formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *negative_sign\fR\fR
 .ad
 .RS 27n
-.rt  
 The string used to indicate a negative-valued formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_frac_digits\fR\fR
 .ad
 .RS 27n
-.rt  
 The number of fractional digits (those to the right of the decimal point) to be
 displayed in an internationally formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar frac_digits\fR\fR
 .ad
 .RS 27n
-.rt  
 The number of fractional digits (those to the right of the decimal point) to be
 displayed in a formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar p_cs_precedes\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to 1 or 0 if the \fBcurrency_symbol\fR respectively precedes or succeeds
 the value for a non-negative formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar p_sep_by_space\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to 0 if no space separates the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR from the value for a non-negative formatted monetary
 quantity. Set to 1 if a space separates the symbol from the value; and set to 2
@@ -247,24 +219,20 @@ if a space separates the symbol and the sign string, if adjacent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar n_cs_precedes\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to 1 or 0 if the \fBcurrency_symbol\fR respectively precedes or succeeds
 the value for a negative formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar n_sep_by_space\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to 0 if no space separates the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR from the value for a negative formatted monetary
 quantity. Set to 1 if a space separates the symbol from the value; and set to 2
@@ -273,60 +241,50 @@ if a space separates the symbol and the sign string, if adjacent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar p_sign_posn\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to a value indicating the positioning of the \fBpositive_sign\fR for a
 non-negative formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar n_sign_posn\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to a value indicating the positioning of the \fBnegative_sign\fR for a
 negative formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_p_cs_precedes\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to 1 or 0 if the \fBint_curr_symbol\fR respectively precedes or succeeds
 the value for a non-negative internationally formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_n_cs_precedes\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to 1 or 0 if the \fBint_curr_symbol\fR respectively precedes or succeeds
 the value for a negative internationally formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_p_sep_by_space\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to a value indicating the separation of the \fBint_curr_symbol\fR, the sign
 string, and the value for a non-negative internationally formatted monetary
 quantity.
@@ -334,12 +292,10 @@ quantity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_n_sep_by_space\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to a value indicating the separation of the \fBint_curr_symbol\fR, the sign
 string, and the value for a negative internationally formatted monetary
 quantity.
@@ -347,24 +303,20 @@ quantity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_p_sign_posn\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to a value indicating the positioning of the \fBpositive_sign\fR for a
 non-negative internationally formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar int_n_sign_posn\fR\fR
 .ad
 .RS 27n
-.rt  
 Set to a value indicating the positioning of the \fBnegative_sign\fR for a
 negative internationally formatted monetary quantity.
 .RE
@@ -375,34 +327,28 @@ The elements of \fBgrouping\fR and \fBmon_grouping\fR are interpreted according
 to the following:
 .sp
 .ne 2
-.mk
 .na
 \fB{\fBCHAR_MAX\fR}\fR
 .ad
 .RS 14n
-.rt  
 No further grouping is to be performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 14n
-.rt  
 The previous element is to be repeatedly used for the remainder of the digits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIother\fR\fR
 .ad
 .RS 14n
-.rt  
 The integer value is the number of digits that comprise the current group. The
 next element is examined to determine the size of the next group of digits
 before the current group.
@@ -415,23 +361,19 @@ The values of \fBp_sep_by_space\fR, \fBn_sep_by_space\fR,
 according to the following:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 No space separates the currency symbol and value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 If the currency symbol and sign string are adjacent, a space separates them
 from the value; otherwise, a space separates the currency symbol from the
 value.
@@ -439,12 +381,10 @@ value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 If the currency symbol and sign string are adjacent, a space separates them;
 otherwise, a space separates the sign string from the value.
 .RE
@@ -460,60 +400,50 @@ The values of \fBp_sign_posn\fR, \fBn_sign_posn\fR, \fBint_p_sign_posn\fR, and
 \fBint_n_sign_posn\fR are interpreted according to the following:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 Parentheses surround the quantity and \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the quantity and \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 The sign string succeeds the quantity and \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 5n
-.rt  
 The sign string immediately precedes the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB4\fR
 .ad
 .RS 5n
-.rt  
 The sign string immediately succeeds the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
@@ -536,19 +466,17 @@ monetary quantities.
 
 .sp
 .TS
-tab();
-lw(1.38i) |lw(1.38i) |lw(1.38i) |lw(1.38i) 
-lw(1.38i) |lw(1.38i) |lw(1.38i) |lw(1.38i) 
-.
-\fBCountry\fR\fBPositive\fR\fBNegative\fR\fBInternational\fR
+l | l | l | l
+l | l | l | l .
+\fBCountry\fR	\fBPositive\fR	\fBNegative\fR	\fBInternational\fR
 _
-Italy (IT)L.1.234\(miL.1.234ITL.1.234
+Italy (IT)	L.1.234	\(miL.1.234	ITL.1.234
 _
-Netherlands (NE)F 1.234,56F \(mi1.234,56NLG 1.234,56
+Netherlands (NE)	F 1.234,56	F \(mi1.234,56	NLG 1.234,56
 _
-Norway (NO)kr1.234,56kr1.234,56\(miNOK 1.234,56
+Norway (NO)	kr1.234,56	kr1.234,56\(mi	NOK 1.234,56
 _
-Switzerland (SW)SFrs.1,234.56SFrs.1,234.56CCHF 1,234.56
+Switzerland (SW)	SFrs.1,234.56	SFrs.1,234.56C	CHF 1,234.56
 .TE
 
 .sp
@@ -560,32 +488,30 @@ structure returned by \fBlocaleconv()\fR are as follows:
 
 .sp
 .TS
-tab();
-lw(5.5i) lw(0i) lw(0i) lw(0i) lw(0i) 
-lw(5.5i) lw(0i) lw(0i) lw(0i) lw(0i) 
-.
-\fBIT\fR\fBNE\fR\fBNO\fR\fBSW\fR
-\fBint_curr_symbol\fR"ITL.""NLG ""NOK ""CHF "
-\fBcurrency_symbol\fR"L.""F""kr""SFrs."
-\fBmon_decimal_point\fR""","",""."
-\fBmon_thousands_sep\fR"."".""."","
-\fBmon_grouping\fR"\e3""\e3""\e3""\e3"
-\fBpositive_sign\fR""""""""
-\fBnegative_sign\fR"-""-""-""C"
-\fBint_frac_digits\fR0222
-\fBfrac_digits\fR0222
-\fBp_cs_precedes\fR1111
-\fBp_sep_by_space\fR0100
-\fBn_cs_precedes\fR1111
-\fBn_sep_by_space\fR0100
-\fBp_sign_posn\fR1111
-\fBn_sign_posn\fR1422
-\fBint_p_cs_precedes\fR1111
-\fBint_n_cs_precedes\fR1111
-\fBint_p_sep_by_space\fR0000
-\fBint_n_sep_by_space\fR0000
-\fBint_p_sign_posn\fR1111
-\fBint_n_sign_posn\fR1442
+l l l l l
+l l l l l .
+	\fBIT\fR	\fBNE\fR	\fBNO\fR	\fBSW\fR
+\fBint_curr_symbol\fR	"ITL."	"NLG "	"NOK "	"CHF "
+\fBcurrency_symbol\fR	"L."	"F"	"kr"	"SFrs."
+\fBmon_decimal_point\fR	""	","	","	"."
+\fBmon_thousands_sep\fR	"."	"."	"."	","
+\fBmon_grouping\fR	"\e3"	"\e3"	"\e3"	"\e3"
+\fBpositive_sign\fR	""	""	""	""
+\fBnegative_sign\fR	"-"	"-"	"-"	"C"
+\fBint_frac_digits\fR	0	2	2	2
+\fBfrac_digits\fR	0	2	2	2
+\fBp_cs_precedes\fR	1	1	1	1
+\fBp_sep_by_space\fR	0	1	0	0
+\fBn_cs_precedes\fR	1	1	1	1
+\fBn_sep_by_space\fR	0	1	0	0
+\fBp_sign_posn\fR	1	1	1	1
+\fBn_sign_posn\fR	1	4	2	2
+\fBint_p_cs_precedes\fR	1	1	1	1
+\fBint_n_cs_precedes\fR	1	1	1	1
+\fBint_p_sep_by_space\fR	0	0	0	0
+\fBint_n_sep_by_space\fR	0	0	0	0
+\fBint_p_sign_posn\fR	1	1	1	1
+\fBint_n_sign_posn\fR	1	4	4	2
 .TE
 
 .SH ATTRIBUTES
@@ -596,17 +522,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .sp

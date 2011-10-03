@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mmap 9E "27 Sep 2002" "SunOS 5.11" "Driver Entry Points"
+.TH MMAP 9E "Sep 27, 2002"
 .SH NAME
 mmap \- check virtual mapping for memory mapped device
 .SH SYNOPSIS
@@ -27,88 +27,72 @@ This interface is obsolete. \fBdevmap\fR(9E) should be used instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 9n
-.rt  
 Device whose memory is to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoff\fR \fR
 .ad
 .RS 9n
-.rt  
 Offset within device memory at which mapping begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprot\fR \fR
 .ad
 .RS 9n
-.rt  
 A bit field that specifies the protections this page of memory will receive.
 Possible settings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR \fR
 .ad
 .RS 15n
-.rt  
 Read access will be granted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR \fR
 .ad
 .RS 15n
-.rt  
 Write access will be granted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR \fR
 .ad
 .RS 15n
-.rt  
 Execute access will be granted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_USER\fR \fR
 .ad
 .RS 15n
-.rt  
 User-level access will be granted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_ALL\fR \fR
 .ad
 .RS 15n
-.rt  
 All access will be granted.
 .RE
 
@@ -211,7 +195,7 @@ static int
 xxmmap(dev_t dev, off_t off, int prot)
 {
         int		instance;
-        struct xxstate *xsp; 
+        struct xxstate *xsp;
 
          /* No write access */
         if (prot & PROT_WRITE)
@@ -238,13 +222,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

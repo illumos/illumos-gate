@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH config_admin 3CFGADM "1 Sep 2004" "SunOS 5.11" "Configuration Administration Library Functions"
+.TH CONFIG_ADMIN 3CFGADM "Sep 1, 2004"
 .SH NAME
 config_admin, config_change_state, config_private_func, config_test,
 config_stat, config_list, config_list_ext, config_ap_id_cmp,
@@ -385,7 +385,6 @@ Additional error information may be returned through \fIerrstring\fR if the
 return code is not \fBCFGA_OK\fR. See  \fBDESCRIPTION\fR for details.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_BUSY\fR\fR
 .ad
@@ -397,7 +396,6 @@ administration system being busy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_ATTR_INVAL\fR\fR
 .ad
@@ -408,7 +406,6 @@ No attachment points with the specified attributes exists
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_ERROR\fR\fR
 .ad
@@ -421,7 +418,6 @@ code.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_INSUFFICIENT_CONDITION\fR\fR
 .ad
@@ -432,7 +428,6 @@ Operation failed due to attachment point condition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_INVAL\fR\fR
 .ad
@@ -444,7 +439,6 @@ the specified attachment point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_LIB_ERROR\fR\fR
 .ad
@@ -456,7 +450,6 @@ resources such as memory and file descriptors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_NACK\fR\fR
 .ad
@@ -468,7 +461,6 @@ The command was not completed due to a negative acknowledgement from the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_NO_LIB\fR\fR
 .ad
@@ -480,7 +472,6 @@ A hardware-specific library could not be located using the supplied
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_NOTSUPP\fR\fR
 .ad
@@ -492,7 +483,6 @@ attachment point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_OK\fR\fR
 .ad
@@ -503,7 +493,6 @@ The command completed as requested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_OPNOTSUPP\fR\fR
 .ad
@@ -515,7 +504,6 @@ attachment point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_PRIV\fR\fR
 .ad
@@ -528,7 +516,6 @@ permissions on the device node would be used to control access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCFGA_SYSTEM_BUSY\fR\fR
 .ad
@@ -546,7 +533,6 @@ functions are hardware-specific. The strings returned in \fIerrstring\fR may
 include the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattachment point\fR \fIap_id\fR \fBnot known\fR\fR
 .ad
@@ -557,7 +543,6 @@ The attachment point detailed in the error message does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown hardware option\fR \fIoption\fR \fBfor\fR\fIoperation\fR\fR
 .ad
@@ -568,7 +553,6 @@ An unknown option was encountered in the \fIoptions\fR string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhardware option\fR \fIoption\fR \fBrequires a value\fR\fR
 .ad
@@ -580,7 +564,6 @@ An option in the \fIoptions\fR string should have been of the form
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlisting option\fR \fIlist_option\fR \fBrequires a value\fR\fR
 .ad
@@ -592,7 +575,6 @@ An option in the listopts string should  have  been of the form
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhardware option\fR \fIoption\fR \fBdoes not require a value\fR\fR
 .ad
@@ -603,7 +585,6 @@ An option in the \fIoptions\fR string should have been a simple option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattachment point\fR \fIap_id\fR \fBis not configured\fR\fR
 .ad
@@ -616,7 +597,6 @@ was made to an attachment point whose occupant was not in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattachment point\fR \fIap_id\fR \fBis not unconfigured\fR\fR
 .ad
@@ -629,7 +609,6 @@ to an attachment point whose occupant was not in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattachment point\fR \fIap_id\fR \fBcondition not satisfactory\fR\fR
 .ad
@@ -641,7 +620,6 @@ condition prevented the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBattachment point\fR \fIap_id\fR \fBin condition\fR \fIcondition\fR
 \fBcannot be used\fR\fR
@@ -660,13 +638,12 @@ See  \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

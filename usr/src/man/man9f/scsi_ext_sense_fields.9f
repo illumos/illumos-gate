@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_ext_sense_fields 9F "29 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_EXT_SENSE_FIELDS 9F "Jun 29, 2006"
 .SH NAME
 scsi_ext_sense_fields, scsi_sense_info_uint64, scsi_sense_cmdspecific_uint64 \-
 retrieve fields from SCSI sense data
@@ -27,7 +27,7 @@ retrieve fields from SCSI sense data
 
 .LP
 .nf
-\fBboolean_t\fR \fBscsi_sense_cmdspecific_uint64\fR(\fBuint8_t *\fR\fIsense_buffer\fR, 
+\fBboolean_t\fR \fBscsi_sense_cmdspecific_uint64\fR(\fBuint8_t *\fR\fIsense_buffer\fR,
      \fBint\fR \fIsense_buf_len\fR, \fBuint64_t *\fR\fIcmd_spec_info\fR);
 .fi
 
@@ -38,12 +38,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsense_buffer\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to a buffer containing \fBSCSI\fR sense data. The sense data is
 expected in wire format starting at the response code. It can be in either a
 fixed or descriptor format.
@@ -51,12 +49,10 @@ fixed or descriptor format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinformation\fR\fR
 .ad
 .RS 17n
-.rt  
 For \fBscsi_ext_sense_fields()\fR, this is a call-by-reference pointer to
 \fBuint8_t\fR. A pointer to the \fBINFORMATION\fR field in the sense data may
 be returned in this parameter.
@@ -69,12 +65,10 @@ significant 32-bits are \fB\fR0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd_spec_info\fR\fR
 .ad
 .RS 17n
-.rt  
 For \fBscsi_ext_sense_fields()\fR, this is a call-by-reference pointer to
 \fBuint8_t\fR. A pointer to the \fBCOMMAND_SPECIFIC INFORMATION\fR field in the
 sense data can be returned in this parameter.
@@ -87,12 +81,10 @@ bits, fixed format, the most significant 32-bits are \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfru_code\fR\fR
 .ad
 .RS 17n
-.rt  
 Call-by-reference pointer to \fBuint8_t\fR. A pointer to the \fBFIELD
 REPLACEABLE UNIT CODE\fR field in the sense data can be returned in this
 parameter.
@@ -100,24 +92,20 @@ parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsk_specific\fR\fR
 .ad
 .RS 17n
-.rt  
 Call-by-reference pointer to \fBuint8_t\fR. A pointer to the \fBSENSE KEY
 SPECIFIC\fR field in the sense data can be returned in this parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstream_flags\fR\fR
 .ad
 .RS 17n
-.rt  
 Call-by-reference pointer to \fBuint8_t\fR. A pointer to the byte containing
 the \fBILI\fR, \fBEOM\fR, and \fBFILEMARK\fR flags can be returned in this
 parameter.

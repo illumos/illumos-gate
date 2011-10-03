@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_validate_sense 9F "29 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_VALIDATE_SENSE 9F "Jun 29, 2006"
 .SH NAME
 scsi_validate_sense \- find descriptor in SCSI sense data
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ scsi_validate_sense \- find descriptor in SCSI sense data
 
 
 
-\fBint\fR \fBscsi_validate_sense\fR(\fBuint8_t *\fR\fIsense_buffer\fR, \fBint\fR \fIsense_buf_len\fR, 
+\fBint\fR \fBscsi_validate_sense\fR(\fBuint8_t *\fR\fIsense_buffer\fR, \fBint\fR \fIsense_buf_len\fR,
      \fBint *\fR\fIflags\fR);
 .fi
 
@@ -24,35 +24,29 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsense_buffer\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to a buffer containing \fBSCSI\fR sense data. The sense data is
 expected in wire format starting at the response code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsense_buf_len\fR\fR
 .ad
 .RS 17n
-.rt  
 Length of sense buffer in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 17n
-.rt  
 Returns additional properties of the sense data.
 .RE
 
@@ -71,24 +65,20 @@ sense data in descriptor format, the function returns \fBSENSE_DESCR_FORMAT\fR.
 The following flags may be set as appropriate depending on the sense data:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNS_BUF_OVERFLOW\fR\fR
 .ad
 .RS 20n
-.rt  
 The sense data buffer provided for the request is too small to hold all the
 sense data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNS_BUF_DEFERRED\fR\fR
 .ad
 .RS 20n
-.rt  
 The sense data contained in the buffer relates to an error that has occurred
 during the processing of a successfully completed command, such as a cached
 write that could not be commited to the media.
@@ -97,35 +87,29 @@ write that could not be commited to the media.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSENSE_UNUSABLE\fR\fR
 .ad
 .RS 22n
-.rt  
 The response code from the sense data is unrecognized or not enough sense data
 present to provide the \fBsense key\fR, \fBasc\fR, and \fBascq\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSENSE_FIXED_FORMAT\fR\fR
 .ad
 .RS 22n
-.rt  
 The sense data in the buffer is in "fixed format".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSENSE_DESCR_FORMAT\fR\fR
 .ad
 .RS 22n
-.rt  
 The sense data in the buffer is in "descriptor format".
 .RE
 

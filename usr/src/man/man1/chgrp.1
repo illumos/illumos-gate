@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH chgrp 1 "11 Jul 2008" "SunOS 5.11" "User Commands"
+.TH CHGRP 1 "Jul 11, 2008"
 .SH NAME
 chgrp \- change file group ownership
 .SH SYNOPSIS
@@ -102,23 +102,19 @@ The following options are supported.
 .SS "/usr/bin/chgrp and /usr/xpg4/bin/chgrp"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Force. Does not report errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 If the file is a symbolic link, this option changes the group of the symbolic
 link. Without this option, the group of the file referenced by the symbolic
 link is changed.
@@ -126,12 +122,10 @@ link is changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 6n
-.rt  
 If the file specified on the command line is a symbolic link referencing a file
 of type directory, this option changes the group of the directory referenced by
 the symbolic link and all the files in the file hierarchy below it. If a
@@ -141,12 +135,10 @@ target file is changed, but no recursion takes place.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 If the file is a symbolic link, this option changes the group of the file
 referenced by the symbolic link. If the file specified on the command line, or
 encountered during the traversal of the file hierarchy, is a symbolic link
@@ -157,12 +149,10 @@ below it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 6n
-.rt  
 If the file specified on the command line or encountered during the traversal
 of a file hierarchy is a symbolic link, this option changes the group of the
 symbolic link. This option does not follow the symbolic link to any other part
@@ -171,12 +161,10 @@ of the file hierarchy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 The specified group is Windows SID. This option requires a file system that
 supports storing SIDs, such as ZFS.
 .RE
@@ -189,12 +177,10 @@ the behavior of \fBchgrp\fR.
 .SS "/usr/bin/chgrp"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Recursive. \fBchgrp\fR descends through the directory, and any subdirectories,
 setting the specified group \fBID\fR as it proceeds. When a symbolic link is
 encountered, the group of the target file is changed, unless the \fB-h\fR or
@@ -205,12 +191,10 @@ encountered, the group of the target file is changed, unless the \fB-h\fR or
 .SS "/usr/xpg4/bin/chgrp"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Recursive. \fBchgrp\fR descends through the directory, and any subdirectories,
 setting the specified group \fBID\fR as it proceeds. When a symbolic link is
 encountered, the group of the target file is changed, unless the \fB-h\fR or
@@ -224,12 +208,10 @@ is specified, the \fB-L\fR option is used as the default mode.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 9n
-.rt  
 A group name from the group database or a numeric group ID. Either specifies a
 group ID to be given to each file named by one of the \fIfile\fR operands. If a
 numeric \fIgroup\fR operand exists in the group database as a group name, the
@@ -238,12 +220,10 @@ group ID number associated with that group name is used as the group ID.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 9n
-.rt  
 A path name of a file whose group ID is to be modified.
 .RE
 
@@ -264,35 +244,29 @@ that affect the execution of \fBchgrp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The utility executed successfully and all requested changes were made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 14n
-.rt  
 group file
 .RE
 
@@ -305,17 +279,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled. See NOTES.
+CSI	Enabled. See NOTES.
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "/usr/xpg4/bin/chgrp"
@@ -323,17 +296,16 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled. See NOTES.
+CSI	Enabled. See NOTES.
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

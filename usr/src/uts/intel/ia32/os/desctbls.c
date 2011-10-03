@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2011 Joyent, Inc. All rights reserved.
+ */
+
+/*
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -103,10 +107,10 @@ gate_desc_t	*idt0; 		/* interrupt descriptor table */
 desctbr_t	idt0_default_r;		/* describes idt0 in IDTR format */
 #endif
 
-struct tss	*ktss0;			/* kernel task state structure */
+tss_t		*ktss0;			/* kernel task state structure */
 
 #if defined(__i386)
-struct tss	*dftss0;		/* #DF double-fault exception */
+tss_t		*dftss0;		/* #DF double-fault exception */
 #endif	/* __i386 */
 
 user_desc_t	zero_udesc;		/* base zero user desc native procs */
@@ -1232,7 +1236,7 @@ init_desctbls(void)
 #if !defined(__lint)
 	ASSERT(sizeof (*ktss0) <= PAGESIZE);
 #endif
-	ktss0 = (struct tss *)BOP_ALLOC(bootops, (caddr_t)KTSS_VA,
+	ktss0 = (tss_t *)BOP_ALLOC(bootops, (caddr_t)KTSS_VA,
 	    PAGESIZE, PAGESIZE);
 	bzero(ktss0, PAGESIZE);
 
@@ -1240,7 +1244,7 @@ init_desctbls(void)
 #if !defined(__lint)
 	ASSERT(sizeof (*dftss0) <= PAGESIZE);
 #endif
-	dftss0 = (struct tss *)BOP_ALLOC(bootops, (caddr_t)DFTSS_VA,
+	dftss0 = (tss_t *)BOP_ALLOC(bootops, (caddr_t)DFTSS_VA,
 	    PAGESIZE, PAGESIZE);
 	bzero(dftss0, PAGESIZE);
 #endif

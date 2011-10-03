@@ -92,7 +92,7 @@ regs	REGSIZE
 
 \#define	REGOFF_PC	REGOFF_EIP
 
-tss32
+tss_t
 	tss_esp0		TSS_ESP0
 	tss_ss0		TSS_SS0
 	tss_ldt		TSS_LDT

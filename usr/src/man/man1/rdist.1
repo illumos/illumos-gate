@@ -1,21 +1,21 @@
 '\" te
 .\" Copyright (c) 1985 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.TH rdist 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.TH RDIST 1 "Dec 23, 2008"
 .SH NAME
 rdist \- remote file distribution program
 .SH SYNOPSIS
 .LP
 .nf
-\fBrdist\fR [\fB-b\fR] [\fB-D\fR] [\fB-h\fR] [\fB-i\fR] [\fB-n\fR] [\fB-q\fR] [\fB-R\fR] [\fB-a\fR] [\fB-K\fR] [\fB-x\fR] 
-     [\fB-PN\fR | \fB-PO\fR] [\fB-k\fR \fIrealm\fR] [\fB-v\fR] [\fB-w\fR] [\fB-y\fR] 
+\fBrdist\fR [\fB-b\fR] [\fB-D\fR] [\fB-h\fR] [\fB-i\fR] [\fB-n\fR] [\fB-q\fR] [\fB-R\fR] [\fB-a\fR] [\fB-K\fR] [\fB-x\fR]
+     [\fB-PN\fR | \fB-PO\fR] [\fB-k\fR \fIrealm\fR] [\fB-v\fR] [\fB-w\fR] [\fB-y\fR]
      [\fB-d\fR \fImacro\fR \fI=\fR \fIvalue\fR] [\fB-f\fR \fIdistfile\fR] [\fB-m\fR \fIhost\fR]...
 .fi
 
 .LP
 .nf
-\fBrdist\fR [\fB-b\fR] [\fB-D\fR] [\fB-h\fR] [\fB-i\fR] [\fB-n\fR] [\fB-q\fR] [\fB-R\fR] [\fB-a\fR] [\fB-K\fR] [\fB-x\fR] 
-     [\fB-PN\fR | \fB-PO\fR] [\fB-k\fR \fIrealm\fR] [\fB-v\fR] [\fB-w\fR] [\fB-y\fR] \fB-c\fR \fIpathname\fR... 
+\fBrdist\fR [\fB-b\fR] [\fB-D\fR] [\fB-h\fR] [\fB-i\fR] [\fB-n\fR] [\fB-q\fR] [\fB-R\fR] [\fB-a\fR] [\fB-K\fR] [\fB-x\fR]
+     [\fB-PN\fR | \fB-PO\fR] [\fB-k\fR \fIrealm\fR] [\fB-v\fR] [\fB-w\fR] [\fB-y\fR] \fB-c\fR \fIpathname\fR...
      [\fIlogin\fR @] \fIhostname\fR [: \fIdestpath\fR]
 .fi
 
@@ -67,7 +67,6 @@ information.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -81,7 +80,6 @@ permits access, the user is allowed to carry out the \fBrdist\fR transfer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -93,7 +91,6 @@ differ, rather than merely comparing dates and sizes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR
 \fIpathname\fR .\|.\|.[\fIlogin\|\fR\fB@\fR]\fIhostname\fR[\fB:\fR\fIdestpath\|\fR]\fR
@@ -110,7 +107,6 @@ pathname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fImacro\fR\fB=\fR\fIvalue\fR\fR
 .ad
@@ -124,7 +120,6 @@ white space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -135,7 +130,6 @@ Enables debugging.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdistfile\fR\fR
 .ad
@@ -147,7 +141,6 @@ Uses the description file \fIdistfile\fR. A `\fB\(mi\fR\&' as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -159,7 +152,6 @@ link itself.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -172,7 +164,6 @@ be found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIrealm\fR\fR
 .ad
@@ -184,7 +175,6 @@ of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
@@ -196,7 +186,6 @@ override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIhost\fR\fR
 .ad
@@ -208,7 +197,6 @@ given to limit updates to a subset of the hosts listed in the distfile.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -220,7 +208,6 @@ a distfile.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-PO\fR\fR
 .ad
@@ -242,7 +229,6 @@ new, more secure "\fBrcmd\fR" protocol is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -253,7 +239,6 @@ Quiet mode. Does not display the files being updated on the standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -266,7 +251,6 @@ This is useful for maintaining truly identical copies of directories.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -278,7 +262,6 @@ of date are displayed, but no files are updated, nor is any mail sent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -296,7 +279,6 @@ directory is appended to the destination name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -309,7 +291,6 @@ are encrypted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
@@ -342,8 +323,8 @@ formats:
 .sp
 .in +2
 .nf
-\fIvariable_name\fR '=' \fIname_list\fR 
-[ label: ] \fIsource_list\fR '\fB->\fR' \fIdestination_list\fR \fIcommand_list\fR 
+\fIvariable_name\fR '=' \fIname_list\fR
+[ label: ] \fIsource_list\fR '\fB->\fR' \fIdestination_list\fR \fIcommand_list\fR
 [ label: ] \fIsource_list\fR '\fB::\fR' \fItime_stamp_file\fR \fIcommand_list\fR
 .fi
 .in -2
@@ -433,7 +414,6 @@ The following primitives can be used to specify actions \fBrdist\fR is to take
 when updating remote copies of each file.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinstall\fR [\fB-b\fR] [\fB-h\fR] [\fB-i\fR] [\fB-R\fR] [\fB-v\fR]
 [\fB-w\fR] [\fB-y\fR] [\fInewname\fR]\fR
@@ -457,7 +437,6 @@ under the username \fIlogin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotify\fR \fIaddress.\|.\|.\fR\fR
 .ad
@@ -474,7 +453,6 @@ name of the destination host to complete the address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexcept\fR \fIfilename .\|.\|.\fR\fR
 .ad
@@ -485,7 +463,6 @@ Omit from updates the files named as arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexcept_pat\fR \fIpattern .\|.\|.\fR\fR
 .ad
@@ -500,7 +477,6 @@ expansion is not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspecial\fR [\fIfilename\fR] .\|.\|. \fB"\fR\fIcommand-line\|\fR\fB"\fR\fR
 .ad
@@ -555,56 +531,46 @@ ${FILES} :: /usr/local/lib/timestamp
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.rhosts\fR\fR
 .ad
 .RS 23n
-.rt  
 User's trusted hosts and users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/host.equiv\fR\fR
 .ad
 .RS 23n
-.rt  
 system trusted hosts and users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/rdist*\fR\fR
 .ad
 .RS 23n
-.rt  
 Temporary file for update lists
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.k5login\fR\fR
 .ad
 .RS 23n
-.rt  
 File containing Kerberos principals that are allowed access
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Kerberos configuration file
 .RE
 

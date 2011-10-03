@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lio_listio 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH LIO_LISTIO 3C "Feb 5, 2008"
 .SH NAME
 lio_listio \- list directed I/O
 .SH SYNOPSIS
@@ -123,12 +123,10 @@ a result of an \fBaio_read\fR(3C) or \fBaio_write\fR(3C) function.
 The \fBlio_listio()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The resources necessary to queue all the I/O requests were not available. The
 error status for each request is recorded in the \fBaio_error\fR member of the
 corresponding \fBaiocb\fR structure, and can be retrieved using
@@ -137,36 +135,30 @@ corresponding \fBaiocb\fR structure, and can be retrieved using
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The number of entries indicated by \fInent\fR would cause the system-wide limit
 \fBAIO_MAX\fR to be exceeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fImode\fR argument is an improper value, or the value of \fInent\fR is
 greater than \fBAIO_LISTIO_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was delivered while waiting for all I/O requests to complete during an
 \fBLIO_WAIT\fR operation. Note that, since each I/O operation invoked by
 \fBlio_listio()\fR may possibly provoke a signal when it completes, this error
@@ -179,12 +171,10 @@ initiated; \fBaio_return\fR(3C) to determine if any request has completed; or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more of the individual I/O operations failed. The application can use
 \fBaio_error\fR(3C) to check the error status for each \fBaiocb\fR structure to
 determine the individual request(s) that failed.
@@ -205,35 +195,29 @@ same as would be set by a \fBread\fR(2) or \fBwrite\fR(2) function, with the
 following additional error codes possible:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 15n
-.rt  
 The requested I/O operation was not queued due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECANCELED\fR\fR
 .ad
 .RS 15n
-.rt  
 The requested I/O was canceled before the I/O completed due to an explicit
 \fBaio_cancel\fR(3C) request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFBIG\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIaiocbp\fR\(->\fBaio_lio_opcode\fR is \fBLIO_WRITE\fR, the file is a
 regular file, \fIaiocbp\fR\(->\fBaio_nbytes\fR is greater than 0, and the
 \fIaiocbp\fR\(->\fBaio_offset\fR is greater than or equal to the offset maximum
@@ -242,23 +226,19 @@ in the open file description associated with \fIaiocbp\fR\(->\fBaio_fildes.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINPROGRESS\fR\fR
 .ad
 .RS 15n
-.rt  
 The requested I/O is in progress.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIaiocbp\fR\(->\fBaio_lio_opcode\fR is \fBLIO_READ\fR, the file is a
 regular file, \fIaiocbp\fR\(->\fBaio_nbytes\fR is greater than 0, and the
 \fIaiocbp\fR\(->\fBaio_offset\fR is before the end-of-file and is greater than
@@ -279,17 +259,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

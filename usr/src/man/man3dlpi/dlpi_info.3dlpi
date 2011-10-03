@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlpi_info 3DLPI "22 Aug 2007" "SunOS 5.11" "Data Link Provider Interface Library Functions"
+.TH DLPI_INFO 3DLPI "Aug 22, 2007"
 .SH NAME
 dlpi_info \- get DLPI information
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ dlpi_info \- get DLPI information
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ldlpi\fR [ \fIlibrary\fR ... ]
 #include <libdlpi.h>
 
-\fBint\fR \fIdlpi_info\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBdlpi_info_t *\fR\fIinfop\fR, 
+\fBint\fR \fIdlpi_info\fR(\fBdlpi_handle_t\fR \fIdh\fR, \fBdlpi_info_t *\fR\fIinfop\fR,
      \fBuint_t\fR \fIopt\fR);
 .fi
 
@@ -38,7 +38,7 @@ typedef struct {
      uint_t                  di_min_sdu;
      uint_t                  di_state;
      uchar_t                 di_mactype;
-     char                    di_linkname[DLPI_LINKNAME_MAX];  
+     char                    di_linkname[DLPI_LINKNAME_MAX];
      uchar_t                 di_physaddr[DLPI_PHYSADDR_MAX];
      uchar_t                 di_physaddrlen;
      uchar_t                 di_bcastaddr[DLPI_PHYSADDR_MAX];
@@ -53,23 +53,19 @@ typedef struct {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_opts\fR\fR
 .ad
 .RS 19n
-.rt  
 Reserved for future \fBdlpi_info_t\fR expansion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_max_sdu\fR\fR
 .ad
 .RS 19n
-.rt  
 Maximum message size, in bytes, that the \fBDLPI\fR link is able to accept for
 transmission. The value is guaranteed to be greater than or equal to
 \fIdi_min_sdu\fR.
@@ -77,58 +73,48 @@ transmission. The value is guaranteed to be greater than or equal to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_min_sdu\fR\fR
 .ad
 .RS 19n
-.rt  
 Minimum message size, in bytes, that the \fBDLPI\fR link is able to accept for
 transmission. The value is guaranteed to be greater than or equal to one.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_state\fR\fR
 .ad
 .RS 19n
-.rt  
 Current \fBDLPI\fR state of \fIdh\fR; either \fBDL_UNBOUND\fR or \fBDL_IDLE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_mactype\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBMAC\fR type supported by the \fBDLPI\fR link associated with \fIdh\fR. See
 \fB<sys/dlpi.h>\fR for the list of possible \fBMAC\fR types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_linkname\fR\fR
 .ad
 .RS 19n
-.rt  
 Link name associated with \fBDLPI\fR handle \fIdh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_physaddr\fR\fR
 .ad
 .RS 19n
-.rt  
 Link-layer physical address of bound \fIdh\fR. If \fIdh\fR is in the
 \fBDL_UNBOUND\fR \fBDLPI\fR state, the contents of \fIdi_physaddr\fR are
 unspecified.
@@ -136,36 +122,30 @@ unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_physaddrlen\fR\fR
 .ad
 .RS 19n
-.rt  
 Physical address length, in bytes. If \fIdh\fR is in the \fBDL_UNBOUND\fR
 \fBDLPI\fR state, \fIdi_physaddrlen\fR is set to zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_bcastaddr\fR\fR
 .ad
 .RS 19n
-.rt  
 Link-layer broadcast address. If the \fIdi_mactype\fR of the \fBDLPI\fR link
 does not support broadcast, the contents of \fIdi_bcastaddr\fR are unspecified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_bcastaddrlen\fR\fR
 .ad
 .RS 19n
-.rt  
 Link-layer broadcast address length, in bytes. If the \fIdi_mactype\fR of the
 \fBDLPI\fR link does not support broadcast, \fIdi_bcastaddrlen\fR is set to
 zero.
@@ -173,35 +153,29 @@ zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_sap\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBSAP\fR currently bound to handle. If \fIdh\fR is in the \fBDL_UNBOUND\fR
 \fBDLPI\fR state, \fIdi_sap\fR is set to zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_timeout\fR\fR
 .ad
 .RS 19n
-.rt  
 Current timeout value, in seconds, set on the \fBdlpi\fR handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_qos_sel\fR\fR
 .ad
 .RS 19n
-.rt  
 Current \fBQOS\fR parameters supported by the \fBDLPI\fR link instance
 associated with \fIdh\fR. Unsupported \fBQOS\fR parameters are set to
 \fBDL_UNKNOWN\fR.
@@ -209,12 +183,10 @@ associated with \fIdh\fR. Unsupported \fBQOS\fR parameters are set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdi_qos_range\fR\fR
 .ad
 .RS 19n
-.rt  
 Available range of \fBQOS\fR parameters supported by a \fBDLPI\fR link instance
 associated with the \fBDLPI\fR handle \fIdh\fR. Unsupported \fBQOS\fR range
 values are set to \fBDL_UNKNOWN\fR.
@@ -230,78 +202,64 @@ in the following section is returned.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EBADMSG\fR\fR
 .ad
 .RS 20n
-.rt  
 Bad DLPI message
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EINHANDLE\fR\fR
 .ad
 .RS 20n
-.rt  
 Invalid \fBDLPI\fR handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EINVAL\fR\fR
 .ad
 .RS 20n
-.rt  
 Invalid argument
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EMODENOTSUP\fR\fR
 .ad
 .RS 20n
-.rt  
 Unsupported \fBDLPI\fR connection mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_ETIMEDOUT\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBDLPI\fR operation timed out
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_EVERNOTSUP\fR\fR
 .ad
 .RS 20n
-.rt  
 Unsupported \fBDLPI\fR Version
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDLPI_FAILURE\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBDLPI\fR operation failed
 .RE
 
@@ -331,7 +289,7 @@ get_bcastaddr(const char *linkname, uchar_t *baddrlenp)
                 dlpi_close(dh);
                 return (NULL);
         }
-        dlpi_close(dh);            
+        dlpi_close(dh);
 
         *baddrlenp = dlinfo.di_bcastaddrlen;
         if ((baddr = malloc(*baddrlenp)) == NULL)
@@ -350,15 +308,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

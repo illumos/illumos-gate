@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLPReg 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.TH SLPREG 3SLP "Jan 16, 2003"
 .SH NAME
 SLPReg \- register an SLP advertisement
 .SH SYNOPSIS
@@ -45,36 +45,30 @@ obtained through configuration.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 14n
-.rt  
 The language specific  \fBSLPHandle\fR on which to  register the advertisement.
 \fIhSLP\fR cannot be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcSrvURL\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBURL\fR  to register.  The value of \fIpcSrvURL\fR cannot be \fINULL\fR
 or the  empty  string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusLifetime\fR\fR
 .ad
 .RS 14n
-.rt  
 An \fBunsigned short\fR giving the life time of the service advertisement, in
 seconds.  The value must be an unsigned integer less than or equal to
 \fBSLP_LIFETIME_MAXIMUM\fR.
@@ -82,24 +76,20 @@ seconds.  The value must be an unsigned integer less than or equal to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcSrvType\fR\fR
 .ad
 .RS 14n
-.rt  
 The service type. If \fIpURL\fR is  a service: URL, then this parameter is
 ignored. \fIpcSrvType\fR cannot be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcAttrs\fR\fR
 .ad
 .RS 14n
-.rt  
 A  comma-separated   list  of  attribute   assignment expressions for the
 attributes of the  advertisement. \fIpcAttrs\fR  cannot  be \fINULL\fR.  Use
 the empty  string,  \fB""\fR,  to indicate no attributes.
@@ -107,36 +97,30 @@ the empty  string,  \fB""\fR,  to indicate no attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfresh\fR\fR
 .ad
 .RS 14n
-.rt  
 An \fBSLPBoolean\fR that is \fBSLP_TRUE\fR if the registration is new or
 \fBSLP_FALSE\fR if it is a reregistration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 14n
-.rt  
 A callback to report the operation completion  status. \fIcallback\fR cannot be
 \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 14n
-.rt  
 Memory passed to the callback code from the client.  \fIpvCookie\fR can be
 \fINULL\fR.
 .RE
@@ -170,12 +154,10 @@ err = SLPReg(hSLP, "service:video://bldg15",
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_CONF_FILE\fR\fR
 .ad
 .RS 17n
-.rt  
 When set, use this file for configuration.
 .RE
 

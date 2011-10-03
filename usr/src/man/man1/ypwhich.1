@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ypwhich 1 "7 Apr 1995" "SunOS 5.11" "User Commands"
+.TH YPWHICH 1 "Apr 7, 1995"
 .SH NAME
 ypwhich \- return name of NIS server or map master
 .SH SYNOPSIS
@@ -30,34 +30,28 @@ Refer to \fBypfiles\fR(4) for an overview of the  NIS name services.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI domain\fR\fR
 .ad
 .RS 13n
-.rt  
 Use \fIdomain\fR instead of the default domain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 13n
-.rt  
 This option inhibits map nickname translation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI mname\fR\fR
 .ad
 .RS 13n
-.rt  
 Find the master NIS server for a map.  No \fBhostname\fR can be specified with
 \fB-m\fR. \fImname\fR can be a mapname, or a nickname for a map. When
 \fImname\fR is omitted, produce a list of available maps.
@@ -65,23 +59,19 @@ Find the master NIS server for a map.  No \fBhostname\fR can be specified with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 13n
-.rt  
 Display the map nickname translation table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(miVn\fR\fR
 .ad
 .RS 13n
-.rt  
 Version of  \fBypbind\fR, V3 is default.
 .RE
 

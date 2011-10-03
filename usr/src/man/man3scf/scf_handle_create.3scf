@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_handle_create 3SCF "17 Aug 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_HANDLE_CREATE 3SCF "Aug 17, 2007"
 .SH NAME
 scf_handle_create, scf_handle_destroy, scf_handle_decorate, scf_handle_bind,
 scf_handle_unbind, scf_myname \- Service Configuration Facility handle
@@ -11,7 +11,7 @@ functions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_handle_t *\fR\fBscf_handle_create\fR(\fBscf_version_t\fR \fIversion\fR);
@@ -60,12 +60,10 @@ invalid values will not cause errors prior to the call to
 \fBscf_handle_bind()\fR. The only available decorations is:
 .sp
 .ne 2
-.mk
 .na
 \fBdebug\fR
 .ad
 .RS 9n
-.rt  
 (count) Set the debugging flags.
 .RE
 
@@ -109,23 +107,19 @@ it returns -1.
 The \fBscf_handle_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
 .RS 30n
-.rt  
 There is no memory available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_VERSION_MISMATCH\fR\fR
 .ad
 .RS 30n
-.rt  
 The version is invalid, or the application was compiled against a version of
 the library that is more recent than the one on the system.
 .RE
@@ -135,56 +129,46 @@ the library that is more recent than the one on the system.
 The \fBscf_handle_decorate()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIparam\fR argument is not a recognized parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIvalue\fR argument does not match the expected type for param.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIvalue\fR argument is not set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_IN_USE\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle is currently bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIvalue\fR argument is not derived from \fIhandle\fR.
 .RE
 
@@ -193,45 +177,37 @@ The \fIvalue\fR argument is not derived from \fIhandle\fR.
 The \fBscf_handle_bind()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 One of the decorations was invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_SERVER\fR\fR
 .ad
 .RS 30n
-.rt  
 The repository server is not running.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The server does not have adequate resources for a new connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_IN_USE\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle is already bound.
 .RE
 
@@ -240,12 +216,10 @@ The handle is already bound.
 The \fBscf_handle_unbind()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
 .RS 23n
-.rt  
 The handle is not bound.
 .RE
 
@@ -254,7 +228,6 @@ The handle is not bound.
 The \fBscf_handle_myname()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -265,7 +238,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -276,7 +248,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -296,15 +267,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSee below.
+MT-Level	See below.
 .TE
 
 .sp

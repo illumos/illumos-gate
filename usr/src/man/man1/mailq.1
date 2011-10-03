@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mailq 1 "10 Jul 2002" "SunOS 5.11" "User Commands"
+.TH MAILQ 1 "Jul 10, 2002"
 .SH NAME
 mailq \- print the mail queue
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ by modifying the Basic Solaris User entry in \fBprof_attr\fR(4).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Ac\fR\fR
 .ad
 .RS 17n
-.rt  
 Like \fBsendmail\fR(1M), this flag tells \fBmailq\fR to use \fBsubmit.cf\fR
 rather than \fBsendmail.cf\fR even  if  the  operation  mode  does  not
 indicate an initial mail submission. This will result in the client queue
@@ -54,12 +52,10 @@ queue \fB/var/spool/mqueue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fBp\fR[\fItime\fR] \fR
 .ad
 .RS 17n
-.rt  
 Similar to \fB-q\fR\fItime\fR, except that instead of periodically forking a
 child to process the queue, \fBsendmail\fR forks a single persistent child for
 each queue that alternates between processing the queue and sleeping. The sleep
@@ -70,71 +66,59 @@ previous queue run.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fBf\fR\fR
 .ad
 .RS 17n
-.rt  
 Processes saved  messages in the queue once and does not \fBfork()\fR, but runs
 in the foreground.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fBG\fR \fIname\fR\fR
 .ad
 .RS 17n
-.rt  
 Processes jobs in the queue group called \fIname\fR only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR[\fB!\fR]\fBI\fR \fIsubstr\fR\fR
 .ad
 .RS 17n
-.rt  
 Limits processed jobs to those containing \fIsubstr\fR as a substring of the
 queue id, or not when \fB!\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR[\fB!\fR]\fBR\fR \fIsubstr\fR\fR
 .ad
 .RS 17n
-.rt  
 Limits processed jobs to those containing \fIsubstr\fR as a substring of one of
 the recipients, or not when \fB!\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR[\fB!\fR]\fBS\fR \fIsubstr\fR\fR
 .ad
 .RS 17n
-.rt  
 Limits processed jobs to those containing \fIsubstr\fR as a substring of the
 sender, or not when \fB!\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fR
 .ad
 .RS 17n
-.rt  
 Prints verbose information. This adds the priority of the message and a single
 character indicator (\fB+\fR or blank) indicating  whether a warning message
 has been sent on the first line of the message. Additionally, extra lines may
@@ -147,57 +131,47 @@ any.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/prof_attr\fR\fR
 .ad
 .RS 27n
-.rt  
 local source for execution profile attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/mqueue\fR\fR
 .ad
 .RS 27n
-.rt  
 default server queue
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/clientmqueue\fR\fR
 .ad
 .RS 27n
-.rt  
 client queue
 .RE
 

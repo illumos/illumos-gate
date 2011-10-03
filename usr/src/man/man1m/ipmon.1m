@@ -2,13 +2,13 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH ipmon 1M "3 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH IPMON 1M "Apr 3, 2008"
 .SH NAME
 ipmon \- monitors /dev/ipl for logged packets
 .SH SYNOPSIS
 .LP
 .nf
-\fBipmon\fR [\fB-abDFhnpstvxX\fR] [\fB-N\fR \fIdevice\fR] [ [o] [NSI]] [\fB-O\fR [NSI]] 
+\fBipmon\fR [\fB-abDFhnpstvxX\fR] [\fB-N\fR \fIdevice\fR] [ [o] [NSI]] [\fB-O\fR [NSI]]
      [\fB-P\fR \fIpidfile\fR] [\fB-S\fR \fIdevice\fR] [\fB-f\fR \fIdevice\fR] [\fIfilename\fR]
 .fi
 
@@ -107,7 +107,6 @@ message.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -119,7 +118,6 @@ displayed to the same output device (stderr or syslog).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -131,7 +129,6 @@ packet contents after the headers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -144,7 +141,6 @@ can run indefinitely.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdevice\fR\fR
 .ad
@@ -156,7 +152,6 @@ normal IP Filter log records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -168,7 +163,6 @@ even if the result is zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -179,7 +173,6 @@ Displays usage information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -191,7 +184,6 @@ hostnames and service names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIdevice\fR\fR
 .ad
@@ -203,7 +195,6 @@ Set the logfile to be opened for reading NAT log records from or to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIletter\fR\fR
 .ad
@@ -216,7 +207,6 @@ is equivalent to using \fB-o\fR \fBNSI\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIletter\fR\fR
 .ad
@@ -229,7 +219,6 @@ same as for \fB-o\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -241,7 +230,6 @@ never attempt to look it up.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpidfile\fR\fR
 .ad
@@ -253,7 +241,6 @@ Write the PD of the \fBipmon\fR process to a file. By default this is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -264,7 +251,6 @@ to a file. The default facility when compiled and installed is \fBlocal0\fR.
 The following levels are used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOG_INFO\fR\fR
 .ad
@@ -276,7 +262,6 @@ or \fBblock\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOG_NOTICE\fR\fR
 .ad
@@ -287,7 +272,6 @@ Packets logged that are also passed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOG_WARNING\fR\fR
 .ad
@@ -298,7 +282,6 @@ Packets logged that are also blocked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOG_ERR\fR\fR
 .ad
@@ -311,7 +294,6 @@ Packets that have been logged and that can be considered "short".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIdevice\fR\fR
 .ad
@@ -323,7 +305,6 @@ Set the logfile to be opened for reading state log records from or to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -334,7 +315,6 @@ Read the input file/device in the way performed by \fBtail\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -345,7 +325,6 @@ Show TCP \fBwindow\fR, \fBack\fR, and \fBsequence\fR fields
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -356,7 +335,6 @@ Show the packet data in hex.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR\fR
 .ad
@@ -392,13 +370,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

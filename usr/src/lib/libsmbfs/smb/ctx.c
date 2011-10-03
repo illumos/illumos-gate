@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -64,8 +65,6 @@
 #include <netsmb/smb_dev.h>
 
 #include "charsets.h"
-#include "spnego.h"
-#include "derparse.h"
 #include "private.h"
 #include "ntlm.h"
 
@@ -88,6 +87,14 @@ int smb_debug, smb_verbose;
  * Was: STDPARAM_OPT - see smb_ctx_scan_argv, smb_ctx_opt
  */
 const char smbutil_std_opts[] = "ABCD:E:I:L:M:NO:P:U:R:S:T:W:";
+
+/*
+ * Defaults for new contexts (connections to servers).
+ * These are set by smbfs_set_default_...
+ */
+static char default_domain[SMBIOC_MAX_NAME];
+static char default_user[SMBIOC_MAX_NAME];
+
 
 /*
  * Give the RPC library a callback hook that will be
@@ -206,7 +213,8 @@ dump_ctx(char *where, struct smb_ctx *ctx)
 	    ctx->ct_origshare ? ctx->ct_origshare : "",
 	    ctx->ct_shtype_req);
 
-	/* dump_iod_work()? */
+	printf(" ct_home=\"%s\"\n", ctx->ct_home);
+	printf(" ct_rpath=\"%s\"\n", ctx->ct_rpath);
 }
 
 int
@@ -233,9 +241,7 @@ smb_ctx_alloc(struct smb_ctx **ctx_pp)
 int
 smb_ctx_init(struct smb_ctx *ctx)
 {
-	char pwbuf[NSS_BUFLEN_PASSWD];
-	struct passwd pw;
-	int error = 0;
+	int error;
 
 	bzero(ctx, sizeof (*ctx));
 
@@ -256,32 +262,15 @@ smb_ctx_init(struct smb_ctx *ctx)
 	ctx->ct_authflags = SMB_AT_DEFAULT;
 	ctx->ct_minauth = SMB_AT_DEFAULT;
 
-	error = nb_ctx_setscope(ctx->ct_nb, "");
-	if (error)
-		return (error);
-
 	/*
-	 * if the user name is not specified some other way,
-	 * use the current user name (built-in default)
+	 * Default domain, user, ...
 	 */
-	if (getpwuid_r(getuid(), &pw, pwbuf, sizeof (pwbuf)) != NULL) {
-		error = smb_ctx_setuser(ctx, pw.pw_name, 0);
-		if (error)
-			return (error);
-		ctx->ct_home = strdup(pw.pw_name);
-		if (ctx->ct_home == NULL)
-			return (ENOMEM);
-	}
+	strlcpy(ctx->ct_domain, default_domain,
+	    sizeof (ctx->ct_domain));
+	strlcpy(ctx->ct_user, default_user,
+	    sizeof (ctx->ct_user));
 
-	/*
-	 * Set a built-in default domain (workgroup).
-	 * Using the Windows/NT default for now.
-	 */
-	error = smb_ctx_setdomain(ctx, "WORKGROUP", 0);
-	if (error)
-		return (error);
-
-	return (error);
+	return (0);
 }
 
 /*
@@ -441,8 +430,14 @@ smb_ctx_done(struct smb_ctx *ctx)
 		freeaddrinfo(ctx->ct_addrinfo);
 		ctx->ct_addrinfo = NULL;
 	}
-	if (ctx->ct_home)
+	if (ctx->ct_home) {
 		free(ctx->ct_home);
+		ctx->ct_home = NULL;
+	}
+	if (ctx->ct_rpath) {
+		free(ctx->ct_rpath);
+		ctx->ct_rpath = NULL;
+	}
 	if (ctx->ct_srv_OS) {
 		free(ctx->ct_srv_OS);
 		ctx->ct_srv_OS = NULL;
@@ -457,26 +452,9 @@ smb_ctx_done(struct smb_ctx *ctx)
 	}
 }
 
-static int
-getsubstring(const char *p, uchar_t sep, char *dest, int maxlen,
-    const char **next)
-{
-	int len;
-
-	maxlen--;
-	for (len = 0; len < maxlen && *p != sep; p++, len++, dest++) {
-		if (*p == 0)
-			return (EINVAL);
-		*dest = *p;
-	}
-	*dest = 0;
-	*next = *p ? p + 1 : p;
-	return (0);
-}
-
 /*
  * Parse the UNC path.  Here we expect something like
- *   "//[workgroup;][user[:password]@]host[/share[/path]]"
+ *   "//[[domain;]user[:password]@]host[/share[/path]]"
  * See http://ietf.org/internet-drafts/draft-crhertel-smb-url-07.txt
  * Values found here are marked as "from CMD".
  */
@@ -485,9 +463,9 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
 	int minlevel, int maxlevel, int sharetype,
 	const char **next)
 {
-	const char *p = unc;
-	char *p1, *colon;
 	char tmp[1024];
+	char *host, *share, *path;
+	char *dom, *usr, *pw, *p;
 	int error;
 
 	/*
@@ -497,118 +475,146 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
 	ctx->ct_minlevel = minlevel;
 	ctx->ct_maxlevel = maxlevel;
 	ctx->ct_shtype_req = sharetype;
-
 	ctx->ct_parsedlevel = SMBL_NONE;
-	if (*p++ != '/' || *p++ != '/') {
+
+	dom = usr = pw = host = NULL;
+
+	/* Work on a temporary copy, fix back slashes. */
+	strlcpy(tmp, unc, sizeof (tmp));
+	for (p = tmp; *p; p++)
+		if (*p == '\\')
+			*p = '/';
+
+	if (tmp[0] != '/' || tmp[1] != '/') {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "UNC should start with '//'"), 0);
 		error = EINVAL;
 		goto out;
 	}
-	p1 = tmp;
-	error = getsubstring(p, ';', p1, sizeof (tmp), &p);
-	if (!error) {
-		if (*p1 == 0) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "empty workgroup name"), 0);
-			error = EINVAL;
-			goto out;
-		}
-		error = smb_ctx_setdomain(ctx, unpercent(tmp), TRUE);
+	p = tmp + 2;	/* user@host... */
+
+	/* Find the share part, if any. */
+	share = strchr(p, '/');
+	if (share)
+		*share = '\0';
+	(void) unpercent(p);	/* host component */
+
+	/*
+	 * Parse the "host" stuff right to left:
+	 * 1: trailing "@hostname" (or whole field)
+	 * 2: trailing ":password"
+	 * 3: trailing "domain;user" (or just user)
+	 */
+	host = strrchr(p, '@');
+	if (host == NULL) {
+		host = p;	/* no user@ prefix */
+	} else {
+		*host++ = '\0';
+
+		/* may have [[domain;]user[:passwd]] */
+		pw = strchr(p, ':');
+		if (pw)
+			*pw++ = '\0';
+		usr = strchr(p, ';');
+		if (usr) {
+			*usr++ = '\0';
+			dom = p;
+		} else
+			usr = p;
+	}
+
+	if (*host == '\0') {
+		smb_error(dgettext(TEXT_DOMAIN, "empty server name"), 0);
+		error = EINVAL;
+		goto out;
+	}
+	error = smb_ctx_setfullserver(ctx, host);
+	if (error)
+		goto out;
+	ctx->ct_parsedlevel = SMBL_VC;
+
+	if (dom != NULL) {
+		error = smb_ctx_setdomain(ctx, dom, TRUE);
 		if (error)
 			goto out;
 	}
-	colon = (char *)p;
-	error = getsubstring(p, '@', p1, sizeof (tmp), &p);
-	if (!error) {
+	if (usr != NULL) {
+		if (*usr == '\0') {
+			smb_error(dgettext(TEXT_DOMAIN,
+			    "empty user name"), 0);
+			error = EINVAL;
+			goto out;
+		}
 		if (ctx->ct_maxlevel < SMBL_VC) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "no user name required"), 0);
 			error = EINVAL;
 			goto out;
 		}
-		p1 = strchr(tmp, ':');
-		if (p1) {
-			colon += p1 - tmp;
-			*p1++ = (char)0;
-			error = smb_ctx_setpassword(ctx, unpercent(p1), TRUE);
-			if (error)
-				goto out;
-			if (p - colon > 2)
-				memset(colon+1, '*', p - colon - 2);
-		}
-		p1 = tmp;
-		if (*p1 == 0) {
+		error = smb_ctx_setuser(ctx, usr, TRUE);
+		if (error)
+			goto out;
+	}
+	if (pw != NULL) {
+		error = smb_ctx_setpassword(ctx, pw, TRUE);
+		if (error)
+			goto out;
+	}
+
+	if (share != NULL) {
+		/* restore the slash */
+		*share = '/';
+		p = share + 1;
+
+		/* Find the path part, if any. */
+		path = strchr(p, '/');
+		if (path)
+			*path = '\0';
+		(void) unpercent(p);	/* share component */
+
+		if (*p == '\0') {
 			smb_error(dgettext(TEXT_DOMAIN,
-			    "empty user name"), 0);
+			    "empty share name"), 0);
 			error = EINVAL;
 			goto out;
 		}
-		error = smb_ctx_setuser(ctx, unpercent(tmp), TRUE);
+		if (ctx->ct_maxlevel < SMBL_SHARE) {
+			smb_error(dgettext(TEXT_DOMAIN,
+			    "no share name required"), 0);
+			error = EINVAL;
+			goto out;
+		}
+
+		/*
+		 * Special case UNC names like:
+		 *	//host/PIPE/endpoint
+		 * to have share: IPC$
+		 */
+		if (strcasecmp(p, "PIPE") == 0) {
+			sharetype = USE_IPC;
+			p = "IPC$";
+		}
+		error = smb_ctx_setshare(ctx, p, sharetype);
 		if (error)
 			goto out;
-		ctx->ct_parsedlevel = SMBL_VC;
-	}
-	error = getsubstring(p, '/', p1, sizeof (tmp), &p);
-	if (error) {
-		error = getsubstring(p, '\0', p1, sizeof (tmp), &p);
-		if (error) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "no server name found"), 0);
-			goto out;
+		ctx->ct_parsedlevel = SMBL_SHARE;
+
+		if (path) {
+			/* restore the slash */
+			*path = '/';
+			p = path + 1;
+			(void) unpercent(p);	/* remainder */
+			free(ctx->ct_rpath);
+			ctx->ct_rpath = strdup(path);
 		}
-	}
-	if (*p1 == 0) {
-		smb_error(dgettext(TEXT_DOMAIN, "empty server name"), 0);
-		error = EINVAL;
-		goto out;
-	}
-
-	/*
-	 * Save ct_fullserver without case conversion.
-	 */
-	if (strchr(tmp, '%'))
-		(void) unpercent(tmp);
-	error = smb_ctx_setfullserver(ctx, tmp);
-	if (error)
-		goto out;
-
-#ifdef	SMB_ST_NONE
-	if (sharetype == SMB_ST_NONE) {
-		if (next)
-			*next = p;
-		error = 0;
-		goto out;
-	}
-#endif
-
-	if (*p != 0 && ctx->ct_maxlevel < SMBL_SHARE) {
-		smb_error(dgettext(TEXT_DOMAIN, "no share name required"), 0);
-		error = EINVAL;
-		goto out;
-	}
-	error = getsubstring(p, '/', p1, sizeof (tmp), &p);
-	if (error) {
-		error = getsubstring(p, '\0', p1, sizeof (tmp), &p);
-		if (error) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "unexpected end of line"), 0);
-			goto out;
-		}
-	}
-	if (*p1 == 0 && ctx->ct_minlevel >= SMBL_SHARE &&
-	    !(ctx->ct_flags & SMBCF_BROWSEOK)) {
+	} else if (ctx->ct_minlevel >= SMBL_SHARE) {
 		smb_error(dgettext(TEXT_DOMAIN, "empty share name"), 0);
 		error = EINVAL;
 		goto out;
 	}
+
 	if (next)
-		*next = p;
-	if (*p1 == 0) {
-		error = 0;
-		goto out;
-	}
-	error = smb_ctx_setshare(ctx, unpercent(p1), sharetype);
+		*next = NULL;
 
 out:
 	if (error == 0 && smb_debug > 0)
@@ -1147,27 +1153,10 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 int
 smb_open_driver()
 {
-	int err, fd;
-	uint32_t version;
+	int fd;
 
 	fd = open("/dev/"NSMB_NAME, O_RDWR);
 	if (fd < 0) {
-		err = errno;
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "failed to open driver"), err);
-		return (-1);
-	}
-
-	/*
-	 * Check the driver version (paranoia)
-	 * Do this BEFORE any other ioctl calls.
-	 */
-	if (ioctl(fd, SMBIOC_GETVERS, &version) < 0)
-		version = 0;
-	if (version != NSMB_VERSION) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "incorrect driver version"), 0);
-		close(fd);
 		return (-1);
 	}
 
@@ -1180,7 +1169,8 @@ smb_open_driver()
 int
 smb_ctx_gethandle(struct smb_ctx *ctx)
 {
-	int fd;
+	int fd, err;
+	uint32_t version;
 
 	if (ctx->ct_dev_fd != -1) {
 		rpc_cleanup_smbctx(ctx);
@@ -1190,8 +1180,24 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 	}
 
 	fd = smb_open_driver();
-	if (fd < 0)
+	if (fd < 0) {
+		err = errno;
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "failed to open driver"), err);
+		return (err);
+	}
+
+	/*
+	 * Check the driver version (paranoia)
+	 */
+	if (ioctl(fd, SMBIOC_GETVERS, &version) < 0)
+		version = 0;
+	if (version != NSMB_VERSION) {
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "incorrect driver version"), 0);
+		close(fd);
 		return (ENODEV);
+	}
 
 	ctx->ct_dev_fd = fd;
 	return (0);
@@ -1241,43 +1247,12 @@ smb_ctx_get_ssn(struct smb_ctx *ctx)
 }
 
 /*
- * Get the string representation of a share "use" type,
- * as needed for the "service" in tree connect.
- */
-static const char *
-smb_use_type_str(smb_use_shtype_t stype)
-{
-	const char *pp;
-
-	switch (stype) {
-	default:
-	case USE_WILDCARD:
-		pp = "?????";
-		break;
-	case USE_DISKDEV:
-		pp = "A:";
-		break;
-	case USE_SPOOLDEV:
-		pp = "LPT1:";
-		break;
-	case USE_CHARDEV:
-		pp = "COMM";
-		break;
-	case USE_IPC:
-		pp = "IPC";
-		break;
-	}
-	return (pp);
-}
-
-/*
  * Find or create a tree connection
  */
 int
 smb_ctx_get_tree(struct smb_ctx *ctx)
 {
 	smbioc_tcon_t *tcon = NULL;
-	const char *stype;
 	int cmd, err = 0;
 
 	if (ctx->ct_dev_fd < 0 ||
@@ -1297,18 +1272,8 @@ smb_ctx_get_tree(struct smb_ctx *ctx)
 	strlcpy(tcon->tc_sh.sh_name, ctx->ct_origshare,
 	    sizeof (tcon->tc_sh.sh_name));
 
-	/*
-	 * Share password (unused - no share-level security)
-	 * MS-SMB 2.2.6 says this should be null terminated,
-	 * and the length includes the null.  Did bzero above,
-	 * so just set length for the null.
-	 */
-	tcon->tc_sh.sh_pwlen = 1;
-
 	/* The share "use" type. */
-	stype = smb_use_type_str(ctx->ct_shtype_req);
-	strlcpy(tcon->tc_sh.sh_type_req, stype,
-	    sizeof (tcon->tc_sh.sh_type_req));
+	tcon->tc_sh.sh_use = ctx->ct_shtype_req;
 
 	/*
 	 * Todo: share passwords for share-level security.
@@ -1323,13 +1288,12 @@ smb_ctx_get_tree(struct smb_ctx *ctx)
 	/*
 	 * Check the returned share type
 	 */
-	DPRINT("ret. sh_type: \"%s\"", tcon->tc_sh.sh_type_ret);
+	DPRINT("ret. sh_type: \"%d\"", tcon->tc_sh.sh_type);
 	if (ctx->ct_shtype_req != USE_WILDCARD &&
-	    0 != strcmp(stype, tcon->tc_sh.sh_type_ret)) {
+	    ctx->ct_shtype_req != tcon->tc_sh.sh_type) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "%s: incompatible share type"),
 		    0, ctx->ct_origshare);
-		err = EINVAL;
 	}
 
 out:
@@ -1360,12 +1324,12 @@ smb_ctx_flags2(struct smb_ctx *ctx)
  * Must already have an active SMB session.
  */
 int
-smb_ctx_get_ssnkey(struct smb_ctx *ctx, uchar_t *key, size_t len)
+smb_fh_getssnkey(int dev_fd, uchar_t *key, size_t len)
 {
 	if (len < SMBIOC_HASH_SZ)
 		return (EINVAL);
 
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_GETSSNKEY, key) == -1)
+	if (ioctl(dev_fd, SMBIOC_GETSSNKEY, key) == -1)
 		return (errno);
 
 	return (0);
@@ -1536,14 +1500,26 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 int
 smb_ctx_readrc(struct smb_ctx *ctx)
 {
-	char *home;
+	char pwbuf[NSS_BUFLEN_PASSWD];
+	struct passwd pw;
 	char *sname = NULL;
 	int sname_max;
 	int err = 0;
 
-	if ((home = getenv("HOME")) == NULL)
-		home = ctx->ct_home;
-	if ((err = smb_open_rcfile(home)) != 0) {
+	/*
+	 * If the user name is not specified some other way,
+	 * use the current user name.  Also save the homedir.
+	 * NB: ct_home=NULL is allowed, and we don't want to
+	 * bail out with an error for a missing ct_home.
+	 */
+	if (getpwuid_r(getuid(), &pw, pwbuf, sizeof (pwbuf)) != NULL) {
+		if (ctx->ct_user[0] == 0)
+			(void) smb_ctx_setuser(ctx, pw.pw_name, B_FALSE);
+		if (ctx->ct_home == NULL)
+			ctx->ct_home = strdup(pw.pw_dir);
+	}
+
+	if ((err = smb_open_rcfile(ctx->ct_home)) != 0) {
 		DPRINT("smb_open_rcfile, err=%d", err);
 		/* ignore any error here */
 		return (0);
@@ -1613,4 +1589,16 @@ done:
 		DPRINT("err=%d\n", err);
 
 	return (err);
+}
+
+void
+smbfs_set_default_domain(const char *domain)
+{
+	strlcpy(default_domain, domain, sizeof (default_domain));
+}
+
+void
+smbfs_set_default_user(const char *user)
+{
+	strlcpy(default_user, user, sizeof (default_user));
 }

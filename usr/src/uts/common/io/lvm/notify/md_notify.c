@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
@@ -37,7 +36,6 @@
 
 md_ops_t		event_md_ops;
 #ifndef lint
-char			_depends_on[] = "drv/md";
 md_ops_t		*md_interface_ops = &event_md_ops;
 #endif
 

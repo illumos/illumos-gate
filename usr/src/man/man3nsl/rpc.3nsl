@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc 3NSL "5 Jun 2001" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC 3NSL "Jun 5, 2001"
 .SH NAME
 rpc \- library routines for remote procedure calls
 .SH SYNOPSIS
@@ -63,12 +63,10 @@ which can be used for a particular application.
 \fInettype\fR can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetpath\fR\fR
 .ad
 .RS 14n
-.rt  
 Choose from the transports which have been indicated by their token names in
 the \fBNETPATH\fR environment variable. If \fBNETPATH\fR is unset or
 \fINULL\fR, it defaults to \fBvisible\fR. \fBnetpath\fR is the default
@@ -77,24 +75,20 @@ the \fBNETPATH\fR environment variable. If \fBNETPATH\fR is unset or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvisible\fR\fR
 .ad
 .RS 14n
-.rt  
 Choose the transports which have the visible flag (\fBv\fR) set in the
 \fB/etc/netconfig\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcircuit_v\fR\fR
 .ad
 .RS 14n
-.rt  
 This is same as \fBvisible\fR except that it chooses only the connection
 oriented transports (semantics \fBtpi_cots\fR or \fBtpi_cots_ord\fR) from the
 entries in the \fB/etc/netconfig\fR file.
@@ -102,12 +96,10 @@ entries in the \fB/etc/netconfig\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatagram_v\fR\fR
 .ad
 .RS 14n
-.rt  
 This is same as \fBvisible\fR except that it chooses only the connectionless
 datagram transports (semantics \fBtpi_clts\fR) from the entries in the
 \fB/etc/netconfig\fR file.
@@ -115,47 +107,39 @@ datagram transports (semantics \fBtpi_clts\fR) from the entries in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcircuit_n\fR\fR
 .ad
 .RS 14n
-.rt  
 This is same as \fBnetpath\fR except that it chooses only the connection
 oriented datagram transports (semantics \fBtpi_cots\fR or \fBtpi_cots_ord\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatagram_n\fR\fR
 .ad
 .RS 14n
-.rt  
 This is same as \fBnetpath\fR except that it chooses only the connectionless
 datagram transports (semantics \fBtpi_clts\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBudp\fR\fR
 .ad
 .RS 14n
-.rt  
 This refers to Internet \fBUDP.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtcp\fR\fR
 .ad
 .RS 14n
-.rt  
 This refers to Internet \fBTCP.\fR
 .RE
 
@@ -172,16 +156,14 @@ In a 64-bit environment, the derived types are defined as follows:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBtypedef\fR\fBuint32_t\fR\fBrpcprog_t;\fR
-\fBtypedef\fR\fBuint32_t\fR\fBrpcvers_t;\fR
-\fBtypedef\fR\fBuint32_t\fR\fBrpcproc_t;\fR
-\fBtypedef\fR\fBuint32_t\fR\fBrpcprot_t;\fR
-\fBtypedef\fR\fBuint32_t\fR\fBrpcport_t;\fR
-\fBtypedef\fR\fBint32_t\fR\fBrpc_inline_t;\fR
+l l l
+l l l .
+\fBtypedef\fR	\fBuint32_t\fR	\fBrpcprog_t;\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBrpcvers_t;\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBrpcproc_t;\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBrpcprot_t;\fR
+\fBtypedef\fR	\fBuint32_t\fR	\fBrpcport_t;\fR
+\fBtypedef\fR	\fBint32_t\fR	\fBrpc_inline_t;\fR
 .TE
 
 .sp
@@ -191,16 +173,14 @@ In a 32-bit environment, the derived types are defined as follows:
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBtypedef\fR\fBunsigned long\fR\fBrpcprog_t;\fR
-\fBtypedef\fR\fBunsigned long\fR\fBrpcvers_t;\fR
-\fBtypedef\fR\fBunsigned long\fR\fBrpcproc_t;\fR
-\fBtypedef\fR\fBunsigned long\fR\fBrpcprot_t;\fR
-\fBtypedef\fR\fBunsigned long\fR\fBrpcport_t;\fR
-\fBtypedef\fR\fBlong\fR\fBrpc_inline_t;\fR
+l l l
+l l l .
+\fBtypedef\fR	\fBunsigned long\fR	\fBrpcprog_t;\fR
+\fBtypedef\fR	\fBunsigned long\fR	\fBrpcvers_t;\fR
+\fBtypedef\fR	\fBunsigned long\fR	\fBrpcproc_t;\fR
+\fBtypedef\fR	\fBunsigned long\fR	\fBrpcprot_t;\fR
+\fBtypedef\fR	\fBunsigned long\fR	\fBrpcport_t;\fR
+\fBtypedef\fR	\fBlong\fR	\fBrpc_inline_t;\fR
 .TE
 
 .SS "Data Structures"
@@ -376,24 +356,24 @@ typedef struct {
 enum xdr_op x_op;    /* operation; fast additional param */
 struct  xdr_ops  {
 
-bool_t       (*x_getlong)(\|);      /* get long from underlying stream */ 
-bool_t       (*x_putlong)(\|);      /* put long to underlying stream */ 
-bool_t       (*x_getbytes)(\|);     /* get bytes from underlying stream */ 
-bool_t       (*x_putbytes)(\|);     /* put bytes to underlying stream */ 
-uint_t       (*x_getpostn)(\|);     /* returns bytes off from beginning */ 
-bool_t       (*x_setpostn)(\|);     /* reposition the stream */ 
-rpc_inline_t *(*x_inline)(\|);      /* buf quick ptr to buffered data */ 
-void         (*x_destroy)(\|);      /* free privates of this xdr_stream */ 
-bool_t       (*x_control)(\|);      /* changed/retrieve client object info*/ 
-bool_t       (*x_getint32)(\|);     /* get int from underlying stream */ 
-bool_t       (*x_putint32)(\|);     /* put int to underlying stream */ 
+bool_t       (*x_getlong)(\|);      /* get long from underlying stream */
+bool_t       (*x_putlong)(\|);      /* put long to underlying stream */
+bool_t       (*x_getbytes)(\|);     /* get bytes from underlying stream */
+bool_t       (*x_putbytes)(\|);     /* put bytes to underlying stream */
+uint_t       (*x_getpostn)(\|);     /* returns bytes off from beginning */
+bool_t       (*x_setpostn)(\|);     /* reposition the stream */
+rpc_inline_t *(*x_inline)(\|);      /* buf quick ptr to buffered data */
+void         (*x_destroy)(\|);      /* free privates of this xdr_stream */
+bool_t       (*x_control)(\|);      /* changed/retrieve client object info*/
+bool_t       (*x_getint32)(\|);     /* get int from underlying stream */
+bool_t       (*x_putint32)(\|);     /* put int to underlying stream */
 
-} *x_ops; 
+} *x_ops;
 
-caddr_t      x_public;             /* users' data */ 
-caddr_t      x_priv                /* pointer to private data */ 
-caddr_t      x_base;               /* private used for position info */ 
-int          x_handy;              /* extra private word */  
+caddr_t      x_public;             /* users' data */
+caddr_t      x_priv                /* pointer to private data */
+caddr_t      x_base;               /* private used for position info */
+int          x_handy;              /* extra private word */
 XDR;
 .fi
 .in -2
@@ -405,1068 +385,874 @@ The following table lists  \fBRPC\fR routines and the manual reference pages on
 which they are described:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC Routine\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBManual Reference Page\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_destroy\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_auth\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdes_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdes_getucred\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdes_seccreate\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthnone_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_auth\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthsys_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_auth\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthsys_create_default\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_auth\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthunix_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthunix_create_default\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcallrpc\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_broadcast\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_call\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_control\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_destroy\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_dg_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_freeres\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_geterr\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_pcreateerror\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_perrno\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_perror\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_raw_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_spcreateerror\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_sperrno\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_sperror\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_tli_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_tp_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_udpcreate\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_vc_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclntraw_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnttcp_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclntudp_bufcreate\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget_myaddress\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetnetname\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost2netname\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_decryptsession\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_encryptsession\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_gendes\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_setsecret\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetname2host\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetname2user\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_getmaps\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_getport\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_rmtcall\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_set\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmap_unset\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBregisterrpc\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_broadcast\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_broadcast_exp\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_call\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_clnt_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_reg\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_destroy\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_dg_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_dg_enablecache\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_fd_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_fds\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_freeargs\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getargs\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getcaller\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getreq\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getreqset\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_getrpccaller\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_raw_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_reg\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_register\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_run\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_sendreply\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_reg\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_tli_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_tp_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_unreg\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_unregister\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_vc_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_auth\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_decode\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_noproc\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_noprog\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_progvers\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_systemerr\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcerr_weakauth\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_err\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcfd_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcraw_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvctcp_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcudp_bufcreate\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvcudp_create\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser2netname\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBsecure_rpc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_accepted_reply\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_authsys_parms\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_authunix_parms\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_soc\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_callhdr\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_callmsg\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_opaque_auth\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_rejected_reply\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_replymsg\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_xdr\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxprt_register\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxprt_unregister\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBrpc_svc_calls\fR(3NSL)
 .RE
 
@@ -1482,13 +1268,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

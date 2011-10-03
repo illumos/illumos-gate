@@ -3,21 +3,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_device_copy 9F "15 Nov 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DEVICE_COPY 9F "Nov 15, 1996"
 .SH NAME
 ddi_device_copy \- copy data from one device register to another device
 register
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBddi_device_copy\fR(\fBddi_acc_handle_t\fR \fIsrc_handle\fR, \fBcaddr_t\fR \fIsrc_addr\fR, 
+\fBint\fR \fBddi_device_copy\fR(\fBddi_acc_handle_t\fR \fIsrc_handle\fR, \fBcaddr_t\fR \fIsrc_addr\fR,
      \fBssize_t\fR \fIsrc_advcnt\fR, \fBddi_acc_handle_t\fR \fIdest_handle\fR,
-     \fBcaddr_t\fR \fIdest_addr\fR, \fBssize_t\fR \fIdest_advcnt\fR, 
+     \fBcaddr_t\fR \fIdest_addr\fR, \fBssize_t\fR \fIdest_advcnt\fR,
      \fBsize_t\fR \fIbytecount\fR, \fBuint_t\fR \fIdev_datasz\fR);
 .fi
 
@@ -28,131 +28,107 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrc_handle\fR \fR
 .ad
 .RS 16n
-.rt  
 The data access handle of the source device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrc_addr\fR \fR
 .ad
 .RS 16n
-.rt  
 Base data source address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrc_advcnt\fR \fR
 .ad
 .RS 16n
-.rt  
 Number of  \fIdev_datasz\fR units to advance on every access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdest_handle\fR \fR
 .ad
 .RS 16n
-.rt  
 The data access handle of the destination device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdest_addr\fR \fR
 .ad
 .RS 16n
-.rt  
 Base data destination address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdest_advcnt\fR \fR
 .ad
 .RS 16n
-.rt  
 Number of  \fIdev_datasz\fR units to advance on every access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbytecount\fR \fR
 .ad
 .RS 16n
-.rt  
 Number of bytes to transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_datasz\fR \fR
 .ad
 .RS 16n
-.rt  
 The size of each data word. Possible values are defined as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ01_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 1 byte data size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ02_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 2 bytes data size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ04_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 4 bytes data size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DATA_SZ08_ACC\fR \fR
 .ad
 .RS 22n
-.rt  
 8 bytes data size
 .RE
 
@@ -190,23 +166,19 @@ access. The data size must be the same between the source and destination.
 \fBddi_device_copy()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 Successfully transferred the data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 The byte count is not a multiple \fIdev_datasz\fR.
 .RE
 

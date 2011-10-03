@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -40,9 +41,7 @@ extern "C" {
  * but do not need all the capabilities of SCSA.  So we make quite a few
  * simplifications:
  *
- * 1) Device block size is fixed at 512 bytes.  (Devices with larger
- *    block sizes can still operate, but will need to support some
- *    form of read-modify-write, and will take a performance penalty.)
+ * 1) Device block size is a multiple of 512 bytes.
  *
  * 2) Non-rotating media.  We assume a simple linear layout.
  *
@@ -89,6 +88,7 @@ struct bd_xfer {
 	ddi_dma_cookie_t	x_dmac;
 	unsigned		x_ndmac;
 	caddr_t			x_kaddr;
+	unsigned		x_flags;
 };
 
 #define	BD_XFER_POLL		(1U << 0)	/* no interrupts (dump) */
@@ -130,7 +130,6 @@ struct bd_ops {
 	int	(*o_sync_cache)(void *, bd_xfer_t *);
 	int	(*o_read)(void *, bd_xfer_t *);
 	int	(*o_write)(void *, bd_xfer_t *);
-	int	(*o_dump)(void *, bd_xfer_t *);
 };
 
 #define	BD_OPS_VERSION_0		0

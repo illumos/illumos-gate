@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getpflags 2 "4 Jun 2009" "SunOS 5.11" "System Calls"
+.TH GETPFLAGS 2 "Jun 4, 2009"
 .SH NAME
 getpflags, setpflags \- get or set process flags
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ current per-process flags.
 The following values for \fIflag\fR are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_AWARE\fR\fR
 .ad
@@ -45,7 +44,6 @@ for a discussion of this flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_AWARE_RESET\fR\fR
 .ad
@@ -65,7 +63,6 @@ through calling \fBsetppriv\fR(2) or by setting \fBPRIV_AWARE\fR to 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRIV_DEBUG\fR\fR
 .ad
@@ -78,7 +75,6 @@ set and unset this flag at will.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNET_MAC_AWARE\fR\fR
 .ad
@@ -118,12 +114,10 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBgetpflags()\fR and \fBsetpflags()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIflag\fR or the value to which the \fIflag\fR is set is out of
 range.
 .RE
@@ -133,12 +127,10 @@ range.
 The \fBsetpflags()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 An attempt was made to unset \fBPRIV_AWARE\fR but the observed set invariance
 condition was not met.
 .RE
@@ -151,15 +143,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

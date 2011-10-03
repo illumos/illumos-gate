@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 
@@ -134,9 +135,6 @@ int zsh_h_log_n[2];
 	if (r0 & ZSRR0_BREAK) zsh_h_log_add('B'); \
 	}
 #endif
-
-
-char _depends_on[] = "drv/zs";
 
 #ifndef	MAXZSH
 #define	MAXZSH	2

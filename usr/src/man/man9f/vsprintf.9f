@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vsprintf 9F "6 May 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH VSPRINTF 9F "May 6, 1996"
 .SH NAME
 vsprintf \- format characters in memory
 .SH SYNOPSIS
@@ -26,34 +26,28 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a character string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfmt\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a character string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a variable argument list.
 .RE
 
@@ -95,12 +89,10 @@ any other conversion character is ignored.
 A character indicating the type of conversion to be applied:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR,\fBD\fR,\fBo\fR,\fBO\fR,\fBx\fR,\fBX\fR,\fBu\fR\fR
 .ad
 .RS 17n
-.rt  
 The integer argument is converted to signed decimal (\fBd\fR, \fBD\fR),
 unsigned octal (\fBo\fR, \fBO\fR), unsigned hexadecimal (\fBx\fR, \fBX\fR) or
 unsigned decimal (\fBu\fR), respectively, and copied. The letters \fBabcdef\fR
@@ -110,23 +102,19 @@ conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 17n
-.rt  
 The character value of the argument is copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 17n
-.rt  
 This conversion uses two additional arguments. The first is an integer, and is
 converted according to the base specified in the second argument. The second
 argument is a character string in the form
@@ -139,12 +127,10 @@ the next bit number or terminating null, supply the name of the bit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
 .RS 17n
-.rt  
 A bit number is a binary-valued character in the range \fB1-32\fR. For each bit
 set in the first argument, and named in the second argument, the bit names are
 copied, separated by commas, and bracketed by \fB<\fR and \fB>\fR. Thus, the
@@ -154,23 +140,19 @@ following function call would generate \fBreg=3<BitTwo,BitOne>\en\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fR
 .ad
 .RS 17n
-.rt  
 \fBvsprintf(buf, "reg=%b\en", 3, "\e10\e2BitTwo\e1BitOne")\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 17n
-.rt  
 The argument is taken to be a string (character pointer), and characters from
 the string are copied until a null character is encountered.  If the character
 pointer is \fINULL\fR on \fBSPARC\fR, the string \fB<nullstring>\fR is used in
@@ -179,12 +161,10 @@ its place; on x86, it is undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 17n
-.rt  
 Copy a \fB%\fR; no argument is converted.
 .RE
 

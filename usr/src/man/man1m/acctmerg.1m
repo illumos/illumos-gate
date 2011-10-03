@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acctmerg 1M "22 Feb 1999" "SunOS 5.11" "System Administration Commands"
+.TH ACCTMERG 1M "Feb 22, 1999"
 .SH NAME
 acctmerg \- merge or add total accounting files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/acct/acctmerg\fR [\fB-a\fR] [\fB-i\fR] [\fB-p\fR] [\fB-t\fR] [\fB-u\fR] [\fB-v\fR] 
+\fB/usr/lib/acct/acctmerg\fR [\fB-a\fR] [\fB-i\fR] [\fB-p\fR] [\fB-t\fR] [\fB-u\fR] [\fB-v\fR]
      [\fIfilename\fR] ...
 .fi
 
@@ -24,67 +24,55 @@ keys.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce output in \fBASCII\fR version of \fBtacct\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce input in \fBASCII\fR version of \fBtacct\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Print input with no processing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce a single record that totals all input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Summarize by user \fBID,\fR rather than by user \fBID\fR and name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce output in verbose \fBASCII\fR format, with more precise notation for
 floating-point numbers.
 .RE
@@ -100,7 +88,7 @@ format:
 .sp
 .in +2
 .nf
-example% acctmerg \|\|\fB-v\fR \|<\fIfilename1\fR\fB\|>\fR\fIfilename2\fR 
+example% acctmerg \|\|\fB-v\fR \|<\fIfilename1\fR\fB\|>\fR\fIfilename2\fR
 .fi
 .in -2
 .sp
@@ -112,7 +100,7 @@ Edit \fIfilename2\fR as you want:
 .sp
 .in +2
 .nf
-\fBexample% acctmerg \|\|\fR\fB-i\fR\fB \|\fR\fI<filename2\fR\fB\|>\fR\fIfilename1\fR 
+\fBexample% acctmerg \|\|\fR\fB-i\fR\fB \|\fR\fI<filename2\fR\fB\|>\fR\fIfilename1\fR
 .fi
 .in -2
 .sp

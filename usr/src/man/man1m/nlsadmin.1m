@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nlsadmin 1M "3 Apr 1997" "SunOS 5.11" "System Administration Commands"
+.TH NLSADMIN 1M "Apr 3, 1997"
 .SH NAME
 nlsadmin \- network listener service administration
 .SH SYNOPSIS
@@ -29,7 +29,7 @@ nlsadmin \- network listener service administration
 
 .LP
 .nf
-\fB/usr/sbin/nlsadmin\fR \fB-c\fR \fIcmd\fR | \fB-o\fR \fIstreamname\fR [\fB-p\fR \fImodules\fR] 
+\fB/usr/sbin/nlsadmin\fR \fB-c\fR \fIcmd\fR | \fB-o\fR \fIstreamname\fR [\fB-p\fR \fImodules\fR]
      [\fB-A\fR \fIaddress\fR | \fB-D\fR] [\fB-R\fR \fIprognum\fR : \fIversnum\fR]
 .fi
 
@@ -72,7 +72,6 @@ those services are put into effect immediately.
 arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -83,7 +82,6 @@ Report the status of all of the listener processes installed on this machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInet_spec\fR\fR
 .ad
@@ -94,7 +92,6 @@ Print the status of the listener process for \fInet_spec\fR \fI\&.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fInet_spec\fR\fR
 .ad
@@ -109,7 +106,6 @@ active, the exit code will be \fB1\fR; the exit code will be greater than
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fInet_spec\fR\fR
 .ad
@@ -123,7 +119,6 @@ before the server is started.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIservice_code net_spec\fR\fR
 .ad
@@ -135,7 +130,6 @@ code \fIservice_code,\fR giving the same information as in the \fB-v\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-q\fR\fB \fR\fB-z\fR \fIservice_code net_spec\fR\fR
 .ad
@@ -148,7 +142,6 @@ Query the status of the service with service code \fIservice_code\fR on network
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR \fIaddress net_spec\fR\fR
 .ad
@@ -166,7 +159,6 @@ A change of address takes effect immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIaddress net_spec\fR\fR
 .ad
@@ -181,7 +173,6 @@ configured as service code 1 (see the \fB-a\fR option, below).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fInet_spec\fR\fR
 .ad
@@ -196,7 +187,6 @@ listener must be initialized before assigning addresses or services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIservice_code\fR\fR
 .ad
@@ -242,7 +232,6 @@ services for a new network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-r\fR \fIservice_code net_spec\fR\fR
 .ad
@@ -255,7 +244,6 @@ a service from a machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fIservice_code net_spec\fR\fR
 .ad
@@ -275,7 +263,6 @@ unaffected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-s\fR \fInet_spec\fR\fR
 .ad
@@ -313,7 +300,6 @@ primary, or default, listener for a particular \fInet_spec\fR.
 commands. In that capacity, the following combinations of options can be used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -326,7 +312,6 @@ standard output. It is used as part of the \fBsacadm\fR command line when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcmd\fR | \fB-o\fR \fIstreamname\fR [ \fB-p\fR \fImodules\fR ] [
 \fB-A\fR \fIaddress\fR | \fB-D\fR ] [ \fB-R\fR \fIprognum\fR : \fIversnum\fR

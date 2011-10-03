@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pcata 7D "2 Mar 2007" "SunOS 5.11" "Devices"
+.TH PCATA 7D "Mar 2, 2007"
 .SH NAME
 pcata \- PCMCIA ATA card device driver
 .SH SYNOPSIS
@@ -54,17 +54,16 @@ have the following:
 
 .sp
 .TS
-tab() box;
-lw(1.49i) |lw(2.08i) |lw(1.93i) 
-lw(1.49i) |lw(2.08i) |lw(1.93i) 
-.
-\fBPlatform\fR\fB/devices name\fR\fB/dev/dsk name\fR
+box;
+l | l | l
+l | l | l .
+\fBPlatform\fR	\fB/devices name\fR	\fB/dev/dsk name\fR
 _
-\fBx86\fR\fB/devices/isa/pcic@1,3e0 /disk@0:a\fR/dev/dsk/c1d0s0
+\fBx86\fR	\fB/devices/isa/pcic@1,3e0 /disk@0:a\fR	/dev/dsk/c1d0s0
 _
-SPARCT{
+SPARC	T{
 \fB/devices/iommu@f,e0000000 /sbus@f,e0001000 /SUNW, pcmcia@3,0 /disk@0:a\fR
-T}/dev/dsk/c1d0s0
+T}	/dev/dsk/c1d0s0
 .TE
 
 .SH PRECONFIGURATION
@@ -218,12 +217,10 @@ menu. For more information, see the \fBformat\fR(1M) man page.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/pcata\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBpcata\fR driver
 .RE
 

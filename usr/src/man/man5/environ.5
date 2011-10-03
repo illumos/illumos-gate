@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH environ 5 "19 Nov 2002" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH ENVIRON 5 "Nov 19, 2002"
 .SH NAME
 environ \- user environment
 .SH DESCRIPTION
@@ -28,7 +28,6 @@ The following environmental variables can be used by applications and are
 expected to be set in the target run-time environment.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
@@ -40,7 +39,6 @@ file; see \fBpasswd\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLANG\fR\fR
 .ad
@@ -68,7 +66,6 @@ The following environment variables correspond to each category of
 \fBsetlocale\fR(3C):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_ALL\fR\fR
 .ad
@@ -80,7 +77,6 @@ and all the other \fBLC_*\fRvariables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_COLLATE\fR\fR
 .ad
@@ -94,7 +90,6 @@ the \fBlocaledef\fR(1) command.   This environment variable affects
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
@@ -115,7 +110,6 @@ corresponding to this category is stored in a database created by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
@@ -130,7 +124,6 @@ another database with German messages. Message databases are created by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MONETARY\fR\fR
 .ad
@@ -144,7 +137,6 @@ is used by \fBlocaleconv\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
@@ -159,7 +151,6 @@ is used by \fBlocaleconv\fR(3C), \fBprintf\fR(3C), and \fBstrtod\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
@@ -177,7 +168,6 @@ environment variable is used by many commands and functions; for example:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSGVERB\fR\fR
 .ad
@@ -190,7 +180,6 @@ messages are displayed to \fBstderr\fR; see  \fBfmtmsg\fR(1) and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNETPATH\fR\fR
 .ad
@@ -211,7 +200,6 @@ the \fBNETPATH\fR environment variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNLSPATH\fR\fR
 .ad
@@ -238,7 +226,6 @@ Substitution fields consist of a \fB%\fR symbol, followed by a single-letter
 keyword. The following keywords are currently defined:
 .sp
 .ne 2
-.mk
 .na
 \fB%N\fR
 .ad
@@ -249,7 +236,6 @@ The value of the \fIname\fR parameter passed to \fBcatopen()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%L\fR
 .ad
@@ -260,7 +246,6 @@ The value of \fBLANG\fR or \fBLC_MESSAGES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%l\fR
 .ad
@@ -271,7 +256,6 @@ The language element from \fBLANG\fR or \fBLC_MESSAGES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%t\fR
 .ad
@@ -282,7 +266,6 @@ The territory element from \fBLANG\fR or \fBLC_MESSAGES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%c\fR
 .ad
@@ -293,7 +276,6 @@ The codeset element from \fBLANG\fR or \fBLC_MESSAGES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%%\fR
 .ad
@@ -333,7 +315,6 @@ associated with message catalogs transparent to both programs and users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
@@ -348,7 +329,6 @@ file known by an incomplete path name. The prefixes are separated by colons
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSEV_LEVEL\fR\fR
 .ad
@@ -361,7 +341,6 @@ format error messages; see  \fBaddseverity\fR(3C), \fBfmtmsg\fR(1), and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERM\fR\fR
 .ad
@@ -374,7 +353,6 @@ of that terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
@@ -414,7 +392,6 @@ Otherwise, \fBTZ\fR is of the second form, which when expanded is as follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstd\fR and \fIdst\fR\fR
 .ad
@@ -452,7 +429,6 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
@@ -481,7 +457,6 @@ Meridian (which can be indicated by an optional preceding "\fI+\fR" sign).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstart\fR/\fItime\fR,\|\fIend\fR/\fItime\fR\fR
 .ad
@@ -496,7 +471,6 @@ made.
 The formats of \fIstart\fR and \fIend\fR are one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBJ\fR\fIn\fR\fR
 .ad
@@ -509,7 +483,6 @@ impossible to refer to the occasional February 29.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
@@ -521,7 +494,6 @@ it is possible to refer to February 29.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fIm.n.d\fR\fR
 .ad

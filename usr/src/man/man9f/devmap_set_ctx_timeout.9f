@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_set_ctx_timeout 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DEVMAP_SET_CTX_TIMEOUT 9F "Jan 16, 2006"
 .SH NAME
 devmap_set_ctx_timeout \- set the timeout value for the context management
 callback
@@ -25,23 +25,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR\fR
 .ad
 .RS 9n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIticks\fR\fR
 .ad
 .RS 9n
-.rt  
 Number of clock ticks to wait between successive calls to the context
 management callback function.
 .RE

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sysbus 4 "18 Nov 2004" "SunOS 5.11" "File Formats"
+.TH SYSBUS 4 "Nov 18, 2004"
 .SH NAME
 sysbus, isa \- device tree properties for ISA bus device drivers
 .SH DESCRIPTION
@@ -27,12 +27,10 @@ The \fBISA\fR nexus drivers all belong to class \fBsysbus\fR. All bus drivers
 of class \fBsysbus\fR recognize the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinterrupts\fR\fR
 .ad
 .RS 16n
-.rt  
 An arbitrary-length array where each element of the array represents a hardware
 interrupt (IRQ) that is used by the device.  In general, this array only has
 one entry unless a particular device uses more than one IRQ.
@@ -60,12 +58,10 @@ Only devices that generate interrupts have an \fBinterrupts\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreg\fR\fR
 .ad
 .RS 16n
-.rt  
 An arbitrary-length array where each element of the array consists of a 3-tuple
 of integers.  Each array element describes a contiguous memory address range
 associated with the device on the bus.
@@ -101,12 +97,10 @@ register space from a high-level interrupt context.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdma-channels\fR\fR
 .ad
 .RS 16n
-.rt  
 A list of integers that specifies the DMA channels used by this device. Only
 devices that use DMA channels have a \fBdma-channels\fR property.
 .RE
@@ -119,13 +113,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

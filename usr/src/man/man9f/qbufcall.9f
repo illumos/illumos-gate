@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH qbufcall 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH QBUFCALL 9F "Jan 16, 2006"
 .SH NAME
 qbufcall \- call a function when a buffer becomes available
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ qbufcall \- call a function when a buffer becomes available
 
 
 
-\fBbufcall_id_t\fR \fBqbufcall\fR(\fBqueue_t *\fR\fIq\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR, 
+\fBbufcall_id_t\fR \fBqbufcall\fR(\fBqueue_t *\fR\fIq\fR, \fBsize_t\fR \fIsize\fR, \fBuint_t\fR \fIpri\fR,
      \fBvoid\fR(\fI*func\fR)(\fBvoid\fR \fI*arg\fR), \fBvoid\fR \fI*arg\fR);
 .fi
 
@@ -25,56 +25,46 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIq\fR\fR
 .ad
 .RS 8n
-.rt  
 Pointer to \fBSTREAMS \fRqueue structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 8n
-.rt  
 Number of bytes required for the buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpri\fR\fR
 .ad
 .RS 8n
-.rt  
 Priority of the \fBallocb\fR(9F) allocation request (not used).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfunc\fR\fR
 .ad
 .RS 8n
-.rt  
 Function or driver routine to be called when a buffer becomes available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 8n
-.rt  
 Argument to the function to be called when a buffer becomes available.
 .RE
 

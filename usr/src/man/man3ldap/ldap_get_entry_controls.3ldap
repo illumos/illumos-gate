@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldap_get_entry_controls 3LDAP "6 Jan 2003" "SunOS 5.11" "LDAP Library Functions"
+.TH LDAP_GET_ENTRY_CONTROLS 3LDAP "Jan 6, 2003"
 .SH NAME
 ldap_get_entry_controls \- get the LDAP controls included with a directory
 entry in a set of search results
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR\fB-flag \&.\|.\|.\fR \fIfile\fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR] 
+\fBcc\fR\fB-flag \&.\|.\|.\fR \fIfile\fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR]
 #include <ldap.h>
 
 \fBint\fR \fBldap_get_entry_controls\fR(\fBLDAP *\fR\fIld\fR, \fBLDAPMessage *\fR\fIentry\fR,
@@ -39,45 +39,37 @@ are returned with results sent from the server. You can call
 \fBldap_get_entry_controls()\fR returns the following error codes.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_SUCCESS\fR\fR
 .ad
 .RS 23n
-.rt  
 LDAP controls were successfully retrieved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_DECODING_ERROR\fR\fR
 .ad
 .RS 23n
-.rt  
 An error occurred when decoding the BER-encoded message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_PARAM_ERROR\fR\fR
 .ad
 .RS 23n
-.rt  
 An invalid parameter was passed to the function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NO_MEMORY\fR\fR
 .ad
 .RS 23n
-.rt  
 Memory cannot be allocated.
 .RE
 
@@ -89,13 +81,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

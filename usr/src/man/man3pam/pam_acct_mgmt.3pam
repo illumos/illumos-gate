@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_acct_mgmt 3PAM "13 Oct 1998" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_ACCT_MGMT 3PAM "Oct 13, 1998"
 .SH NAME
 pam_acct_mgmt \- perform PAM account validation procedures
 .SH SYNOPSIS
@@ -30,23 +30,19 @@ The \fIpamh\fR argument is an authentication handle obtained by a prior call to
 \fBpam_start()\fR. The following flags may be set in the \fIflags\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SILENT\fR\fR
 .ad
 .RS 29n
-.rt  
 The account management service should not generate any messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
 .ad
 .RS 29n
-.rt  
 The account management service should return \fBPAM_NEW_AUTHTOK_REQD\fR if the
 user has a null authentication token.
 .RE
@@ -59,34 +55,28 @@ error return values described in \fBpam\fR(3PAM), the following values may be
 returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 24n
-.rt  
 User not known to underlying account management module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
 .ad
 .RS 24n
-.rt  
 New authentication token required. This is normally returned if the machine
 security policies require that the password should be changed because the
 password is  \fBNULL\fR or has aged.
@@ -94,12 +84,10 @@ password is  \fBNULL\fR or has aged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_ACCT_EXPIRED\fR\fR
 .ad
 .RS 24n
-.rt  
 User account has expired.
 .RE
 
@@ -111,15 +99,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

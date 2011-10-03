@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pthread_cond_wait 3C "11 Nov 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH PTHREAD_COND_WAIT 3C "Nov 11, 2008"
 .SH NAME
 pthread_cond_wait, pthread_cond_timedwait, pthread_cond_reltimedwait_np \- wait
 on a condition
@@ -17,7 +17,7 @@ on a condition
 .LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
-#include <pthread.h> 
+#include <pthread.h>
 
 \fBint\fR \fBpthread_cond_wait\fR(\fBpthread_cond_t *restrict\fR \fIcond\fR,
      \fBpthread_mutex_t *restrict\fR \fImutex\fR);
@@ -143,12 +143,10 @@ returned to indicate the error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 The mutex type is \fBPTHREAD_MUTEX_ERRORCHECK\fR or the mutex is a robust
 mutex, and the current thread does not own the mutex.
 .RE
@@ -158,12 +156,10 @@ mutex, and the current thread does not own the mutex.
 The  \fBpthread_cond_timedwait()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 13n
-.rt  
 The absolute time specified by \fIabstime\fR to \fBpthread_cond_timedwait()\fR
 has passed.
 .RE
@@ -173,23 +169,19 @@ has passed.
 The \fBpthread_cond_reltimedwait_np()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The value specified by \fIreltime\fR is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 13n
-.rt  
 The relative time specified by \fIreltime\fR to
 \fBpthread_cond_reltimedwait_np()\fR has passed.
 .RE
@@ -199,24 +191,20 @@ The relative time specified by \fIreltime\fR to
 These functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value specified by \fIcond\fR, \fImutex\fR, \fIabstime\fR, or \fIreltime\fR
 is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Different mutexes were supplied for concurrent operations on the same condition
 variable.
 .RE
@@ -232,24 +220,20 @@ the \fBpthread_mutex_lock\fR(3C) and \fBpthread_mutexattr_setrobust\fR(3C)
 manual pages.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOWNERDEAD\fR\fR
 .ad
 .RS 19n
-.rt  
 The last owner of this mutex died while holding the mutex, leaving the state it
 was protecting possibly inconsistent. The mutex is now owned by the caller.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTRECOVERABLE\fR\fR
 .ad
 .RS 19n
-.rt  
 The mutex was protecting state that has now been left irrecoverable. The mutex
 has not been acquired.
 .RE
@@ -262,15 +246,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

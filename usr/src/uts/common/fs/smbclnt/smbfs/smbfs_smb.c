@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -273,7 +274,7 @@ top:
 	if (cmd == SMB_TRANS2_QUERY_PATH_INFORMATION) {
 		mb_put_uint32le(mbp, 0);
 		/* mb_put_uint8(mbp, SMB_DT_ASCII); specs are wrong */
-		error = smbfs_fullpath(mbp, vcp, np, NULL, NULL, '\\');
+		error = smbfs_fullpath(mbp, vcp, np, NULL, 0, '\\');
 		if (error) {
 			smb_t2_done(t2p);
 			return (error);
@@ -800,7 +801,7 @@ smbfs_smb_query_info(struct smbnode *np, const char *name, int nmlen,
 	mb_put_uint8(mbp, SMB_DT_ASCII);
 
 	error = smbfs_fullpath(mbp, SSTOVC(ssp), np,
-	    name, &nmlen, '\\');
+	    name, nmlen, '\\');
 	if (error)
 		goto out;
 	smb_rq_bend(rqp);
@@ -865,7 +866,7 @@ smbfs_smb_setpattr1(struct smbnode *np, const char *name, int len,
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
 
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), np, name, &len, '\\');
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), np, name, len, '\\');
 	if (error)
 		goto out;
 	mb_put_uint8(mbp, SMB_DT_ASCII);
@@ -1057,7 +1058,7 @@ smbfs_smb_setfattrNT(
 	mb_put_uint32le(mbp, 0);		/* MBZ */
 
 	if (cmd == SMB_TRANS2_SET_PATH_INFORMATION) {
-		error = smbfs_fullpath(mbp, vcp, np, NULL, NULL, '\\');
+		error = smbfs_fullpath(mbp, vcp, np, NULL, 0, '\\');
 		if (error != 0)
 			goto out;
 	}
@@ -1096,21 +1097,6 @@ out:
 
 /*
  * Modern create/open of file or directory.
- *
- * If disp is ..._DISP_OPEN, or ...DISP_OPEN_IF, or...
- * then this is an open attempt, and:
- *   If xattr then name is the stream to be opened at np,
- *   Else np should be opened.
- *   ...we won't touch *fidp,
- *   ...we will set or clear *attrcacheupdated.
- * Else this is a creation attempt, and:
- *   If xattr then name is the stream to create at np,
- *   Else name is the thing to create under directory np.
- *   ...we will return *fidp,
- *   ...we won't touch *attrcacheupdated.
- *
- * Note, We use: disp = ...OPEN_IF, ...OVERWRITE_IF, etc.
- * now too, which may or may not create a new object.
  */
 int
 smbfs_smb_ntcreatex(
@@ -1124,119 +1110,33 @@ smbfs_smb_ntcreatex(
 	uint32_t disp,		/* open disposition */
 	uint32_t createopt,	/* NTCREATEX_OPTIONS_ */
 	struct smb_cred *scrp,
-	uint16_t *fidp,
-	uint32_t *cr_act_p,	/* create action */
-	struct smbfattr *fap)	/* optional */
+	uint16_t *fidp,		/* returned FID */
+	uint32_t *cr_act_p,	/* optional returned create action */
+	struct smbfattr *fap)	/* optional returned attributes */
 {
-	struct smb_rq rq, *rqp = &rq;
+	struct mbchain name_mb;
 	struct smb_share *ssp = np->n_mount->smi_share;
-	struct smb_vc *vcp = SSTOVC(ssp);
-	struct mbchain *mbp;
-	struct mdchain *mdp;
-	struct smbfattr fa;
-	uint8_t wc;
-	uint32_t longint, createact;
-	uint64_t llongint;
-	int error;
-	uint16_t fid, *namelenp;
+	int err;
 
-	bzero(&fa, sizeof (fa));
-	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_NT_CREATE_ANDX, scrp);
-	if (error)
-		return (error);
-	smb_rq_getrequest(rqp, &mbp);
-	smb_rq_wstart(rqp);
-	mb_put_uint8(mbp, 0xff);	/* secondary command */
-	mb_put_uint8(mbp, 0);		/* MBZ */
-	mb_put_uint16le(mbp, 0);	/* offset to next command (none) */
-	mb_put_uint8(mbp, 0);		/* MBZ */
-	namelenp = (uint16_t *)mb_reserve(mbp, sizeof (uint16_t));
-	/*
-	 * XP to a W2K Server does not use NTCREATEX_FLAGS_OPEN_DIRECTORY
-	 * for creating nor for opening a directory.  Samba ignores the bit.
-	 */
-	mb_put_uint32le(mbp, 0);	/* NTCREATEX_FLAGS_* */
-	mb_put_uint32le(mbp, 0);	/* FID - basis for path if not root */
-	mb_put_uint32le(mbp, req_acc);
-	mb_put_uint64le(mbp, 0);	/* "initial allocation size" */
-	mb_put_uint32le(mbp, efa);
-	mb_put_uint32le(mbp, share_acc);
-	mb_put_uint32le(mbp, disp);
-	mb_put_uint32le(mbp, createopt);
-	mb_put_uint32le(mbp, NTCREATEX_IMPERSONATION_IMPERSONATION); /* (?) */
-	mb_put_uint8(mbp, 0);   /* security flags (?) */
-	smb_rq_wend(rqp);
-	smb_rq_bstart(rqp);
+	mb_init(&name_mb);
 
 	if (name == NULL)
 		nmlen = 0;
-	error = smbfs_fullpath(mbp, vcp, np, name, &nmlen,
-	    xattr ? ':' : '\\');
-	if (error)
-		goto done;
-	*namelenp = htoles(nmlen); /* includes null */
-	smb_rq_bend(rqp);
-	/*
-	 * Don't want to risk missing a successful
-	 * open response, or we could "leak" FIDs.
-	 */
-	rqp->sr_flags |= SMBR_NOINTR_RECV;
-	error = smb_rq_simple_timed(rqp, smb_timo_open);
-	if (error)
-		goto done;
-	smb_rq_getreply(rqp, &mdp);
-	/*
-	 * spec says 26 for word count, but 34 words are defined
-	 * and observed from win2000
-	 */
-	error = md_get_uint8(mdp, &wc);
-	if (error)
-		goto done;
-	if (wc != 26 && wc != 34 && wc != 42) {
-		error = EBADRPC;
-		goto done;
-	}
-	md_get_uint8(mdp, NULL);		/* secondary cmd */
-	md_get_uint8(mdp, NULL);		/* mbz */
-	md_get_uint16le(mdp, NULL);		/* andxoffset */
-	md_get_uint8(mdp, NULL);		/* oplock lvl granted */
-	md_get_uint16le(mdp, &fid);		/* file ID */
-	md_get_uint32le(mdp, &createact);	/* create_action */
+	err = smbfs_fullpath(&name_mb, SSTOVC(ssp),
+	    np, name, nmlen, xattr ? ':' : '\\');
+	if (err)
+		goto out;
 
-	md_get_uint64le(mdp, &llongint);	/* creation time */
-	smb_time_NT2local(llongint, &fa.fa_createtime);
-	md_get_uint64le(mdp, &llongint);	/* access time */
-	smb_time_NT2local(llongint, &fa.fa_atime);
-	md_get_uint64le(mdp, &llongint);	/* write time */
-	smb_time_NT2local(llongint, &fa.fa_mtime);
-	md_get_uint64le(mdp, &llongint);	/* change time */
-	smb_time_NT2local(llongint, &fa.fa_ctime);
+	err = smb_smb_ntcreate(ssp, &name_mb,
+	    0,	/* NTCREATEX_FLAGS... */
+	    req_acc, efa, share_acc, disp, createopt,
+	    NTCREATEX_IMPERSONATION_IMPERSONATION,
+	    scrp, fidp, cr_act_p, fap);
 
-	md_get_uint32le(mdp, &longint);		/* attributes */
-	fa.fa_attr = longint;
+out:
+	mb_done(&name_mb);
 
-	md_get_uint64le(mdp, &llongint);	/* allocation size */
-	fa.fa_allocsz = llongint;
-
-	md_get_uint64le(mdp, &llongint);	/* EOF position */
-	fa.fa_size = llongint;
-
-	error = md_get_uint16le(mdp, NULL);	/* file type */
-	/* other stuff we don't care about */
-
-done:
-	smb_rq_done(rqp);
-	if (error)
-		return (error);
-
-	if (fidp)
-		*fidp = fid;
-	if (cr_act_p)
-		*cr_act_p = createact;
-	if (fap)
-		*fap = fa; /* struct copy */
-
-	return (0);
+	return (err);
 }
 
 static uint32_t
@@ -1335,7 +1235,7 @@ smbfs_smb_oldopen(
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
 
-	error = smbfs_fullpath(mbp, vcp, np, name, &nmlen,
+	error = smbfs_fullpath(mbp, vcp, np, name, nmlen,
 	    xattr ? ':' : '\\');
 	if (error)
 		goto done;
@@ -1514,40 +1414,13 @@ smbfs_smb_open(
 }
 
 int
-smbfs_smb_close(struct smb_share *ssp, uint16_t fid, struct timespec *mtime,
-	struct smb_cred *scrp)
+smbfs_smb_close(struct smb_share *ssp, uint16_t fid,
+	struct timespec *mtime,	struct smb_cred *scrp)
 {
-	struct smb_rq rq, *rqp = &rq;
-	struct mbchain *mbp;
-	long time;
 	int error;
 
-	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_CLOSE, scrp);
-	if (error)
-		return (error);
-	smb_rq_getrequest(rqp, &mbp);
-	smb_rq_wstart(rqp);
-	mb_put_uint16le(mbp, fid);
-	if (mtime) {
-		int sv_tz = SSTOVC(ssp)->vc_sopt.sv_tz;
-		smb_time_local2server(mtime, sv_tz, &time);
-	} else
-		time = 0;
-	mb_put_uint32le(mbp, time);
-	smb_rq_wend(rqp);
-	smb_rq_bstart(rqp);
-	smb_rq_bend(rqp);
+	error = smb_smb_close(ssp, fid, mtime, scrp);
 
-	/*
-	 * We don't really care about the result here, but we
-	 * do need to make sure we send this out, or we could
-	 * "leak" open file handles on interrupt or timeout.
-	 * The NOINTR_SEND flag makes this request immune to
-	 * interrupt or timeout until the send is done.
-	 */
-	rqp->sr_flags |= SMBR_NOINTR_SEND;
-	error = smb_rq_simple(rqp);
-	smb_rq_done(rqp);
 	/*
 	 * ENOTCONN isn't interesting - if the connection is closed,
 	 * so are all our FIDs - and EIO is also not interesting,
@@ -1596,7 +1469,7 @@ smbfs_smb_oldcreate(struct smbnode *dnp, const char *name, int nmlen,
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), dnp, name, &nmlen,
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), dnp, name, nmlen,
 	    xattr ? ':' : '\\');
 	if (error)
 		goto out;
@@ -1680,7 +1553,7 @@ smbfs_smb_delete(struct smbnode *np, struct smb_cred *scrp, const char *name,
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), np, name, &nmlen,
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), np, name, nmlen,
 	    xattr ? ':' : '\\');
 	if (!error) {
 		smb_rq_bend(rqp);
@@ -1718,7 +1591,7 @@ smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
 	 * passed sep is ignored, so just pass sep=0.
 	 */
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), src, NULL, NULL, 0);
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), src, NULL, 0, 0);
 	if (error)
 		goto out;
 
@@ -1727,7 +1600,7 @@ smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
 	 */
 	sep = (src->n_flag & N_XATTR) ? ':' : '\\';
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), tdnp, tname, &tnmlen, sep);
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), tdnp, tname, tnmlen, sep);
 	if (error)
 		goto out;
 
@@ -1759,11 +1632,11 @@ smbfs_smb_move(struct smbnode *src, struct smbnode *tdnp,
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
 
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), src, NULL, NULL, '\\');
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), src, NULL, 0, '\\');
 	if (error)
 		goto out;
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), tdnp, tname, &tnmlen, '\\');
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), tdnp, tname, tnmlen, '\\');
 	if (error)
 		goto out;
 	smb_rq_bend(rqp);
@@ -1791,7 +1664,7 @@ smbfs_smb_oldmkdir(struct smbnode *dnp, const char *name, int len,
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), dnp, name, &len, '\\');
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), dnp, name, len, '\\');
 	if (!error) {
 		smb_rq_bend(rqp);
 		error = smb_rq_simple(rqp);
@@ -1850,7 +1723,7 @@ smbfs_smb_rmdir(struct smbnode *np, struct smb_cred *scrp)
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	error = smbfs_fullpath(mbp, SSTOVC(ssp), np, NULL, NULL, '\\');
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), np, NULL, 0, '\\');
 	if (!error) {
 		smb_rq_bend(rqp);
 		error = smb_rq_simple(rqp);
@@ -1868,7 +1741,7 @@ smbfs_smb_search(struct smbfs_fctx *ctx)
 	struct mdchain *mdp;
 	uint8_t wc, bt;
 	uint16_t ec, dlen, bc;
-	int len, maxent, error, iseof = 0;
+	int maxent, error, iseof = 0;
 
 	maxent = min(ctx->f_left,
 	    (vcp->vc_txmax - SMB_HDRLEN - 2*2) / SMB_DENTRYLEN);
@@ -1889,9 +1762,8 @@ smbfs_smb_search(struct smbfs_fctx *ctx)
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);	/* buffer format */
 	if (ctx->f_flags & SMBFS_RDD_FINDFIRST) {
-		len = ctx->f_wclen;
-		error = smbfs_fullpath(mbp, vcp, ctx->f_dnp, ctx->f_wildcard,
-		    &len, '\\');
+		error = smbfs_fullpath(mbp, vcp, ctx->f_dnp,
+		    ctx->f_wildcard, ctx->f_wclen, '\\');
 		if (error)
 			return (error);
 		mb_put_uint8(mbp, SMB_DT_VARIABLE);
@@ -2029,7 +1901,7 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 	struct mbchain *mbp;
 	struct mdchain *mdp;
 	uint16_t ecnt, eos, lno, flags;
-	int len, error;
+	int error;
 
 	if (ctx->f_t2) {
 		smb_t2_done(ctx->f_t2);
@@ -2053,9 +1925,8 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		mb_put_uint16le(mbp, flags);
 		mb_put_uint16le(mbp, ctx->f_infolevel);
 		mb_put_uint32le(mbp, 0);
-		len = ctx->f_wclen;
-		error = smbfs_fullpath(mbp, vcp, ctx->f_dnp, ctx->f_wildcard,
-		    &len, '\\');
+		error = smbfs_fullpath(mbp, vcp, ctx->f_dnp,
+		    ctx->f_wildcard, ctx->f_wclen, '\\');
 		if (error)
 			return (error);
 	} else	{

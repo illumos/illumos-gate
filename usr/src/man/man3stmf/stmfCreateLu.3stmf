@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfCreateLu 3STMF "8 May 2009" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.TH STMFCREATELU 3STMF "May 8, 2009"
 .SH NAME
 stmfCreateLu \- create a logical unit
 .SH SYNOPSIS
@@ -18,24 +18,20 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lstmf [ \fIlibrary\fR... ]
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhdl\fR\fR
 .ad
 .RS 10n
-.rt  
 The logical unit resource returned from a previous call to
 \fBstmfCreateLuResource\fR(3STMF).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIluGuid\fR\fR
 .ad
 .RS 10n
-.rt  
 If non-null, it must contain a pointer to an \fBstmfGuid\fR structure allocated
 by the caller. On successful return from this API, it will contain the guid of
 the newly created logical unit. If \fIluGuid\fR is \fINULL\fR, this argument is
@@ -54,7 +50,6 @@ properties and their possible values.
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_STATUS_SUCCESS\fR\fR
 .ad
@@ -65,7 +60,6 @@ The API call was successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_FILE_IN_USE\fR\fR
 .ad
@@ -77,7 +71,6 @@ The filename specified by the \fBSTMF_LU_PROP_DATA_FILENAME\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_GUID_IN_USE\fR\fR
 .ad
@@ -89,7 +82,6 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_INVALID_BLKSIZE\fR\fR
 .ad
@@ -100,7 +92,6 @@ The blocksize specified by \fBSTMF_LU_PROP_BLOCK_SIZE\fR is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_WRITE_CACHE_SET\fR\fR
 .ad
@@ -111,7 +102,6 @@ The requested write cache setting could not be provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_SIZE_OUT_OF_RANGE\fR\fR
 .ad
@@ -122,7 +112,6 @@ The specified logical unit size is not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_META_FILE_NAME\fR\fR
 .ad
@@ -133,7 +122,6 @@ The specified meta file could not be accessed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_DATA_FILE_NAME\fR\fR
 .ad
@@ -150,15 +138,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

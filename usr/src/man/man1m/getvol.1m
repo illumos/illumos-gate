@@ -1,9 +1,9 @@
 '\" te
-.\"  Copyright 1989 AT&T   Copyright (c) 1997 Sun Microsystems, Inc.   All Rights Reserved.  
+.\"  Copyright 1989 AT&T   Copyright (c) 1997 Sun Microsystems, Inc.   All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getvol 1M "5 Jul 1990" "SunOS 5.11" "System Administration Commands"
+.TH GETVOL 1M "Jul 5, 1990"
 .SH NAME
 getvol \- verifies device accessibility
 .SH SYNOPSIS
@@ -30,71 +30,59 @@ information.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 12n
-.rt  
 Runs the command in non-interactive mode. The volume is assumed to be inserted
 upon command invocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fI label\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies that the label  \fIlabel\fR must exist on the inserted volume (can be
 overridden by the \fB-o\fR option).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 12n
-.rt  
 Formats the volume after insertion, using the format command defined for this
 device in the device table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 12n
-.rt  
 Formats the volume after insertion and places a file system on the device. Also
 uses the format command defined for this device in the device table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 12n
-.rt  
 Allows the administrator to override a label check.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 12n
-.rt  
 Allows administrator to write a new label on the device. User is prompted to
 supply the label text. This option is ineffective if the  \fB-n\fR option is
 enabled.
@@ -102,12 +90,10 @@ enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fI label\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies that the label  \fIlabel\fR must exist on the device. This option
 should be used in place of the  \fB-l\fR option when the label can only be
 verified by visual means. Use of the option causes a message to be displayed
@@ -121,12 +107,10 @@ asking the administrator to visually verify that the label is indeed
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the device to be verified for accessibility.
 .RE
 
@@ -136,47 +120,39 @@ Specifies the device to be verified for accessibility.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command syntax was incorrect, invalid option was used, or an internal error
 occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Device table could not be opened for reading.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/device.tab\fR\fR
 .ad
 .RS 19n
-.rt  
 
 .RE
 

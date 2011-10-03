@@ -22,8 +22,7 @@
 # uts/intel/st/Makefile
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the st driver
 #	kernel module.
@@ -74,6 +73,11 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+#
+# Depends on scsi
+#
+LDFLAGS         += -dy -N misc/scsi
 
 #
 #	Default build targets.

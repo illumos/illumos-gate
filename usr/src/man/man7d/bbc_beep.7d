@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bbc_beep 7D "18 Dec 2001" "SunOS 5.11" "Devices"
+.TH BBC_BEEP 7D "Dec 18, 2001"
 .SH NAME
 bbc_beep \-  Platform-dependent Beep driver for BBC-based hardware.
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ ioctl is issued to the USB keyboard module (see \fBusbkbm\fR(7M)) with command
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4u/kernel/drv/sparcv9/bbc_beep\fR\fR
 .ad
@@ -41,13 +40,12 @@ See attributes(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureBBC-based SPARC
+Architecture	BBC-based SPARC
 .TE
 
 .SH SEE ALSO

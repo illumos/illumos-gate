@@ -3,37 +3,37 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH install 1M "3 Nov 2005" "SunOS 5.11" "System Administration Commands"
+.TH INSTALL 1M "Nov 3, 2005"
 .SH NAME
 install \- install commands
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/install\fR \fB-c\fR \fIdira\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR] 
+\fB/usr/sbin/install\fR \fB-c\fR \fIdira\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR]
      [\fB-o\fR] [\fB-s\fR] \fIfile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/install\fR \fB-f\fR \fIdirb\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR] 
+\fB/usr/sbin/install\fR \fB-f\fR \fIdirb\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR]
      [\fB-o\fR] [\fB-s\fR] \fIfile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/install\fR \fB-n\fR \fIdirc\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR] 
+\fB/usr/sbin/install\fR \fB-n\fR \fIdirc\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR]
      [\fB-o\fR] [\fB-s\fR] \fIfile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/install\fR \fB-d\fR | \fB-i\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR] 
+\fB/usr/sbin/install\fR \fB-d\fR | \fB-i\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR]
      [\fB-o\fR] [\fB-s\fR] \fIdirx\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/install\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR] [\fB-o\fR] [\fB-s\fR] \fIfile\fR 
+\fB/usr/sbin/install\fR [\fB-m\fR \fImode\fR] [\fB-u\fR \fIuser\fR] [\fB-g\fR \fIgroup\fR] [\fB-o\fR] [\fB-s\fR] \fIfile\fR
      [\fIdirx\fR]...
 .fi
 
@@ -108,12 +108,10 @@ higher degree of compatibility with other Unix versions, use
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIdira\fR\fR
 .ad
 .RS 12n
-.rt  
 Install \fBfile\fR in the directory specified by \fIdira\fR, if \fBfile\fR does
 not yet exist. If it is found, \fBinstall\fR issues a message saying that the
 file already exists, and exits without overwriting it.
@@ -121,12 +119,10 @@ file already exists, and exits without overwriting it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdirb\fR\fR
 .ad
 .RS 12n
-.rt  
 Force \fBfile\fR to be installed in given directory, even if the file already
 exists. If the file being installed does not already exist, the mode and owner
 of the new file is set to \fB755\fR and \fBbin\fR \fB,\fR respectively. If the
@@ -135,12 +131,10 @@ file already exists, the mode and owner is that of the already existing file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIdirc\fR\fR
 .ad
 .RS 12n
-.rt  
 If \fBfile\fR is not found in any of the searched directories, it is put in the
 directory specified in \fIdirc\fR. The mode and owner of the new file is set to
 \fB755\fR and \fBbin\fR, respectively.
@@ -148,12 +142,10 @@ directory specified in \fIdirc\fR. The mode and owner of the new file is set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 12n
-.rt  
 Create a directory. Missing parent directories are created as required as in
 \fBmkdir \fR\fB-p\fR. If the directory already exists, the owner, group and
 mode is set to the values given on the command line.
@@ -161,59 +153,49 @@ mode is set to the values given on the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 12n
-.rt  
 Ignore default directory list, searching only through the given directories
 (\fIdirx\fR .\|.\|.).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImode\fR\fR
 .ad
 .RS 12n
-.rt  
 The mode of the new file is set to \fImode\fR. Set to \fB0755\fR by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser\fR\fR
 .ad
 .RS 12n
-.rt  
 The owner of the new file is set to \fIuser\fR. Only available to the
 super-user. Set to \fBbin\fR by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgroup\fR\fR
 .ad
 .RS 12n
-.rt  
 The group id of the new file is set to \fIgroup\fR. Only available to the
 super-user. Set to \fBbin\fR by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 12n
-.rt  
 If \fBfile\fR is found, save the ``found'' file by copying it to
 \fBOLD\fR\fBfile\fR in the directory in which it was found. This option is
 useful when installing a frequently used file such as \fB/bin/sh\fR or
@@ -222,12 +204,10 @@ useful when installing a frequently used file such as \fB/bin/sh\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 12n
-.rt  
 Suppress printing of messages other than error messages.
 .RE
 

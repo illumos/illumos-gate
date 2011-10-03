@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH port_alert 3C "1 Oct 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH PORT_ALERT 3C "Oct 1, 2003"
 .SH NAME
 port_alert \- set a port in alert mode
 .SH SYNOPSIS
@@ -77,45 +77,37 @@ Upon succesful completion, 0 is returned. Otherwise, -1 is returned and
 The \fBport_alert()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The port identifier is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADFD\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIport\fR argument is not an event port file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The port is already in alert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Mutually exclusive \fIflags\fR are set.
 .RE
 
@@ -127,17 +119,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architectureall
+Architecture	all
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

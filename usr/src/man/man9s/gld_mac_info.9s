@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gld_mac_info 9S "7 June 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH GLD_MAC_INFO 9S "Jun 7, 2004"
 .SH NAME
 gld_mac_info \- Generic LAN Driver MAC info data structure
 .SH SYNOPSIS
@@ -70,7 +70,7 @@ ddi_iblock_cookie_tgldm_cookie;            /* Device's interrupt */
                                             /* block cookie */
 int               gldm_margin              /* accepted data beyond */
                                             /*gldm_maxpkt */
-uint32_t          gldm_capabilities;       /* Device capabilities */ 
+uint32_t          gldm_capabilities;       /* Device capabilities */
 .fi
 .in -2
 .sp
@@ -81,12 +81,10 @@ Below is a description of the members of the \fBgld_mac_info\fR structure that
 are visible to the device driver.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_private\fR\fR
 .ad
 .RS 16n
-.rt  
 This structure member is private to the device-specific driver and is not used
 or modified by GLD. Conventionally, this is used as a pointer to private data,
 pointing to a driver-defined and driver-allocated per-instance data structure.
@@ -101,134 +99,110 @@ structure members, so changes made by the driver after calling
 \fBgld_register()\fR might cause unpredicted results.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_reset\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_start\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_stop\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_set_mac_addr\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_set_multicast\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_set_promiscuous\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_send\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_intr\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_get_stats\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_ioctl\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to driver entry point; can be \fINULL\fR; see \fBgld\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_ident\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to a string containing a short description of the device. It is used to
 identify the device in system messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_type\fR\fR
 .ad
 .RS 24n
-.rt  
 The type of device the driver handles. The values currently supported by GLD
 are \fBDL_ETHER\fR (IEEE 802.3 and Ethernet Bus), \fBDL_TPR\fR (IEEE 802.5
 Token Passing Ring), and \fBDL_FDDI\fR (ISO 9314-2 Fibre Distributed Data
@@ -241,12 +215,10 @@ in a future release of Solaris.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_minpkt\fR\fR
 .ad
 .RS 24n
-.rt  
 Minimum \fIService\fR \fIData\fR \fIUnit\fR size \(em the minimum packet size,
 not including the MAC header, that the device will transmit. This can be zero
 if the device-specific driver can handle any required padding.
@@ -254,12 +226,10 @@ if the device-specific driver can handle any required padding.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_maxpkt\fR\fR
 .ad
 .RS 24n
-.rt  
 Maximum \fIService\fR \fIData\fR \fIUnit\fR size \(em the maximum size of
 packet, not including the MAC header, that can be transmitted by the device.
 For Ethernet, this number is 1500.
@@ -267,24 +237,20 @@ For Ethernet, this number is 1500.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_addrlen\fR\fR
 .ad
 .RS 24n
-.rt  
 The length in bytes of physical addresses handled by the device. For Ethernet,
 Token Ring, and FDDI, the value of this structure member should be 6.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_saplen\fR\fR
 .ad
 .RS 24n
-.rt  
 The length in bytes of the Service Access Point (SAP) address used by the
 driver. For GLD-based drivers, this should always be set to -2, to indicate
 that two-byte SAP values are supported and that the SAP appears \fIafter\fR the
@@ -294,12 +260,10 @@ DL_INFO_ACK'' in the DLPI specification for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_broadcast_addr\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to an array of bytes of length \fBgldm_addrlen\fR containing the
 broadcast address to be used for transmit. The driver must allocate space to
 hold the broadcast address, fill it in with the appropriate value, and set
@@ -309,12 +273,10 @@ the broadcast address is normally 0xFF-FF-FF-FF-FF-FF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_vendor_addr\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to an array of bytes of length \fBgldm_addrlen\fR containing the
 vendor-provided network physical address of the device. The driver must
 allocate space to hold the address, fill it in with information read from the
@@ -323,12 +285,10 @@ device, and set \fBgldm_vendor_addr\fR to point at it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_ppa\fR\fR
 .ad
 .RS 24n
-.rt  
 The Physical Point of Attachment (PPA) number for this instance of the device.
 Normally this should be set to the instance number, returned from
 \fBddi_get_instance\fR(9F).
@@ -336,23 +296,19 @@ Normally this should be set to the instance number, returned from
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_devinfo\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to the \fBdev_info\fR node for this device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_cookie\fR\fR
 .ad
 .RS 24n
-.rt  
 The interrupt block cookie returned by \fBddi_get_iblock_cookie\fR(9F),
 \fBddi_add_intr\fR(9F), \fBddi_get_soft_iblock_cookie\fR(9F), or
 \fBddi_add_softintr\fR(9F). This must correspond to the device's receive
@@ -361,12 +317,10 @@ interrupt, from which \fBgld_recv()\fR is called.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_margin\fR\fR
 .ad
 .RS 24n
-.rt  
 Drivers set this value to the amount of data in bytes that the device can
 transmit beyond \fBgldm_maxpkt\fR. For example, if an Ethernet device can
 handle packets whose payload section is no greater than 1522 bytes and the
@@ -377,12 +331,10 @@ reported in acknowledgements of the DLIOCMARGININFO ioctl (see \fBdlpi\fR(7P)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgldm_capabilities\fR\fR
 .ad
 .RS 24n
-.rt  
 Bit-field of device capabilities. If the device is capable of reporting media
 link state, the GLD_CAP_LINKSTATE bit should be set.
 .RE

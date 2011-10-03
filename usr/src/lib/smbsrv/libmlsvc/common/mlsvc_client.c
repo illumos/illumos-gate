@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -29,19 +30,23 @@
 
 #include <sys/types.h>
 #include <sys/errno.h>
+#include <sys/fcntl.h>
 #include <sys/tzfile.h>
 #include <time.h>
 #include <strings.h>
 #include <assert.h>
+#include <errno.h>
 #include <thread.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <synch.h>
+
+#include <netsmb/smbfs_api.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/srvsvc.ndl>
+#include <libsmbrdr.h>
 #include <mlsvc.h>
 
 /*
@@ -137,10 +142,11 @@ int
 ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
     char *username, const char *service)
 {
-	ndr_client_t		*clnt;
+	struct smb_ctx		*ctx = NULL;
+	ndr_client_t		*clnt = NULL;
 	ndr_service_t		*svc;
 	srvsvc_server_info_t	svinfo;
-	int			fid;
+	int			fd = -1;
 	int			rc;
 
 	if (handle == NULL || server == NULL ||
@@ -167,48 +173,85 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	if (strcasecmp(service, "SRVSVC") != 0)
 		(void) ndr_svinfo_lookup(server, domain, &svinfo);
 
-	if ((clnt = malloc(sizeof (ndr_client_t))) == NULL)
-		return (-1);
-
-	fid = smbrdr_open_pipe(server, domain, username, svc->endpoint);
-	if (fid < 0) {
-		free(clnt);
-		return (-1);
+	/*
+	 * Setup smbfs library handle, authenticate, connect to
+	 * the IPC$ share.  This will reuse an existing connection
+	 * if the driver already has one for this combination of
+	 * server, user, domain.
+	 */
+	if ((rc = smbrdr_ctx_new(&ctx, server, domain, username)) != 0) {
+		syslog(LOG_ERR, "ndr_rpc_bind: "
+		    "smbrdr_ctx_new(S=%s, D=%s, U=%s), err=%d",
+		    server, domain, username, rc);
+		goto errout;
 	}
 
+	/*
+	 * Open the named pipe.
+	 */
+	fd = smb_fh_open(ctx, svc->endpoint, O_RDWR);
+	if (fd < 0) {
+		syslog(LOG_DEBUG, "ndr_rpc_bind: "
+		    "smb_fh_open, err=%d", errno);
+		goto errout;
+	}
+
+	/*
+	 * Setup the RPC client handle.
+	 */
+	if ((clnt = malloc(sizeof (ndr_client_t))) == NULL)
+		return (-1);
 	bzero(clnt, sizeof (ndr_client_t));
+
 	clnt->handle = &handle->handle;
-	clnt->fid = fid;
-
-	ndr_svc_binding_pool_init(&clnt->binding_list,
-	    clnt->binding_pool, NDR_N_BINDING_POOL);
-
 	clnt->xa_init = ndr_xa_init;
 	clnt->xa_exchange = ndr_xa_exchange;
 	clnt->xa_read = ndr_xa_read;
 	clnt->xa_preserve = ndr_xa_preserve;
 	clnt->xa_destruct = ndr_xa_destruct;
 	clnt->xa_release = ndr_xa_release;
+	clnt->xa_private = ctx;
+	clnt->xa_fd = fd;
 
+	ndr_svc_binding_pool_init(&clnt->binding_list,
+	    clnt->binding_pool, NDR_N_BINDING_POOL);
+
+	if ((clnt->heap = ndr_heap_create()) == NULL)
+		goto errout;
+
+	/*
+	 * Fill in the caller's handle.
+	 */
 	bzero(&handle->handle, sizeof (ndr_hdid_t));
 	handle->clnt = clnt;
 	bcopy(&svinfo, &handle->svinfo, sizeof (srvsvc_server_info_t));
 
-	if (ndr_rpc_get_heap(handle) == NULL) {
-		free(clnt);
-		return (-1);
-	}
-
+	/*
+	 * Do the OtW RPC bind.
+	 */
 	rc = ndr_clnt_bind(clnt, service, &clnt->binding);
 	if (NDR_DRC_IS_FAULT(rc)) {
-		(void) smbrdr_close_pipe(fid);
-		ndr_heap_destroy(clnt->heap);
-		free(clnt);
-		handle->clnt = NULL;
-		return (-1);
+		syslog(LOG_DEBUG, "ndr_rpc_bind: "
+		    "ndr_clnt_bind, rc=0x%x", rc);
+		goto errout;
 	}
 
+	/* Success! */
 	return (0);
+
+errout:
+	handle->clnt = NULL;
+	if (clnt != NULL) {
+		ndr_heap_destroy(clnt->heap);
+		free(clnt);
+	}
+	if (ctx != NULL) {
+		if (fd != -1)
+			(void) smb_fh_close(fd);
+		smbrdr_ctx_free(ctx);
+	}
+
+	return (-1);
 }
 
 /*
@@ -224,14 +267,16 @@ void
 ndr_rpc_unbind(mlsvc_handle_t *handle)
 {
 	ndr_client_t *clnt = handle->clnt;
+	struct smb_ctx *ctx = clnt->xa_private;
 
 	if (clnt->heap_preserved)
 		ndr_clnt_free_heap(clnt);
 	else
 		ndr_heap_destroy(clnt->heap);
 
-	(void) smbrdr_close_pipe(clnt->fid);
-	free(handle->clnt);
+	(void) smb_fh_close(clnt->xa_fd);
+	smbrdr_ctx_free(ctx);
+	free(clnt);
 	bzero(handle, sizeof (mlsvc_handle_t));
 }
 
@@ -317,7 +362,7 @@ ndr_rpc_get_ssnkey(mlsvc_handle_t *handle,
 	if (clnt == NULL)
 		return (EINVAL);
 
-	rc = smbrdr_get_ssnkey(clnt->fid, ssn_key, len);
+	rc = smb_fh_getssnkey(clnt->xa_fd, ssn_key, len);
 	return (rc);
 }
 
@@ -484,19 +529,19 @@ ndr_xa_exchange(ndr_client_t *clnt, ndr_xa_t *mxa)
 {
 	ndr_stream_t *recv_nds = &mxa->recv_nds;
 	ndr_stream_t *send_nds = &mxa->send_nds;
-	int nbytes;
+	int err, more, nbytes;
 
-	nbytes = smbrdr_transact(clnt->fid,
-	    (char *)send_nds->pdu_base_offset, send_nds->pdu_size,
-	    (char *)recv_nds->pdu_base_offset, recv_nds->pdu_max_size);
-
-	if (nbytes < 0) {
+	nbytes = recv_nds->pdu_max_size;
+	err = smb_fh_xactnp(clnt->xa_fd,
+	    send_nds->pdu_size, (char *)send_nds->pdu_base_offset,
+	    &nbytes, (char *)recv_nds->pdu_base_offset, &more);
+	if (err) {
 		recv_nds->pdu_size = 0;
 		return (-1);
 	}
 
 	recv_nds->pdu_size = nbytes;
-	return (nbytes);
+	return (0);
 }
 
 /*
@@ -519,8 +564,8 @@ ndr_xa_read(ndr_client_t *clnt, ndr_xa_t *mxa)
 	if ((len = (nds->pdu_max_size - nds->pdu_size)) < 0)
 		return (-1);
 
-	nbytes = smbrdr_readx(clnt->fid,
-	    (char *)nds->pdu_base_offset + nds->pdu_size, len);
+	nbytes = smb_fh_read(clnt->xa_fd, 0, len,
+	    (char *)nds->pdu_base_offset + nds->pdu_size);
 
 	if (nbytes < 0)
 		return (-1);

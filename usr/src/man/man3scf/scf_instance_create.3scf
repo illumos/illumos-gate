@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_instance_create 3SCF "24 Sep 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_INSTANCE_CREATE 3SCF "Sep 24, 2007"
 .SH NAME
 scf_instance_create, scf_instance_handle, scf_instance_destroy,
 scf_instance_get_parent, scf_instance_get_name, scf_service_get_instance,
@@ -12,7 +12,7 @@ handles and instances in the Service Configuration Facility
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_instance_t *\fR\fBscf_instance_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
@@ -65,12 +65,10 @@ repository tree. An instance is the child of a service and has two sets of
 children:
 .sp
 .ne 2
-.mk
 .na
 \fBProperty Groups\fR
 .ad
 .RS 19n
-.rt  
 These hold configuration information specific to this instance. See
 \fBscf_pg_create\fR(3SCF), \fBscf_iter_instance_pgs\fR(3SCF), and
 \fBscf_iter_instance_pgs_typed\fR(3SCF).
@@ -78,12 +76,10 @@ These hold configuration information specific to this instance. See
 
 .sp
 .ne 2
-.mk
 .na
 \fBSnapshots\fR
 .ad
 .RS 19n
-.rt  
 These are complete configuration snapshots that hold unchanging copies of all
 of the property groups necessary to run the instance. See
 \fBscf_snapshot_create\fR(3SCF) and \fBscf_iter_instance_snapshots\fR(3SCF).
@@ -147,7 +143,6 @@ Upon successful completion, \fBscf_instance_get_parent()\fR,
 The \fBscf_instance_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
@@ -158,7 +153,6 @@ An object was bound to a destroyed handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -169,7 +163,6 @@ An internal error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -180,7 +173,6 @@ The \fIhandle\fR argument is \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
@@ -191,7 +183,6 @@ There is not enough memory to allocate an \fBscf_instance_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -205,7 +196,6 @@ The server does not have adequate resources for a new instance handle.
 The \fBscf_instance_handle()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
@@ -220,7 +210,6 @@ The \fBscf_instance_get_name()\fR, \fBscf_instance_get_parent()\fR, and
 \fBscf_instance_delete()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -231,7 +220,6 @@ The instance has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -242,7 +230,6 @@ The instance is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -253,7 +240,6 @@ The repository handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -267,7 +253,6 @@ The connection to the repository was lost.
 The \fBscf_service_add_instance()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_EXISTS\fR\fR
 .ad
@@ -278,7 +263,6 @@ An instance named \fIname\fR already exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -289,7 +273,6 @@ An internal error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -300,7 +283,6 @@ The server does not have the resources to complete the request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -314,57 +296,47 @@ The handle is not bound.
 The \fBscf_service_get_instance()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
 .RS 28n
-.rt  
 The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(1M))
 chose for the operation denied access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
 .RS 28n
-.rt  
 An internal error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
 .RS 28n
-.rt  
 The handle is not bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
 .RS 28n
-.rt  
 No instance specified by \fIname\fR was found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
 .RS 28n
-.rt  
 The repository server is out of resources.
 .RE
 
@@ -374,7 +346,6 @@ The \fBscf_service_add_instance()\fR and \fBscf_service_get_instance()\fR
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -385,7 +356,6 @@ The service is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -396,7 +366,6 @@ The service has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -407,7 +376,6 @@ The \fIname\fR argument is not a valid instance name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -418,7 +386,6 @@ The service and instance are not derived from the same handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -432,7 +399,6 @@ The connection to the repository was lost.
 The \fBscf_instance_get_parent()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -448,7 +414,6 @@ The \fBscf_service_add_instance()\fR and \fBscf_instance_delete()\fR functions
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -459,7 +424,6 @@ The user does not have sufficient privileges to create or delete an instance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_READONLY\fR\fR
 .ad
@@ -470,7 +434,6 @@ The repository backend is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -484,12 +447,10 @@ The repository backend refused the modification.
 The \fBscf_instance_delete()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
 .RS 26n
-.rt  
 The server does not have adequate resources for a new instance handle.
 .RE
 
@@ -501,15 +462,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

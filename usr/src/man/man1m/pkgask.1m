@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgask 1M "6 Apr 2005" "SunOS 5.11" "System Administration Commands"
+.TH PKGASK 1M "Apr 6, 2005"
 .SH NAME
 pkgask \- stores answers to a request script
 .SH SYNOPSIS
@@ -27,12 +27,10 @@ already contains all of the information the package needs.
 The following options are supported
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI device\fR\fR
 .ad
 .RS 16n
-.rt  
 Run the request script for a package on \fIdevice\fR. \fIdevice\fR can be a
 directory pathname or the identifiers for tape, floppy disk or removable disk
 (for example, \fB/var/tmp\fR, \fB/dev/diskette\fR, and \fB/dev/dsk/c1d0s0\fR).
@@ -41,12 +39,10 @@ The default device is the installation spool directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fI root_path\fR\fR
 .ad
 .RS 16n
-.rt  
 Define the full path name of a directory to use as the \fIroot_path\fR. All
 files, including package system information files, are relocated to a directory
 tree starting in the specified \fIroot_path\fR.
@@ -63,12 +59,10 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI response\fR\fR
 .ad
 .RS 16n
-.rt  
 Identify a file or directory which should be created to contain the responses
 to interaction with the package. The name must be a full pathname. The file, or
 directory of files, can later be used as input to the \fBpkgadd\fR(1M) command.
@@ -80,12 +74,10 @@ directory of files, can later be used as input to the \fBpkgadd\fR(1M) command.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
 .RS 11n
-.rt  
 Specify the package instance, or list of instances for which \fBrequest\fR
 scripts will be created. The token \fBall\fR may be used to refer to all
 packages available on the source medium.
@@ -94,23 +86,19 @@ packages available on the source medium.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

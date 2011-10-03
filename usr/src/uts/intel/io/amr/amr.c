@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 /*
  * Copyright (c) 1999,2000 Michael Smith
@@ -111,7 +112,6 @@ int	amr_debug_var = 0;
 /*
  * driver interfaces
  */
-char _depends_on[] = "misc/scsi";
 
 static uint_t amr_intr(caddr_t arg);
 static void amr_done(struct amr_softs *softs);

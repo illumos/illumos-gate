@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH id 1M "28 Nov 2006" "SunOS 5.11" "System Administration Commands"
+.TH ID 1M "Nov 28, 2006"
 .SH NAME
 id \- return user identity
 .SH SYNOPSIS
@@ -208,12 +208,10 @@ The following options are supported by both \fB/usr/bin/id\fR and
 specified with any of the \fB-G\fR, \fB-g\fR, or \fB-u\fR options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports additionally the current project membership of the invoking process.
 The project is reported using the            format:
 .sp
@@ -241,23 +239,19 @@ be mapped by the system into a printable project name, the corresponding
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports user name, user  \fBID\fR and all the groups to which the user belongs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
 .RS 6n
-.rt  
 Outputs all different group \fBID\fRs (effective, real and supplementary) only,
 using the format \fB"%u\en"\fR. If there is more than one distinct group
 affiliation, output each such affiliation, using the format \fB" %u"\fR, before
@@ -266,46 +260,38 @@ the \fBNEWLINE\fR character is output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 6n
-.rt  
 Outputs only the effective group \fBID\fR, using the format \fB"%u\en"\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Outputs the name in the format \fB"%s"\fR instead of the numeric \fBID\fR using
 the format \fB"%u"\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Outputs the real \fBID\fR instead of the effective \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Outputs only the effective user \fBID\fR, using the format \fB"%u\en"\fR.
 .RE
 
@@ -315,12 +301,10 @@ Outputs only the effective user \fBID\fR, using the format \fB"%u\en"\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 8n
-.rt  
 The user (login) name for which information is to be written.
 .RE
 
@@ -336,23 +320,19 @@ that affect the execution of \fBid\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -365,13 +345,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SS "/usr/xpg4/bin/id"
@@ -379,13 +358,12 @@ Interface StabilityStable
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

@@ -25,6 +25,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _SYS_X86_ARCHEXT_H
 #define	_SYS_X86_ARCHEXT_H

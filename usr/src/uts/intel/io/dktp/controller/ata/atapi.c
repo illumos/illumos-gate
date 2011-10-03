@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 
@@ -59,11 +60,6 @@ static void atapi_complete(ata_drv_t *ata_drvp, ata_pkt_t *ata_pktp,
     int do_callback);
 static int atapi_id_update(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
     ata_pkt_t *ata_pktp);
-
-
-/* external dependencies */
-
-char _depends_on[] = "misc/scsi";
 
 /*
  * Local static data

@@ -96,7 +96,7 @@ extern int	prom_serengeti_cpu_off(pnode_t);
 extern sbdp_wnode_t *sbdp_get_wnodep(int);
 extern caddr_t	sbdp_shutdown_va;
 static int	sbdp_prom_get_cpu(void *arg, int changed);
-
+static void	sbdp_cpu_shutdown_self(void);
 
 int
 sbdp_disconnect_cpu(sbdp_handle_t *hp, dev_info_t *dip, processorid_t cpuid)
@@ -360,7 +360,6 @@ int
 sbdp_cpu_poweroff(struct cpu *cp)
 {
 	processorid_t	cpuid;
-	static void	sbdp_cpu_shutdown_self(void);
 	pnode_t		nodeid;
 	sbdp_cpu_sram_map_t	map;
 	static fn_t	f = "sbdp_cpu_poweroff";

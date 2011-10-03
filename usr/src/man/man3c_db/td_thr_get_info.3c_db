@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH td_thr_get_info 3C_DB "20 Oct 1998" "SunOS 5.11" "Threads Debugging Library Functions"
+.TH TD_THR_GET_INFO 3C_DB "Oct 20, 1998"
 .SH NAME
 td_thr_get_info \- get thread information in libc_db library of interfaces
 .SH SYNOPSIS
@@ -30,38 +30,38 @@ The \fBtd_thrinfo_t\fR structure contains the following fields:
 typedef struct td_thrinfo_t {
   td_thragen_tx    *ti_ta_p           /* internal process handle */
   unsigned         ti_user_flags;     /* value of flags parameter */
-  thread_t         ti_tid;            /* thread identifier */ 
+  thread_t         ti_tid;            /* thread identifier */
   char             *ti_tls;           /* pointer to thread-local storage*/
-  paddr            ti_startfunc;      /* address of function at which thread 
+  paddr            ti_startfunc;      /* address of function at which thread
                                          execution began*/
   paddr            ti_stkbase;        /* base of thread's stack area*/
   int              ti_stksize;        /* size in bytes of thread's allocated
                                          stack region*/
   paddr            ti_ro_area;        /* address of ulwp_t structure*/
-  int              ti_ro_size         /* size of the ulwp_t structure in 
+  int              ti_ro_size         /* size of the ulwp_t structure in
                                          bytes */
   td_thr_state_e   ti_state           /* state of the thread */
-  uchar_t          ti_db_suspended    /* non-zero if thread suspended by 
+  uchar_t          ti_db_suspended    /* non-zero if thread suspended by
                                          td_thr_dbsuspend*/
   td_thr_type_e    ti_type            /* type of the thread*/
   int              ti_pc              /* value of thread's program counter*/
   int              ti_sp              /* value of thread's stack counter*/
-  short            ti_flags           /* set of special flags used by 
+  short            ti_flags           /* set of special flags used by
                                          libc*/
-  int              ti_pri             /* priority of thread returned by 
+  int              ti_pri             /* priority of thread returned by
                                          thr_getprio(3T)*/
-  lwpid_t          ti_lid             /* id of light weight process (LWP) 
+  lwpid_t          ti_lid             /* id of light weight process (LWP)
                                          executing this thread*/
-  sigset_t         ti_sigmask         /* thread's signal mask.  See 
+  sigset_t         ti_sigmask         /* thread's signal mask.  See
                                          thr_sigsetmask(3T)*/
   u_char           ti_traceme         /* non-zero if event tracing is on*/
-  u_char_t         ti_preemptflag     /* non-zero if thread preempted when 
+  u_char_t         ti_preemptflag     /* non-zero if thread preempted when
                                          last active*/
-  u_char_t         ti_pirecflag      /* non-zero if thread runs priority 
+  u_char_t         ti_pirecflag      /* non-zero if thread runs priority
                                         beside regular */
-  sigset_t         ti_pending        /* set of signals pending for this 
+  sigset_t         ti_pending        /* set of signals pending for this
                                         thread*/
-  td_thr_events_t  ti_events         /* bitmap of events enabled for this 
+  td_thr_events_t  ti_events         /* bitmap of events enabled for this
                                         thread*/
 } ;
 .fi
@@ -106,91 +106,75 @@ The \fBti_state\fR member is the state of the thread.  The \fBtd_thr_state_e\fR
 enumeration type can contain the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_ANY_STATE\fR \fR
 .ad
 .RS 26n
-.rt  
 This value is never returned by \fBtd_thr_get_info()\fR but is used as a
 wildcard to select threads in \fBtd_ta_thr_iter()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_UNKNOWN\fR \fR
 .ad
 .RS 26n
-.rt  
 The \fBlibc_db\fR library cannot determine the state of the thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_STOPPED\fR \fR
 .ad
 .RS 26n
-.rt  
 The thread has been stopped by a call to  \fBthr_suspend\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_RUN\fR \fR
 .ad
 .RS 26n
-.rt  
 The thread is runnable, but it is not currently assigned to an \fBLWP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_ACTIVE\fR \fR
 .ad
 .RS 26n
-.rt  
 The thread is currently executing on an  \fBLWP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_ZOMBIE\fR \fR
 .ad
 .RS 26n
-.rt  
 The thread has exited, but it has not yet been deallocated by a call to
 \fBthr_join\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_SLEEP\fR \fR
 .ad
 .RS 26n
-.rt  
 The thread is not currently runnable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_THR_STOPPED_ASLEEP\fR \fR
 .ad
 .RS 26n
-.rt  
 The thread is both blocked by  \fBTD_THR_SLEEP\fR and stopped by a call to
 \fBtd_thr_dbsuspend\fR(3C_DB).
 .RE
@@ -253,45 +237,37 @@ The \fBti_events\fR member is the bitmap of events enabled for this thread.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_OK\fR\fR
 .ad
 .RS 12n
-.rt  
 The call completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_BADTH\fR\fR
 .ad
 .RS 12n
-.rt  
 An invalid thread handle was passed in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_DBERR\fR\fR
 .ad
 .RS 12n
-.rt  
 A call to one of the imported interface routines failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTD_ERR\fR\fR
 .ad
 .RS 12n
-.rt  
 The call did not complete successfully.
 .RE
 
@@ -303,13 +279,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

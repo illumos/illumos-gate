@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_setup_pkt 9E "29 Jan 2009" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_SETUP_PKT 9E "Jan 29, 2009"
 .SH NAME
 tran_setup_pkt, tran_teardown_pkt, tran_pkt_constructor, tran_pkt_destructor \-
 SCSI HBA packet allocation and deallocation
@@ -40,56 +40,46 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Flags for associating DMA resources with the packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to either \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 Always \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkmflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Either \fBKM_SLEEP\fR or \fBKM_NOSLEEP\fR.
 .RE
 
@@ -144,23 +134,19 @@ The \fIcallback\fR argument indicates what the allocator routines should do
 when resources are not available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Do not wait for resources. Return a \fINULL\fR pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait indefinitely for resources.
 .RE
 

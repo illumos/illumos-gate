@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -170,6 +171,18 @@ smbfs_keychain_add(uid_t uid, const char *dom, const char *usr,
 		return (err);
 
 	err = smbfs_keychain_cmn(cmd, uid, dom, usr, lmhash, nthash);
+	return (err);
+}
+
+/* Variant of the above that takes an NT hash. */
+int
+smbfs_keychain_addhash(uid_t uid, const char *dom, const char *usr,
+	const uchar_t *nthash)
+{
+	static const uchar_t lmhash[SMBIOC_HASH_SZ] = { 0 };
+	int err, cmd = SMBIOC_PK_ADD;
+	err = smbfs_keychain_cmn(cmd, uid, dom, usr,
+	    (uchar_t *)lmhash, (uchar_t *)nthash);
 	return (err);
 }
 

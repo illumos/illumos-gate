@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stropts.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH STROPTS.H 3HEAD "Sep 10, 2004"
 .SH NAME
 stropts.h, stropts \- STREAMS interface (STREAMS)
 .SH SYNOPSIS
@@ -124,12 +124,10 @@ The <\fBstropts.h\fR> header defines the \fBstr_mlist\fR structure that
 includes the following member:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar l_name[FMNAMESZ+1]\fR\fR
 .ad
 .RS 27n
-.rt  
 a STREAMS module name
 .RE
 
@@ -139,320 +137,262 @@ The following macros are defined for use as the request argument to
 \fBioctl()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_PUSH\fR\fR
 .ad
 .RS 15n
-.rt  
 Push a STREAMS module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_POP\fR\fR
 .ad
 .RS 15n
-.rt  
 Pop a STREAMS module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_LOOK\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the top module name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_FLUSH\fR\fR
 .ad
 .RS 15n
-.rt  
 Flush a stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_FLUSHBAND\fR\fR
 .ad
 .RS 15n
-.rt  
 Flush one band of a stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_SETSIG\fR\fR
 .ad
 .RS 15n
-.rt  
 Ask for notification signals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_GETSIG\fR\fR
 .ad
 .RS 15n
-.rt  
 Retrieve current notification signals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_FIND\fR\fR
 .ad
 .RS 15n
-.rt  
 Look for a STREAMS module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_PEEK\fR\fR
 .ad
 .RS 15n
-.rt  
 Peek at the top message on a stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_SRDOPT\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the read mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_GRDOPT\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the read mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_NREAD\fR\fR
 .ad
 .RS 15n
-.rt  
 Size the top message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_FDINSERT\fR\fR
 .ad
 .RS 15n
-.rt  
 Send implementation-defined information about another stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_STR\fR\fR
 .ad
 .RS 15n
-.rt  
 Send a STREAMS \fBioctl()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_SWROPT\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the write mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_GWROPT\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the write mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_SENDFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Pass a file descriptor through a STREAMS pipe.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_RECVFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Get a file descriptor sent via I_SENDFD.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_LIST\fR\fR
 .ad
 .RS 15n
-.rt  
 Get all the module names on a stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_ATMARK\fR\fR
 .ad
 .RS 15n
-.rt  
 Is the top message ``marked''?
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_CKBAND\fR\fR
 .ad
 .RS 15n
-.rt  
 See if any messages exist in a band.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_GETBAND\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the band of the top message on a stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_CANPUT\fR\fR
 .ad
 .RS 15n
-.rt  
 Is a band writable?
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_SETCLTIME\fR\fR
 .ad
 .RS 15n
-.rt  
 Set close time delay.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_GETCLTIME\fR\fR
 .ad
 .RS 15n
-.rt  
 Get close time delay.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_LINK\fR\fR
 .ad
 .RS 15n
-.rt  
 Connect two streams.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_UNLINK\fR\fR
 .ad
 .RS 15n
-.rt  
 Disconnect two streams.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_PLINK\fR\fR
 .ad
 .RS 15n
-.rt  
 Persistently connect two streams.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI_PUNLINK\fR\fR
 .ad
 .RS 15n
-.rt  
 Dismantle a persistent STREAMS link.
 .RE
 
@@ -461,12 +401,10 @@ Dismantle a persistent STREAMS link.
 The following macro is defined for use with \fBI_LOOK\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFMNAMESZ\fR\fR
 .ad
 .RS 12n
-.rt  
 minimum size in bytes of the buffer referred to by the \fBarg\fR argument
 .RE
 
@@ -475,34 +413,28 @@ minimum size in bytes of the buffer referred to by the \fBarg\fR argument
 The following macros are defined for use with \fBI_FLUSH\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLUSHR\fR\fR
 .ad
 .RS 11n
-.rt  
 flush read queues
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLUSHW\fR\fR
 .ad
 .RS 11n
-.rt  
 flush write queues
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLUSHRW\fR\fR
 .ad
 .RS 11n
-.rt  
 flush read and write queues
 .RE
 
@@ -511,59 +443,49 @@ flush read and write queues
 The following macros are defined for use with \fBI_SETSIG\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_RDNORM\fR\fR
 .ad
 .RS 13n
-.rt  
 A normal (priority band set to 0)  message has arrived at the head of a stream
 head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_RDBAND\fR\fR
 .ad
 .RS 13n
-.rt  
 A message with a non-zero priority band has arrived at the head of a stream
 head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_INPUT\fR\fR
 .ad
 .RS 13n
-.rt  
 A message, other than a high-priority message, has arrived at the head of a
 stream head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_HIPRI\fR\fR
 .ad
 .RS 13n
-.rt  
 A high-priority message is present on a stream head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_OUTPUT\fR\fR
 .ad
 .RS 13n
-.rt  
 The write queue for normal data (priority band 0) just below the stream head is
 no longer full. This notifies the process that there is room on the queue for
 sending (or writing) normal data downstream.
@@ -571,69 +493,57 @@ sending (or writing) normal data downstream.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_WRNORM\fR\fR
 .ad
 .RS 13n
-.rt  
 Equivalent to \fBS_OUTPUT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_WRBAND\fR\fR
 .ad
 .RS 13n
-.rt  
 The write queue for a non-zero priority band just below the stream head is no
 longer full.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_MSG\fR\fR
 .ad
 .RS 13n
-.rt  
 A STREAMS signal message that contains the \fBSIGPOLL\fR signal reaches the
 front of the stream head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_ERROR\fR\fR
 .ad
 .RS 13n
-.rt  
 Notification of an error condition reaches the stream head.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_HANGUP\fR\fR
 .ad
 .RS 13n
-.rt  
 Notification of a hangup reaches the stream head.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS_BANDURG\fR\fR
 .ad
 .RS 13n
-.rt  
 When used in conjunction with \fBS_RDBAND\fR, \fBSIGURG\fR is generated instead
 of \fBSIGPOLL\fR when a priority  message reaches the front of the stream head
 read queue.
@@ -644,12 +554,10 @@ read queue.
 The following macro is defined for use with \fBI_PEEK\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRS_HIPRI\fR\fR
 .ad
 .RS 12n
-.rt  
 Only look for high-priority messages.
 .RE
 
@@ -658,69 +566,57 @@ Only look for high-priority messages.
 The following macros are defined for use with \fBI_SRDOPT\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRNORM\fR\fR
 .ad
 .RS 13n
-.rt  
 Byte-stream mode, the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRMSGD\fR\fR
 .ad
 .RS 13n
-.rt  
 Message-discard mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRMSGN\fR\fR
 .ad
 .RS 13n
-.rt  
 Message-non-discard mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPROTNORM\fR\fR
 .ad
 .RS 13n
-.rt  
 Fail \fBread()\fR with \fB[EBADMSG]\fR if a message containing a control part
 is at the front of the stream head read queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPROTDAT\fR\fR
 .ad
 .RS 13n
-.rt  
 Deliver the control part of a message as data when a process issues a
 \fBread()\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPROTDIS\fR\fR
 .ad
 .RS 13n
-.rt  
 Discard the control part of a message, delivering any data part, when a process
 issues a \fBread()\fR
 .RE
@@ -730,12 +626,10 @@ issues a \fBread()\fR
 The following macro is defined for use with \fBI_SWOPT\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSNDZERO\fR\fR
 .ad
 .RS 11n
-.rt  
 Send a zero-length message downstream when a \fBwrite()\fR of 0 bytes occurs.
 .RE
 
@@ -744,23 +638,19 @@ Send a zero-length message downstream when a \fBwrite()\fR of 0 bytes occurs.
 The following macros are defined for use with \fBI_ATMARK\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBANYMARK\fR\fR
 .ad
 .RS 12n
-.rt  
 Check if the message is marked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLASTMARK\fR\fR
 .ad
 .RS 12n
-.rt  
 Check if the message is the last one marked on the queue.
 .RE
 
@@ -769,12 +659,10 @@ Check if the message is the last one marked on the queue.
 The following macro is defined for use with \fBI_UNLINK\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMUXID_ALL\fR\fR
 .ad
 .RS 13n
-.rt  
 Unlink all stream linked to the stream associated with \fBfildes\fR.
 .RE
 
@@ -784,56 +672,46 @@ The following macros are defined for \fBgetmsg()\fR, \fBgetpmsg()\fR,
 \fBputmsg()\fR, and \fBputpmsg()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_ANY\fR\fR
 .ad
 .RS 13n
-.rt  
 Receive any message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_BAND\fR\fR
 .ad
 .RS 13n
-.rt  
 Receive message from specified band.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_HIPRI\fR\fR
 .ad
 .RS 13n
-.rt  
 Send/receive high-priority message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMORECTL\fR\fR
 .ad
 .RS 13n
-.rt  
 More control information is left in message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMOREDATA\fR\fR
 .ad
 .RS 13n
-.rt  
 More data is left in message.
 .RE
 
@@ -849,13 +727,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

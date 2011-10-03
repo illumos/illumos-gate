@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 PROG=		dns-sd finger rdate ruptime rwho whois
 SUIDPROG=	rcp rlogin rsh
@@ -36,7 +38,7 @@ MSGSUBDIRS=	nca talk
 
 # As programs get lint-clean, add them here.  Eventually.
 # This hack should go away, and all in PROG should be lint-clean.
-LINTCLEAN=	rlogin.c rsh.c rcp.c rdate.c rwho.c
+LINTCLEAN=	rlogin.c rsh.c rcp.c rdate.c rwho.c whois.c
 
 # Likewise, as subdirs get lint-clean, add them here.  Once
 # they're all clean, replace the dependency of the lint target
@@ -81,7 +83,7 @@ rcp lint-rcp :=		LDLIBS += -lsocket -lsec -lsendfile
 rdate lint-rdate:=	LDLIBS += -lsocket
 rlogin lint-rlogin :=	LDLIBS += -lnsl -lsocket
 rsh lint-rsh :=		LDLIBS += -lsocket
-whois :=		LDLIBS += -lsocket
+whois lint-whois :=	LDLIBS += -lsocket
 
 include  $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 $(KCMDPROGS)	:=	LDLIBS += -lnsl -lmech_krb5

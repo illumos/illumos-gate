@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH u8_validate 9F "18 Sep 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH U8_VALIDATE 9F "Sep 18, 2007"
 .SH NAME
 u8_validate \- validate UTF-8 characters and calculate the byte length
 .SH SYNOPSIS
@@ -24,34 +24,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIu8str\fR\fR
 .ad
 .RS 9n
-.rt  
 The UTF-8 string to be validated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 9n
-.rt  
 The maximum number of bytes in \fIu8str\fR that can be examined and validated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlist\fR\fR
 .ad
 .RS 9n
-.rt  
 A list of null-terminated character strings in UTF-8 that must be additionally
 checked against as invalid characters. The last string in \fIlist\fR must be
 null to indicate there is no further string.
@@ -59,17 +53,14 @@ null to indicate there is no further string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 9n
-.rt  
 Possible validation options constructed by a bitwise-inclusive-OR of the
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_VALIDATE_ENTIRE\fR\fR
 .ad
@@ -86,7 +77,6 @@ result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_VALIDATE_CHECK_ADDITIONAL\fR\fR
 .ad
@@ -102,7 +92,6 @@ strings supplied with \fIlist\fR and returns EBADF in \fIerrno\fR if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_VALIDATE_UCS2_RANGE\fR\fR
 .ad
@@ -119,57 +108,47 @@ U+0000 to U+FFFF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrno\fR\fR
 .ad
 .RS 9n
-.rt  
 An error occurred during validation.  The following values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 Validation failed because list-specified characters were found in the string
 pointed to by \fIu8str\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 Validation failed because an illegal byte was found in the string pointed to by
 \fIu8str\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Validation failed because an incomplete byte was found in the string pointed to
 by  \fIu8str\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 Validation failed because character bytes were encountered that are outside the
 range of the Unicode coding space.
 .RE
@@ -300,13 +279,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

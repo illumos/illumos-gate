@@ -2,32 +2,32 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lp 1 "31 May 2006" "SunOS 5.11" "User Commands"
+.TH LP 1 "May 31, 2006"
 .SH NAME
 lp \- submit print request
 .SH SYNOPSIS
 .LP
 .nf
-\fBlp\fR [\fB-c\fR] [\fB-m\fR] [\fB-p\fR] [\fB-s\fR] [\fB-w\fR] [\fB-d\fR \fIdestination\fR] [\fB-f\fR \fIform-name\fR] 
-     [\fB-H\fR \fIspecial-handling\fR] [\fB-n\fR \fInumber\fR] [\fB-o\fR \fIoption\fR] 
-     [\fB-P\fR \fIpage-list\fR] [\fB-q\fR \fIpriority-level\fR] 
-     [\fB-S\fR \fIcharacter-set\fR | \fIprint-wheel\fR] [\fB-t\fR \fItitle\fR] 
+\fBlp\fR [\fB-c\fR] [\fB-m\fR] [\fB-p\fR] [\fB-s\fR] [\fB-w\fR] [\fB-d\fR \fIdestination\fR] [\fB-f\fR \fIform-name\fR]
+     [\fB-H\fR \fIspecial-handling\fR] [\fB-n\fR \fInumber\fR] [\fB-o\fR \fIoption\fR]
+     [\fB-P\fR \fIpage-list\fR] [\fB-q\fR \fIpriority-level\fR]
+     [\fB-S\fR \fIcharacter-set\fR | \fIprint-wheel\fR] [\fB-t\fR \fItitle\fR]
      [\fB-T\fR \fIcontent-type\fR [\fB-r\fR]] [\fB-y\fR \fImode-list\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fBlp\fR \fB-i\fR \fIrequest-ID\fR... [\fB-c\fR] [\fB-m\fR] [\fB-p\fR] [\fB-s\fR] [\fB-w\fR] 
-     [\fB-d\fR \fIdestination\fR] [\fB-f\fR \fIform-name\fR] [\fB-H\fR \fIspecial-handling\fR] 
-     [\fB-n\fR \fInumber\fR] [\fB-o\fR \fIoption\fR] [\fB-P\fR \fIpage-list\fR] 
-     [\fB-q\fR \fIpriority-level\fR] [\fB-S\fR \fIcharacter-set\fR | \fIprint-wheel\fR] 
+\fBlp\fR \fB-i\fR \fIrequest-ID\fR... [\fB-c\fR] [\fB-m\fR] [\fB-p\fR] [\fB-s\fR] [\fB-w\fR]
+     [\fB-d\fR \fIdestination\fR] [\fB-f\fR \fIform-name\fR] [\fB-H\fR \fIspecial-handling\fR]
+     [\fB-n\fR \fInumber\fR] [\fB-o\fR \fIoption\fR] [\fB-P\fR \fIpage-list\fR]
+     [\fB-q\fR \fIpriority-level\fR] [\fB-S\fR \fIcharacter-set\fR | \fIprint-wheel\fR]
      [\fB-t\fR \fItitle\fR] [\fB-T\fR \fIcontent-type\fR [\fB-r\fR]] [\fB-y\fR \fImode-list\fR]
 .fi
 
@@ -75,12 +75,10 @@ requests sent to such destinations differently (see NOTES).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 23n
-.rt  
 Copies \fIfile\fR before printing.
 .sp
 Unless \fB-c\fR is specified, users should not remove any \fIfile\fR before the
@@ -91,12 +89,10 @@ printed output. \fIfile\fR is linked (as opposed to copied).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdestination\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints \fIfile\fR on a specific destination. The \fB-d\fR option is used to set
 the destination only when the job is first created. (\fBNote:\fR To move
 existing jobs to a different destination, see \fBlpmove\fR(1M).)
@@ -109,12 +105,10 @@ more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIform-name\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints \fIfile\fR on \fIform-name\fR. The \fBLP\fR print service ensures that
 the form is mounted on the printer. The print request is rejected if the
 printer does not support \fIform-name\fR, if \fIform-name\fR is not defined for
@@ -124,22 +118,18 @@ the system, or if the user is not allowed to use \fIform-name\fR (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR \fIspecial-handling\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints the print request according to the value of \fIspecial-handling\fR. The
 following \fIspecial-handling\fR values are acceptable:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhold\fR\fR
 .ad
 .RS 13n
-.rt  
 Do not print the print request until notified. If printing has already begun,
 stop it. Other print requests are placed ahead of a request that has been put
 on hold (\fIheld print request\fR) until the print request is resumed.
@@ -147,12 +137,10 @@ on hold (\fIheld print request\fR) until the print request is resumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresume\fR\fR
 .ad
 .RS 13n
-.rt  
 Resume a held print request. If the print request had begun to print when held,
 it is the next print request printed, unless it is superseded by an
 \fIimmediate\fR print request.
@@ -160,12 +148,10 @@ it is the next print request printed, unless it is superseded by an
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimmediate\fR\fR
 .ad
 .RS 13n
-.rt  
 Print the print request next. If more than one print request is assigned, the
 most recent print request is printed next. If a print request is currently
 printing on the desired printer, a \fBhold\fR request must be issued to allow
@@ -177,12 +163,10 @@ to \fBLP\fR administrators.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIrequest-ID\fR\fR
 .ad
 .RS 23n
-.rt  
 Changes options for the print request identified by \fIrequest-ID\fR. There
 must be a space between \fB-i\fR and \fIrequest-ID\fR.
 .sp
@@ -193,36 +177,30 @@ job modification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 23n
-.rt  
 Sends mail after \fIfile\fR has printed (see \fBmail\fR(1)). By default, no
 mail is sent upon normal completion of a print request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInumber\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints a specific number of copies of \fIfile\fR. Specify \fInumber\fR as a
 digit. The default for \fInumber\fR is \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
 .RS 23n
-.rt  
 Specifies printer-dependent \fIoptions\fR. Specify several options by
 specifying \fB-o\fR \fIoption\fR multiple times (\fB-o\fR \fIoption\fR \fB-o\fR
 \fIoption\fR \fB-o\fR \fIoption\fR ). Printer-dependent options can also be
@@ -232,12 +210,10 @@ enclosed in double quotes (\fB-o\fR"\fIoption\fR \fIoption option\fR").
 \fIoption\fRs take the following forms:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkey\fR\fB=\fR\fIvalue\fR\fR
 .ad
 .RS 13n
-.rt  
 Associates information with the request for use by the backend print service.
 The keys and values that can be used are specific to the backend print service
 and queue configuration.
@@ -245,12 +221,10 @@ and queue configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[no]key\fR\fR
 .ad
 .RS 13n
-.rt  
  Associates boolean information with the request for use by the backend print
 service. The keys that can be used are specific to the backend print service
 and queue configuration.
@@ -259,7 +233,6 @@ and queue configuration.
 The following options are commonly used with the LP print service:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnobanner\fR\fR
 .ad
@@ -274,7 +247,6 @@ requires the \fBsolaris.print.nobanner\fR authorization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnofilebreak\fR\fR
 .ad
@@ -285,7 +257,6 @@ Prints multiple files without inserting a form feed between them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnolabels\fR\fR
 .ad
@@ -298,7 +269,6 @@ of page header and footer labels. Use of this option requires the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlength=\fR\fInumber\fR\fBi\fR | \fInumber\fR\fBc\fR | \fInumber\fR\fR
 .ad
@@ -316,7 +286,6 @@ This option can not be used with the \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwidth=\fR\fInumber\fR\fBi\fR | \fInumber\fR\fBc\fR | \fInumber\fR\fR
 .ad
@@ -334,7 +303,6 @@ This option can not be used with the \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlpi=\fR\fInumber\fR\fR
 .ad
@@ -348,7 +316,6 @@ This option can not be used with the \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpi=\fR\fIn\fR|\fBpica\fR|\fBelite\fR|\fBcompressed\fR\fR
 .ad
@@ -367,7 +334,6 @@ default character pitch for your printer. This option can not be used with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstty=\fR\fIstty-option-list\fR\fR
 .ad
@@ -382,12 +348,10 @@ blanks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpage-list\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints the pages specified in \fIpage-list\fR in ascending order. Specify
 \fIpage-list\fR as a of range of numbers, single page number, or a combination
 of both.
@@ -398,24 +362,20 @@ it; otherwise, the print request is rejected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 23n
-.rt  
 Enables notification on completion of the print request. Delivery of the
 notification is dependent on additional software.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fIpriority-level\fR\fR
 .ad
 .RS 23n
-.rt  
 Assigns the print request a priority in the print queue. Specify
 \fIpriority-level\fR as an integer between from \fB0\fR and \fB39\fR. Use
 \fB0\fR to indicate the highest priority; \fB39\fR to indicate the lowest
@@ -426,18 +386,15 @@ assign a default priority to individual users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 23n
-.rt  
 Suppresses the display of messages sent from \fBlp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIcharacter-set\fR \fB|\fR\fR
 .ad
@@ -446,7 +403,6 @@ Suppresses the display of messages sent from \fBlp\fR.
 \fB\fB-S\fR \fIprint-wheel\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints the request using the \fIcharacter-set\fR or \fIprint-wheel\fR. If a
 form was requested and requires a character set or print wheel other than the
 one specified with the \fB-S\fR option, the request is rejected. Printers using
@@ -467,12 +423,10 @@ administrator, the request is rejected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItitle\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints a title on the banner page of the output. Enclose \fItitle\fR in quotes
 if it contains blanks. If \fItitle\fR is not not specified, the name of the
 file is printed on the banner page.
@@ -480,12 +434,10 @@ file is printed on the banner page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-T\fR\fIcontent-type\fR [\fB-r\fR]\fR
 .ad
 .RS 23n
-.rt  
 Prints the request on a printer that can support the specified
 \fIcontent-type\fR. If no printer accepts this type directly, a filter is used
 to convert the content into an acceptable type. If the \fB-r\fR option is
@@ -497,24 +449,20 @@ filter, the request is rejected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 23n
-.rt  
 Writes a message on the user's terminal after the \fIfile\fRs have been
 printed. If the user is not logged in, then mail is sent instead.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fImode-list\fR\fR
 .ad
 .RS 23n
-.rt  
 Prints the request according to the printing modes listed in \fImode-list\fR.
 The allowed values for \fImode-list\fR are locally defined.
 .sp
@@ -528,12 +476,10 @@ otherwise, the print request is rejected.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 The name of the file to be printed. Specify \fIfile\fR as a pathname or as a
 hyphen (\fB\(mi\fR) to indicate the standard input. If \fIfile\fR is not
 specified, \fBlp\fR uses the standard input.
@@ -552,24 +498,20 @@ that affect the execution of \fBlp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBNLSPATH\fR, and \fBPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the format and contents of date and time strings displayed in the
 \fBlp\fR banner page, if any.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLPDEST\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the destination. If the \fBLPDEST\fR environment variable is not set,
 the \fBPRINTER\fR environment variable shall be used. The \fB-d\fR \fIdest\fR
 option takes precedence over \fBLPDEST\fR. Results are undefined when \fB-d\fR
@@ -579,12 +521,10 @@ destination name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRINTER\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the output device or destination. If the \fBLPDEST\fR and
 \fBPRINTER\fR environment variables are not set, an unspecified output device
 is used. The \fB-d\fR \fIdest\fR option and the \fBLPDEST\fR environment
@@ -595,12 +535,10 @@ value that is not a valid device or destination name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the timezone used to calculate date and time strings displayed in the
 \fBlp\fR banner page, if any. If \fBTZ\fR is unset or null, an unspecified
 default timezone shall be used.
@@ -612,79 +550,65 @@ default timezone shall be used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS+\fR version of \fB/etc/printers.conf\fR
 .RE
 
@@ -696,15 +620,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled. See \fBNOTES\fR.
+CSI	Enabled. See \fBNOTES\fR.
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

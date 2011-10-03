@@ -22,6 +22,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/ksynch.h>
 #include <sys/kmem.h>
@@ -122,6 +126,7 @@ struct bd_xfer_impl {
 #define	i_kaddr		i_public.x_kaddr
 #define	i_nblks		i_public.x_nblks
 #define	i_blkno		i_public.x_blkno
+#define	i_flags		i_public.x_flags
 
 
 /*
@@ -136,6 +141,7 @@ static int bd_open(dev_t *, int, int, cred_t *);
 static int bd_close(dev_t, int, int, cred_t *);
 static int bd_strategy(struct buf *);
 static int bd_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+static int bd_dump(dev_t, caddr_t, daddr_t, int);
 static int bd_read(dev_t, struct uio *, cred_t *);
 static int bd_write(dev_t, struct uio *, cred_t *);
 static int bd_aread(dev_t, struct aio_req *, cred_t *);
@@ -166,7 +172,7 @@ static struct cb_ops bd_cb_ops = {
 	bd_close, 		/* close */
 	bd_strategy, 		/* strategy */
 	nodev, 			/* print */
-	nodev,			/* dump */
+	bd_dump,		/* dump */
 	bd_read, 		/* read */
 	bd_write, 		/* write */
 	bd_ioctl, 		/* ioctl */
@@ -399,7 +405,7 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rv = cmlb_attach(dip, &bd_tg_ops, DTYPE_DIRECT,
 	    bd->d_removable, bd->d_hotpluggable,
 	    drive.d_lun >= 0 ? DDI_NT_BLOCK_CHAN : DDI_NT_BLOCK,
-	    CMLB_FAKE_LABEL_ONE_PARTITION, bd->d_cmlbh, bd);
+	    CMLB_FAKE_LABEL_ONE_PARTITION, bd->d_cmlbh, 0);
 	if (rv != 0) {
 		cmlb_free_handle(&bd->d_cmlbh);
 		kmem_cache_destroy(bd->d_cache);
@@ -473,7 +479,7 @@ bd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	} else {
 		kmem_free(bd->d_kiop, sizeof (kstat_io_t));
 	}
-	cmlb_detach(bd->d_cmlbh, bd);
+	cmlb_detach(bd->d_cmlbh, 0);
 	cmlb_free_handle(&bd->d_cmlbh);
 	if (bd->d_devid)
 		ddi_devid_free(bd->d_devid);
@@ -704,7 +710,7 @@ bd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 	bd_update_state(bd);
 
-	if (cmlb_validate(bd->d_cmlbh, 0, bd) != 0) {
+	if (cmlb_validate(bd->d_cmlbh, 0, 0) != 0) {
 
 		/* non-blocking opens are allowed to succeed */
 		if (!ndelay) {
@@ -712,7 +718,7 @@ bd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 			goto done;
 		}
 	} else if (cmlb_partinfo(bd->d_cmlbh, part, &nblks, &lba,
-	    NULL, NULL, bd) == 0) {
+	    NULL, NULL, 0) == 0) {
 
 		/*
 		 * We read the partinfo, verify valid ranges.  If the
@@ -820,11 +826,80 @@ bd_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	mutex_exit(&bd->d_ocmutex);
 
 	if (last) {
-		cmlb_invalidate(bd->d_cmlbh, bd);
+		cmlb_invalidate(bd->d_cmlbh, 0);
 	}
 	rw_exit(&bd_lock);
 
 	return (0);
+}
+
+static int
+bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
+{
+	minor_t		inst;
+	minor_t		part;
+	diskaddr_t	pstart;
+	diskaddr_t	psize;
+	bd_t		*bd;
+	bd_xfer_impl_t	*xi;
+	buf_t		*bp;
+	int		rv;
+
+	rw_enter(&bd_lock, RW_READER);
+
+	part = BDPART(dev);
+	inst = BDINST(dev);
+
+	if ((bd = ddi_get_soft_state(bd_state, inst)) == NULL) {
+		rw_exit(&bd_lock);
+		return (ENXIO);
+	}
+	/*
+	 * do cmlb, but do it synchronously unless we already have the
+	 * partition (which we probably should.)
+	 */
+	if (cmlb_partinfo(bd->d_cmlbh, part, &psize, &pstart, NULL, NULL,
+	    (void *)1)) {
+		rw_exit(&bd_lock);
+		return (ENXIO);
+	}
+
+	if ((blkno + nblk) > psize) {
+		rw_exit(&bd_lock);
+		return (EINVAL);
+	}
+	bp = getrbuf(KM_NOSLEEP);
+	if (bp == NULL) {
+		rw_exit(&bd_lock);
+		return (ENOMEM);
+	}
+
+	bp->b_bcount = nblk << bd->d_blkshift;
+	bp->b_resid = bp->b_bcount;
+	bp->b_lblkno = blkno;
+	bp->b_un.b_addr = caddr;
+
+	xi = bd_xfer_alloc(bd, bp,  bd->d_ops.o_write, KM_NOSLEEP);
+	if (xi == NULL) {
+		rw_exit(&bd_lock);
+		freerbuf(bp);
+		return (ENOMEM);
+	}
+	xi->i_blkno = blkno + pstart;
+	xi->i_flags = BD_XFER_POLL;
+	bd_submit(bd, xi);
+	rw_exit(&bd_lock);
+
+	/*
+	 * Generally, we should have run this entirely synchronously
+	 * at this point and the biowait call should be a no-op.  If
+	 * it didn't happen this way, it's a bug in the underlying
+	 * driver not honoring BD_XFER_POLL.
+	 */
+	(void) biowait(bp);
+	rv = geterror(bp);
+	freerbuf(bp);
+	return (rv);
 }
 
 static int
@@ -882,7 +957,7 @@ bd_strategy(struct buf *bp)
 	}
 
 	if (cmlb_partinfo(bd->d_cmlbh, part, &p_nblks, &p_lba,
-	    NULL, NULL, bd)) {
+	    NULL, NULL, 0)) {
 		bioerror(bp, ENXIO);
 		biodone(bp);
 		return (0);
@@ -942,7 +1017,7 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		return (ENXIO);
 	}
 
-	rv = cmlb_ioctl(bd->d_cmlbh, dev, cmd, arg, flag, credp, rvalp, bd);
+	rv = cmlb_ioctl(bd->d_cmlbh, dev, cmd, arg, flag, credp, rvalp, 0);
 	if (rv != ENOTTY)
 		return (rv);
 
@@ -1048,7 +1123,7 @@ bd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 		    name, valuep, lengthp));
 
 	return (cmlb_prop_op(bd->d_cmlbh, dev, dip, prop_op, mod_flags, name,
-	    valuep, lengthp, BDPART(dev), bd));
+	    valuep, lengthp, BDPART(dev), 0));
 }
 
 
@@ -1061,17 +1136,24 @@ bd_tg_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr, diskaddr_t start,
 	bd_xfer_impl_t	*xi;
 	int		rv;
 	int		(*func)(void *, bd_xfer_t *);
+	int		kmflag;
 
-	_NOTE(ARGUNUSED(dip));
+	/*
+	 * If we are running in polled mode (such as during dump(9e)
+	 * execution), then we cannot sleep for kernel allocations.
+	 */
+	kmflag = tg_cookie ? KM_NOSLEEP : KM_SLEEP;
 
+	bd = ddi_get_soft_state(bd_state, ddi_get_instance(dip));
 
-	bd = tg_cookie;
 	if (P2PHASE(length, (1U << bd->d_blkshift)) != 0) {
 		/* We can only transfer whole blocks at a time! */
 		return (EINVAL);
 	}
 
-	bp = getrbuf(KM_SLEEP);
+	if ((bp = getrbuf(kmflag)) == NULL) {
+		return (ENOMEM);
+	}
 
 	switch (cmd) {
 	case TG_READ:
@@ -1089,13 +1171,13 @@ bd_tg_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr, diskaddr_t start,
 
 	bp->b_un.b_addr = bufaddr;
 	bp->b_bcount = length;
-	xi = bd_xfer_alloc(bd, bp, func, KM_SLEEP);
+	xi = bd_xfer_alloc(bd, bp, func, kmflag);
 	if (xi == NULL) {
 		rv = geterror(bp);
 		freerbuf(bp);
 		return (rv);
 	}
-
+	xi->i_flags = tg_cookie ? BD_XFER_POLL : 0;
 	xi->i_blkno = start;
 	bd_submit(bd, xi);
 	(void) biowait(bp);
@@ -1110,8 +1192,8 @@ bd_tg_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 {
 	bd_t		*bd;
 
-	_NOTE(ARGUNUSED(dip));
-	bd = tg_cookie;
+	_NOTE(ARGUNUSED(tg_cookie));
+	bd = ddi_get_soft_state(bd_state, ddi_get_instance(dip));
 
 	switch (cmd) {
 	case TG_GETPHYGEOM:
@@ -1157,7 +1239,7 @@ bd_sched(bd_t *bd)
 	struct buf	*bp;
 	int		rv;
 
-	ASSERT(mutex_owned(&bd->d_iomutex));
+	mutex_enter(&bd->d_iomutex);
 
 	while ((bd->d_qactive < bd->d_qsize) &&
 	    ((xi = list_remove_head(&bd->d_waitq)) != NULL)) {
@@ -1165,21 +1247,31 @@ bd_sched(bd_t *bd)
 		kstat_waitq_to_runq(bd->d_kiop);
 		list_insert_tail(&bd->d_runq, xi);
 
-		/* Submit the job to driver */
+		/*
+		 * Submit the job to the driver.  We drop the I/O mutex
+		 * so that we can deal with the case where the driver
+		 * completion routine calls back into us synchronously.
+		 */
+
+		mutex_exit(&bd->d_iomutex);
+
 		rv = xi->i_func(bd->d_private, &xi->i_public);
 		if (rv != 0) {
-			bd->d_qactive--;
-			kstat_runq_exit(bd->d_kiop);
-			list_remove(&bd->d_runq, xi);
-
-			mutex_exit(&bd->d_iomutex);
 			bp = xi->i_bp;
 			bd_xfer_free(xi);
 			bioerror(bp, rv);
 			biodone(bp);
+
+			mutex_enter(&bd->d_iomutex);
+			bd->d_qactive--;
+			kstat_runq_exit(bd->d_kiop);
+			list_remove(&bd->d_runq, xi);
+		} else {
 			mutex_enter(&bd->d_iomutex);
 		}
 	}
+
+	mutex_exit(&bd->d_iomutex);
 }
 
 static void
@@ -1188,8 +1280,9 @@ bd_submit(bd_t *bd, bd_xfer_impl_t *xi)
 	mutex_enter(&bd->d_iomutex);
 	list_insert_tail(&bd->d_waitq, xi);
 	kstat_waitq_enter(bd->d_kiop);
-	bd_sched(bd);
 	mutex_exit(&bd->d_iomutex);
+
+	bd_sched(bd);
 }
 
 static void
@@ -1198,10 +1291,12 @@ bd_runq_exit(bd_xfer_impl_t *xi, int err)
 	bd_t	*bd = xi->i_bd;
 	buf_t	*bp = xi->i_bp;
 
-	ASSERT(mutex_owned(&bd->d_iomutex));
-
+	mutex_enter(&bd->d_iomutex);
 	bd->d_qactive--;
 	kstat_runq_exit(bd->d_kiop);
+	list_remove(&bd->d_runq, xi);
+	mutex_exit(&bd->d_iomutex);
+
 	if (err == 0) {
 		if (bp->b_flags & B_READ) {
 			bd->d_kiop->reads++;
@@ -1211,7 +1306,6 @@ bd_runq_exit(bd_xfer_impl_t *xi, int err)
 			bd->d_kiop->nwritten += (bp->b_bcount - xi->i_resid);
 		}
 	}
-	list_remove(&bd->d_runq, xi);
 	bd_sched(bd);
 }
 
@@ -1274,9 +1368,9 @@ bd_update_state(bd_t *bd)
 
 	if (docmlb) {
 		if (state == DKIO_INSERTED) {
-			(void) cmlb_validate(bd->d_cmlbh, 0, bd);
+			(void) cmlb_validate(bd->d_cmlbh, 0, 0);
 		} else {
-			cmlb_invalidate(bd->d_cmlbh, bd);
+			cmlb_invalidate(bd->d_cmlbh, 0);
 		}
 	}
 }
@@ -1505,10 +1599,8 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 	bd_t		*bd = xi->i_bd;
 	size_t		len;
 
-	mutex_enter(&bd->d_iomutex);
 	if (err != 0) {
 		bd_runq_exit(xi, err);
-		mutex_exit(&bd->d_iomutex);
 
 		bp->b_resid += xi->i_resid;
 		bd_xfer_free(xi);
@@ -1523,7 +1615,6 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 	if (xi->i_resid == 0) {
 		/* Job completed succcessfully! */
 		bd_runq_exit(xi, 0);
-		mutex_exit(&bd->d_iomutex);
 
 		bd_xfer_free(xi);
 		biodone(bp);
@@ -1547,7 +1638,6 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 	if ((rv != DDI_SUCCESS) ||
 	    (P2PHASE(len, (1U << xi->i_blkshift) != 0))) {
 		bd_runq_exit(xi, EFAULT);
-		mutex_exit(&bd->d_iomutex);
 
 		bp->b_resid += xi->i_resid;
 		bd_xfer_free(xi);
@@ -1562,16 +1652,12 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 	rv = xi->i_func(bd->d_private, &xi->i_public);
 	if (rv != 0) {
 		bd_runq_exit(xi, rv);
-		mutex_exit(&bd->d_iomutex);
 
 		bp->b_resid += xi->i_resid;
 		bd_xfer_free(xi);
 		bioerror(bp, rv);
 		biodone(bp);
-		return;
 	}
-
-	mutex_exit(&bd->d_iomutex);
 }
 
 void

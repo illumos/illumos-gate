@@ -2,7 +2,7 @@
 .\" Copyright (C) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH getnetbyname 3SOCKET "4 Nov 2004" "SunOS 5.11" "Sockets Library Functions"
+.TH GETNETBYNAME 3SOCKET "Nov 4, 2004"
 .SH NAME
 getnetbyname, getnetbyname_r, getnetbyaddr, getnetbyaddr_r, getnetent,
 getnetent_r, setnetent, endnetent \- get network entry
@@ -83,15 +83,13 @@ aligned based upon the input string. For example:
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-TextValue
-\fB"10"\fR\fB0x0000000a\fR
-\fB"10.0"\fR\fB0x00000a00\fR
-\fB"10.0.1"\fR\fB0a000a0001\fR
-\fB"10.0.1.28\fR"\fB0x0a000180\fR
+c c
+l l .
+Text	Value
+\fB"10"\fR	\fB0x0000000a\fR
+\fB"10.0"\fR	\fB0x00000a00\fR
+\fB"10.0.1"\fR	\fB0a000a0001\fR
+\fB"10.0.1.28\fR"	\fB0x0a000180\fR
 .TE
 
 .sp
@@ -225,23 +223,19 @@ result. See \fBIntro\fR(2) for the proper usage and interpretation of
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/networks\fR\fR
 .ad
 .RS 22n
-.rt  
 network name database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 configuration file for the name service switch
 .RE
 
@@ -253,13 +247,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

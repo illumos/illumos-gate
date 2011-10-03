@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH groupadd 1M "27 Aug 2008" "SunOS 5.11" "System Administration Commands"
+.TH GROUPADD 1M "Aug 27, 2008"
 .SH NAME
 groupadd \- add (create) a new group definition on the system
 .SH SYNOPSIS
@@ -23,12 +23,10 @@ adding the appropriate entry to the \fB/etc/group\fR file.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgid\fR\fR
 .ad
 .RS 10n
-.rt  
 Assigns the group id \fIgid\fR for the new group. This group id must be a
 non-negative decimal integer below \fBMAXUID\fR as defined in
 \fB/usr/include/sys/param.h\fR. The group \fBID\fR defaults to the next
@@ -40,12 +38,10 @@ groups, the next default group number will be  \fB201\fR. (Group \fBIDs\fR from
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 10n
-.rt  
 Allows the \fIgid\fR to be duplicated (non-unique).
 .RE
 
@@ -55,12 +51,10 @@ Allows the \fIgid\fR to be duplicated (non-unique).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 9n
-.rt  
 A string consisting of characters from the set of lower case alphabetic
 characters and numeric characters. A warning message will be written if the
 string exceeds \fBMAXGLEN,\fR which is usually set at eight characters. The
@@ -75,68 +69,56 @@ numeric characters or a combination of both, and must not contain a colon
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Invalid command syntax. A usage message for the \fBgroupadd\fR command is
 displayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 6n
-.rt  
 An invalid argument was provided to an option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 6n
-.rt  
 The \fIgid\fR is not unique (when  \fB-o\fR option is not used).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9\fR\fR
 .ad
 .RS 6n
-.rt  
 The \fIgroup\fR is not unique.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10\fR\fR
 .ad
 .RS 6n
-.rt  
 The  \fB/etc/group\fR file cannot be updated.
 .RE
 

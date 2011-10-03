@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH menu_format 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH MENU_FORMAT 3CURSES "Dec 31, 1996"
 .SH NAME
 menu_format, set_menu_format \- set and get maximum numbers of rows and columns
 in menus
@@ -39,45 +39,37 @@ the variables used to return these values.
 \fBset_menu_format()\fR returns one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBE_OK\fR
 .ad
 .RS 18n
-.rt  
 The routine returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_SYSTEM_ERROR\fR
 .ad
 .RS 18n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_BAD_ARGUMENT\fR
 .ad
 .RS 18n
-.rt  
 An incorrect argument was passed to the routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_POSTED\fR
 .ad
 .RS 18n
-.rt  
 The menu is already posted.
 .RE
 
@@ -89,13 +81,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

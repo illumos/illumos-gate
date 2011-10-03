@@ -50,15 +50,10 @@ driver name=dnet clone_perms="dnet 0666 root sys" perms="* 0666 root sys" \
     alias=pci1109,1400 \
     alias=pci1109,2400 \
     alias=pci2646,1
-driver name=pcn clone_perms="pcn 0666 root sys" perms="* 0666 root sys" \
-    alias=pci1022,2000 \
-    alias=pci103c,104c
 file path=etc/bootrc group=sys mode=0755
 file path=etc/mach group=sys original_name=SUNWos86r:etc/mach preserve=true
 file path=kernel/drv/$(ARCH64)/dnet group=sys
-file path=kernel/drv/$(ARCH64)/pcn group=sys
 file path=kernel/drv/dnet group=sys
-file path=kernel/drv/pcn group=sys
 file path=kernel/drv/sd group=sys
 file path=kernel/drv/sd.conf group=sys \
     original_name=SUNWos86r:kernel/drv/sd.conf preserve=true
@@ -67,10 +62,9 @@ legacy pkg=SUNWos86r desc="Platform Support, OS Functionality (Root)" \
     name="Platform Support, OS Functionality (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-# when pcn is removed, we can remove the OSBL as well
-license lic_OSBL license=lic_OSBL
-license lic_OSBL_preamble license=lic_OSBL_preamble
 # elxl moved out of this package, so create a dependency for upgraded systems
 depend fmri=driver/network/elxl type=require
 # iprb moved out of this package, so create a dependency for upgraded systems
 depend fmri=driver/network/iprb type=require
+# pcn moved out of this package, so create a dependency for upgraded systems
+depend fmri=driver/network/pcn type=require

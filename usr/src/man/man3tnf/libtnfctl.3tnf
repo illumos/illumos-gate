@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libtnfctl 3TNF "1 Mar 2004" "SunOS 5.11" "TNF Library Functions"
+.TH LIBTNFCTL 3TNF "Mar 1, 2004"
 .SH NAME
 libtnfctl \- library for TNF probe control in a process or the kernel
 .SH SYNOPSIS
@@ -22,24 +22,20 @@ The \fBlibtnfctl\fR library provides an  \fBAPI\fR to control  \fBTNF\fR
 client of \fBlibtnfctl\fR controls probes in one of four modes:
 .sp
 .ne 2
-.mk
 .na
 \fBinternal mode\fR
 .ad
 .RS 17n
-.rt  
 The target is the controlling process itself; that is, the client controls its
 own probes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdirect mode\fR
 .ad
 .RS 17n
-.rt  
 The target is a separate process; a client can either  \fBexec\fR(2) a program
 or attach to a running process for probe control. The \fBlibtnfctl\fR library
 uses \fBproc\fR(4) on the target process for probe and process control in this
@@ -48,12 +44,10 @@ mode, and additionally provides basic process control features.
 
 .sp
 .ne 2
-.mk
 .na
 \fBindirect mode\fR
 .ad
 .RS 17n
-.rt  
 The target is a separate process, but the controlling process is already using
 \fBproc\fR(4) to control the target, and hence  \fBlibtnfctl\fR cannot use
 those interfaces directly.  Use this mode to control probes from within a
@@ -63,12 +57,10 @@ debugger. In this mode, the client must provide a set of functions that
 
 .sp
 .ne 2
-.mk
 .na
 \fBkernel mode\fR
 .ad
 .RS 17n
-.rt  
 The target is the Solaris kernel.
 .RE
 
@@ -100,15 +92,13 @@ These interfaces create handles in the specified modes:
 
 .sp
 .TS
-tab();
-lw(2.49i) lw(.76i) lw(.74i) lw(.78i) lw(.74i) 
-lw(2.49i) lw(.76i) lw(.74i) lw(.78i) lw(.74i) 
-.
-\fBtnfctl_internal_open()\fRINT
-\fBtnfctl_exec_open()\fRD
-\fBtnfctl_pid_open()\fRD
-\fBtnfctl_indirect_open()\fRIND
-\fBtnfctl_kernel_open()\fRK
+l l l l l
+l l l l l .
+\fBtnfctl_internal_open()\fR	INT			
+\fBtnfctl_exec_open()\fR		D		
+\fBtnfctl_pid_open()\fR		D		
+\fBtnfctl_indirect_open()\fR			IND	
+\fBtnfctl_kernel_open()\fR				K
 .TE
 
 .sp
@@ -118,32 +108,30 @@ These interfaces are used with the specified modes:
 
 .sp
 .TS
-tab();
-lw(2.46i) lw(.76i) lw(.79i) lw(.78i) lw(.71i) 
-lw(2.46i) lw(.76i) lw(.79i) lw(.78i) lw(.71i) 
-.
-\fBtnfctl_continue()\fRD
-\fBtnfctl_probe_connect()\fRINTDIND
-\fBtnfctl_probe_disconnect_all ()\fRINTDIND
-\fBtnfctl_trace_attrs_get()\fRINTDINDK
-\fBtnfctl_buffer_alloc()\fRINTDINDK
-\fBtnfctl_register_funcs()\fRINTDINDK
-\fBtnfctl_probe_apply()\fRINTDINDK
-\fBtnfctl_probe_apply_ids()\fRINTDINDK
-\fBtnfctl_probe_state_get ()\fRINTDINDK
-\fBtnfctl_probe_enable()\fRINTDINDK
-\fBtnfctl_probe_disable()\fRINTDINDK
-\fBtnfctl_probe_trace()\fRINTDINDK
-\fBtnfctl_probe_untrace()\fRINTDINDK
-\fBtnfctl_check_libs()\fRINTDINDK
-\fBtnfctl_close()\fRINTDINDK
-\fBtnfctl_strerror()\fRINTDINDK
-\fBtnfctl_buffer_dealloc()\fRK
-\fBtnfctl_trace_state_set()\fRK
-\fBtnfctl_filter_state_set()\fRK
-\fBtnfctl_filter_list_get()\fRK
-\fBtnfctl_filter_list_add()\fRK
-\fBtnfctl_filter_list_delete()\fRK
+l l l l l
+l l l l l .
+\fBtnfctl_continue()\fR		D		
+\fBtnfctl_probe_connect()\fR	INT	D	IND	
+\fBtnfctl_probe_disconnect_all ()\fR	INT	D	IND	
+\fBtnfctl_trace_attrs_get()\fR	INT	D	IND	K
+\fBtnfctl_buffer_alloc()\fR	INT	D	IND	K
+\fBtnfctl_register_funcs()\fR	INT	D	IND	K
+\fBtnfctl_probe_apply()\fR	INT	D	IND	K
+\fBtnfctl_probe_apply_ids()\fR	INT	D	IND	K
+\fBtnfctl_probe_state_get ()\fR	INT	D	IND	K
+\fBtnfctl_probe_enable()\fR	INT	D	IND	K
+\fBtnfctl_probe_disable()\fR	INT	D	IND	K
+\fBtnfctl_probe_trace()\fR	INT	D	IND	K
+\fBtnfctl_probe_untrace()\fR	INT	D	IND	K
+\fBtnfctl_check_libs()\fR	INT	D	IND	K
+\fBtnfctl_close()\fR	INT	D	IND	K
+\fBtnfctl_strerror()\fR	INT	D	IND	K
+\fBtnfctl_buffer_dealloc()\fR				K
+\fBtnfctl_trace_state_set()\fR				K
+\fBtnfctl_filter_state_set()\fR				K
+\fBtnfctl_filter_list_get()\fR				K
+\fBtnfctl_filter_list_add()\fR				K
+\fBtnfctl_filter_list_delete()\fR				K
 .TE
 
 .sp
@@ -234,243 +222,199 @@ Upon successful completion, these functions return\fBTNFCTL_ERR_NONE\fR.
 The error codes for  \fBlibtnfctl\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_ACCES\fR\fR
 .ad
 .RS 28n
-.rt  
 Permission denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOTARGET\fR\fR
 .ad
 .RS 28n
-.rt  
 The target process completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_ALLOCFAIL\fR\fR
 .ad
 .RS 28n
-.rt  
 A memory allocation failure occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 28n
-.rt  
 An internal error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_SIZETOOSMALL\fR\fR
 .ad
 .RS 28n
-.rt  
 The requested trace size is too small.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_SIZETOOBIG\fR\fR
 .ad
 .RS 28n
-.rt  
 The requested trace size is too big.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 28n
-.rt  
 Bad input argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOTDYNAMIC\fR\fR
 .ad
 .RS 28n
-.rt  
 The target is not a dynamic executable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOLIBTNFPROBE\fR\fR
 .ad
 .RS 28n
-.rt  
 \fBlibtnfprobe.so\fR not linked in target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BUFBROKEN\fR\fR
 .ad
 .RS 28n
-.rt  
 Tracing is broken in the target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BUFEXISTS\fR\fR
 .ad
 .RS 28n
-.rt  
 A buffer already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOBUF\fR\fR
 .ad
 .RS 28n
-.rt  
 No buffer exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADDEALLOC\fR\fR
 .ad
 .RS 28n
-.rt  
 Cannot deallocate buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_NOPROCESS\fR\fR
 .ad
 .RS 28n
-.rt  
 No such target process exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_FILENOTFOUND\fR\fR
 .ad
 .RS 28n
-.rt  
 File not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BUSY\fR\fR
 .ad
 .RS 28n
-.rt  
 Cannot attach to process or kernel because it is already tracing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INVALIDPROBE\fR\fR
 .ad
 .RS 28n
-.rt  
 Probe no longer valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_USR1\fR\fR
 .ad
 .RS 28n
-.rt  
 Error code reserved for user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_USR2\fR\fR
 .ad
 .RS 28n
-.rt  
 Error code reserved for user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_USR3\fR\fR
 .ad
 .RS 28n
-.rt  
 Error code reserved for user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_USR4\fR\fR
 .ad
 .RS 28n
-.rt  
 Error code reserved for user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_USR5\fR\fR
 .ad
 .RS 28n
-.rt  
 Error code reserved for user.
 .RE
 
@@ -482,13 +426,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe with exceptions
+MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

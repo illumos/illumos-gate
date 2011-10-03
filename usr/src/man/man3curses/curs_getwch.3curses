@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curs_getwch 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH CURS_GETWCH 3CURSES "Dec 31, 1996"
 .SH NAME
 curs_getwch, getwch, wgetwch, mvgetwch, mvwgetwch, ungetwch \- get (or push
 back) wchar_t characters from curses terminal keyboard
@@ -82,106 +82,105 @@ present in the  \fBterminfo\fR(4) database.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fIName\fR\fIKey name\fR
+box;
+c c
+l l .
+\fIName\fR	\fIKey name\fR
 _
-KEY_BREAKBreak key
-KEY_DOWNThe four arrow keys \|.\|.\|.
-KEY_UP
-KEY_LEFT
-KEY_RIGHT
-KEY_HOMEHome key (upward+left arrow)
-KEY_BACKSPACEBackspace
-KEY_F0T{
+KEY_BREAK	Break key
+KEY_DOWN	The four arrow keys \|.\|.\|.
+KEY_UP	
+KEY_LEFT	
+KEY_RIGHT	
+KEY_HOME	Home key (upward+left arrow)
+KEY_BACKSPACE	Backspace
+KEY_F0	T{
 Function keys; space for 64 keys is reserved.
 T}
-KEY_F(\fIn\fR)For 0 \(<= \fIn\fR \(<= 63
-KEY_DLDelete line
-KEY_ILInsert line
-KEY_DCDelete character
-KEY_ICInsert char or enter insert mode
-KEY_EICExit insert char mode
-KEY_CLEARClear screen
-KEY_EOSClear to end of screen
-KEY_EOLClear to end of line
-KEY_SFScroll 1 line forward
- KEY_SRScroll 1 line backward (reverse)
-KEY_NPAGENext page
-KEY_PPAGEPrevious page
-KEY_STABSet tab
-KEY_CTABClear tab
-KEY_CATABClear all tabs
-KEY_ENTEREnter or send
-KEY_SRESETSoft (partial) reset
-KEY_RESETReset or hard reset
-KEY_PRINTPrint or copy
-KEY_LLT{
+KEY_F(\fIn\fR)	For 0 \(<= \fIn\fR \(<= 63
+KEY_DL	Delete line
+KEY_IL	Insert line
+KEY_DC	Delete character
+KEY_IC	Insert char or enter insert mode
+KEY_EIC	Exit insert char mode
+KEY_CLEAR	Clear screen
+KEY_EOS	Clear to end of screen
+KEY_EOL	Clear to end of line
+KEY_SF	Scroll 1 line forward
+ KEY_SR	Scroll 1 line backward (reverse)
+KEY_NPAGE	Next page
+KEY_PPAGE	Previous page
+KEY_STAB	Set tab
+KEY_CTAB	Clear tab
+KEY_CATAB	Clear all tabs
+KEY_ENTER	Enter or send
+KEY_SRESET	Soft (partial) reset
+KEY_RESET	Reset or hard reset
+KEY_PRINT	Print or copy
+KEY_LL	T{
 Home down or bottom (lower left). Keypad is arranged like this:      A1 up    A3     left   B2   right      C1   down   C3
 T}
-KEY_A1Upper left of keypad
-KEY_A3Upper right of keypad
-KEY_B2Center of keypad
-KEY_C1Lower left of keypad
-KEY_C3Lower right of keypad
-KEY_BTABBack tab key
-KEY_BEGBeg(inning) key
-KEY_CANCELCancel key
-KEY_CLOSEClose key
-KEY_COMMANDCmd (command) key
-KEY_COPYCopy key
-KEY_CREATECreate key
-KEY_ENDEnd key
-KEY_EXITExit key
-KEY_FINDFind key
-KEY_HELPHelp key
-KEY_MARKMark key
-KEY_MESSAGEMessage key
-KEY_MOVEMove key
-KEY_NEXTNext object key
-KEY_OPENOpen key
-KEY_OPTIONSOptions key
-KEY_PREVIOUSPrevious object key
-KEY_REDORedo key
-KEY_REFERENCEReference key
-KEY_REFRESH Refresh key
-KEY_REPLACEReplace key
-KEY_RESTARTRestart key
-KEY_RESUMEResume key
-KEY_SAVESave key
-KEY_SBEGShifted beginning key
-KEY_SCANCELShifted cancel key
-KEY_SCOMMANDShifted command key
-KEY_SCOPYShifted copy key
-KEY_SCREATEShifted create key
-KEY_SDCShifted delete char key
-KEY_SDLShifted delete line key
-KEY_SELECTSelect key
-KEY_SENDShifted end key
-KEY_SEOLShifted clear line key
-KEY_SEXITShifted exit key
-KEY_SFINDShifted find key
-KEY_SHELPShifted help key
-KEY_SHOMEShifted home key
-KEY_SICShifted input key
-KEY_SLEFTShifted left arrow key
-KEY_SMESSAGEShifted message key
-KEY_SMOVEShifted move key
-KEY_SNEXTShifted next key
-KEY_SOPTIONSShifted options key
-KEY_SPREVIOUSShifted prev key
-KEY_SPRINTShifted print key
-KEY_SREDOShifted redo key
-KEY_SREPLACEShifted replace key
-KEY_SRIGHTShifted right arrow
-KEY_SRSUMEShifted resume key
-KEY_SSAVEShifted save key
-KEY_SSUSPENDShifted suspend key
-KEY_SUNDOShifted undo key
-KEY_SUSPENDSuspend key
-KEY_UNDOUndo key
+KEY_A1	Upper left of keypad
+KEY_A3	Upper right of keypad
+KEY_B2	Center of keypad
+KEY_C1	Lower left of keypad
+KEY_C3	Lower right of keypad
+KEY_BTAB	Back tab key
+KEY_BEG	Beg(inning) key
+KEY_CANCEL	Cancel key
+KEY_CLOSE	Close key
+KEY_COMMAND	Cmd (command) key
+KEY_COPY	Copy key
+KEY_CREATE	Create key
+KEY_END	End key
+KEY_EXIT	Exit key
+KEY_FIND	Find key
+KEY_HELP	Help key
+KEY_MARK	Mark key
+KEY_MESSAGE	Message key
+KEY_MOVE	Move key
+KEY_NEXT	Next object key
+KEY_OPEN	Open key
+KEY_OPTIONS	Options key
+KEY_PREVIOUS	Previous object key
+KEY_REDO	Redo key
+KEY_REFERENCE	Reference key
+KEY_REFRESH 	Refresh key
+KEY_REPLACE	Replace key
+KEY_RESTART	Restart key
+KEY_RESUME	Resume key
+KEY_SAVE	Save key
+KEY_SBEG	Shifted beginning key
+KEY_SCANCEL	Shifted cancel key
+KEY_SCOMMAND	Shifted command key
+KEY_SCOPY	Shifted copy key
+KEY_SCREATE	Shifted create key
+KEY_SDC	Shifted delete char key
+KEY_SDL	Shifted delete line key
+KEY_SELECT	Select key
+KEY_SEND	Shifted end key
+KEY_SEOL	Shifted clear line key
+KEY_SEXIT	Shifted exit key
+KEY_SFIND	Shifted find key
+KEY_SHELP	Shifted help key
+KEY_SHOME	Shifted home key
+KEY_SIC	Shifted input key
+KEY_SLEFT	Shifted left arrow key
+KEY_SMESSAGE	Shifted message key
+KEY_SMOVE	Shifted move key
+KEY_SNEXT	Shifted next key
+KEY_SOPTIONS	Shifted options key
+KEY_SPREVIOUS	Shifted prev key
+KEY_SPRINT	Shifted print key
+KEY_SREDO	Shifted redo key
+KEY_SREPLACE	Shifted replace key
+KEY_SRIGHT	Shifted right arrow
+KEY_SRSUME	Shifted resume key
+KEY_SSAVE	Shifted save key
+KEY_SSUSPEND	Shifted suspend key
+KEY_SUNDO	Shifted undo key
+KEY_SUSPEND	Suspend key
+KEY_UNDO	Undo key
 .TE
 
 .SH RETURN VALUE
@@ -197,13 +196,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

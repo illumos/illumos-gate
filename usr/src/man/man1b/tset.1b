@@ -3,20 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tset 1B "15 Feb 1995" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH TSET 1B "Feb 15, 1995"
 .SH NAME
 tset, reset \- establish or restore terminal characteristics
 .SH SYNOPSIS
 .LP
 .nf
-\fBtset\fR [\fB-InQrs\fR] [\fB-e\fR\fIc\fR] [\fB-k\fR\fIc\fR] 
+\fBtset\fR [\fB-InQrs\fR] [\fB-e\fR\fIc\fR] [\fB-k\fR\fIc\fR]
      [\fB-m\fR [\fIport-ID\fR [\fIbaudrate\fR] : \fItype\fR]...] [\fItype\fR]
 .fi
 
 .LP
 .nf
-\fBreset\fR [\fB-\fR] [\fB-e\fR\fIc\fR] [\fB-I\fR] [\fB-k\fR\fIc\fR] 
-     [\fB-n\fR] [\fB-Q\fR] [\fB-r\fR] [\fB-s\fR] 
+\fBreset\fR [\fB-\fR] [\fB-e\fR\fIc\fR] [\fB-I\fR] [\fB-k\fR\fIc\fR]
+     [\fB-n\fR] [\fB-Q\fR] [\fB-r\fR] [\fB-s\fR]
      [\fB-m\fR [\fIindent\fR] [\fItest\fR \fIbaudrate\fR] : \fItype\fR]... [\fItype\fR]
 .fi
 
@@ -128,12 +128,10 @@ had been used.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 8n
-.rt  
 The name of the terminal finally decided upon is output on the standard output.
 This is intended to be captured by the shell and placed in the \fBTERM\fR
 environment variable.
@@ -141,12 +139,10 @@ environment variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fIc\fR\fR
 .ad
 .RS 8n
-.rt  
 Set the erase character to be the named character \fIc\fR on all terminals.
 Default is the BACKSPACE key on the keyboard, usually \fB^H\fR (CTRL-H). The
 character \fIc\fR can either be typed directly, or entered using the
@@ -155,12 +151,10 @@ circumflex-character notation used here.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fIc\fR\fR
 .ad
 .RS 8n
-.rt  
 Set the interrupt character to be the named character \fIc\fR on all terminals.
 Default is \fB^C\fR (CTRL-C). The character \fIc\fR can either be typed
 directly, or entered using the circumflex-character notation used here.
@@ -168,23 +162,19 @@ directly, or entered using the circumflex-character notation used here.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 8n
-.rt  
 Suppress transmitting terminal-initialization strings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fIc\fR\fR
 .ad
 .RS 8n
-.rt  
 Set the line kill character to be the named character \fIc\fR on all terminals.
 Default is \fB^U\fR (CTRL-U). The kill character is left alone if \fB-k\fR is
 not specified. Control characters can be specified by prefixing the
@@ -195,46 +185,38 @@ currently assigned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 8n
-.rt  
 Specify that the new tty driver modes should be initialized for this terminal.
 Probably useless since \fBstty new\fR is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 8n
-.rt  
 Suppress printing the `\fBErase set to\fR' and `\fBKill set to\fR' messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 8n
-.rt  
 In addition to other actions, reports the terminal type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 8n
-.rt  
 Output commands to set and export \fBTERM\fR. This can be used with
 .sp
 .in +2
@@ -254,7 +236,6 @@ commands are output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR [ \fIport-ID\fR [ \fIbaudrate\fR ] \fB:\fR \fBtype\fR ] .\|.\|.\fR
 .ad
@@ -268,56 +249,46 @@ of the following operators to specify the conditions under which the mapping is
 made:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fR
 .ad
 .RS 5n
-.rt  
 Greater than
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB@\fR\fR
 .ad
 .RS 5n
-.rt  
 Equals or ``at''
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fR
 .ad
 .RS 5n
-.rt  
 Less than
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 5n
-.rt  
 It is not the case that (negates the above operators)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 5n
-.rt  
 Prompt for the terminal type.  If no response is given, then \fBtype\fR is
 selected by default.
 .RE
@@ -449,34 +420,28 @@ unset noglob
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.login\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.profile\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/termcap\fR\fR
 .ad
 .RS 16n
-.rt  
 
 .RE
 

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ct 1C "14 Sep 1992" "SunOS 5.11" "Communication Commands"
+.TH CT 1C "Sep 14, 1992"
 .SH NAME
 ct \- spawn login to a remote terminal
 .SH SYNOPSIS
@@ -46,12 +46,10 @@ The user should log out properly before disconnecting.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 11n
-.rt  
 Normally,  \fBct\fR will hang up the current line so that it can be used to
 answer the incoming call.  The \fB-h\fR option will prevent this action. The
 \fB-h\fR option will also wait for the termination of the specified \fBct\fR
@@ -60,36 +58,30 @@ process before returning control to the user's terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIspeed\fR\fR
 .ad
 .RS 11n
-.rt  
 The data rate may be set with the \fB-s\fR option. \fIspeed\fR is expressed in
 baud rates.  The default baud rate is 1200.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 11n
-.rt  
 If the \fB-v\fR (verbose) option is used,  \fBct\fR will send a running
 narrative to the standard error output stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fIn\fR\fR
 .ad
 .RS 11n
-.rt  
 If there are no free lines \fBct\fR will ask if it should wait, and for how
 many minutes,  before it gives up. \fBct\fR will continue to try to open the
 dialers at one-minute intervals until the specified limit is exceeded. This
@@ -99,12 +91,10 @@ the maximum number of minutes that \fBct\fR is to wait for a line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fIn\fR\fR
 .ad
 .RS 11n
-.rt  
 This option is used for debugging; it produces a detailed output of the program
 execution on stderr. \fIn\fR is a single number between 0 and 9. As \fIn\fR
 increases to 9, more detailed debugging information is given.
@@ -113,23 +103,19 @@ increases to 9, more detailed debugging information is given.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Devices\fR\fR
 .ad
 .RS 21n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/ctlog\fR\fR
 .ad
 .RS 21n
-.rt  
 
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getexecattr 3SECDB "31 Mar 2005" "SunOS 5.11" "Security Attributes Database Library Functions"
+.TH GETEXECATTR 3SECDB "Mar 31, 2005"
 .SH NAME
 getexecattr, free_execattr, setexecattr, endexecattr, getexecuser, getexecprof,
 match_execattr \- get execution profile entry
@@ -162,8 +162,8 @@ the \fBkva_match\fR(3SECDB) function.
 .sp
 .in +2
 .nf
-if ((execprof=getexecprof(NULL, KV_COMMAND, "/usr/sbin/ping", 
-    GET_ONE)) == NULL) { 
+if ((execprof=getexecprof(NULL, KV_COMMAND, "/usr/sbin/ping",
+    GET_ONE)) == NULL) {
         /* do error */
 }
 .fi
@@ -175,7 +175,7 @@ Administration Profile.
 .sp
 .in +2
 .nf
-if ((execprof=getexecprof("Network Administration", KV_COMMAND, 
+if ((execprof=getexecprof("Network Administration", KV_COMMAND,
     "/usr/sbin/ping", GET_ALL))==NULL) {
         /* do error */
 }
@@ -188,8 +188,8 @@ profile.
 .sp
 .in +2
 .nf
-if ((execprof=getexecprof("Filesystem Security", KV_NULL, NULL, 
-    GET_ALL))==NULL)) { 
+if ((execprof=getexecprof("Filesystem Security", KV_NULL, NULL,
+    GET_ALL))==NULL)) {
         /* do error */
 }
 .fi
@@ -208,7 +208,7 @@ returned.
 .sp
 .in +2
 .nf
-if ((execprof=getexecuser("wetmore", KV_COMMAND, "/usr/bin/tar", 
+if ((execprof=getexecuser("wetmore", KV_COMMAND, "/usr/bin/tar",
     GET_ONE))==NULL) {
         /* do error */
 }
@@ -218,45 +218,37 @@ if ((execprof=getexecuser("wetmore", KV_COMMAND, "/usr/bin/tar",
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 configuration file lookup information for the name server switch
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/user_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 extended user attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/exec_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 execution profiles
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/policy.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 policy definitions
 .RE
 
@@ -268,13 +260,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

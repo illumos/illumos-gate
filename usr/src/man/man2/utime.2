@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH utime 2 "1 Sep 2009" "SunOS 5.11" "System Calls"
+.TH UTIME 2 "Sep 1, 2009"
 .SH NAME
 utime \- set file access and modification times
 .SH SYNOPSIS
@@ -60,79 +60,65 @@ Upon successful completion, 0 is returned. Otherwise, \(mi1 is returned and
 The \fButime()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied by a component of the \fIpath\fR prefix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 The process does not have appropriate privileges and is not the owner of the
 file, write permission is denied for the file, and \fItimes\fR is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during the execution of the \fButime()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds \fIPATH_MAX\fR, or the length of
 a \fIpath\fR component exceeds \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
 effect.
@@ -140,46 +126,38 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The named file does not exist or is a null pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the \fIpath\fR prefix is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 The effective user of the calling process is not the owner of the file,
 {\fBPRIV_FILE_OWNER\fR} is not asserted in the effective set of the calling
 process, and \fItimes\fR is not \fINULL\fR.
@@ -187,12 +165,10 @@ process, and \fItimes\fR is not \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The file system containing the file is mounted read-only.
 .RE
 
@@ -204,17 +180,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

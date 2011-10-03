@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ks_snapshot 9E "4 Dec 2002" "SunOS 5.11" "Driver Entry Points"
+.TH KS_SNAPSHOT 9E "Dec 4, 2002"
 .SH NAME
 ks_snapshot \- take a snapshot of kstat data
 .SH SYNOPSIS
@@ -26,54 +26,44 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIksp\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a \fBkstat\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR \fR
 .ad
 .RS 8n
-.rt  
 Pointer to a buffer to copy the snapshot into.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrw\fR \fR
 .ad
 .RS 8n
-.rt  
 Read/Write flag. Possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_READ\fR\fR
 .ad
 .RS 15n
-.rt  
 Copy driver statistics from the driver to the buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_WRITE\fR\fR
 .ad
 .RS 15n
-.rt  
 Copy statistics from the buffer to the driver.
 .RE
 
@@ -135,34 +125,28 @@ from the buffer to the \fBkstat\fR on \fBKSTAT_WRITE\fR.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 Success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 If \fBKSTAT_WRITE\fR is not allowed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 For any other error
 .RE
 
@@ -199,7 +183,7 @@ xxx_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
                                  KSTAT_NAMED_STR_BUFLEN(knp));
                          KSTAT_NAMED_STR_PTR(knp) = end;
                          end += KSTAT_NAMED_STR_BUFLEN(knp);
-                 } 
+                 }
     }
     return (0);
 }

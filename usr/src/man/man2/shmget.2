@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH shmget 2 "14 Aug 2006" "SunOS 5.11" "System Calls"
+.TH SHMGET 2 "Aug 14, 2006"
 .SH NAME
 shmget \- get shared memory segment identifier
 .SH SYNOPSIS
@@ -89,12 +89,10 @@ set to indicate the error.
 The \fBshmget()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 A shared memory identifier exists for \fIkey\fR but operation permission (see
 \fBIntro\fR(2)) as specified by the low-order 9 bits of \fIshmflg\fR would not
 be granted.
@@ -102,24 +100,20 @@ be granted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 A shared memory identifier exists for \fIkey\fR but both
 (\fIshmflg\fR\fB&IPC_CREAT\fR) and (\fIshmflg\fR\fB&IPC_EXCL\fR) are true.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsize\fR argument is less than the system-imposed minimum or greater than
 the system-imposed maximum. See NOTES.
 .sp
@@ -129,24 +123,20 @@ associated with it is less than \fIsize\fR and \fIsize\fR is not equal to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 A shared memory identifier does not exist for \fIkey\fR and
 (\fIshmflg\fR\fB&IPC_CREAT\fR) is false.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 A shared memory identifier and associated shared memory segment are to be
 created but the amount of available memory is not sufficient to fill the
 request.
@@ -154,12 +144,10 @@ request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 10n
-.rt  
 A shared memory identifier is to be created but the system-imposed limit on the
 maximum number of allowed shared memory identifiers system-wide would be
 exceeded. See NOTES.
@@ -173,13 +161,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

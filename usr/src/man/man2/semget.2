@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH semget 2 "14 Aug 2006" "SunOS 5.11" "System Calls"
+.TH SEMGET 2 "Aug 14, 2006"
 .SH NAME
 semget \- get set of semaphores
 .SH SYNOPSIS
@@ -84,12 +84,10 @@ set to indicate the error.
 The \fBsemget()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 A semaphore identifier exists for \fIkey\fR, but operation permission (see
 \fBIntro\fR(2)) as specified by the low-order 9 bits of \fIsemflg\fR would not
 be granted.
@@ -97,24 +95,20 @@ be granted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 A semaphore identifier exists for \fIkey\fR but both
 (\fIsemflg\fR\fB&IPC_CREAT\fR) and (\fIsemflg\fR\fB&IPC_EXCL\fR) are both true.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fInsems\fR argument is either less than or equal to 0 or greater than the
 system-imposed limit. See NOTES.
 .sp
@@ -125,24 +119,20 @@ equal to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 A semaphore identifier does not exist for \fIkey\fR and
 (\fIsemflg\fR\fB&IPC_CREAT\fR) is false.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 10n
-.rt  
 A semaphore identifier is to be created but the system-imposed limit on the
 maximum number of allowed semaphores or semaphore identifiers system-wide would
 be exceeded. See NOTES.
@@ -156,13 +146,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

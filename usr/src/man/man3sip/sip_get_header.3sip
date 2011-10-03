@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sip_get_header 3SIP "09 Feb 2007" "SunOS 5.11" "Session Initiation Protocol Library Functions"
+.TH SIP_GET_HEADER 3SIP "Feb 09, 2007"
 .SH NAME
 sip_get_header \- get a SIP header from a message
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ sip_get_header \- get a SIP header from a message
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsip\fR [ \fIlibrary\fR ... ]
 #include <sip.h>
 
-\fBconst struct sip_header *\fR\fIsip_get_header\fR(\fBsip_msg_t\fR \fIsip_msg\fR, 
+\fBconst struct sip_header *\fR\fIsip_get_header\fR(\fBsip_msg_t\fR \fIsip_msg\fR,
      \fBchar *\fR\fIheader_name\fR, \fBsip_header_t\fR \fIold_header\fR, \fBint *\fR\fIerror\fR);
 .fi
 
@@ -62,12 +62,10 @@ error.
 The following value may be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIheader_name\fR specified in the \fBSIP\fR message is not present or has
 been deleted; or, the \fIheader_name\fR is not specified and there are no
 "un-deleted" headers in the \fBSIP\fR message.
@@ -81,15 +79,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

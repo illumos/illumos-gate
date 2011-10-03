@@ -33,6 +33,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -199,8 +200,7 @@ smb_usr_simplerq(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 out:
 	if (rqp != NULL)
 		smb_rq_done(rqp); /* free rqp */
-	if (ioc != NULL)
-		kmem_free(ioc, sizeof (*ioc));
+	kmem_free(ioc, sizeof (*ioc));
 	smb_credrele(&scred);
 
 	return (err);
@@ -239,14 +239,24 @@ smb_usr_t2request(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 		goto out;
 	}
 
+	/*
+	 * Fill in the FID for libsmbfs transact named pipe.
+	 */
+	if (ioc->ioc_setupcnt > 1 && ioc->ioc_setup[1] == 0xFFFF) {
+		if (sdp->sd_vcgenid != ssp->ss_vcgenid) {
+			err = ESTALE;
+			goto out;
+		}
+		ioc->ioc_setup[1] = (uint16_t)sdp->sd_smbfid;
+	}
+
 	t2p = kmem_alloc(sizeof (*t2p), KM_SLEEP);
 	err = smb_t2_init(t2p, SSTOCP(ssp),
 	    ioc->ioc_setup, ioc->ioc_setupcnt, &scred);
 	if (err)
 		goto out;
-	len = t2p->t2_setupcount = ioc->ioc_setupcnt;
-	if (len > 1)
-		t2p->t2_setupdata = ioc->ioc_setup;
+	t2p->t2_setupcount = ioc->ioc_setupcnt;
+	t2p->t2_setupdata  = ioc->ioc_setup;
 
 	/* This ioc member is a fixed-size array. */
 	if (ioc->ioc_name[0]) {
@@ -319,8 +329,7 @@ out:
 		smb_t2_done(t2p);
 		kmem_free(t2p, sizeof (*t2p));
 	}
-	if (ioc != NULL)
-		kmem_free(ioc, sizeof (*ioc));
+	kmem_free(ioc, sizeof (*ioc));
 	smb_credrele(&scred);
 
 	return (err);
@@ -352,7 +361,7 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	smbioc_rw_t *ioc = NULL;
 	struct iovec aiov[1];
 	struct uio  auio;
-	u_int16_t fh;
+	uint16_t fh;
 	int err;
 	uio_rw_t rw;
 
@@ -383,7 +392,14 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 		goto out;
 	}
 
-	fh = ioc->ioc_fh;
+	/*
+	 * If caller passes -1 in ioc_fh, then
+	 * use the FID from SMBIOC_NTCREATE.
+	 */
+	if (ioc->ioc_fh == -1)
+		fh = (uint16_t)sdp->sd_smbfid;
+	else
+		fh = (uint16_t)ioc->ioc_fh;
 
 	aiov[0].iov_base = ioc->ioc_base;
 	aiov[0].iov_len = (size_t)ioc->ioc_cnt;
@@ -407,8 +423,154 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
 
 out:
-	if (ioc != NULL)
-		kmem_free(ioc, sizeof (*ioc));
+	kmem_free(ioc, sizeof (*ioc));
+	smb_credrele(&scred);
+
+	return (err);
+}
+
+/*
+ * Helper for nsmb_ioctl case
+ * SMBIOC_NTCREATE
+ */
+int
+smb_usr_ntcreate(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
+{
+	struct smb_cred scred;
+	struct mbchain name_mb;
+	struct smb_share *ssp;
+	smbioc_ntcreate_t *ioc = NULL;
+	uint16_t fid;
+	int err, nmlen;
+
+	/* This ioctl requires a share. */
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	/* Must not be already open. */
+	if (sdp->sd_smbfid != -1)
+		return (EINVAL);
+
+	mb_init(&name_mb);
+	smb_credinit(&scred, cr);
+	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
+	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
+		err = EFAULT;
+		goto out;
+	}
+
+	/* Build name_mb */
+	ioc->ioc_name[SMBIOC_MAX_NAME-1] = '\0';
+	nmlen = strnlen(ioc->ioc_name, SMBIOC_MAX_NAME-1);
+	err = smb_put_dmem(&name_mb, SSTOVC(ssp),
+	    ioc->ioc_name, nmlen,
+	    SMB_CS_NONE, NULL);
+	if (err != 0)
+		goto out;
+
+	/* Do the OtW open, save the FID. */
+	err = smb_smb_ntcreate(ssp, &name_mb,
+	    0,	/* create flags */
+	    ioc->ioc_req_acc,
+	    ioc->ioc_efattr,
+	    ioc->ioc_share_acc,
+	    ioc->ioc_open_disp,
+	    ioc->ioc_creat_opts,
+	    NTCREATEX_IMPERSONATION_IMPERSONATION,
+	    &scred,
+	    &fid,
+	    NULL,
+	    NULL);
+	if (err != 0)
+		goto out;
+
+	sdp->sd_smbfid = fid;
+	sdp->sd_vcgenid = ssp->ss_vcgenid;
+
+out:
+	kmem_free(ioc, sizeof (*ioc));
+	smb_credrele(&scred);
+	mb_done(&name_mb);
+
+	return (err);
+}
+
+/*
+ * Helper for nsmb_ioctl case
+ * SMBIOC_PRINTJOB
+ */
+int
+smb_usr_printjob(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
+{
+	struct smb_cred scred;
+	struct smb_share *ssp;
+	smbioc_printjob_t *ioc = NULL;
+	uint16_t fid;
+	int err;
+
+	/* This ioctl requires a share. */
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	/* The share must be a print queue. */
+	if (ssp->ss_type != STYPE_PRINTQ)
+		return (EINVAL);
+
+	/* Must not be already open. */
+	if (sdp->sd_smbfid != -1)
+		return (EINVAL);
+
+	smb_credinit(&scred, cr);
+	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
+	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
+		err = EFAULT;
+		goto out;
+	}
+	ioc->ioc_title[SMBIOC_MAX_NAME-1] = '\0';
+
+	/* Do the OtW open, save the FID. */
+	err = smb_smb_open_prjob(ssp, ioc->ioc_title,
+	    ioc->ioc_setuplen, ioc->ioc_prmode,
+	    &scred, &fid);
+	if (err != 0)
+		goto out;
+
+	sdp->sd_smbfid = fid;
+	sdp->sd_vcgenid = ssp->ss_vcgenid;
+
+out:
+	kmem_free(ioc, sizeof (*ioc));
+	smb_credrele(&scred);
+
+	return (err);
+}
+
+/*
+ * Helper for nsmb_ioctl case
+ * SMBIOC_CLOSEFH
+ */
+int
+smb_usr_closefh(smb_dev_t *sdp, cred_t *cr)
+{
+	struct smb_cred scred;
+	struct smb_share *ssp;
+	uint16_t fid;
+	int err;
+
+	/* This ioctl requires a share. */
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	if (sdp->sd_smbfid == -1)
+		return (0);
+	fid = (uint16_t)sdp->sd_smbfid;
+	sdp->sd_smbfid = -1;
+
+	smb_credinit(&scred, cr);
+	if (ssp->ss_type == STYPE_PRINTQ)
+		err = smb_smb_close_prjob(ssp, fid, &scred);
+	else
+		err = smb_smb_close(ssp, fid, NULL, &scred);
 	smb_credrele(&scred);
 
 	return (err);
@@ -514,8 +676,7 @@ out:
 		/* Error path: rele hold from _findcreate */
 		smb_vc_rele(vcp);
 	}
-	if (ossn != NULL)
-		kmem_free(ossn, sizeof (*ossn));
+	kmem_free(ossn, sizeof (*ossn));
 	smb_credrele(&scred);
 
 	return (error);
@@ -583,8 +744,6 @@ smb_usr_get_tree(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	 */
 	tcon->tc_sh.sh_name[SMBIOC_MAX_NAME-1] = '\0';
 	tcon->tc_sh.sh_pass[SMBIOC_MAX_NAME-1] = '\0';
-	tcon->tc_sh.sh_type_req[SMBIOC_STYPE_LEN-1] = '\0';
-	bzero(tcon->tc_sh.sh_type_ret, SMBIOC_STYPE_LEN);
 
 	if (cmd == SMBIOC_TREE_CONNECT)
 		tcon->tc_opt |= SMBSOPT_CREATE;
@@ -612,8 +771,7 @@ smb_usr_get_tree(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	 * the tree connect response, so they can
 	 * see if they got the requested type.
 	 */
-	(void) memcpy(tcon->tc_sh.sh_type_ret,
-	    ssp->ss_type_ret, SMBIOC_STYPE_LEN);
+	tcon->tc_sh.sh_type = ssp->ss_type;
 
 	/*
 	 * The share has a hold from _tcon
@@ -630,14 +788,12 @@ out:
 		/* Error path: rele hold from _findcreate */
 		smb_share_rele(ssp);
 	}
-	if (tcon) {
-		/*
-		 * This structure may contain a
-		 * cleartext password, so zap it.
-		 */
-		bzero(tcon, sizeof (*tcon));
-		kmem_free(tcon, sizeof (*tcon));
-	}
+	/*
+	 * This structure may contain a
+	 * cleartext password, so zap it.
+	 */
+	bzero(tcon, sizeof (*tcon));
+	kmem_free(tcon, sizeof (*tcon));
 	smb_credrele(&scred);
 
 	return (error);

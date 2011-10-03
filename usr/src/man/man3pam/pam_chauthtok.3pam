@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_chauthtok 3PAM "1 Mar 2005" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_CHAUTHTOK 3PAM "Mar 1, 2005"
 .SH NAME
 pam_chauthtok \- perform password related functions within the PAM framework
 .SH SYNOPSIS
@@ -27,35 +27,29 @@ associated with a particular user referenced by the authentication handle
 The following flag may be passed in to \fBpam_chauthtok()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SILENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The password service should not generate any messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CHANGE_EXPIRED_AUTHTOK\fR\fR
 .ad
 .RS 30n
-.rt  
 The password service should only update those passwords that have aged. If this
 flag is not passed, all password services should update their passwords.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_NO_AUTHTOK_CHECK\fR\fR
 .ad
 .RS 30n
-.rt  
 The password service should not perform conformance checks on the password
 entered.
 .RE
@@ -73,78 +67,64 @@ error return values described in \fBpam\fR(3PAM), the following values may be
 returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_PERM_DENIED\fR\fR
 .ad
 .RS 29n
-.rt  
 No permission.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_ERR\fR\fR
 .ad
 .RS 29n
-.rt  
 Authentication token manipulation error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_RECOVERY_ERR\fR\fR
 .ad
 .RS 29n
-.rt  
 Authentication information cannot be recovered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_LOCK_BUSY\fR\fR
 .ad
 .RS 29n
-.rt  
 Authentication token lock busy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_DISABLE_AGING\fR\fR
 .ad
 .RS 29n
-.rt  
 Authentication token aging disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 29n
-.rt  
 User unknown to password service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_TRY_AGAIN\fR\fR
 .ad
 .RS 29n
-.rt  
 Preliminary check by password service failed.
 .RE
 
@@ -156,15 +136,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mt-streams 9F "5 May 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH MT-STREAMS 9F "May 5, 2009"
 .SH NAME
 mt-streams \- STREAMS multithreading
 .SH SYNOPSIS
@@ -56,46 +56,38 @@ The inner perimeter presence and scope are controlled by the mutually exclusive
 flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_MTPERQ\fR\fR
 .ad
 .RS 21n
-.rt  
 The module/driver has an inner perimeter around each queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_MTQPAIR\fR\fR
 .ad
 .RS 21n
-.rt  
 The module/driver has an inner perimeter around each read/write pair of queues.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_MTPERMOD\fR\fR
 .ad
 .RS 21n
-.rt  
 The module/driver has an inner perimeter that encloses all the
 module's/driver's queues.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBNone of the above\fR
 .ad
 .RS 21n
-.rt  
 The module/driver has no inner perimeter.
 .RE
 
@@ -105,12 +97,10 @@ The module/driver has no inner perimeter.
 The outer perimeter presence is configured using:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_MTOUTPERIM\fR\fR
 .ad
 .RS 16n
-.rt  
 In addition to any inner perimeter, the module/driver has an outer perimeter
 that encloses all the module's/driver's queues. This can be combined with all
 the inner perimeter options except \fBD_MTPERMOD.\fR
@@ -127,24 +117,20 @@ the module or driver in the system.
 The default concurrency can be modified using:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_MTPUTSHARED\fR\fR
 .ad
 .RS 17n
-.rt  
 This flag modifies the default behavior when \fBput\fR(9E) procedure are
 invoked so that the inner perimeter is entered shared instead of exclusively.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_MTOCEXCL\fR\fR
 .ad
 .RS 17n
-.rt  
 This flag modifies the default behavior when \fBopen\fR(9E) and \fBclose\fR(9E)
 procedures are invoked so the outer perimeter is entered exclusively instead of
 shared.

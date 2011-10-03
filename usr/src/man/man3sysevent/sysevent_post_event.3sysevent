@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sysevent_post_event 3SYSEVENT "24 Jul 2009" "SunOS 5.11" "System Event Library Functions"
+.TH SYSEVENT_POST_EVENT 3SYSEVENT "Jul 24, 2009"
 .SH NAME
 sysevent_post_event \- post system event for applications
 .SH SYNOPSIS
@@ -20,68 +20,56 @@ sysevent_post_event \- post system event for applications
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr_list\fR\fR
 .ad
 .RS 13n
-.rt  
 pointer to an \fBnvlist_t\fR, listing the name-value attributes associated with
 the event, or \fINULL\fR if there are no such attributes for this event
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclass\fR\fR
 .ad
 .RS 13n
-.rt  
 pointer to a string defining the event class
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIeid\fR\fR
 .ad
 .RS 13n
-.rt  
 pointer to a system unique identifier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpublisher\fR\fR
 .ad
 .RS 13n
-.rt  
 pointer to a string defining the event's publisher nam
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsubclass\fR\fR
 .ad
 .RS 13n
-.rt  
 pointer to a string defining the event subclass
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvendor\fR\fR
 .ad
 .RS 13n
-.rt  
 pointer to a string defining the vendor
 .RE
 
@@ -122,57 +110,47 @@ sets \fBerrno\fR to indicate the error.
 The \fBsysevent_post_event()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient resources to queue the system event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBsyseventd\fR daemon is not responding and events cannot be queued or
 delivered at this time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 Permission denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 A copy error occurred.
 .RE
 
@@ -230,15 +208,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

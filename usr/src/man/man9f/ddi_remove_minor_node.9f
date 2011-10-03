@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_remove_minor_node 9F "10 Mar 1992" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_REMOVE_MINOR_NODE 9F "Mar 10, 1992"
 .SH NAME
 ddi_remove_minor_node \- remove a minor node for this dev_info
 .SH SYNOPSIS
@@ -19,23 +19,19 @@ Solaris \fBDDI\fR specific (Solaris \fBDDI\fR).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 9n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fR
 .ad
 .RS 9n
-.rt  
 The name of this minor device.  If  \fIname\fR is  \fINULL\fR, then remove all
 minor data structures from this \fBdev_info\fR.
 .RE

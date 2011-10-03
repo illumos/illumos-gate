@@ -1,27 +1,27 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nm 1 "10 Oct 2007" "SunOS 5.11" "User Commands"
+.TH NM 1 "Oct 10, 2007"
 .SH NAME
 nm \- print name list of an object file
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/nm\fR [\fB-ACDhlnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR] 
+\fB/usr/bin/nm\fR [\fB-ACDhlnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR]
      [\fB-t\fR \fIformat\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/nm\fR [\fB-ACDhlnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR] 
+\fB/usr/xpg4/bin/nm\fR [\fB-ACDhlnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR]
      [\fB-t\fR \fIformat\fR] \fIfile\fR...
 .fi
 
@@ -40,34 +40,28 @@ utility reports that fact, but not consider it an error condition.
 The output of \fBnm\fR can be controlled using the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 13n
-.rt  
 Writes the full path name or library name of an object on each line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 13n
-.rt  
 Demangles C++ symbol names before printing them out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays the \fBSHT_DYNSYM\fR symbol information. This is the symbol table used
 by \fBld.so.1\fR and is present even in stripped dynamic executables. If
 \fB-D\fR is not specified, the default behavior is to display the
@@ -76,56 +70,46 @@ by \fBld.so.1\fR and is present even in stripped dynamic executables. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 13n
-.rt  
 See NOTES below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 13n
-.rt  
 See NOTES below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 13n
-.rt  
 Writes only external (global) symbol information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 13n
-.rt  
 Does not display the output heading data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays the \fBSHT_SUNW_LDYNSYM\fR symbol information. This symbol table
 contains local function symbols. \fBSHT_SUNW_LDYNSM\fR symbol tables are
 present even in stripped dynamic executables. These symbols augment the global
@@ -136,191 +120,157 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 13n
-.rt  
 Distinguishes between \fBWEAK\fR and \fBGLOBAL\fR symbols by appending a * to
 the key letter for \fBWEAK\fR symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 13n
-.rt  
 Sorts external symbols by name before they are printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints the value and size of a symbol in octal instead of decimal (equivalent
 to \fB-t\fR \fBo\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Produces easy to parse, terse output. Each symbol name is preceded by its value
 (blanks if undefined) and one of the letters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fR\fR
 .ad
 .RS 5n
-.rt  
 Absolute symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB\fR\fR
 .ad
 .RS 5n
-.rt  
 bss (uninitialized data space) symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 5n
-.rt  
 COMMON symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 Data object symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR\fR
 .ad
 .RS 5n
-.rt  
 File symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN\fR\fR
 .ad
 .RS 5n
-.rt  
 Symbol has no type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 5n
-.rt  
 Thread-Local storage symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 5n
-.rt  
 Section symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT\fR\fR
 .ad
 .RS 5n
-.rt  
 Text symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU\fR\fR
 .ad
 .RS 5n
-.rt  
 Undefined.
 .RE
 
 If the symbol's binding attribute is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The key letter is lower case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWEAK\fR\fR
 .ad
 .RS 10n
-.rt  
 The key letter is upper case. If the \fB-l\fR modifier is specified, the upper
 case key letter is followed by a \fB*\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOBAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The key letter is upper case.
 .RE
 
@@ -328,90 +278,74 @@ The key letter is upper case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 13n
-.rt  
 Writes information in a portable output format, as specified in \fBStandard
 Output\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 13n
-.rt  
 Prepends the name of the object file or archive to each output line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints the archive name (if present), followed by the object file and symbol
 name. If the \fB-r\fR option is also specified, this option is ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints section name instead of section index.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIformat\fR\fR
 .ad
 .RS 13n
-.rt  
 Writes each numeric value in the specified format. The format is dependent on
 the single character used as the \fIformat\fR option-argument:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 The offset is written in decimal (default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 The offset is written in octal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 The offset is written in hexadecimal.
 .RE
 
@@ -419,70 +353,58 @@ The offset is written in hexadecimal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 13n
-.rt  
 See \fBNOTES\fR.
 .RE
 
 .SS "/usr/bin/nm"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints undefined symbols only.
 .RE
 
 .SS "/usr/xpg4/bin/nm"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints long listing for each undefined symbol. See \fBOUTPUT\fR below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Sorts external symbols by value before they are printed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the version of the \fBnm\fR command executing on the standard error
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the value and size of a symbol in hexadecimal instead of decimal
 (equivalent to \fB-t\fR \fBx\fR).
 .RE
@@ -500,12 +422,10 @@ exception.)
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of an object file, executable file or object-file library.
 .RE
 
@@ -519,23 +439,19 @@ This section describes the \fBnm\fR utility's output options.
 For each symbol, the following information is printed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIndex\fR\fR
 .ad
 .RS 15n
-.rt  
 The index of the symbol. (The index appears in brackets.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBValue\fR\fR
 .ad
 .RS 15n
-.rt  
 The value of the symbol is one of the following:
 .RS +4
 .TP
@@ -559,109 +475,89 @@ A virtual address in executable and dynamic library files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSize\fR\fR
 .ad
 .RS 15n
-.rt  
 The size in bytes of the associated object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBType\fR\fR
 .ad
 .RS 15n
-.rt  
 A symbol is of one of the following types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNOTYPE\fR\fR
 .ad
 .RS 11n
-.rt  
 No type was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOBJECT\fR\fR
 .ad
 .RS 11n
-.rt  
 A data object such as an array or variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFUNC\fR\fR
 .ad
 .RS 11n
-.rt  
 A function or other executable code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREGI\fR\fR
 .ad
 .RS 11n
-.rt  
 A register symbol (\fBSPARC\fR only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSECTION\fR\fR
 .ad
 .RS 11n
-.rt  
 A section symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILE\fR\fR
 .ad
 .RS 11n
-.rt  
 Name of the source file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMMON\fR\fR
 .ad
 .RS 11n
-.rt  
 An uninitialized common block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTLS\fR\fR
 .ad
 .RS 11n
-.rt  
 A variable associated with Thread-Local storage.
 .RE
 
@@ -669,43 +565,35 @@ A variable associated with Thread-Local storage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBind\fR\fR
 .ad
 .RS 15n
-.rt  
 The symbol's binding attributes.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCAL symbols\fR\fR
 .ad
 .RS 18n
-.rt  
 Have a scope limited to the object file containing their definition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLOBAL symbols\fR\fR
 .ad
 .RS 18n
-.rt  
 Are visible to all object files being combined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWEAK symbols\fR\fR
 .ad
 .RS 18n
-.rt  
 Are essentially global symbols with a lower precedence than \fBGLOBAL\fR.
 .RE
 
@@ -713,12 +601,10 @@ Are essentially global symbols with a lower precedence than \fBGLOBAL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOther\fR\fR
 .ad
 .RS 15n
-.rt  
 A symbol's visibility.
 .sp
 The lower bits of the \fBst_other\fR member of the \fBElf32_Sym\fR structure,
@@ -742,44 +628,36 @@ used and can be one of:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBShndx\fR\fR
 .ad
 .RS 15n
-.rt  
 Except for three special values, this is the section header table index in
 relation to which the symbol is defined. The following special values exist:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBABS\fR\fR
 .ad
 .RS 10n
-.rt  
 Indicates the symbol's value does not change through relocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMMON\fR\fR
 .ad
 .RS 10n
-.rt  
 Indicates an unallocated block and the value provides alignment constraints.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNDEF\fR\fR
 .ad
 .RS 10n
-.rt  
 Indicates an undefined symbol.
 .RE
 
@@ -787,23 +665,19 @@ Indicates an undefined symbol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBName\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBObject Name\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the object or library if \fB-A\fR is specified.
 .RE
 
@@ -916,23 +790,19 @@ that affect the execution of \fBnm\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -945,13 +815,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
@@ -967,12 +836,10 @@ The following options are obsolete because of changes to the object file format
 and might be deleted in a future release.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints only external and static symbols. The symbol table now contains only
 static and external symbols. Automatic symbols no longer appear in the symbol
 table. They do appear in the debugging information produced by \fBcc\fR
@@ -981,12 +848,10 @@ table. They do appear in the debugging information produced by \fBcc\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Produces full output. Redundant symbols (such as \fB\&.text\fR, \fB\&.data\fR,
 and so forth), which existed previously, do not exist and producing full output
 is identical to the default output.
@@ -994,12 +859,10 @@ is identical to the default output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 6n
-.rt  
 By default, \fBnm\fR prints the entire name of the symbols listed. Since symbol
 names have been moved to the last column, the problem of overflow is removed
 and it is no longer necessary to truncate the symbol name.

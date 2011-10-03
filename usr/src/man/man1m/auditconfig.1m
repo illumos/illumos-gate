@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH auditconfig 1M "14 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH AUDITCONFIG 1M "Sep 14, 2009"
 .SH NAME
 auditconfig \- configure auditing
 .SH SYNOPSIS
@@ -38,7 +38,6 @@ administrator. \fBperzone\fR and \fBahlt\fR are described under the
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-aconf\fR\fR
 .ad
@@ -59,7 +58,6 @@ Configured non-attributable events.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-audit\fR \fIevent\fR \fIsorf\fR \fIretval\fR \fIstring\fR\fR
 .ad
@@ -91,7 +89,6 @@ audit record from audit trail:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-chkaconf\fR\fR
 .ad
@@ -105,7 +102,6 @@ reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-chkconf\fR\fR
 .ad
@@ -118,7 +114,6 @@ mismatch is reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-conf\fR\fR
 .ad
@@ -130,7 +125,6 @@ changed to match those in the audit event to class database file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getasid\fR\fR
 .ad
@@ -150,7 +144,6 @@ audit session id = 102336
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getaudit\fR\fR
 .ad
@@ -173,7 +166,6 @@ audit session id = 102336
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getauid\fR\fR
 .ad
@@ -193,7 +185,6 @@ audit id = abc(666)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getcar\fR\fR
 .ad
@@ -214,7 +205,6 @@ current active root = /
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getclass\fR \fIevent\fR\fR
 .ad
@@ -226,7 +216,6 @@ Display the preselection mask associated with the specified kernel audit event.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getcond\fR\fR
 .ad
@@ -243,7 +232,6 @@ records. See \fBauditon\fR(2) and \fBauditd\fR(1M) for further information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getestate\fR \fIevent\fR\fR
 .ad
@@ -266,7 +254,6 @@ audit class mask for event AUE_RENAME(42) = 0x30
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getkaudit\fR\fR
 .ad
@@ -291,7 +278,6 @@ global zone. Otherwise, it is the terminal id of the local zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getkmask\fR\fR
 .ad
@@ -313,7 +299,6 @@ global zone. Otherwise, it is that of the local zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getpinfo\fR \fIpid\fR\fR
 .ad
@@ -325,7 +310,6 @@ the specified process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getpolicy\fR\fR
 .ad
@@ -339,7 +323,6 @@ policies are machine-wide.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getcwd\fR\fR
 .ad
@@ -361,7 +344,6 @@ current working directory = /var/tmp
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getqbufsz\fR\fR
 .ad
@@ -381,7 +363,6 @@ Get audit queue write buffer size. For example:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getqctrl\fR\fR
 .ad
@@ -405,7 +386,6 @@ audit queue delay (ticks) = 20
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getqdelay\fR\fR
 .ad
@@ -425,7 +405,6 @@ audit queue delay (ticks) = 20
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getqhiwater\fR\fR
 .ad
@@ -446,7 +425,6 @@ audit queue hiwater mark (records) = 100
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getqlowater\fR\fR
 .ad
@@ -467,7 +445,6 @@ audit queue lowater mark (records) = 10
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-getstat\fR\fR
 .ad
@@ -490,7 +467,6 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-gettid\fR\fR
 .ad
@@ -510,7 +486,6 @@ terminal id (maj,min,host) = 235,197121,elbow(172.146.89.77)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-lsevent\fR\fR
 .ad
@@ -522,7 +497,6 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-lspolicy\fR\fR
 .ad
@@ -533,7 +507,6 @@ Display the kernel audit policies with a description of each policy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setasid\fR \fIsession-ID\fR [\fIcmd\fR]\fR
 .ad
@@ -558,7 +531,6 @@ audit session id = 2000
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setaudit\fR \fIaudit-ID\fR \fIpreselect_flags\fR \fIterm-ID\fR
 \fIsession-ID\fR [\fIcmd\fR]\fR
@@ -570,7 +542,6 @@ Execute shell or \fIcmd\fR with the specified audit characteristics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setauid\fR \fIaudit-ID\fR [\fIcmd\fR]\fR
 .ad
@@ -581,7 +552,6 @@ Execute shell or \fIcmd\fR with the specified \fIaudit-ID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setclass\fR \fIevent audit_flag\fR[\fI,audit_flag .\|.\|.\fR]\fR
 .ad
@@ -596,7 +566,6 @@ global zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setkaudit\fR \fIIP-address_type\fR \fIIP_address\fR\fR
 .ad
@@ -610,7 +579,6 @@ If \fBperzone\fR is not set, this option is valid only in the global zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setkmask\fR \fIaudit_flags\fR\fR
 .ad
@@ -623,7 +591,6 @@ If \fBperzone\fR is not set, this option is valid only in the global zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setpmask\fR \fIpid flags\fR\fR
 .ad
@@ -637,7 +604,6 @@ If \fBperzone\fR is not set, this option is valid only in the global zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setpolicy\fR
 [\fI+\fR|\fI-\fR]\fIpolicy_flag\fR[\fI,policy_flag ...\fR]\fR
@@ -653,23 +619,19 @@ valid policy flag strings (\fBauditconfig\fR \fB-lspolicy\fR also lists the
 current valid audit policy flag strings):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 16n
-.rt  
 Include all policies that apply to the current zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBahlt\fR\fR
 .ad
 .RS 16n
-.rt  
 Panic is called and the system dumps core if an asynchronous audit event occurs
 that cannot be delivered because the audit queue has reached the high-water
 mark or because there are insufficient resources to construct an audit record.
@@ -679,36 +641,30 @@ records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarge\fR\fR
 .ad
 .RS 16n
-.rt  
 Include the \fBexecv\fR(2) system call environment arguments to the audit
 record. This information is not included by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargv\fR\fR
 .ad
 .RS 16n
-.rt  
 Include the \fBexecv\fR(2) system call parameter arguments to the audit record.
 This information is not included by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcnt\fR\fR
 .ad
 .RS 16n
-.rt  
 Do not suspend processes when audit resources are exhausted. Instead, drop
 audit records and keep a count of the number of records dropped. By default,
 process are suspended until audit resources become available.
@@ -716,36 +672,30 @@ process are suspended until audit resources become available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup\fR\fR
 .ad
 .RS 16n
-.rt  
 Include the supplementary group token in audit records. By default, the group
 token is not included.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 16n
-.rt  
 Include no policies. If used in other than the global zone, the \fBahlt\fR and
 \fBperzone\fR policies are not changed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR\fR
 .ad
 .RS 16n
-.rt  
 Add secondary path tokens to audit record. These are typically the pathnames of
 dynamically linked shared libraries or command interpreters for shell scripts.
 By default, they are not included.
@@ -753,24 +703,20 @@ By default, they are not included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBperzone\fR\fR
 .ad
 .RS 16n
-.rt  
 Maintain separate configuration, queues, and logs for each zone and execute a
 separate version of \fBauditd\fR(1M) for each zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpublic\fR\fR
 .ad
 .RS 16n
-.rt  
 Audit public files. By default, read-type operations are not audited for
 certain files which meet \fBpublic\fR characteristics: owned by root, readable
 by all, and not writable by all.
@@ -778,24 +724,20 @@ by all, and not writable by all.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrail\fR\fR
 .ad
 .RS 16n
-.rt  
 Include the trailer token in every audit record. By default, the trailer token
 is not included.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBseq\fR\fR
 .ad
 .RS 16n
-.rt  
 Include the sequence token as part of every audit record. By default, the
 sequence token is not included. The sequence token attaches a sequence number
 to every audit record.
@@ -803,12 +745,10 @@ to every audit record.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwindata_down\fR\fR
 .ad
 .RS 16n
-.rt  
 Include in an audit record any downgraded data moved between windows. This
 policy is available only if the system is configured with Trusted Extensions.
 By default, this information is not included.
@@ -816,12 +756,10 @@ By default, this information is not included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwindata_up\fR\fR
 .ad
 .RS 16n
-.rt  
 Include in an audit record any upgraded data moved between windows. This policy
 is available only if the system is configured with Trusted Extensions. By
 default, this information is not included.
@@ -829,12 +767,10 @@ default, this information is not included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzonename\fR\fR
 .ad
 .RS 16n
-.rt  
 Include the \fBzonename\fR token as part of every audit record. By default, the
 \fBzonename\fR token is not included. The \fBzonename\fR token gives the name
 of the zone from which the audit record was generated.
@@ -844,7 +780,6 @@ of the zone from which the audit record was generated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setqbufsz\fR \fIbuffer_size\fR\fR
 .ad
@@ -855,7 +790,6 @@ Set the audit queue write buffer size (bytes).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setqctrl\fR \fIhiwater\fR \fIlowater\fR \fIbufsz\fR \fIinterval\fR\fR
 .ad
@@ -868,7 +802,6 @@ zone only if \fBperzone\fR is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setqdelay\fR \fIinterval\fR\fR
 .ad
@@ -881,7 +814,6 @@ trail. Valid within a local zone only if \fBperzone\fR is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setqhiwater\fR \fIhiwater\fR\fR
 .ad
@@ -894,7 +826,6 @@ set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setqlowater\fR \fIlowater\fR\fR
 .ad
@@ -907,7 +838,6 @@ set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setsmask\fR \fIasid flags\fR\fR
 .ad
@@ -919,7 +849,6 @@ Valid within a local zone only if \fBperzone\fR is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setstat\fR\fR
 .ad
@@ -931,7 +860,6 @@ Reset audit statistics counters. Valid within a local zone only if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-setumask\fR \fIauid flags\fR\fR
 .ad
@@ -967,46 +895,38 @@ The following is an example of an \fBauditconfig\fR program:
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_event\fR\fR
 .ad
 .RS 29n
-.rt  
 Stores event definitions used in the audit system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_class\fR\fR
 .ad
 .RS 29n
-.rt  
 Stores class definitions used in the audit system.
 .RE
 
@@ -1018,13 +938,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

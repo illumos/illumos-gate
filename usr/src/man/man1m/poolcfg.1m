@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poolcfg 1M "29 Nov 2007" "SunOS 5.11" "System Administration Commands"
+.TH POOLCFG 1M "Nov 29, 2007"
 .SH NAME
 poolcfg \- create and modify resource pool configuration files
 .SH SYNOPSIS
@@ -49,46 +49,38 @@ The configurations which are created by this utility can be used by
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcommand\fR\fR
 .ad
 .RS 19n
-.rt  
 Specify \fIcommand\fR as an editing command. See \fBUSAGE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 19n
-.rt  
 Operate directly on the kernel state. No \fIfilename\fR is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIcommand_file\fR\fR
 .ad
 .RS 19n
-.rt  
 Take the commands from \fIcommand_file\fR. \fIcommand_file\fR consists of
 editing commands, one per line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 19n
-.rt  
 Display extended information about the syntax of editing commands.
 .RE
 
@@ -99,7 +91,6 @@ Display extended information about the syntax of editing commands.
 A script consists of editing commands, one per line, of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBinfo [\fIentity-name\fR]\fR
 .ad
@@ -113,7 +104,6 @@ output. If no entity is specified, system information is displayed. Therefore,
 
 .sp
 .ne 2
-.mk
 .na
 \fBcreate \fIentity-name\fR [\fIproperty-list\fR]\fR
 .ad
@@ -124,7 +114,6 @@ Make an entity of the specified type and name.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdestroy \fIentity-name\fR\fR
 .ad
@@ -135,7 +124,6 @@ Remove the specified entity.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmodify \fIentity-name\fR [\fIproperty-list\fR]\fR
 .ad
@@ -146,7 +134,6 @@ Change the listed properties on the named entity.
 
 .sp
 .ne 2
-.mk
 .na
 \fBassociate \fIpool-name\fR [\fIresource-list\fR]\fR
 .ad
@@ -158,7 +145,6 @@ connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fBtransfer to [\fIresourcetype\fR] \fIname\fR[\fIcomponent-list\fR]\fR
 .ad
@@ -169,7 +155,6 @@ Transfer one or more discrete components to a resource .
 
 .sp
 .ne 2
-.mk
 .na
 \fBtransfer [\fIquantity\fR] from [\fIresourcetype\fR] [\fIsrc\fR] to
 [\fItgt\fR]\fR
@@ -181,7 +166,6 @@ Transfer a resource quantity from \fIsrc\fR to \fItgt\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBtransfer [\fIquantity\fR] to [\fIresourcetype\fR] [\fItgt\fR] from
 [\fIsrc\fR]\fR
@@ -193,7 +177,6 @@ Transfer a resource quantity to \fItgt\fR from \fIsrc\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdiscover\fR
 .ad
@@ -214,7 +197,6 @@ with the \fB-s\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrename \fIentity-name\fR to \fInew-name\fR\fR
 .ad
@@ -271,92 +253,76 @@ holds. There is no deletion syntax for component lists.
 .SS "Recognized Entities"
 .sp
 .ne 2
-.mk
 .na
 \fBsystem\fR
 .ad
 .RS 10n
-.rt  
 Machine level entity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpool\fR
 .ad
 .RS 10n
-.rt  
 Named collection of resource associations
 .RE
 
 .SS "Resource Types"
 .sp
 .ne 2
-.mk
 .na
 \fBpset\fR
 .ad
 .RS 8n
-.rt  
 Processor set resource
 .RE
 
 .SS "Property Types"
 .sp
 .ne 2
-.mk
 .na
 \fBboolean\fR
 .ad
 .RS 11n
-.rt  
 Takes one of two values true or false.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBint\fR
 .ad
 .RS 11n
-.rt  
 A 64-bit signed integer value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuint\fR
 .ad
 .RS 11n
-.rt  
 A 64-bit unsigned integer value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstring\fR
 .ad
 .RS 11n
-.rt  
 Strings are delimited by quotes (\fB"\fR), and support the character escape
 sequences defined in \fBformats\fR(5).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfloat\fR
 .ad
 .RS 11n
-.rt  
 Scientific notation is not supported.
 .RE
 
@@ -492,13 +458,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

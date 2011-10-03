@@ -2,14 +2,14 @@
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dd 1M "16 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH DD 1M "Sep 16, 1996"
 .SH NAME
 dd \- convert and copy a file
 .SH SYNOPSIS
@@ -58,7 +58,6 @@ output blocks.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif=\fR\fIfile\fR\fR
 .ad
@@ -69,7 +68,6 @@ Specifies the input path. Standard input is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBof=\fR\fIfile\fR\fR
 .ad
@@ -87,7 +85,6 @@ size of the output file, the output file is shortened by the copy.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBibs=\fR\fIn\fR\fR
 .ad
@@ -98,7 +95,6 @@ Specifies the input block size in \fIn\fR bytes (default is \fB512\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobs=\fR\fIn\fR\fR
 .ad
@@ -109,7 +105,6 @@ Specifies the output block size in \fIn\fR bytes (default is \fB512\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbs=\fR\fIn\fR\fR
 .ad
@@ -123,7 +118,6 @@ single block without aggregating short blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcbs=\fR\fIn\fR\fR
 .ad
@@ -145,7 +139,6 @@ characters are added.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfiles=\fR\fIn\fR\fR
 .ad
@@ -157,7 +150,6 @@ only where input is a magnetic tape or similar device).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBskip=\fR\fIn\fR\fR
 .ad
@@ -171,7 +163,6 @@ discarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiseek=\fR\fIn\fR\fR
 .ad
@@ -183,7 +174,6 @@ for disk files, where \fBskip\fR can be incredibly slow).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoseek=\fR\fIn\fR\fR
 .ad
@@ -194,7 +184,6 @@ Seeks \fIn\fR blocks from beginning of output file before copying.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBseek=\fR\fIn\fR\fR
 .ad
@@ -209,7 +198,6 @@ offset or reads the blocks as described for non-seekable files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcount=\fR\fIn\fR\fR
 .ad
@@ -220,7 +208,6 @@ Copies only \fIn\fR input blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconv=\fR\fIvalue\fR[\fB,\fR\fIvalue\fR.\|.\|.\|]\fR
 .ad
@@ -229,35 +216,29 @@ Copies only \fIn\fR input blocks.
 Where \fIvalue\fRs are comma-separated symbols from the following list:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBascii\fR\fR
 .ad
 .RS 11n
-.rt  
 Converts \fBEBCDIC\fR to \fBASCII\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasciib\fR\fR
 .ad
 .RS 11n
-.rt  
 Converts \fBEBCDIC\fR to \fBASCII\fR using \fBBSD\fR-compatible character
 translations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBebcdic\fR\fR
 .ad
 .RS 11n
-.rt  
 Converts \fBASCII\fR to \fBEBCDIC\fR. If converting fixed-length \fBASCII\fR
 records without NEWLINEs, sets up a pipeline with \fBdd conv=unblock\fR
 beforehand.
@@ -265,12 +246,10 @@ beforehand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBebcdicb\fR\fR
 .ad
 .RS 11n
-.rt  
 Converts \fBASCII\fR to \fBEBCDIC\fR using \fBBSD\fR-compatible character
 translations. If converting fixed-length \fBASCII\fR records without
 \fBNEWLINE\fRs, sets up a pipeline with \fBdd conv=unblock\fR beforehand.
@@ -278,12 +257,10 @@ translations. If converting fixed-length \fBASCII\fR records without
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBibm\fR\fR
 .ad
 .RS 11n
-.rt  
 Slightly different map of \fBASCII\fR to \fBEBCDIC\fR. If converting
 fixed-length \fBASCII\fR records without \fBNEWLINE\fRs, sets up a pipeline
 with \fBdd conv=unblock\fR beforehand.
@@ -291,12 +268,10 @@ with \fBdd conv=unblock\fR beforehand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBibmb\fR\fR
 .ad
 .RS 11n
-.rt  
 Slightly different map of \fBASCII\fR to \fBEBCDIC\fR using
 \fBBSD\fR-compatible character translations. If converting fixed-length
 \fBASCII\fR records without \fBNEWLINE\fRs, sets up a pipeline with \fBdd
@@ -307,12 +282,10 @@ The \fBascii\fR (or \fBasciib\fR), \fBebcdic\fR (or \fBebcdicb\fR), and
 \fBibm\fR (or \fBibmb\fR) values are mutually exclusive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblock\fR\fR
 .ad
 .RS 11n
-.rt  
 Treats the input as a sequence of \fBNEWLINE\fR-terminated or
 \fBEOF\fR-terminated variable-length records independent of the input block
 boundaries. Each record is converted to a record with a fixed length specified
@@ -325,12 +298,10 @@ will fit into that size. The number of truncated lines is reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunblock\fR\fR
 .ad
 .RS 11n
-.rt  
 Converts fixed-length records to variable length. Reads a number of bytes equal
 to the conversion block size (or the number of bytes remaining in the input, if
 less than the conversion block size), delete all trailing \fBSPACE\fR
@@ -340,12 +311,10 @@ characters, and append a \fBNEWLINE\fR character.
 The  \fBblock\fR and \fBunblock\fR values are mutually exclusive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcase\fR\fR
 .ad
 .RS 9n
-.rt  
 Maps upper-case characters specified by the \fBLC_CTYPE\fR keyword
 \fBtolower\fR to the corresponding lower-case character. Characters for which
 no mapping is specified are not modified by this conversion.
@@ -353,12 +322,10 @@ no mapping is specified are not modified by this conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBucase\fR\fR
 .ad
 .RS 9n
-.rt  
 Maps lower-case characters specified by the \fBLC_CTYPE\fR keyword
 \fBtoupper\fR to the corresponding upper-case character. Characters for which
 no mapping is specified are not modified by this conversion.
@@ -367,24 +334,20 @@ no mapping is specified are not modified by this conversion.
 The \fBlcase\fR and \fBucase\fR symbols are mutually exclusive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBswab\fR\fR
 .ad
 .RS 11n
-.rt  
 Swaps every pair of input bytes. If the current input record is an odd number
 of bytes, the last byte in the input record is ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoerror\fR\fR
 .ad
 .RS 11n
-.rt  
 Does not stop processing on an input error. When an input error occurs, a
 diagnostic message is written on standard error, followed by the current input
 and output block counts in the same format as used at completion. If the
@@ -395,12 +358,10 @@ the output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotrunc\fR\fR
 .ad
 .RS 11n
-.rt  
 Does not truncate the output file. Preserves blocks in the output file not
 explicitly written by this invocation of \fBdd\fR. (See also the preceding
 \fBof=\fR\fIfile\fR operand.)
@@ -408,12 +369,10 @@ explicitly written by this invocation of \fBdd\fR. (See also the preceding
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsync\fR\fR
 .ad
 .RS 11n
-.rt  
 Pads every input block to the size of the \fBibs=\fR buffer, appending null
 bytes. (If either \fBblock\fR or \fBunblock\fR is also specified, appends
 \fBSPACE\fR characters, rather than null bytes.)
@@ -532,23 +491,19 @@ that affect the execution of \fBdd\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The input file was copied successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -567,13 +522,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
@@ -584,12 +538,10 @@ Interface StabilityStandard
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf+p records in(out)\fR\fR
 .ad
 .RS 23n
-.rt  
 numbers of full and partial blocks read(written)
 .RE
 

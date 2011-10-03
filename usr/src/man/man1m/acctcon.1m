@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acctcon 1M "22 Feb 1999" "SunOS 5.11" "System Administration Commands"
+.TH ACCTCON 1M "Feb 22, 1999"
 .SH NAME
 acctcon, acctcon1, acctcon2 \- connect-time accounting
 .SH SYNOPSIS
@@ -19,7 +19,7 @@ acctcon, acctcon1, acctcon2 \- connect-time accounting
 
 .LP
 .nf
-\fB/usr/lib/acct/acctcon2\fR 
+\fB/usr/lib/acct/acctcon2\fR
 .fi
 
 .SH DESCRIPTION
@@ -44,24 +44,20 @@ described below, as well as with the \fB-p\fR and \fB-t\fR options.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 14n
-.rt  
 Print input only, showing line name, login name, and time (in both numeric and
 date/time formats).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBacctcon1\fR maintains a list of lines on which users are logged in. When it
 reaches the end of its input, it emits a session record for each line that
 still appears to be active. It normally assumes that its input is a current
@@ -73,12 +69,10 @@ non-current files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlineuse\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIlineuse\fR is created to contain a summary of line usage showing line name,
 number of minutes used, percentage of total elapsed time used, number of
 sessions charged, number of logins, and number of logoffs.  This file helps
@@ -90,12 +84,10 @@ times the number of sessions. See \fB init\fR(1M) and \fButmpx\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIreboot\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBreboot\fR is filled with an overall record for the accounting period, giving
 starting time, ending time, number of reboots, and number of date changes.
 .RE
@@ -123,7 +115,7 @@ The \fBacctcon1\fR and \fBacctcon2\fR commands are typically used as follows:
 .in +2
 .nf
 example% acctcon1 \fB-l\fR lineuse \fB-o\fR reboots < tmpwtmp | sort +1n +2 > ctmp
-example% acctcon2 < ctmp > ctacct 
+example% acctcon2 < ctmp > ctacct
 .fi
 .in -2
 .sp
@@ -131,12 +123,10 @@ example% acctcon2 < ctmp > ctacct
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 History of user access and administration information
 .RE
 

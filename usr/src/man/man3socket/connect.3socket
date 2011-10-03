@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH connect 3SOCKET "08 Mar 2005" "SunOS 5.11" "Sockets Library Functions"
+.TH CONNECT 3SOCKET "Mar 08, 2005"
 .SH NAME
 connect \- initiate a connection on a socket
 .SH SYNOPSIS
@@ -47,80 +47,66 @@ If the connection or binding succeeds, \fB0\fR is returned. Otherwise,
 The call fails if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 17n
-.rt  
 Search permission is denied for a component of the path prefix of the pathname
 in \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 17n
-.rt  
 The address is already in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 17n
-.rt  
 The specified address is not available on the remote machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 17n
-.rt  
 Addresses in the specified address family cannot be used with this socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEALREADY\fR\fR
 .ad
 .RS 17n
-.rt  
 The socket is non-blocking,  and a previous connection attempt has not yet been
 completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 17n
-.rt  
 \fIs\fR is not a valid descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNREFUSED\fR\fR
 .ad
 .RS 17n
-.rt  
 The attempt to connect was forcefully rejected. The calling program should
 \fBclose\fR(2) the socket descriptor, and issue another \fBsocket\fR(3SOCKET)
 call to obtain a new descriptor before attempting another \fBconnect()\fR call.
@@ -128,12 +114,10 @@ call to obtain a new descriptor before attempting another \fBconnect()\fR call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINPROGRESS\fR\fR
 .ad
 .RS 17n
-.rt  
 The socket is non-blocking, and the connection cannot be completed immediately.
 You can use  \fBselect\fR(3C) to complete the connection by selecting the
 socket for writing.
@@ -141,148 +125,122 @@ socket for writing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 17n
-.rt  
 The connection attempt was interrupted before any data arrived by the delivery
 of a signal. The connection, however, will be established asynchronously.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 17n
-.rt  
 \fInamelen\fR is not the size of a valid address for the specified address
 family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 17n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 17n
-.rt  
 The socket is already connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 17n
-.rt  
 Too many symbolic links were encountered in translating the pathname in
 \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETUNREACH\fR\fR
 .ad
 .RS 17n
-.rt  
 The network is not reachable from this host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEHOSTUNREACH\fR\fR
 .ad
 .RS 17n
-.rt  
 The remote host is not reachable from this host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 17n
-.rt  
 A component of the path prefix of the pathname in \fIname\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 17n
-.rt  
 The socket referred to by the pathname in \fIname\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 17n
-.rt  
 There were insufficient \fBSTREAMS\fR resources available to complete the
 operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 17n
-.rt  
 The server exited before the connection was complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 17n
-.rt  
 Connection establishment timed out without establishing a connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 17n
-.rt  
 The socket is marked as non-blocking, and the requested operation would block.
 .RE
 
@@ -292,46 +250,38 @@ The following errors are specific to connecting names in the UNIX domain.
 These errors might not apply in future versions of the UNIX  \fBIPC\fR domain.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 14n
-.rt  
 A component of the path prefix of the pathname in \fIname\fR is not a
 directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIs\fR is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIname\fR is not a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTOTYPE\fR\fR
 .ad
 .RS 14n
-.rt  
 The file that is referred to by \fIname\fR is a socket of a type other than
 type \fIs\fR. For example, \fIs\fR is a \fBSOCK_DGRAM\fR socket, while
 \fIname\fR refers to a \fBSOCK_STREAM\fR socket.
@@ -345,13 +295,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

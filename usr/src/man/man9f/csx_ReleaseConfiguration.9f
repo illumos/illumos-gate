@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_ReleaseConfiguration 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_RELEASECONFIGURATION 9F "Jul 19, 1996"
 .SH NAME
 csx_ReleaseConfiguration \- release PC Card and socket configuration
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris \fBDDI\fR Specific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR \fR
 .ad
 .RS 7n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrc\fR \fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBrelease_config_t\fR structure.
 .RE
 
@@ -86,56 +82,46 @@ Card Services implementations, it should be set to the logical socket number.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR \fR
 .ad
 .RS 28n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR \fR
 .ad
 .RS 28n
-.rt  
 Client handle is invalid or \fBcsx_RequestConfiguration\fR(9F) not done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_SOCKET\fR \fR
 .ad
 .RS 28n
-.rt  
 Error getting or setting socket hardware parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPC\fR card in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPCMCIA\fR hardware installed.
 .RE
 

@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sem_wait 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH SEM_WAIT 3C "Feb 5, 2008"
 .SH NAME
 sem_wait, sem_trywait \- acquire or wait for a semaphore
 .SH SYNOPSIS
@@ -57,23 +57,19 @@ the semaphore is unchanged, and the function returns \fB\(mi1\fR and sets
 The  \fBsem_wait()\fR and \fBsem_trywait()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fIsem\fR function does not refer to a valid semaphore.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fBsem_wait()\fR and \fBsem_trywait()\fR functions are not supported by the
 system.
 .RE
@@ -83,12 +79,10 @@ system.
 The  \fBsem_trywait()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR \fR
 .ad
 .RS 11n
-.rt  
 The semaphore was already locked, so it cannot be immediately locked by the
 \fBsem_trywait()\fR operation.
 .RE
@@ -98,12 +92,10 @@ The semaphore was already locked, so it cannot be immediately locked by the
 The  \fBsem_wait()\fR and \fBsem_trywait()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR \fR
 .ad
 .RS 12n
-.rt  
 A deadlock condition was detected; that is, two separate processes are waiting
 for an available resource to be released via a semaphore "held" by the other
 process.
@@ -111,12 +103,10 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR \fR
 .ad
 .RS 12n
-.rt  
 A signal interrupted this function.
 .RE
 
@@ -149,14 +139,14 @@ int banking_hours(), deposit_withdrawal;
 void *customer(), do_business(), skip_banking_today();
 thread_t tid;
 \&...
- 
-sem_init(&bank_line,TRUE,TELLERS);  /* 10 tellers 
+
+sem_init(&bank_line,TRUE,TELLERS);  /* 10 tellers
                                        available */
 while(banking_hours())
-        thr_create(NULL, NULL, customer, 
+        thr_create(NULL, NULL, customer,
             (void *)deposit_withdrawal, THREAD_NEW_LWP, &tid);
 \&...
- 
+
 void *
 customer(deposit_withdrawal)
 void *deposit_withdrawal;
@@ -168,15 +158,15 @@ void *deposit_withdrawal;
         if (errno == EAGAIN) {    /* no teller available */
             skip_banking_today(this_customer);
             return;
-        }     /*else go immediately to available teller 
+        }     /*else go immediately to available teller
                & decrement bank_line*/
     }
     else
-        sem_wait(&bank_line); /* wait for next teller, 
+        sem_wait(&bank_line); /* wait for next teller,
              then proceed, and decrement bank_line */
     do_business((int *)deposit_withdrawal);
     sem_getvalue(&bank_line,&num_tellers);
-    sem_post(&bank_line); /* increment bank_line; 
+    sem_post(&bank_line); /* increment bank_line;
         this_customer's teller is now available */
 }
 .fi
@@ -190,17 +180,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

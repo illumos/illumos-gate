@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pvs 1 "25 Sep 2008" "SunOS 5.11" "User Commands"
+.TH PVS 1 "Sep 25, 2008"
 .SH NAME
 pvs \- display the internal version information of dynamic objects
 .SH SYNOPSIS
@@ -59,34 +59,28 @@ The following options are supported. If neither the \fB-d\fR or \fB-r\fR
 options are specified, both are enabled.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 18n
-.rt  
 Demangles C++ symbol names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints version definition information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR  \fIindex-expr\fR\fR
 .ad
 .RS 18n
-.rt  
 Qualifies the versions to examine with a specific version index or index range.
 For example, the version with index 3 in an object can be displayed using:
 .sp
@@ -127,12 +121,10 @@ See Matching Options for additional information about the matching options
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints any symbols that have been reduced from global to local binding due to
 versioning. By convention, these symbol entries are located in the
 \fI\&.symtab\fR section, and fall between the \fIFILE\fR symbol representing
@@ -147,12 +139,10 @@ Use of the \fB-l\fR option implicitly enables the \fB-s\fR option
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 18n
-.rt  
 Normalizes version definition information. By default, all version definitions
 within the object are displayed. However, version definitions can inherit other
 version definitions. Under normalization, only the head of each inheritance
@@ -161,12 +151,10 @@ list is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIname\fR\fR
 .ad
 .RS 18n
-.rt  
 When used with the \fB-d\fR option, \fB-N\fR prints only the information for
 the given version definition \fIname\fR and any of its inherited version
 definitions.
@@ -189,12 +177,10 @@ See Matching Options for additional information about the matching options
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 18n
-.rt  
 Creates one-line version definition output. By default, file, version
 definitions, and any symbol output is indented to ease human inspection. This
 option prefixes each output line with the file and version definition name and
@@ -203,23 +189,19 @@ can be more useful for analysis with automated  tools.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints version dependency (requirements) information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints the symbols associated with each version definition. Any data symbols
 from versions defined by the object are accompanied with the size, in bytes, of
 the data item.
@@ -227,12 +209,10 @@ the data item.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Verbose output. Indicates any weak version definitions, and any version
 definition inheritance. When used with the \fB-N\fR and \fB-d\fR options, the
 inheritance of the base version definition is also shown. When used with the
@@ -245,12 +225,10 @@ inheritance of the base version definition is also shown. When used with the
 The following operands are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 The  \fBELF\fR file about which internal version information is displayed.
 .RE
 

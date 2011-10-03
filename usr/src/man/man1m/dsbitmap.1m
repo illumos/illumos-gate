@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dsbitmap 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH DSBITMAP 1M "Oct 2, 2007"
 .SH NAME
 dsbitmap \- size Availability Suite bitmap volumes
 .SH SYNOPSIS
@@ -33,7 +33,6 @@ volume required for use with the specified data volume.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -44,7 +43,6 @@ Prints the usage message for the \fBdsbitmap\fR command
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fB\fIdata_volume\fR\fR \fB[\fIbitmap_volume\fR]\fR\fR
 .ad
@@ -62,7 +60,6 @@ this volume is large enough to be used as the bitmap volume for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fB\fIdata_volume\fR\fR \fB[\fIbitmap_volume\fR]\fR\fR
 .ad
@@ -91,46 +88,38 @@ volumes that have been created are suitable.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Successful completion. If the name of a bitmap volume was specified, that
 volume is sufficiently large for all potential uses.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 13n
-.rt  
 An invalid option was supplied on the command line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 13n
-.rt  
 The specified bitmap volume is not large enough to be used as an Availability
 Suite Remote Mirror bitmap for an asynchronous set with a disk queue, but is
 large enough to be used for all other Remote Mirror set configurations.
@@ -138,36 +127,30 @@ large enough to be used for all other Remote Mirror set configurations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 13n
-.rt  
 The specified bitmap volume is not large enough to be used as an Availability
 Suite Remote Mirror bitmap for any Remote Mirror set configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
 .RS 13n
-.rt  
 The specified bitmap volume is not large enough to be used as an Availability
 Suite Remote Mirror bitmap for any Remote Mirror set configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 13n
-.rt  
 The specified bitmap volume is not large enough to be used as an Availability
 Suite Point in Time bitmap for a compact dependent shadow, but is large enough
 to be used for all other Point in Time set configurations.
@@ -181,13 +164,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

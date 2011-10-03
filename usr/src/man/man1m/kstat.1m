@@ -3,21 +3,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kstat 1M "23 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH KSTAT 1M "Mar 23, 2009"
 .SH NAME
 kstat \- display kernel statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBkstat\fR [\fB-lpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR] [\fB-m\fR \fImodule\fR] 
-     [\fB-i\fR \fIinstance\fR] [\fB-n\fR \fIname\fR] [\fB-s\fR \fIstatistic\fR] 
+\fBkstat\fR [\fB-lpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR] [\fB-m\fR \fImodule\fR]
+     [\fB-i\fR \fIinstance\fR] [\fB-n\fR \fIname\fR] [\fB-s\fR \fIstatistic\fR]
      [interval [count]]
 .fi
 
 .LP
 .nf
-\fBkstat\fR [\fB-lpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR] 
-     [\fImodule\fR:\fIinstance\fR:\fIname\fR:\fIstatistic\fR]... 
+\fBkstat\fR [\fB-lpq\fR] [\fB-T\fR u | d ] [\fB-c\fR \fIclass\fR]
+     [\fImodule\fR:\fIinstance\fR:\fIname\fR:\fIstatistic\fR]...
      [interval [count]]
 .fi
 
@@ -63,68 +63,56 @@ options may be specified as a shell glob pattern, or a Perl regular expression
 enclosed in '/' characters.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays only kstats that match the specified class. \fIclass\fR is a
 kernel-defined string which classifies the "type" of the kstat.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinstance\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays only kstats that match the specified instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 16n
-.rt  
 Lists matching kstat names without displaying values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImodule\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays only kstats that match the specified module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays only kstats that match the specified name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays output in parseable format. All example output in this document is
 given in this format. If this option is not specified, \fBkstat\fR produces
 output in a human-readable, table format.
@@ -132,35 +120,29 @@ output in a human-readable, table format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays no output, but return appropriate exit status for matches against
 given criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIstatistic\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays only kstats that match the specified statistic.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR d | u\fR
 .ad
 .RS 16n
-.rt  
 Displays a time stamp before each statistics block, either in \fBdate\fR(1)
 format (\fBd\fR) or as an alphanumeric representation of the value returned by
 \fBtime\fR(2) (\fBu\fR).
@@ -172,7 +154,6 @@ format (\fBd\fR) or as an alphanumeric representation of the value returned by
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodule\fR:\fIinstance\fR:\fIname\fR:\fIstatistic\fR\fR
 .ad
@@ -188,7 +169,6 @@ specifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
@@ -199,7 +179,6 @@ The number of seconds between reports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
@@ -263,7 +242,7 @@ cpu_stat:3:cpu_stat3:intrthread 59626
 .nf
 example$ \fBkstat -p :::state ':::avenrun*'\fR
 example$ \fBkstat -p :::state :::/^avenrun/\fR
- 
+
 cpu_info:0:cpu_info0:state      on-line
 cpu_info:1:cpu_info1:state      on-line
 cpu_info:2:cpu_info2:state      on-line
@@ -284,11 +263,11 @@ example$ \fBkstat -p 'unix:0:system_misc:avenrun*' 1 3\fR
 unix:0:system_misc:avenrun_15min        15
 unix:0:system_misc:avenrun_1min 11
 unix:0:system_misc:avenrun_5min 21
- 
+
 unix:0:system_misc:avenrun_15min        15
 unix:0:system_misc:avenrun_1min 11
 unix:0:system_misc:avenrun_5min 21
- 
+
 unix:0:system_misc:avenrun_15min        15
 unix:0:system_misc:avenrun_1min 11
 unix:0:system_misc:avenrun_5min 21
@@ -306,7 +285,7 @@ Thu Jul 22 19:39:50 1999
 unix:0:system_misc:avenrun_15min        12
 unix:0:system_misc:avenrun_1min 0
 unix:0:system_misc:avenrun_5min 11
- 
+
 Thu Jul 22 19:39:55 1999
 unix:0:system_misc:avenrun_15min        12
 unix:0:system_misc:avenrun_1min 0
@@ -335,57 +314,47 @@ unix:0:system_misc:avenrun_5min 18
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 One or more statistics were matched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 No statistics were matched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kstat\fR\fR
 .ad
 .RS 14n
-.rt  
 kernel statistics driver
 .RE
 

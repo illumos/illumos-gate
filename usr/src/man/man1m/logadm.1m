@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH logadm 1M "23 May 2007" "SunOS 5.11" "System Administration Commands"
+.TH LOGADM 1M "May 23, 2007"
 .SH NAME
 logadm \- manage endlessly growing log files
 .SH SYNOPSIS
 .LP
 .nf
-\fBlogadm\fR 
+\fBlogadm\fR
 .fi
 
 .LP
@@ -46,7 +46,6 @@ command searches \fB/etc/logadm.conf\fR for lines of the form \fIlogname\fR
 \fIoptions\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogname\fR\fR
 .ad
@@ -59,7 +58,6 @@ this field, it must be a fully qualified pathname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptions\fR\fR
 .ad
@@ -121,7 +119,6 @@ default.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIpost_command\fR\fR
 .ad
@@ -140,7 +137,6 @@ executed only once after all the logs are rotated, not once per rotated log.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIage\fR\fR
 .ad
@@ -155,7 +151,6 @@ Specify \fIage\fR as a number followed by an \fBh\fR (hours), \fBd\fR (days),
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIpre_command\fR\fR
 .ad
@@ -174,7 +169,6 @@ executed only once before all the logs are rotated, not once per rotated log.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -186,7 +180,6 @@ length, rather than renaming the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIcount\fR\fR
 .ad
@@ -202,7 +195,6 @@ being added automatically, specify \fB\fR\fB-C\fR \fB0\fR .
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fImail_addr\fR\fR
 .ad
@@ -220,7 +212,6 @@ generated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fIcmd\fR\fR
 .ad
@@ -241,7 +232,6 @@ administrators, or copying old log files to long term storage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIconf_file\fR\fR
 .ad
@@ -255,7 +245,6 @@ files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgroup\fR\fR
 .ad
@@ -273,7 +262,6 @@ This option requires the ability to change file group ownership using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -284,7 +272,6 @@ Print a help message that describes \fBlogadm\fR's options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -297,7 +284,6 @@ supplied with the \fB-t\fR option).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImode\fR\fR
 .ad
@@ -311,7 +297,6 @@ Specify \fImode\fR in any form that is accepted by the \fBchmod\fR(1) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIcmd\fR\fR
 .ad
@@ -327,7 +312,6 @@ is "\fB/bin/mv\fR \fB$file\fR\fB\fR\fB$nfile\fR".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fI\fR\fR
 .ad
@@ -349,7 +333,6 @@ it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
@@ -364,7 +347,6 @@ empty replacement log file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIowner\fR\fR
 .ad
@@ -378,7 +360,6 @@ Specify \fIowner\fR in any form that is accepted by the \fBchown\fR(1) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIperiod\fR\fR
 .ad
@@ -395,7 +376,6 @@ forces no log rotation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fItimestamp\fR\fR
 .ad
@@ -413,7 +393,6 @@ timezone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -425,7 +404,6 @@ Remove any entries corresponding to the specified \fIlogname\fR from the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIcmd\fR\fR
 .ad
@@ -445,7 +423,6 @@ log file (that is, sorting it, removing uninteresting lines, etc.). The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsize\fR\fR
 .ad
@@ -459,7 +436,6 @@ Specify \fIsize\fR as a number followed by the letter \fBb\fR for bytes,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIsize\fR\fR
 .ad
@@ -474,7 +450,6 @@ Specify \fIsize\fR as a number followed by the letter \fBb\fR for bytes,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItemplate\fR\fR
 .ad
@@ -487,7 +462,6 @@ contain special keywords which are expanded by \fBlogadm\fR and are in the form
 \fB$\fR\fIword\fR. Allowed sequences are:
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIbasename\fR\fR
 .ad
@@ -498,7 +472,6 @@ The log file name, without the directory name
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIdirname\fR\fR
 .ad
@@ -509,7 +482,6 @@ The directory of the file to be rotated
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIdomain\fR\fR
 .ad
@@ -520,7 +492,6 @@ Expands to the output of \fBdomainname\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIfile\fR\fR
 .ad
@@ -531,7 +502,6 @@ The full path name of the file to be rotated
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIisa\fR\fR
 .ad
@@ -542,7 +512,6 @@ Expands to the output of \fBuname\fR \fB-p\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fImachine\fR\fR
 .ad
@@ -553,7 +522,6 @@ Expands to the output of \fBuname\fR \fB-m\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIn\fR\fR
 .ad
@@ -565,7 +533,6 @@ forth
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIN\fR\fR
 .ad
@@ -576,7 +543,6 @@ The same as $\fIn\fR, but starts at \fB1\fR instead of zero
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fInodename\fR\fR
 .ad
@@ -587,7 +553,6 @@ Expands to the output of \fBuname\fR \fB-n\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIplatform\fR\fR
 .ad
@@ -598,7 +563,6 @@ Expands to the output of \fBuname\fR \fB-i\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIrelease\fR\fR
 .ad
@@ -609,7 +573,6 @@ Expands to the output of \fBuname\fR \fB-r\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIsecs\fR\fR
 .ad
@@ -620,7 +583,6 @@ The number of seconds since \fB00:00:00 UTC, January 1,1970\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fIzonename\fR\fR
 .ad
@@ -646,7 +608,6 @@ the expire rules, if any, are applied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIpattern\fR\fR
 .ad
@@ -665,7 +626,6 @@ a pathname with special characters such as \fB*\fR and \fB?\fR as supported by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -676,7 +636,6 @@ Print information about the actions being executed in verbose mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -694,7 +653,6 @@ is true. Otherwise the exit value is false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIentryname\fR\fR
 .ad
@@ -725,7 +683,6 @@ lines achieve the same thing, keeping two copies of rotated log files:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIcount\fR\fR
 .ad
@@ -746,7 +703,6 @@ suffix of \fB\&.gz\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogname\fR\fR
 .ad
@@ -919,7 +875,6 @@ logadm -w apache /var/apache/logs/*_log
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/logadm.conf\fR\fR
 .ad
@@ -936,13 +891,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

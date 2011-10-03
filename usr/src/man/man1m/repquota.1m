@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH repquota 1M "16 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH REPQUOTA 1M "Sep 16, 1996"
 .SH NAME
 repquota \- summarize quotas for a ufs file system
 .SH SYNOPSIS
@@ -36,24 +36,20 @@ Only the super-user may view quotas which are not their own.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Report on all mounted ufs file systems that have \fBrq\fR in the  \fBmntopts\fR
 field of the \fB/etc/vfstab\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Report quotas for all users, even those who do not consume resources.
 .RE
 

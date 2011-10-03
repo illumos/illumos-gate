@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wanboot_keygen 1M "18 Apr 2003" "SunOS 5.11" "System Administration Commands"
+.TH WANBOOT_KEYGEN 1M "Apr 18, 2003"
 .SH NAME
 wanboot_keygen \- create and display client and server keys for WAN booting
 .SH SYNOPSIS
@@ -78,12 +78,10 @@ by the user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Generate and store per-client 3DES/AES encryption keys, avoiding any DES weak
 keys. Also generates and stores per-client HMAC SHA-1 keys. Used in conjunction
 with \fB-o\fR.
@@ -91,12 +89,10 @@ with \fB-o\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Display a key of type specified by \fIkeytype\fR, which must be one of
 \fB3des\fR, \fBaes\fR, or \fBsha1\fR. Use \fB-d\fR with \fB-m\fR or with
 \fB-c\fR and \fB-o\fR.
@@ -104,23 +100,19 @@ Display a key of type specified by \fIkeytype\fR, which must be one of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Generate and store a "master" HMAC SHA-1 key for WAN install.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the WANboot client and/or keytype.
 .RE
 
@@ -161,23 +153,19 @@ Key
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -189,13 +177,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_clnt_create 3NSL "23 Jul 2009" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_CLNT_CREATE 3NSL "Jul 23, 2009"
 .SH NAME
 rpc_clnt_create, clnt_control, clnt_create, clnt_create_timed,
 clnt_create_vers, clnt_create_vers_timed, clnt_destroy, clnt_dg_create,
@@ -140,7 +140,6 @@ that enables each thread to have its own \fBrpc_createerr()\fR. See
 See \fBrpc\fR(3NSL) for the definition of the \fBCLIENT\fR data structure.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_control()\fR\fR
 .ad
@@ -199,59 +198,59 @@ The following operations are valid for connection-oriented transports only:
 .nf
 CLSET_IO_MODE rpciomode_t*    set the IO mode used
  		to send one-way requests. The argument for this operation
-		can be either: 
+		can be either:
    - RPC_CL_BLOCKING 	all sending operations block
  		until the underlying transport protocol has
  		accepted requests. If you specify this argument
  		you cannot use flush and getting and setting buffer
- 		size is meaningless. 
+ 		size is meaningless.
    - RPC_CL_NONBLOCKING   sending operations do not
  		block and return as soon as requests enter the buffer.
- 		You can now use non-blocking I/O. The requests in the 
-		buffer are pending. The requests are sent to 
-		the server as soon as a two-way request is sent 
+ 		You can now use non-blocking I/O. The requests in the
+		buffer are pending. The requests are sent to
+		the server as soon as a two-way request is sent
 		or a flush is done. You are responsible for flushing
 		the buffer. When you choose RPC_CL_NONBLOCKING argument
- 		you have a choice of flush modes as specified by 
-		CLSET_FLUSH_MODE. 
-CLGET_IO_MODE rpciomode_t* 		get the current IO mode 
+ 		you have a choice of flush modes as specified by
+		CLSET_FLUSH_MODE.
+CLGET_IO_MODE rpciomode_t* 		get the current IO mode
 CLSET_FLUSH_MODE rpcflushmode_t* 		set the flush mode.
- 		The flush mode can only be used in non-blocking I/O mode. 
+ 		The flush mode can only be used in non-blocking I/O mode.
 		The argument can be either of the following: 	
 	- RPC_CL_BESTEFFORT_FLUSH: All flushes send requests
  		in the buffer until the transport end-point blocks.
  		If the transport connection is congested, the call
  		returns directly. 	
 	- RPC_CL_BLOCKING_FLUSH: Flush blocks until the
- 		underlying transport protocol accepts all pending 
-		requests into the queue. 
-CLGET_FLUSH_MODE rpcflushmode_t*  	get the current flush mode. 
+ 		underlying transport protocol accepts all pending
+		requests into the queue.
+CLGET_FLUSH_MODE rpcflushmode_t*  	get the current flush mode.
 CLFLUSH rpcflushmode_t  		flush the pending requests.
-		This command can only be used in non-blocking I/O mode. 
-		The flush policy depends on which of the following 
+		This command can only be used in non-blocking I/O mode.
+		The flush policy depends on which of the following
 		parameters is specified:
-	- RPC_CL_DEFAULT_FLUSH, or NULL:	The flush is done 
-	   according to the current flush mode policy 
+	- RPC_CL_DEFAULT_FLUSH, or NULL:	The flush is done
+	   according to the current flush mode policy
 		(see CLSET_FLUSH_MODE option).
 	- RPC_CL_BESTEFFORT_FLUSH:		The flush tries
 		to send pending requests without blocking; the call
 		returns directly. If the transport connection is
 		congested, this call could return without the request
 		being sent.
-	- RPC_CL_BLOCKING_FLUSH:		The flush sends all pending 
-		requests. This call will block until all the requests 
+	- RPC_CL_BLOCKING_FLUSH:		The flush sends all pending
+		requests. This call will block until all the requests
 		have been accepted by the transport layer.
 CLSET_CONNMAXREC_SIZE int*    set the buffer size.
- 		It is not possible to dynamically 
-		resize the buffer if it contains data. 
+ 		It is not possible to dynamically
+		resize the buffer if it contains data.
 		The default size of the buffer is 16 kilobytes.
-CLGET_CONNMAXREC_SIZE int*  		get the current size of the 
+CLGET_CONNMAXREC_SIZE int*  		get the current size of the
 		buffer
-CLGET_CURRENT_REC_SIZE int*  		get the size of 
-		the pending requests stored in the buffer. Use of this 
-		command is only recommended when you are in non-blocking 
-		I/O mode. The current size of the buffer is always zero 
-		when the handle is in blocking mode as the buffer is not 
+CLGET_CURRENT_REC_SIZE int*  		get the size of
+		the pending requests stored in the buffer. Use of this
+		command is only recommended when you are in non-blocking
+		I/O mode. The current size of the buffer is always zero
+		when the handle is in blocking mode as the buffer is not
 		used in this mode.
 .fi
 .in -2
@@ -273,7 +272,6 @@ before retransmitting the request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_create()\fR\fR
 .ad
@@ -300,7 +298,6 @@ with the \fBrpcbind\fR service. This mismatch will be discovered by a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_create_timed()\fR\fR
 .ad
@@ -315,7 +312,6 @@ respects, the \fBclnt_create_timed()\fR call behaves exactly like the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_create_vers()\fR\fR
 .ad
@@ -344,7 +340,6 @@ supplied is supported by the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_create_vers_timed()\fR\fR
 .ad
@@ -359,7 +354,6 @@ time allowed for each transport class tried.   In all other respects, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_destroy()\fR\fR
 .ad
@@ -379,7 +373,6 @@ calling \fBclnt_destroy()\fR) to destroy the associated \fBAUTH\fR structure
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_dg_create()\fR\fR
 .ad
@@ -400,7 +393,6 @@ routine returns \fINULL\fR if it fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_pcreateerror()\fR\fR
 .ad
@@ -413,7 +405,6 @@ colon, and appended with a newline.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_raw_create()\fR\fR
 .ad
@@ -432,7 +423,6 @@ if it fails. \fBclnt_raw_create()\fR should be called after
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_spcreateerror()\fR\fR
 .ad
@@ -448,7 +438,6 @@ multithread applications, this buffer is implemented as thread-specific data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_tli_create()\fR\fR
 .ad
@@ -476,7 +465,6 @@ the address of the remote service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_tp_create()\fR\fR
 .ad
@@ -495,7 +483,6 @@ address of the remote service. This routine returns \fINULL\fR if it fails. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_tp_create_timed()\fR\fR
 .ad
@@ -510,7 +497,6 @@ creation attempt to succeed. In all other respects, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_vc_create()\fR\fR
 .ad
@@ -531,7 +517,6 @@ the remote \fBrpcbind\fR service for this information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_createerr()\fR\fR
 .ad
@@ -547,7 +532,6 @@ enables each thread to have its own \fBrpc_createerr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclnt_door_create()\fR\fR
 .ad
@@ -570,17 +554,16 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureAll
+Architecture	All
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

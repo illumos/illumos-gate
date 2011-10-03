@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_delete_sec_context 3GSS "15 jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_DELETE_SEC_CONTEXT 3GSS "Jan 15, 2003"
 .SH NAME
 gss_delete_sec_context \- delete a GSS-API security context
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_delete_sec_context\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -45,23 +45,19 @@ that no token should be transferred by the application.
 The parameter descriptions for \fBgss_delete_sec_context()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 18n
-.rt  
 A mechanism specific status code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext_handle\fR\fR
 .ad
 .RS 18n
-.rt  
 Context handle identifying specific context to delete. After deleting the
 context, the \fBGSS-API\fR will set \fIcontext_handle\fR to
 \fBGSS_C_NO_CONTEXT\fR.
@@ -69,12 +65,10 @@ context, the \fBGSS-API\fR will set \fIcontext_handle\fR to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutput_token\fR\fR
 .ad
 .RS 18n
-.rt  
 A token to be sent to remote applications that instructs them to delete the
 context.
 .RE
@@ -85,34 +79,28 @@ context.
 \fBgss_delete_sec_context()\fR may return the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 20n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CONTEXT\fR\fR
 .ad
 .RS 20n
-.rt  
 No valid context was supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 20n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -126,13 +114,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

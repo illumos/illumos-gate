@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mountd 1M "27 Apr 2005" "SunOS 5.11" "System Administration Commands"
+.TH MOUNTD 1M "Apr 27, 2005"
 .SH NAME
 mountd \- server for NFS mount requests and NFS access checks
 .SH SYNOPSIS
@@ -42,24 +42,20 @@ The options shown below are supported for NVSv2/v3 clients. They are not
 supported for Solaris NFSv4 clients.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Reject mount requests from clients. Clients that have file systems mounted will
 not be affected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Run the command in verbose mode. Each time \fBmountd\fR determines what access
 a client should get, it will log the result to the console, as well as how it
 got that result.
@@ -68,12 +64,10 @@ got that result.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/sharetab\fR\fR
 .ad
 .RS 21n
-.rt  
 shared file system table
 .RE
 

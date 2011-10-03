@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH device_contract 4 "21 Aug 2007" "SunOS 5.11" "File Formats"
+.TH DEVICE_CONTRACT 4 "Aug 21, 2007"
 .SH NAME
 device_contract \- device contract type
 .SH SYNOPSIS
@@ -49,34 +49,28 @@ A state refers to the state of the device which is the subject of the contract.
 Currently, three states are defined for device contracts:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCT_DEV_EV_ONLINE\fR\fR
 .ad
 .RS 22n
-.rt  
 The device is online and functioning normally.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCT_DEV_EV_DEGRADED\fR\fR
 .ad
 .RS 22n
-.rt  
 The device is online, but functioning in a degraded capacity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCT_DEV_EV_OFFLINE\fR\fR
 .ad
 .RS 22n
-.rt  
 The device is offline and is not configured for use.
 .RE
 
@@ -177,12 +171,10 @@ The following common contract terms, defined in \fBcontract\fR(4), have
 device-contract specific attributes:
 .sp
 .ne 2
-.mk
 .na
 \fBinformative set\fR
 .ad
 .RS 19n
-.rt  
 The default value for the informative set is \fBCT_DEV_EV_DEGRADE\fR that is,
 transitions to the \fBDEGRADED\fR state will by default result in informative
 events. Use \fBct_tmpl_set_informative\fR(3CONTRACT) to set this term.
@@ -190,12 +182,10 @@ events. Use \fBct_tmpl_set_informative\fR(3CONTRACT) to set this term.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcritical set\fR
 .ad
 .RS 19n
-.rt  
 The default value for the informative set is \fBCT_DEV_EV_OFFLINE\fR. That is,
 transitions to the \fBOFFLINE\fR state will by default result in critical
 events. Use \fBct_tmpl_set_critical\fR(3CONTRACT) to set this term.
@@ -208,12 +198,10 @@ template using the named \fBlibcontract\fR(3LIB) interfaces. These contract
 terms are in addition to those described in \fBcontract\fR(4).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDP_ACCEPT\fR\fR
 .ad
 .RS 15n
-.rt  
 Acceptable set or "A-set".
 .sp
 This term is required for every device contract. It defines the set of device
@@ -229,12 +217,10 @@ Use \fBct_dev_tmpl_set_aset\fR() to set this term. The default "A-set" is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDP_MINOR\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the \fBdevfs\fR path to a minor node that is the subject of the
 contract. Used to specify the minor node to be used for creating a contract
 when contract creation takes place other than at open time.
@@ -252,12 +238,10 @@ term.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDP_NONEG\fR\fR
 .ad
 .RS 15n
-.rt  
 If set, this term indicates that any negotiable departure from the contract
 terms should be \fBNACK\fRed. That is, the contract subsystem should assume a
 \fBNACK\fR for any negotiated breaking of the contract. This term is ignored
@@ -276,12 +260,10 @@ In addition to the standard items, the status object read from a status file
 descriptor contains the following items if \fBCTD_FIXED\fR is specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDS_STATE\fR\fR
 .ad
 .RS 14n
-.rt  
 Returns the current state of the device. One of the following states is
 returned:
 .RS +4
@@ -308,12 +290,10 @@ Use \fBct_dev_status_get_dev_state\fR() to obtain this information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDS_ASET\fR\fR
 .ad
 .RS 14n
-.rt  
 Returns the acceptable states ("A-set") of the device contract. The return
 value is a bitset of device states and may include one or more of the
 following:
@@ -341,12 +321,10 @@ Use \fBct_dev_status_get_aset\fR() to obtain this information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDS_NONEG\fR\fR
 .ad
 .RS 14n
-.rt  
 Returns the current setting of the \fBnoneg\fR flag. Returns 1 if the
 \fBnoneg\fR flag is set, or 0 if the flag is not set. Use
 \fBct_dev_status_get_noneg\fR() to obtain this information.
@@ -357,12 +335,10 @@ Returns the current setting of the \fBnoneg\fR flag. Returns 1 if the
 If \fBCTD_ALL\fR is specified, the following items are also available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTDS_MINOR\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBdevfs\fR path of the device which is the subject of the device contract.
 Use \fBct_dev_status_get_minor\fR() to obtain this information.
 .RE
@@ -375,7 +351,6 @@ are defined for device contract events.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/contract/device.h\fR\fR
 .ad

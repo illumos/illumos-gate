@@ -22,8 +22,7 @@
 # uts/sparc/md_sp/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the soft partitioning module.
 #
@@ -54,6 +53,11 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# Define dependency on md
+#
+LDFLAGS += -dy -N drv/md
 
 #
 # For now, disable these lint checks; maintainers should endeavor

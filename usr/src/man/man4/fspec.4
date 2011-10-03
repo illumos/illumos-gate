@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fspec 4 "3 Jul 1990" "SunOS 5.11" "File Formats"
+.TH FSPEC 4 "Jul 3, 1990"
 .SH NAME
 fspec \- format specification in text files
 .SH DESCRIPTION
@@ -23,12 +23,10 @@ of a keyletter, possibly followed immediately by a value. The following
 parameters are recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fItabs\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBt\fR parameter specifies the tab settings for the file. The value of
 \fBtabs\fR must be one of the following:
 .RS +4
@@ -58,12 +56,10 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fIsize\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBs\fR parameter specifies a maximum line size. The value of \fBsize\fR
 must be an integer. Size checking is performed after tabs have been expanded,
 but before the margin is prepended.
@@ -71,36 +67,30 @@ but before the margin is prepended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fImargin\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBm\fR parameter specifies a number of spaces to be prepended to each
 line. The value of \fImargin\fR must be an integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBd\fR parameter takes no value. Its presence indicates that the line
 containing the format specification is to be deleted from the converted file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBe\fR parameter takes no value. Its presence indicates that the current
 format is to prevail only until another format specification is encountered in
 the file.

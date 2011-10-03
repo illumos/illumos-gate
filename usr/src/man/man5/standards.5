@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH standards 5 "14 Jan 2004" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH STANDARDS 5 "Jan 14, 2004"
 .SH NAME
 standards, ANSI, C, C++, ISO, POSIX, POSIX.1, POSIX.2, SUS, SUSv2, SUSv3, SVID,
 SVID3, XNS, XNS4, XNS5, XPG, XPG3, XPG4, XPG4v2 \- standards and specifications
@@ -19,27 +19,25 @@ first conformed to it.
 
 .sp
 .TS
-tab();
-cw(1.25i) cw(3.3i) cw(.95i) 
-lw(1.25i) lw(3.3i) lw(.95i) 
-.
-POSIX StandardDescriptionRelease
+c c c
+l l l .
+POSIX Standard	Description	Release
 _
-POSIX.1-1988system interfaces and headersSunOS 4.1
+POSIX.1-1988	system interfaces and headers	SunOS 4.1
 _
-POSIX.1-1990POSIX.1-1988 updateSolaris 2.0
+POSIX.1-1990	POSIX.1-1988 update	Solaris 2.0
 _
-POSIX.1b-1993realtime extensionsSolaris 2.4
+POSIX.1b-1993	realtime extensions	Solaris 2.4
 _
-POSIX.1c-1996threads extensionsSolaris 2.6
+POSIX.1c-1996	threads extensions	Solaris 2.6
 _
-POSIX.2-1992shell and utilitiesSolaris 2.5
+POSIX.2-1992	shell and utilities	Solaris 2.5
 _
-POSIX.2a-1992interactive shell and utilitiesSolaris 2.5
+POSIX.2a-1992	interactive shell and utilities	Solaris 2.5
 _
-POSIX.1-2001T{
+POSIX.1-2001	T{
 POSIX.1-1990, POSIX.1b-1993, POSIX.1c-1996, POSIX.2-1992, and POSIX.2a-1992 updates
-T}Solaris 10
+T}	Solaris 10
 .TE
 
 .sp
@@ -58,37 +56,35 @@ and the SunOS or Solaris release that first conformed to it.
 
 .sp
 .TS
-tab();
-cw(1.29i) cw(3.27i) cw(.93i) 
-cw(1.29i) cw(3.27i) cw(.93i) 
-.
-X/Open CAE
+c c c
+c c c .
+X/Open CAE		
 _
- SpecificationDescriptionRelease
+ Specification	Description	Release
 _
-XPG3T{
+XPG3	T{
 superset of POSIX.1-1988 containing utilities from SVID3
-T}SunOS 4.1
+T}	SunOS 4.1
 _
-XPG4T{
+XPG4	T{
 superset of POSIX.1-1990, POSIX.2-1992, and POSIX.2a-1992 containing extensions to POSIX standards from XPG3
-T}Solaris 2.4
+T}	Solaris 2.4
 _
-SUS (XPG4v2)T{
+SUS (XPG4v2)	T{
 superset of XPG4 containing historical BSD interfaces widely used by common application packages
-T}Solaris 2.6
+T}	Solaris 2.6
 _
-XNS4sockets and XTI interfacesSolaris 2.6
+XNS4	sockets and XTI interfaces	Solaris 2.6
 _
-SUSv2T{
+SUSv2	T{
 superset of SUS extended to support POSIX.1b-1993, POSIX.1c-1996, and ISO/IEC 9899 (C Standard) Amendment 1
-T}Solaris 7
+T}	Solaris 7
 _
-XNS5T{
+XNS5	T{
 superset and LP64-clean derivative of XNS4.
-T}Solaris 7
+T}	Solaris 7
 _
-SUSv3same as POSIX.1-2001Solaris 10
+SUSv3	same as POSIX.1-2001	Solaris 10
 .TE
 
 .sp
@@ -149,7 +145,6 @@ environment variable to specify the directories listed below in the order
 specified to get the appropriate utilities:
 .sp
 .ne 2
-.mk
 .na
 \fBSVID3, XPG3\fR
 .ad
@@ -179,7 +174,6 @@ other directories containing binaries needed by the application
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOSIX.2, POSIX.2a, SUS, SUSv2, XPG4\fR
 .ad
@@ -214,7 +208,6 @@ other directories containing binaries needed by the application
 
 .sp
 .ne 2
-.mk
 .na
 \fBPOSIX.1-2001, SUSv3\fR
 .ad
@@ -300,22 +293,20 @@ supported by the implementation.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBPOSIX Standard\fR\fBFeature Test Macros\fR
+c c
+l l .
+\fBPOSIX Standard\fR	\fBFeature Test Macros\fR
 _
-POSIX.1-1990\fB_POSIX_SOURCE\fR
+POSIX.1-1990	\fB_POSIX_SOURCE\fR
 _
 T{
 POSIX.1-1990 and POSIX.2-1992  C-Language Bindings Option
-T}\fB_POSIX_SOURCE\fR and \fB_POSIX_C_SOURCE=2\fR
-POSIX.1b-1993\fB_POSIX_C_SOURCE=199309L\fR
+T}	\fB_POSIX_SOURCE\fR and \fB_POSIX_C_SOURCE=2\fR
+POSIX.1b-1993	\fB_POSIX_C_SOURCE=199309L\fR
 _
-POSIX.1c-1996\fB_POSIX_C_SOURCE=199506L\fR
+POSIX.1c-1996	\fB_POSIX_C_SOURCE=199506L\fR
 _
-POSIX.1-2001\fB_POSIX_C_SOURCE=200112L\fR
+POSIX.1-2001	\fB_POSIX_C_SOURCE=200112L\fR
 .TE
 
 .SS "SVID3"
@@ -332,24 +323,20 @@ specifications, use the following guidelines. Applications need not set the
 POSIX feature test macros if they require both CAE and POSIX functionality.
 .sp
 .ne 2
-.mk
 .na
 \fBXPG3\fR
 .ad
 .RS 16n
-.rt  
 The application must define \fB_XOPEN_SOURCE\fR. If \fB_XOPEN_SOURCE\fR is
 defined with a value, the value must be less than 500.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBXPG4\fR
 .ad
 .RS 16n
-.rt  
 The application must define \fB_XOPEN_SOURCE\fR and set \fB_XOPEN_VERSION=4\fR.
 If \fB_XOPEN_SOURCE\fR is defined with a value, the value must be less than
 500.
@@ -357,12 +344,10 @@ If \fB_XOPEN_SOURCE\fR is defined with a value, the value must be less than
 
 .sp
 .ne 2
-.mk
 .na
 \fBSUS (XPG4v2)\fR
 .ad
 .RS 16n
-.rt  
 The application must define \fB_XOPEN_SOURCE\fR and set
 \fB_XOPEN_SOURCE_EXTENDED=1\fR. If \fB_XOPEN_SOURCE\fR is defined with a value,
 the value must be less than 500.
@@ -370,23 +355,19 @@ the value must be less than 500.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSUSv2\fR
 .ad
 .RS 16n
-.rt  
 The application must define \fB_XOPEN_SOURCE=500\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSUSv3\fR
 .ad
 .RS 16n
-.rt  
 The application must define \fB_XOPEN_SOURCE=600\fR.
 .RE
 
@@ -502,12 +483,10 @@ c99 $(getconf POSIX_V6_LP64_OFF64_CFLAGS) -D_XOPEN_SOURCE=600 \e
 .SS "SUSv3"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc99\fR\fR
 .ad
 .RS 28n
-.rt  
 \fB_XOPEN_SOURCE=600\fR
 .RE
 

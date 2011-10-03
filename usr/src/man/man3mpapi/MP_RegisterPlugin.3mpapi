@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_RegisterPlugin 3MPAPI "15 Feb 2006" "SunOS 5.11" "Common Multipath Management Library Functions"
+.TH MP_REGISTERPLUGIN 3MPAPI "Feb 15, 2006"
 .SH NAME
 MP_RegisterPlugin \- register a plugin with the common library
 .SH SYNOPSIS
@@ -20,12 +20,10 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpPluginId\fR\fR
 .ad
 .RS 13n
-.rt  
 A pointer to the key name shall be the reversed domain name of the vendor
 followed by a ".", followed by the vendor-specific name for the plugin that
 uniquely identifies it.
@@ -33,12 +31,10 @@ uniquely identifies it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpFileName\fR\fR
 .ad
 .RS 13n
-.rt  
 The full path name of the plugin library.
 .RE
 
@@ -74,7 +70,6 @@ filenames.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
 .ad
@@ -85,7 +80,6 @@ The \fIpFileName\fR does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_SUCCESS\fR\fR
 .ad
@@ -97,12 +91,10 @@ The operation is successful.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mpapi.conf\fR\fR
 .ad
 .RS 19n
-.rt  
 MPAPI library configuration file
 .RE
 
@@ -114,17 +106,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 Standard: ANSI INCITS 412 Multipath Management API
 T}
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

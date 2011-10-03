@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH keypad 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.TH KEYPAD 3XCURSES "Jun 5, 2002"
 .SH NAME
 keypad \- enable/disable keypad handling
 .SH SYNOPSIS
@@ -22,23 +22,19 @@ keypad \- enable/disable keypad handling
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwin\fR\fR
 .ad
 .RS 7n
-.rt  
 Is a pointer to the window in which to enable/disable keypad handling.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbf\fR\fR
 .ad
 .RS 7n
-.rt  
 Is a Boolean expression.
 .RE
 
@@ -131,21 +127,20 @@ character, and the kill character:
 
 .sp
 .TS
-tab() box;
-cw(1.44i) cw(4.06i) 
-lw(1.44i) lw(4.06i) 
-.
- Input Mode Effect
-Cooked ModeT{
+box;
+c c
+l l .
+ Input Mode	 Effect
+Cooked Mode	T{
  This achieves normal line-at-a-time processing with all special characters handled outside the application. This achieves the same effect as canonical-mode input processing. The state of the \fBISIG\fR and \fBIXON\fR flags are not changed upon entering this mode by calling \fBnocbreak\fR(3XCURSES), and are set upon entering this mode by calling \fBnoraw\fR(3XCURSES).Erase and kill characters are supported from any supported locale, no matter the width of the character.
 T}
-\fBcbreak\fR ModeT{
+\fBcbreak\fR Mode	T{
 Characters typed by the user are immediately available to the application and Curses does not perform special processing on either the erase character or the kill character. An application can set \fBcbreak\fR mode to do its own line editing but to let the abort character be used to abort the task. This mode achieves the same effect as non-canonical-mode, Case B input processing (with MIN set to 1 and ICRNL cleared.) The state of the \fBISIG\fR and \fBIXON\fR flags are not changed upon entering this mode.
 T}
-Half-Delay ModeT{
+Half-Delay Mode	T{
  The effect is the same as \fBcbreak\fR, except that input functions wait until a character is available or an interval defined by the application elapses, whichever comes first. This mode achieves the same effect as non-canonical-mode, Case C input processing (with TIME set to the value specified by the application.) The state of the \fBISIG\fR and \fBIXON\fR flags are not changed upon entering this mode.
 T}
-Raw ModeT{
+Raw Mode	T{
 Raw mode gives the application maximum control over terminal input. The application sees each character as it is typed. This achieves the same effect as non-canonical mode, Case D input processing. The \fBISIG\fR and \fBIXON\fR flags are cleared upon entering this mode.
 T}
 .TE
@@ -169,23 +164,19 @@ return to the application when there is no terminal input waiting when the
 function is called:
 .sp
 .ne 2
-.mk
 .na
 \fBNo Delay\fR
 .ad
 .RS 12n
-.rt  
 The function fails.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDelay\fR
 .ad
 .RS 12n
-.rt  
  The application waits until text is passed through to the application. If
 \fBcbreak\fR or Raw Mode is set, this is after one character. Otherwise, this
 is after the first <newline> character, end-of-line character, or end-of-file
@@ -242,15 +233,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

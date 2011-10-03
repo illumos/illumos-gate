@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH strerr 1M "4 Oct 1994" "SunOS 5.11" "System Administration Commands"
+.TH STRERR 1M "Oct 4, 1994"
 .SH NAME
 strerr \- STREAMS error logger daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fBstrerr\fR 
+\fBstrerr\fR
 .fi
 
 .SH DESCRIPTION
@@ -29,79 +29,65 @@ The format of an error log message is:
 <\fItext\fR>
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIseq\fR>\fR
 .ad
 .RS 11n
-.rt  
 error sequence number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fBtime\fR>\fR
 .ad
 .RS 11n
-.rt  
 time of message in hh:mm:ss
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIticks\fR>\fR
 .ad
 .RS 11n
-.rt  
 time of message in machine ticks since boot priority level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIflags\fR>\fR
 .ad
 .RS 11n
-.rt  
 \fBT\fR : the message was also sent to a tracing process \fBF\fR : indicates a
 fatal error \fBN\fR : send mail to the system administrator (hardcoded as root)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fImid\fR>\fR
 .ad
 .RS 11n
-.rt  
 module  \fBID\fR number of source
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIsid\fR>\fR
 .ad
 .RS 11n
-.rt  
 sub-ID number of source
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fItext\fR>\fR
 .ad
 .RS 11n
-.rt  
 formatted text of the error message
 .RE
 
@@ -122,7 +108,6 @@ It is commonly executed asynchronously.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/streams/error.\fR\fImm\fR\fB-\fR\fBdd\fR\fR
 .ad

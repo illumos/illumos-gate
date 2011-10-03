@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ike.preshared 4 "15 Oct 2001" "SunOS 5.11" "File Formats"
+.TH IKE.PRESHARED 4 "Oct 15, 2001"
 .SH NAME
 ike.preshared \- pre-shared keys file for IKE
 .SH SYNOPSIS
@@ -28,16 +28,14 @@ required inside a pre-shared key:
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-NameValueExample
-localidtypeIPlocalidtype IP
-remoteidtypeIPremoteidtype IP
-localidIP-addresslocalid 10.1.1.2
-remoteidIP-addressremoteid 10.1.1.3
-keyhex-string          1234567890abcdef
+c c c
+l l l .
+Name	Value	Example
+localidtype	IP	localidtype IP
+remoteidtype	IP	remoteidtype IP
+localid	IP-address	localid 10.1.1.2
+remoteid	IP-address	remoteid 10.1.1.3
+key	hex-string          	1234567890abcdef
 .TE
 
 .sp
@@ -57,10 +55,10 @@ The following is an example of an \fBike.preshared\fR file:
 .sp
 .in +2
 .nf
-  
+
 #
 # Two pre-shared keys between myself, 10.1.1.2, and two remote
-# hosts.  Note that names are not allowed for IP addresses.     
+# hosts.  Note that names are not allowed for IP addresses.
 #
 # A decent hex string can be obtained by performing:
 #           od -x </dev/random | head
@@ -71,7 +69,7 @@ The following is an example of an \fBike.preshared\fR file:
     localid 10.1.1.2
     remoteidtype IP
     remoteid 10.21.12.4
-    key 4b656265207761732068657265210c0a 
+    key 4b656265207761732068657265210c0a
 }
 
 {

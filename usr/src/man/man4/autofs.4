@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH autofs 4 "2 Aug 2005" "SunOS 5.11" "File Formats"
+.TH AUTOFS 4 "Aug 2, 2005"
 .SH NAME
 autofs \- file containing parameter values for automountd daemon and automount
 command
@@ -49,7 +49,6 @@ file is preserved across operating system upgrades.
 The following parameters are currently supported in the \fBautofs\fR file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTOMOUNT_TIMEOUT=\fR\fI<num>\fR\fR
 .ad
@@ -62,7 +61,6 @@ option in \fBautomount\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTOMOUNT_VERBOSE=\fR\fBTRUE | FALSE\fR\fR
 .ad
@@ -75,7 +73,6 @@ to the \fB-v\fR option in \fBautomount\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTOMOUNTD_VERBOSE=\fR\fBTRUE | FALSE\fR\fR
 .ad
@@ -89,7 +86,6 @@ The default value is \fBFALSE\fR. Equivalent to the \fB-v\fR option in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTOMOUNTD_NOBROWSE=\fR\fI<num>\fR\fR
 .ad
@@ -101,7 +97,6 @@ Turn on or off browsing for all \fBautofs\fR mount points. The default value is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTOMOUNTD_TRACE=\fR\fI<num>\fR\fR
 .ad
@@ -115,7 +110,6 @@ higher value, the verbosity of trace output increases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTOMOUNTD_ENV\fR=\fI<name>\fR\fB=\fR\fI<value>\fR\fR
 .ad

@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_TASKQ_IMPL_H
 #define	_SYS_TASKQ_IMPL_H
@@ -43,10 +46,15 @@ typedef struct taskq_ent {
 	struct taskq_ent	*tqent_prev;
 	task_func_t		*tqent_func;
 	void			*tqent_arg;
-	taskq_bucket_t		*tqent_bucket;
+	union {
+		taskq_bucket_t	*tqent_bucket;
+		uintptr_t	tqent_flags;
+	}			tqent_un;
 	kthread_t		*tqent_thread;
 	kcondvar_t		tqent_cv;
 } taskq_ent_t;
+
+#define	TQENT_FLAG_PREALLOC	0x1
 
 /*
  * Taskq Statistics fields are not protected by any locks.
@@ -140,6 +148,10 @@ struct taskq {
 	int		tq_tcreates;
 	int		tq_tdeaths;
 };
+
+/* Special form of taskq dispatch that uses preallocated entries. */
+void taskq_dispatch_ent(taskq_t *, task_func_t, void *, uint_t, taskq_ent_t *);
+
 
 #define	tq_thread tq_thr._tq_thread
 #define	tq_threadlist tq_thr._tq_threadlist

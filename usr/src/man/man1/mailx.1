@@ -2,26 +2,26 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mailx 1 "19 Sep 2001" "SunOS 5.11" "User Commands"
+.TH MAILX 1 "Sep 19, 2001"
 .SH NAME
 mailx \- interactive message processing system
 .SH SYNOPSIS
 .LP
 .nf
-\fBmailx\fR [\fB-BdeHiInNURvV~\fR] [\fB-f\fR [\fIfile\fR | \fI+folder\fR]] [\fB-T\fR \fIfile\fR] 
+\fBmailx\fR [\fB-BdeHiInNURvV~\fR] [\fB-f\fR [\fIfile\fR | \fI+folder\fR]] [\fB-T\fR \fIfile\fR]
      [\fB-u\fR \fIuser\fR]
 .fi
 
 .LP
 .nf
-\fBmailx\fR [\fB-BdFintUv~\fR] [\fB-b\fR \fIbcc\fR] [\fB-c\fR \fIcc\fR] [\fB-h\fR \fInumber\fR] 
+\fBmailx\fR [\fB-BdFintUv~\fR] [\fB-b\fR \fIbcc\fR] [\fB-c\fR \fIcc\fR] [\fB-h\fR \fInumber\fR]
      [\fB-r\fR \fIaddress\fR] [\fB-s\fR \fIsubject\fR] \fIrecipient\fR...
 .fi
 
@@ -71,117 +71,97 @@ taken to be destinations (recipients). If no recipients are specified,
 \fBmailx\fR attempts to read messages from the \fBmailbox\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not buffer standard input or standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbcc\fR\fR
 .ad
 .RS 17n
-.rt  
 Set the blind carbon copy list to \fIbcc\fR. \fIbcc\fR should be enclosed in
 quotes if it contains more than one name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcc\fR\fR
 .ad
 .RS 17n
-.rt  
 Set the carbon copy list to \fIcc\fR. \fIcc\fR should be enclosed in quotes if
 it contains more than one name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 17n
-.rt  
 Turn on debugging output. (Neither particularly interesting nor recommended.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 17n
-.rt  
 Test for the presence of mail. \fBmailx\fR prints nothing and exits with a
 successful return code if there is mail to read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 17n
-.rt  
 Record the message in a file named after the first recipient. Overrides the
 \fBrecord\fR variable, if set (see \fBInternal Variables\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-f\fR\fB [\fR\fIfile\fR\fB]\fR\fR
 .ad
 .RS 17n
-.rt  
 Read messages from \fIfile\fR instead of \fBmailbox\fR. If no \fIfile\fR is
 specified, the \fBmbox\fR is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-f\fR\fB [ \fR\fB+\fR\fIfolder\fR\fB]\fR\fR
 .ad
 .RS 17n
-.rt  
 Use the file \fIfolder\fR in the folder directory (same as the \fBfold\fRer
 command). The name of this directory is listed in the \fBfolder\fR variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 17n
-.rt  
 Print header summary only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fInumber\fR\fR
 .ad
 .RS 17n
-.rt  
 The number of network "hops" made so far. This is provided for network software
 to avoid infinite delivery loops. This option and its argument are passed to
 the delivery program.
@@ -189,58 +169,48 @@ the delivery program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 17n
-.rt  
 Include the newsgroup and article-id header lines when printing mail messages.
 This option requires the \fB-f\fR option to be specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 17n
-.rt  
 Ignore interrupts. See also \fBignore\fR in \fBInternal Variables\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not print initial header summary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 17n
-.rt  
 Do not initialize from the system default \fBmailx.rc\fR or \fBMail.rc\fR file.
 See USAGE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIaddress\fR\fR
 .ad
 .RS 17n
-.rt  
 Use \fIaddress\fR as the return address when invoking the delivery program. All
 tilde commands are disabled. This option and its argument is passed to the
 delivery program.
@@ -248,94 +218,78 @@ delivery program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsubject\fR\fR
 .ad
 .RS 17n
-.rt  
 Set the Subject header field to \fIsubject\fR. \fIsubject\fR should be enclosed
 in quotes if it contains embedded white space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIfile\fR\fR
 .ad
 .RS 17n
-.rt  
 Message-id and article-id header lines are recorded in \fIfile\fR after the
 message is read. This option also sets the \fB-I\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 17n
-.rt  
 Scan the input for \fBTo:\fR, \fBCc:\fR, and \fBBcc:\fR fields. Any recipients
 on the command line will be ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 17n
-.rt  
 Convert \fBUUCP-style\fR addresses to internet standards.  Overrides the
 \fBconv\fR environment variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser\fR\fR
 .ad
 .RS 17n
-.rt  
 Read \fIuser\fR's \fBmailbox\fR. This is only effective if \fIuser\fR's
 \fBmailbox\fR is not read protected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 17n
-.rt  
 Print the \fBmailx\fR version number and exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 17n
-.rt  
 Pass the \fB-v\fR flag to \fBsendmail\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-~\fR\fR
 .ad
 .RS 17n
-.rt  
 Interpret tilde escapes in the input even if not reading from a tty.
 .RE
 
@@ -345,12 +299,10 @@ Interpret tilde escapes in the input even if not reading from a tty.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrecipient\fR\fR
 .ad
 .RS 13n
-.rt  
 Addressee of message.
 .RE
 
@@ -441,175 +393,143 @@ The default for \fImessage-list\fR is the current message. A \fImessage-list\fR
 is a list of message identifiers separated by spaces, which may include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 11n
-.rt  
 Message number \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.\fR\fR
 .ad
 .RS 11n
-.rt  
 The current message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 11n
-.rt  
 The first undeleted message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 11n
-.rt  
 The last message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 11n
-.rt  
 All messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 11n
-.rt  
 The next undeleted message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 11n
-.rt  
 The previous undeleted message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fB\(mi\fR\fIm\fR\fR
 .ad
 .RS 11n
-.rt  
 An inclusive range of message numbers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 11n
-.rt  
 All messages from \fIuser\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI/string\fR\fR
 .ad
 .RS 11n
-.rt  
 All messages with \fIstring\fR in the Subject line (case ignored).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR\fIc\fR\fR
 .ad
 .RS 11n
-.rt  
 All messages of type \fIc\fR, where \fIc\fR is one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 deleted messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 5n
-.rt  
 new messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 old messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 read messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 5n
-.rt  
 unread messages
 .RE
 
@@ -668,7 +588,6 @@ message. If no command is specified in \fIcommand mode\fR, \fBn\fRext is
 assumed. The following is a complete list of \fBmailx\fR commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fIshell-command\fR\fR
 .ad
@@ -679,7 +598,6 @@ Escape to the shell. See \fBSHELL\fR in ENVIRONMENT VARIABLES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR \fIcomment\fR\fR
 .ad
@@ -690,7 +608,6 @@ Escape to the shell. See \fBSHELL\fR in ENVIRONMENT VARIABLES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fR
 .ad
@@ -701,7 +618,6 @@ Print the current message number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -712,7 +628,6 @@ Prints a summary of commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fRlias \fIalias name\fR .\|.\|.\fR
 .ad
@@ -729,7 +644,6 @@ arguments, the command displays the list of defined aliases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalt\fRernates \fIname .\|.\|.\fR\fR
 .ad
@@ -743,7 +657,6 @@ arguments, print the current list of alternate names. See also \fBallnet\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR [\fIdirectory\fR]\fR
 .ad
@@ -758,7 +671,6 @@ Change directory. If \fIdirectory\fR is not specified, \fB$HOME\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fRopy [\fIfile\fR]\fR
 .ad
@@ -774,7 +686,6 @@ equivalent to the \fBs\fRave command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fRopy [\fImessage-list\fR]\fR
 .ad
@@ -787,7 +698,6 @@ equivalent to the \fBS\fRave command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fRelete [\fImessage-list\fR]\fR
 .ad
@@ -799,7 +709,6 @@ message after the last one deleted is printed (see \fBInternal Variables\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdi\fRscard [\fIheader-field\fR.\|.\|.\|]\fR
 .ad
@@ -820,7 +729,6 @@ current list of header fields being ignored is printed. See also the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdp\fR [\fImessage-list\fR]\fR
 .ad
@@ -837,7 +745,6 @@ followed by a \fBp\fRrint command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBec\fRho \fIstring \fR.\|.\|.\fR
 .ad
@@ -848,7 +755,6 @@ Echo the given strings (like \fBecho\fR(1)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fRdit [\fImessage-list\fR]\fR
 .ad
@@ -861,7 +767,6 @@ ENVIRONMENT VARIABLES). Default editor is \fBed\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBex\fRit\fR
 .ad
@@ -877,7 +782,6 @@ saved in the \fBmbox\fR (see also \fBq\fRuit).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfie\fRld [\fImessage-list\fR] header-file\fR
 .ad
@@ -888,7 +792,6 @@ Display the value of the header field in the specified message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfi\fRle [\fIfile\fR]\fR
 .ad
@@ -902,56 +805,46 @@ Quit from the current file of messages and read in the specified file. Several
 special characters are recognized when used as file names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 9n
-.rt  
 the current \fBmailbox\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIuser\fR\fR
 .ad
 .RS 9n
-.rt  
 the \fBmailbox\fR for \fIuser\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 9n
-.rt  
 the previous mail file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&\fR\fR
 .ad
 .RS 9n
-.rt  
 the current \fBmbox\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIfile\fR\fR
 .ad
 .RS 9n
-.rt  
 The named file in the \fIfolder\fR directory (listed in the \fBfolder\fR
 variable).
 .RE
@@ -962,7 +855,6 @@ messages and characters it contains.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfolders\fR\fR
 .ad
@@ -974,7 +866,6 @@ Print the names of the files in the directory set by the \fBfolder\fR variable
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFo\fRllowup [\fImessage\fR]\fR
 .ad
@@ -990,7 +881,6 @@ the \fBreplyall\fR variable is set, the actions of \fBFo\fRllowup and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fRollowup [\fImessage-list\fR]\fR
 .ad
@@ -1007,7 +897,6 @@ the \fBFo\fRllowup, \fBS\fRave, and \fBC\fRopy commands and \fBoutfolder\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fRrom [\fImessage-list\fR]\fR
 .ad
@@ -1019,7 +908,6 @@ specified, print the header summary for the current message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fRroup \fIalias name \fR.\|.\|.\fR
 .ad
@@ -1035,7 +923,6 @@ Declare an alias for the given names. The names are substituted when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fReaders [\fImessage\fR]\fR
 .ad
@@ -1048,7 +935,6 @@ Variables\fR). See also the \fBz\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhel\fRp\fR
 .ad
@@ -1059,7 +945,6 @@ Print a summary of commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBho\fRld [\fImessage-list\fR]\fR
 .ad
@@ -1074,7 +959,6 @@ Hold the specified messages in the \fBmailbox\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fRf \fBs\fR | \fBr\fR | \fBt\fR\fR
 .ad
@@ -1113,7 +997,6 @@ being run from a terminal. Useful in the \fBmailrc\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinc\fR\fR
 .ad
@@ -1127,7 +1010,6 @@ messages are not renumbered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBig\fRnore [\fIheader-field \fR.\|.\|.\|]\fR
 .ad
@@ -1147,7 +1029,6 @@ the \fBundi\fRscard and \fBunig\fRnore commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fRist\fR
 .ad
@@ -1158,7 +1039,6 @@ Print all commands available. No explanation is given.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlo\fRad\fR
 .ad
@@ -1171,7 +1051,6 @@ headers (as saved by the \fBs\fRave command).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fRail \fIrecipient \fR.\|.\|.\fR
 .ad
@@ -1182,7 +1061,6 @@ Mail a message to the specified recipients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fRail \fIrecipient\fR\fR
 .ad
@@ -1196,7 +1074,6 @@ if set. See also the \fBSave\fR and \fBCopy\fR commands and \fBoutfolder\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmb\fRox [\fImessage-list\fR]\fR
 .ad
@@ -1210,7 +1087,6 @@ commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmo\fRre [\fImessage-list\fR]\fR
 .ad
@@ -1230,7 +1106,6 @@ command specified by the \fBPAGER\fR variable. The default command is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMo\fRre [\fImessage-list\fR]\fR
 .ad
@@ -1247,7 +1122,6 @@ Overrides suppression of fields by the \fBig\fRnore command. Same as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBne\fRw [\fImessage-list\fR]\fR
 .ad
@@ -1271,7 +1145,6 @@ having been read.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fRext [\fImessage\fR]\fR
 .ad
@@ -1288,7 +1161,6 @@ description of possible message specifications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpi\fRpe [\fImessage-list\fR] [\fIshell-command\fR]\fR
 .ad
@@ -1307,7 +1179,6 @@ message (see \fBInternal Variables\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpre\fRserve [\fImessage-list\fR]\fR
 .ad
@@ -1322,7 +1193,6 @@ Preserve the specified messages in the \fBmailbox\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fRrint [\fImessage-list\fR]\fR
 .ad
@@ -1342,7 +1212,6 @@ commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fRrint [\fImessage-list\fR]\fR
 .ad
@@ -1359,7 +1228,6 @@ Overrides suppression of fields by the \fBig\fRnore command.  Same as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpu\fRt [\fIfile\fR]\fR
 .ad
@@ -1375,7 +1243,6 @@ Save the specified message in the given file. Use the same conventions as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPu\fRt [\fIfile\fR]\fR
 .ad
@@ -1391,7 +1258,6 @@ by the \fBig\fRnore command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fRuit\fR
 .ad
@@ -1404,7 +1270,6 @@ file are deleted unless the \fBkeepsave\fR variable is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fReply [\fImessage-list\fR]\fR
 .ad
@@ -1429,7 +1294,6 @@ message. See the \fBStarting Mail\fR section in USAGE above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fReply [\fImessage\fR]\fR
 .ad
@@ -1454,7 +1318,6 @@ Mail\fR section in USAGE above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBret\fRain\fR
 .ad
@@ -1471,7 +1334,6 @@ arguments, it lists the current set of retained fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fRave [\fImessage-list\fR]\fR
 .ad
@@ -1485,7 +1347,6 @@ and \fBF\fRollowup commands and \fBoutfolder\fR in \fBInternal Variables\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fRave [\fIfile\fR]\fR
 .ad
@@ -1503,7 +1364,6 @@ also \fBInternal Variables\fR and the \fBex\fRit and \fBq\fRuit commands).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBse\fRt\fR
 .ad
@@ -1534,7 +1394,6 @@ might have. See \fBInternal Variables\fR for a description of all predefined
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsh\fRell\fR
 .ad
@@ -1545,7 +1404,6 @@ Invoke an interactive shell. See also \fBSHELL\fR in ENVIRONMENT VARIABLES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsi\fRze [\fImessage-list\fR]\fR
 .ad
@@ -1556,7 +1414,6 @@ Print the size in characters of the specified messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBso\fRurce \fIfile\fR\fR
 .ad
@@ -1567,7 +1424,6 @@ Read commands from the given file and return to command mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBto\fRp [\fImessage-list\fR]\fR
 .ad
@@ -1580,7 +1436,6 @@ Variables\fR). The default is 5.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtou\fRch [\fImessage-list\fR]\fR
 .ad
@@ -1594,7 +1449,6 @@ specified in the \fBMBOX\fR environment variable, upon normal termination. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT\fRype [\fImessage-list\fR]\fR
 .ad
@@ -1610,7 +1464,6 @@ Overrides suppression of fields by the \fBig\fRnore command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fRype [\fImessage-list\fR]\fR
 .ad
@@ -1628,7 +1481,6 @@ command specified by the \fBPAGER\fR variable. The default command is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuna\fRlias [\fBalias\fR] .\|.\|.\fR
 .ad
@@ -1643,7 +1495,6 @@ Remove the definitions of the specified aliases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fRndelete [\fImessage-list\fR]\fR
 .ad
@@ -1656,7 +1507,6 @@ restored is printed (see \fBInternal Variables\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBundi\fRscard [\fIheader-field\fR\|.\|.\|.]\fR
 .ad
@@ -1673,7 +1523,6 @@ ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunret\fRain [\fIheader-field\fR\|.\|.\|.]\fR
 .ad
@@ -1686,7 +1535,6 @@ retained.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunr\fRead [\fImessage-list\fR]\fR
 .ad
@@ -1701,7 +1549,6 @@ retained.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuns\fRet \fIvariable\fR\|.\|.\|.\fR
 .ad
@@ -1714,7 +1561,6 @@ cannot be unset from within \fBmailx\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBve\fRrsion\fR
 .ad
@@ -1725,7 +1571,6 @@ Print the current version and release date of the \fBmailx\fR utility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fRisual [\fImessage-list\fR]\fR
 .ad
@@ -1739,7 +1584,6 @@ edit it (see ENVIRONMENT VARIABLES). Notice that the default visual editor is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fRrite [\fImessage-list\fR] \fBfile\fR\fR
 .ad
@@ -1751,7 +1595,6 @@ blank line. Otherwise equivalent to the \fBs\fRave command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fRit\fR
 .ad
@@ -1767,7 +1610,6 @@ saved in the \fBmbox\fR (see also \fBq\fRuit).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBz\fR[\fB+\fR\||\|\fB\(mi\fR]\fR
 .ad
@@ -1788,29 +1630,24 @@ changing this special character. The escape character can be entered as text by
 typing it twice.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~\|!\fR\fIshell-command\fR\fR
 .ad
 .RS 23n
-.rt  
 Escape to the shell. If present, run \fIshell-command\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~.\fR\fR
 .ad
 .RS 23n
-.rt  
 Simulate end of file (terminate message input).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~\|:\fR\fImail-command\fR\fR
 .ad
@@ -1819,54 +1656,45 @@ Simulate end of file (terminate message input).
 \fB\fB~_\|\fR\fImail-command\fR\fR
 .ad
 .RS 23n
-.rt  
 Perform the command-level request. Valid only when sending a message while
 reading mail.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~?\fR\fR
 .ad
 .RS 23n
-.rt  
 Print a summary of tilde escapes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~A\fR\fR
 .ad
 .RS 23n
-.rt  
 Insert the autograph string \fBSign\fR into the message (see \fBInternal
 Variables\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~a\fR\fR
 .ad
 .RS 23n
-.rt  
 Insert the autograph string \fBsign\fR into the message (see \fBInternal
 Variables\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~b\fR\fI name \|.\|.\|.\fR\fR
 .ad
 .RS 23n
-.rt  
 Add the \fIname\fRs to the blind carbon copy (\fBBcc\fR) list. This is like the
 carbon copy (\fBCc\fR) list, except that the names in the \fBBcc\fR list are
 not shown in the header of the mail message.
@@ -1874,47 +1702,39 @@ not shown in the header of the mail message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~c\fR\fI name \|.\|.\|.\fR\fR
 .ad
 .RS 23n
-.rt  
 Add the \fIname\fRs to the carbon copy (\fBCc\fR) list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~d\fR\fR
 .ad
 .RS 23n
-.rt  
 Read in the \fBdead-letter\fR file. See \fBDEAD\fR in ENVIRONMENT VARIABLES for
 a description of this file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~e\fR\fR
 .ad
 .RS 23n
-.rt  
 Invoke the editor on the partial message. See also \fBEDITOR\fR in ENVIRONMENT
 VARIABLES.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~f\fR [\fImessage-list\fR]\fR
 .ad
 .RS 23n
-.rt  
 Forward the specified message, or the current message being read. Valid only
 when sending a message while reading mail. The messages are inserted into the
 message without alteration (as opposed to the \fB~m\fR escape).
@@ -1922,24 +1742,20 @@ message without alteration (as opposed to the \fB~m\fR escape).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~F\fR [\fImessage-list\fR]\fR
 .ad
 .RS 23n
-.rt  
 Forward the specified message, or the current message being read, including all
 header fields. Overrides the suppression of fields by the \fBig\fRnore command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~h\fR\fR
 .ad
 .RS 23n
-.rt  
 Prompt for \fBSubject\fR line and \fBTo\fR, \fBCc\fR, and \fBBcc\fR lists. If
 the field is displayed with an initial value, it may be edited as if you had
 just typed it.
@@ -1947,12 +1763,10 @@ just typed it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~i\fR \fIvariable\fR\fR
 .ad
 .RS 23n
-.rt  
 Insert the value of the named variable into the text of the message. For
 example, \fB~A\fR is equivalent to `\fB~i Sign\fR.' Environment variables set
 and exported in the shell are also accessible by \fB~i\fR.
@@ -1960,12 +1774,10 @@ and exported in the shell are also accessible by \fB~i\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~m\fR [\fImessage-list\fR]\fR
 .ad
 .RS 23n
-.rt  
 Insert the listed messages, or the current message being read into the letter.
 Valid only when sending a message while reading mail. The text of the message
 is shifted to the right, and the string contained in the \fBindentprefix\fR
@@ -1975,12 +1787,10 @@ variable is inserted as the leftmost characters of each line. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~M\fR [\fImessage-list\fR]\fR
 .ad
 .RS 23n
-.rt  
 Insert the listed messages, or the current message being read, including the
 header fields, into the letter. Valid only when sending a message while reading
 mail. The text of the message is shifted to the right, and the string contained
@@ -1991,23 +1801,19 @@ each line. Overrides the suppression of fields by the \fBig\fRnore command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~p\fR\fR
 .ad
 .RS 23n
-.rt  
 Print the message being entered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~q\fR\fR
 .ad
 .RS 23n
-.rt  
 Quit from input mode by simulating an interrupt. If the body of the message is
 not null, the partial message is saved in \fBdead-letter\fR. See \fBDEAD\fR in
 ENVIRONMENT VARIABLES for a description of this file.
@@ -2015,18 +1821,15 @@ ENVIRONMENT VARIABLES for a description of this file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~R\fR\fR
 .ad
 .RS 23n
-.rt  
 Mark message for return receipt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~r\fR \fIfile\fR\fR
 .ad
@@ -2039,7 +1842,6 @@ Mark message for return receipt.
 \fB\fB~< ! \fR\fIshell-command\fR\fR
 .ad
 .RS 23n
-.rt  
 Read in the specified file. If the argument begins with an exclamation point
 (!), the rest of the string is taken as an arbitrary shell command and is
 executed, with the standard output inserted into the message.
@@ -2047,68 +1849,56 @@ executed, with the standard output inserted into the message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~s\fR \fIstring \|.\|.\|.\fR\fR
 .ad
 .RS 23n
-.rt  
 Set the subject line to \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~t\fR \fIname \|.\|.\|.\fR\fR
 .ad
 .RS 23n
-.rt  
 Add the given \fIname\fRs to the To list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~v\fR\fR
 .ad
 .RS 23n
-.rt  
 Invoke a preferred screen editor on the partial message. The default visual
 editor is \fBvi\fR(1). See also \fBVISUAL\fR in ENVIRONMENT VARIABLES.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~w\fR \fIfile\fR\fR
 .ad
 .RS 23n
-.rt  
 Write the message into the given file, without the header.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~x\fR\fR
 .ad
 .RS 23n
-.rt  
 Exit as with \fB~q\fR except the message is not saved in \fBdead-letter\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~|\fR \fIshell-command\fR\fR
 .ad
 .RS 23n
-.rt  
 Pipe the body of the message through the given \fIshell-command\fR. If the
 \fIshell-command\fR returns a successful exit status, the output of the command
 replaces the message.
@@ -2122,12 +1912,10 @@ execution environment or set using the \fBse\fRt command at any time. The
 \fBuns\fRet command may be used to erase variables.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallnet\fR\fR
 .ad
 .RS 26n
-.rt  
 All network names whose last component (login name) match are treated as
 identical. This causes the \fImessage-list\fR message specifications to behave
 similarly. Disabled by default. See also the \fBalt\fRernates command and the
@@ -2136,12 +1924,10 @@ similarly. Disabled by default. See also the \fBalt\fRernates command and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalwaysignore\fR\fR
 .ad
 .RS 26n
-.rt  
 Ignore header fields with \fBig\fRnore everywhere, not just during \fBp\fRrint
 or \fBt\fRype. Affects the \fBs\fRave, \fBS\fRave, \fBc\fRopy, \fBC\fRopy,
 \fBto\fRp, \fBpi\fRpe, and \fBw\fRrite commands, and the \fB~m\fR and \fB~f\fR
@@ -2150,12 +1936,10 @@ tilde escapes. Enabled by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappend\fR\fR
 .ad
 .RS 26n
-.rt  
 Upon termination, append messages to the end of the \fBmbox\fR file instead of
 prepending them. Although disabled by default, \fBappend\fR is set in the
 system startup file (which can be suppressed with the \fB-n\fR command line
@@ -2164,12 +1948,10 @@ option).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappenddeadletter\fR\fR
 .ad
 .RS 26n
-.rt  
 Append to the deadletter file rather than overwrite it. Although disabled by
 default, \fBappenddeadletter\fR is frequently set in the system startup file.
 See \fBStarting Mail\fR in USAGE above.
@@ -2177,48 +1959,40 @@ See \fBStarting Mail\fR in USAGE above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaskbcc\fR\fR
 .ad
 .RS 26n
-.rt  
 Prompt for the \fBBcc\fR list after the \fBSubject\fR is entered if it is not
 specified on the command line with the \fB-b\fR option. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaskcc\fR\fR
 .ad
 .RS 26n
-.rt  
 Prompt for the \fBCc\fR list after the \fBSubject\fR is entered if it is not
 specified on the command line with the \fB-c\fR option. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBasksub\fR\fR
 .ad
 .RS 26n
-.rt  
 Prompt for subject if it is not specified on the command line with the \fB-s\fR
 option. Enabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautoinc\fR\fR
 .ad
 .RS 26n
-.rt  
 Automatically incorporate new messages into the current session as they arrive.
 This has an affect similar to issuing the \fBinc\fR command every time the
 command prompt is displayed. Disabled by default, but \fBautoinc\fR is set in
@@ -2228,36 +2002,30 @@ the default system startup file for \fBmailx\fR; it is not set for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautoprint\fR\fR
 .ad
 .RS 26n
-.rt  
 Enable automatic printing of messages after \fBd\fRelete and \fBu\fRndelete
 commands. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbang\fR\fR
 .ad
 .RS 26n
-.rt  
 Enable the special-casing of exclamation points (!) in shell escape command
 lines as in \fBvi\fR(1). Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbsdcompat\fR\fR
 .ad
 .RS 26n
-.rt  
 Set automatically if \fBmailx\fR is invoked as \fBmail\fR or \fBMail\fR. Causes
 \fBmailx\fR to use \fB/etc/mail/Mail.rc\fR as the system startup file. Changes
 the default pager to \fBmore\fR(1).
@@ -2265,45 +2033,37 @@ the default pager to \fBmore\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcmd=\fR\fIshell-command\fR\fR
 .ad
 .RS 26n
-.rt  
 Set the default command for the \fBpi\fRpe command.  No default value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconv=\fR\fIconversion\fR\fR
 .ad
 .RS 26n
-.rt  
 Convert \fBuucp\fR addresses to the specified address style, which can be
 either:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinternet\fR\fR
 .ad
 .RS 12n
-.rt  
 This requires a mail delivery program conforming to the \fBRFC822\fR standard
 for electronic mail addressing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoptimize\fR\fR
 .ad
 .RS 12n
-.rt  
 Remove loops in \fBuucp\fR(1C) address paths (typically generated by the
 \fBr\fReply command).  No rerouting is performed; \fBmail\fR has no knowledge
 of \fBUUCP\fR routes or connections.
@@ -2315,12 +2075,10 @@ command-line option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrt\fR[\fB=\fR\fInumber\fR]\fR
 .ad
 .RS 26n
-.rt  
 Pipe messages having more than \fInumber\fR lines through the command specified
 by the value of the \fBPAGER\fR variable ( \fBpg\fR(1) or \fBmore\fR(1) by
 default). If \fInumber\fR is not specified, the current window size is used.
@@ -2329,24 +2087,20 @@ Disabled by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 26n
-.rt  
 Enable verbose diagnostics for debugging. Messages are not delivered. Disabled
 by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdot\fR\fR
 .ad
 .RS 26n
-.rt  
 Take a period on a line by itself, or \fBEOF\fR during input from a terminal as
 end-of-file. Disabled by default, but \fBdot\fR is set in the system startup
 file (which can be suppressed with the \fB-n\fR command line option).
@@ -2354,12 +2108,10 @@ file (which can be suppressed with the \fB-n\fR command line option).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfcc\fR\fR
 .ad
 .RS 26n
-.rt  
 By default, \fBmailx\fR will treat any address containing a slash ("/")
 character as a local "send to file" address. By unsetting this option, this
 behavior is disabled. Enabled by default.
@@ -2367,12 +2119,10 @@ behavior is disabled. Enabled by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflipr\fR\fR
 .ad
 .RS 26n
-.rt  
 Reverse the effect of the \fBfo\fRllowup/\fBFo\fRllowup and
 \fBr\fReply/\fBR\fReply command pairs.  If both \fBflipr\fR and \fBreplyall\fR
 are set, the effect is as if neither was set.
@@ -2380,24 +2130,20 @@ are set, the effect is as if neither was set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfrom\fR\fR
 .ad
 .RS 26n
-.rt  
 Extract the author listed in the header summary from the \fBFrom:\fR header
 instead of the UNIX \fBFrom\fR line. Enabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfuzzymatch\fR\fR
 .ad
 .RS 26n
-.rt  
 The \fBfrom\fR command searches for messages from the indicated sender. By
 default, the full sender address must be specified. By setting this option,
 only a sub-string of the sender address need be specified. Disabled by default.
@@ -2405,24 +2151,20 @@ only a sub-string of the sender address need be specified. Disabled by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBescape=\fR\fIc\fR\fR
 .ad
 .RS 26n
-.rt  
 Substitute \fIc\fR for the ~ escape character. Takes effect with next message
 sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfolder=\fR\fIdirectory\fR\fR
 .ad
 .RS 26n
-.rt  
 The directory for saving standard mail files. User-specified file names
 beginning with a plus (+) are expanded by preceding the file name with this
 directory name to obtain the real file name. If \fIdirectory\fR does not start
@@ -2432,48 +2174,40 @@ with a slash (/), \fB$HOME\fR is prepended to it.  There is no default for the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBheader\fR\fR
 .ad
 .RS 26n
-.rt  
 Enable printing of the header summary when entering \fBmailx\fR. Enabled by
 default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhold\fR\fR
 .ad
 .RS 26n
-.rt  
 Preserve all messages that are read in the \fBmailbox\fR instead of putting
 them in the standard \fBmbox\fR save file. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignore\fR\fR
 .ad
 .RS 26n
-.rt  
 Ignore interrupts while entering messages. Handy for noisy dial-up lines.
 Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignoreeof\fR\fR
 .ad
 .RS 26n
-.rt  
 Ignore end-of-file during message input. Input must be terminated by a period
 (.) on a line by itself or by the \fB~.\fR command. See also \fBdot\fR above.
 Disabled by default.
@@ -2481,60 +2215,50 @@ Disabled by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindentprefix=\fR\fIstring\fR\fR
 .ad
 .RS 26n
-.rt  
 When \fBindentprefix\fR is set, \fIstring\fR is used to mark indented lines
 from messages included with \fB~m\fR. The default is a TAB character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeep\fR\fR
 .ad
 .RS 26n
-.rt  
 When the \fBmailbox\fR is empty, truncate it to zero length instead of removing
 it. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBiprompt=\fR\fIstring\fR\fR
 .ad
 .RS 26n
-.rt  
 The specified prompt string is displayed before each line on input is requested
 when sending a message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeepsave\fR\fR
 .ad
 .RS 26n
-.rt  
 Keep messages that have been saved in other files in the \fBmailbox\fR instead
 of deleting them. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmakeremote\fR\fR
 .ad
 .RS 26n
-.rt  
 When replying to all recipients of a message, if an address does not include a
 machine name, it is assumed to be relative to the sender of the message.
 Normally not needed when dealing with hosts that support RFC822.
@@ -2542,35 +2266,29 @@ Normally not needed when dealing with hosts that support RFC822.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmetoo\fR\fR
 .ad
 .RS 26n
-.rt  
 If your login appears as a recipient, do not delete it from the list. Disabled
 by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmustbang\fR\fR
 .ad
 .RS 26n
-.rt  
 Force all mail addresses to be in bang format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonehop\fR\fR
 .ad
 .RS 26n
-.rt  
 When responding to a message that was originally sent to several recipients,
 the other recipient addresses are normally forced to be relative to the
 originating author's machine for the response. This flag disables alteration of
@@ -2581,12 +2299,10 @@ default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoutfolder\fR\fR
 .ad
 .RS 26n
-.rt  
 Locate the files used to record outgoing messages in the directory specified by
 the \fBfolder\fR variable unless the path name is absolute. Disabled by
 default. See \fBfolder\fR above and the \fBS\fRave, \fBC\fRopy, \fBfo\fRllowup,
@@ -2595,24 +2311,20 @@ and \fBF\fRollowup commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpage\fR\fR
 .ad
 .RS 26n
-.rt  
 Used with the \fBpi\fRpe command to insert a form feed after each message sent
 through the pipe. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpipeignore\fR\fR
 .ad
 .RS 26n
-.rt  
 Omit ignored header when outputting to the \fBpipe\fR command. Although
 disabled by default,  \fBpipeignore\fR is frequently set in the system startup
 file. See \fBStarting Mail\fR in USAGE above.
@@ -2620,12 +2332,10 @@ file. See \fBStarting Mail\fR in USAGE above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpostmark\fR\fR
 .ad
 .RS 26n
-.rt  
 Your "real name" to be included in the From line of messages you send.  By
 default this is derived from the comment field in your \fBpasswd\fR(4) file
 entry.
@@ -2633,48 +2343,40 @@ entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprompt=\fR\fIstring\fR\fR
 .ad
 .RS 26n
-.rt  
 Set the \fIcommand mode\fR prompt to \fIstring\fR. Default is "\fB? \fR",
 unless the \fBbsdcompat\fR variable is set, then the default is "\fB&\fR".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquiet\fR\fR
 .ad
 .RS 26n
-.rt  
 Refrain from printing the opening message and version when entering
 \fBmailx\fR. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrecord=\fR\fIfile\fR\fR
 .ad
 .RS 26n
-.rt  
 Record all outgoing mail in \fIfile\fR. Disabled by default. See also
 \fBoutfolder\fR above.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreplyall\fR\fR
 .ad
 .RS 26n
-.rt  
 Reverse the effect of the \fBr\fReply and \fBR\fReply and \fBfo\fRllowup and
 \fBFo\fRllowup commands. Although set by default,  \fBreplayall\fR is
 frequently unset in the system startup file. See \fBflipr\fR and \fBStarting
@@ -2683,36 +2385,30 @@ Mail\fR in USAGE above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreturnaddr=\fR\fIstring\fR\fR
 .ad
 .RS 26n
-.rt  
 The default sender address is that of the current user. This variable can be
 used to set the sender address to any arbitrary value. Set with caution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsave\fR\fR
 .ad
 .RS 26n
-.rt  
 Enable saving of messages in \fBdead-letter\fR on interrupt or delivery error.
 See \fBDEAD\fR for a description of this file. Enabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscreen=\fR\fInumber\fR\fR
 .ad
 .RS 26n
-.rt  
 Sets the number of lines in a screen-full of headers for the \fBh\fReaders
 command. \fInumber\fR must be a positive number.
 .sp
@@ -2725,12 +2421,10 @@ defaults to the default window size minus 4. Otherwise, the default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsendmail=\fR\fIshell-command\fR\fR
 .ad
 .RS 26n
-.rt  
 Alternate command for delivering messages. \fBNote:\fR In addition to the
 expected list of recipients, \fBmail\fR also passes the \fB-i\fR and \fB-m\fR,
 flags to the command. Since these flags are not appropriate to other commands,
@@ -2740,23 +2434,19 @@ before invoking the desired command. Default is \fB/usr/bin/rmail\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsendwait\fR\fR
 .ad
 .RS 26n
-.rt  
 Wait for background mailer to finish before returning. Disabled by default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowname\fR\fR
 .ad
 .RS 26n
-.rt  
 Causes the message header display to show the sender's real name (if known)
 rather than their mail address. Disabled by default, but \fBshowname\fR is set
 in the \fB/etc/mail/mailx.rc\fR system startup file for \fBmailx\fR.
@@ -2764,24 +2454,20 @@ in the \fB/etc/mail/mailx.rc\fR system startup file for \fBmailx\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowto\fR\fR
 .ad
 .RS 26n
-.rt  
 When displaying the header summary and the message is from you, print the
 recipient's name instead of the author's name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsign=\fR\fIstring\fR\fR
 .ad
 .RS 26n
-.rt  
 The variable inserted into the text of a message when the \fB~a\fR (autograph)
 command is given. No default (see also \fB~i\fR in \fBTilde Escapes\fR).
 .sp
@@ -2790,47 +2476,39 @@ command is given. No default (see also \fB~i\fR in \fBTilde Escapes\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSign=\fR\fIstring\fR\fR
 .ad
 .RS 26n
-.rt  
 The variable inserted into the text of a message when the \fB~A\fR command is
 given.  No default (see also \fB~i\fR in \fBTilde Escapes\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoplines=\fR\fInumber\fR\fR
 .ad
 .RS 26n
-.rt  
 The number of lines of header to print with the \fBto\fRp command. Default is
 \fB5\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
 .RS 26n
-.rt  
 Invoke \fBsendmail\fR(1M) with the \fB-v\fR flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtranslate\fR\fR
 .ad
 .RS 26n
-.rt  
 The name of a program to translate mail addresses. The program receives mail
 addresses as arguments. The program produces, on the standard output, lines
 containing the following data, in this order:
@@ -2874,95 +2552,79 @@ that affect the execution of \fBmailx\fR: \fBHOME\fR, \fBLANG\fR,
 \fBTERM\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEAD\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the file in which to save partial letters in case of untimely
 interrupt. Default is \fB$HOME/dead.letter\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDITOR\fR\fR
 .ad
 .RS 14n
-.rt  
 The command to run when the \fBe\fRdit or \fB~e\fR command is used. Default is
 \fBed\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLISTER\fR\fR
 .ad
 .RS 14n
-.rt  
 The command (and options) to use when listing the contents of the \fBfolder\fR
 directory. The default is \fBls\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAIL\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the initial mailbox file to read (in lieu of the standard system
 mailbox). The default is \fB/var/mail/\fIusername\fR .\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILRC\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the startup file.  Default is \fB$HOME/.mailrc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILX_HEAD\fR\fR
 .ad
 .RS 14n
-.rt  
 The specified string is included at the beginning of the body of each message
 that is sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILX_TAIL\fR\fR
 .ad
 .RS 14n
-.rt  
 The specified string is included at the end of the body of each message that is
 sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMBOX\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the file to save messages which have been read. The \fBex\fRit
 command overrides this function, as does saving the message explicitly in
 another file.  Default is \fB$HOME/mbox\fR.
@@ -2970,12 +2632,10 @@ another file.  Default is \fB$HOME/mbox\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAGER\fR\fR
 .ad
 .RS 14n
-.rt  
 The command to use as a filter for paginating output. This can also be used to
 specify the options to be used.  Default is \fBpg\fR(1), or if the
 \fBbsdcompat\fR variable is set, the default is \fBmore\fR(1). See \fBInternal
@@ -2984,23 +2644,19 @@ Variables\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of a preferred command interpreter. Default is \fBsh\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVISUAL\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of a preferred screen editor.  Default is \fBvi\fR(1).
 .RE
 
@@ -3010,23 +2666,19 @@ The name of a preferred screen editor.  Default is \fBvi\fR(1).
 When the \fB-e\fR option is specified, the following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Mail was found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 Mail was not found or an error occurred.
 .RE
 
@@ -3035,12 +2687,10 @@ Mail was not found or an error occurred.
 Otherwise, the following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion. Notice that this status implies that all messages were
 \fBsent\fR, but it gives no assurances that any of them were actually
 \fBdelivered\fR.
@@ -3048,19 +2698,16 @@ Successful completion. Notice that this status implies that all messages were
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.mailrc\fR\fR
 .ad
@@ -3071,7 +2718,6 @@ An error occurred
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/mbox\fR\fR
 .ad
@@ -3082,7 +2728,6 @@ secondary storage file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.Maillock\fR\fR
 .ad
@@ -3093,7 +2738,6 @@ lock file to prevent multiple writers of system mailbox
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/mailx.rc\fR\fR
 .ad
@@ -3104,7 +2748,6 @@ optional system startup file for \fBmailx\fR only
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mail/Mail.rc\fR\fR
 .ad
@@ -3116,7 +2759,6 @@ BSD compatibility system-wide startup file for \fB/usr/ucb/mail\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/R[emqsx]*\fR\fR
 .ad
@@ -3127,7 +2769,6 @@ temporary files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/mailx/mailx.help*\fR\fR
 .ad
@@ -3138,7 +2779,6 @@ help message files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mail/*\fR\fR
 .ad
@@ -3155,13 +2795,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

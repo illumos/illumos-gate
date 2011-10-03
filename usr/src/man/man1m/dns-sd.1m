@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2003-2004 Apple Computer, Inc. All Rights Reserved. 
+.\" Copyright (c) 2003-2004 Apple Computer, Inc. All Rights Reserved.
 .\" Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing,
 .\" software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH dns-sd 1M "21 Aug 2007" "SunOS 5.11" "System Administration Commands"
+.TH DNS-SD 1M "Aug 21, 2007"
 .SH NAME
 dns-sd \- Multicast DNS (mDNS) & DNS Service Discovery (DNS-SD) Test Tool
 .SH SYNOPSIS
@@ -66,7 +66,6 @@ as they happen.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIname\fR \fItype\fR \fIdomain\fR \fIport\fR
 [\fIkey\fR=\fIvalue\fR ...]\fR
@@ -104,7 +103,6 @@ registration at http://www.dns-sd.org/ServiceTypes.html
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fItype\fR \fIdomain\fR\fR
 .ad
@@ -118,7 +116,6 @@ domain name or using "." means "pick a sensible default."
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIname\fR \fItype\fR \fIdomain\fR\fR
 .ad
@@ -138,7 +135,6 @@ address and port number every time the user presses Cmd-P to print.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fIFQDN\fR \fIrrtype\fR \fIrrclass\fR\fR
 .ad
@@ -149,7 +145,6 @@ Generic query for any resource record type and class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIFQDN\fR \fIrrtype\fR \fIrrclass\fR\fR
 .ad
@@ -164,7 +159,6 @@ other \fBmdnsd\fR(1M) caches on the network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIname\fR \fItype\fR \fIdomain\fR \fIport\fR \fIhost\fR \fIIP\fR
 [\fIkey\fR=\fIvalue\fR ...]\fR
@@ -180,7 +174,6 @@ service must be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -193,7 +186,6 @@ returned by querying the name servers in \fBresolv.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -206,7 +198,6 @@ querying the name servers in \fBresolv.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -218,7 +209,6 @@ delete operations of \fBDNS\fR records with Multicast \fBDNS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
@@ -230,7 +220,6 @@ Test registering service with Multicast \fBDNS\fR and test updating of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
@@ -242,7 +231,6 @@ Test adding a large \fBNULL\fR record for a service registered with Multicast
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -254,7 +242,6 @@ Test adding a large \fBTXT\fR record for a service registered with Multicast
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -265,7 +252,6 @@ Test creating a registration with multiple \fBTXT\fR records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
@@ -334,13 +320,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_ctrl_xfer 9F "15 Sep 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_CTRL_XFER 9F "Sep 15, 2009"
 .SH NAME
 usb_pipe_ctrl_xfer, usb_pipe_ctrl_xfer_wait \- USB control pipe transfer
 functions
@@ -12,15 +12,15 @@ functions
 .nf
 #include <sys/usb/usba.h>
 
-\fBint\fR \fBusb_pipe_ctrl_xfer\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR, 
+\fBint\fR \fBusb_pipe_ctrl_xfer\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR,
      \fBusb_ctrl_req_t *\fR\fIrequest\fR, \fBusb_flags_t\fR \fIflags\fR);
-     
+
 .fi
 
 .LP
 .nf
-\fBint\fR \fBusb_pipe_ctrl_xfer_wait\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR, 
-     \fBusb_ctrl_setup_t *\fR\fIsetup\fR, \fBmblk_t **\fR\fIdata\fR, 
+\fBint\fR \fBusb_pipe_ctrl_xfer_wait\fR(\fBusb_pipe_handle_t\fR \fIpipe_handle\fR,
+     \fBusb_ctrl_setup_t *\fR\fIsetup\fR, \fBmblk_t **\fR\fIdata\fR,
      \fBusb_cr_t *\fR \fIcompletion_reason\fR, \fBusb_cb_flags_t *cb_\fR\fIflags\fR,
      \fBusb_flags_t\fR \fIflags\fR);
 .fi
@@ -35,34 +35,28 @@ Solaris DDI specific (Solaris DDI)
 For \fBusb_pipe_ctrl_xfer()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 15n
-.rt  
 Control pipe handle on which request is made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to control transfer request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 USB_FLAGS_SLEEP is the only flag recognized. Wait for all pending request
 callbacks to complete.
 .RE
@@ -72,70 +66,58 @@ callbacks to complete.
 For \fBusb_pipe_ctrl_xfer_wait()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 21n
-.rt  
 Control pipe handle on which request is made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsetup\fR\fR
 .ad
 .RS 21n
-.rt  
 Pointer to setup parameters. (See below.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR\fR
 .ad
 .RS 21n
-.rt  
 Pointer to mblk containing data bytes to transfer with command.  Ignored if
 NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcompletion_reason\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns overall completion status. Ignored if NULL. Please see
 \fBusb_callback_flags\fR(9S) for more information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback_flags\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns flags set either during autoclearing or some other callback, which
 indicate recovery handling done in callback. Ignored if NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 21n
-.rt  
 No flags are recognized. Reserved for future expansion.
 .RE
 
@@ -209,45 +191,37 @@ allocate an mblk.
 For \fBusb_pipe_ctrl_xfer()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 25n
-.rt  
 Transfer was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 25n
-.rt  
 Request is \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 25n
-.rt  
 Called from interrupt context with the USB_FLAGS_SLEEP flag set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_REQUEST\fR
 .ad
 .RS 25n
-.rt  
 The request has been freed or otherwise invalidated.
 .sp
 A set of conflicting attributes were specified. See
@@ -260,12 +234,10 @@ Data space not provided to a control request while ctrl_wLength is nonzero.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 25n
-.rt  
 Pipe handle is NULL or invalid.
 .sp
 Pipe is closing or closed.
@@ -273,34 +245,28 @@ Pipe is closing or closed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_NO_RESOURCES\fR
 .ad
 .RS 25n
-.rt  
 Memory, descriptors or other resources unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_HC_HARDWARE_ERROR\fR
 .ad
 .RS 25n
-.rt  
 Host controller is in error state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 25n
-.rt  
 An asynchronous transfer failed or an internal error occurred.
 .sp
 The pipe is in an unsuitable state (error, busy, not ready).
@@ -317,34 +283,28 @@ information.
 For \fBusb_pipe_ctrl_xfer_wait()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Request was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from interrupt context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 \fIdip\fR is NULL.
 .RE
 
@@ -471,7 +431,7 @@ context.
 
   /* Retrieve data in endian neutral way. */
   status = (*(data->b_rptr + 1) << 8) | *(data->b_rptr);
-            
+
 .fi
 .in -2
 
@@ -483,15 +443,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

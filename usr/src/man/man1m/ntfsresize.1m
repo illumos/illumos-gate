@@ -7,7 +7,7 @@
 .\" This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation ; either version 2 of the License, or (at your option) any later version.  This program is distributed
 .\" in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.  You should have received a copy of the GNU General Public License along with this program
 .\" (in the main directory of the Linux-NTFS distribution in the file COPYING);  if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 11-1307 USA
-.TH ntfsresize 1M "21 May 2009" "SunOS 5.11" "System Administration Commands"
+.TH NTFSRESIZE 1M "May 21, 2009"
 .SH NAME
 ntfsresize \- resize an NTFS file system without data loss
 .SH SYNOPSIS
@@ -109,7 +109,6 @@ can be combined. For example, \fB-fv\fR is the equivalent of \fB-f\fR \fB-v\fR.
 A full-name option can be abbreviated to a unique prefix of its name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR, \fB--bad-sectors\fR\fR
 .ad
@@ -130,7 +129,6 @@ This option has no effect if a disk has no bad sectors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR, \fB--force\fR\fR
 .ad
@@ -145,7 +143,6 @@ times without booting into Windows between each resizing step.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB--help\fR\fR
 .ad
@@ -156,7 +153,6 @@ Display usage information and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR, \fB--info\fR\fR
 .ad
@@ -181,7 +177,6 @@ opened read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR, \fB--no-action\fR\fR
 .ad
@@ -195,7 +190,6 @@ test run passed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR, \fB--no-progress-bar\fR\fR
 .ad
@@ -206,7 +200,6 @@ Do not display progress bars during \fBntfsresize\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR, \fB--size\fR \fIsize\fR[k|M|G]]\fR
 .ad
@@ -223,7 +216,6 @@ Before performing an actual resizing, run \fBntfsresize\fR with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR, \fB--verbose\fR\fR
 .ad
@@ -234,7 +226,6 @@ Display copious output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR, \fB--version\fR\fR
 .ad
@@ -255,13 +246,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

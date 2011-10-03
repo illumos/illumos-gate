@@ -3,35 +3,35 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH th_define 1M "11 Apr 2001" "SunOS 5.11" "System Administration Commands"
+.TH TH_DEFINE 1M "Apr 11, 2001"
 .SH NAME
 th_define \- create fault injection test harness error specifications
 .SH SYNOPSIS
 .LP
 .nf
-\fBth_define\fR [\fB-n\fR \fIname\fR \fB-i\fR \fIinstance\fR| \fB-P\fR \fIpath\fR] [\fB-a\fR \fIacc_types\fR] 
-     [\fB-r\fR \fIreg_number\fR] [\fB-l\fR \fIoffset\fR [\fIlength\fR]] 
-     [\fB-c\fR \fIcount\fR [\fIfailcount\fR]] [\fB-o\fR \fIoperator\fR [\fIoperand\fR]] 
+\fBth_define\fR [\fB-n\fR \fIname\fR \fB-i\fR \fIinstance\fR| \fB-P\fR \fIpath\fR] [\fB-a\fR \fIacc_types\fR]
+     [\fB-r\fR \fIreg_number\fR] [\fB-l\fR \fIoffset\fR [\fIlength\fR]]
+     [\fB-c\fR \fIcount\fR [\fIfailcount\fR]] [\fB-o\fR \fIoperator\fR [\fIoperand\fR]]
      [\fB-f\fR \fIacc_chk\fR] [\fB-w\fR \fImax_wait_period\fR [\fIreport_interval\fR]]
 .fi
 
 .LP
 .nf
-\fBor\fR 
+\fBor\fR
 .fi
 
 .LP
 .nf
-\fBth_define\fR [\fB-n\fR \fIname\fR \fB-i\fR \fIinstance\fR| \fB-P\fR \fIpath\fR] 
-     [\fB-a\fR log [\fIacc_types\fR] [\fB-r\fR \fIreg_number\fR] [\fB-l\fR \fIoffset\fR [\fIlength\fR]]] 
-     [\fB-c\fR \fIcount\fR [\fIfailcount\fR]] [\fB-s\fR \fIcollect_time\fR] [\fB-p\fR \fIpolicy\fR] 
-     [\fB-x\fR \fIflags\fR] [\fB-C\fR \fIcomment_string\fR] 
+\fBth_define\fR [\fB-n\fR \fIname\fR \fB-i\fR \fIinstance\fR| \fB-P\fR \fIpath\fR]
+     [\fB-a\fR log [\fIacc_types\fR] [\fB-r\fR \fIreg_number\fR] [\fB-l\fR \fIoffset\fR [\fIlength\fR]]]
+     [\fB-c\fR \fIcount\fR [\fIfailcount\fR]] [\fB-s\fR \fIcollect_time\fR] [\fB-p\fR \fIpolicy\fR]
+     [\fB-x\fR \fIflags\fR] [\fB-C\fR \fIcomment_string\fR]
      [\fB-e\fR \fIfixup_script\fR [\fIargs\fR]]
 .fi
 
 .LP
 .nf
-\fBor\fR 
+\fBor\fR
 .fi
 
 .LP
@@ -100,7 +100,6 @@ error coverage as described below.
 The following options are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR \fR
 .ad
@@ -111,7 +110,6 @@ Specify the name of the driver to test. (String)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI instance\fR \fR
 .ad
@@ -123,7 +121,6 @@ Test only the specified driver instance (-1 matches all instances of driver).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fI path\fR \fR
 .ad
@@ -134,7 +131,6 @@ Specify the full device path of the driver to test. (String)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIreg_number\fR \fR
 .ad
@@ -146,7 +142,6 @@ and DMA handles). (Numeric)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fI acc_types\fR \fR
 .ad
@@ -170,7 +165,6 @@ writing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIoffset \fR\fB[\fR\fIlength\fR\fB]\fR\fR
 .ad
@@ -189,7 +183,6 @@ is maximal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcount\fR\fB[\fR\fIfailcount\fR\fB]\fR \fR
 .ad
@@ -219,7 +212,6 @@ further \fIfailcount\fR - 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fI operator \fR\fB[\fR\fIoperand\fR\fB]\fR \fR
 .ad
@@ -229,57 +221,47 @@ For qualifying PIO read and write accesses, the value read from or written to
 the hardware is corrupted according to the value of \fIoperator\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEQ\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIoperand\fR is returned to the driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOR\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIoperand\fR is bitwise ORed with the real value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAND\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIoperand\fR is bitwise ANDed with the real value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXOR\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIoperand\fR is bitwise XORed with the real value.
 .RE
 
 For PIO write accesses, the following operator is allowed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNO\fR\fR
 .ad
 .RS 6n
-.rt  
 Simply ignore the driver's attempt to write to the hardware.
 .RE
 
@@ -296,12 +278,10 @@ interrupts has been requested then the operator may take any of the following
 values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDELAY\fR\fR
 .ad
 .RS 9n
-.rt  
 After \fIcount\fR accesses (see the \fB-c\fR option), delay delivery of the
 next \fIfailcount\fR number of interrupts for \fIoperand\fR number of
 microseconds.
@@ -309,24 +289,20 @@ microseconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOSE\fR\fR
 .ad
 .RS 9n
-.rt  
 After \fIcount\fR number of interrupts, fail to deliver the next
 \fIfailcount\fR number of real interrupts to the driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXTRA\fR\fR
 .ad
 .RS 9n
-.rt  
 After \fIcount\fR number of interrupts, start delivering \fIoperand\fR number
 of extra interrupts for the next \fIfailcount\fR number of real interrupts.
 .RE
@@ -337,7 +313,6 @@ access by flipping each bit (XOR with -1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIacc_chk\fR\fR
 .ad
@@ -352,7 +327,6 @@ access count goes to 1. If the \fIacc_chk\fR parameter is set to 2 or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fImax_wait_period\fR\fB [\fR\fIreport_interval\fR\fB]\fR \fR
 .ad
@@ -372,90 +346,74 @@ fields are integers):
 which are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIft\fR\fR
 .ad
 .RS 13n
-.rt  
 The UTC time when the fault was injected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImt\fR\fR
 .ad
 .RS 13n
-.rt  
 The UTC time when the driver reported the fault.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIac\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of remaining non-faulting accesses.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfc\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of remaining faulting accesses.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchk\fR\fR
 .ad
 .RS 13n
-.rt  
 The value of the \fIacc_chk\fR field of the errdef.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIec\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of fault reports issued by the driver against this errdef (\fImt\fR
 holds the time of the initial report).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs\fR\fR
 .ad
 .RS 13n
-.rt  
 The severity level reported by the driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI"message"\fR\fR
 .ad
 .RS 13n
-.rt  
 Textual reason why the driver has reported a fault.
 .RE
 
@@ -463,7 +421,6 @@ Textual reason why the driver has reported a fault.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -474,7 +431,6 @@ Display the command usage string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIcollect_time\fR \fR
 .ad
@@ -495,7 +451,6 @@ semantics of \fBSIGALRM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpolicy\fR\fR
 .ad
@@ -563,7 +518,6 @@ section for further information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIflags\fR\fR
 .ad
@@ -574,34 +528,28 @@ parameter modifies the way in which the \fBbofi\fR driver logs accesses. It is
 specified as a string containing any combination of the following letters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 Continuous logging (that is, the log will wrap when full).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 Timestamp each log entry (access times are in seconds).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 Log repeated I/O as individual accesses (for example, a \fBddi_rep_get16\fR(9F)
 call which has a repcount of \fIN\fR is logged \fIN\fR times with each
 transaction logged as size 2 bytes. Without this option, the default logging
@@ -613,7 +561,6 @@ behavior is to log this access once only, with a transaction size of twice the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIcomment_string\fR\fR
 .ad
@@ -626,7 +573,6 @@ enclosed in double quotes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIfixup_script\fR \fB[\fR\fIargs\fR\fB]\fR \fR
 .ad
@@ -643,45 +589,37 @@ offline and again after the instance has been brought online. The following
 variables are passed into the environment of the called executable:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDRIVER_PATH\fR\fR
 .ad
 .RS 22n
-.rt  
 Identifies the device path of the instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDRIVER_INSTANCE\fR\fR
 .ad
 .RS 22n
-.rt  
 Identifies the instance number of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDRIVER_UNCONFIGURE\fR\fR
 .ad
 .RS 22n
-.rt  
 Has the value 1 when the instance is about to be taken offline.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDRIVER_CONFIGURE\fR\fR
 .ad
 .RS 22n
-.rt  
 Has the value 1 when the instance has just been brought online.
 .RE
 
@@ -883,56 +821,46 @@ policies is selected, all transfer sizes are treated equally. Otherwise, only
 those specified transfer sizes will be selected.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonebyte\fR\fR
 .ad
 .RS 13n
-.rt  
 Create errdefs for one byte accesses (\fBddi_get8()\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtwobyte\fR\fR
 .ad
 .RS 13n
-.rt  
 Create errdefs for two byte accesses (\fBddi_get16()\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfourbyte\fR\fR
 .ad
 .RS 13n
-.rt  
 Create errdefs for four byte accesses (\fBddi_get32()\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeightbyte\fR\fR
 .ad
 .RS 13n
-.rt  
 Create errdefs for eight byte accesses (\fBddi_get64()\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmultibyte\fR\fR
 .ad
 .RS 13n
-.rt  
 Create errdefs for repeated byte accesses (\fBddi_rep_get*()\fR)
 .RE
 
@@ -963,34 +891,28 @@ A location whose access patterns lies within these cutoffs is regarded as a
 location that is accessed with median frequency.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrare\fR\fR
 .ad
 .RS 10n
-.rt  
 Create errdefs for locations that are rarely accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcommon\fR\fR
 .ad
 .RS 10n
-.rt  
 Create errdefs for locations that are commonly accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmedian\fR\fR
 .ad
 .RS 10n
-.rt  
 Create errdefs for locations that are accessed a median frequency.
 .RE
 
@@ -1001,34 +923,28 @@ If a transaction is duplicated, either a single or multiple errdefs will be
 written to the test scripts, depending upon the following two policies:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaximal\fR\fR
 .ad
 .RS 13n
-.rt  
 Create multiple errdefs for locations that are repeatedly accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunbiased\fR\fR
 .ad
 .RS 13n
-.rt  
 Create a single errdef for locations that are repeatedly accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoperators\fR\fR
 .ad
 .RS 13n
-.rt  
 For each location, a default operator and operand is typically applied. For
 maximal test coverage, this default may be modified using the \fBoperators\fR
 policy so that a separate errdef is created for each of the possible corruption

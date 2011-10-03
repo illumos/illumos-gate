@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH media_findname 3VOLMGT "2 Mar 2007" "SunOS 5.11" "Volume Management Library Functions"
+.TH MEDIA_FINDNAME 3VOLMGT "Mar 2, 2007"
 .SH NAME
 media_findname \- convert a supplied name into an absolute pathname that can be
 used to access removable media
@@ -35,47 +35,39 @@ absolute pathname that can then be used to access a particular piece of media.
 The \fIstart\fR parameter can be one of the following types of specifications:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/\fR\|.\|.\|.\fR
 .ad
 .RS 18n
-.rt  
 An absolute pathname in \fB/dev\fR, such as \fB/dev/rdiskette0\fR, in which
 case a copy of that string is returned (see \fBNOTES\fR on this page).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvolume_name\fR\fR
 .ad
 .RS 18n
-.rt  
 The volume name for a particular volume, such as \fBfred\fR (see
 \fBfdformat\fR(1) for a description of how to label floppies).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvolmgt_symname\fR\fR
 .ad
 .RS 18n
-.rt  
 The symbolic name for a device, such as \fBfloppy0\fR or \fBcdrom2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImedia_type\fR\fR
 .ad
 .RS 18n
-.rt  
 The generic media type name.  For example, \fBfloppy\fR or \fBcdrom\fR. In this
 case \fBmedia_findname()\fR looks for the first piece of media that matches
 that media type, starting at 0 (zero) and continuing on until a match is found
@@ -99,12 +91,10 @@ pathname pointed to by that symbolic link fails, or if any of the following is
 true:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 9n
-.rt  
 The specified absolute pathname was not a character special device, and it was
 not a directory with a character special device in it.
 .RE
@@ -155,15 +145,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Unsafe
+MT-Level	MT-Unsafe
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

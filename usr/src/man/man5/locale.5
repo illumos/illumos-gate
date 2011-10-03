@@ -8,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH locale 5 "1 Dec 2003" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH LOCALE 5 "Dec 1, 2003"
 .SH NAME
 locale \- subset of a user's environment that depends on language and cultural
 conventions
@@ -22,67 +22,55 @@ aspects of the behavior of components of the system. Category names correspond
 to the following environment variable names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 15n
-.rt  
 Character classification and case conversion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_COLLATE\fR\fR
 .ad
 .RS 15n
-.rt  
 Collation order.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
 .RS 15n
-.rt  
 Date and time formats.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
 .RS 15n
-.rt  
 Numeric formatting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MONETARY\fR\fR
 .ad
 .RS 15n
-.rt  
 Monetary formatting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
 .RS 15n
-.rt  
 Formats of informative and diagnostic messages and interactive responses.
 .RE
 
@@ -360,12 +348,10 @@ be specified if the character values (that is, encoding) differ from the
 implementation default values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupper\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as upper-case letters.
 .sp
 In the POSIX locale, the 26 upper-case letters are included:
@@ -384,12 +370,10 @@ upper-case letters \fBA\fR to \fBZ\fR are automatically included in this class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlower\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as lower-case letters. In the POSIX locale,
 the 26 lower-case letters are included:
 .sp
@@ -408,12 +392,10 @@ automatically included in this class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalpha\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as letters.
 .sp
 In the POSIX locale, all characters in the classes \fBupper\fR and \fBlower\fR
@@ -427,12 +409,10 @@ included in this class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdigit\fR\fR
 .ad
 .RS 18n
-.rt  
 Define the characters to be classified as numeric digits.
 .sp
 In the POSIX locale, only
@@ -459,12 +439,10 @@ example, Hindi or Kanji) cannot be specified here.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalnum\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as letters and numeric digits. Only the
 characters specified for the \fBalpha\fR and \fBdigit\fR keywords are
 specified. Characters specified for the keywords \fBalpha\fR and \fBdigit\fR
@@ -473,12 +451,10 @@ are automatically included in this class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBspace\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as white-space characters.
 .sp
 In the POSIX locale, at a minimum, the characters  \fBSPACE\fR, \fBFORMFEED\fR,
@@ -487,7 +463,7 @@ included.
 .sp
 In a locale definition file, no character specified for the keywords
 \fBupper\fR, \fBlower\fR, \fBalpha\fR, \fBdigit\fR, \fBgraph\fR, or
-\fBxdigit\fR can be specified. The characters	 \fBSPACE\fR, \fBFORMFEED\fR,
+\fBxdigit\fR can be specified. The characters \fBSPACE\fR, \fBFORMFEED\fR,
 \fBNEWLINE\fR, \fBCARRIAGE RETURN\fR, \fBTAB\fR, and  \fBVERTICAL TAB\fR of the
 portable character set, and any characters included in the class \fBblank\fR
 are automatically included in this class.
@@ -495,12 +471,10 @@ are automatically included in this class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcntrl\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as control characters.
 .sp
 In the POSIX locale, no characters in classes \fBalpha\fR or \fBprint\fR are
@@ -513,12 +487,10 @@ In a locale definition file, no character specified for the keywords
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpunct\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as punctuation characters.
 .sp
 In the POSIX locale, neither the space character nor any characters in classes
@@ -531,12 +503,10 @@ or as the space character can be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgraph\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as printable characters, not including the
 space character.
 .sp
@@ -551,12 +521,10 @@ automatically included in this class. No character specified for the keyword
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprint\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as printable characters, including the space
 character.
 .sp
@@ -571,12 +539,10 @@ the keyword \fBcntrl\fR can be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdigit\fR\fR
 .ad
 .RS 18n
-.rt  
 Define the characters to be classified as hexadecimal digits.
 .sp
 In the POSIX locale, only:
@@ -605,12 +571,10 @@ included in character class \fBdigit\fR be included here also.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblank\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as blank characters.
 .sp
 In the POSIX locale, only the space and tab characters are included.
@@ -621,12 +585,10 @@ included in this class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcharclass\fR\fR
 .ad
 .RS 18n
-.rt  
 Define one or more locale-specific character class names as strings separated
 by semi-colons. Each named character class can then be defined subsequently in
 the \fBLC_CTYPE\fR definition. A character class name consists of at least one
@@ -638,12 +600,10 @@ keywords defined in this document.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcharclass-name\fR\fR
 .ad
 .RS 18n
-.rt  
 Define characters to be classified as belonging to the named locale-specific
 character class. In the POSIX locale, the locale-specific named character
 classes need not exist. If a class name is defined by a \fBcharclass\fR
@@ -656,12 +616,10 @@ bracket expressions, and by the \fBtr\fR(1) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoupper\fR\fR
 .ad
 .RS 18n
-.rt  
 Define the mapping of lower-case letters to upper-case letters.
 .sp
 In the POSIX locale, at a minimum, the 26 lower-case characters:
@@ -695,12 +653,10 @@ is omitted from the locale definition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtolower\fR\fR
 .ad
 .RS 18n
-.rt  
 Define the mapping of upper-case letters to lower-case letters.
 .sp
 In the POSIX locale, at a minimum, the 26 upper-case characters:
@@ -797,48 +753,40 @@ The following keywords are recognized in a collation sequence definition. They
 are described in detail in the following sections.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcopy\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify the name of an existing locale which is used as the definition of this
 category. If this keyword is specified, no other keyword is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcollating-element\fR\fR
 .ad
 .RS 21n
-.rt  
 Define a collating-element symbol representing a multi-character collating
 element. This keyword is optional.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcollating-symbol\fR\fR
 .ad
 .RS 21n
-.rt  
 Define a collating symbol for use in collation order statements. This keyword
 is optional.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBorder_start\fR\fR
 .ad
 .RS 21n
-.rt  
 Define collation rules. This statement is followed by one or more collation
 order statements, assigning character collation values and collation weights to
 collating elements.
@@ -846,12 +794,10 @@ collating elements.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBorder_end\fR\fR
 .ad
 .RS 21n
-.rt  
 Specify the end of the collation-order statements.
 .RE
 
@@ -961,36 +907,30 @@ operands exceeds the \fB{COLL_WEIGHTS_MAX}\fR limit, the utility will issue a
 warning message. The following directives will be supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforward\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies that comparison operations for the weight level proceed from start of
 string towards the end of string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbackward\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies that comparison operations for the weight level proceed from end of
 string towards the beginning of string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBposition\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies that comparison operations for the weight level will consider the
 relative position of elements in the strings not subject to \fBIGNORE.\fR The
 string containing an element not subject to \fBIGNORE\fR after the fewest
@@ -1168,26 +1108,24 @@ Example:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBorder_start\fR\fBforward;backward\fR
-\fBUNDEFINED\fR\fBIGNORE;IGNORE\fR
-\fB<LOW>\fR
-\fB<space>\fR\fB<LOW>;<space>\fR
-\fB\&.\|.\|.\fR\fB<LOW>;.\|.\|.\fR
-\fB<a>\fR\fB<a>;<a>\fR
-\fB<a-acute>\fR\fB<a>;<a-acute>\fR
-\fB<a-grave>\fR\fB<a>;<a-grave>\fR
-\fB<A>\fR\fB<a>;<A>\fR
-\fB<A-acute>\fR\fB<a>;<A-acute>\fR
-\fB<A-grave>\fR\fB<a>;<A-grave>\fR
-\fB<ch>\fR\fB<ch>;<ch>\fR
-\fB<Ch>\fR\fB<ch>;<Ch>\fR
-\fB<s>\fR\fB<s>;<s>\fR
-\fB<eszet>\fR\fB"<s><s>";"<eszet><eszet>"\fR
-\fBorder_end\fR
+l l
+l l .
+\fBorder_start\fR	\fBforward;backward\fR
+\fBUNDEFINED\fR	\fBIGNORE;IGNORE\fR
+\fB<LOW>\fR	
+\fB<space>\fR	\fB<LOW>;<space>\fR
+\fB\&.\|.\|.\fR	\fB<LOW>;.\|.\|.\fR
+\fB<a>\fR	\fB<a>;<a>\fR
+\fB<a-acute>\fR	\fB<a>;<a-acute>\fR
+\fB<a-grave>\fR	\fB<a>;<a-grave>\fR
+\fB<A>\fR	\fB<a>;<A>\fR
+\fB<A-acute>\fR	\fB<a>;<A-acute>\fR
+\fB<A-grave>\fR	\fB<a>;<A-grave>\fR
+\fB<ch>\fR	\fB<ch>;<ch>\fR
+\fB<Ch>\fR	\fB<ch>;<Ch>\fR
+\fB<s>\fR	\fB<s>;<s>\fR
+\fB<eszet>\fR	\fB"<s><s>";"<eszet><eszet>"\fR
+\fBorder_end\fR	
 .TE
 
 .sp
@@ -1246,12 +1184,10 @@ values set to the empty string (\fB""\fR), or integer keywords set to \fB-1\fR,
 are used to indicate that the value is not available in the locale.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_curr_symbol\fR\fR
 .ad
 .RS 22n
-.rt  
 The international currency symbol. The operand is a four-character string, with
 the first three characters containing the alphabetic international currency
 symbol in accordance with those specified in the ISO 4217 standard. The fourth
@@ -1261,35 +1197,29 @@ from the monetary quantity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcurrency_symbol\fR\fR
 .ad
 .RS 22n
-.rt  
 The string used as the local currency symbol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmon_decimal_point\fR\fR
 .ad
 .RS 22n
-.rt  
 The operand is a string containing the symbol that is used as the decimal
 delimiter (radix character) in monetary formatted quantities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmon_thousands_sep\fR\fR
 .ad
 .RS 22n
-.rt  
 The operand is a string containing the symbol that is used as a separator for
 groups of digits to the left of the decimal delimiter in formatted monetary
 quantities.
@@ -1297,12 +1227,10 @@ quantities.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmon_grouping\fR\fR
 .ad
 .RS 22n
-.rt  
 Define the size of each group of digits in formatted monetary quantities. The
 operand is a sequence of integers separated by semicolons. Each integer
 specifies the number of digits in each group, with the initial integer defining
@@ -1336,34 +1264,28 @@ In these examples, the octal value of \fB{CHAR_MAX}\fR is 177.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpositive_sign\fR\fR
 .ad
 .RS 22n
-.rt  
 A string used to indicate a non-negative-valued formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnegative_sign\fR\fR
 .ad
 .RS 22n
-.rt  
 A string used to indicate a negative-valued formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_frac_digits\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer representing the number of fractional digits (those to the right of
 the decimal delimiter) to be written in a formatted monetary quantity using
 \fBint_curr_symbol\fR.
@@ -1371,12 +1293,10 @@ the decimal delimiter) to be written in a formatted monetary quantity using
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfrac_digits\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer representing the number of fractional digits (those to the right of
 the decimal delimiter) to be written in a formatted monetary quantity using
 \fBcurrency_symbol\fR.
@@ -1384,12 +1304,10 @@ the decimal delimiter) to be written in a formatted monetary quantity using
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp_cs_precedes\fR\fR
 .ad
 .RS 22n
-.rt  
 In an application conforming to the SUSv3 standard, an integer set to \fB1\fR
 if the \fBcurrency_symbol\fR precedes the value for a monetary quantity with a
 non-negative value, and set to \fB0\fR if the symbol succeeds the value.
@@ -1402,12 +1320,10 @@ the symbol succeeds the value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp_sep_by_space\fR\fR
 .ad
 .RS 22n
-.rt  
 In an application conforming to the SUSv3 standard, an integer set to \fB0\fR
 if no space separates the \fBcurrency_symbol\fR from the value for a monetary
 quantity with a non-negative value, set to \fB1\fR if a space separates the
@@ -1424,12 +1340,10 @@ if adjacent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn_cs_precedes\fR\fR
 .ad
 .RS 22n
-.rt  
 In an application conforming to the SUSv3 standard, an integer set to \fB1\fR
 if the \fBcurrency_symbol\fR precedes the value for a monetary quantity with a
 negative value, and set to \fB0\fR if the symbol succeeds the value.
@@ -1442,12 +1356,10 @@ symbol succeeds the value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn_sep_by_space\fR\fR
 .ad
 .RS 22n
-.rt  
 In an application conforming to the SUSv3 standard, an integer set to \fB0\fR
 if no space separates the \fBcurrency_symbol\fR from the value for a monetary
 quantity with a negative value, set to \fB1\fR if a space separates the symbol
@@ -1463,12 +1375,10 @@ to \fB2\fR if a space separates the symbol and the sign string, if adjacent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp_sign_posn\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to a value indicating the positioning of the \fBpositive_sign\fR
 for a monetary quantity with a non-negative value. The following integer values
 are recognized for both \fBp_sign_posn\fR and \fBn_sign_posn\fR:
@@ -1476,115 +1386,95 @@ are recognized for both \fBp_sign_posn\fR and \fBn_sign_posn\fR:
 In an application conforming to the SUSv3 standard:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Parentheses enclose the quantity and the \fBcurrency_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the quantity and the \fBcurrency_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string succeeds the quantity and the \fBcurrency_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the \fBcurrency_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string succeeds the \fBcurrency_symbol\fR.
 .RE
 
 In an application \fBnot\fR conforming to the SUSv3 standard:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Parentheses enclose the quantity and the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the quantity and the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string succeeds the quantity and the \fBcurrency_symbol\fR or
 \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the \fBcurrency_symbol\fR or \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string succeeds the \fBcurrency_symbol\fR or \fBint_curr_symbol\fR.
 .RE
 
@@ -1592,24 +1482,20 @@ The sign string succeeds the \fBcurrency_symbol\fR or \fBint_curr_symbol\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn_sign_posn\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to a value indicating the positioning of the \fBnegative_sign\fR
 for a negative formatted monetary quantity.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_p_cs_precedes\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to \fB1\fR if the \fBint_curr_symbol\fR precedes the value for a
 monetary quantity with a non-negative value, and set to \fB0\fR if the symbol
 succeeds the value.
@@ -1617,12 +1503,10 @@ succeeds the value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_n_cs_precedes\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to \fB1\fR if the \fBint_curr_symbol\fR precedes the value for a
 monetary quantity with a negative value, and set to \fB0\fR if the symbol
 succeeds the value.
@@ -1630,12 +1514,10 @@ succeeds the value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_p_sep_by_space\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to \fB0\fR if no space separates the \fBint_curr_symbol\fR from
 the value for a monetary quantity with a non-negative value, set to \fB1\fR if
 a space separates the symbol from the value, and set to \fB2\fR if a space
@@ -1644,12 +1526,10 @@ separates the symbol and the sign string, if adjacent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_n_sep_by_space\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to \fB0\fR if no space separates the \fBint_curr_symbol\fR from
 the value for a monetary quantity with a negative value, set to \fB1\fR if a
 space separates the symbol from the value, and set to \fB2\fR if a space
@@ -1658,68 +1538,56 @@ separates the symbol and the sign string, if adjacent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_p_sign_posn\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to a value indicating the positioning of the \fBpositive_sign\fR
 for a positive monetary quantity formatted with the international format. The
 following integer values are recognized for \fBint_p_sign_posn\fR and
 \fBint_n_sign_posn\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Parentheses enclose the quantity and the \fB\fR\fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the quantity and the \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the quantity and the \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string precedes the \fBint_curr_symbol\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 The sign string succeeds the \fBint_curr_symbol\fR.
 .RE
 
@@ -1727,12 +1595,10 @@ The sign string succeeds the \fBint_curr_symbol\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint_n_sign_posn\fR\fR
 .ad
 .RS 22n
-.rt  
 An integer set to a value indicating the positioning of the \fBnegative_sign\fR
 for a negative monetary quantity formatted with the international format.
 .RE
@@ -1744,22 +1610,20 @@ The following table shows the result of various combinations:
 
 .sp
 .TS
-tab();
-lw(1.48i) lw(1.48i) lw(.8i) lw(.8i) lw(.8i) lw(.13i) 
-lw(1.48i) lw(1.48i) lw(.8i) lw(.8i) lw(.8i) lw(.13i) 
-.
-\fBp_sep_by_space\fR
-210
-\fBp_cs_precedes\fR= 1\fBp_sign_posn\fR= 0\fB($1.25)\fR\fB($1.25)\fR\fB($1.25)\fR
-\fBp_sign_posn\fR= 1\fB+$1.25\fR\fB+$1.25\fR\fB+$1.25\fR
-\fBp_sign_posn\fR= 2\fB$1.25+\fR\fB$1.25+\fR\fB$1.25+\fR
-\fBp_sign_posn\fR= 3\fB+$1.25\fR\fB+$1.25\fR\fB+$1.25\fR
-\fBp_sign_posn\fR= 4\fB$+1.25\fR\fB$+1.25\fR\fB$+1.25\fR
-\fBp_cs_precedes\fR= 0\fBp_sign_posn\fR= 0\fB(1.25 $)\fR\fB(1.25 $)\fR\fB(1.25$)\fR
-\fBp_sign_posn\fR= 1\fB+1.25 $\fR\fB+1.25 $\fR\fB+1.25$\fR
-\fBp_sign_posn\fR= 2\fB1.25$ +\fR\fB1.25 $+\fR\fB1.25$+\fR
-\fBp_sign_posn\fR= 3\fB1.25+ $\fR\fB1.25 +$\fR\fB1.25+$\fR
-\fBp_sign_posn\fR= 4\fB1.25$ +\fR\fB1.25 $+\fR\fB1.25$+\fR
+l l l l l l
+l l l l l l .
+		\fBp_sep_by_space\fR	
+		2	1	0	
+\fBp_cs_precedes\fR= 1	\fBp_sign_posn\fR= 0	\fB($1.25)\fR	\fB($1.25)\fR	\fB($1.25)\fR	
+	\fBp_sign_posn\fR= 1	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR	
+	\fBp_sign_posn\fR= 2	\fB$1.25+\fR	\fB$1.25+\fR	\fB$1.25+\fR	
+	\fBp_sign_posn\fR= 3	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR	
+	\fBp_sign_posn\fR= 4	\fB$+1.25\fR	\fB$+1.25\fR	\fB$+1.25\fR	
+\fBp_cs_precedes\fR= 0	\fBp_sign_posn\fR= 0	\fB(1.25 $)\fR	\fB(1.25 $)\fR	\fB(1.25$)\fR	
+	\fBp_sign_posn\fR= 1	\fB+1.25 $\fR	\fB+1.25 $\fR	\fB+1.25$\fR	
+	\fBp_sign_posn\fR= 2	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR	
+	\fBp_sign_posn\fR= 3	\fB1.25+ $\fR	\fB1.25 +$\fR	\fB1.25+$\fR	
+	\fBp_sign_posn\fR= 4	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR	
 .TE
 
 .sp
@@ -1829,12 +1693,10 @@ will be used to indicate that the value is not available in the locale. The
 following keywords are recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecimal_point\fR\fR
 .ad
 .RS 17n
-.rt  
 The operand is a string containing the symbol that is used as the decimal
 delimiter (radix character) in numeric, non-monetary formatted quantities. This
 keyword cannot be omitted and cannot be set to the empty string. In contexts
@@ -1844,12 +1706,10 @@ specifying a multi-byte operand is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBthousands_sep\fR\fR
 .ad
 .RS 17n
-.rt  
 The operand is a string containing the symbol that is used as a separator for
 groups of digits to the left of the decimal delimiter in numeric, non-monetary
 formatted monetary quantities. In contexts where standards limit the
@@ -1859,12 +1719,10 @@ operand is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgrouping\fR\fR
 .ad
 .RS 17n
-.rt  
 Define the size of each group of digits in formatted non-monetary quantities.
 The operand is a sequence of integers separated by semicolons. Each integer
 specifies the number of digits in each group, with the initial integer defining
@@ -1898,16 +1756,14 @@ END LC_NUMERIC
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBPOSIX locale\fR\fBlanginfo\fR\fBlocaleconv()\fR\fBlocaledef\fR
-\fBItem\fR\fBValue\fR\fBConstant\fR\fBValue\fR\fBValue\fR
+l l l l l
+l l l l l .
+	\fBPOSIX locale\fR	\fBlanginfo\fR	\fBlocaleconv()\fR	\fBlocaledef\fR
+\fBItem\fR	\fBValue\fR	\fBConstant\fR	\fBValue\fR	\fBValue\fR
 _
-\fBdecimal_point\fR\fB"."\fR\fBRADIXCHAR\fR\fB"."\fR\fB\&.\fR
-\fBthousands_sep\fR\fBn/a\fR\fBTHOUSEP\fR\fB""\fR\fB""\fR
-\fBgrouping\fR\fBn/a\fR\fB-\fR\fB""\fR\fB\(mi1\fR
+\fBdecimal_point\fR	\fB"."\fR	\fBRADIXCHAR\fR	\fB"."\fR	\fB\&.\fR
+\fBthousands_sep\fR	\fBn/a\fR	\fBTHOUSEP\fR	\fB""\fR	\fB""\fR
+\fBgrouping\fR	\fBn/a\fR	\fB-\fR	\fB""\fR	\fB\(mi1\fR
 .TE
 
 .sp
@@ -1925,12 +1781,10 @@ significantly, they are described separately. For locale definition, the
 following mandatory keywords are recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabday\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the abbreviated weekday names, corresponding to the \fB%a\fR field
 descriptor (conversion specification in the \fBstrftime()\fR, \fBwcsftime()\fR,
 and \fBstrptime()\fR functions). The operand consists of seven
@@ -1941,12 +1795,10 @@ abbreviated name of the day corresponding to Monday, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBday\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the full weekday names, corresponding to the \fB%A\fR field descriptor.
 The operand consists of seven semicolon-separated  strings, each surrounded by
 double-quotes. The first string is the full name of the day corresponding to
@@ -1955,12 +1807,10 @@ Sunday, the second the full name of the day corresponding to Monday, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabmon\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the abbreviated month names, corresponding to the \fB%b\fR field
 descriptor. The operand consists of twelve semicolon-separated strings, each
 surrounded by double-quotes. The first string is the abbreviated name of the
@@ -1970,12 +1820,10 @@ second month, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmon\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the full month names, corresponding to the \fB%B\fR field descriptor.
 The operand consists of twelve semicolon-separated strings, each surrounded by
 double-quotes. The first string is the full name of the first month of the year
@@ -1984,12 +1832,10 @@ double-quotes. The first string is the full name of the first month of the year
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_t_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the appropriate date and time representation, corresponding to the
 \fB%c\fR field descriptor. The operand consists of a string, and can contain
 any combination of characters and field descriptors. In addition, the string
@@ -1999,12 +1845,10 @@ can contain the escape sequences  \e\e, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdate_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the appropriate date and time representation, corresponding to the
 \fB%C\fR field descriptor. The operand consists of a string, and can contain
 any combination of characters and field descriptors. In addition, the string
@@ -2014,12 +1858,10 @@ can contain the escape sequences  \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the appropriate date representation, corresponding to the \fB%x\fR field
 descriptor. The operand consists of a string, and can contain any combination
 of characters and field descriptors. In addition, the string can contain the
@@ -2029,12 +1871,10 @@ escape sequences  \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the appropriate time representation, corresponding to the \fB%X\fR field
 descriptor. The operand consists of a string, and can contain any combination
 of characters and field descriptors. In addition, the string can contain the
@@ -2044,12 +1884,10 @@ escape sequences  \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBam_pm\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the appropriate representation of the \fIante meridiem\fR and \fIpost
 meridiem\fR strings, corresponding to the \fB%p\fR field descriptor. The
 operand consists of two strings, separated by a semicolon, each surrounded by
@@ -2059,12 +1897,10 @@ the last string the \fIpost meridiem\fR designation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt_fmt_ampm\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the appropriate time representation in the 12-hour clock format with
 \fBam_pm\fR, corresponding to the \fB%r\fR field descriptor. The operand
 consists of a string and can contain any combination of characters and field
@@ -2074,12 +1910,10 @@ locale.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBera\fR\fR
 .ad
 .RS 15n
-.rt  
 Define how years are counted and displayed for each era in a locale. The
 operand consists of semicolon-separated strings. Each string is an era
 description segment with the format:
@@ -2094,12 +1928,10 @@ era B.C. starts on the day before January 1, A.D. 1, and increases with earlier
 time.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirection\fR\fR
 .ad
 .RS 14n
-.rt  
 Either a \fB+\fR or a \fB-\fR character. The \fB+\fR character indicates that
 years closer to the \fIstart_date\fR have lower numbers than those closer to
 the \fIend_date\fR. The \fB-\fR character indicates that years closer to the
@@ -2108,24 +1940,20 @@ the \fIend_date\fR. The \fB-\fR character indicates that years closer to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of the year closest to the \fIstart_date\fR in the era,
 corresponding to the \fB%Eg\fR and \fB%Ey\fR field descriptors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstart_date\fR\fR
 .ad
 .RS 14n
-.rt  
 A date in the form \fIyyyy\fR/\fImm\fR/\fBdd\fR, where \fIyyyy\fR, \fImm\fR,
 and \fBdd\fR are the year, month and day numbers respectively of the start of
 the era. Years prior to A.D. 1 are represented as negative numbers.
@@ -2133,12 +1961,10 @@ the era. Years prior to A.D. 1 are represented as negative numbers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIend_date\fR\fR
 .ad
 .RS 14n
-.rt  
 The ending date of the era, in the same format as the \fIstart_date\fR, or one
 of the two special values -* or +*. The value -* indicates that the ending date
 is the beginning of time. The value +* indicates that the ending date is the
@@ -2147,24 +1973,20 @@ end of time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIera_name\fR\fR
 .ad
 .RS 14n
-.rt  
 A string representing the name of the era, corresponding to the \fB%EC\fR field
 descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIera_format\fR\fR
 .ad
 .RS 14n
-.rt  
 A string for formatting the year in the era, corresponding to the \fB%EG\fR and
 \fB%EY\fR field descriptors.
 .RE
@@ -2173,48 +1995,40 @@ A string for formatting the year in the era, corresponding to the \fB%EG\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBera_d_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the format of the date in alternative era notation, corresponding to the
 \fB%Ex\fR field descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBera_t_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the locale's appropriate alternative time format, corresponding to the
 \fB%EX\fR field descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBera_d_t_fmt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the locale's appropriate alternative date and time format, corresponding
 to the \fB%Ec\fR field descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalt_digits\fR\fR
 .ad
 .RS 15n
-.rt  
 Define alternative symbols for digits, corresponding to the \fB%O\fR field
 descriptor modifier. The operand consists of semicolon-separated strings, each
 surrounded by double-quotes. The first string is the alternative symbol
@@ -2232,127 +2046,105 @@ defined in <\fBlanginfo.h\fR> and used as arguments to the
 \fBnl_langinfo\fR(3C) function.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBABDAY_\fIx\fR\fR\fR
 .ad
 .RS 15n
-.rt  
 The abbreviated weekday names (for example Sun), where \fIx\fR is a number from
 1 to 7.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAY_\fIx\fR\fR\fR
 .ad
 .RS 15n
-.rt  
 The full weekday names (for example Sunday), where \fIx\fR is a number from 1
 to 7.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBABMON_\fIx\fR\fR\fR
 .ad
 .RS 15n
-.rt  
 The abbreviated month names (for example Jan), where \fIx\fR is a number from 1
 to 12.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMON_\fIx\fR\fR\fR
 .ad
 .RS 15n
-.rt  
 The full month names (for example January), where \fIx\fR is a number from 1 to
 12.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_T_FMT\fR\fR
 .ad
 .RS 15n
-.rt  
 The appropriate date and time representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD_FMT\fR\fR
 .ad
 .RS 15n
-.rt  
 The appropriate date representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_FMT\fR\fR
 .ad
 .RS 15n
-.rt  
 The appropriate time representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAM_STR\fR\fR
 .ad
 .RS 15n
-.rt  
 The appropriate ante-meridiem affix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPM_STR\fR\fR
 .ad
 .RS 15n
-.rt  
 The appropriate post-meridiem affix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_FMT_AMPM\fR\fR
 .ad
 .RS 15n
-.rt  
 The appropriate time representation in the 12-hour clock format with
 \fBAM_STR\fR and  \fBPM_STR.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERA\fR\fR
 .ad
 .RS 15n
-.rt  
 The era description segments, which describe how years are counted and
 displayed for each era in a locale. Each era description segment has the
 format:
@@ -2373,12 +2165,10 @@ era B.C. starts on the day before January 1, A.D. 1, and increases with earlier
 time.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirection\fR\fR
 .ad
 .RS 14n
-.rt  
 Either a + or a - character. The + character indicates that years closer to the
 \fIstart_date\fR have lower numbers than those closer to the \fIend_date\fR.
 The - character indicates that years closer to the \fIstart_date\fR have higher
@@ -2387,23 +2177,19 @@ numbers than those closer to the \fIend_date\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of the year closest to the start_date in the era.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstart_date\fR\fR
 .ad
 .RS 14n
-.rt  
 A date in the form \fIyyyy\fR/\fImm\fR/\fIdd\fR, where \fIyyyy\fR, \fImm\fR,
 and \fBdd\fR are the year, month and day numbers respectively of the start of
 the era. Years prior to AD 1 are represented as negative numbers.
@@ -2411,12 +2197,10 @@ the era. Years prior to AD 1 are represented as negative numbers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIend_date\fR\fR
 .ad
 .RS 14n
-.rt  
 The ending date of the era, in the same format as the \fIstart_date\fR, or one
 of the two special values, \fB-*\fR or \fB+*\fR. The value \fB-*\fR indicates
 that the ending date is the beginning of time. The value \fB+*\fR indicates
@@ -2425,23 +2209,19 @@ that the ending date is the end of time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIera_name\fR\fR
 .ad
 .RS 14n
-.rt  
 The era, corresponding to the \fB%EC\fR conversion specification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIera_format\fR\fR
 .ad
 .RS 14n
-.rt  
 The format of the year in the era, corresponding to the \fB%EY\fR and \fB%EY\fR
 conversion specifications.
 .RE
@@ -2450,47 +2230,39 @@ conversion specifications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERA_D_FMT\fR\fR
 .ad
 .RS 15n
-.rt  
 The era date format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERA_T_FMT\fR\fR
 .ad
 .RS 15n
-.rt  
 The locale's appropriate alternative time format, corresponding to the
 \fB%EX\fR field descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERA_D_T_FMT\fR\fR
 .ad
 .RS 15n
-.rt  
 The locale's appropriate alternative date and time format, corresponding to the
 \fB%Ec\fR field descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBALT_DIGITS\fR\fR
 .ad
 .RS 15n
-.rt  
 The alternative symbols for digits, corresponding to the \fB%O\fR conversion
 specification modifier. The value consists of semicolon-separated symbols. The
 first is the alternative symbol corresponding to zero, the second is the symbol
@@ -2504,30 +2276,29 @@ described above and the conversion specifiers used by  \fBdate\fR(1) and the
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-cw(1.83i) |cw(1.83i) |cw(1.83i) 
-.
-\fBlocaledef\fR\fBlanginfo\fR\fBConversion\fR
-\fBKeyword\fR\fBConstant\fR\fBSpecifier\fR
+box;
+c | c | c
+c | c | c .
+\fBlocaledef\fR	\fBlanginfo\fR	\fBConversion\fR
+\fBKeyword\fR	\fBConstant\fR	\fBSpecifier\fR
 _
-\fBabday\fR\fBABDAY_\fR\fIx\fR\fB%a\fR
-\fBday\fR\fBDAY_\fR\fIx\fR\fB%A\fR
-\fBabmon\fR\fBABMON_\fR\fIx\fR\fB%b\fR
-\fBmon\fR\fBMON\fR\fB%B\fR
-\fBd_t_fmt\fR\fBD_T_FMT\fR\fB%c\fR
-\fBdate_fmt\fR\fBDATE_FMT\fR\fB%C\fR
-\fBd_fmt\fR\fBD_FMT\fR\fB%x\fR
-\fBt_fmt\fR\fBT_FMT\fR\fB%X\fR
-\fBam_pm\fR\fBAM_STR\fR\fB%p\fR
-\fBam_pm\fR\fBPM_STR\fR\fB%p\fR
-\fBt_fmt_ampm\fR\fBT_FMT_AMPM\fR\fB%r\fR
-\fBera\fR\fBERA\fR\fB%EC, %Eg,\fR
-\fB%EG, %Ey, %EY\fR
-\fBera_d_fmt\fR\fBERA_D_FMT\fR\fB%Ex\fR
-\fBera_t_fmt\fR\fBERA_T_FMT\fR\fB%EX\fR
-\fBera_d_t_fmt\fR\fBERA_D_T_FMT\fR\fB%Ec\fR
-\fBalt_digits\fR\fBALT_DIGITS\fR\fB%O\fR
+\fBabday\fR	\fBABDAY_\fR\fIx\fR	\fB%a\fR
+\fBday\fR	\fBDAY_\fR\fIx\fR	\fB%A\fR
+\fBabmon\fR	\fBABMON_\fR\fIx\fR	\fB%b\fR
+\fBmon\fR	\fBMON\fR	\fB%B\fR
+\fBd_t_fmt\fR	\fBD_T_FMT\fR	\fB%c\fR
+\fBdate_fmt\fR	\fBDATE_FMT\fR	\fB%C\fR
+\fBd_fmt\fR	\fBD_FMT\fR	\fB%x\fR
+\fBt_fmt\fR	\fBT_FMT\fR	\fB%X\fR
+\fBam_pm\fR	\fBAM_STR\fR	\fB%p\fR
+\fBam_pm\fR	\fBPM_STR\fR	\fB%p\fR
+\fBt_fmt_ampm\fR	\fBT_FMT_AMPM\fR	\fB%r\fR
+\fBera\fR	\fBERA\fR	\fB%EC, %Eg,\fR
+		\fB%EG, %Ey, %EY\fR
+\fBera_d_fmt\fR	\fBERA_D_FMT\fR	\fB%Ex\fR
+\fBera_t_fmt\fR	\fBERA_T_FMT\fR	\fB%EX\fR
+\fBera_d_t_fmt\fR	\fBERA_D_T_FMT\fR	\fB%Ec\fR
+\fBalt_digits\fR	\fBALT_DIGITS\fR	\fB%O\fR
 .TE
 
 .SS "LC_TIME \fIGeneral\fR Information"
@@ -2581,12 +2352,10 @@ The \fBnl_langinfo\fR(3C) function accepts upper-case versions of the first
 four keywords.
 .sp
 .ne 2
-.mk
 .na
 \fB\fByesexpr\fR\fR
 .ad
 .RS 11n
-.rt  
 The operand consists of an extended regular expression (see \fBregex\fR(5))
 that describes the acceptable affirmative response to a question expecting an
 affirmative or negative response.
@@ -2594,12 +2363,10 @@ affirmative or negative response.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoexpr\fR\fR
 .ad
 .RS 11n
-.rt  
 The operand consists of an extended regular expression that describes the
 acceptable negative response to a question expecting an affirmative or negative
 response.
@@ -2607,12 +2374,10 @@ response.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByesstr\fR\fR
 .ad
 .RS 11n
-.rt  
 The operand consists of a fixed string (not a regular expression) that can be
 used by an application for composition of a message that lists an acceptable
 affirmative response, such as in a prompt.
@@ -2620,12 +2385,10 @@ affirmative response, such as in a prompt.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnostr\fR\fR
 .ad
 .RS 11n
-.rt  
 The operand consists of a fixed string that can be used by an application for
 composition of a message that lists an acceptable negative response. The format
 and values for affirmative and negative responses of the POSIX locale follow;
@@ -2657,15 +2420,14 @@ END LC_MESSAGES
 
 .sp
 .TS
-tab() box;
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-lw(1.83i) |lw(1.83i) |lw(1.83i) 
-.
-\fBlocaledef Keyword\fR\fBlanginfo Constant\fR\fBPOSIX Locale Value\fR
-\fByesexpr\fR\fBYESEXPR\fR\fB"^[yY]"\fR
-\fBnoexpr\fR\fBNOEXPR\fR\fB"^[nN]"\fR
-\fByesstr\fR\fBYESSTR\fR\fB"yes"\fR
-\fBnostr\fR\fBNOSTR\fR\fB"no"\fR
+box;
+l | l | l
+l | l | l .
+\fBlocaledef Keyword\fR	\fBlanginfo Constant\fR	\fBPOSIX Locale Value\fR
+\fByesexpr\fR	\fBYESEXPR\fR	\fB"^[yY]"\fR
+\fBnoexpr\fR	\fBNOEXPR\fR	\fB"^[nN]"\fR
+\fByesstr\fR	\fBYESSTR\fR	\fB"yes"\fR
+\fBnostr\fR	\fBNOSTR\fR	\fB"no"\fR
 .TE
 
 .sp

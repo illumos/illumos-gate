@@ -2,34 +2,34 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserve
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ex "1has" "15 Jun 2004" "SunOS 5.11" "User Commands"
+.TH EX 1HAS "Jun 15, 2004"
 .SH NAME
 ex \- text editor
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] [\fB-t\fR \fItag\fR] 
+\fB/usr/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] [\fB-t\fR \fItag\fR]
      [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg4/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg6/bin/ex\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfile\fR]]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfile\fR...
 .fi
 
@@ -127,94 +127,78 @@ portions of the buffer through commands such as \fBsort\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR | \fB-s\fR\fR
 .ad
 .RS 25n
-.rt  
 Suppresses all interactive user feedback. This is useful when processing editor
 scripts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets up for editing \fBLISP\fR programs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 25n
-.rt  
 Lists the name of all files saved as the result of an editor or system crash.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBReadonly\fR mode. The \fBreadonly\fR flag is set, preventing accidental
 overwriting of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIfile\fR\fR
 .ad
 .RS 25n
-.rt  
 Edits \fIfile\fR after an editor or system crash. (Recovers the version of
 \fIfile\fR that was in the buffer when the crash occurred.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItag\fR\fR
 .ad
 .RS 25n
-.rt  
 Edits the file containing the \fItag\fR and positions the editor at its
 definition. It is an error to specify more than one \fB-t\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 25n
-.rt  
 Starts up in display editing state, using \fBvi\fR. You can achieve the same
 effect by typing the \fBvi\fR command itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 25n
-.rt  
 Verbose. When \fBex\fR commands are read by means of standard input, the input
 is echoed to standard error. This can be useful when processing \fBex\fR
 commands within shell scripts.
@@ -222,12 +206,10 @@ commands within shell scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 25n
-.rt  
 Encryption option. Simulates the \fBX\fR command and prompts the user for a
 key. This key is used to encrypt and decrypt text using the algorithm of the
 \fBcrypt\fR command. The \fBX\fR command makes an educated guess to determine
@@ -238,24 +220,20 @@ encrypted also, using a transformed version of the key typed in for the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fIn\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the default window size to \fIn\fR. This is useful when using the editor
 over a slow speed line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 25n
-.rt  
 Encryption option. Same as the \fB-x\fR option, except that \fB-C\fR simulates
 the \fBC\fR command. The \fBC\fR command is like the \fBX\fR command, except
 that all text read in is assumed to have been encrypted.
@@ -263,19 +241,16 @@ that all text read in is assumed to have been encrypted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIcommand\fR | \fB-c\fR\fI command\fR\fR
 .ad
 .RS 25n
-.rt  
 Begins editing by executing the specified editor \fIcommand\fR (usually a
 search or positioning command).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
 .ad
@@ -292,12 +267,10 @@ the tag is selected by \fB-t\fR and then the command is executed.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a file to be edited.
 .RE
 
@@ -309,24 +282,20 @@ scanning pattern formations.
 .SS "ex States"
 .sp
 .ne 2
-.mk
 .na
 \fBCommand\fR
 .ad
 .RS 11n
-.rt  
 Normal and initial state. Input prompted for by "\fB:\fR". The line kill
 character cancels a partial command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBInsert\fR
 .ad
 .RS 11n
-.rt  
 Entered by \fBa\fR, \fBi\fR, or \fBc\fR. Arbitrary text can be entered. Insert
 state normally is terminated by a line having only "\fB\&.\fR" on it, or,
 abnormally, with an interrupt.
@@ -334,12 +303,10 @@ abnormally, with an interrupt.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVisual\fR
 .ad
 .RS 11n
-.rt  
 Entered by typing \fBvi\fR. Terminated by typing \fBQ\fR or ^\e (Control-\e).
 .RE
 
@@ -368,7 +335,7 @@ file       f          put        pu          version    ve
 
 global     g          quit       q           visual     vi
 
-insert     i          read       r           write     
+insert     i          read       r           write
  w
 
 join       j          recover    rec         xit        x
@@ -392,7 +359,6 @@ Join     [\fIrange\fR] j[\fIoin\fR][!] [\fIcount\fR] [\fIflags\fR]
 If count is specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
 .ad
@@ -407,7 +373,6 @@ count\fR). If one address is specified, the \fBjoin\fR command behaves as if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/xpg4/bin/ex\fR\fR
 .ad
@@ -423,7 +388,6 @@ specified address plus \fIcount\fR \fB-1\fR ( \fIaddr\fR\fB,\fR \fIaddr\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/ex\fR, \fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
 .ad
@@ -442,7 +406,6 @@ the edit buffer.
 If no count is specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/ex\fR, \fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
 .ad
@@ -457,7 +420,6 @@ address and the next line ( \fIaddr\fR\fB,\fR \fIaddr\fR \fB+1\fR).
 .SS "Additional ex Command Arguments"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
 .ad
@@ -473,7 +435,6 @@ the last line of the edit buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/xpg4/bin/ex\fR\fR
 .ad
@@ -489,69 +450,66 @@ to be the first line addressed by the range.
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(4.13i) 
-lw(1.38i) lw(4.13i) 
-.
-Abbreviateab[brev] word rhs
-Append[line]a[ppend][!]
-Argumentsar[gs]
-Change[range] c[hange][!] [count]
-Change DirectoryT{
+l l
+l l .
+Abbreviate	ab[brev] word rhs
+Append	[line]a[ppend][!]
+Arguments	ar[gs]
+Change	[range] c[hange][!] [count]
+Change Directory	T{
 chd[ir][!] [directory]; cd[!] [directory]
 T}
-CopyT{
+Copy	T{
 [range] co[py] line [flags]; [range] t line [flags]
 T}
-DeleteT{
+Delete	T{
 [range] d[elete] [buffer] [count] [flags]
 T}
-EditT{
+Edit	T{
 e[dit][!] [+line][file]; ex[!] [+line] [file]
 T}
-Filef[ile] [file]
-GlobalT{
+File	f[ile] [file]
+Global	T{
 [range] g[lobal] /pattern/ [commands]; [range] v /pattern/ [commands]
 T}
-Insert[line] i[nsert][!]
-List[range] l[ist] [count] [flags]
-Mapmap[!] [x rhs]
-Mark[line] ma[rk] x; [line] k x
-Move[range] m[ove] line
-Nextn[ext][!] [file ...]
-Open[line] o[pen] /pattern/ [flags]
-Preservepre[serve]
-Put[line] pu[t] [buffer]
-Quitq[uit][!]
-Read[line] r[ead][!] [file]
-Recoverrec[over] file
-Rewindrew[ind][!]
-SetT{
+Insert	[line] i[nsert][!]
+List	[range] l[ist] [count] [flags]
+Map	map[!] [x rhs]
+Mark	[line] ma[rk] x; [line] k x
+Move	[range] m[ove] line
+Next	n[ext][!] [file ...]
+Open	[line] o[pen] /pattern/ [flags]
+Preserve	pre[serve]
+Put	[line] pu[t] [buffer]
+Quit	q[uit][!]
+Read	[line] r[ead][!] [file]
+Recover	rec[over] file
+Rewind	rew[ind][!]
+Set	T{
 se[t] [option[=[value]]...] [nooption...] [option?...] [all]
 T}
-Shellsh[ell]
-Sourceso[urce] file
-Suspendsu[spend][!]; st[op][!]
-Tagta[g][!] tagstring
-Unabbreviateuna[bbrev] word
-Undou[ndo]
-Unmapunm[ap][!] x
-Visual[line] v[isual] [type] [count] [flags]
-WriteT{
+Shell	sh[ell]
+Source	so[urce] file
+Suspend	su[spend][!]; st[op][!]
+Tag	ta[g][!] tagstring
+Unabbreviate	una[bbrev] word
+Undo	u[ndo]
+Unmap	unm[ap][!] x
+Visual	[line] v[isual] [type] [count] [flags]
+Write	T{
 [range] w[rite][!] [>>] [file]; [range] w[rite][!] [file]; [range] wq[!] [>>] [file]
 T}
-Write and Exit[range] x[it][!] [file]
-Yank[range] ya[nk] [buffer] [count]
-Adjust Window[line] z [type] [count] [flags]
-Escape! command [range]! command
-ScrollEOF
-Write Line Number[line] = [flags]
-Execute@ buffer; * buffer
+Write and Exit	[range] x[it][!] [file]
+Yank	[range] ya[nk] [buffer] [count]
+Adjust Window	[line] z [type] [count] [flags]
+Escape	! command [range]! command
+Scroll	EOF
+Write Line Number	[line] = [flags]
+Execute	@ buffer; * buffer
 .TE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/ex\fR, \fB/usr/xpg4/bin/ex\fR, \fB/usr/xpg6/bin/ex\fR\fR
 .ad
@@ -569,20 +527,18 @@ the last line of the edit buffer.
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(4.13i) 
-lw(1.38i) lw(4.13i) 
-.
-NumberT{
-[range] nu[mber] [count] [flags]; [range] |                        # [count] [flags] 
+l l
+l l .
+Number	T{
+[range] nu[mber] [count] [flags]; [range] |                        # [count] [flags]
 T}
-Print[range] p[rint] [count] [flags]
-SubstituteT{
+Print	[range] p[rint] [count] [flags]
+Substitute	T{
 [range] s[ubstitute] [/pattern/repl/[options] [count] [flags]]
 T}
-Shift Left[range] < [count] [flags]
-Shift Right[range] > [count] [flags]
-ResubstituteT{
+Shift Left	[range] < [count] [flags]
+Shift Right	[range] > [count] [flags]
+Resubstitute	T{
 [range] & [options] [count] [flags]; [range] s[ubstitute] [options] [count] [flags]; [range] ~ [options] [count [flags]
 T}
 .TE
@@ -592,19 +548,17 @@ T}
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(4.4i) 
-lw(1.1i) lw(4.4i) 
-.
-\fBC\fRforced encryption
-\fBX\fRheuristic encryption
-\fB&\fRresubst
-\fBCR\fRprint next
-\fB>\fRrshift
-\fB<\fRlshift
-\fB^D\fRscroll
-\fBz\fRwindow
-\fB!\fRshell escape
+l l
+l l .
+\fBC\fR	forced encryption
+\fBX\fR	heuristic encryption
+\fB&\fR	resubst
+\fBCR\fR	print next
+\fB>\fR	rshift
+\fB<\fR	lshift
+\fB^D\fR	scroll
+\fBz\fR	window
+\fB!\fR	shell escape
 .TE
 
 .SS "ex Command Addresses"
@@ -612,23 +566,21 @@ lw(1.1i) lw(4.4i)
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(4.4i) 
-lw(1.1i) lw(4.4i) 
-.
-\fIn\fRline \fIn\fR
-\fB\&.\fRcurrent
-\fB$\fRlast
-\fB+\fRnext
-\fB-\fRprevious
-\fB+\fR\fIn\fR\fIn\fR forward
-\fB%\fR1,$
-\fB/\fR\fIpat\fRnext with \fIpat\fR
-\fB?\fR\fIpat\fRprevious with \fIpat\fR
-\fIx\fR\fB-\fR\fIn\fR\fIn\fR before \fIx\fR
-\fIx\fR\fB,\fR\fIy\fR\fIx\fR through \fIy\fR
-\fB\&'\fR\fIx\fRmarked with \fIx\fR
-\fB"\fRprevious context
+l l
+l l .
+\fIn\fR	line \fIn\fR
+\fB\&.\fR	current
+\fB$\fR	last
+\fB+\fR	next
+\fB-\fR	previous
+\fB+\fR\fIn\fR	\fIn\fR forward
+\fB%\fR	1,$
+\fB/\fR\fIpat\fR	next with \fIpat\fR
+\fB?\fR\fIpat\fR	previous with \fIpat\fR
+\fIx\fR\fB-\fR\fIn\fR	\fIn\fR before \fIx\fR
+\fIx\fR\fB,\fR\fIy\fR	\fIx\fR through \fIy\fR
+\fB\&'\fR\fIx\fR	marked with \fIx\fR
+\fB"\fR	previous context
 .TE
 
 .SS "Initializing Options"
@@ -636,19 +588,17 @@ lw(1.1i) lw(4.4i)
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(4.13i) 
-lw(1.38i) lw(4.13i) 
-.
-\fBEXINIT\fRplace \fBset\fR's here in environment variable
-\fB$HOME/.exrc\fReditor initialization file
-\fB\&./.exrc\fReditor initialization file
-\fBset\fR \fIx\fRenable option \fIx\fR
-\fBset\fR \fBno\fR\fIx\fRdisable option \fIx\fR
-\fBset\fR \fIx\fR=\fIval\fRgive value \fIval\fR to option \fIx\fR
-\fBset\fRshow changed options
-\fBset\fR \fBall\fRshow all options
-\fBset\fR \fIx\fR\fB?\fRshow value of option \fIx\fR
+l l
+l l .
+\fBEXINIT\fR	place \fBset\fR's here in environment variable
+\fB$HOME/.exrc\fR	editor initialization file
+\fB\&./.exrc\fR	editor initialization file
+\fBset\fR \fIx\fR	enable option \fIx\fR
+\fBset\fR \fBno\fR\fIx\fR	disable option \fIx\fR
+\fBset\fR \fIx\fR=\fIval\fR	give value \fIval\fR to option \fIx\fR
+\fBset\fR	show changed options
+\fBset\fR \fBall\fR	show all options
+\fBset\fR \fIx\fR\fB?\fR	show value of option \fIx\fR
 .TE
 
 .SS "Useful Options and Abbreviations"
@@ -656,42 +606,40 @@ lw(1.38i) lw(4.13i)
 
 .sp
 .TS
-tab();
-lw(.92i) lw(.92i) lw(3.67i) 
-lw(.92i) lw(.92i) lw(3.67i) 
-.
-autoindent\fBai\fRsupply indent
-autowrite\fBaw\fRwrite before changing files
-directoryT{
+l l l
+l l l .
+autoindent	\fBai\fR	supply indent
+autowrite	\fBaw\fR	write before changing files
+directory		T{
 pathname of directory for temporary work files
 T}
-exrc\fBex\fRT{
+exrc	\fBex\fR	T{
 allow \fBvi\fR/\fBex\fR to read the \fB\&.exrc\fR in the current directory. This option is set in the \fBEXINIT\fR shell variable or in the \fB\&.exrc\fR file in the \fB$\fR\fBHOME\fRdirectory.
 T}
-ignorecase\fBic\fRignore case of letters in scanning
-listprint \fB^I\fR for tab, $ at end
-magictreat \fB\&. [ *\fR special in patterns
-modelinesT{
+ignorecase	\fBic\fR	ignore case of letters in scanning
+list		print \fB^I\fR for tab, $ at end
+magic		treat \fB\&. [ *\fR special in patterns
+modelines		T{
 first five lines and last five lines executed as \fBvi\fR/\fBex\fR commands if they are of the form \fBex:\fR\fBcommand\fR\fB:\fR or \fBvi:\fR\fBcommand\fR\fB:\fR
 T}
-number\fBnu\fRnumber lines
-paragraphs\fBpara\fRmacro names that start paragraphs
-redrawsimulate smart terminal
-reportT{
+number	\fBnu\fR	number lines
+paragraphs	\fBpara\fR	macro names that start paragraphs
+redraw		simulate smart terminal
+report		T{
 informs you if the number of lines modified by the last command is greater than the value of the \fBreport\fR variable
 T}
-scrollcommand mode lines
-sections\fBsect\fRmacro names that start sections
-shiftwidth\fBsw\fRfor \fB< >\fR, and input \fB^D\fR
-showmatch\fBsm\fRto \fB)\fR and \fB}\fR as typed
-showmode\fBsmd\fRshow insert mode in \fB vi\fR
-slowopen\fBslow\fRstop updates during insert
-termT{
+scroll		command mode lines
+sections	\fBsect\fR	macro names that start sections
+shiftwidth	\fBsw\fR	for \fB< >\fR, and input \fB^D\fR
+showmatch	\fBsm\fR	to \fB)\fR and \fB}\fR as typed
+showmode	\fBsmd\fR	show insert mode in \fB vi\fR
+slowopen	\fBslow\fR	stop updates during insert
+term		T{
 specifies to \fBvi\fR the type of terminal being used (the default is the value of the environment variable \fBTERM\fR)
 T}
-windowvisual mode lines
-wrapmargin\fBwm\fRautomatic line splitting
-wrapscan\fBws\fRT{
+window		visual mode lines
+wrapmargin	\fBwm\fR	automatic line splitting
+wrapscan	\fBws\fR	T{
 search around end (or beginning) of buffer
 T}
 .TE
@@ -701,19 +649,17 @@ T}
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(4.4i) 
-lw(1.1i) lw(4.4i) 
-.
-\fB^\fRbeginning of line
-\fB$\fRend of line
-\fB\&.\fRany character
-\fB\e<\fRbeginning of word
-\fB\e>\fRend of word
-\fB[\fR\fIstr\fR\fB]\fRany character in \fIstr\fR
-\fB[^\fR\fIstr\fR\fB]\fRany character not in \fIstr\fR
-\fB[\fR\fIxy\fR\fB]\fRany character between \fIx\fR and \fIy\fR
-\fB*\fRany number of preceding characters
+l l
+l l .
+\fB^\fR	beginning of line
+\fB$\fR	end of line
+\fB\&.\fR	any character
+\fB\e<\fR	beginning of word
+\fB\e>\fR	end of word
+\fB[\fR\fIstr\fR\fB]\fR	any character in \fIstr\fR
+\fB[^\fR\fIstr\fR\fB]\fR	any character not in \fIstr\fR
+\fB[\fR\fIxy\fR\fB]\fR	any character between \fIx\fR and \fIy\fR
+\fB*\fR	any number of preceding characters
 .TE
 
 .SH ENVIRONMENT VARIABLES
@@ -725,23 +671,19 @@ that affect the execution of \fBex\fR: \fBHOME\fR, \fBLANG\fR, \fBLC_ALL\fR,
 \fBSHELL\fR, and \fBTERM\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLUMNS\fR\fR
 .ad
 .RS 11n
-.rt  
 Override the system-selected horizontal screen size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXINIT\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine a list of \fBex\fR commands that are executed on editor start-up,
 before reading the first file. The list can contain multiple commands by
 separating them using a vertical-line (\fB|\fR) character.
@@ -749,12 +691,10 @@ separating them using a vertical-line (\fB|\fR) character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINES\fR\fR
 .ad
 .RS 11n
-.rt  
 Override the system-selected vertical screen size, used as the number of lines
 in a screenful and the vertical screen size in visual mode.
 .RE
@@ -765,123 +705,101 @@ in a screenful and the vertical screen size in visual mode.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/tmp/Ex\fInnnnn\fR\fR\fR
 .ad
 .RS 29n
-.rt  
 editor temporary
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/tmp/Rx\fInnnnn\fR\fR\fR
 .ad
 .RS 29n
-.rt  
 named buffer temporary
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/expreserve\fR\fR
 .ad
 .RS 29n
-.rt  
 preserve command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/exrecover\fR\fR
 .ad
 .RS 29n
-.rt  
 recover command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/exstrings\fR\fR
 .ad
 .RS 29n
-.rt  
 error messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/*\fR\fR
 .ad
 .RS 29n
-.rt  
 describes capabilities of terminals
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/preserve/login\fR\fR
 .ad
 .RS 29n
-.rt  
 preservation directory (where \fBlogin\fR is the user's login)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.exrc\fR\fR
 .ad
 .RS 29n
-.rt  
 editor startup file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&./.exrc\fR\fR
 .ad
 .RS 29n
-.rt  
 editor startup file
 .RE
 
@@ -894,12 +812,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-CSIEnabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+CSI	Enabled
 .TE
 
 .SS "\fB/usr/xpg4/bin/ex\fR"
@@ -907,15 +824,14 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "\fB/usr/xpg6/bin/ex\fR"
@@ -923,15 +839,14 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

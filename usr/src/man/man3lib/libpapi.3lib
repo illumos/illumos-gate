@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpapi 3LIB "18 Dec 2006" "SunOS 5.11" "Interface Libraries"
+.TH LIBPAPI 3LIB "Dec 18, 2006"
 .SH NAME
 libpapi \- Free Standards Group Open Printing API (PAPI) library functions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <papi.h>
 .fi
 
@@ -39,22 +39,20 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpapiAttributeListAddBoolean\fR\fBpapiAttributeListAddCollection\fR
-\fBpapiAttributeListAddDatetime\fR\fBpapiAttributeListAddInteger\fR
-\fBpapiAttributeListAddMetadata\fR\fBpapiAttributeListAddRange\fR
-\fBpapiAttributeListAddResolution\fR\fBpapiAttributeListAddString\fR
-\fBpapiAttributeListAddValue\fR\fBpapiAttributeListDelete\fR
-\fBpapiAttributeListFind\fR\fBpapiAttributeListFree\fR
-\fBpapiAttributeListFromString\fR\fBpapiAttributeListGetBoolean\fR
-\fBpapiAttributeListGetCollection\fR\fBpapiAttributeListGetDatetime\fR
-\fBpapiAttributeListGetInteger\fR\fBpapiAttributeListGetMetadata\fR
-\fBpapiAttributeListGetNext\fR\fBpapiAttributeListGetRange\fR
-\fBpapiAttributeListGetResolution\fR\fBpapiAttributeListGetString\fR
-\fBpapiAttributeListGetValue\fR\fBpapiAttributeListToString\fR
+l l
+l l .
+\fBpapiAttributeListAddBoolean\fR	\fBpapiAttributeListAddCollection\fR
+\fBpapiAttributeListAddDatetime\fR	\fBpapiAttributeListAddInteger\fR
+\fBpapiAttributeListAddMetadata\fR	\fBpapiAttributeListAddRange\fR
+\fBpapiAttributeListAddResolution\fR	\fBpapiAttributeListAddString\fR
+\fBpapiAttributeListAddValue\fR	\fBpapiAttributeListDelete\fR
+\fBpapiAttributeListFind\fR	\fBpapiAttributeListFree\fR
+\fBpapiAttributeListFromString\fR	\fBpapiAttributeListGetBoolean\fR
+\fBpapiAttributeListGetCollection\fR	\fBpapiAttributeListGetDatetime\fR
+\fBpapiAttributeListGetInteger\fR	\fBpapiAttributeListGetMetadata\fR
+\fBpapiAttributeListGetNext\fR	\fBpapiAttributeListGetRange\fR
+\fBpapiAttributeListGetResolution\fR	\fBpapiAttributeListGetString\fR
+\fBpapiAttributeListGetValue\fR	\fBpapiAttributeListToString\fR
 .TE
 
 .SS "Service"
@@ -62,17 +60,15 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpapiServiceCreate\fR\fBpapiServiceDestroy\fR
-\fBpapiServiceGetAppData\fR\fBpapiServiceGetAttributeList\fR
-\fBpapiServiceGetEncryption\fR\fBpapiServiceGetPassword\fR
-\fBpapiServiceGetServiceName\fR\fBpapiServiceGetStatusMessage\fR
-\fBpapiServiceGetUserName\fR\fBpapiServiceSetAppData\fR
-\fBpapiServiceSetAuthCB\fR\fBpapiServiceSetEncryption\fR
-\fBpapiServiceSetPassword\fR\fBpapiServiceSetUserName\fR
+l l
+l l .
+\fBpapiServiceCreate\fR	\fBpapiServiceDestroy\fR
+\fBpapiServiceGetAppData\fR	\fBpapiServiceGetAttributeList\fR
+\fBpapiServiceGetEncryption\fR	\fBpapiServiceGetPassword\fR
+\fBpapiServiceGetServiceName\fR	\fBpapiServiceGetStatusMessage\fR
+\fBpapiServiceGetUserName\fR	\fBpapiServiceSetAppData\fR
+\fBpapiServiceSetAuthCB\fR	\fBpapiServiceSetEncryption\fR
+\fBpapiServiceSetPassword\fR	\fBpapiServiceSetUserName\fR
 .TE
 
 .SS "Printer"
@@ -80,17 +76,15 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpapiPrinterAdd\fR\fBpapiPrinterDisable\fR
-\fBpapiPrinterEnable\fR\fBpapiPrinterFree\fR
-\fBpapiPrinterGetAttributeList\fR\fBpapiPrinterListFree\fR
-\fBpapiPrinterListJobs\fR\fBpapiPrinterModify\fR
-\fBpapiPrinterPause\fR\fBpapiPrinterPurgeJobs\fR
-\fBpapiPrinterQuery\fR\fBpapiPrinterRemove\fR
-\fBpapiPrinterResume\fR\fBpapiPrintersList\fR
+l l
+l l .
+\fBpapiPrinterAdd\fR	\fBpapiPrinterDisable\fR
+\fBpapiPrinterEnable\fR	\fBpapiPrinterFree\fR
+\fBpapiPrinterGetAttributeList\fR	\fBpapiPrinterListFree\fR
+\fBpapiPrinterListJobs\fR	\fBpapiPrinterModify\fR
+\fBpapiPrinterPause\fR	\fBpapiPrinterPurgeJobs\fR
+\fBpapiPrinterQuery\fR	\fBpapiPrinterRemove\fR
+\fBpapiPrinterResume\fR	\fBpapiPrintersList\fR
 .TE
 
 .SS "Job"
@@ -98,20 +92,18 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpapiJobCancel\fR\fBpapiJobFree\fR
-\fBpapiJobGetAttributeList\fR\fBpapiJobGetId\fR
-\fBpapiJobGetJobTicket\fR\fBpapiJobGetPrinterName\fR
-\fBpapiJobHold\fR\fBpapiJobListFree\fR
-\fBpapiJobModify\fR\fBpapiJobMove\fR
-\fBpapiJobPromote\fR\fBpapiJobQuery\fR
-\fBpapiJobRelease\fR\fBpapiJobRestart\fR
-\fBpapiJobStreamClose\fR\fBpapiJobStreamOpen\fR
-\fBpapiJobStreamWrite\fR\fBpapiJobSubmit\fR
-\fBpapiJobSubmitByReference\fR\fBpapiJobValidate\fR
+l l
+l l .
+\fBpapiJobCancel\fR	\fBpapiJobFree\fR
+\fBpapiJobGetAttributeList\fR	\fBpapiJobGetId\fR
+\fBpapiJobGetJobTicket\fR	\fBpapiJobGetPrinterName\fR
+\fBpapiJobHold\fR	\fBpapiJobListFree\fR
+\fBpapiJobModify\fR	\fBpapiJobMove\fR
+\fBpapiJobPromote\fR	\fBpapiJobQuery\fR
+\fBpapiJobRelease\fR	\fBpapiJobRestart\fR
+\fBpapiJobStreamClose\fR	\fBpapiJobStreamOpen\fR
+\fBpapiJobStreamWrite\fR	\fBpapiJobSubmit\fR
+\fBpapiJobSubmitByReference\fR	\fBpapiJobValidate\fR
 .TE
 
 .SS "Miscellaneous"
@@ -119,18 +111,15 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpapiLibrarySupportedCall\fR\fBpapiLibrarySupportedCalls\fR
-\fBpapiStatusString\fR
+l l
+l l .
+\fBpapiLibrarySupportedCall\fR	\fBpapiLibrarySupportedCalls\fR
+\fBpapiStatusString\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libpapi.so.0\fR\fR
 .ad
@@ -141,7 +130,6 @@ shared object
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libpapi-common.so.0\fR\fR
 .ad
@@ -152,7 +140,6 @@ private shared code
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/print/psm-lpd.so\fR\fR
 .ad
@@ -163,7 +150,6 @@ private rfc1179 support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/print/psm-lpsched.so\fR\fR
 .ad
@@ -174,7 +160,6 @@ private LP support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/print/psm-ipp.so\fR\fR
 .ad
@@ -185,7 +170,6 @@ private IPP support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libipp-core.so\fR\fR
 .ad
@@ -196,7 +180,6 @@ private IPP marshalling support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libipp-listener.so\fR\fR
 .ad
@@ -207,7 +190,6 @@ private IPP operations support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lip/libhttp-core.so\fR\fR
 .ad
@@ -224,15 +206,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

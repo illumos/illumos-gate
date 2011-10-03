@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldaplist 1 "7 Jun 2008" "SunOS 5.11" "User Commands"
+.TH LDAPLIST 1 "Jun 7, 2008"
 .SH NAME
 ldaplist \- search and list naming information from an LDAP directory using the
 configured profile
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/ldaplist\fR [\fB-dlv\fR] [\fB-h\fR \fILDAP_server\fR[\fB:\fR\fIserverPort\fR] [\fB-M\fR \fIdomainName\fR] 
-   [\fB-N\fR \fIprofileName\fR] [\fB-a\fR \fIauthenticationMethod\fR] [\fB-P\fR \fIcertifPath\fR] 
+\fB/usr/bin/ldaplist\fR [\fB-dlv\fR] [\fB-h\fR \fILDAP_server\fR[\fB:\fR\fIserverPort\fR] [\fB-M\fR \fIdomainName\fR]
+   [\fB-N\fR \fIprofileName\fR] [\fB-a\fR \fIauthenticationMethod\fR] [\fB-P\fR \fIcertifPath\fR]
    [\fB-D\fR \fIbindDN\fR] [\fB-w\fR \fIbindPassword\fR] [\fB-j\fR \fIpasswdFile\fR]]
    [\fIdatabase\fR [\fIkey\fR]...]
 .fi
@@ -150,7 +150,6 @@ If the key is not specified, all the containers in the current search
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIauthenticationMethod\fR\fR
 .ad
@@ -182,7 +181,6 @@ must use this option to provide an authentication method.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -194,7 +192,6 @@ default, the entries are listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIbindDN\fR\fR
 .ad
@@ -205,7 +202,6 @@ Specifies an entry which has read permission to the requested database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -216,7 +212,6 @@ Lists the database mapping.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -229,7 +224,6 @@ This option has been deprecated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fILDAP_server[:serverPort]\fR\fR
 .ad
@@ -244,7 +238,6 @@ default LDAP server port number is \fB636\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIpasswdFile\fR\fR
 .ad
@@ -259,7 +252,6 @@ This option is mutually exclusive of the \fB-w\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -271,7 +263,6 @@ default, \fBldaplist\fR lists only the Distinguished Name of the entries found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIdomainName\fR\fR
 .ad
@@ -283,7 +274,6 @@ is not specified, the default domain name is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIprofileName\fR\fR
 .ad
@@ -295,7 +285,6 @@ the server specified by \fB-H\fR option. The default value is default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIcertifPath\fR\fR
 .ad
@@ -309,7 +298,6 @@ support, which is specified in the \fIauthenticationMethod\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIbindPassword\fR\fR
 .ad
@@ -329,7 +317,6 @@ password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -438,7 +425,7 @@ server is specified explicitly.
 .sp
 .in +2
 .nf
-example% \fBldaplist -H 10.10.10.10:3890 \e 
+example% \fBldaplist -H 10.10.10.10:3890 \e
             -M another.domain.name -N special_duaprofile \e
             -D "cn=directory manager" -w secret \e
             user1\fR
@@ -452,41 +439,34 @@ example% \fBldaplist -H 10.10.10.10:3890 \e
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successfully matched some entries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Successfully searched the table and no matches were found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred. An error message is output.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ldap/ldap_client_file\fR\fR
 .ad
@@ -495,7 +475,6 @@ An error occurred. An error message is output.
 \fB\fB/var/ldap/ldap_client_cred\fR\fR
 .ad
 .RS 30n
-.rt  
 Files that contain the LDAP configuration of the client. Do not manually modify
 these files. Their content is not guaranteed to be human readable. To update
 these files, use \fBldapclient\fR(1M)
@@ -509,13 +488,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

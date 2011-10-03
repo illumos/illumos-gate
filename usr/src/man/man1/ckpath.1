@@ -3,33 +3,33 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ckpath 1 "4 Nov 2005" "SunOS 5.11" "User Commands"
+.TH CKPATH 1 "Nov 4, 2005"
 .SH NAME
 ckpath, errpath, helppath, valpath \- display a prompt; verify and return a
 pathname
 .SH SYNOPSIS
 .LP
 .nf
-\fBckpath\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-a\fR | l] [\fB-b\fR | c | f | y] 
-     [\fB-n\fR [o | z]] [\fB-rtwx\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] 
+\fBckpath\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-a\fR | l] [\fB-b\fR | c | f | y]
+     [\fB-n\fR [o | z]] [\fB-rtwx\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR]
      [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/errpath\fR [\fB-W\fR \fIwidth\fR] [\fB-a\fR | l] [\fB-b\fR | c | f | y] 
+\fB/usr/sadm/bin/errpath\fR [\fB-W\fR \fIwidth\fR] [\fB-a\fR | l] [\fB-b\fR | c | f | y]
      [\fB-n\fR [o | z]] [\fB-rtwx\fR] [\fB-e\fR \fIerror\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/helppath\fR [\fB-W\fR \fIwidth\fR] [\fB-a\fR | l] [\fB-b\fR | c | f | y] 
+\fB/usr/sadm/bin/helppath\fR [\fB-W\fR \fIwidth\fR] [\fB-a\fR | l] [\fB-b\fR | c | f | y]
      [\fB-n\fR [o | z]] [\fB-rtwx\fR] [\fB-h\fR \fIhelp\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/valpath\fR [\fB-a\fR | l] [\fB-b\fR | c | f | y] 
+\fB/usr/sadm/bin/valpath\fR [\fB-a\fR | l] [\fB-b\fR | c | f | y]
      [\fB-n\fR [o | z]] [\fB-rtwx\fR] \fIinput\fR
 .fi
 
@@ -70,168 +70,138 @@ standard output), and \fBvalpath\fR (which validates a response).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be an absolute path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be a block special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be a character special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefault\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the default value as \fIdefault\fR. The default is not validated and so
 does not have to meet any criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIerror\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the error message as \fI error\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be a regular file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhelp\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the help message as \fI help\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIpid\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that process \fBID\fR \fIpid\fR is to be sent a signal if the user
 chooses to quit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be a relative path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must not exist (must be new).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must exist (must be old).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprompt\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the prompt message as \fIprompt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that \fBquit\fR is not allowed as a valid response.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be readable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsignal\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that the process \fBID\fR \fIpid\fR defined with the \fB-k\fR option
 is to be sent signal \fIsignal\fR when quit is chosen. If no signal is
 specified, \fBSIGTERM\fR is used.
@@ -239,69 +209,57 @@ specified, \fBSIGTERM\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be creatable (touchable). Pathname will be created if it does not
 already exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be writable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIwidth\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify that prompt, help and error messages be formatted to a line length of
 \fIwidth\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be executable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must be a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname must have a file having a size greater than zero bytes.
 .RE
 
@@ -311,12 +269,10 @@ Pathname must have a file having a size greater than zero bytes.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput\fR\fR
 .ad
 .RS 9n
-.rt  
 Input to be verified against validation options.
 .RE
 
@@ -350,7 +306,7 @@ An example default error message (using the \fB-a\fR option) is:
 .in +2
 .nf
 example% \fB/usr/sadm/bin/errpath \fR\fB-a\fR
-ERROR: A pathname is a filename, optionally preceded by parent 
+ERROR: A pathname is a filename, optionally preceded by parent
        directories.
        The pathname you enter: - must begin with a slash (/)
 .fi
@@ -405,56 +361,46 @@ usage: valpath [\fB-[a|l][b|c|f|y][n|[o|z]]rtwx\fR] input
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBEOF\fR on input, or negative width on \fB-W\fR option, or usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Mutually exclusive options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 User termination (quit).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Mutually exclusive options.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_ident_from_dev 9F "26 Mar 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_IDENT_FROM_DEV 9F "Mar 26, 2009"
 .SH NAME
 ldi_ident_from_dev, ldi_ident_from_stream, ldi_ident_from_dip,
 ldi_ident_release \- ldi cookie management
@@ -33,56 +33,46 @@ ldi_ident_release \- ldi cookie management
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIli\fR\fR
 .ad
 .RS 7n
-.rt  
 ldi identifier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlip\fR\fR
 .ad
 .RS 7n
-.rt  
 ldi identifier pointer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 pointer to device info node
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 7n
-.rt  
 device number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsq\fR\fR
 .ad
 .RS 7n
-.rt  
 pointer to a stream queue
 .RE
 

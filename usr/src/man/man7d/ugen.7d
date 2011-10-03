@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ugen 7D "3 Dec 2008" "SunOS 5.11" "Devices"
+.TH UGEN 7D "Dec 3, 2008"
 .SH NAME
 ugen \- USB generic driver
 .SH SYNOPSIS
@@ -77,7 +77,7 @@ When using ugen for the first time, you must add the  driver utilizing
 .nf
 Assuming that the vid is 472 and pid is b0b0:
 
-add_drv -n -m '* <device perms> <owner> <group>' 
+add_drv -n -m '* <device perms> <owner> <group>'
    -i '"usb472,b0b0"' ugen
 .fi
 .in -2
@@ -99,7 +99,7 @@ If the command fails with:
 .in +2
 .nf
 update_drv -a -m '* <device perms> <owner> <group>'
-   -i '"usb472,b0b0"' ugen 
+   -i '"usb472,b0b0"' ugen
 .fi
 .in -2
 
@@ -228,7 +228,7 @@ Configuration index 1, Endpoints > 0, alternate > 0:
                                 <alternate<in|out|cntrl><endpoint#>stat
 
     For example:
- 
+
         /dev/usb/472.b0b0/0/if0.1in3
         /dev/usb/472.b0b0/0/if0.1in3stat
 
@@ -242,7 +242,7 @@ Configuration index> 1, Endpoints > 0, alternate 0:
 
        /dev/usb/472.b0b0/0/cfg2if0in1
        /dev/usb/472.b0b0/0/cfg2if0in1stat
-    
+
     Note that the configuration value from the configuration
     descriptor indexed by the configuration index is used in
     the node name and not the configuration index itself.
@@ -344,46 +344,38 @@ no error and zero bytes read.
 Device statuses are:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_STAT_ONLINE\fR
 .ad
 .RS 29n
-.rt  
 Device is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_STAT_DISCONNECTED\fR
 .ad
 .RS 29n
-.rt  
 Device has been disconnected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_STAT_RESUMED\fR
 .ad
 .RS 29n
-.rt  
 Device has been resumed, however, endpoints which were open on suspend have not
 yet been closed and reopened.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_STAT_UNAVAILABLE\fR
 .ad
 .RS 29n
-.rt  
 Device has been reconnected, however, endpoints which were open on disconnect
 have not yet been closed and reopened.
 .RE
@@ -511,7 +503,7 @@ For example:
 .in +2
 .nf
 fd = open("/dev/usb/472.b0b0/0/cntrl0", O_RDWR);
-        
+
 .fi
 .in -2
 
@@ -649,19 +641,19 @@ configuration.  For sake of brevity, uninteresting parts are omitted.
    uchar_t *curr_descr;
 
    uchar_t *bytes;
-  
+
    int curr_descr_len;
    int curr_descr_type;
-   
+
    usb_cfg_descr_t cfg_descr;
    usb_if_descr_t if_descr;
    usb_ep_descr_t ep_descr;
-  
+
    /* See 9.13 of USB 2.0 spec for ordering. */
    static char *pipetypes[] = {
         "Control", "Isochronous", "Bulk", "Interrupt"
    };
-  
+
    /*
     * Setup to send a request to read just the config descriptor.  The
     * size of the whole cloud, containing all cfg, interface, endpoint,
@@ -670,7 +662,7 @@ configuration.  For sake of brevity, uninteresting parts are omitted.
     */
    init_cntrl_req(&setup_data, USB_DEV_REQ_DEV_TO_HOST, USB_REQ_GET_DESCR,
                    USB_DESCR_TYPE_SETUP_CFG, 0, USB_CFG_DESCR_SIZE);
-   
+
    /*
     * Write setup data. USB device will prepare to return the whole
     * config cloud as a response to this. We will read this separately.
@@ -684,21 +676,21 @@ configuration.  For sake of brevity, uninteresting parts are omitted.
                     /* Error recovery. */
            }
    }
-   
+
    /* USB data is little endian. */
    bytes = (uchar_t *)(&cfg_descr.wTotalLength);
    totalLength = bytes[0] + (bytes[1] << 8);
-   
+
    /*
     * The size of the whole cloud is in the bLength field.  Set up
     * to read this amount of data, to get the whole cloud.
     */
    config_cloud = malloc(totalLength);
-   
+
    init_cntrl_req(&setup_data, USB_DEV_REQ_DEV_TO_HOST, USB_REQ_GET_DESCR,
                    USB_DESCR_TYPE_SETUP_CFG, 0, totalLength);
-   
-   count = write(ctrl_fd, &setup_data, sizeof (setup_data));                                                                                          	   
+
+   count = write(ctrl_fd, &setup_data, sizeof (setup_data));                                                                                          	
    if (count != sizeof (setup_data)) {
            /* Error recovery. */
    } else {
@@ -707,43 +699,43 @@ configuration.  For sake of brevity, uninteresting parts are omitted.
                    /* Error recovery. */
             }
    }
-   
+
    /* Got the data.  Now loop, dumping out the descriptors found. */
-   
+
    curr_descr = config_cloud;
    offset = 0;
    while (offset < totalLength) {
-   
+
            /* All descr have length and type at offset 0 and 1 */
            curr_descr_len = curr_descr[0];
            curr_descr_type = curr_descr[1];
-           
+
            switch (curr_descr_type) {
            case USB_DESCR_TYPE_CFG:
-           
+
                     /*
-                     * Copy data into separate structure, needed for                                                                   
+                     * Copy data into separate structure, needed for
                      * proper alignment of all non char fields.  Note:
                      * non-char fields of all descriptors begin on aligned
                      * boundaries.  The issue is that some structures may
                      * be adjacent to others which have an odd-numbered
                      * byte size, and may thus start on an odd-numbered
                      * boundary.  */
-                    bcopy(curr_descr, &cfg_descr, curr_descr_len);    
+                    bcopy(curr_descr, &cfg_descr, curr_descr_len);
 
                     /* Remember to read any words in endian-neutral way. */
-                    
+
                     (void) printf("\enConfig %d found.\en",
                         cfg_descr.bConfigurationValue);
                     break;
-                     
+
             case USB_DESCR_TYPE_IF:
                     bcopy(curr_descr, &if_descr, curr_descr_len);
                     (void) printf("\en\etInterface %d, Alt %d found.\en",
                         if_descr.bInterfaceNumber,
                         if_descr.bAlternateSetting);
                     break;
-                  
+
             case USB_DESCR_TYPE_EP:
                     bcopy(curr_descr, &ep_descr, curr_descr_len);
                     (void) printf("\en\et\etEndpoint %d (%s-%s) found.\en",
@@ -760,7 +752,7 @@ configuration.  For sake of brevity, uninteresting parts are omitted.
                          curr_descr_type);
                      break;
              }
-             
+
              offset += curr_descr_len;
              curr_descr = &config_cloud[offset];
    }
@@ -788,7 +780,7 @@ fd = open("/dev/usb/472.b0b0/0/if0in1", O_RDONLY);
 .in +2
 .nf
 fdstat = open("/dev/usb/472.b0b0/0/if0in1stat", O_RDONLY);
-    
+
 .fi
 .in -2
 
@@ -888,11 +880,11 @@ interrupt-IN data endpoints, not their status endpoints.)
                 if (pfd[0].revents & POLLIN) {
                         count = read(fd1, buf, sizeof (buf));
                         ....
-                } 
+                }
                 if (pfd[1].revents & POLLIN) {
                         count = read(fd2, buf, sizeof (buf));
                         ....
-                } 
+                }
         }
 .fi
 .in -2
@@ -922,7 +914,7 @@ fd = open("/dev/usb/472.b0b0/0/if0out3", O_WRONLY);
 
 fdstat = open("/dev/usb/472.b0b0/0/if0out3stat", O_RDONLY);
 
-       
+
 .fi
 .in -2
 
@@ -1021,27 +1013,27 @@ typedef struct ugen_isoc_pkt_descr {
 		* in a packet.
 		*/
  	      ushort_t        dsc_isoc_pkt_len;
- 
-		/*         
+
+		/*
 		* Set by ugen to actual num. of bytes sent/received
 		* in a packet.
 			*/
        ushort_t        dsc_isoc_pkt_actual_len;
- 
+
 		/*
 		* Per pkt. status set by ugen driver both for the
 		* isochronous IN and OUT requests. Application can
 		* use USB_LC_STAT_* to parse the status.
 		*/
       int     dsc_isoc_pkt_status;
- } ugen_isoc_pkt_descr_t; 
-      
+ } ugen_isoc_pkt_descr_t;
+
  typedef struct ugen_isoc_req_head {
    /* pkt count of the isoc request */
     int req_isoc_pkts_count;
- 
+
   /* pkt descriptors */
-  ugen_isoc_pkt_descr_t req_isoc_pkt_descrs[1]; 
+  ugen_isoc_pkt_descr_t req_isoc_pkt_descrs[1];
  } ugen_isoc_req_head_t;
 .fi
 .in -2
@@ -1092,34 +1084,34 @@ The following example shows how to read an isochronous-IN endpoint:
 		ugen_isoc_req_head_t *req;
 		ugen_isoc_pkt_descr_t *pktdesc;
 		char rdbuf[5000];
- 
+
 		pktcnt = 4; /* 4 packets in this request */
  	
 		len = sizeof(int) +
 			sizeof(ugen_isoc_pkt_descr_t) * pktcount;
-  
+
 		buf = malloc(len);
 		if (!buf) {
 			/* Error recovery. */
  	    }
- 
+
 		req = (ugen_isoc_req_head_t *)buf;
 		req->req_isoc_pkts_count = pktcnt;
- 
+
 		pktdesc = (ugen_isoc_pkt_descr_t *)
 			(req->req_isoc_pkt_descrs);
- 
+
      for (i = 0; i < pktcnt; i++) {
 				/*
 				* pktlen should not exceed xfer
 				* capability of an endpoint
 				*/
-				pktdesc[i].dsc_isoc_pkt_len = pktlen; 
- 
+				pktdesc[i].dsc_isoc_pkt_len = pktlen;
+
  				pktdesc[i].dsc_isoc_pkt_actual_len = 0;
 				pktdesc[i].dsc_isoc_pkt_status = 0;
  	    }
- 
+
 			/*
 			* write request info to driver and len must
 			* be exactly the sum of
@@ -1128,8 +1120,8 @@ The following example shows how to read an isochronous-IN endpoint:
 			*/
 			if (write(fd, buf, len) < 0) {
 				/* Error recovery. */
- 	    } 
- 
+ 	    }
+
 			/*
 			* Read length should be sum of all pkt descriptors
 			* length + payload data length of all pkts
@@ -1139,27 +1131,27 @@ The following example shows how to read an isochronous-IN endpoint:
  	        pktlen) * pktcnt) < 0) {
 				/* Error recovery. */
  	    }
- 
+
 			pktdesc = (ugen_isoc_pkt_descr_t *) rdbuf;
- 
+
 			/* points to payload beginning */
 			p = rdbuf + pktcnt * sizeof(ugen_isoc_pkt_descr_t);
- 
+
 			for (i = 0; i < pktcnt; i++) {
 				printf("packet %d len = %d,"
 					" actual_len = %d, status = 0x%x\n",
 					i, pktdesc->dsc_isoc_pkt_len,
 					pktdesc->dsc_isoc_pkt_actual_len,
 					pktdesc->dsc_isoc_pkt_status);
- 
+
 				/* Processing data */
- 
+
 				/*
 				* next packet data payload, do NOT use
 				* dsc_isoc_pkt_actual_len
 				*/
-				p += pktdesc->dsc_isoc_pkt_len; 
- 
+				p += pktdesc->dsc_isoc_pkt_len;
+
 				pktdesc++;
  }
 .fi
@@ -1188,31 +1180,31 @@ endpoint:
 		ugen_isoc_req_head_t *req;
 		ugen_isoc_pkt_descr_t *pktdesc;
 		char rdbuf[4096];
- 
+
 		pktcnt = 4;
- 
+
 		/*
 		* set packet length to a proper value, don't
 		* exceed endpoint's capability
 		*/
-		pktlen = 1024; 
- 
+		pktlen = 1024;
+
 		len = sizeof(int) +
 			sizeof(ugen_isoc_pkt_descr_t) * pktcount;
- 	    
+ 	
 		len += pktlen * pktcnt;
- 
+
 		buf = malloc(len);
 		if (!buf) {
 			/* Error recovery. */
  	    }
-     
+
 		req = (ugen_isoc_req_head_t *)buf;
 		req->req_isoc_pkts_count = pktcnt;
- 
+
 		pktdesc =
 			(ugen_isoc_pkt_descr_t *)(req->req_isoc_pkt_descrs);
- 
+
 		for (i = 0; i < pktcnt; i++) {
 			pktdesc[i].dsc_isoc_pkt_len = pktlen;
 			pktdesc[i].dsc_isoc_pkt_actual_len = 0;
@@ -1222,12 +1214,12 @@ endpoint:
 		/* moving to beginning of payload data */
 		p = buf + sizeof(int) + sizeof(*pktdesc) * pktcnt;
 		for (i = 0; i < pktcnt; i++) {
- 
+
 			/* fill in the data buffer */
- 
+
 			p += pktlen;
      }
- 
+
 		/*
 		* write packet request information and data to ugen driver
 		*
@@ -1236,17 +1228,17 @@ endpoint:
 		*/
 		if (write(fd, buf, len) < 0) {
 			/* Error recovery. */
- 	    } 
- 
+ 	    }
+
 		/* read packet status */
 		if (read(fd, rdbuf, sizeof(*pktdesc) * pktcnt) < 0) {
- 
+
 			/* Error recovery. */
- 
+
 		} else {
- 
+
 			/* Parse every packet's transfer status */
- 
+
   	    }
 .fi
 .in -2
@@ -1257,7 +1249,6 @@ endpoint:
 The following statuses are returned by endpoint status device logical names:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_NOERROR\fR
 .ad
@@ -1268,7 +1259,6 @@ No error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_CRC\fR
 .ad
@@ -1279,7 +1269,6 @@ CRC error detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_BITSTUFFING\fR
 .ad
@@ -1290,7 +1279,6 @@ Bit stuffing error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_DATA_TOGGLE_MM\fR
 .ad
@@ -1301,7 +1289,6 @@ Data toggle did not match.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_STALL\fR
 .ad
@@ -1312,7 +1299,6 @@ Endpoint returned stall.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_DEV_NOT_RESP\fR
 .ad
@@ -1323,7 +1309,6 @@ Device not responding.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_UNEXP_PID\fR
 .ad
@@ -1334,7 +1319,6 @@ Unexpected Packet Identifier (PID).
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_PID_CHECKFAILURE\fR
 .ad
@@ -1345,7 +1329,6 @@ Check bits on PID failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_DATA_OVERRUN\fR
 .ad
@@ -1356,7 +1339,6 @@ Data overrun.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_DATA_UNDERRUN\fR
 .ad
@@ -1367,7 +1349,6 @@ Data underrun.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_BUFFER_OVERRUN\fR
 .ad
@@ -1378,7 +1359,6 @@ Buffer overrun.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_BUFFER_UNDERRUN\fR
 .ad
@@ -1389,7 +1369,6 @@ Buffer underrun.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_TIMEOUT\fR
 .ad
@@ -1400,7 +1379,6 @@ Command timed out.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_NOT_ACCESSED\fR
 .ad
@@ -1411,7 +1389,6 @@ Not accessed by the hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_UNSPECIFIED_ERR\fR
 .ad
@@ -1422,7 +1399,6 @@ Unspecified USBA or HCD error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_NO_BANDWIDTH\fR
 .ad
@@ -1433,7 +1409,6 @@ No bandwidth available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_HW_ERR\fR
 .ad
@@ -1444,7 +1419,6 @@ Host Controller h/w error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_SUSPENDED\fR
 .ad
@@ -1455,7 +1429,6 @@ Device was suspended.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_DISCONNECTED\fR
 .ad
@@ -1466,7 +1439,6 @@ Device was disconnected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_INTR_BUF_FULL\fR
 .ad
@@ -1478,7 +1450,6 @@ empty and polling has been resumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_INTERRUPTED\fR
 .ad
@@ -1489,7 +1460,6 @@ Request was interrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_NO_RESOURCES\fR
 .ad
@@ -1500,7 +1470,6 @@ No resources available for request.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_INTR_POLLING_FAILED\fR
 .ad
@@ -1511,7 +1480,6 @@ Failed to restart polling.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_ISOC_POLLING_FAILED\fR
 .ad
@@ -1522,7 +1490,6 @@ Failed to start isochronous polling.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_ISOC_UNINITIALIZED\fR
 .ad
@@ -1533,7 +1500,6 @@ Isochronous packet information not initialized.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_LC_STAT_ISOC_PKT_ERROR\fR
 .ad
@@ -1548,102 +1514,84 @@ isochronous-IN endpoint is suspended and can be resumed on next \fBread\fR(2).
 The following system call \fBerrno\fR values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 An attempt was made to enable or disable "one transfer" mode while the
 associated endpoint was open.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 11n
-.rt  
 The endpoint has been opened and another open is attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 An endpoint open was attempted with incorrect flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 Operation not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 Device associated with the file descriptor does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENODEV\fR
 .ad
 .RS 11n
-.rt  
 Device has been hot-removed or a suspend/resume happened before this command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEIO\fR
 .ad
 .RS 11n
-.rt  
 An I/O error occurred. Send a read on the endpoint status minor node to get the
 exact error information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEINTR\fR
 .ad
 .RS 11n
-.rt  
 Interrupted system call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOMEM\fR
 .ad
 .RS 11n
-.rt  
 No memory for the allocation of internal structures.
 .RE
 
@@ -1697,13 +1645,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based  SPARC
+Architecture	PCI-based  SPARC
 .TE
 
 .SH SEE ALSO
@@ -1727,7 +1674,6 @@ Warning: <device path> (ugen<instance num>): Error Message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBToo many minor nodes. \fR
 .ad
@@ -1738,7 +1684,6 @@ Device has too many minor nodes. Not all are available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInstance number too high (<\fInumber\fR>).\fR
 .ad
@@ -1749,7 +1694,6 @@ Too many devices are using this driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot access <device>.  Please reconnect.\fR
 .ad
@@ -1762,7 +1706,6 @@ of the original device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice is not identical to the previous one on this port. Please disconnect
 and reconnect.\fR

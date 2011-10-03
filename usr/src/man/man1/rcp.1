@@ -1,10 +1,10 @@
 '\" te
 .\"  Copyright 1989 AT&T
-.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved 
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rcp 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.TH RCP 1 "Dec 23, 2008"
 .SH NAME
 rcp \- remote file copy
 .SH SYNOPSIS
@@ -112,12 +112,10 @@ to the home directory of the user named \fIusername\fR, on the remote host.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 12n
-.rt  
 This option explicitly enables Kerberos authentication and trusts the
 \fB\&.k5login\fR file for access-control. If the authorization check by
 \fBin.rshd\fR(1M) on the server-side succeeds and if the \fB\&.k5login\fR file
@@ -126,43 +124,36 @@ permits access, the user is allowed to carry out the \fBrcp\fR transfer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIrealm\fR\fR
 .ad
 .RS 12n
-.rt  
 Causes \fBrcp\fR to obtain tickets for the remote host in \fIrealm\fR instead
 of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR \fIrealm\fR\fR
 .ad
 .RS 12n
-.rt  
 This option explicitly disables Kerberos authentication. It canbe used to
 override the \fBautologin\fR variable in\fBkrb5.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 12n
-.rt  
 Attempts to give each copy the same modification times, access times, modes,
 and \fBACL\fRs if applicable as the original file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-PO\fR\fR
 .ad
@@ -171,7 +162,6 @@ and \fBACL\fRs if applicable as the original file.
 \fB\fB-PN\fR\fR
 .ad
 .RS 12n
-.rt  
 Explicitly requests new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
 "\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalant
 in the old one and is regarded much more secure, but is not interoperable with
@@ -184,24 +174,20 @@ new, more secure "\fBrcmd\fR" protocol is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 12n
-.rt  
 Copies each subtree rooted at \fIfilename\fR; in this case the destination must
 be a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 12n
-.rt  
 Causes the information transferred between hosts to be encrypted. Notice that
 the command is sent unencrypted to the remote system. All subsequent transfers
 are encrypted.
@@ -235,23 +221,19 @@ only when Kerberos authentication is being done.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All files were copied successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -264,23 +246,19 @@ See the NOTES section for caveats on the exit code.
 \fB$HOME/.profile\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.k5login\fR\fR
 .ad
 .RS 23n
-.rt  
 File containing Kerberos principals that are allowed access
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Kerberos configuration file
 .RE
 
@@ -292,13 +270,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

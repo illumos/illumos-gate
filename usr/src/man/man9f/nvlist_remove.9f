@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvlist_remove 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NVLIST_REMOVE 9F "Jan 16, 2006"
 .SH NAME
 nvlist_remove, nvlist_remove_all \- remove name-value pairs
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/nvpair.h> 
+#include <sys/nvpair.h>
 
 \fBint\fR \fBnvlist_remove\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, \fBdata_type_t\fR \fItype\fR);
 .fi
@@ -26,34 +26,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvl\fR\fR
 .ad
 .RS 8n
-.rt  
 The list of name-value pairs (\fBnvlist_t\fR) to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 8n
-.rt  
 Name of the name-value pair (\fBnvpair\fR) to be removed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 8n
-.rt  
 Data type of the \fBnvpair\fR to be removed.
 .RE
 
@@ -83,23 +77,19 @@ from user, interrupt, or kernel context.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 There is an invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOENT\fR
 .ad
 .RS 10n
-.rt  
 No name-value pairs were found to match the criteria specified by name and
 type.
 .RE

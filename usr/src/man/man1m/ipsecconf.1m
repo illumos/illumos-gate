@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipsecconf 1M "28 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH IPSECCONF 1M "Sep 28, 2009"
 .SH NAME
 ipsecconf \- configure system wide IPsec policy
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/ipsecconf\fR 
+\fB/usr/sbin/ipsecconf\fR
 .fi
 
 .LP
@@ -127,7 +127,6 @@ See \fBNOTES\fR for more information on managing IPsec security policy and
 \fBipsecconf\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIfile\fR\fR
 .ad
@@ -154,7 +153,6 @@ not advisable to depend upon this feature.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfile\fR\fR
 .ad
@@ -167,7 +165,6 @@ and when \fBsmf\fR(5) reports a configuration error. See \fBSECURITY\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIindex\fR\fR
 .ad
@@ -185,7 +182,6 @@ index.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIname\fR,\fIindex\fR\fR
 .ad
@@ -199,7 +195,6 @@ latching does not apply as it does in the host policy case. Equivalent to:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -211,7 +206,6 @@ option with respect to latching and host versus per-tunnel behavior.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -222,7 +216,6 @@ Flush all policies on all tunnels and also flush all host policies.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIname\fR\fR
 .ad
@@ -234,7 +227,6 @@ Specify a tunnel interface name for use with the \fB-d\fR, \fB-f\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -254,7 +246,6 @@ entries are listed separately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -269,7 +260,6 @@ interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -281,7 +271,6 @@ only be used with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -354,13 +343,13 @@ The complete syntax of a policy entry is:
 .in +2
 .nf
 policy ::= { <pattern1> } <action1> { <properties1> } |
-     { <pattern2> } <action2> { <properties2> } 
+     { <pattern2> } <action2> { <properties2> }
      [ 'or' <action2> { <properties2>} ]*
 
      pattern1 ::=  <pattern_name_value_pair1>*
 
      pattern2 ::=  <pattern_name_value_pair2>*
- 
+
      action1 ::= apply | permit | bypass | pass
      action2 ::=  bypass | pass | drop | ipsec
 
@@ -371,7 +360,7 @@ policy ::= { <pattern1> } <action1> { <properties1> } |
      pattern_name_value_pair1 ::=
         saddr <address>/<prefix> |
         src  <address>/<prefix> |
-        srcaddr <address>/<prefix> |      
+        srcaddr <address>/<prefix> |
         smask <mask> |
         sport <port> |
         daddr <address>/<prefix> |
@@ -432,14 +421,14 @@ policy ::= { <pattern1> } <action1> { <properties1> } |
           sa <sa_val>
 
      auth_alg ::=  <auth_algname> ['(' <keylen> ')']
-     auth_algname ::= any | md5 | hmac-md5 | sha | sha1 | hmac-sha | 
-                      hmac-sha1 | hmac-sha256 | hmac-sha384 | 
+     auth_algname ::= any | md5 | hmac-md5 | sha | sha1 | hmac-sha |
+                      hmac-sha1 | hmac-sha256 | hmac-sha384 |
                       hmac-sha512 |<number>
 
      encr_alg ::= <encr_algname> ['(' <keylen> ')']
-     encr_algname ::= any | aes | aes-cbc | des | des-cbc | 3des | 
+     encr_algname ::= any | aes | aes-cbc | des | des-cbc | 3des |
                       3des-cbc | blowfish | blowfish-cbc | <number>
-     
+
      keylen ::= <number> | <number>'..' | '..'<number> | <number>'..' \e
      <number>
 
@@ -473,7 +462,6 @@ Policy entries may contain the following (name value) pairs in the
 policy entry.
 .sp
 .ne 2
-.mk
 .na
 \fBladdr/plen\fR
 .ad
@@ -496,7 +484,6 @@ be added for each of the addresses with other entries remaining the same.
 
 .sp
 .ne 2
-.mk
 .na
 \fBraddr/plen\fR
 .ad
@@ -519,7 +506,6 @@ will be added for each of the addresses with other entries remaining the same.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsrc/plen\fR
 .ad
@@ -549,7 +535,6 @@ with other entries remaining the same.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdaddr/plen\fR
 .ad
@@ -574,7 +559,6 @@ address-destination address pair will be added to the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsmask\fR\fR
 .ad
@@ -595,7 +579,6 @@ For both IPv4 and IPv6 addresses, the same information can be specified as a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdmask\fR\fR
 .ad
@@ -606,7 +589,6 @@ Analogous to \fIsmask.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlport\fR\fR
 .ad
@@ -619,7 +601,6 @@ getservbyname(3XNET)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrport\fR\fR
 .ad
@@ -632,7 +613,6 @@ getservbyname(3XNET)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsport\fR\fR
 .ad
@@ -645,7 +625,6 @@ in \fBgetservbyname\fR(3XNET)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdport\fR\fR
 .ad
@@ -658,7 +637,6 @@ searched with \fBNULL\fR proto argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproto\fR \fIulp\fR\fR
 .ad
@@ -674,7 +652,6 @@ all \fBicmp\fR rules.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR \fInum\fR or \fInum\fR-\fInum\fR\fR
 .ad
@@ -689,7 +666,6 @@ hyphen separating numbers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcode\fR \fInum\fR or \fInum\fR-\fInum\fR\fR
 .ad
@@ -703,7 +679,6 @@ be present. A range of codes can be specified with a hyphen separating numbers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtunnel\fR \fIname\fR\fR
 .ad
@@ -717,7 +692,6 @@ its policy entries disappear.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnegotiate\fR \fItunnel\fR\fR
 .ad
@@ -740,7 +714,6 @@ Policy entries may contain the following (name-value) pairs in the properties
 field. Each (name-value) pair may appear only once in a given policy entry.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_algs\fR\fR
 .ad
@@ -755,7 +728,6 @@ on outbound datagrams and verified to be present on inbound datagrams. See
 This entry can contain either a string or a decimal number.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring\fR\fR
 .ad
@@ -775,7 +747,6 @@ at this time for manual \fBSA\fRs and the key negotiating daemon for automatic
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnumber\fR\fR
 .ad
@@ -791,7 +762,6 @@ the outbound datagram, and the same will be verified for the inbound datagram.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencr_algs\fR\fR
 .ad
@@ -807,7 +777,6 @@ This entry can contain either a string or a decimal number. Strings are not
 case-sensitive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring\fR\fR
 .ad
@@ -818,16 +787,14 @@ Can be one of the following:
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-string value:Algorithm Used:See RFC:
+c c c
+l l l .
+string value:	Algorithm Used:	See RFC:
 _
-DES or DES-CBCDES-CBC2405
-3DES or 3DES-CBC3DES-CBC2451
-BLOWFISH or BLOWFISH-CBCBLOWFISH-CBC2451
-AES or AES-CBCAES-CBC2451
+DES or DES-CBC	DES-CBC	2405
+3DES or 3DES-CBC	3DES-CBC	2451
+BLOWFISH or BLOWFISH-CBC	BLOWFISH-CBC	2451
+AES or AES-CBC	AES-CBC	2451
 .TE
 
 You can use the \fBipsecalgs\fR(1M) command to obtain the complete list of
@@ -843,7 +810,6 @@ not case-sensitive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnumber\fR\fR
 .ad
@@ -857,7 +823,6 @@ dynamically loaded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBencr_auth_algs\fR\fR
 .ad
@@ -871,7 +836,6 @@ to be present on inbound datagrams. See \fIRFC 2406\fR. This entry can contain
 either a string or a number. Strings are case-insensitive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring\fR\fR
 .ad
@@ -882,7 +846,6 @@ Valid values are the same as the ones described for \fBauth_algs\fR above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnumber\fR\fR
 .ad
@@ -916,7 +879,6 @@ and/or maximum key lengths. Minimum or maximum lengths may be omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdir\fR\fR
 .ad
@@ -926,7 +888,6 @@ Values following this decides whether this entry is for outbound or inbound
 datagram. Valid values are strings that should be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBout\fR\fR
 .ad
@@ -938,7 +899,6 @@ datagrams.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBin\fR\fR
 .ad
@@ -950,7 +910,6 @@ datagrams.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBboth\fR\fR
 .ad
@@ -967,7 +926,6 @@ if it is given while the action is "apply" or "permit", it should be "out" or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsa\fR\fR
 .ad
@@ -982,7 +940,6 @@ determine whether a new \fBSA\fR will be used/obtained. Valid values are
 strings that could be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunique\fR\fR
 .ad
@@ -1004,7 +961,6 @@ value of either IPv4-in-IP or IPv6-in-IP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshared\fR\fR
 .ad
@@ -1027,7 +983,6 @@ Action follows the pattern and should be given before properties. It should be
 one of the following and this field is mandatory.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipsec\fR\fR
 .ad
@@ -1040,7 +995,6 @@ matched to incoming and outgoing datagrams.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBapply\fR\fR
 .ad
@@ -1053,7 +1007,6 @@ the outbound datagram.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpermit\fR\fR
 .ad
@@ -1067,7 +1020,6 @@ matched only for inbound datagrams.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbypass\fR\fR
 .ad
@@ -1086,7 +1038,6 @@ entry in the system. This has the highest precedence over any other entries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrop\fR\fR
 .ad
@@ -1385,10 +1336,10 @@ properties.
 .sp
 .in +2
 .nf
-{ 
-    laddr arachnid 
-    raddr spiderweb 
-    dir in 
+{
+    laddr arachnid
+    raddr spiderweb
+    dir in
 } ipsec {auth_algs any sa unique}
 .fi
 .in -2
@@ -1633,7 +1584,6 @@ C-prefix/24} ipsec {encr_algs aes encr_auth_algs md5}
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/run/ipsecpolicy.conf\fR\fR
 .ad
@@ -1645,7 +1595,6 @@ Cache of IPsec policies currently configured for the system, maintained by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipsecinit.conf\fR\fR
 .ad
@@ -1657,7 +1606,6 @@ File containing IPsec policies to be installed at system restart by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipsecinit.sample\fR\fR
 .ad
@@ -1674,13 +1622,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
@@ -1731,7 +1678,6 @@ IPsec\fR. 2001.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fBBad "string" on line \fIN\fR.\fR
 .ad
@@ -1749,7 +1695,6 @@ Address arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInterface name already selected\fR
 .ad
@@ -1760,7 +1705,6 @@ Dual use of \fB-i\fR \fIname\fR and \fIname\fR,\fIindex\fR for an index.
 
 .sp
 .ne 2
-.mk
 .na
 \fBError before or at line \fIN\fR.\fR
 .ad
@@ -1771,7 +1715,6 @@ Indicates parsing error before or at line \fIN\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNon-existent index\fR
 .ad
@@ -1782,7 +1725,6 @@ Reported when the \fIindex\fR for delete is not a valid one.
 
 .sp
 .ne 2
-.mk
 .na
 \fBspd_msg return: File exists\fR
 .ad

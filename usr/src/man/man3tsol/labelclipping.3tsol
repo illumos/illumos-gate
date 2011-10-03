@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH labelclipping 3TSOL "20 Jul 2007" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH LABELCLIPPING 3TSOL "Jul 20, 2007"
 .SH NAME
 labelclipping, Xbsltos, Xbcleartos \- translate a binary label and clip to the
 specified width
@@ -35,45 +35,37 @@ effective privileges to translate labels or clearances that dominate the
 current process' sensitivity label.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdisplay\fR\fR
 .ad
 .RS 13n
-.rt  
 The structure controlling the connection to an X Window System display.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsenslabel\fR\fR
 .ad
 .RS 13n
-.rt  
 The sensitivity label to be translated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclearance\fR\fR
 .ad
 .RS 13n
-.rt  
 The clearance to be translated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwidth\fR\fR
 .ad
 .RS 13n
-.rt  
 The width of the translated label or clearance in pixels. If the specified
 width is shorter than the full label, the label is clipped and the presence of
 clipped letters is indicated by an arrow. In this example, letters have been
@@ -85,24 +77,20 @@ using a width of half the display width.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfontlist\fR\fR
 .ad
 .RS 13n
-.rt  
 A list of fonts and character sets where each font is associated with a
 character set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 13n
-.rt  
 The value of flags indicates which words in the \fBlabel_encodings\fR(4) file
 are used for the translation. See the \fBbltos\fR(3TSOL) manual page for a
 description of the flag values: \fBLONG_WORDS\fR, \fBSHORT_WORDS\fR,
@@ -126,7 +114,6 @@ not dominated by the process' sensitivity label and the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/dt/include/Dt/label_clipping.h\fR\fR
 .ad
@@ -137,7 +124,6 @@ Header file for label clipping functions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/tsol/label_encodings\fR\fR
 .ad
@@ -159,7 +145,7 @@ clearance to a width of 72 pixels.
 .sp
 .in +2
 .nf
-xmstr = Xbcleartos(XtDisplay(topLevel), 
+xmstr = Xbcleartos(XtDisplay(topLevel),
 &clearance, 72, fontlist, LONG_WORDS
 .fi
 .in -2
@@ -172,15 +158,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .sp

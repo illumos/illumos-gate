@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH picl_set_propval 3PICL "28 Mar 2000" "SunOS 5.11" "PICL Library Functions"
+.TH PICL_SET_PROPVAL 3PICL "Mar 28, 2000"
 .SH NAME
 picl_set_propval, picl_set_propval_by_name \- set the value of a property to
 the specified value
@@ -57,111 +57,91 @@ handles.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_NOTINITIALIZED\fR\fR
 .ad
 .RS 23n
-.rt  
 Session not initialized
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_NORESPONSE\fR\fR
 .ad
 .RS 23n
-.rt  
 Daemon not responding
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_PERMDENIED\fR\fR
 .ad
 .RS 23n
-.rt  
 Insufficient permission
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_NOTWRITABLE\fR\fR
 .ad
 .RS 23n
-.rt  
 Property is read-only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_VALUETOOBIG\fR\fR
 .ad
 .RS 23n
-.rt  
 Value too big
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_NOTPROP\fR\fR
 .ad
 .RS 23n
-.rt  
 Not a property
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_NOTNODE\fR\fR
 .ad
 .RS 23n
-.rt  
 Not a node
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_INVALIDHANDLE\fR\fR
 .ad
 .RS 23n
-.rt  
 Invalid handle specified
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_STALEHANDLE\fR\fR
 .ad
 .RS 23n
-.rt  
 Stale handle specified
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPICL_FAILURE\fR\fR
 .ad
 .RS 23n
-.rt  
 General system failure
 .RE
 
@@ -173,13 +153,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

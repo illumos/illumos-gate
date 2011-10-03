@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH aclcheck 3SEC "10 Dec 2001" "SunOS 5.11" "File Access Control Library Functions"
+.TH ACLCHECK 3SEC "Dec 10, 2001"
 .SH NAME
 aclcheck \- check the validity of an ACL
 .SH SYNOPSIS
@@ -125,91 +125,75 @@ If the \fBACL\fR is valid, \fBalcheck()\fR will return \fB0\fR. Otherwise
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGRP_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 There is more than one \fBGROUP_OBJ\fR or \fBDEF_GROUP_OBJ\fR \fBACL\fR entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSER_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 There is more than one \fBUSER_OBJ\fR or \fBDEF_USER_OBJ\fR \fBACL\fR entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLASS_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 There is more than one \fBCLASS_OBJ\fR (\fBACL\fR mask) or \fBDEF_CLASS_OBJ\fR
 (default \fBACL\fR mask) entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOTHER_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 There is more than one \fBOTHER_OBJ\fR or \fBDEF_OTHER_OBJ\fR \fBACL\fR entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDUPLICATE_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 Duplicate entries of \fBUSER\fR, \fBGROUP\fR, \fBDEF_USER\fR, or
 \fBDEF_GROUP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENTRY_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 The entry type is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMISS_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 Missing an entry. The \fIwhich\fR parameter returns \fB\(mi1\fR in this case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEM_ERROR\fR\fR
 .ad
 .RS 19n
-.rt  
 The system cannot allocate any memory. The \fBwhich\fR parameter returns
 \fB\(mi1\fR in this case.
 .RE
@@ -222,15 +206,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

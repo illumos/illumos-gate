@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sharemgr 1M "21 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH SHAREMGR 1M "Sep 21, 2009"
 .SH NAME
 sharemgr \- configure and manage file sharing
 .SH SYNOPSIS
@@ -141,7 +141,6 @@ take the form:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR \fB[-nvh] [-P \fIproto\fR [-p \fIproperty\fR=\fIvalue\fR]]
 \fIgroup\fR\fR\fR
@@ -176,7 +175,6 @@ protocols will be enabled on the group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR \fB[-nvh] [-P \fIproto\fR] [-f] \fIgroup\fR\fR\fR
 .ad
@@ -215,7 +213,6 @@ Note the use of the force (\fB-f\fR) option, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR \fB[-vh] [-P \fIproto\fR]\fR\fR
 .ad
@@ -242,7 +239,6 @@ rdonlygrp  disabled   nfs
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow\fR \fB[-pvxh] [-P \fIproto\fR] [\fIgroup\fR...]\fR\fR
 .ad
@@ -309,7 +305,6 @@ zfs        nfs=()
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR \fB[-nvh] -P \fIproto\fR [-S \fIoptionset\fR] [-p
 \fIproperty\fR=\fIvalue\fR]* [-s \fIshare path\fR] \fIgroup\fR\fR\fR
@@ -358,7 +353,6 @@ reshared with the new property value(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunset\fR \fB[-nvh] -P proto [-S \fIoptionset\fR] [-p \fIproperty\fR]* [-s
 \fIsharepath\fR ] \fIgroup\fR\fR\fR
@@ -390,7 +384,6 @@ reshared with the new property value(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-share\fR \fB[-nth] [-r \fIresource-name\fR] [-d "\fIdescription
 text\fR"] -s \fIsharepath\fR \fIgroup\fR\fR\fR
@@ -444,7 +437,6 @@ a resource name are included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmove-share\fR \fB[-nvh] -s \fIsharepath\fR \fIdestination-group\fR\fR\fR
 .ad
@@ -471,7 +463,6 @@ and then reshares the directory with the properties associated with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-share\fR \fB[-fnvh] -s \fIsharepath\fR \fIgroup\fR\fR\fR
 .ad
@@ -488,7 +479,6 @@ along with the parent shares.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset-share\fR \fB[-nvh] [-r \fIresource\fR] [-d "\fIdescription text\fR"]
 -s \fIsharepath\fR \fIgroup\fR\fR\fR
@@ -510,7 +500,6 @@ subcommand is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR \fB[-nvh] [\fIgroup\fR... | -a]\fR\fR
 .ad
@@ -526,7 +515,6 @@ currently online.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR \fB[-nvh] [\fIgroup\fR... | -a]\fR\fR
 .ad
@@ -542,7 +530,6 @@ shares to be started at boot time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR \fB[-vh] [-P \fIproto\fR] [\fIgroup\fR... | -a]\fR\fR
 .ad
@@ -581,7 +568,6 @@ The command:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fB[-vh] [-P \fIproto\fR] [\fIgroup\fR... | -a]\fR\fR
 .ad
@@ -617,7 +603,6 @@ enabled. The command:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshare\fR \fB[-F \fIfstype\fR] [-p] [-o \fIoptionlist\fR] [-d
 \fIdescription\fR] [\fIpathname\fR [\fIresourcename\fR]]\fR\fR
@@ -632,7 +617,6 @@ to be persistent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunshare\fR \fB[-F \fIfstype\fR] [-p] [-o \fIoptionlist\fR]
 \fIsharepath\fR\fR\fR
@@ -680,7 +664,6 @@ descriptions of the NFS properties.
 The general properties supported for NFS are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBabe=\fR\fIboolean\fR\fR
 .ad
@@ -693,7 +676,6 @@ returned to the client. When set to \fBfalse\fR or not defined, ABE filtering
 will not be performed on  this share. This property is not defined by default.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisabled\fR\fR
 .ad
@@ -704,7 +686,6 @@ Disable ABE for this share.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenabled\fR\fR
 .ad
@@ -717,7 +698,6 @@ Enable ABE for this share.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaclok=\fIboolean\fR\fR\fR
 .ad
@@ -732,7 +712,6 @@ given to all clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBad-container\fR\fR
 .ad
@@ -787,7 +766,6 @@ includes the following object classes:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBanon=\fIuid\fR\fR\fR
 .ad
@@ -800,7 +778,6 @@ users are given the effective user ID \fBUID_NOBODY\fR. If uid is set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcatia=\fIboolean\fR\fR\fR
 .ad
@@ -817,7 +794,7 @@ substitution is applied to file names.
 .sp
 .in +2
 .nf
-CATIA    CATIA 
+CATIA    CATIA
 V4 UNIX  V5 Windows
   "      \e250   0x00a8  Dieresis
   *      \e244   0x00a4  Currency Sign
@@ -836,7 +813,6 @@ V4 UNIX  V5 Windows
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcksum=\fIcksumlist\fR\fR\fR
 .ad
@@ -848,7 +824,6 @@ specifies the checksum algorithms that should be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcsc=\fR\fIvalue\fR\fR
 .ad
@@ -892,7 +867,6 @@ clients are permitted to work from their local cache even while offline.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBguestok=\fR\fIboolean\fR\fR
 .ad
@@ -921,7 +895,6 @@ Example name-based rule:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex=\fIfile\fR\fR\fR
 .ad
@@ -933,7 +906,6 @@ when the directory is referenced by an NFS URL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog=\fItag\fR\fR\fR
 .ad
@@ -948,7 +920,6 @@ NFS server logging is available only for NFS Version 2 and Version 3 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnosub=\fIboolean\fR\fR\fR
 .ad
@@ -971,7 +942,6 @@ only to NFS Version 2 and Version 3 requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnosuid=\fIboolean\fR\fR\fR
 .ad
@@ -985,7 +955,6 @@ the server file system to silently ignore any attempt to enable the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpublic=\fIboolean\fR\fR\fR
 .ad
@@ -1005,7 +974,6 @@ security modes are documented in \fBnfssec\fR(5). The properties supported for
 these optionsets are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcharset\fR=\fIaccess-list\fR\fR
 .ad
@@ -1023,7 +991,6 @@ converted to UTF-8 for the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBro=\fIaccess-list\fR\fR\fR
 .ad
@@ -1036,7 +1003,6 @@ Sharing is read-only to the clients listed in \fIaccess-list\fR; overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrw=\fIaccess-list\fR\fR\fR
 .ad
@@ -1049,7 +1015,6 @@ Sharing is read-write to the clients listed in \fIaccess-list\fR; overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone=\fIaccess-list\fR\fR\fR
 .ad
@@ -1062,7 +1027,6 @@ is when the access list is an asterisk (\fB*\fR), in which case \fBro\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot=\fIaccess-list\fR\fR\fR
 .ad
@@ -1077,7 +1041,6 @@ authentication (\fBAUTH_SYS\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot_mapping=\fIuid\fR\fR\fR
 .ad
@@ -1089,7 +1052,6 @@ user id.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwindow=\fIvalue\fR\fR\fR
 .ad
@@ -1108,7 +1070,6 @@ seconds (8.3 hours). This property is ignored for security modes other than
 The general properties supported for SMB are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBro=\fIaccess-list\fR\fR\fR
 .ad
@@ -1121,7 +1082,6 @@ Sharing is read-only to the clients listed in \fIaccess-list\fR; overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrw=\fIaccess-list\fR\fR\fR
 .ad
@@ -1134,7 +1094,6 @@ Sharing is read-write to the clients listed in \fIaccess-list\fR; overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone=\fIaccess-list\fR\fR\fR
 .ad
@@ -1153,7 +1112,6 @@ hosts or a colon-separated list whose components can be any number of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostname\fR\fR
 .ad
@@ -1166,7 +1124,6 @@ fully qualified DNS or LDAP name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetgroup\fR\fR
 .ad
@@ -1180,7 +1137,6 @@ name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdomainname\fR.\fIsuffix\fR\fR
 .ad
@@ -1196,7 +1152,6 @@ an IP address to a hostname, they do not return domain information. For
 example, for the IP address 172.16.45.9:
 .sp
 .ne 2
-.mk
 .na
 \fBNIS or NIS+\fR
 .ad
@@ -1207,7 +1162,6 @@ Returns: \fBmyhost\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBDNS or LDAP\fR
 .ad
@@ -1241,7 +1195,6 @@ LDAP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetwork\fR\fR
 .ad
@@ -1310,46 +1263,38 @@ rw=engineering:-terra
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 18n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB98\fR\fR
 .ad
 .RS 18n
-.rt  
 Service is offline and cannot be enabled (start only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIother non-zero\fR\fR
 .ad
 .RS 18n
-.rt  
 Command failed.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/libshare.h\fR\fR
 .ad
 .RS 27n
-.rt  
 Error codes used for exit status.
 .RE
 
@@ -1361,13 +1306,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

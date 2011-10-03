@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_set_mask 9F "05 Apri 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_SET_MASK 9F "Apr 05, 2006"
 .SH NAME
 ddi_intr_set_mask, ddi_intr_clr_mask \- set or clear mask for a given interrupt
 .SH SYNOPSIS
@@ -29,12 +29,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 5n
-.rt  
 DDI interrupt handle
 .RE
 
@@ -69,45 +67,37 @@ preceded by a call to \fBddi_intr_set_mask()\fR. It is not necessary to call
 The \fBddi_intr_set_mask()\fR and \fBddi_intr_clr_mask()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 On encountering invalid input parameters or when an interrupt is not enabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 On any implementation specific failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 On device not supporting operation.
 .RE
 
@@ -124,13 +114,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

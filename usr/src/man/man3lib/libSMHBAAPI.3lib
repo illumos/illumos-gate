@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libSMHBAAPI 3LIB "28 Sep 2009" "SunOS 5.11" "Interface Libraries"
+.TH LIBSMHBAAPI 3LIB "Sep 28, 2009"
 .SH NAME
 libSMHBAAPI, libsmhbaapi, SMHBA_GetAdapterAttributes,
 SMHBA_GetAdapterPortAttributes, SMHBA_GetBindingCapability,
@@ -91,37 +91,35 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(3i) lw(2.5i) 
-lw(3i) lw(2.5i) 
-.
-\fBHBA_CloseAdapter\fR\fBHBA_FreeLibrary\fR
-\fBHBA_GetAdapterName\fR\fBHBA_GetNumberOfAdapters\fR
-\fBHBA_GetRNIDMgmtInfo\fR\fBHBA_LoadLibrary\fR
-\fBHBA_OpenAdapter\fR\fBHBA_RefreshAdapterConfiguration\fR
-\fBHBA_RefreshInformation\fR\fBHBA_RegisterForLinkEvents\fR
-\fBHBA_RemoveCallback\fR\fBHBA_SendCTPassThruV2\fR
-\fBHBA_SendLIRR\fR\fBHBA_SendRLS\fR
-\fBHBA_SendRNIDV2\fR\fBHBA_SendRPL\fR
-\fBHBA_SendRPS\fR\fBHBA_SendSRL\fR
-\fBHBA_SetRNIDMgmtInfo\fR\fBSMHBA_GetAdapterAttributes\fR
-\fBSMHBA_GetAdapterPortAttributes\fR\fBSMHBA_GetBindingCapability\fR
-\fBSMHBA_GetBindingSupport\fR\fBSMHBA_GetDiscoveredPortAttributes\fR
-\fBSMHBA_GetFCPhyAttributes\fR\fBSMHBA_GetLUNStatistics\fR
-\fBSMHBA_GetNumberofPorts\fR\fBSMHBA_GetPersistentBinding\fR
-\fBSMHBA_GetPhyStatistics\fR\fBSMHBA_GetPortAttributesByWWN\fR
-\fBSMHBA_GetPortType\fR\fBSMHBA_GetProtocolStatistics\fR
-\fBSMHBA_GetSASPhyAttributes\fR\fBSMHBA_GetTargetMapping\fR
-\fBSMHBA_GetVendorLibraryAttributes\fR\fBSMHBA_GetVersion\fR
-\fBSMHBA_GetWrapperLibraryAttributes\fR\fBSMHBA_RegisterForAdapterAddEvents\fR
-\fBSMHBA_RegisterForAdapterEvents\fR\fBSMHBA_RegisterForAdapterPhyStatEvents\fR
-\fBSMHBA_RegisterForAdapterPortEvents\fR\fBSMHBA_RegisterForAdapterPortStatEvents\fR
-\fBSMHBA_RegisterForTargetEvents\fR\fBSMHBA_RegisterLibrary\fR
-\fBSMHBA_RemoveAllPersistentBindings\fR\fBSMHBA_RemovePersistentBinding\fR
-\fBSMHBA_ScsiInquiry\fR\fBSMHBA_ScsiReadCapacity\fR
-\fBSMHBA_ScsiReportLuns\fR\fBSMHBA_SendECHO\fR
-\fBSMHBA_SendSMPPassThru\fR\fBSMHBA_SendTEST\fR
-\fBSMHBA_SetBindingSupport\fR\fBSMHBA_SetPersistentBinding\fR
+l l
+l l .
+\fBHBA_CloseAdapter\fR	\fBHBA_FreeLibrary\fR
+\fBHBA_GetAdapterName\fR	\fBHBA_GetNumberOfAdapters\fR
+\fBHBA_GetRNIDMgmtInfo\fR	\fBHBA_LoadLibrary\fR
+\fBHBA_OpenAdapter\fR	\fBHBA_RefreshAdapterConfiguration\fR
+\fBHBA_RefreshInformation\fR	\fBHBA_RegisterForLinkEvents\fR
+\fBHBA_RemoveCallback\fR	\fBHBA_SendCTPassThruV2\fR
+\fBHBA_SendLIRR\fR	\fBHBA_SendRLS\fR
+\fBHBA_SendRNIDV2\fR	\fBHBA_SendRPL\fR
+\fBHBA_SendRPS\fR	\fBHBA_SendSRL\fR
+\fBHBA_SetRNIDMgmtInfo\fR	\fBSMHBA_GetAdapterAttributes\fR
+\fBSMHBA_GetAdapterPortAttributes\fR	\fBSMHBA_GetBindingCapability\fR
+\fBSMHBA_GetBindingSupport\fR	\fBSMHBA_GetDiscoveredPortAttributes\fR
+\fBSMHBA_GetFCPhyAttributes\fR	\fBSMHBA_GetLUNStatistics\fR
+\fBSMHBA_GetNumberofPorts\fR	\fBSMHBA_GetPersistentBinding\fR
+\fBSMHBA_GetPhyStatistics\fR	\fBSMHBA_GetPortAttributesByWWN\fR
+\fBSMHBA_GetPortType\fR	\fBSMHBA_GetProtocolStatistics\fR
+\fBSMHBA_GetSASPhyAttributes\fR	\fBSMHBA_GetTargetMapping\fR
+\fBSMHBA_GetVendorLibraryAttributes\fR	\fBSMHBA_GetVersion\fR
+\fBSMHBA_GetWrapperLibraryAttributes\fR	\fBSMHBA_RegisterForAdapterAddEvents\fR
+\fBSMHBA_RegisterForAdapterEvents\fR	\fBSMHBA_RegisterForAdapterPhyStatEvents\fR
+\fBSMHBA_RegisterForAdapterPortEvents\fR	\fBSMHBA_RegisterForAdapterPortStatEvents\fR
+\fBSMHBA_RegisterForTargetEvents\fR	\fBSMHBA_RegisterLibrary\fR
+\fBSMHBA_RemoveAllPersistentBindings\fR	\fBSMHBA_RemovePersistentBinding\fR
+\fBSMHBA_ScsiInquiry\fR	\fBSMHBA_ScsiReadCapacity\fR
+\fBSMHBA_ScsiReportLuns\fR	\fBSMHBA_SendECHO\fR
+\fBSMHBA_SendSMPPassThru\fR	\fBSMHBA_SendTEST\fR
+\fBSMHBA_SetBindingSupport\fR	\fBSMHBA_SetPersistentBinding\fR
 .TE
 
 .SH USAGE
@@ -432,17 +430,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardT{
+Standard	T{
 ANSI INCITS 428  Storage Management Host Bus Adapter Application Programming Interface (SM-HBA)
 T}
 .TE

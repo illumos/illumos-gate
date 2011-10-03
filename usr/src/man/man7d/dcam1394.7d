@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dcam1394 7D "19 May 2004" "SunOS 5.11" "Devices"
+.TH DCAM1394 7D "May 19, 2004"
 .SH NAME
 dcam1394 \- 1394-based digital camera (IIDC) driver
 .SH SYNOPSIS
@@ -53,7 +53,6 @@ listed under DCAM1394_PARAM_VID_MODE below.
 The following ioctl requests are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_CAM_RESET\fR
 .ad
@@ -64,7 +63,6 @@ Reset the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_REG_READ\fR
 .ad
@@ -92,7 +90,6 @@ After the operation is completed, the camera register value is put in the
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_REG_WRITE\fR
 .ad
@@ -110,7 +107,6 @@ The val field should be set to the value to be written to the camera register.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_PARAM_GET\fR
 .ad
@@ -125,7 +121,6 @@ The paramter list only supports Format 1 video formats.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_PARAM_SET\fR
 .ad
@@ -140,7 +135,6 @@ The paramter list only supports Format 1 video formats.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_FRAME_RCV_START\fR
 .ad
@@ -154,7 +148,6 @@ stream device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_FRAME_RCV_STOP\fR
 .ad
@@ -165,7 +158,6 @@ Stop receiving frames from the camera.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_RING_BUFF_FLUSH\fR
 .ad
@@ -176,7 +168,6 @@ Flush the frames in the ring buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_CMD_FRAME_SEQ_NUM_COUNT_RESET\fR
 .ad
@@ -195,7 +186,6 @@ the parameter list is \fBdcam1394_param_list_t\fR.
 The following macros are used to access the parameter list:
 .sp
 .ne 2
-.mk
 .na
 \fBPARAM_LIST_INIT(param_list)\fR
 .ad
@@ -206,7 +196,6 @@ Initialize the parameter list.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPARAM_LIST_ADD(param_list, param, subparam)\fR
 .ad
@@ -217,7 +206,6 @@ Add a parameter to the list.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPARAM_LIST_REMOVE(param_list, param, subparam)\fR
 .ad
@@ -228,7 +216,6 @@ Remove a parameter from the list.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPARAM_LIST_IS_ENTRY(param_list, param, subparam)\fR
 .ad
@@ -239,7 +226,6 @@ Indicates if a specific parameter is in the list.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPARAM_VAL(param_list, param, subparam)\fR
 .ad
@@ -250,7 +236,6 @@ Value of a specified parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPARAM_ERR(param_list, param, subparam)\fR
 .ad
@@ -269,7 +254,6 @@ used.
 The following parameters may appear in the list:
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_POWER_CTRL\fR
 .ad
@@ -281,7 +265,6 @@ value is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_POWER\fR
 .ad
@@ -293,7 +276,6 @@ DCAM1394_PARAM_CAP_POWER_CTRL before use. The subparam field is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_VID_MOD\fR
 .ad
@@ -336,7 +318,6 @@ mode is supported by the camera:
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_VID_MODE\fR
 .ad
@@ -381,7 +362,6 @@ The value of this parameter may be one of the following:
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0\fR
 .ad
@@ -421,7 +401,6 @@ rate is supported by the camera:
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_1\fR
 .ad
@@ -434,7 +413,6 @@ listing of valid subparam values.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_2\fR
 .ad
@@ -447,7 +425,6 @@ listing of valid subparam values.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_3\fR
 .ad
@@ -460,7 +437,6 @@ listing of valid subparam values.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_4\fR
 .ad
@@ -473,7 +449,6 @@ valid subparam values.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_5\fR
 .ad
@@ -486,7 +461,6 @@ valid subparam values.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_FRAME_RATE\fR
 .ad
@@ -527,7 +501,6 @@ The value of this parameter may be one of the following:
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_RING_BUFF_CAPACITY\fR
 .ad
@@ -539,7 +512,6 @@ value can range between 2 and 30. The subparam field is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_RING_BUFF_NUM_FRAMES_READY\fR
 .ad
@@ -551,7 +523,6 @@ subparam field is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_RING_BUFF_READ_PTR_INCR\fR
 .ad
@@ -563,7 +534,6 @@ consumes data from the ring buffer. The subparam field is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_FRAME_NUM_BYTES\fR
 .ad
@@ -575,7 +545,6 @@ field is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_STATUS\fR
 .ad
@@ -587,7 +556,6 @@ The values for the parameter status is a bit field with the following values
 possibly set:
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_STATUS_FRAME_RCV_DONE\fR
 .ad
@@ -598,7 +566,6 @@ Frame successfully received.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_STATUS_RING_BUFF_LOST_FRAME\fR
 .ad
@@ -609,7 +576,6 @@ A frame has been lost while processing the ring buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_STATUS_PARAM_CHANGE\fR
 .ad
@@ -620,7 +586,6 @@ A parameter has been changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_STATUS_FRAME_SEQ_NUM_COUNT_OVERFLOW\fR
 .ad
@@ -632,7 +597,6 @@ overflowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_STATUS_CAM_UNPLUG\fR
 .ad
@@ -645,7 +609,6 @@ Camera has been unplugged.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_BRIGHTNESS\fR
 .ad
@@ -655,7 +618,6 @@ Query or control a camera feature. This feature queries or controls the
 brightness of the camera.
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_PRESENCE\fR
 .ad
@@ -666,7 +628,6 @@ Indicates if the feature is available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_CAP_ON_OFF\fR
 .ad
@@ -677,7 +638,6 @@ Indicates if the feature may be enabled and disabled. May only be queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_ON_OFF\fR
 .ad
@@ -688,7 +648,6 @@ Indicates if the feature is enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_CAP_CTRL_AUTO\fR
 .ad
@@ -700,7 +659,6 @@ May only be queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_CAP_CTRL_MANUAL\fR
 .ad
@@ -712,7 +670,6 @@ only be queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_CTRL_MODE\fR
 .ad
@@ -723,7 +680,6 @@ Indicates if the feature is in auto or manual mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_MIN_VAL\fR
 .ad
@@ -734,7 +690,6 @@ Minimum value of the feature. May only be queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_MAX_VAL\fR
 .ad
@@ -745,7 +700,6 @@ Maximum value of the feature. May only be queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_VALUE\fR
 .ad
@@ -756,7 +710,6 @@ Current value of the feature.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_CAP_READ\fR
 .ad
@@ -769,7 +722,6 @@ Indicates if the feature may be read. May only be                queried.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_EXPOSURE\fR
 .ad
@@ -782,7 +734,6 @@ under DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_SHARPNESS\fR
 .ad
@@ -795,7 +746,6 @@ under DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_WHITE_BALANCE\fR
 .ad
@@ -807,23 +757,19 @@ under DCAM1394_PARAM_BRIGHTNESS, except for DCAM1394_SUBPARAM_VALUE.
 DCAM1394_SUBPARAM_VALUE is replaced by two distinct subparams.
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_U_VALUE\fR
 .ad
 .RS 29n
-.rt  
 U or B component of the white balance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_SUBPARAM_V_VALUE\fR
 .ad
 .RS 29n
-.rt  
 V or R component of the white balance.
 .RE
 
@@ -831,7 +777,6 @@ V or R component of the white balance.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_HUE\fR
 .ad
@@ -844,7 +789,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_SATURATION\fR
 .ad
@@ -857,7 +801,6 @@ under DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_GAMMA\fR
 .ad
@@ -870,7 +813,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_SHUTTER\fR
 .ad
@@ -883,7 +825,6 @@ under DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_GAIN\fR
 .ad
@@ -896,7 +837,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_IRIS\fR
 .ad
@@ -909,7 +849,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_FOCUS\fR
 .ad
@@ -922,7 +861,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_ZOOM\fR
 .ad
@@ -935,7 +873,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_PAN\fR
 .ad
@@ -948,7 +885,6 @@ DCAM1394_PARAM_BRIGHTNESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDCAM1394_PARAM_TILT\fR
 .ad
@@ -962,30 +898,25 @@ DCAM1394_PARAM_BRIGHTNESS.
 .SH DEVICE SPECIAL FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dcam\fIN\fR\fR\fR
 .ad
 .RS 17n
-.rt  
 Device node for isochronous input from camera.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dcamctl\fIN\fR\fR\fR
 .ad
 .RS 17n
-.rt  
 Device node for camera control.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/sparcv9/dcam1394\fR\fR
 .ad
@@ -996,7 +927,6 @@ Device node for camera control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkernel/drv/dcam1394\fR\fR
 .ad
@@ -1013,13 +943,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

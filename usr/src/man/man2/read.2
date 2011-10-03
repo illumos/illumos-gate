@@ -2,14 +2,14 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH read 2 "13 Sep 2007" "SunOS 5.11" "System Calls"
+.TH READ 2 "Sep 13, 2007"
 .SH NAME
 read, readv, pread \- read from file
 .SH SYNOPSIS
@@ -295,12 +295,10 @@ the functions return \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
 The \fBread()\fR, \fBreadv()\fR, and \fBpread()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 Mandatory file/record locking was set, \fBO_NDELAY\fR or \fBO_NONBLOCK\fR was
 set, and there was a blocking record lock; total amount of system memory
 available when reading using raw I/O is temporarily insufficient; no data is
@@ -311,67 +309,55 @@ was set; or no message is waiting to be read on a stream and \fBO_NDELAY\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIfildes\fR argument is not a valid file descriptor open for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADMSG\fR\fR
 .ad
 .RS 11n
-.rt  
 Message waiting to be read on a stream is not a data message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR\fR
 .ad
 .RS 11n
-.rt  
 The read was going to go to sleep and cause a deadlock to occur.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 11n
-.rt  
 A signal was caught during the read operation and no data was transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 An attempt was made to read from a stream linked to a multiplexor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 11n
-.rt  
 A physical I/O error has occurred, or the process is in a background process
 group and is attempting to read from its controlling terminal, and either the
 process is ignoring or blocking the \fBSIGTTIN\fR signal or the process group
@@ -380,48 +366,40 @@ of the process is orphaned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISDIR\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIfildes\fR argument refers to a directory on a file system type that does
 not support read operations on directories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLCK\fR\fR
 .ad
 .RS 11n
-.rt  
 The system record lock table was full, so the \fBread()\fR or \fBreadv()\fR
 could not go to sleep until the blocking record lock was removed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIfildes\fR argument is on a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 The device associated with \fIfildes\fR is a block special or character special
 file and the value of the file pointer is out of range.
 .RE
@@ -431,23 +409,19 @@ file and the value of the file pointer is out of range.
 The \fBread()\fR and \fBpread()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIbuf\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fInbyte\fR argument overflowed an \fBssize_t\fR.
 .RE
 
@@ -456,12 +430,10 @@ The \fInbyte\fR argument overflowed an \fBssize_t\fR.
 The \fBread()\fR and \fBreadv()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The file is a regular file, \fInbyte\fR is greater than 0, the starting
 position is before the end-of-file, and the starting position is greater than
 or equal to the offset maximum established in the open file description
@@ -473,23 +445,19 @@ associated with \fIfildes\fR.
 The \fBreadv()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIiov\fR argument points outside the allocated address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIiovcnt\fR argument was less than or equal to \fB0\fR or greater than
 {\fBIOV_MAX\fR}. See \fBIntro\fR(2) for a definition of {\fBIOV_MAX\fR}).
 .sp
@@ -502,12 +470,10 @@ of the \fBiov_len\fR values in the \fIiov\fR array overflowed an \fBssize_t\fR.
 The \fBpread()\fR function will fail and the file pointer remain unchanged if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESPIPE\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is associated with a pipe or FIFO.
 .RE
 
@@ -524,17 +490,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-Level\fBread()\fR is Async-Signal-Safe
+MT-Level	\fBread()\fR is Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

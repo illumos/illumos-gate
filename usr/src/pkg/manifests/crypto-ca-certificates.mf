@@ -31,7 +31,6 @@ set name=pkg.summary \
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/certs group=sys
 dir path=etc/certs/CA group=sys

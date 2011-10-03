@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_ac 7D "13 May 2009" "SunOS 5.11" "Devices"
+.TH USB_AC 7D "May 13, 2009"
 .SH NAME
 usb_ac \- USB audio control driver
 .SH SYNOPSIS
@@ -42,45 +42,37 @@ EIO. All other errors are defined in the \fBaudio\fR(7I) man page.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/usb_ac\fR\fR
 .ad
 .RS 30n
-.rt  
 32-bit x86 ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/usb_ac\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit x86 ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/usb_ac\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit SPARC ELF kernel module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/usb_ac.conf\fR\fR
 .ad
 .RS 30n
-.rt  
 USB audio driver configuration file.
 .RE
 
@@ -92,15 +84,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86, PCI-based systems
+Architecture	SPARC, x86, PCI-based systems
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
@@ -137,7 +128,6 @@ Warning: <device path> (usb_ac<instance num>): Error Message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailure to plumb audio streams drivers.\fR
 .ad

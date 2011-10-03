@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ktutil 1 "16 Nov 2006" "SunOS 5.11" "User Commands"
+.TH KTUTIL 1 "Nov 16, 2006"
 .SH NAME
 ktutil \- Kerberos keytab maintenance utility
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/ktutil\fR 
+\fB/usr/bin/ktutil\fR
 .fi
 
 .SH DESCRIPTION
@@ -25,7 +25,6 @@ appropriate permissions.
 .SH COMMANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear_list\fR\fR
 .ad
@@ -34,13 +33,11 @@ appropriate permissions.
 \fB\fBclear\fR\fR
 .ad
 .RS 23n
-.rt  
 Clears the current keylist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread_kt\fR \fIfile\fR\fR
 .ad
@@ -49,14 +46,12 @@ Clears the current keylist.
 \fB\fBrkt\fR \fIfile\fR\fR
 .ad
 .RS 23n
-.rt  
 Reads a keytab into the current keylist. You must specify a keytab \fIfile\fR
 to read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite_kt\fR \fIfile\fR\fR
 .ad
@@ -65,7 +60,6 @@ to read.
 \fB\fBwkt\fR \fIfile\fR\fR
 .ad
 .RS 23n
-.rt  
 Writes the current keylist to a keytab \fIfile\fR. You must specify a keytab
 file to write. If the keytab file already exists, the current keylist is
 appended to the existing keytab file.
@@ -73,7 +67,6 @@ appended to the existing keytab file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd_entry\fR \fInumber\fR\fR
 .ad
@@ -82,14 +75,12 @@ appended to the existing keytab file.
 \fB\fBaddent\fR \fInumber\fR\fR
 .ad
 .RS 23n
-.rt  
 Adds an entry to the current keylist. Specify the entry by the keylist slot
 number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete_entry\fR \fInumber\fR\fR
 .ad
@@ -98,14 +89,12 @@ number.
 \fB\fBdelent\fR \fInumber\fR\fR
 .ad
 .RS 23n
-.rt  
 Deletes an entry from the current keylist. Specify the entry by the keylist
 slot number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
@@ -114,13 +103,11 @@ slot number.
 \fB\fBl\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists the current keylist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist_request\fR\fR
 .ad
@@ -129,13 +116,11 @@ Lists the current keylist.
 \fB\fBlr\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists available requests (commands).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -148,7 +133,6 @@ Lists available requests (commands).
 \fB\fBq\fR\fR
 .ad
 .RS 23n
-.rt  
 Exits utility.
 .RE
 
@@ -189,12 +173,10 @@ example# \fBmv /tmp/krb5.keytab /etc/krb5/krb5.keytab\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
 .ad
 .RS 25n
-.rt  
 keytab file for Kerberos clients
 .RE
 
@@ -206,13 +188,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

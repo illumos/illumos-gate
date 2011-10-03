@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnfctl_close 3TNF "4 Mar 1997" "SunOS 5.11" "TNF Library Functions"
+.TH TNFCTL_CLOSE 3TNF "Mar 4, 1997"
 .SH NAME
 tnfctl_close \- close a tnfctl handle
 .SH SYNOPSIS
 .LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-ltnfctl\fR [ \fIlibrary\fR ... ]
-#include <tnf/tnfctl.h> 
+#include <tnf/tnfctl.h>
 \fBtnfctl_errcode_t\fR \fBtnfctl_close\fR(\fBtnfctl_handle_t *\fR\fIhndl\fR,
      \fBtnfctl_targ_op_t\fR \fIaction\fR);
 .fi
@@ -33,12 +33,10 @@ direct mode, \fIaction\fR specifies whether the process will proceed, be
 killed, or remain suspended. \fIaction\fR may have the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_TARG_DEFAULT\fR\fR
 .ad
 .RS 23n
-.rt  
 Kills the target process if  \fIhndl\fR was created with
 \fBtnfctl_exec_open\fR(3TNF), but lets it continue if it was created with
 \fBtnfctl_pid_open\fR(3TNF).
@@ -46,34 +44,28 @@ Kills the target process if  \fIhndl\fR was created with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_TARG_KILL\fR\fR
 .ad
 .RS 23n
-.rt  
 Kills the target process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_TARG_RESUME\fR\fR
 .ad
 .RS 23n
-.rt  
 Allows the target process to continue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_TARG_SUSPEND\fR\fR
 .ad
 .RS 23n
-.rt  
 Leaves the target process suspended.  This is not a job control suspend. It is
 possible to attach to the process again with a debugger or with the
 \fBtnfctl_pid_open\fR(3TNF) interface.  The target process can also be
@@ -90,23 +82,19 @@ continued with \fBprun\fR(1).
 The following error codes apply to \fBtnfctl_close()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_BADARG\fR\fR
 .ad
 .RS 23n
-.rt  
 A bad argument was sent in  \fIaction\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 23n
-.rt  
 An internal error occurred.
 .RE
 
@@ -118,13 +106,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe
+MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO

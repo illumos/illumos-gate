@@ -1,18 +1,18 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acctcom 1 "11 Jan 1996" "SunOS 5.11" "User Commands"
+.TH ACCTCOM 1 "Jan 11, 1996"
 .SH NAME
 acctcom \- search and print process accounting files
 .SH SYNOPSIS
 .LP
 .nf
-\fBacctcom\fR [\fB-abfhikmqrtv\fR] [\fB-C\fR \fIsec\fR] [\fB-e\fR \fItime\fR] [\fB-E\fR \fItime\fR] 
-     [\fB-g\fR \fIgroup\fR] [\fB-H\fR \fIfactor\fR] [\fB-I\fR \fIchars\fR] [\fB-l\fR \fIline\fR] 
-     [\fB-n\fR \fIpattern\fR] [\fB-o\fR \fIoutput-file\fR] [\fB-O\fR \fIsec\fR] [\fB-s\fR \fItime\fR] 
+\fBacctcom\fR [\fB-abfhikmqrtv\fR] [\fB-C\fR \fIsec\fR] [\fB-e\fR \fItime\fR] [\fB-E\fR \fItime\fR]
+     [\fB-g\fR \fIgroup\fR] [\fB-H\fR \fIfactor\fR] [\fB-I\fR \fIchars\fR] [\fB-l\fR \fIline\fR]
+     [\fB-n\fR \fIpattern\fR] [\fB-o\fR \fIoutput-file\fR] [\fB-O\fR \fIsec\fR] [\fB-s\fR \fItime\fR]
      [\fB-S\fR \fItime\fR] [\fB-u\fR \fIuser\fR] [\fIfilename\fR]...
 .fi
 
@@ -53,48 +53,40 @@ the current file are found in \fB/var/adm/pacct\fIincr\fR\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 18n
-.rt  
 Show some average statistics about the processes selected. The statistics will
 be printed after the output records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 18n
-.rt  
 Read backwards, showing latest commands first. This option has no effect when
 standard input is read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 18n
-.rt  
 Print the \fBfork()\fR/\fBexec()\fR flag and system exit status columns in the
 output. The numeric output for this option will be in octal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Instead of mean memory size, show the fraction of total available \fBCPU\fR
 time consumed by the process during its execution. This "hog factor" is
 computed as (total \fBCPU\fR time)/(elapsed time).
@@ -102,230 +94,190 @@ computed as (total \fBCPU\fR time)/(elapsed time).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 18n
-.rt  
 Print columns containing the \fBI/O\fR counts in the output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 18n
-.rt  
 Instead of memory size, show total kcore-minutes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 18n
-.rt  
 Show mean core size (the default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 18n
-.rt  
 Do not print any output records, just print the average statistics as with the
 \fB-a\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 18n
-.rt  
 Show \fBCPU\fR factor (user-time/(system-time + user-time)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 18n
-.rt  
 Show separate system and user \fBCPU\fR times.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Exclude column headings from the output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIsec\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes with total \fBCPU\fR time (system-time + user-time)
 exceeding \fIsec\fR seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fItime\fR\fR
 .ad
 .RS 18n
-.rt  
 Select processes existing at or before \fItime\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fItime\fR\fR
 .ad
 .RS 18n
-.rt  
 Select processes ending at or before \fItime\fR. Using the same \fItime\fR for
 both \fB-S\fR and \fB-E\fR shows the processes that existed at \fItime\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgroup\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes belonging to \fIgroup\fR. The \fIgroup\fR may be designated
 by either the group \fBID\fR or group name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR \fIfactor\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes that exceed \fBfactor\fR, where factor is the "hog factor"
 as explained in option \fB-h\fR above.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIchars\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes transferring more characters than the cutoff number given
 by \fIchars\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIline\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes belonging to terminal \fB/dev/term/line\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIpattern\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only commands matching \fIpattern\fR that may be a regular expression as
 in \fBregcmp\fR(3C), except \fB+\fR means one or more occurrences.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutput-file\fR\fR
 .ad
 .RS 18n
-.rt  
 Copy selected process records in the input data format to \fIoutput-file\fR;
 suppress printing to standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIsec\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes with \fBCPU\fR system time exceeding \fIsec\fR seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fItime\fR\fR
 .ad
 .RS 18n
-.rt  
 Select processes existing at or after \fItime\fR, given in the format
 \fIhr\fR\|[\|:\fImin\fR\|[\|:\fIsec\fR\|]\|].
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fItime\fR\fR
 .ad
 .RS 18n
-.rt  
 Select processes starting at or after \fItime\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser\fR\fR
 .ad
 .RS 18n
-.rt  
 Show only processes belonging to \fIuser\fR. The user may be specified by a
 user \fBID\fR, a login name that is then converted to a user \fBID\fR,
 `\fB#\fR' (which designates only those processes executed with superuser
@@ -336,34 +288,28 @@ with unknown user \fBID\fRs).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 22n
-.rt  
 system group file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 22n
-.rt  
 system password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/pacct\fIincr\fR\fR\fR
 .ad
 .RS 22n
-.rt  
 active processes accounting file
 .RE
 
@@ -375,13 +321,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

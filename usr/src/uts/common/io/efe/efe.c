@@ -1098,7 +1098,7 @@ efe_stop_dma(efe_t *efep)
 	efe_error(efep->efe_dip, "timed out stopping DMA engine!");
 }
 
-inline void
+static inline void
 efe_restart(efe_t *efep)
 {
 	efe_stop(efep);

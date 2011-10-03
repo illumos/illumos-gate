@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH form_driver 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH FORM_DRIVER 3CURSES "Dec 31, 1996"
 .SH NAME
 form_driver \- command processor for the forms subsystem
 .SH SYNOPSIS
@@ -32,628 +32,514 @@ relative to \fBMAX_COMMAND\fR, the maximum value of a request listed below.
 Form driver requests:
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEXT_PAGE\fR
 .ad
 .RS 20n
-.rt  
 Move to the next page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_PREV_PAGE\fR
 .ad
 .RS 20n
-.rt  
 Move to the previous page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_FIRST_PAGE\fR
 .ad
 .RS 20n
-.rt  
 Move to the first page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_LAST_PAGE\fR
 .ad
 .RS 20n
-.rt  
 Move to the last page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEXT_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the next field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_PREV_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the previous field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_FIRST_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the first field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_LAST_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the last field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SNEXT_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the sorted next field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SPREV_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the sorted prev field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SFIRST_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the sorted first field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SLAST_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the sorted last field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_LEFT_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move left to field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_RIGHT_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move right to field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_UP_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move up to field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_DOWN_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move down to field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEXT_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Move to the next character in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_PREV_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Move to the previous character in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEXT_LINE\fR
 .ad
 .RS 20n
-.rt  
 Move to the next line in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_PREV_LINE\fR
 .ad
 .RS 20n
-.rt  
 Move to the previous line in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEXT_WORD\fR
 .ad
 .RS 20n
-.rt  
 Move to the next word in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_PREV_WORD\fR
 .ad
 .RS 20n
-.rt  
 Move to the previous word in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_BEG_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Move to the first char in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_END_FIELD\fR
 .ad
 .RS 20n
-.rt  
-	Move after the last char in the field.
+Move after the last char in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_BEG_LINE\fR
 .ad
 .RS 20n
-.rt  
 Move to the beginning of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_END_LINE\fR
 .ad
 .RS 20n
-.rt  
 Move after the last char in the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_LEFT_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Move left in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_RIGHT_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Move right in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_UP_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Move up in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_DOWN_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Move down in the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEW_LINE\fR
 .ad
 .RS 20n
-.rt  
 Insert/overlay a new line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_INS_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Insert the blank character at the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_INS_LINE\fR
 .ad
 .RS 20n
-.rt  
 Insert a blank line at the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_DEL_CHAR\fR
 .ad
 .RS 20n
-.rt  
 Delete the character at the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_DEL_PREV\fR
 .ad
 .RS 20n
-.rt  
 Delete the character before the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_DEL_LINE\fR
 .ad
 .RS 20n
-.rt  
 Delete the line at the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_DEL_WORD\fR
 .ad
 .RS 20n
-.rt  
 Delete the word at the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_CLR_EOL\fR
 .ad
 .RS 20n
-.rt  
 Clear to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_CLR_EOF\fR
 .ad
 .RS 20n
-.rt  
 Clear to the end of the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_CLR_FIELD\fR
 .ad
 .RS 20n
-.rt  
 Clear the entire field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_OVL_MODE\fR
 .ad
 .RS 20n
-.rt  
 Enter overlay mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_INS_MODE\fR
 .ad
 .RS 20n
-.rt  
 Enter insert mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_FLINE\fR
 .ad
 .RS 20n
-.rt  
 Scroll the field forward a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_BLINE\fR
 .ad
 .RS 20n
-.rt  
 Scroll the field backward a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_FPAGE\fR
 .ad
 .RS 20n
-.rt  
 Scroll the field forward a page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_BPAGE \fR
 .ad
 .RS 20n
-.rt  
-	Scroll the field backward a page.
+Scroll the field backward a page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_FHPAGE\fR
 .ad
 .RS 20n
-.rt  
 Scroll the field forward half a page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_BHPAGE\fR
 .ad
 .RS 20n
-.rt  
 Scroll the field backward half a page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_FCHAR\fR
 .ad
 .RS 20n
-.rt  
 Horizontal scroll forward a character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_BCHAR\fR
 .ad
 .RS 20n
-.rt  
-	Horizontal scroll backward a character
+Horizontal scroll backward a character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_HFLINE\fR
 .ad
 .RS 20n
-.rt  
 Horizontal scroll forward a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_HBLINE\fR
 .ad
 .RS 20n
-.rt  
 Horizontal scroll backward a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_HFHALF\fR
 .ad
 .RS 20n
-.rt  
 Horizontal scroll forward half a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_SCR_HBHALF\fR
 .ad
 .RS 20n
-.rt  
 Horizontal scroll backward half a line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_VALIDATION\fR
 .ad
 .RS 20n
-.rt  
 Validate field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_PREV_CHOICE\fR
 .ad
 .RS 20n
-.rt  
 Display the previous field choice.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBREQ_NEXT_CHOICE\fR
 .ad
 .RS 20n
-.rt  
 Display the next field choice.
 .RE
 
@@ -663,89 +549,73 @@ Display the next field choice.
 The \fBform_driver()\fR function returns one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBE_OK\fR
 .ad
 .RS 21n
-.rt  
 The function returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_SYSTEM_ERROR\fR
 .ad
 .RS 21n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_BAD_ARGUMENT\fR
 .ad
 .RS 21n
-.rt  
 An argument is incorrect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_NOT_POSTED\fR
 .ad
 .RS 21n
-.rt  
 The form is not posted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_INVALID_FIELD\fR
 .ad
 .RS 21n
-.rt  
 The field contents are invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_BAD_STATE\fR
 .ad
 .RS 21n
-.rt  
 The routine was called from an initialization or termination function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_REQUEST_DENIED\fR
 .ad
 .RS 21n
-.rt  
 The form driver request failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE_UNKNOWN_COMMAND\fR
 .ad
 .RS 21n
-.rt  
 An unknown request was passed to the form driver.
 .RE
 
@@ -757,13 +627,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH apptrace 1 "29 Nov 2004" "SunOS 5.11" "User Commands"
+.TH APPTRACE 1 "Nov 29, 2004"
 .SH NAME
 apptrace \- trace application function calls to Solaris shared libraries
 .SH SYNOPSIS
 .LP
 .nf
-\fBapptrace\fR [\fB-f\fR] [\fB-F\fR [!] \fItracefromlist\fR] [\fB-T\fR [!] \fItracetolist\fR] 
-     [\fB-o\fR \fIoutputfile\fR] [ [\fB-tv\fR] [!] \fIcall\fR ,...] \fIcommand\fR 
+\fBapptrace\fR [\fB-f\fR] [\fB-F\fR [!] \fItracefromlist\fR] [\fB-T\fR [!] \fItracetolist\fR]
+     [\fB-o\fR \fIoutputfile\fR] [ [\fB-tv\fR] [!] \fIcall\fR ,...] \fIcommand\fR
      [\fIcommand\fR \fIarguments\fR]
 .fi
 
@@ -63,24 +63,20 @@ Guide\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 24n
-.rt  
 Follows all children created by \fBfork\fR(2). This option will also cause the
 process id to be printed at the beginning of each line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fB[!]\fR\fItracefromlist\fR \fR
 .ad
 .RS 24n
-.rt  
 Traces calls from a comma-separated list of shared objects. Only calls from
 these shared objects will be traced. The default is to trace calls from the
 main executable only. Only the basename of the shared object is required. For
@@ -93,12 +89,10 @@ be traced. If the tracing of calls from \fIcommand\fR is required, then
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutputfile\fR \fR
 .ad
 .RS 24n
-.rt  
 \fBapptrace\fR output will be directed to the \fIoutputfile\fR. By default,
 \fBapptrace\fR output is placed on the stderr stream of the process being
 traced.
@@ -106,12 +100,10 @@ traced.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fB!\fR]\fIcall,\|.\|.\|.\fR\fR
 .ad
 .RS 24n
-.rt  
 Traces or excludes function calls. Those calls specified in the comma-separated
 list \fIcall\fR are traced. If the list begins with a !, the specified function
 calls are excluded from the trace output. The default is \fB-t\fR \fB*\fR. The
@@ -120,12 +112,10 @@ use of shell style wildcards is allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fB[!]\fR\fItracetolist\fR \fR
 .ad
 .RS 24n
-.rt  
 Traces calls to a comma-separated list of shared objects. The default is to
 trace calls to all shared objects. As above, the basename is all that is
 required and wildcarding is allowed. A list preceded by a ``!'' denotes a list
@@ -134,12 +124,10 @@ of objects to which calls should not be traced.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR [\fB!\fR]\fIcall,\|.\|.\|.\fR\fR
 .ad
 .RS 24n
-.rt  
 Provides verbose, formatted output of the arguments and return values of  the
 function calls specified (as above in the \fB-t\fR option). Unlike
 \fBtruss\fR(1), calls named by the \fB-v\fR option do not have to be named by
@@ -271,7 +259,7 @@ For security reasons, only those processes with appropriate privileges can use
 .LP
 Tracing functions whose usage requires the inclusion of <\fBvarargs.h\fR>, such
 as \fBvwprintw\fR(3XCURSES) and \fBvwscanw\fR(3XCURSES), will not provide
-formatted 	printing of arguments.
+formatted printing of arguments.
 .SH ATTRIBUTES
 .sp
 .LP
@@ -280,13 +268,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO

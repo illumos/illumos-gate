@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH syncstat 1M "9 Mar 1993" "SunOS 5.11" "System Administration Commands"
+.TH SYNCSTAT 1M "Mar 9, 1993"
 .SH NAME
 syncstat \- report driver statistics from a synchronous serial link
 .SH SYNOPSIS
@@ -39,27 +39,25 @@ The following is a breakdown of  \fBsyncstat\fR output:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(4.4i) 
-lw(1.1i) lw(4.4i) 
-.
-\fBspeed\fRT{
+l l
+l l .
+\fBspeed\fR	T{
 The line speed the device has been set to operate at. It is the user's responsibility to make this value correspond to the modem clocking speed when clocking is provided by the modem.
 T}
-\fBipkts\fRThe total number of input packets.
-\fBopkts\fRThe total number of output packets.
-\fBundrun\fRT{
+\fBipkts\fR	The total number of input packets.
+\fBopkts\fR	The total number of output packets.
+\fBundrun\fR	T{
 The number of transmitter underrun errors.
 T}
-\fBovrrun\fRThe number of receiver overrun errors.
-\fBabort\fRThe number of aborted received frames.
-\fBcrc\fRT{
+\fBovrrun\fR	The number of receiver overrun errors.
+\fBabort\fR	The number of aborted received frames.
+\fBcrc\fR	T{
 The number of received frames with CRC errors.
 T}
-\fBisize\fRT{
+\fBisize\fR	T{
 The average size (in bytes) of input packets.
 T}
-\fBosize\fRT{
+\fBosize\fR	T{
 The average size (in bytes) of output packets.
 T}
 .TE
@@ -67,12 +65,10 @@ T}
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 12n
-.rt  
 Clear the accumulated statistics for the device specified. This may be useful
 when it is not desirable to unload a particular driver, or when the driver is
 not capable of being unloaded.
@@ -80,12 +76,10 @@ not capable of being unloaded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBsyncstat\fR samples the statistics every  \fIinterval\fR seconds and reports
 incremental changes. The output reports line utilization for input and output
 in place of average packet sizes. These are the relationships between bytes
@@ -102,7 +96,7 @@ indefinitely, with a column heading printed every twenty lines for convenience.
 example# \fBsyncstat zsh0\fR
 
 
-speed ipkts opkts undrun ovrrun abort crc isize osize 
+speed ipkts opkts undrun ovrrun abort crc isize osize
 9600  15716 17121   0      0      1    3   98    89
 .fi
 .in -2
@@ -144,7 +138,6 @@ ipkts opkts undrun ovrrun abort crc iutil outil
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbad interval: \fR\fIarg\fR\fR
 .ad
@@ -156,7 +149,6 @@ understood.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fB missing minor device number\fR\fR
 .ad
@@ -168,7 +160,6 @@ minor device number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbaud rate not set\fR\fR
 .ad

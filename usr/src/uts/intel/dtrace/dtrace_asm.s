@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/asm_linkage.h>
 #include <sys/regset.h>

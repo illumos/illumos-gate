@@ -34,8 +34,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rpcbind.c
  * Implements the program, version to address mapping for rpc.
@@ -75,6 +73,7 @@
 #include <rpcsvc/daemon_utils.h>
 #include <priv_utils.h>
 #include <libscf.h>
+#include <sys/ccompile.h>
 
 #ifdef PORTMAP
 extern void pmap_service(struct svc_req *, SVCXPRT *xprt);
@@ -216,10 +215,10 @@ main(int argc, char *argv[])
 		if (trouble) {
 			syslog(LOG_ERR,
 	"%s: found %d errors with network configuration files. Exiting.",
-				argv[0], trouble);
+			    argv[0], trouble);
 			fprintf(stderr,
 	"%s: found %d errors with network configuration files. Exiting.\n",
-				argv[0], trouble);
+			    argv[0], trouble);
 			exit(1);
 		}
 	}
@@ -232,7 +231,7 @@ main(int argc, char *argv[])
 	endnetconfig(nc_handle);
 
 	if ((loopback_dg[0] == NULL) && (loopback_vc[0] == NULL) &&
-		(loopback_vc_ord[0] == NULL)) {
+	    (loopback_vc_ord[0] == NULL)) {
 		syslog(LOG_ERR, "could not find loopback transports");
 		exit(1);
 	}
@@ -288,7 +287,7 @@ check_netconfig(void)
 	if (nc == NULL) {
 		if (debugging)
 			fprintf(stderr,
-				"setnetconfig() failed:  %s\n", nc_sperror());
+			    "setnetconfig() failed:  %s\n", nc_sperror());
 		syslog(LOG_ALERT, "setnetconfig() failed:  %s", nc_sperror());
 		return (1);
 	}
@@ -297,7 +296,7 @@ check_netconfig(void)
 			continue;
 		if (debugging)
 			fprintf(stderr, "checking netid \"%s\"\n",
-				np->nc_netid);
+			    np->nc_netid);
 		if (strcmp(np->nc_protofmly, NC_LOOPBACK) == 0)
 			switch (np->nc_semantics) {
 			case NC_TPI_CLTS:
@@ -315,14 +314,14 @@ check_netconfig(void)
 		if (stat(np->nc_device, &sb) == -1 && errno == ENOENT) {
 			if (debugging)
 				fprintf(stderr, "\tdevice %s does not exist\n",
-					np->nc_device);
+				    np->nc_device);
 			syslog(LOG_ERR, "netid %s:  device %s does not exist",
-				np->nc_netid, np->nc_device);
+			    np->nc_netid, np->nc_device);
 			busted++;
 		} else
 			if (debugging)
 				fprintf(stderr, "\tdevice %s present\n",
-					np->nc_device);
+				    np->nc_device);
 		for (i = 0; i < np->nc_nlookups; i++) {
 			char	*libname = np->nc_lookups[i];
 
@@ -333,11 +332,12 @@ check_netconfig(void)
 				if (debugging) {
 					fprintf(stderr,
 	"\tnetid %s: dlopen of name-to-address library %s failed\ndlerror: %s",
-	np->nc_netid, libname, dlerrstr ? dlerrstr : "");
+					    np->nc_netid, libname,
+					    dlerrstr ? dlerrstr : "");
 				}
 				syslog(LOG_ERR,
 	"netid %s:  dlopen of name-to-address library %s failed",
-						np->nc_netid, libname);
+				    np->nc_netid, libname);
 				if (dlerrstr)
 					syslog(LOG_ERR, "%s", dlerrstr);
 				busted++;
@@ -386,7 +386,7 @@ check_netconfig(void)
 		syslog(LOG_ALERT, "no COTS ORD loopback transport found\n");
 		if (debugging)
 			fprintf(stderr,
-				"no COTS ORD loopback transport found\n");
+			    "no COTS ORD loopback transport found\n");
 	}
 
 	return (busted);
@@ -409,8 +409,8 @@ init_transport(struct netconfig *nconf)
 	static int msgprt = 0;
 
 	if ((nconf->nc_semantics != NC_TPI_CLTS) &&
-		(nconf->nc_semantics != NC_TPI_COTS) &&
-		(nconf->nc_semantics != NC_TPI_COTS_ORD))
+	    (nconf->nc_semantics != NC_TPI_COTS) &&
+	    (nconf->nc_semantics != NC_TPI_COTS_ORD))
 		return (1);	/* not my type */
 
 	if ((strcmp(nconf->nc_protofmly, NC_INET6) == 0) && !ipv6flag) {
@@ -426,7 +426,7 @@ init_transport(struct netconfig *nconf)
 	char **s;
 
 	(void) fprintf(stderr, "%s: %d lookup routines :\n",
-		nconf->nc_netid, nconf->nc_nlookups);
+	    nconf->nc_netid, nconf->nc_nlookups);
 	for (i = 0, s = nconf->nc_lookups; i < nconf->nc_nlookups; i++, s++)
 		fprintf(stderr, "[%d] - %s\n", i, *s);
 	}
@@ -434,7 +434,7 @@ init_transport(struct netconfig *nconf)
 
 	if ((fd = t_open(nconf->nc_device, O_RDWR, NULL)) < 0) {
 		syslog(LOG_ERR, "%s: cannot open connection: %s",
-				nconf->nc_netid, t_errlist[t_errno]);
+		    nconf->nc_netid, t_errlist[t_errno]);
 		return (1);
 	}
 
@@ -457,7 +457,7 @@ init_transport(struct netconfig *nconf)
 	baddr = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR);
 	if ((baddr == NULL) || (taddr == NULL)) {
 		syslog(LOG_ERR, "%s: cannot allocate netbuf: %s",
-				nconf->nc_netid, t_errlist[t_errno]);
+		    nconf->nc_netid, t_errlist[t_errno]);
 		exit(1);
 	}
 
@@ -503,7 +503,7 @@ init_transport(struct netconfig *nconf)
 
 	if (t_bind(fd, taddr, baddr) != 0) {
 		syslog(LOG_ERR, "%s: cannot bind: %s",
-			nconf->nc_netid, t_errlist[t_errno]);
+		    nconf->nc_netid, t_errlist[t_errno]);
 		goto error;
 	}
 
@@ -516,7 +516,7 @@ init_transport(struct netconfig *nconf)
 	my_xprt = (SVCXPRT *)svc_tli_create(fd, nconf, baddr, 0, 0);
 	if (my_xprt == (SVCXPRT *)NULL) {
 		syslog(LOG_ERR, "%s: could not create service",
-				nconf->nc_netid);
+		    nconf->nc_netid);
 		goto error;
 	}
 
@@ -539,14 +539,14 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 	 * Register both the versions for tcp/ip and udp/ip
 	 */
 	if ((strcmp(nconf->nc_protofmly, NC_INET) == 0) &&
-		((strcmp(nconf->nc_proto, NC_TCP) == 0) ||
-		(strcmp(nconf->nc_proto, NC_UDP) == 0))) {
+	    ((strcmp(nconf->nc_proto, NC_TCP) == 0) ||
+	    (strcmp(nconf->nc_proto, NC_UDP) == 0))) {
 		PMAPLIST *pml;
 
 		if (!svc_register(my_xprt, PMAPPROG, PMAPVERS,
-			pmap_service, NULL)) {
+		    pmap_service, NULL)) {
 			syslog(LOG_ERR, "could not register on %s",
-					nconf->nc_netid);
+			    nconf->nc_netid);
 			goto error;
 		}
 		pml = (PMAPLIST *)malloc((uint_t)sizeof (PMAPLIST));
@@ -615,7 +615,7 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 	/* version 3 registration */
 	if (!svc_reg(my_xprt, RPCBPROG, RPCBVERS, rpcb_service_3, NULL)) {
 		syslog(LOG_ERR, "could not register %s version 3",
-				nconf->nc_netid);
+		    nconf->nc_netid);
 		goto error;
 	}
 	rbllist_add(RPCBPROG, RPCBVERS, nconf, &baddr->addr);
@@ -623,7 +623,7 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 	/* version 4 registration */
 	if (!svc_reg(my_xprt, RPCBPROG, RPCBVERS4, rpcb_service_4, NULL)) {
 		syslog(LOG_ERR, "could not register %s version 4",
-				nconf->nc_netid);
+		    nconf->nc_netid);
 		goto error;
 	}
 	rbllist_add(RPCBPROG, RPCBVERS4, nconf, &baddr->addr);
@@ -642,13 +642,13 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 #ifdef BIND_DEBUG
 	if (status < 0) {
 		fprintf(stderr, "Error in finding bind status for %s\n",
-			nconf->nc_netid);
+		    nconf->nc_netid);
 	} else if (status == 0) {
 		fprintf(stderr, "check binding for %s\n",
-			nconf->nc_netid);
+		    nconf->nc_netid);
 	} else if (status > 0) {
 		fprintf(stderr, "No check binding for %s\n",
-			nconf->nc_netid);
+		    nconf->nc_netid);
 	}
 #endif
 	/*
@@ -661,10 +661,10 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 #ifdef BIND_DEBUG
 		if (status < 0) {
 			fprintf(stderr, "Could not create rmtcall fd for %s\n",
-				nconf->nc_netid);
+			    nconf->nc_netid);
 		} else {
 			fprintf(stderr, "rmtcall fd for %s is %d\n",
-				nconf->nc_netid, status);
+			    nconf->nc_netid, status);
 		}
 #endif
 	}
@@ -783,9 +783,10 @@ parseargs(int argc, char *argv[])
 		}
 	}
 	if (doabort && !debugging) {
-	    fprintf(stderr,
-		"-a (abort) specified without -d (debugging) -- ignored.\n");
-	    doabort = 0;
+		fprintf(stderr,
+		    "-a (abort) specified without -d "
+		    "(debugging) -- ignored.\n");
+		doabort = 0;
 	}
 }
 
@@ -848,7 +849,7 @@ setup_callit(int fd)
 
 	/* multicast address */
 	(void) inet_pton(AF_INET6, RPCB_MULTICAST_ADDR,
-		mreq.ipv6mr_multiaddr.s6_addr);
+	    mreq.ipv6mr_multiaddr.s6_addr);
 	mreq.ipv6mr_interface = 0;
 
 	/* insert it into opt */
@@ -930,7 +931,7 @@ static cond_t logcond = DEFAULTCV;
 static int logcount = 0;
 
 /*ARGSUSED*/
-static void *
+static void * __NORETURN
 logthread(void *arg)
 {
 	while (1) {

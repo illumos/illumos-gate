@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_devid_compare 9F "21 May 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DEVID_COMPARE 9F "May 21, 2009"
 .SH NAME
 ddi_devid_compare, ddi_devid_free, ddi_devid_init, ddi_devid_register,
 ddi_devid_sizeof, ddi_devid_str_decode, ddi_devid_str_encode,
@@ -22,7 +22,7 @@ kernel interfaces for device ids
 
 .LP
 .nf
-\fBint\fR \fBddi_devid_init\fR(\fBdev_info_t *\fR\fIdip\fR, \fBushort_t\fR \fIdevid_type\fR, 
+\fBint\fR \fBddi_devid_init\fR(\fBdev_info_t *\fR\fIdip\fR, \fBushort_t\fR \fIdevid_type\fR,
      \fBushort_t\fR \fInbytes\fR, \fBvoid *\fR\fIid\fR, \fBddi_devid_t *\fR\fIretdevid\fR);
 .fi
 
@@ -38,7 +38,7 @@ kernel interfaces for device ids
 
 .LP
 .nf
-\fBint\fR \fBddi_devid_str_decode\fR(\fBchar *\fR\fIdevidstr\fR, \fBddi_devid_t *\fR\fIretdevid\fR, 
+\fBint\fR \fBddi_devid_str_decode\fR(\fBchar *\fR\fIdevidstr\fR, \fBddi_devid_t *\fR\fIretdevid\fR,
      \fBchar **\fR\fIretminor_name\fR);
 .fi
 
@@ -70,90 +70,74 @@ kernel interfaces for device ids
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevid\fR\fR
 .ad
 .RS 14n
-.rt  
 The device id address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevidstr\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fIdevid\fR and \fIminor_name\fR represented as a string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevid1\fR\fR
 .ad
 .RS 14n
-.rt  
 The first of two device id addresses to be compared calling
 \fBddi_devid_compare()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevid2\fR\fR
 .ad
 .RS 14n
-.rt  
 The second of two device id addresses to be compared calling
 \fBddi_devid_compare()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 14n
-.rt  
 A \fBdev_info\fR pointer, which identifies the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevid_type\fR\fR
 .ad
 .RS 14n
-.rt  
 The following device id types may be accepted by the \fBddi_devid_init()\fR
 function:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVID_SCSI3_WWN\fR\fR
 .ad
 .RS 21n
-.rt  
 World Wide Name associated with SCSI-3 devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVID_SCSI_SERIAL\fR\fR
 .ad
 .RS 21n
-.rt  
 Vendor \fBID\fRand serial number associated with a SCSI device. Note: This may
 only be used if known to be unique; otherwise a fabricated device id must be
 used.
@@ -161,23 +145,19 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVID_ENCAP\fR\fR
 .ad
 .RS 21n
-.rt  
 Device \fBID\fR of another device. This is for layered device driver usage.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEVID_FAB\fR\fR
 .ad
 .RS 21n
-.rt  
 Fabricated device \fBID\fR.
 .RE
 
@@ -185,45 +165,37 @@ Fabricated device \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_name\fR\fR
 .ad
 .RS 17n
-.rt  
 The minor name to be encoded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInbytes\fR\fR
 .ad
 .RS 17n
-.rt  
 The length in bytes of device \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIretdevid\fR\fR
 .ad
 .RS 17n
-.rt  
 The return address of the device \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIretminor_name\fR\fR
 .ad
 .RS 17n
-.rt  
 The return address of a minor name. Free string with
 \fBddi_devid_str_free()\fR.
 .RE
@@ -334,31 +306,25 @@ value and the returned \fIretminor_name\fR argument).
 \fBddi_devid_init()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Out of memory. An invalid \fIdevid_type\fR was passed in.
 .RE
 
@@ -369,31 +335,25 @@ Out of memory. An invalid \fIdevid_type\fR was passed in.
 \fBddi_devid_valid()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Valid device \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Invalid device \fBID\fR.
 .RE
 
@@ -404,31 +364,25 @@ Invalid device \fBID\fR.
 \fBddi_devid_register()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failure. The device \fBID\fR is already registered or the device \fBID\fR is
 invalid.
 .RE
@@ -440,31 +394,25 @@ invalid.
 \fBddi_devid_valid()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Valid device \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Invalid device \fBID\fR.
 .RE
 
@@ -475,31 +423,25 @@ Invalid device \fBID\fR.
 \fBddi_devid_get()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Device \fBID\fR is present and a pointer to it is returned in \fIretdevid\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 No device \fBID\fR is defined for this \fBdev_info\fR node.
 .RE
 
@@ -510,42 +452,34 @@ No device \fBID\fR is defined for this \fBdev_info\fR node.
 \fBddi_devid_compare()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 The first device ID is less than the second device ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 The first device ID is equal to the second device ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 9n
-.rt  
 The first device ID is greater than the second device ID.
 .RE
 
@@ -567,31 +501,25 @@ the \fBdevid_str_free()\fR function.
 \fBddi_devid_str_decode()\fR returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB \fR
 .ad
 .RS 5n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failure; the \fIdevidstr\fR string was not valid.
 .RE
 

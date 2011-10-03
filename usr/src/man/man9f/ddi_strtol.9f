@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_strtol 9F "13 May 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_STRTOL 9F "May 13, 2004"
 .SH NAME
 ddi_strtol \- String conversion routines
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_strtol\fR(\fBconst char *\fR\fIstr\fR, \fBchar **\fR\fIendptr\fR, \fBint\fR \fIbase\fR, 
+\fBint\fR \fBddi_strtol\fR(\fBconst char *\fR\fIstr\fR, \fBchar **\fR\fIendptr\fR, \fBint\fR \fIbase\fR,
      \fBlong *\fR\fIresult\fR);
 .fi
 
@@ -23,45 +23,37 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstr\fR \fR
 .ad
 .RS 11n
-.rt  
 Pointer to a character string to be converted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIendptr\fR \fR
 .ad
 .RS 11n
-.rt  
 Post-conversion final string of unrecognized characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbase\fR\fR
 .ad
 .RS 11n
-.rt  
 Radix used for conversion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresult\fR \fR
 .ad
 .RS 11n
-.rt  
 Pointer to variable which contains the converted value.
 .RE
 

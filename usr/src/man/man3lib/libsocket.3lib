@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libsocket 3LIB "2 Nov 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBSOCKET 3LIB "Nov 2, 2004"
 .SH NAME
 libsocket \- sockets library
 .SH SYNOPSIS
@@ -27,72 +27,66 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB__xnet_bind\fR\fB__xnet_connect\fR
-\fB__xnet_getsockopt\fR\fB__xnet_listen\fR
-\fB__xnet_recvmsg\fR\fB__xnet_sendmsg\fR
-\fB__xnet_sendto\fR\fB__xnet_socket\fR
-\fB__xnet_socketpair\fR\fBaccept\fR
-\fBbind\fR\fBconnect\fR
-\fBendnetent\fR\fBendprotoent\fR
-\fBendservent\fR\fBether_aton\fR
-\fBether_hostton\fR\fBether_line\fR
-\fBether_ntoa\fR\fBether_ntohost\fR
-\fBfreeaddrinfo\fR\fBgai_strerror\fR
-\fBgetaddrinfo\fR\fBgetnameinfo\fR
-\fBgetnetbyaddr\fR\fBgetnetbyaddr_r\fR
-\fBgetnetbyname\fR\fBgetnetbyname_r\fR
-\fBgetnetent\fR\fBgetnetent_r\fR
-\fBgetpeername\fR\fBgetprotobyname\fR
-\fBgetprotobyname_r\fR\fBgetprotobynumber\fR
-\fBgetprotobynumber_r\fR\fBgetprotoent\fR
-\fBgetprotoent_r\fR\fBgetservbyname\fR
-\fBgetservbyname_r\fR\fBgetservbyport\fR
-\fBgetservbyport_r\fR\fBgetservent\fR
-\fBgetservent_r\fR\fBgetsockname\fR
-\fBgetsockopt\fR\fBhtonl\fR
-\fBhtons\fR\fBif_freenameindex\fR
-\fBif_indextoname\fR\fBif_nameindex\fR
-\fBif_nametoindex\fR\fBin6addr_any\fR
-\fBin6addr_loopback\fR\fBinet_lnaof\fR
-\fBinet_makeaddr\fR\fBinet_network\fR
-\fBlisten\fR\fBntohl\fR
-\fBntohs\fR\fBrcmd\fR
-\fBrcmd_af\fR\fBrecv\fR
-\fBrecvfrom\fR\fBrecvmsg\fR
-\fBrexec\fR\fBrexec_af\fR
-\fBrresvport\fR\fBrresvport_af\fR
-\fBruserok\fR\fBsend\fR
-\fBsendmsg\fR\fBsendto\fR
-\fBsetnetent\fR\fBsetprotoent\fR
-\fBsetservent\fR\fBsetsockopt\fR
-\fBshutdown\fR\fBsocket\fR
-\fBsocketpair\fR
+l l
+l l .
+\fB__xnet_bind\fR	\fB__xnet_connect\fR
+\fB__xnet_getsockopt\fR	\fB__xnet_listen\fR
+\fB__xnet_recvmsg\fR	\fB__xnet_sendmsg\fR
+\fB__xnet_sendto\fR	\fB__xnet_socket\fR
+\fB__xnet_socketpair\fR	\fBaccept\fR
+\fBbind\fR	\fBconnect\fR
+\fBendnetent\fR	\fBendprotoent\fR
+\fBendservent\fR	\fBether_aton\fR
+\fBether_hostton\fR	\fBether_line\fR
+\fBether_ntoa\fR	\fBether_ntohost\fR
+\fBfreeaddrinfo\fR	\fBgai_strerror\fR
+\fBgetaddrinfo\fR	\fBgetnameinfo\fR
+\fBgetnetbyaddr\fR	\fBgetnetbyaddr_r\fR
+\fBgetnetbyname\fR	\fBgetnetbyname_r\fR
+\fBgetnetent\fR	\fBgetnetent_r\fR
+\fBgetpeername\fR	\fBgetprotobyname\fR
+\fBgetprotobyname_r\fR	\fBgetprotobynumber\fR
+\fBgetprotobynumber_r\fR	\fBgetprotoent\fR
+\fBgetprotoent_r\fR	\fBgetservbyname\fR
+\fBgetservbyname_r\fR	\fBgetservbyport\fR
+\fBgetservbyport_r\fR	\fBgetservent\fR
+\fBgetservent_r\fR	\fBgetsockname\fR
+\fBgetsockopt\fR	\fBhtonl\fR
+\fBhtons\fR	\fBif_freenameindex\fR
+\fBif_indextoname\fR	\fBif_nameindex\fR
+\fBif_nametoindex\fR	\fBin6addr_any\fR
+\fBin6addr_loopback\fR	\fBinet_lnaof\fR
+\fBinet_makeaddr\fR	\fBinet_network\fR
+\fBlisten\fR	\fBntohl\fR
+\fBntohs\fR	\fBrcmd\fR
+\fBrcmd_af\fR	\fBrecv\fR
+\fBrecvfrom\fR	\fBrecvmsg\fR
+\fBrexec\fR	\fBrexec_af\fR
+\fBrresvport\fR	\fBrresvport_af\fR
+\fBruserok\fR	\fBsend\fR
+\fBsendmsg\fR	\fBsendto\fR
+\fBsetnetent\fR	\fBsetprotoent\fR
+\fBsetservent\fR	\fBsetsockopt\fR
+\fBshutdown\fR	\fBsocket\fR
+\fBsocketpair\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libsocket.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libsocket.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object
 .RE
 
@@ -104,13 +98,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSee the manual page for each interface.
+MT-Level	See the manual page for each interface.
 .TE
 
 .SH SEE ALSO

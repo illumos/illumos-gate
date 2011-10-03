@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH accept 1M "5 Jun 2006" "SunOS 5.11" "System Administration Commands"
+.TH ACCEPT 1M "Jun 5, 2006"
 .SH NAME
 accept, reject \- accept or reject print requests
 .SH SYNOPSIS
@@ -41,12 +41,10 @@ and server.
 The following options are supported for \fBreject\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIreason\fR\fR
 .ad
 .RS 13n
-.rt  
 Assigns a reason for rejection of print requests for \fIdestination.\fR
 .sp
 \fIreason\fR is reported by \fBlpstat\fR \fB-a\fR. By default, \fIreason\fR is
@@ -61,12 +59,10 @@ destinations added to the system but not yet accepting requests. Enclose
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestination\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the destination accepting or rejecting print requests. Destination
 specifies the name of a printer or class of printers (see \fBlpadmin\fR(1M)).
 Specify \fIdestination\fR using atomic name or URI-style (scheme://endpoint)
@@ -80,79 +76,65 @@ conventions for destinations.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS+\fR version of \fB/etc/printers.conf\fR
 .RE
 
@@ -164,15 +146,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled. See \fBNOTES\fR.
+CSI	Enabled. See \fBNOTES\fR.
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getacinfo 3BSM "31 Mar 2005" "SunOS 5.11" "Security and Auditing Library Functions"
+.TH GETACINFO 3BSM "Mar 31, 2005"
 .SH NAME
 getacinfo, getacdir, getacflg, getacmin, getacna, setac, endac \- get audit
 control file information
@@ -79,7 +79,6 @@ is complete.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_control\fR\fR
 .ad
@@ -95,23 +94,19 @@ The \fBgetacdir()\fR, \fBgetacflg()\fR, \fBgetacna()\fR, and \fBgetacmin()\fR
 functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 on success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi2\fR\fR
 .ad
 .RS 9n
-.rt  
 on failure and set \fBerrno\fR to indicate the error.
 .RE
 
@@ -120,12 +115,10 @@ on failure and set \fBerrno\fR to indicate the error.
 The \fBgetacmin()\fR and \fBgetacflg()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 on \fBEOF.\fR
 .RE
 
@@ -134,23 +127,19 @@ on \fBEOF.\fR
 The \fBgetacdir()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 on \fBEOF.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 9n
-.rt  
 if the directory search had to start from the beginning because one of the
 other functions was called between calls to \fBgetacdir()\fR.
 .RE
@@ -160,12 +149,10 @@ other functions was called between calls to \fBgetacdir()\fR.
 These functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi3\fR\fR
 .ad
 .RS 9n
-.rt  
 if the directory entry format in the \fBaudit_control\fR file is incorrect.
 .RE
 
@@ -174,12 +161,10 @@ if the directory entry format in the \fBaudit_control\fR file is incorrect.
 The \fBgetacdir()\fR, \fBgetacflg()\fR, and \fBgetacna()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi3\fR\fR
 .ad
 .RS 9n
-.rt  
 if the input buffer is too short to accommodate the record.
 .RE
 
@@ -191,13 +176,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

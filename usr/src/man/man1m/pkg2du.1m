@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkg2du 1M "23 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH PKG2DU 1M "Sep 23, 2009"
 .SH NAME
 pkg2du \- convert driver packages to Driver Update format
 .SH SYNOPSIS
@@ -33,7 +33,6 @@ are specified, then both an ISO image and a directory tree are generated.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdir\fR\fR
 .ad
@@ -44,7 +43,6 @@ Directory where the DU directory should be created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIiso\fR\fR
 .ad
@@ -55,7 +53,6 @@ Create a Solaris ISO image of the DU directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -66,7 +63,6 @@ If \fB\fIdir\fR/DU\fR or \fIiso\fR exists, remove it without asking first.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlabel\fR\fR
 .ad
@@ -77,7 +73,6 @@ Label/volume name of the ISO image (if \fB-o\fR option is specified).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrelease\fR\fR
 .ad
@@ -90,7 +85,6 @@ of the currently running Solaris is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -105,7 +99,6 @@ Verbose. Multiple \fB-v\fR options increase verbosity.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkg\fR [\fIpkg\fR...]\fR
 .ad
@@ -139,13 +132,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

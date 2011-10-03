@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftp 1 "6 Jun 2006" "SunOS 5.11" "User Commands"
+.TH FTP 1 "Jun 6, 2006"
 .SH NAME
 ftp \- file transfer program
 .SH SYNOPSIS
 .LP
 .nf
-\fBftp\fR [\fB-adfginpstvx\fR] [\fB-m\fR \fIGSS Mech\fR] [\fB-T\fR \fItimeout\fR] 
+\fBftp\fR [\fB-adfginpstvx\fR] [\fB-m\fR \fIGSS Mech\fR] [\fB-T\fR \fItimeout\fR]
      [\fIhostname\fR [\fIport\fR]]
 .fi
 
@@ -35,68 +35,56 @@ The following options can be specified at the command line, or to the command
 interpreter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Uses \fBGSSAPI\fR authentication \fBonly\fR. If the authentication fails, this
 option closes the connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 14n
-.rt  
 Enables debugging.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Forwards local security credentials to the remote server.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 14n
-.rt  
 Disables filename "globbing".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 14n
-.rt  
 Turns off interactive prompting during multiple file transfers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the \fBGSS\fR-\fBAPI\fR mechanism to use. The default is to use the
 kerberos_v5 mechanism. Supported alternatives are defined in
 \fB/etc/gss/mech\fR (see \fBmech\fR(4)).
@@ -104,12 +92,10 @@ kerberos_v5 mechanism. Supported alternatives are defined in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 14n
-.rt  
 Does not attempt "auto-login" upon initial connection. If auto-login is not
 disabled, \fBftp\fR checks the \fB\&.netrc\fR file in the user's home directory
 for an entry describing an account on the remote machine. If no entry exists,
@@ -120,24 +106,20 @@ a password and an account with which to login.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 14n
-.rt  
 Enables passive mode for data transfers. This command is useful when connecting
 to a remote host from behind a connection filtering firewall.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 14n
-.rt  
 Skips the \fBSYST\fR command that is sent by default to all remote servers upon
 connection. The system command is what enables the automatic use of binary mode
 rather than the protocol default ascii mode.
@@ -148,23 +130,19 @@ provided to allow inter-operability with these servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 14n
-.rt  
 Enables packet tracing (unimplemented).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItimeout\fR\fR
 .ad
 .RS 14n
-.rt  
 Enables global connection timer, specified in seconds (decimal). There is a
 timer for the control connection that is reset when anything is sent to the
 server and disabled while the client is prompting for user input. Another
@@ -173,12 +151,10 @@ independent timer is used to monitor incoming or outgoing data connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 14n
-.rt  
 Shows all responses from the remote server, as well as report on data transfer
 statistics. This is turned on by default if \fBftp\fR is running interactively
 with its input coming from the user's terminal.
@@ -186,12 +162,10 @@ with its input coming from the user's terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 14n
-.rt  
 Attempts to use \fBGSSAPI\fR for authentication and encryption. Data and
 Command channel protection is set to "\fBprivate\fR".
 .RE
@@ -201,7 +175,6 @@ Command channel protection is set to "\fBprivate\fR".
 The following commands can be specified to the command interpreter:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
@@ -213,7 +186,6 @@ If no \fIcommand\fR is given, invokes an interactive shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR \fImacro-name\fR [ \fIargs\fR ]\fR
 .ad
@@ -225,7 +197,6 @@ command. Arguments are passed to the macro unglobbed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaccount\fR [ \fIpasswd\fR ]\fR
 .ad
@@ -239,7 +210,6 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappend\fR \fIlocal-file\fR [ \fIremote-file\fR ]\fR
 .ad
@@ -253,7 +223,6 @@ for "representation type", "file structure", and "transfer mode".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBascii\fR\fR
 .ad
@@ -265,7 +234,6 @@ type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbell\fR\fR
 .ad
@@ -276,7 +244,6 @@ Sounds a bell after each file transfer command is completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinary\fR\fR
 .ad
@@ -287,7 +254,6 @@ Sets the "representation type" to "image".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbye\fR\fR
 .ad
@@ -299,7 +265,6 @@ Terminates the \fBFTP\fR session with the remote server and exit \fBftp\fR. An
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcase\fR\fR
 .ad
@@ -313,7 +278,6 @@ lower case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR \fIremote-directory\fR\fR
 .ad
@@ -324,7 +288,6 @@ Changes the working directory on the remote machine to \fIremote-directory\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcdup\fR\fR
 .ad
@@ -336,7 +299,6 @@ remote machine working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear\fR\fR
 .ad
@@ -348,7 +310,6 @@ command succeeded, then this is the default protection level.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclose\fR\fR
 .ad
@@ -360,7 +321,6 @@ command interpreter. Any defined macros are erased.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcr\fR\fR
 .ad
@@ -378,7 +338,6 @@ from a record delimiter only when \fBcr\fR is off.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR \fIremote-file\fR\fR
 .ad
@@ -389,7 +348,6 @@ Deletes the file \fIremote-file\fR on the remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
@@ -401,7 +359,6 @@ sent to the remote machine, preceded by the string \fB->\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdir\fR [ \fIremote-directory\fR [ \fIlocal-file\fR ]]\fR
 .ad
@@ -416,7 +373,6 @@ on the remote machine is used. If no local file is specified, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnect\fR\fR
 .ad
@@ -427,7 +383,6 @@ A synonym for \fBclose\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBform\fR [ \fIformat-name\fR ]\fR
 .ad
@@ -440,7 +395,6 @@ corresponds to the default "non-print" subtype.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR \fIremote-file\fR [ \fIlocal-file\fR ]\fR
 .ad
@@ -455,7 +409,6 @@ structure", and "transfer mode" are used while transferring the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglob\fR\fR
 .ad
@@ -480,7 +433,6 @@ of files. You can do this by transferring a \fBtar\fR(1) archive of the subtree
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhash\fR\fR
 .ad
@@ -492,7 +444,6 @@ of a data block is 8192 bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR [ \fIcommand\fR ]\fR
 .ad
@@ -504,7 +455,6 @@ argument is given, \fBftp\fR prints a list of the known commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcd\fR [ \fIdirectory\fR ]\fR
 .ad
@@ -516,7 +466,6 @@ specified, the user's home directory is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBls\fR [ \fB-al\fR | \fIremote-directory\fR [ \fIlocal-file\fR ]]\fR
 .ad
@@ -545,7 +494,6 @@ is sent to the terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmacdef\fR \fImacro-name\fR\fR
 .ad
@@ -569,7 +517,6 @@ on. A \fB\e\fR followed by any character is replaced by that character. Use the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmdelete\fR \fIremote-files\fR\fR
 .ad
@@ -580,7 +527,6 @@ Deletes the \fIremote-files\fR on the remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmdir\fR \fIremote-files local-file\fR\fR
 .ad
@@ -593,7 +539,6 @@ indeed the target local file for receiving \fBmdir\fR output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmget\fR \fIremote-files\fR\fR
 .ad
@@ -609,7 +554,6 @@ local directories can be created with \fB! mkdir\fR \fIdirectory\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkdir\fR \fIdirectory-name\fR\fR
 .ad
@@ -620,7 +564,6 @@ Makes a directory on the remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmls\fR \fIremote-files local-file\fR\fR
 .ad
@@ -633,7 +576,6 @@ indeed the target local file for receiving \fBmls\fR output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmode\fR [ \fImode-name\fR ]\fR
 .ad
@@ -646,7 +588,6 @@ implementation only supports \fBstream\fR, and requires that it be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmput\fR \fIlocal-files\fR\fR
 .ad
@@ -660,7 +601,6 @@ filename expansion. Resulting file names are processed according to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnlist\fR [ \fB-al\fR | \fIremote-directory\fR [ \fIlocal-file\fR ]]\fR
 .ad
@@ -679,7 +619,6 @@ long format the same way it does when used with the \fBls\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnmap\fR [ \fIinpattern outpattern\fR ]\fR
 .ad
@@ -724,7 +663,6 @@ of the \fB$\fR, \fB[\fR, \fB]\fR, and \fB,\fR, characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBntrans\fR [ \fIinchars\fR [ \fIoutchars\fR ] ]\fR
 .ad
@@ -752,7 +690,6 @@ alphabet.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopen\fR \fIhost\fR [ \fIport\fR ]\fR
 .ad
@@ -767,7 +704,6 @@ the \fBFTP\fR server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive\fR\fR
 .ad
@@ -786,7 +722,6 @@ be used in place of \fBPASV\fR and \fBEPRT\fR in place of \fBPORT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivate\fR\fR
 .ad
@@ -799,7 +734,6 @@ If no \fBADAT\fR command succeeded, then the only possible level is "clear".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprompt\fR\fR
 .ad
@@ -813,7 +747,6 @@ default, prompting is turned on. If prompting is turned off, any \fBmget\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprotect\fR \fIprotection-level\fR\fR
 .ad
@@ -831,7 +764,6 @@ is specified, the current level is printed. The default protection level is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproxy\fR \fIftp-command\fR\fR
 .ad
@@ -858,7 +790,6 @@ server on the secondary control connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBput\fR \fIlocal-file\fR [ \fIremote-file\fR ]\fR
 .ad
@@ -873,7 +804,6 @@ uses the current settings for "representation type", "file structure", and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwd\fR\fR
 .ad
@@ -884,7 +814,6 @@ Prints the name of the current working directory on the remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -895,7 +824,6 @@ A synonym for \fBbye\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquote\fR \fIarg1 arg2\fR ...\fR
 .ad
@@ -911,7 +839,6 @@ FTP protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrecv\fR \fIremote-file\fR [ \fIlocal-file\fR ]\fR
 .ad
@@ -922,7 +849,6 @@ FTP protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreget\fR \fIremote-file\fR [ \fIlocal-file\fR ]\fR
 .ad
@@ -937,7 +863,6 @@ transferring large files over networks that are prone to dropping connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremotehelp\fR [ \fIcommand-name\fR ]\fR
 .ad
@@ -949,7 +874,6 @@ specified it is supplied to the server as well.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrename\fR \fIfrom to\fR\fR
 .ad
@@ -960,7 +884,6 @@ Renames the file \fIfrom\fR on the remote machine to have the name \fIto\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreset\fR\fR
 .ad
@@ -973,7 +896,6 @@ violation of the \fBFTP\fR protocol by the remote server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestart\fR [ \fImarker\fR ]\fR
 .ad
@@ -988,7 +910,6 @@ marker. If no argument is specified, the current restart status is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrmdir\fR \fIdirectory-name\fR\fR
 .ad
@@ -999,7 +920,6 @@ Deletes a directory on the remote machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrunique\fR\fR
 .ad
@@ -1017,7 +937,6 @@ command. The default value is off.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsafe\fR\fR
 .ad
@@ -1030,7 +949,6 @@ succeeded, then the only possible level is "\fBclear\fR".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsend\fR \fIlocal-file\fR [ \fIremote-file\fR ]\fR
 .ad
@@ -1041,7 +959,6 @@ A synonym for \fBput\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsendport\fR\fR
 .ad
@@ -1059,7 +976,6 @@ incorrectly indicate they have been accepted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsite\fR \fIarg1\fR [ \fIarg2\fR ] ...\fR
 .ad
@@ -1071,7 +987,6 @@ Sends the arguments specified, verbatim, to the remote \fBFTP\fR server as a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -1082,7 +997,6 @@ Show the current status of \fBftp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstruct\fR [ \fIstruct-name\fR ]\fR
 .ad
@@ -1095,7 +1009,6 @@ implementation only supports \fBfile\fR, and requires that it be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunique\fR\fR
 .ad
@@ -1108,7 +1021,6 @@ The remote server reports the unique name. Default value is off.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtcpwindow\fR [ \fIsize\fR ]\fR
 .ad
@@ -1121,7 +1033,6 @@ connections. If no argument is specified, the current setting is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtenex\fR\fR
 .ad
@@ -1132,7 +1043,6 @@ Sets the "representation type" to that needed to talk to \fBTENEX\fR machines.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace\fR\fR
 .ad
@@ -1143,7 +1053,6 @@ Toggles packet tracing (unimplemented).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR [ \fItype-name\fR ]\fR
 .ad
@@ -1158,7 +1067,6 @@ printed. The default type is "network \fBASCII\fR".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR \fIuser-name\fR [ \fIpassword\fR [ \fIaccount\fR ]]\fR
 .ad
@@ -1176,7 +1084,6 @@ automatically on initial connection to the \fBFTP\fR server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
@@ -1191,7 +1098,6 @@ from a terminal, and off otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR [ \fIcommand\fR ]\fR
 .ad
@@ -1233,24 +1139,20 @@ Local files specified as arguments to \fBftp\fR commands are processed
 according to the following rules.
 .sp
 .ne 2
-.mk
 .na
 \fB1)\fR
 .ad
 .RS 6n
-.rt  
 If the file name \fB\(mi\fR is specified, the standard input (for reading) or
 standard output (for writing) is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2)\fR
 .ad
 .RS 6n
-.rt  
 If the first character of the file name is \fB|\fR, the remainder of the
 argument is interpreted as a shell command. \fBftp\fR then forks a shell, using
 \fBpopen\fR(3C) with the argument supplied, and reads (writes) from the
@@ -1262,12 +1164,10 @@ SPACE characters, the argument must be quoted; for example \fB"| ls
 
 .sp
 .ne 2
-.mk
 .na
 \fB3)\fR
 .ad
 .RS 6n
-.rt  
 Failing the above checks, if globbing is enabled, local file names are expanded
 according to the rules used in the \fBsh\fR(1); see the \fBglob\fR command. If
 the \fBftp\fR command expects a single local file (for example, \fBput\fR),
@@ -1276,12 +1176,10 @@ only the first filename generated by the globbing operation is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB4)\fR
 .ad
 .RS 6n
-.rt  
 For \fBmget\fR commands and \fBget\fR commands with unspecified local file
 names, the local filename is the remote filename, which can be altered by a
 \fBcase\fR, \fBntrans\fR, or \fBnmap\fR setting. The resulting filename can
@@ -1290,12 +1188,10 @@ then be altered if \fBrunique\fR is on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB5)\fR
 .ad
 .RS 6n
-.rt  
 For \fBmput\fR commands and \fBput\fR commands with unspecified remote file
 names, the remote filename is the local filename, which can be altered by a
 \fBntrans\fR or \fBnmap\fR setting. The resulting filename can then be altered
@@ -1349,13 +1245,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIenabled
+CSI	enabled
 .TE
 
 .SH SEE ALSO

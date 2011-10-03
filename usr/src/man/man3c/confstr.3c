@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH confstr 3C "15 Dec 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH CONFSTR 3C "Dec 15, 2003"
 .SH NAME
 confstr \- get configurable variables
 .SH SYNOPSIS
@@ -47,7 +47,6 @@ The \fBconfstr()\fR function supports the following values for \fIname\fR,
 defined in \fB<unistd.h>\fR, for both SPARC and x86:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS64_CFLAGS\fR\fR
 .ad
@@ -61,7 +60,6 @@ an application using the Large File Summit transitional compilation environment
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS64_LDFLAGS\fR\fR
 .ad
@@ -75,7 +73,6 @@ an application using the Large File Summit transitional compilation environment
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS64_LIBS\fR\fR
 .ad
@@ -89,7 +86,6 @@ application using the Large File Summit transitional compilation environment
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS64_LINTFLAGS\fR\fR
 .ad
@@ -103,7 +99,6 @@ using the Large File Summit transitional compilation environment (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS_CFLAGS\fR\fR
 .ad
@@ -117,7 +112,6 @@ for 32-bit applications (see \fBlfcompile\fR(5)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS_LDFLAGS\fR\fR
 .ad
@@ -131,7 +125,6 @@ for 32-bit applications (see \fBlfcompile\fR(5)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS_LIBS\fR\fR
 .ad
@@ -145,7 +138,6 @@ application using the Large File Summit large file compilation environment for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_LFS_LINTFLAGS\fR\fR
 .ad
@@ -159,7 +151,6 @@ applications (see \fBlfcompile\fR(5)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_PATH\fR\fR
 .ad
@@ -172,7 +163,6 @@ of this value is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_ILP32_OFF32_CFLAGS\fR\fR
 .ad
@@ -186,7 +176,6 @@ model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_ILP32_OFF32_LDFLAGS\fR\fR
 .ad
@@ -200,7 +189,6 @@ model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and \fBoff_t\fR types.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_ILP32_OFF32_LIBS\fR\fR
 .ad
@@ -214,7 +202,6 @@ to the \fBc99\fR utility to build an application using a programming model with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_ILP32_OFFBIG_CFLAGS\fR\fR
 .ad
@@ -229,7 +216,6 @@ model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types, and an
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS\fR\fR
 .ad
@@ -244,7 +230,6 @@ model with 32-bit \fBint\fR, \fBlong\fR, and \fBpointer\fR types, and an
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_ILP32_OFFBIG_LIBS\fR\fR
 .ad
@@ -259,7 +244,6 @@ using at least 64 bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_LP64_OFF64_CFLAGS\fR\fR
 .ad
@@ -273,7 +257,6 @@ to the \fBc99\fR utility to build an application using a programming model with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_LP64_OFF64_LDFLAGS\fR\fR
 .ad
@@ -287,7 +270,6 @@ to the \fBc99\fR utility to build an application using a programming model with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_LP64_OFF64_LIBS\fR\fR
 .ad
@@ -301,7 +283,6 @@ the \fBc99\fR utility to build an application using a programming model with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS\fR\fR
 .ad
@@ -316,7 +297,6 @@ model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS\fR\fR
 .ad
@@ -331,7 +311,6 @@ model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_LPBIG_OFFBIG_LIBS\fR\fR
 .ad
@@ -346,7 +325,6 @@ an \fBint\fR type using at least 32 bits and \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS\fR\fR
 .ad
@@ -362,7 +340,6 @@ width of type \fBlong\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFF32_CFLAGS\fR\fR
 .ad
@@ -377,7 +354,6 @@ programming model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFF32_LDFLAGS\fR\fR
 .ad
@@ -392,7 +368,6 @@ programming model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFF32_LIBS\fR\fR
 .ad
@@ -407,7 +382,6 @@ programming model with 32-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFF32_LINTFLAGS\fR\fR
 .ad
@@ -421,7 +395,6 @@ is unspecified.  Otherwise, this value is the set of options to be given to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFFBIG_CFLAGS\fR\fR
 .ad
@@ -436,7 +409,6 @@ and an \fBoff_t\fR type using at least 64 bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFFBIG_LDFLAGS\fR\fR
 .ad
@@ -451,7 +423,6 @@ and an \fBoff_t\fR type using at least 64 bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFFBIG_LIBS\fR\fR
 .ad
@@ -466,7 +437,6 @@ and an \fBoff_t\fR type using at least 64 bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_ILP32_OFFBIG_LINTFLAGS\fR\fR
 .ad
@@ -485,7 +455,6 @@ The \fBconfstr()\fR function supports the following values for \fIname\fR,
 defined in \fB<unistd.h>\fR, for SPARC only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LP64_OFF64_CFLAGS\fR\fR
 .ad
@@ -500,7 +469,6 @@ programming model with 64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LP64_OFF64_LDFLAGS\fR\fR
 .ad
@@ -515,7 +483,6 @@ programming model with 64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LP64_OFF64_LIBS\fR\fR
 .ad
@@ -530,7 +497,6 @@ programming model with 64-bit \fBint\fR, \fBlong\fR, \fBpointer\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LP64_OFF64_LINTFLAGS\fR\fR
 .ad
@@ -544,7 +510,6 @@ is unspecified.  Otherwise, this value is the set of options to be given to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LPBIG_OFFBIG_CFLAGS\fR\fR
 .ad
@@ -559,7 +524,6 @@ programming model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LPBIG_OFFBIG_LDFLAGS\fR\fR
 .ad
@@ -574,7 +538,6 @@ programming model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LPBIG_OFFBIG_LIBS\fR\fR
 .ad
@@ -589,7 +552,6 @@ programming model with an \fBint\fR type using at least 32 bits and \fBlong\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CS_XBS5_LPBIG_OFFBIG_LINTFLAGS\fR\fR
 .ad
@@ -623,12 +585,10 @@ returns  \fB0\fR and leaves \fBerrno\fR unchanged.
 The \fBconfstr()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fIname\fR argument is invalid.
 .RE
 
@@ -640,15 +600,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMt-Safe
+MT-Level	Mt-Safe
 .TE
 
 .SH SEE ALSO

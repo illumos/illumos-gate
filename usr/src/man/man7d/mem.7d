@@ -4,23 +4,23 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mem 7D "18 Feb 2002" "SunOS 5.11" "Devices"
+.TH MEM 7D "Feb 18, 2002"
 .SH NAME
 mem, kmem, allkmem \- physical or virtual memory access
 .SH SYNOPSIS
 .LP
 .nf
-/dev/mem 
+/dev/mem
 .fi
 
 .LP
 .nf
-/dev/kmem 
+/dev/kmem
 .fi
 
 .LP
 .nf
-/dev/allkmem 
+/dev/allkmem
 .fi
 
 .SH DESCRIPTION
@@ -56,12 +56,10 @@ calls, a \fBpread64()\fR or \fBpwrite64()\fR call, or a combination of
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 Occurs when trying to  \fBwrite\fR(2) a read-only location (\fBallkmem\fR),
 \fBread\fR(2) a write-only location (\fBallkmem\fR), or \fBread\fR(2) or
 \fBwrite\fR(2) a non-existent or unimplemented location (\fBmem\fR, \fBkmem\fR,
@@ -70,24 +68,20 @@ Occurs when trying to  \fBwrite\fR(2) a read-only location (\fBallkmem\fR),
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Occurs when trying to \fBread\fR(2) or \fBwrite\fR(2) a memory location that is
 associated with an I/O device using the \fB/dev/kmem\fR special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Results from attempting to \fBmmap\fR(2) a non-existent physical (\fBmem\fR) or
 virtual (\fBkmem\fR, \fBallkmem\fR) memory address.
 .RE
@@ -95,35 +89,29 @@ virtual (\fBkmem\fR, \fBallkmem\fR) memory address.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/mem\fR\fR
 .ad
 .RS 16n
-.rt  
 Provides access to the computer's physical memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kmem\fR\fR
 .ad
 .RS 16n
-.rt  
 Provides access to the virtual address space of the operating system kernel,
 excluding memory that is associated with an I/O device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/allkmem\fR\fR
 .ad
 .RS 16n
-.rt  
 Provides access to the virtual address space of the operating system kernel,
 including memory that is associated with an I/O device.
 .RE

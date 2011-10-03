@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audioplay 1 "1 May 2009" "SunOS 5.11" "User Commands"
+.TH AUDIOPLAY 1 "May 1, 2009"
 .SH NAME
 audioplay \- play audio files
 .SH SYNOPSIS
@@ -37,12 +37,10 @@ such deviations are flagged with warning messages.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdev\fR\fR
 .ad
 .RS 11n
-.rt  
 \fIDevice\fR: The \fIdev\fR argument specifies an alternate audio device to
 which output should be directed. If the \fB-d\fR option is not specified, the
 \fBAUDIODEV\fR environment variable is consulted (see below). Otherwise,
@@ -51,12 +49,10 @@ which output should be directed. If the \fB-d\fR option is not specified, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 11n
-.rt  
 \fIImmediate\fR: If the audio device is unavailable (that is, another process
 currently has write access), \fBaudioplay\fR ordinarily waits until it can
 obtain access to the device. When the \fB-i\fR option is present,
@@ -66,12 +62,10 @@ busy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIvol\fR\fR
 .ad
 .RS 11n
-.rt  
 \fIVolume\fR: The output volume is set to the specified value before playing
 begins, and is reset to its previous level when \fBaudioplay\fR exits. The
 \fIvol\fR argument is an integer value between 0 and 100, inclusive. If this
@@ -81,36 +75,30 @@ set by any process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 11n
-.rt  
 \fIVerbose\fR: Prints messages on the standard error when waiting for access to
 the audio device or when sample rate deviations are detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\e?\fR\fR
 .ad
 .RS 11n
-.rt  
 \fIHelp\fR: Prints a command line usage message.
 .RE
 
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 \fIFile Specification\fR: Audio files named on the command line are played
 sequentially. If no filenames are present, the standard input stream (if it is
 not a tty) is played (it, too, must contain an audio file header). The special
@@ -127,24 +115,20 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIODEV\fR\fR
 .ad
 .RS 13n
-.rt  
 The full path name of the audio device to write to, if no \fB-d\fR argument is
 supplied. If the \fBAUDIODEV\fR variable is not set, \fB/dev/audio\fR is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIOPATH\fR\fR
 .ad
 .RS 13n
-.rt  
 A colon-separated list of directories in which to search for audio files whose
 names are given by relative pathnames. The current directory (\fB\&.\fR) can be
 specified explicitly in the search path. If the \fBAUDIOPATH\fR variable is not
@@ -159,15 +143,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

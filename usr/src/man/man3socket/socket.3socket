@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved. 
+.\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH socket 3SOCKET "28 Jan 2009" "SunOS 5.11" "Sockets Library Functions"
+.TH SOCKET 3SOCKET "Jan 28, 2009"
 .SH NAME
 socket \- create an endpoint for communication
 .SH SYNOPSIS
@@ -33,45 +33,37 @@ These families are defined in \fB<sys/socket.h>\fR.
 The currently supported protocol families are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPF_UNIX\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBUNIX\fR system internal protocols
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPF_INET\fR\fR
 .ad
 .RS 12n
-.rt  
 Internet Protocol Version 4 (IPv4)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPF_INET6\fR\fR
 .ad
 .RS 12n
-.rt  
 Internet Protocol Version 6 (IPv6)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPF_NCA\fR\fR
 .ad
 .RS 12n
-.rt  
 Network Cache and Accelerator (NCA) protocols
 .RE
 
@@ -176,100 +168,82 @@ Otherwise, -1 is returned and \fBerrno\fR is set to indicate the error.
 The \fBsocket()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 19n
-.rt  
 Permission to create a socket of the specified type or protocol is denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 19n
-.rt  
 There were insufficient resources available to complete the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 19n
-.rt  
 The specified address family is not supported by the protocol family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 19n
-.rt  
 The per-process descriptor table is full.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 19n
-.rt  
 Insufficient user memory is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 19n
-.rt  
 There were insufficient STREAMS resources available to complete the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPFNOSUPPORT\fR\fR
 .ad
 .RS 19n
-.rt  
 The specified protocol family is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTONOSUPPORT\fR\fR
 .ad
 .RS 19n
-.rt  
 The protocol type is not supported by the address family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTOTYPE\fR\fR
 .ad
 .RS 19n
-.rt  
 The socket type is not supported by the protocol.
 .RE
 
@@ -281,13 +255,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

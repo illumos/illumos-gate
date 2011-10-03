@@ -3,18 +3,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH log 7D "11 Mar 1998" "SunOS 5.11" "Devices"
+.TH LOG 7D "Mar 11, 1998"
 .SH NAME
 log \- interface to STREAMS error logging and event tracing
 .SH SYNOPSIS
 .LP
 .nf
-\fB#include <sys/strlog.h>\fR 
+\fB#include <sys/strlog.h>\fR
 .fi
 
 .LP
 .nf
-\fB#include <sys/log.h>\fR 
+\fB#include <sys/log.h>\fR
 .fi
 
 .SH DESCRIPTION
@@ -36,11 +36,11 @@ an error logger, a trace logger, or processes that need to submit their own
 .sp
 .in +2
 .nf
-strlog(short \fImid\fR, 
-    short \fIsid\fR, 
-    char \fIlevel\fR, 
-    ushort_t \fIflags\fR, 
-    char *\fBfmt\fR, 
+strlog(short \fImid\fR,
+    short \fIsid\fR,
+    char \fIlevel\fR,
+    ushort_t \fIflags\fR,
+    char *\fBfmt\fR,
     unsigned \fIarg1\fR\fB\|.\|.\|.\|
 );\fR
 .fi
@@ -178,24 +178,20 @@ The following driver configuration properties may be defined in the
 \fBlog.conf\fR file.
 .sp
 .ne 2
-.mk
 .na
 \fBmsgid=1\fR
 .ad
 .RS 11n
-.rt  
 If \fBmsgid=1\fR, each message will be preceded by a message ID as described in
 \fBsyslogd\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmsgid=0\fR
 .ad
 .RS 11n
-.rt  
  If \fBmsgid=0\fR, message IDs will not be generated. This property is unstable
 and may be removed in a future release.
 .RE
@@ -259,34 +255,28 @@ putmsg(log, &ctl, &dat, 0);
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/log\fR\fR
 .ad
 .RS 24n
-.rt  
 Log driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/conslog\fR\fR
 .ad
 .RS 24n
-.rt  
 Write only instance of the log driver, for console logging.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/log.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 Log configuration file.
 .RE
 

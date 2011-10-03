@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH krb5kdc 1M "24 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH KRB5KDC 1M "Oct 24, 2007"
 .SH NAME
 krb5kdc \- KDC daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/krb5/krb5kdc\fR [\fB-d\fR \fIdbpath\fR] [\fB-r\fR \fIrealm\fR]  [\fB-m\fR] 
-     [\fB-k\fR \fImasterenctype\fR] [\fB-M\fR \fImasterkeyname\fR] 
+\fB/usr/lib/krb5/krb5kdc\fR [\fB-d\fR \fIdbpath\fR] [\fB-r\fR \fIrealm\fR]  [\fB-m\fR]
+     [\fB-k\fR \fImasterenctype\fR] [\fB-M\fR \fImasterkeyname\fR]
      [\fB-p\fR \fIport\fR] [\fB-n\fR] [\fB-x\fR \fIdb_args\fR]...
 .fi
 
@@ -30,7 +30,6 @@ Prior to running \fBkrb5kdc\fR, you must initialize the Kerberos database using
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdbpath\fR\fR
 .ad
@@ -41,7 +40,6 @@ Specify the path to the database; default value is \fB/var/krb5\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fImasterenctype\fR\fR
 .ad
@@ -55,7 +53,6 @@ Specify the encryption type for encrypting the database. The default value is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -66,7 +63,6 @@ Specify that the master key for the database is to be entered manually.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fImasterkeyname\fR\fR
 .ad
@@ -77,7 +73,6 @@ Specify the principal to retrieve the master Key for the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -88,7 +83,6 @@ Specify that \fBkrb5kdc\fR should not detach from the terminal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport\fR\fR
 .ad
@@ -100,7 +94,6 @@ requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -111,7 +104,6 @@ Specify the realm name; default is the local realm name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdb_args\fR\fR
 .ad
@@ -121,7 +113,6 @@ Pass database-specific arguments to \fBkadmin\fR. Supported arguments are for
 the LDAP plug-in. These arguments are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinddn\fR=\fIbinddn\fR\fR
 .ad
@@ -135,7 +126,6 @@ the \fBldap_kdc_dn\fR parameter setting in \fBkrb5.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbindpwd\fR=\fIbindpwd\fR\fR
 .ad
@@ -148,7 +138,6 @@ not to use this option. Instead, the password can be stashed using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnconns\fR=\fInum\fR\fR
 .ad
@@ -159,7 +148,6 @@ Specifies the number of connections to be maintained per LDAP server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost\fR=\fIldapuri\fR\fR
 .ad
@@ -173,7 +161,6 @@ Specifies, by an LDAP URI, the LDAP server to which to connect.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.db\fR\fR
 .ad
@@ -184,7 +171,6 @@ Kerberos principal database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5\fR\fR
 .ad
@@ -195,7 +181,6 @@ Kerberos administrative database. This file contains policy information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5.lock\fR\fR
 .ad
@@ -208,7 +193,6 @@ does \fInot\fR exist).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kdc.conf\fR\fR
 .ad
@@ -219,7 +203,6 @@ does \fInot\fR exist).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kpropd.acl\fR\fR
 .ad
@@ -246,7 +229,6 @@ The following signal has the specified effect when sent to the server process
 using the \fBkill\fR(1)command:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR\fR
 .ad

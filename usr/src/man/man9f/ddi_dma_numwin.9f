@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_numwin 9F "29 Sep 1994" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_NUMWIN 9F "Sep 29, 1994"
 .SH NAME
 ddi_dma_numwin \- retrieve number of DMA windows
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
@@ -20,24 +20,20 @@ ddi_dma_numwin \- retrieve number of DMA windows
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR \fR
 .ad
 .RS 11n
-.rt  
 The  \fBDMA\fR handle previously allocated by a call to
 \fBddi_dma_alloc_handle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInwinp\fR \fR
 .ad
 .RS 11n
-.rt  
 Upon a successful return,  \fInwinp\fR will contain the number of  \fBDMA\fR
 windows for this object.
 .RE
@@ -57,23 +53,19 @@ Solaris DDI specific (Solaris DDI).
 \fBddi_dma_numwin()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR \fR
 .ad
 .RS 16n
-.rt  
 Successfully filled in the number of  \fBDMA\fR windows.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR \fR
 .ad
 .RS 16n
-.rt  
 \fBDMA\fR windows are not activated.
 .RE
 

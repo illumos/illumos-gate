@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH it_tgt_create 3ISCSIT "1 Oct 2008" "SunOS 5.11" "iSCSI Management Library Functions"
+.TH IT_TGT_CREATE 3ISCSIT "Oct 1, 2008"
 .SH NAME
 it_tgt_create, it_tgt_setprop, it_tgt_delete, it_tpgt_create, it_tpgt_delete,
 it_tgt_free, it_tpgt_free \- create, modify and delete iSCSI Targets
@@ -54,34 +54,28 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-liscsit\fR [ \fIlibrary\fR\&.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcfg\fR\fR
 .ad
 .RS 13n
-.rt  
 a pointer to the iSCSI configuration structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItgt\fR\fR
 .ad
 .RS 13n
-.rt  
 a pointer to an iSCSI target structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItgt_name\fR\fR
 .ad
 .RS 13n
-.rt  
 the target node name for the target to be created. The name must be in either
 IQN or EUI format. If this value is \fINULL\fR, a node name will be generated
 automatically in IQN format.
@@ -89,35 +83,29 @@ automatically in IQN format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIproplist\fR\fR
 .ad
 .RS 13n
-.rt  
 a pointer to an \fBnvlist_t\fR containing the target properties to be set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrlist\fR\fR
 .ad
 .RS 13n
-.rt  
 an optional pointer to an \fBnvlist_t\fR that will be used to store specific
 errors (if any) when validating target properties
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIforce\fR\fR
 .ad
 .RS 13n
-.rt  
 a boolean value indicating if the target should be set to offline before
 removing it from the configuration. If not specified, the operation will fail
 if the target is determined to be online
@@ -125,35 +113,29 @@ if the target is determined to be online
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItpgt\fR\fR
 .ad
 .RS 13n
-.rt  
 a pointer to a target portal group tag structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItpgt_name\fR\fR
 .ad
 .RS 13n
-.rt  
 the name of the target portal group to be associated with this target portal
 group tag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItpgt_tag\fR\fR
 .ad
 .RS 13n
-.rt  
 a 16-bit numerical identifier for this target portal group tag. Valid values
 are 2 through 65535. If tpgt_tag is '0', \fBit_tpgt_create()\fR will assign an
 appropriate tag number. If \fItpgt_tag\fR is != 0, and the requested tag number
@@ -214,18 +196,16 @@ Target nvlist properties are as follows:
 
 .sp
 .TS
-tab();
-cw(1.12i) cw(.9i) cw(3.48i) 
-lw(1.12i) lw(.9i) lw(3.48i) 
-.
-\fBnvlist\fR KeyTypeValid Values
+c c c
+l l l .
+\fBnvlist\fR Key	Type	Valid Values
 _
-\fBtargetchapuser\fR\fBstring\fRany string, or \fBnone\fR to remove
-\fBtargetchapsecret\fR\fBstring\fRT{
+\fBtargetchapuser\fR	\fBstring\fR	any string, or \fBnone\fR to remove
+\fBtargetchapsecret\fR	\fBstring\fR	T{
 string of at least 12 characters but not more than 255 characters.  secret will be base64 encoded when stored.
 T}
-\fBalias\fR\fBstring\fRany string or \fBnone\fR to remove
-\fBauth\fR\fBstring\fR\fBradius\fR, \fBchap\fR, or \fBnone\fR
+\fBalias\fR	\fBstring\fR	any string or \fBnone\fR to remove
+\fBauth\fR	\fBstring\fR	\fBradius\fR, \fBchap\fR, or \fBnone\fR
 .TE
 
 .SH RETURN VALUES
@@ -241,56 +221,46 @@ The \fBit_tgt_create()\fR, \fBit_tgt_setprop()\fR, \fBit_tgt_delete()\fR,
 \fBit_tpgt_create()\fR, and \fBit_tpgt_delete()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 10n
-.rt  
 All tag numbers are already in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The target is online.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested target node name is already configured.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A parameter or property is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Resources could not be allocated.
 .RE
 
@@ -302,15 +272,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

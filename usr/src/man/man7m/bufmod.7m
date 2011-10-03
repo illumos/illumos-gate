@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bufmod 7M "11 Nov 1997" "SunOS 5.11" "STREAMS Modules"
+.TH BUFMOD 7M "Nov 11, 1997"
 .SH NAME
 bufmod \- STREAMS Buffer Module
 .SH SYNOPSIS
@@ -148,12 +148,10 @@ suffices to close and transmit the current read side chunk.
 \fBbufmod\fR responds to the following \fBioctl\fRs.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCSTIME\fR \fR
 .ad
 .RS 16n
-.rt  
 Set the read timeout value to the value referred to by the \fBstruct timeval\fR
 pointer given as argument. Setting the timeout value to zero has the
 side-effect of forcing the chunk size to zero as well, so that the module will
@@ -163,12 +161,10 @@ rejected with an \fBEINVAL\fR error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCGTIME\fR \fR
 .ad
 .RS 16n
-.rt  
 Return the read timeout in the \fBstruct timeval\fR pointed to by the argument.
 If the timeout has been cleared with the \fBSBIOCCTIME\fR \fBioctl\fR, return
 with an \fBERANGE\fR error.
@@ -176,24 +172,20 @@ with an \fBERANGE\fR error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCCTIME\fR \fR
 .ad
 .RS 16n
-.rt  
 Clear the read timeout, effectively setting its value to infinity. This results
 in no timeouts being active and the chunk being delivered when it is full.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCSCHUNK\fR \fR
 .ad
 .RS 16n
-.rt  
 Set the chunk size to the value referred to by the \fIuint_t\fR pointer given
 as argument. See Notes for a description of effect on stream head high water
 mark.
@@ -201,23 +193,19 @@ mark.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCGCHUNK\fR \fR
 .ad
 .RS 16n
-.rt  
 Return the chunk size in the \fIuint_t\fR pointed to by the argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCSSNAP\fR \fR
 .ad
 .RS 16n
-.rt  
 Set the current snapshot length to the value given in the \fBuint_t\fR pointed
 to by the \fBioctl\fR's final argument. \fBbufmod\fR interprets a snapshot
 length value of zero as meaning infinity, so it will not alter the message. See
@@ -226,79 +214,65 @@ Notes for a description of effect on stream head high water mark.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCGSNAP\fR \fR
 .ad
 .RS 16n
-.rt  
 Returns the current snapshot length in the \fBuint_t\fR pointed to by the
 \fBioctl\fR's final argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCSFLAGS\fR \fR
 .ad
 .RS 16n
-.rt  
 Set the current flags to the value given in the \fBuint_t\fR pointed to by the
 \fBioctl\fR's final argument. Possible values are a combination of the
 following.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSB_SEND_ON_WRITE\fR \fR
 .ad
 .RS 21n
-.rt  
 Transmit the read side chunk on arrival of a message on the write side.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSB_NO_HEADER\fR \fR
 .ad
 .RS 21n
-.rt  
 Do not add headers to read side messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSB_NO_DROPS\fR \fR
 .ad
 .RS 21n
-.rt  
 Do not drop messages due to flow control upstream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSB_NO_PROTO_CVT\fR \fR
 .ad
 .RS 21n
-.rt  
 Do not convert \fBM_PROTO\fR messages into \fBM_DATA\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSB_DEFER_CHUNK\fR \fR
 .ad
 .RS 21n
-.rt  
 Begin buffering on arrival of the second read side message in a timeout
 interval.
 .RE
@@ -307,12 +281,10 @@ interval.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSBIOCGFLAGS\fR \fR
 .ad
 .RS 16n
-.rt  
 Returns the current flags in the \fBuint_t\fR pointed to by the \fBioctl\fR's
 final argument.
 .RE

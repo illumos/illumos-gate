@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pci_report_pmcap 9F "13 August 1999" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PCI_REPORT_PMCAP 9F "Aug 13, 1999"
 .SH NAME
 pci_report_pmcap \- Report Power Management capability of a PCI device
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
@@ -24,34 +24,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the device's \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcap\fR\fR
 .ad
 .RS 7n
-.rt  
 Power management capability
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 7n
-.rt  
 Argument for the capability
 .RE
 
@@ -76,23 +70,19 @@ to \fB(void *)\fRbefore passing as \fBarg\fR to \fBpci_report_pmcap()\fR.
 The special values of \fBarg\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPCI_PM_IDLESPEED_ANY\fR\fR
 .ad
 .RS 25n
-.rt  
 The device can tolerate any idle clock speed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPCI_PM_IDLESPEED_NONE\fR\fR
 .ad
 .RS 25n
-.rt  
 The device cannot tolerate slowing down of PCI clock even when idle.
 .RE
 
@@ -107,23 +97,19 @@ managed.
 The \fBpci_report_pmcap()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Successful reporting of the capability
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failure to report capability because of invalid argument(s)
 .RE
 
@@ -143,7 +129,7 @@ the following call from its \fBattach\fR(9E):
 .in +2
 .nf
 if (pci_report_pmcap(dip, PCI_PM_IDLESPEED, PCI_PM_IDLESPEED_ANY) !=
-            DDI_SUCCESS) 
+            DDI_SUCCESS)
                 cmn_err(CE_WARN, "%s%d: pci_report_pmcap failed\fB\en\fR",
                     ddi_driver_name(dip), ddi_get_instance(dip));
 .fi
@@ -159,7 +145,7 @@ makes the following call whenever it negotiates a 100 Mb Ethernet connection:
 .in +2
 .nf
 if (pci_report_pmcap(dip,  PCI_PM_IDLESPEED, (void *)4000) !=
-               DDI_SUCCESS) 
+               DDI_SUCCESS)
                 cmn_err(CE_WARN, "%s%d: pci_report_pmcap failed\fB\en\fR",
                     ddi_driver_name(dip), ddi_get_instance(dip));
 .fi
@@ -173,13 +159,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

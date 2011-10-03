@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH disks 1M "2 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH DISKS 1M "Jul 2, 2009"
 .SH NAME
 disks \- creates /dev entries for hard disks attached to the system
 .SH SYNOPSIS
@@ -128,12 +128,10 @@ type: \fBDDI_NT_BLOCK,\fR \fBDDI_NT_BLOCK_CHAN,\fR \fBDDI_NT_CD,\fR or
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 14n
-.rt  
 Causes disks to remove any invalid links after adding any new entries to
 \fB/dev/dsk\fR and \fB/dev/rdsk\fR. Invalid links are links which refer to
 non-existent disk nodes that have been removed, powered off, or are otherwise
@@ -142,12 +140,10 @@ inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrootdir\fR\fR
 .ad
 .RS 14n
-.rt  
 Causes \fBdisks\fR to presume that the \fB/dev/dsk\fR, \fB/dev/rdsk\fR and
 \fB/devices\fR directory trees are found under \fIrootdir\fR, not directly
 under \fB/\fR.
@@ -280,34 +276,28 @@ and /dev/rdsk will contain the disk entries for the character device nodes in
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk/*\fR\fR
 .ad
 .RS 15n
-.rt  
 Disk entries (block device interface)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/*\fR\fR
 .ad
 .RS 15n
-.rt  
 Disk entries (character device interface)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/devices/*\fR\fR
 .ad
 .RS 15n
-.rt  
 Device special files (minor device nodes)
 .RE
 

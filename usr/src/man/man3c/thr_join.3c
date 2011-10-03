@@ -2,21 +2,21 @@
 .\" Copyright (c) 2000 Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 1995 IEEE  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH thr_join 3C "27 Mar 2000" "SunOS 5.11" "Standard C Library Functions"
+.TH THR_JOIN 3C "Mar 27, 2000"
 .SH NAME
 thr_join \- wait for thread termination
 .SH SYNOPSIS
 .LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
-#include <thread.h> 
+#include <thread.h>
 
 \fBint\fR \fBthr_join\fR(\fBthread_t\fR \fIthread\fR, \fBthread_t *\fR\fIdeparted\fR, \fBvoid **\fR\fIstatus\fR);
 .fi
@@ -61,12 +61,10 @@ returned to indicate the error.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR \fR
 .ad
 .RS 12n
-.rt  
 A joining deadlock would occur, such as when a thread attempts to wait for
 itself, or the calling thread is waiting for any thread to exit and only daemon
 threads or waiting threads exist in the process.
@@ -74,12 +72,10 @@ threads or waiting threads exist in the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR \fR
 .ad
 .RS 12n
-.rt  
 No undetached thread could be found corresponding to the given thread ID.
 .RE
 
@@ -91,13 +87,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
@@ -112,7 +107,7 @@ Using thr_join(3C) in the following syntax,
 .sp
 .in +2
 .nf
-while (thr_join(0, NULL, NULL) == 0); 
+while (thr_join(0, NULL, NULL) == 0);
 .fi
 .in -2
 

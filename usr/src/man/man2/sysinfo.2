@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sysinfo 2 "29 Jan 2009" "SunOS 5.11" "System Calls"
+.TH SYSINFO 2 "Jan 29, 2009"
 .SH NAME
 sysinfo \- get and set system information strings
 .SH SYNOPSIS
@@ -32,7 +32,6 @@ than a string.
 The values for \fIcommand\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_SYSNAME\fR\fR
 .ad
@@ -45,7 +44,6 @@ implementation of the operating system, for example, \fBSunOS\fR or \fBUTS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_HOSTNAME\fR\fR
 .ad
@@ -64,7 +62,6 @@ length (plus the terminating null).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_SET_HOSTNAME\fR\fR
 .ad
@@ -79,7 +76,6 @@ calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_RELEASE\fR\fR
 .ad
@@ -92,7 +88,6 @@ or \fB4.1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_VERSION\fR\fR
 .ad
@@ -105,7 +100,6 @@ string are defined by the system provider.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_MACHINE\fR\fR
 .ad
@@ -117,7 +111,6 @@ by \fBuname\fR(2) in the \fImachine\fR field, for example, \fBsun4u\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_ARCHITECTURE\fR\fR
 .ad
@@ -131,7 +124,6 @@ predefined names in the C language compilation system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_ARCHITECTURE_64\fR\fR
 .ad
@@ -146,7 +138,6 @@ allow a 64-bit application to run.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_ARCHITECTURE_32\fR\fR
 .ad
@@ -160,7 +151,6 @@ compilation system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_ARCHITECTURE_K\fR\fR
 .ad
@@ -174,7 +164,6 @@ compilation system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_ARCHITECTURE_NATIVE\fR\fR
 .ad
@@ -188,7 +177,6 @@ compilation system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_ISALIST\fR\fR
 .ad
@@ -218,7 +206,6 @@ handle instruction set extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_PLATFORM\fR\fR
 .ad
@@ -231,7 +218,6 @@ model of the hardware platform, for example, \fBSUNW,Sun-Blade-1500\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_HW_PROVIDER\fR\fR
 .ad
@@ -243,7 +229,6 @@ Copies the name of the hardware manufacturer into the array pointed to by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_HW_SERIAL\fR\fR
 .ad
@@ -265,7 +250,6 @@ lifetime of a given system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_SRPC_DOMAIN\fR\fR
 .ad
@@ -277,7 +261,6 @@ by \fIbuf\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_SET_SRPC_DOMAIN\fR\fR
 .ad
@@ -291,7 +274,6 @@ of the calling process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSI_DHCP_CACHE\fR\fR
 .ad
@@ -323,35 +305,29 @@ Otherwise, \(mi1 is returned and \fBerrno\fR is set to indicate the error.
 The \fBsysinfo()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIbuf\fR argument does not point to a valid address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIcount\fR argument for a non-SET command is less than 0 or the data for a
 SET command exceeds the limits established by the implementation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_SYS_ADMIN\fR} was not asserted in the effective set of the calling
 process.
 .RE

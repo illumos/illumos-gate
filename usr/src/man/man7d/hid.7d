@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hid 7D "21 Aug 2009" "SunOS 5.11" "Devices"
+.TH HID 7D "Aug 21, 2009"
 .SH NAME
 hid \- Human interface device (HID) class driver
 .SH SYNOPSIS
@@ -47,12 +47,10 @@ predefines packet formats for the boot protocol keyboard and mouse.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHIDIOCKMGDIRECT\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl should only be addressed to a USB keyboard or mouse device. The
 \fBhid\fR driver maintains two streams for each USB keyboard/mouse instance: an
 internal one for the use of the kernel and an external one for the use of user
@@ -66,12 +64,10 @@ gets the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHIDIOCKMSDIRECT\fR\fR
 .ad
 .RS 19n
-.rt  
 This ioctl should only be addressed to a USB keyboard or mouse device. The hid
 driver maintains two streams for each USB keyboard/mouse instance: an internal
 one for the use of the kernel and an external one for the use of user
@@ -85,7 +81,6 @@ gets the input.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/hid\fR\fR
 .ad
@@ -96,7 +91,6 @@ gets the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/hid\fR\fR
 .ad
@@ -107,7 +101,6 @@ gets the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/hid\fR\fR
 .ad
@@ -118,7 +111,6 @@ gets the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/hidparser\fR\fR
 .ad
@@ -129,7 +121,6 @@ gets the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/amd64/hidparser\fR\fR
 .ad
@@ -140,7 +131,6 @@ gets the input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/sparcv9/hidparser\fR\fR
 .ad
@@ -157,13 +147,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86, PCI-based systems
+Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
@@ -191,7 +180,6 @@ ArchitectureSPARC, x86, PCI-based systems
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fBhid_attach: Unsupported HID device.\fR
 .ad
@@ -202,7 +190,6 @@ The device requires a protocol not supported by the hid driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBParsing of hid descriptor failed.\fR
 .ad
@@ -214,7 +201,6 @@ supported by the hid driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInvalid report descriptor.\fR
 .ad
@@ -238,7 +224,6 @@ the following manner:
 
 .sp
 .ne 2
-.mk
 .na
 \fBhid_attach: Unsupported HID device.\fR
 .ad
@@ -249,7 +234,6 @@ The device cannot be supported by this version of the HID driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBParsing of HID descriptor failed.\fR
 .ad
@@ -260,7 +244,6 @@ The device cannot be supported by this version of the HID driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInvalid report descriptor.\fR
 .ad

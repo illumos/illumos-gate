@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bscv 7D "22 August 2003" "SunOS 5.11" "Devices"
+.TH BSCV 7D "Aug 22, 2003"
 .SH NAME
 bscv, bscbus, i2bsc \- Blade support chip interface driver
 .SH DESCRIPTION
@@ -22,7 +22,6 @@ logs.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4u/kernel/drv/sparcv9/bscbus\fR\fR
 .ad
@@ -33,7 +32,6 @@ logs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4u/kernel/drv/sparcv9/bscv\fR\fR
 .ad
@@ -44,7 +42,6 @@ logs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4u/kernel/drv/sparcv9/i2bsc\fR\fR
 .ad
@@ -55,7 +52,6 @@ logs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/bscbus\fR\fR
 .ad
@@ -66,7 +62,6 @@ logs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/bscv\fR\fR
 .ad
@@ -83,13 +78,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE  TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE  TYPE	ATTRIBUTE VALUE
 _
-ArchitectureT{
+Architecture	T{
 Limited to systems with Blade Support Chip
 T}
 .TE

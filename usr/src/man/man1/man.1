@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH man 1 "8 May 2008" "SunOS 5.11" "User Commands"
+.TH MAN 1 "May 8, 2008"
 .SH NAME
 man \- find and display reference manual pages
 .SH SYNOPSIS
@@ -67,36 +67,30 @@ output through \fBmore\fR(1) to handle paging and underlining on the screen.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 20n
-.rt  
 Shows all manual pages matching \fIname\fR within the \fBMANPATH\fR search
 path. Manual pages are displayed in the order found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 20n
-.rt  
 Debugs. Displays what a section-specifier evaluates to, method used for
 searching, and paths searched by \fBman\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile ...\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBman\fR attempts to locate manual pages related to any of the given
 \fIfile\fRs. It strips the leading path name components from each \fIfile\fR,
 and then prints one-line summaries containing the resulting basename or names.
@@ -105,12 +99,10 @@ This option also uses the \fBwindex\fR database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 20n
-.rt  
 Forces \fBman\fR to search all directories specified by \fBMANPATH\fR or the
 \fBman.cf\fR file, rather than using the \fBwindex\fR lookup database. This
 option is useful if the database is not up to date and it has been made the
@@ -120,12 +112,10 @@ to be invoked and is documented here for reference only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkeyword ...\fR\fR
 .ad
 .RS 20n
-.rt  
 Prints out one-line summaries from the \fBwindex\fR database (table of
 contents) that contain any of the given \fIkeyword\fRs. The \fBwindex\fR
 database is created using \fBcatman\fR(1M).
@@ -133,23 +123,19 @@ database is created using \fBcatman\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 20n
-.rt  
 Lists all manual pages found matching \fIname\fR within the search path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fIpath\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies an alternate search path for manual pages. \fIpath\fR is a
 colon-separated list of directories that contain manual page directory
 subtrees. For example, if \fIpath\fR is \fB/usr/share/man:/usr/local/man\fR,
@@ -162,24 +148,20 @@ section. This option overrides the \fBMANPATH\fR environment variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 20n
-.rt  
 Reformats the manual page, but does not display it. This replaces the \fBman\fR
 \fB-\fR \fB-t\fR \fIname\fR combination.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsection ...\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies sections of the manual for \fBman\fR to search. The directories
 searched for \fIname\fR are limited to those specified by \fIsection\fR.
 \fIsection\fR can be a numerical digit, perhaps followed by one or more letters
@@ -193,12 +175,10 @@ below for an explanation of how \fBman\fR conducts its search.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBman\fR arranges for the specified manual pages to be \fBtroff\fRed to a
 suitable raster output device (see \fBtroff\fR(1)). If both the \fB-\fR and
 \fB-t\fR flags are given, \fBman\fR updates the \fBtroff\fRed versions of each
@@ -207,12 +187,10 @@ named \fIname\fR (if necessary), but does not display them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fImacro-package\fR\fR
 .ad
 .RS 20n
-.rt  
 Formats manual pages using \fImacro-package\fR rather than the standard
 \fB-man\fR macros defined in \fB/usr/share/lib/tmac/an\fR. See \fBSearch
 Path\fR under USAGE for a complete explanation of the default search path
@@ -225,12 +203,10 @@ order.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 8n
-.rt  
 The name of a standard utility or a keyword.
 .RE
 
@@ -298,7 +274,7 @@ The \fBman.cf\fR file has the following format:
 .sp
 .in +2
 .nf
-MANSECTS=\fIsection\fR[,\fIsection\fR]... 
+MANSECTS=\fIsection\fR[,\fIsection\fR]...
 .fi
 .in -2
 .sp
@@ -337,45 +313,37 @@ any combination of characters in the following list, \fBman\fR pipes its input
 to \fBtroff\fR(1) or \fBnroff\fR(1) through the corresponding preprocessors.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBeqn\fR(1), or \fBneqn\fR for \fBnroff\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBrefer\fR(1)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBtbl\fR(1)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBvgrind\fR(1)
 .RE
 
@@ -424,12 +392,10 @@ that affect the execution of \fBman\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMANPATH\fR\fR
 .ad
 .RS 11n
-.rt  
 A colon-separated list of directories; each directory can be followed by a
 comma-separated list of sections. If set, its value overrides
 \fB/usr/share/man\fR as the default directory search path, and the \fBman.cf\fR
@@ -439,35 +405,29 @@ turn, override these values.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAGER\fR\fR
 .ad
 .RS 11n
-.rt  
 A program to use for interactively delivering \fBman\fR's output to the screen.
 If not set, `\fBmore\fR \fB-s\fR' is used. See \fBmore\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTCAT\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the program to use to display \fBtroff\fRed manual pages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTROFF\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the formatter to use when the \fB-t\fR flag is given. If not set,
 \fBtroff\fR(1) is used.
 .RE
@@ -519,30 +479,25 @@ the default printer, if the user wants a text file version of the man page.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man\fR\fR
 .ad
@@ -553,7 +508,6 @@ Root of the standard manual page directory subtree
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/man?/*\fR\fR
 .ad
@@ -564,7 +518,6 @@ Unformatted nroff manual entries
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/sman?/*\fR\fR
 .ad
@@ -575,7 +528,6 @@ Unformatted \fBSGML\fR manual entries
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/cat?/*\fR\fR
 .ad
@@ -586,7 +538,6 @@ Unformatted \fBSGML\fR manual entries
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/fmt?/*\fR\fR
 .ad
@@ -597,7 +548,6 @@ Unformatted \fBSGML\fR manual entries
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/windex\fR\fR
 .ad
@@ -608,7 +558,6 @@ Table of contents and keyword database
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/an\fR\fR
 .ad
@@ -619,7 +568,6 @@ Standard \fB-man\fR macro package
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/sgml/locale/C/dtd/*\fR\fR
 .ad
@@ -630,7 +578,6 @@ Standard \fB-man\fR macro package
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/sgml/locale/C/solbook/*\fR\fR
 .ad
@@ -641,7 +588,6 @@ Standard \fB-man\fR macro package
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/pub/eqnchar\fR\fR
 .ad
@@ -652,7 +598,6 @@ Standard definitions for \fBeqn\fR and \fBneqn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBman.cf\fR\fR
 .ad
@@ -669,17 +614,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled, see \fBNOTES\fR.
+CSI	Enabled, see \fBNOTES\fR.
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5). 
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

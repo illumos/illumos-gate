@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mctl 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH MCTL 3UCB "Oct 30, 2007"
 .SH NAME
 mctl \- memory management control
 .SH SYNOPSIS
@@ -29,12 +29,10 @@ function to be performed is identified by the argument \fIfunction\fR. Valid
 functions are defined in  \fB<mman.h>\fR as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_LOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock the pages in the range in memory.  This function is used to support
 \fBmlock()\fR. See \fBmlock\fR(3C) for semantics and usage. \fIarg\fR is
 ignored.
@@ -42,35 +40,29 @@ ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_LOCKAS\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock the pages in the address space in memory.  This function is used to
 support \fBmlockall()\fR. See \fBmlockall\fR(3C) for semantics and usage.
 \fIaddr\fR and \fIlen\fR are ignored. \fIarg\fR is an integer built from the
 flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCL_CURRENT\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock current mappings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMCL_FUTURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Lock future mappings
 .RE
 
@@ -78,12 +70,10 @@ Lock future mappings
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_SYNC\fR\fR
 .ad
 .RS 15n
-.rt  
 Synchronize the pages in the range with their backing storage. Optionally
 invalidate cache copies. This function is used to support \fBmsync()\fR. See
 \fBmsync\fR(3C) for semantics and usage. \fIarg\fR is used to represent the
@@ -91,34 +81,28 @@ invalidate cache copies. This function is used to support \fBmsync()\fR. See
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_SYNC\fR\fR
 .ad
 .RS 17n
-.rt  
 Synchronized write
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_ASYNC\fR\fR
 .ad
 .RS 17n
-.rt  
 Return immediately
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMS_INVALIDATE\fR\fR
 .ad
 .RS 17n
-.rt  
 Invalidate mappings
 .RE
 
@@ -132,24 +116,20 @@ reference.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_UNLOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 Unlock the pages in the range. This function is used to support
 \fBmunlock()\fR. \fIarg\fR is ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMC_UNLOCKAS\fR\fR
 .ad
 .RS 15n
-.rt  
 Remove address space memory lock, and locks on all current mappings. This
 function is used to support  \fBmunlockall()\fR. \fIaddr\fR and \fIlen\fR must
 have the value 0. \fIarg\fR is ignored.
@@ -165,94 +145,78 @@ have the value 0. \fIarg\fR is ignored.
 \fBmctl()\fR fails if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Some or all of the memory identified by the operation could not be locked due
 to insufficient system resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBMS_INVALIDATE\fR was specified and one or more of the pages is locked in
 memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIaddr\fR is not a multiple of the page size as returned by
 \fBgetpagesize()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIaddr\fR and/or \fIlen\fR do not have the value 0 when \fBMC_LOCKAS\fR or
 \fBMC_UNLOCKAS\fR are specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIarg\fR is not valid for the function specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Addresses in the range [\fIaddr, addr + len\fR) are invalid for the address
 space of a process, or specify one or more pages which are not mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The process's effective user \fBID\fR is not superuser and one of \fBMC_LOCK
 MC_LOCKAS\fR, \fBMC_UNLOCK\fR, or \fBMC_UNLOCKAS\fR was specified.
 .RE

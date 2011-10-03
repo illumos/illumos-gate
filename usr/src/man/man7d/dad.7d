@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dad 7D "24 Oct 2005" "SunOS 5.11" "Devices"
+.TH DAD 7D "Oct 24, 2005"
 .SH NAME
 dad \- driver for IDE disk devices
 .SH SYNOPSIS
 .LP
 .nf
-\fBdad@\fR \fItarget\fR,\fIlun\fR:\fIpartition\fR 
+\fBdad@\fR \fItarget\fR,\fIlun\fR:\fIpartition\fR
 .fi
 
 .SH DESCRIPTION
@@ -51,23 +51,19 @@ implemented as required.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk/c\fR\fIn\fR\fBt\fR\fIn\fR\fBd\fR\fIn\fR\fBs\fR\fIn\fR \fR
 .ad
 .RS 23n
-.rt  
 block files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/c\fR\fIn\fR\fBt\fR\fIn\fR\fBd\fR\fIn\fR\fBs\fR\fIn\fR \fR
 .ad
 .RS 23n
-.rt  
 raw files
 .RE
 
@@ -76,45 +72,37 @@ raw files
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fIn\fR \fR
 .ad
 .RS 7n
-.rt  
 controller  \fIn\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fIn\fR \fR
 .ad
 .RS 7n
-.rt  
 IDE target id  \fIn\fR (0-3)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fIn\fR \fR
 .ad
 .RS 7n
-.rt  
 Always 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fIn\fR \fR
 .ad
 .RS 7n
-.rt  
 partition  \fIn\fR (0-7)
 .RE
 
@@ -123,45 +111,37 @@ partition  \fIn\fR (0-7)
 The target ide numbers are assigned as:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 Master disk on Primary channel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 Slave disk on Primary channel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 Master disk on Secondary channel
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3\fR
 .ad
 .RS 5n
-.rt  
 Slave disk on Secondary channel.
 .RE
 
@@ -172,89 +152,73 @@ Refer to \fBdkio\fR(7I).
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR \fR
 .ad
 .RS 11n
-.rt  
 Permission denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR \fR
 .ad
 .RS 11n
-.rt  
 The partition was opened exclusively by another thread.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR \fR
 .ad
 .RS 11n
-.rt  
 Argument was a bad address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 Invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR \fR
 .ad
 .RS 11n
-.rt  
  I/O error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR \fR
 .ad
 .RS 11n
-.rt  
 The device does not  support the requested ioctl function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR \fR
 .ad
 .RS 11n
-.rt  
 The device did not exist during opening.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR \fR
 .ad
 .RS 11n
-.rt  
 The device is a read-only device.
 .RE
 
@@ -269,7 +233,6 @@ X3T10 ATA-4 specifications.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCommand:<\fInumber\fR>\fR, Error:<\fInumber\fR>, Status:<\fInumber\fR>\fR
 .ad
@@ -281,7 +244,6 @@ contents. Where <\fInumber\fR> is a hexadecimal value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffline\fR \fR
 .ad
@@ -292,7 +254,6 @@ The driver has decided that the target disk is no longer there.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk ok\fR \fR
 .ad
@@ -303,7 +264,6 @@ The target disk is now responding again.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk not responding to selection\fR \fR
 .ad
@@ -314,7 +274,6 @@ The target disk is not responding.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi/o to invalid geometry\fR \fR
 .ad
@@ -325,7 +284,6 @@ The geometry of the drive could not be established.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBincomplete read/write - retrying/giving up\fR \fR
 .ad
@@ -336,7 +294,6 @@ There was a residue after the command completed normally.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno bp for disk label\fR \fR
 .ad
@@ -347,7 +304,6 @@ A bp with consistent memory could not be allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno memory for disk label\fR \fR
 .ad
@@ -358,7 +314,6 @@ Free memory pool exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBATA transport failed: reason 'nnnn': {retrying|giving}\fR \fR
 .ad
@@ -370,7 +325,6 @@ stated. The driver will either retry the command or, ultimately, give up.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno mem for property\fR \fR
 .ad
@@ -381,7 +335,6 @@ Free memory pool exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtransport rejected (<n>)\fR \fR
 .ad
@@ -392,7 +345,6 @@ Host adapter driver was unable to accept a command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDevice Fault\fR \fR
 .ad

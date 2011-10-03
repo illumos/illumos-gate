@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kstat_create 9F "13 Nov 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH KSTAT_CREATE 9F "Nov 13, 2006"
 .SH NAME
 kstat_create \- create and initialize a new kstat
 .SH SYNOPSIS
@@ -14,8 +14,8 @@ kstat_create \- create and initialize a new kstat
 
 
 
-\fBkstat_t *\fR\fBkstat_create\fR(\fBconst char *\fR\fIks_module\fR, \fBint\fR \fIks_instance\fR, 
-     \fBconst char *\fR\fIks_name\fR, \fBconst char *\fR\fIks_class\fR, \fBuchar_t\fR \fIks_type\fR, 
+\fBkstat_t *\fR\fBkstat_create\fR(\fBconst char *\fR\fIks_module\fR, \fBint\fR \fIks_instance\fR,
+     \fBconst char *\fR\fIks_name\fR, \fBconst char *\fR\fIks_class\fR, \fBuchar_t\fR \fIks_type\fR,
      \fBulong_t\fR \fIks_ndata\fR, \fBuchar_t\fR \fIks_flag\fR);
 .fi
 
@@ -26,48 +26,40 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_module\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the provider's module (such as "\fBsd\fR", "\fBesp\fR", ...). The
 "\fBcore\fR" kernel uses the name "unix".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_instance\fR\fR
 .ad
 .RS 15n
-.rt  
 The provider's instance number, as from \fBddi_get_instance\fR(9F). Modules
 which do not have a meaningful instance number should use \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_name\fR\fR
 .ad
 .RS 15n
-.rt  
 A pointer to a string that uniquely identifies this structure. Only
 \fBKSTAT_STRLEN \(mi 1\fR characters are significant.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_class\fR\fR
 .ad
 .RS 15n
-.rt  
 The general class that this kstat belongs to. The following classes are
 currently in use: \fBdisk\fR, \fBtape\fR, \fBnet\fR, \fBcontroller\fR,
 \fBvm\fR, \fBkvm\fR, \fBhat\fR, \fBstreams\fR, \fBkstat\fR, and \fBmisc\fR.
@@ -75,43 +67,35 @@ currently in use: \fBdisk\fR, \fBtape\fR, \fBnet\fR, \fBcontroller\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_type\fR\fR
 .ad
 .RS 15n
-.rt  
 The type of \fBkstat\fR to allocate. Valid types are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_NAMED\fR\fR
 .ad
 .RS 20n
-.rt  
 Allows more than one data record per \fBkstat\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_INTR\fR\fR
 .ad
 .RS 20n
-.rt  
 Interrupt; only one data record per \fBkstat\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_IO\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBI/O\fR; only one data record per \fBkstat\fR
 .RE
 
@@ -119,33 +103,27 @@ Interrupt; only one data record per \fBkstat\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_ndata\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of type-specific data records to allocate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_flag\fR\fR
 .ad
 .RS 15n
-.rt  
 A bit-field of various flags for this \fBkstat\fR. \fIks_flag\fR is some
 combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_FLAG_VIRTUAL\fR\fR
 .ad
 .RS 25n
-.rt  
 Tells \fBkstat_create()\fR not to allocate memory for the \fBkstat\fR data
 section; instead, the driver will set the \fBks_data\fR field to point to the
 data it wishes to export. This provides a convenient way to export existing
@@ -154,23 +132,19 @@ data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_FLAG_WRITABLE\fR\fR
 .ad
 .RS 25n
-.rt  
 Makes the \fBkstat\fR data section writable by root.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_FLAG_PERSISTENT\fR\fR
 .ad
 .RS 25n
-.rt  
 Indicates that this \fBkstat\fR is to be persistent over time. For persistent
 \fBkstat\fRs, \fBkstat_delete\fR(9F) simply marks the \fBkstat\fR as dormant; a
 subsequent \fBkstat_create()\fR reactivates the kstat. This feature is provided

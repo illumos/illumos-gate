@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER,
 .\" with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sd 7D "8 Sep 2009" "SunOS 5.11" "Devices"
+.TH SD 7D "Sep 8, 2009"
 .SH NAME
 sd \- SCSI disk and ATAPI/SCSI CD-ROM device driver
 .SH SYNOPSIS
@@ -124,133 +124,109 @@ Refer to \fBdkio\fR(7I), and \fBcdio\fR(7I)
 .SS "ERRORS"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 Permission denied
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The partition was opened exclusively by another thread
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The argument features a bad address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid argument
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR\fR
 .ad
 .RS 10n
-.rt  
 The device does not support the requested ioctl function
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 During opening, the device did not exist. During close, the drive unlock failed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 10n
-.rt  
 The device is read-only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Resource temporarily unavailable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was caught during the execution of the \fBioctl()\fR function
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient memory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficent access permission
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error occurred. Refer to notes for details on copy-protected DVD-ROM
 media.
 .RE
@@ -262,12 +238,10 @@ The \fBsd\fR driver can be configured by defining properties in the
 \fBsd.conf\fR file. The \fBsd\fR driver supports the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable-partition-kstats\fR\fR
 .ad
 .RS 27n
-.rt  
 The default value is 1, which causes partition IO statistics to be maintained.
 Set this value to zero to prevent the driver from recording partition
 statistics. This slightly reduces the CPU overhead for IO, mimimizes the amount
@@ -279,36 +253,30 @@ maintained.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqfull-retries\fR\fR
 .ad
 .RS 27n
-.rt  
 The supplied value is passed as the \fBqfull-retries\fR capability value of the
 HBA driver. See \fBscsi_ifsetcap\fR(9F) for details.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqfull-retry-interval\fR\fR
 .ad
 .RS 27n
-.rt  
 The supplied value is passed as the \fBqfull-retry interval\fR capability value
 of the HBA driver. See \fBscsi_ifsetcap\fR(9F) for details.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow-bus-device-reset\fR\fR
 .ad
 .RS 27n
-.rt  
 The default value is 1, which allows resetting to occur. Set this value to
 \fB0\fR (zero) to prevent the \fBsd\fR driver from calling \fBscsi_reset\fR(9F)
 with a second argument of \fBRESET_TARGET\fR when in error-recovery mode. This
@@ -322,12 +290,10 @@ prohibit the Bus Device Reset message; to do this, set the
 
 .sp
 .ne 2
-.mk
 .na
 \fBoptical-device-bind\fR
 .ad
 .RS 27n
-.rt  
 Controls the binding of the driver to non self-identifying SCSI target optical
 devices. (See \fBscsi\fR(4)). The default value is 1, which causes \fBsd\fR to
 bind to DTYPE_OPTICAL devices (as noted in \fBscsi\fR(4)).  Setting this value
@@ -337,12 +303,10 @@ to 0 prevents automatic binding. The default behavior for the SPARC-based
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpower-condition\fR\fR
 .ad
 .RS 27n
-.rt  
 Boolean type, when set to \fBFalse\fR, it indicates that the disk does not
 support \fBpower condition\fR field in th\fBe START STOP UNIT\fR command.
 .RE
@@ -357,11 +321,11 @@ value of this property is a list of duplets. The formal syntax is:
 .nf
 sd-config-list = <duplet> [, <duplet> ]* ;
 
-where 
+where
 
 <duplet>:= "<vid+pid>" , "<tunable-list>"
 
-and 
+and
 
 <tunable-list>:= <tunable>  [, <tunable> ]*;
 <tunable> = <name> : <value>
@@ -374,21 +338,19 @@ all target devices with the specified <vid+pid>.
 
 Each <tunable> is a <name> : <value> pair. Supported
 tunable names are:
-  
+
    delay-busy: when busy, nsecs of delay before retry.
-   
+
    retries-timeout: retries to perform on an IO timeout.
 .fi
 .in -2
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmmc-gesn-polling\fR\fR
 .ad
 .RS 20n
-.rt  
 For optical drives compliant with \fBMMC-3\fR and supporting the \fBGET EVENT
 STATUS NOTIFICATION\fR command, this command is used for periodic media state
 polling, usually initiated by the \fBDKIOCSTATE\fR \fBdkio\fR(7I) ioctl. To
@@ -402,7 +364,7 @@ command is used instead.
 .in +2
 .nf
 The following is an example of a global sd-config-list property:
-  
+
    sd-config-list =
       "SUN     T4", "delay-busy:600, retries-timeout:6",
       "SUN     StorEdge_3510", "retries-timeout:3";
@@ -412,34 +374,28 @@ The following is an example of a global sd-config-list property:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sd.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Driver configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk/cntndnsn\fR\fR
 .ad
 .RS 23n
-.rt  
 Block files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/cntndnsn\fR\fR
 .ad
 .RS 23n
-.rt  
 Raw files
 .RE
 
@@ -448,58 +404,48 @@ Raw files
 Where:
 .sp
 .ne 2
-.mk
 .na
 \fBcn\fR
 .ad
 .RS 6n
-.rt  
 controller n
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtn\fR
 .ad
 .RS 6n
-.rt  
 SCSI target id n (0-6)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdn\fR
 .ad
 .RS 6n
-.rt  
 SCSI LUN n (0-7 normally; some HBAs support LUNs to 15 or 32. See the specific
 manpage for details)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsn\fR
 .ad
 .RS 6n
-.rt  
 partition n (0-7)
 .RE
 
 .SS "x86 Only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/cntndnpn\fR\fR
 .ad
 .RS 22n
-.rt  
 raw files
 .RE
 
@@ -508,12 +454,10 @@ raw files
 Where:
 .sp
 .ne 2
-.mk
 .na
 \fBpn\fR
 .ad
 .RS 6n
-.rt  
 Where \fIn\fR=0 the node corresponds to the entire disk.
 .RE
 
@@ -555,7 +499,6 @@ Sense Key:\fI<sense key name>\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBASC: 0x<a> (<ASC name>), ASCQ: 0x<b>, FRU: 0x<c>\fR
 .ad
@@ -569,7 +512,6 @@ target in response to a request sense command.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCaddy not inserted in drive\fR
 .ad
@@ -580,7 +522,6 @@ The drive is not ready because no caddy has been inserted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCheck Condition on REQUEST SENSE\fR
 .ad
@@ -592,7 +533,6 @@ will be retried a number of times.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLabel says <m> blocks Drive says <n> blocks\fR
 .ad
@@ -604,7 +544,6 @@ There is a discrepancy between the label and what the drive returned on the
 
 .sp
 .ne 2
-.mk
 .na
 \fBNot enough sense information\fR
 .ad
@@ -615,7 +554,6 @@ The request sense data was less than expected.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRequest Sense couldn't get sense data\fR
 .ad
@@ -626,7 +564,6 @@ The \fBREQUEST SENSE\fR command did not transfer any data.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReservation Conflict\fR
 .ad
@@ -637,7 +574,6 @@ The drive was reserved by another initiator.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSCSI transport failed: reason \fB\&'xxxx'\fR: {retrying|giving up}\fR
 .ad
@@ -649,7 +585,6 @@ stated. The driver will either retry the command or, ultimately, give up.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnhandled Sense Key<\fIn\fR>\fR
 .ad
@@ -660,7 +595,6 @@ The REQUEST SENSE data included an invalid sense.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnit not ready. Additional sense code 0x\fR
 .ad
@@ -671,7 +605,6 @@ The REQUEST SENSE data included an invalid sense.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCan't do switch back to mode 1\fR
 .ad
@@ -682,7 +615,6 @@ A failure to switch back to read mode 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCorrupt label - bad geometry\fR
 .ad
@@ -693,7 +625,6 @@ The disk label is corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCorrupt label - label checksum failed\fR
 .ad
@@ -704,7 +635,6 @@ The disk label is corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCorrupt label - wrong magic number\fR
 .ad
@@ -715,7 +645,6 @@ The disk label is corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice busy too long\fR
 .ad
@@ -726,7 +655,6 @@ The drive returned busy during a number of retries.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDisk not responding to selection\fR
 .ad
@@ -737,7 +665,6 @@ The drive is powered down or died
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to handle UA\fR
 .ad
@@ -748,7 +675,6 @@ A retry on a Unit Attention condition failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBI/O to invalid geometry\fR
 .ad
@@ -759,7 +685,6 @@ The geometry of the drive could not be established.
 
 .sp
 .ne 2
-.mk
 .na
 \fBIncomplete read/write - retrying/giving up\fR
 .ad
@@ -770,7 +695,6 @@ There was a residue after the command completed normally.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo bp for direct access device format geometry\fR
 .ad
@@ -781,7 +705,6 @@ A bp with consistent memory could not be allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo bp for disk label\fR
 .ad
@@ -792,7 +715,6 @@ A bp with consistent memory could not be allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo bp for fdisk\fR
 .ad
@@ -803,7 +725,6 @@ A bp with consistent memory could not be allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo bp for rigid disk geometry\fR
 .ad
@@ -814,7 +735,6 @@ A bp with consistent memory could not be allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo mem for property\fR
 .ad
@@ -825,7 +745,6 @@ Free memory pool exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo memory for direct access device format geometry\fR
 .ad
@@ -836,7 +755,6 @@ Free memory pool exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo memory for disk label\fR
 .ad
@@ -847,7 +765,6 @@ Free memory pool exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo memory for rigid disk geometry\fR
 .ad
@@ -858,7 +775,6 @@ The disk label is corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNo resources for dumping\fR
 .ad
@@ -869,7 +785,6 @@ A packet could not be allocated during dumping.
 
 .sp
 .ne 2
-.mk
 .na
 \fBOffline\fR
 .ad
@@ -880,7 +795,6 @@ Drive went offline; probably powered down.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRequeue of command fails\fR
 .ad
@@ -891,7 +805,6 @@ Driver attempted to retry a command and experienced a transport error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsdrestart transport failed()\fR
 .ad
@@ -902,7 +815,6 @@ Driver attempted to retry a command and experienced a transport error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTransfer length not modulo\fR
 .ad
@@ -913,7 +825,6 @@ Illegal request size.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTransport of request sense fails()\fR
 .ad
@@ -924,7 +835,6 @@ Driver attempted to submit a request sense command and failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTransport rejected()\fR
 .ad
@@ -935,7 +845,6 @@ Host adapter driver was unable to accept a command.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnable to read label\fR
 .ad
@@ -946,7 +855,6 @@ Failure to read disk label.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnit does not respond to selection\fR
 .ad

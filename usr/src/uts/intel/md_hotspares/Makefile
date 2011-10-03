@@ -23,8 +23,7 @@
 # uts/intel/md_hotspares/Makefile
 # Copyright (c) 1999, 2000 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell.
 #
 #	This makefile drives the production of the md_hotspares module
 #
@@ -55,6 +54,11 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# Depends on md
+#
+LDFLAGS         += -dy -N drv/md
 
 #
 #	Default build targets.

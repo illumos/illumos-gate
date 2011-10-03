@@ -1,11 +1,11 @@
 '\" te
-.\" Copyright 1989 AT&T  
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2002, Sun Microsystems, Inc.
 .\" All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dupb 9F "22 Mar 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DUPB 9F "Mar 22, 2002"
 .SH NAME
 dupb \- duplicate a message block descriptor
 .SH SYNOPSIS
@@ -42,12 +42,10 @@ and db_ref incremented by one
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR \fR
 .ad
 .RS 7n
-.rt  
 Pointer to the message block to be duplicated. \fBmblk_t\fR is an instance of
 the  \fBmsgb\fR(9S) structure.
 .RE
@@ -113,7 +111,7 @@ the new message block (line 34)  and pass it along (line 35).
       5   mblk_t *mp;
       6   mblk_t *bp;
       7   extern mblk_t *hdr;
-      8 
+      8
       9   while ((mp = getq(q)) != NULL) {
      10        if (mp->b_datap->db_type >= QPCTL) {
      11             putnext(q, mp);
@@ -134,7 +132,7 @@ the new message block (line 34)  and pass it along (line 35).
      26                       if (xx->xx_qbufcall_id) {
      27                            /* qbufcall pending */
      28                            return;
-     29                       } 
+     29                       }
      30                       xx->xx_qbufcall_id = qbufcall(q, size,
      31                            BPRI_MED, xxxcallback, (intptr_t)q);
      32                       return;
@@ -161,7 +159,7 @@ the new message block (line 34)  and pass it along (line 35).
      52   xxxclose(q, cflag, crp)
      53        queue_t *q;
      54        int  cflag;
-     55        cred_t *crp;     
+     55        cred_t *crp;
      56   {
      57        struct xx *xx = (struct xx *)q->q_ptr;
                ...

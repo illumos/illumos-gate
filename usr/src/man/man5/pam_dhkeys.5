@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_dhkeys 5 "21 Jan 2003" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_DHKEYS 5 "Jan 21, 2003"
 .SH NAME
 pam_dhkeys \- authentication Diffie-Hellman keys management module
 .SH SYNOPSIS
@@ -27,23 +27,19 @@ and other \fBONC RPC\fRs use Secure RPC as the underlying security mechanism.
 The following options may be passed to the module:
 .sp
 .ne 2
-.mk
 .na
 \fBdebug\fR
 .ad
 .RS 10n
-.rt  
 \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnowarn\fR
 .ad
 .RS 10n
-.rt  
 Turn off warning messages
 .RE
 
@@ -84,68 +80,56 @@ effectively update the users secret keys.
 The authentication service returns the following error codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 20n
-.rt  
 Credentials set successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 20n
-.rt  
 Credentials not needed to access the password repository.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBPAM_USER\fR is not set, or the user is unknown.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 No secret keys were set. \fBPAM_AUTHTOK\fR is not set, no credentials are
 present or there is a wrong password.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_BUF_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Module ran out of memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 The NIS\(ma+ subsystem failed .
 .RE
 
@@ -154,45 +138,37 @@ The NIS\(ma+ subsystem failed .
 The authentication token management returns the following error codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS \fR\fR
 .ad
 .RS 20n
-.rt  
 Old \fBrpc\fR password is set in \fBSUNW_OLDRPCPASS\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 20n
-.rt  
 User in \fBPAM_USER\fR is unknown.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 User did not provide a password that decrypts the secret keys.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_BUF_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Module ran out of memory.
 .RE
 
@@ -204,15 +180,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT LevelMT-Safe with exceptions
+MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

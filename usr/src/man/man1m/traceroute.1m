@@ -3,17 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH traceroute 1M "18 Sep 2008" "SunOS 5.11" "System Administration Commands"
+.TH TRACEROUTE 1M "Sep 18, 2008"
 .SH NAME
 traceroute \- print the route packets take to network host
 .SH SYNOPSIS
 .LP
 .nf
-\fBtraceroute\fR [\fB-adFIlnSvx\fR] [\fB-A\fR \fIaddr_family\fR] [\fB-c\fR \fItraffic_class\fR] 
-     [\fB-f\fR \fIfirst_hop\fR] [\fB-g\fR \fIgateway\fR [\fB-g\fR \fIgateway\fR...] | \fB-r\fR] 
-     [\fB-i\fR \fIiface\fR] [\fB-L\fR \fIflow_label\fR] [\fB-m\fR \fImax_hop\fR] 
-     [\fB-P\fR \fIpause_sec\fR] [\fB-p\fR \fIport\fR] [\fB-Q\fR \fImax_timeout\fR] 
-     [\fB-q\fR \fInqueries\fR] [\fB-s\fR \fIsrc_addr\fR] [\fB-t\fR \fItos\fR] [\fB-w\fR \fIwait_time\fR] host 
+\fBtraceroute\fR [\fB-adFIlnSvx\fR] [\fB-A\fR \fIaddr_family\fR] [\fB-c\fR \fItraffic_class\fR]
+     [\fB-f\fR \fIfirst_hop\fR] [\fB-g\fR \fIgateway\fR [\fB-g\fR \fIgateway\fR...] | \fB-r\fR]
+     [\fB-i\fR \fIiface\fR] [\fB-L\fR \fIflow_label\fR] [\fB-m\fR \fImax_hop\fR]
+     [\fB-P\fR \fIpause_sec\fR] [\fB-p\fR \fIport\fR] [\fB-Q\fR \fImax_timeout\fR]
+     [\fB-q\fR \fInqueries\fR] [\fB-s\fR \fIsrc_addr\fR] [\fB-t\fR \fItos\fR] [\fB-w\fR \fIwait_time\fR] host
      [\fIpacketlen\fR]
 .fi
 
@@ -49,7 +49,6 @@ second timeout interval, an asterisk (\fB*\fR) is displayed for that probe. The
 annotations that may appear after the time are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
@@ -60,7 +59,6 @@ the \fIttl\fR (\fIhop limit\fR) value in the received packet is \fB<= 1\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!H\fR\fR
 .ad
@@ -71,7 +69,6 @@ host unreachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!X\fR\fR
 .ad
@@ -82,7 +79,6 @@ communication administratively prohibited.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<!N>\fR\fR
 .ad
@@ -96,7 +92,6 @@ communication administratively prohibited.
 The following annotations appear only for IPv4:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!F\fR\fR
 .ad
@@ -108,7 +103,6 @@ gateway is broken.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!N\fR\fR
 .ad
@@ -119,7 +113,6 @@ network unreachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!P\fR\fR
 .ad
@@ -130,7 +123,6 @@ protocol unreachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!S\fR\fR
 .ad
@@ -142,7 +134,6 @@ routing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!T\fR\fR
 .ad
@@ -153,7 +144,6 @@ unreachable for the specified tos (type-of-service).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!U\fR\fR
 .ad
@@ -167,7 +157,6 @@ source host isolated or precedence problem.
 The following annotations appear only for IPv6:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!A\fR\fR
 .ad
@@ -178,7 +167,6 @@ host unreachable for a reason other than lack of an entry in the routing table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!B\fR\fR
 .ad
@@ -189,7 +177,6 @@ packet too big.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!E\fR\fR
 .ad
@@ -200,7 +187,6 @@ destination is not a neighbor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!R\fR\fR
 .ad
@@ -233,7 +219,6 @@ hexadecimal notation. For example, \fIpacketlen\fR can be specified either as
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\ \fIaddr_family\fR\fR
 .ad
@@ -261,7 +246,6 @@ will state that the host is unknown and exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -278,7 +262,6 @@ address by sending a \fBSIGINT\fR, or exit \fBtraceroute\fR by sending a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\ \fItraffic_class\fR\fR
 .ad
@@ -292,7 +275,6 @@ packet. This option is valid only on IPv6.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -303,7 +285,6 @@ Set the \fBSO_DEBUG\fR socket option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
@@ -316,7 +297,6 @@ bit is always set in this case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfirst_hop\fR\fR
 .ad
@@ -329,7 +309,6 @@ intermediate gateways which are less than \fIfirst_hop\fR hops away.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgateway\fR\fR
 .ad
@@ -347,7 +326,6 @@ source route with this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
@@ -358,7 +336,6 @@ Use \fBICMP\fR (\fBICMP6\fR) \fBECHO\fR instead of \fBUDP\fR datagrams.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIiface\fR\fR
 .ad
@@ -374,7 +351,6 @@ for example, \fBeri0\fR, \fBhme0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\ \fIflow_label\fR\fR
 .ad
@@ -386,7 +362,6 @@ range from 0 to 1048575. This option is valid only on IPv6.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -398,7 +373,6 @@ received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImax_hop\fR\fR
 .ad
@@ -410,7 +384,6 @@ default is 30 hops, which is the same default used for \fBTCP \fR connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -422,7 +395,6 @@ saves a nameserver address-to-name lookup for each gateway found on the path.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpause_sec\fR\fR
 .ad
@@ -436,7 +408,6 @@ received a reply. Note that \fIpause_sec\fR is a real number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport\fR\fR
 .ad
@@ -454,7 +425,6 @@ between the source and the destination.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fImax_timeout\fR\fR
 .ad
@@ -467,7 +437,6 @@ option if you have specified a large \fInqueries\fR probe count.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fInqueries\fR\fR
 .ad
@@ -478,7 +447,6 @@ Set the desired number of probe queries. The default is 3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -493,7 +461,6 @@ You cannot use this option if the \fB-g\fR option is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
@@ -504,7 +471,6 @@ Display a summary of how many probes were not answered for each hop.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsrc_addr\fR\fR
 .ad
@@ -524,7 +490,6 @@ address do not have to match.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItos\fR\fR
 .ad
@@ -538,7 +503,6 @@ the \fItos\fR value set in the probe packet. This option is valid only on IPv4.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -551,7 +515,6 @@ packets is displayed. Also \fBICMP\fR (\fBICMP6\fR) packets received other than
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIwaittime\fR\fR
 .ad
@@ -563,7 +526,6 @@ seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -574,7 +536,7 @@ required for the last hop when using \fBICMP\fR \fBECHO\fR probes. This option
 is valid only on IPv4. See the \fB-I\fR option.
 .sp
 When specified from within a shared-IP zone, this option has no effect as the
-checksum is always calculated by the operating 	system in this case.
+checksum is always calculated by the operating system in this case.
 .RE
 
 .SH OPERANDS
@@ -583,7 +545,6 @@ checksum is always calculated by the operating 	system in this case.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhost\fR\fR
 .ad
@@ -636,15 +597,15 @@ sanfrancisco.
 .sp
 .in +2
 .nf
-istanbul% \fBtraceroute sanfrancisco\fR      
+istanbul% \fBtraceroute sanfrancisco\fR
 traceroute: Warning: Multiple interfaces found; using 172.31.86.247 @eri0
 traceroute to sanfrancisco (172.29.64.39), 30 hops max, 40 byte packets
-1  frbldg7c-86 (172.31.86.1)  1.516 ms  1.283 ms  1.362 ms      
-2  bldg1a-001 (172.31.1.211)  2.277 ms  1.773 ms  2.186 ms      
-3  bldg4-bldg1 (172.30.4.42)  1.978 ms  1.986 ms  13.996 ms      
-4  bldg6-bldg4 (172.30.4.49)  2.655 ms  3.042 ms  2.344 ms      
-5  ferbldg11a-001 (172.29.1.236)  2.636 ms  3.432 ms  3.830 ms      
-6  frbldg12b-153 (172.29.153.72)  3.452 ms  3.146 ms  2.962 ms      
+1  frbldg7c-86 (172.31.86.1)  1.516 ms  1.283 ms  1.362 ms
+2  bldg1a-001 (172.31.1.211)  2.277 ms  1.773 ms  2.186 ms
+3  bldg4-bldg1 (172.30.4.42)  1.978 ms  1.986 ms  13.996 ms
+4  bldg6-bldg4 (172.30.4.49)  2.655 ms  3.042 ms  2.344 ms
+5  ferbldg11a-001 (172.29.1.236)  2.636 ms  3.432 ms  3.830 ms
+6  frbldg12b-153 (172.29.153.72)  3.452 ms  3.146 ms  2.962 ms
 7  sanfrancisco (172.29.64.39)  3.430 ms  3.312 ms  3.451 ms
 .fi
 .in -2
@@ -678,7 +639,7 @@ traceroute to sanfrancisco (172.29.64.39), 30 hops max, 56 byte packets
 11  frbldg12b-153 (172.29.153.72)  9.634 ms
 12  sanfrancisco (172.29.64.39)  14.631 ms
 
- 
+
 .fi
 .in -2
 .sp
@@ -689,7 +650,6 @@ traceroute to sanfrancisco (172.29.64.39), 30 hops max, 56 byte packets
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -700,7 +660,6 @@ Successful operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad

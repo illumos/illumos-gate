@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsync 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH FSYNC 3C "Feb 5, 2008"
 .SH NAME
 fsync \- synchronize changes to a file
 .SH SYNOPSIS
@@ -45,56 +45,46 @@ completed.
 The \fBfsync()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIfildes\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-.rt  
 A signal was caught during execution of the \fBfsync()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 13n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 13n
-.rt  
 There was no free space remaining on the device containing the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 13n
-.rt  
 Remote connection timed out. This occurs when the file is on an  \fBNFS\fR file
 system mounted with the  \fIsoft\fR option. See  \fBmount_nfs\fR(1M).
 .RE
@@ -123,17 +113,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_map_regs 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_MAP_REGS 9F "Jan 16, 2006"
 .SH NAME
 ddi_map_regs, ddi_unmap_regs \- map or unmap registers
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ddi_map_regs, ddi_unmap_regs \- map or unmap registers
 
 
 
-\fBint\fR \fBddi_map_regs\fR(\fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIrnumber\fR, \fBcaddr_t *\fR\fIkaddrp\fR, 
+\fBint\fR \fBddi_map_regs\fR(\fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIrnumber\fR, \fBcaddr_t *\fR\fIkaddrp\fR,
      \fBoff_t\fR \fIoffset\fR, \fBoff_t\fR \fIlen\fR);
 .fi
 
@@ -35,112 +35,92 @@ These interfaces are obsolete. Use \fBddi_regs_map_setup\fR(9F) instead of
 .SS "\fBddi_map_regs()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrnumber\fR\fR
 .ad
 .RS 11n
-.rt  
 Register set number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkaddrp\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the base kernel address of the mapped region (set on return).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 11n
-.rt  
 Offset into register space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 11n
-.rt  
 Length to be mapped.
 .RE
 
 .SS "\fBddi_unmap_regs()\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrnumber\fR\fR
 .ad
 .RS 11n
-.rt  
 Register set number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkaddrp\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the base kernel address of the region to be unmapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 11n
-.rt  
 Offset into register space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 11n
-.rt  
 Length to be unmapped.
 .RE
 
@@ -175,12 +155,10 @@ unmapped. \fIkaddrp\fR is a pointer to the address returned from
 The \fBddi_map_regs()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 on success.
 .RE
 
@@ -196,13 +174,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Obsolete
+Interface Stability 	Obsolete
 .TE
 
 .SH SEE ALSO

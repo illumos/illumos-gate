@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2005, 2006 Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cancel 1 "26 May 2006" "SunOS 5.11" "User Commands"
+.TH CANCEL 1 "May 26, 2006"
 .SH NAME
 cancel \- cancel print request
 .SH SYNOPSIS
@@ -55,12 +55,10 @@ The print client commands locate destination information using the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuser\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the user for which print requests are to be cancelled. Specify
 \fIuser\fR as a username.
 .RE
@@ -71,12 +69,10 @@ The name of the user for which print requests are to be cancelled. Specify
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestination\fR\fR
 .ad
 .RS 15n
-.rt  
 The destination on which the print requests are to be canceled.
 \fIdestination\fR is the name of a printer or class of printers (see
 \fBlpadmin\fR(1M)). If \fIdestination\fR is not specified, \fBcancel\fR cancels
@@ -89,24 +85,20 @@ See \fBprinters.conf\fR(4) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest-ID\fR\fR
 .ad
 .RS 15n
-.rt  
 The print request to be canceled. Specify \fIrequest-ID\fR using \fBLP-style\fR
 request \fBIDs\fR (\fIdestination\fR-\fInumber\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the user for which the print requests are to be cancelled. Specify
 \fIuser\fR as a username.
 .RE
@@ -117,79 +109,65 @@ The name of the user for which the print requests are to be cancelled. Specify
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBNIS+\fR version of \fB/etc/printers.conf\fR
 .RE
 
@@ -201,13 +179,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

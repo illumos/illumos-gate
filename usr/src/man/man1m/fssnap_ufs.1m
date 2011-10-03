@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fssnap_ufs 1M "29 Jan 2007" "SunOS 5.11" "System Administration Commands"
+.TH FSSNAP_UFS 1M "Jan 29, 2007"
 .SH NAME
 fssnap_ufs \- create a temporary snapshot of a UFS file system
 .SH SYNOPSIS
 .LP
 .nf
-\fBfssnap\fR [\fB-F\fR ufs] [\fB-V\fR] \fB-o\fR \fIbacking-store\fR=\fIpath\fR, 
+\fBfssnap\fR [\fB-F\fR ufs] [\fB-V\fR] \fB-o\fR \fIbacking-store\fR=\fIpath\fR,
      [\fIspecific-options\fR] \fI/mount/point\fR
 .fi
 
@@ -50,7 +50,6 @@ an \fBNFS\fR-mounted file system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -61,7 +60,6 @@ Deletes the snapshot associated with the given file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -85,7 +83,6 @@ The following \fB-o\fR options display specific information for a given
 snapshot. See the EXAMPLES section for examples of how to use these options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsnapnumber\fR\fR
 .ad
@@ -96,7 +93,6 @@ Display the snapshot number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblockdevname\fR\fR
 .ad
@@ -107,7 +103,6 @@ Display the block device path.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrawdevname\fR\fR
 .ad
@@ -118,7 +113,6 @@ Display the raw device path.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmountpoint\fR\fR
 .ad
@@ -129,7 +123,6 @@ Display the mount point of the master file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstate\fR\fR
 .ad
@@ -140,7 +133,6 @@ Display the state of the snapshot device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbacking-store\fR\fR
 .ad
@@ -153,7 +145,6 @@ the first file, with the suffixes \fB\&.2\fR, \fB\&.3\fR, and so forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbacking-store-len\fR\fR
 .ad
@@ -164,7 +155,6 @@ Display the sum of the sizes of the backing-store files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxsize\fR\fR
 .ad
@@ -175,7 +165,6 @@ Display the \fBmaxsize\fR value specified for the backing-store file(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreatetime\fR\fR
 .ad
@@ -186,7 +175,6 @@ Display the time that the snapshot was created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchunksize\fR\fR
 .ad
@@ -199,7 +187,6 @@ Display the copy-on-write granularity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific-options\fR\fR
 .ad
@@ -210,7 +197,6 @@ Specify the following options when creating a snapshot. All of these options
 are discretionary, except for the backing-store file, which is required.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbacking-store=\fR\fIpath\fR\fR
 .ad
@@ -231,7 +217,6 @@ This option can be abbreviated as \fBbf=\fR\fIpath\fR or \fBbs=\fR\fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunlink\fR\fR
 .ad
@@ -247,7 +232,6 @@ deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchunksize=\fR\fIn\fR [\fBk\fR,\fBm\fR,\fBg\fR]\fR
 .ad
@@ -263,7 +247,6 @@ the block size of the file system (typically \fB32k\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxsize=\fR\fIn\fR[\fBk\fR,\fBm\fR,\fBg\fR]\fR
 .ad
@@ -280,7 +263,6 @@ for megabytes, or \fBg\fR for gigabytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBraw\fR\fR
 .ad
@@ -301,7 +283,6 @@ Both devices are always created. This option affects only the output.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImount-point\fR\fR
 .ad
@@ -312,7 +293,6 @@ The directory where the file system resides.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspecial\fR\fR
 .ad
@@ -351,7 +331,7 @@ removed in the second command.
 .sp
 .in +2
 .nf
-# ufsdump 0uf /dev/rmt/0 `fssnap -F ufs 
+# ufsdump 0uf /dev/rmt/0 `fssnap -F ufs
       -o raw,bs=/export/snap /export/home`
 \fI<output from ufsdump>\fR
 # fssnap -F ufs -d /export/home
@@ -371,9 +351,9 @@ system snapshot.
 .in +2
 .nf
 # ufsdump 0uf /dev/rmt/0 `fssnap -F ufs
-      -o maxsize=400m,backing-store=/export/snap,raw 
-      /export/home` 
-# fssnap -F ufs -d /export/home 
+      -o maxsize=400m,backing-store=/export/snap,raw
+      /export/home`
+# fssnap -F ufs -d /export/home
 .fi
 .in -2
 .sp
@@ -391,7 +371,7 @@ flag.
 .sp
 .in +2
 .nf
-# ufsdump lfNu /dev/rmt/0 /dev/rdsk/c0t3d0s2 `fssnap -F ufs 
+# ufsdump lfNu /dev/rmt/0 /dev/rdsk/c0t3d0s2 `fssnap -F ufs
 -o raw,bs=/export/scratch,unlink /var`
 .fi
 .in -2
@@ -407,7 +387,7 @@ The following command displays the currently existing snapshots.
 .in +2
 .nf
 # fssnap -i
-0  /src  
+0  /src
 1  /export/home
 \fI<output continues>\fR
 .fi
@@ -425,9 +405,9 @@ system snapshot, mount it on \fB/tmp/mount\fR for temporary read-only access.
 .in +2
 .nf
 # fssnap -F ufs -o backing-store=/nfs/server/scratch /export/home
-/dev/fssnap/1 
-# mkdir /tmp/mount 
-# mount -F ufs -o ro /dev/fssnap/1 /tmp/mount  
+/dev/fssnap/1
+# mkdir /tmp/mount
+# mount -F ufs -o ro /dev/fssnap/1 /tmp/mount
 .fi
 .in -2
 .sp
@@ -445,18 +425,18 @@ backing-store file, check the state of the snapshot.
 .in +2
 .nf
 # fssnap -o bs=/scratch,unlink /src
-/dev/fssnap/0 
-# fssnap -i /src 
-Snapshot number               : 0 
-Block Device                  : /dev/fssnap/0 
-Raw Device                    : /dev/rfssnap/0 
-Mount point                   : /src 
-Device state                  : active 
-Backing store path            : /scratch/snapshot2 <UNLINKED> 
-Backing store size            : 192 KB 
-Maximum backing store size    : Unlimited 
-Snapshot create time          : Sat May 06 10:55:11 2000 
-Copy-on-write granularity     : 32 KB 
+/dev/fssnap/0
+# fssnap -i /src
+Snapshot number               : 0
+Block Device                  : /dev/fssnap/0
+Raw Device                    : /dev/rfssnap/0
+Mount point                   : /src
+Device state                  : active
+Backing store path            : /scratch/snapshot2 <UNLINKED>
+Backing store size            : 192 KB
+Maximum backing store size    : Unlimited
+Snapshot create time          : Sat May 06 10:55:11 2000
+Copy-on-write granularity     : 32 KB
 .fi
 .in -2
 .sp
@@ -473,9 +453,9 @@ the \fB/test\fR file system.
 .sp
 .in +2
 .nf
-# fssnap -i -o backing-store-len,backing-store,createtime /test 
-196608 
-/snapshot2 
+# fssnap -i -o backing-store-len,backing-store,createtime /test
+196608
+/snapshot2
 Sat May 6 10:55:11 2000
 .fi
 .in -2
@@ -493,7 +473,6 @@ they will have names of the form \fIfile\fR (for the first file), \fIfile\fR.1,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -504,7 +483,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad

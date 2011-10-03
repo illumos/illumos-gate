@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH recvmsg 3XNET "27 Feb 2006" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH RECVMSG 3XNET "Feb 27, 2006"
 .SH NAME
 recvmsg \- receive a message from a socket
 .SH SYNOPSIS
@@ -94,45 +94,37 @@ the bitwise-inclusive OR of all of the following flags that indicate conditions
 detected for the received message:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_EOR\fR\fR
 .ad
 .RS 14n
-.rt  
 End of record was received (if supported by the protocol).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_OOB\fR\fR
 .ad
 .RS 14n
-.rt  
 Out-of-band data was received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_TRUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data was truncated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_CTRUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Control data was truncated.
 .RE
 
@@ -142,23 +134,19 @@ Control data was truncated.
 The function takes the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocket\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies the socket file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImessage\fR\fR
 .ad
 .RS 11n
-.rt  
 Points to a \fBmsghdr\fR structure, containing both the buffer to store the
 source address and the buffers for the incoming message. The length and format
 of the address depend on the address family of the socket. The \fBmsg_flags\fR
@@ -167,45 +155,37 @@ member is ignored on input, but may contain meaningful values on output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies the type of message reception. Values of this argument are formed by
 logically OR'ing zero or more of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_OOB\fR\fR
 .ad
 .RS 15n
-.rt  
 Requests out-of-band data. The significance and semantics of out-of-band data
 are protocol-specific.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_PEEK\fR\fR
 .ad
 .RS 15n
-.rt  
 Peeks at the incoming message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_WAITALL\fR\fR
 .ad
 .RS 15n
-.rt  
 Requests that the function block until the full amount of data requested can be
 returned. The function may return a smaller amount of data if a signal is
 caught, if the connection is terminated, if \fBMSG_PEEK\fR was specified, or if
@@ -232,7 +212,6 @@ performed an orderly shutdown, \fBrecvmsg()\fR returns \fB0\fR. Otherwise,
 The \fBrecvmsg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
@@ -241,7 +220,6 @@ The \fBrecvmsg()\fR function will fail if:
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 The socket's file descriptor is marked \fBO_NONBLOCK\fR and no data is waiting
 to be received; or \fBMSG_OOB\fR is set and no out-of-band data is available
 and either the socket's file descriptor is marked \fBO_NONBLOCK\fR or the
@@ -250,34 +228,28 @@ socket does not support blocking to await out-of-band data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIsocket\fR argument is not a valid open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNRESET\fR\fR
 .ad
 .RS 15n
-.rt  
 A connection was forcibly closed by a peer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fImessage\fR parameter, or storage pointed to by the \fImsg_name\fR,
 \fImsg_control\fR or \fImsg_iov\fR fields of the \fImessage\fR parameter, or
 storage pointed to by the \fBiovec\fR structures pointed to by the
@@ -286,80 +258,66 @@ storage pointed to by the \fBiovec\fR structures pointed to by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 15n
-.rt  
 This function was interrupted by a signal before any data was available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 The sum of the \fBiov_len\fR values overflows an \fBssize_t\fR. or the MSG_OOB
 flag is set and no out-of-band data is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMSGSIZE\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fBmsg_iovlen\fR member of the \fBmsghdr\fR structure pointed to by
 \fImessage\fR is less than or equal to 0, or is greater than \fBIOV_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 15n
-.rt  
 A receive is attempted on a connection-mode socket that is not connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIsocket\fR argument does not refer to a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 15n
-.rt  
 The specified flags are not supported for this socket type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBETIMEDOUT\fR\fR
 .ad
 .RS 15n
-.rt  
 The connection timed out during connection establishment, or due to a
 transmission timeout on active connection.
 .RE
@@ -369,45 +327,37 @@ transmission timeout on active connection.
 The \fBrecvmsg()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 11n
-.rt  
 An \fBIO\fR error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 Insufficient resources were available in the system to perform the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 Insufficient memory was available to fulfill the request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 11n
-.rt  
 There were insufficient STREAMS resources available for the operation to
 complete.
 .RE
@@ -420,15 +370,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

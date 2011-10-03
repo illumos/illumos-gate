@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH moe 1 "2 Feb 2005" "SunOS 5.11" "User Commands"
+.TH MOE 1 "Feb 2, 2005"
 .SH NAME
 moe \- manifest the optimal expansion of a pathname
 .SH SYNOPSIS
@@ -57,45 +57,37 @@ runtime linker, refer to the \fILinker and Libraries Guide\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-32\fR\fR
 .ad
 .RS 7n
-.rt  
 Only analyze 32-bit objects.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-64\fR\fR
 .ad
 .RS 7n
-.rt  
 Only analyze 64-bit objects.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 7n
-.rt  
 Prefix each pathname with the class of the object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 7n
-.rt  
 Silent. No optimal name, or error diagnostics are displayed. Only an error
 return is made available. This option is only meaningful with the \fB-32\fR and
 \fB-64\fR options. The \fB-s\fR option can not be used with the \fB-v\fR
@@ -104,12 +96,10 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 7n
-.rt  
 Verbose. If no optimal expansion name can be determined, an error diagnostic is
 written to standard error. The \fB-v\fR option can not be used with the
 \fB-s\fR option.
@@ -121,12 +111,10 @@ written to standard error. The \fB-v\fR option can not be used with the
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath\fR\fR
 .ad
 .RS 8n
-.rt  
 The pathname to be expanded.
 .RE
 
@@ -180,7 +168,7 @@ result in the following diagnostic being produced.
 .in +2
 .nf
 % \fBmoe -c -v -32 '/opt/ISV/$ISALIST/isa.so.1'\fR
-32-bit: /opt/ISV/sparcv9/isa.so.1: wrong ELF class: ELFCLASS64 
+32-bit: /opt/ISV/sparcv9/isa.so.1: wrong ELF class: ELFCLASS64
 .fi
 .in -2
 .sp
@@ -199,13 +187,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

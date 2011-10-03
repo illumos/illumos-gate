@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libvolmgt 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBVOLMGT 3LIB "May 22, 2003"
 .SH NAME
 libvolmgt \- volume management library
 .SH SYNOPSIS
@@ -27,39 +27,33 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBmedia_findname\fR\fBmedia_getattr\fR
-\fBmedia_getid\fR\fBmedia_setattr\fR
-\fBvolmgt_acquire\fR\fBvolmgt_check\fR
-\fBvolmgt_feature_enabled\fR\fBvolmgt_inuse\fR
-\fBvolmgt_ownspath\fR\fBvolmgt_release\fR
-\fBvolmgt_root\fR\fBvolmgt_running\fR
-\fBvolmgt_symdev\fR\fBvolmgt_symname\fR
+l l
+l l .
+\fBmedia_findname\fR	\fBmedia_getattr\fR
+\fBmedia_getid\fR	\fBmedia_setattr\fR
+\fBvolmgt_acquire\fR	\fBvolmgt_check\fR
+\fBvolmgt_feature_enabled\fR	\fBvolmgt_inuse\fR
+\fBvolmgt_ownspath\fR	\fBvolmgt_release\fR
+\fBvolmgt_root\fR	\fBvolmgt_running\fR
+\fBvolmgt_symdev\fR	\fBvolmgt_symname\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libvolmgt.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libvolmgt.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit shared object
 .RE
 
@@ -71,13 +65,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe with exceptions 
+MT-Level	Safe with exceptions
 .TE
 
 .SH SEE ALSO

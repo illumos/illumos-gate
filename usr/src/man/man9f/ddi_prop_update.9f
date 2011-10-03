@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_prop_update 9F "28 Aug 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_PROP_UPDATE 9F "Aug 28, 2001"
 .SH NAME
 ddi_prop_update, ddi_prop_update_int_array, ddi_prop_update_int,
 ddi_prop_update_string_array, ddi_prop_update_int64,
@@ -17,13 +17,13 @@ ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
 
 
 
-\fBint\fR \fBddi_prop_update_int_array\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBddi_prop_update_int_array\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR,
      \fBchar *\fR\fIname\fR, \fBint *\fR\fIdata\fR, \fBuint_t\fR \fInelements\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_update_int\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+\fBint\fR \fBddi_prop_update_int\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
      \fBint\fR \fIdata\fR);
 .fi
 
@@ -35,7 +35,7 @@ ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_update_int64\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+\fBint\fR \fBddi_prop_update_int64\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
      \fBint64_t\fR \fIdata\fR);
 .fi
 
@@ -47,7 +47,7 @@ ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
 
 .LP
 .nf
-\fBint\fR \fBddi_prop_update_string\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+\fBint\fR \fBddi_prop_update_string\fR(\fBdev_t\fR \fIdev\fR, \fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
      \fBchar *\fR\fIdata\fR);
 .fi
 
@@ -60,46 +60,38 @@ ddi_prop_update_int64_array, ddi_prop_update_string, ddi_prop_update_byte_array
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR \fR
 .ad
 .RS 14n
-.rt  
 Device number associated with the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 14n
-.rt  
 Pointer to the device info node of device whose property list should be
 updated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fR
 .ad
 .RS 14n
-.rt  
 String containing the name of the property to be updated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInelements\fR \fR
 .ad
 .RS 14n
-.rt  
 The number of elements contained in the memory pointed at by \fIdata\fR.
 .RE
 
@@ -108,12 +100,10 @@ The number of elements contained in the memory pointed at by \fIdata\fR.
 \fBddi_prop_update_int_array()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 A pointer an integer array with which to update the property.
 .RE
 
@@ -122,12 +112,10 @@ A pointer an integer array with which to update the property.
 \fBddi_prop_update_int()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 An integer value with which to update the property.
 .RE
 
@@ -136,12 +124,10 @@ An integer value with which to update the property.
 \fBddi_prop_update_int64_array()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 An pointer to a 64-bit integer array with which to update the property.
 .RE
 
@@ -150,12 +136,10 @@ An pointer to a 64-bit integer array with which to update the property.
 \fBddi_prop_update_int64()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 A 64-bit integer value with which to update the property.
 .RE
 
@@ -164,12 +148,10 @@ A 64-bit integer value with which to update the property.
 \fBddi_prop_update_string_array()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 A pointer to a string array with which to update the property. The array of
 strings is formatted as an array of pointers to \fBNULL \fRterminated strings,
 much like the \fIargv\fR argument to \fBexecve\fR(2).
@@ -180,12 +162,10 @@ much like the \fIargv\fR argument to \fBexecve\fR(2).
 \fBddi_prop_update_string()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 A pointer to a string value with which to update the property.
 .RE
 
@@ -194,12 +174,10 @@ A pointer to a string value with which to update the property.
 \fBddi_prop_update_byte_array()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdata\fR \fR
 .ad
 .RS 9n
-.rt  
 A pointer to a byte array with which to update the property.
 .RE
 
@@ -324,35 +302,29 @@ value of the property.
 All of the property update routines return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_SUCCESS\fR \fR
 .ad
 .RS 27n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_INVAL_ARG\fR \fR
 .ad
 .RS 27n
-.rt  
 If an attempt is made to update a property with \fIname\fR set to \fINULL\fR or
 \fIname\fR set to the null string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_PROP_CANNOT_ENCODE\fR \fR
 .ad
 .RS 27n
-.rt  
 If the bytes of the property cannot be encoded.
 .RE
 

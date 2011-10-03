@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_init 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_INIT 3DEVINFO "May 15, 2008"
 .SH NAME
 di_init, di_fini \- create and destroy a snapshot of kernel device tree
 .SH SYNOPSIS
@@ -23,88 +23,72 @@ di_init, di_fini \- create and destroy a snapshot of kernel device tree
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 13n
-.rt  
 Snapshot content specification. The possible values can be a bitwise OR of at
 least one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOSUBTREE\fR\fR
 .ad
 .RS 16n
-.rt  
 Include subtree.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOPROP\fR\fR
 .ad
 .RS 16n
-.rt  
 Include properties.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOMINOR\fR\fR
 .ad
 .RS 16n
-.rt  
 Include minor node data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOCPYALL\fR\fR
 .ad
 .RS 16n
-.rt  
 Include all of the above.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOPATH\fR\fR
 .ad
 .RS 16n
-.rt  
 Include multipath path node data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOLYR\fR\fR
 .ad
 .RS 16n
-.rt  
 Include device layering data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDINFOCPYONE\fR\fR
 .ad
 .RS 16n
-.rt  
 Include only a single node without properties, minor nodes, or path nodes.
 .RE
 
@@ -112,24 +96,20 @@ Include only a single node without properties, minor nodes, or path nodes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIphys_path\fR\fR
 .ad
 .RS 13n
-.rt  
 Physical path of the \fIroot\fR device node of the snapshot. See
 \fBdi_devfs_path\fR(3DEVINFO).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIroot\fR\fR
 .ad
 .RS 13n
-.rt  
 Handle obtained by calling \fBdi_init()\fR.
 .RE
 
@@ -157,35 +137,29 @@ also be set by \fBopen\fR(2), \fBioctl\fR(2) or \fBmmap\fR(2). The most common
 error codes include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient privilege for accessing device configuration data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Either the device named by \fIphys_path\fR is not present in the system, or the
 \fBdevinfo\fR(7D) driver is not installed properly.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Either \fIphys_path\fR is incorrectly formed or the \fIflags\fR argument is
 invalid.
 .RE
@@ -209,7 +183,7 @@ device tree device node names:
 #include <stdio.h>
 #include <libdevinfo.h>
 
-int 
+int
 prt_nodename(di_node_t node, void *arg)
 {
      printf("%s\en", di_node_name(node));
@@ -299,15 +273,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

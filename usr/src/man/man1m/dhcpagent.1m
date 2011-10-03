@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcpagent 1M "21 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH DHCPAGENT 1M "Sep 21, 2009"
 .SH NAME
 dhcpagent \- Dynamic Host Configuration Protocol (DHCP) client daemon
 .SH SYNOPSIS
@@ -142,7 +142,6 @@ The \fBdhcpagent\fR daemon writes information and error messages in five
 categories:
 .sp
 .ne 2
-.mk
 .na
 \fBcritical\fR
 .ad
@@ -153,7 +152,6 @@ Critical messages indicate severe conditions that prevent proper operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fBerrors\fR
 .ad
@@ -166,7 +164,6 @@ lead to degraded functionality.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwarnings\fR
 .ad
@@ -179,7 +176,6 @@ be provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinformational\fR
 .ad
@@ -193,7 +189,6 @@ of information, such as the IP address obtained, are always provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdebug\fR
 .ad
@@ -219,7 +214,6 @@ If an executable (binary or script) is placed at \fB/etc/dhcp/eventhook\fR, the
 following events occur:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBOUND\fR and \fBBOUND6\fR\fR
 .ad
@@ -235,7 +229,6 @@ leases.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXTEND\fR and \fBEXTEND6\fR\fR
 .ad
@@ -257,7 +250,6 @@ Those to be removed will be marked with the \fBIFF_DEPRECATED\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXPIRE\fR and \fBEXPIRE6\fR\fR
 .ad
@@ -271,7 +263,6 @@ addresses are removed from the interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDROP\fR and \fBDROP6\fR\fR
 .ad
@@ -286,7 +277,6 @@ might not be present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINFORM\fR and \fBINFORM6\fR\fR
 .ad
@@ -303,7 +293,6 @@ lease from the server, and instead obtains only configuration parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOSS6\fR\fR
 .ad
@@ -320,7 +309,6 @@ DHCPv6. If all leases have expired, then the EXPIRE6 event occurs instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRELEASE\fR and \fBRELEASE6\fR\fR
 .ad
@@ -365,7 +353,6 @@ See EXAMPLES for an example event program.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -406,7 +393,6 @@ http://www.ietf.org
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIn\fR\fR
 .ad
@@ -418,7 +404,6 @@ and 2; the latter is more verbose.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -430,7 +415,6 @@ messages are sent to standard error instead of to \fBsyslog\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -489,7 +473,6 @@ Note the redirection of stdout and stderr to a file.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dhcp/\fIif\fR.dhc\fR\fR
 .ad
@@ -507,7 +490,6 @@ using REQUEST (for DHCPv4) or Confirm (DHCPv6).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dhcp/duid\fR\fR
 .ad
@@ -524,7 +506,6 @@ undocumented, and applications should not read from or write to them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/dhcpagent\fR\fR
 .ad
@@ -543,7 +524,6 @@ IPv6 parameter request list, use \fB\&.v6.PARAM_REQUEST_LIST\fR. To set the
 The parameters include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVERIFIED_LEASE_ONLY\fR\fR
 .ad
@@ -565,7 +545,6 @@ allow the system to recover quickly from moves.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFFER_WAIT\fR\fR
 .ad
@@ -578,7 +557,6 @@ for valid Advertisements after sending a Solicit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLIENT_ID\fR\fR
 .ad
@@ -602,7 +580,6 @@ first form, the format of \fIdata\fR... depends on the decimal value. The
 following formats are defined for this first form:
 .sp
 .ne 2
-.mk
 .na
 \fB1,\fIhwtype\fR,\fItime\fR,\fIlla\fR\fR
 .ad
@@ -618,7 +595,6 @@ used, the \fIhwtype\fR value can be omitted. For example: \fB1,,,hme0\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB2,\fIenterprise\fR,\fIhex\fR...\fR
 .ad
@@ -631,7 +607,6 @@ Type 2, DUID-EN. The \fIenterprise\fR value is an integer in the range
 
 .sp
 .ne 2
-.mk
 .na
 \fB3,\fIhwtype\fR,\fIlla\fR\fR
 .ad
@@ -643,7 +618,6 @@ stamp is not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB*,\fIhex\fR\fR
 .ad
@@ -660,7 +634,6 @@ format. Thus, "\fBSun\fR" and \fB0x53756E\fR are equivalent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPARAM_REQUEST_LIST\fR\fR
 .ad
@@ -674,7 +647,6 @@ Option names for IPv6 are resolved by means of \fB/etc/dhcp/inittab6\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPARAM_IGNORE_LIST\fR\fR
 .ad
@@ -690,7 +662,6 @@ default router.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREQUEST_HOSTNAME\fR\fR
 .ad
@@ -718,7 +689,6 @@ This option works with DHCPv4 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dhcp/eventhook\fR\fR
 .ad
@@ -735,13 +705,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

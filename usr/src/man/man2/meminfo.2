@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH meminfo 2 "21 Feb 2003" "SunOS 5.11" "System Calls"
+.TH MEMINFO 2 "Feb 21, 2003"
 .SH NAME
 meminfo \- provide information about memory
 .SH SYNOPSIS
@@ -20,69 +20,57 @@ meminfo \- provide information about memory
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinaddr\fR\fR
 .ad
 .RS 14n
-.rt  
 array of input addresses; the maximum number of addresses that can be processed
 for each call is \fBMAX_MEMINFO_CNT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr_count\fR\fR
 .ad
 .RS 14n
-.rt  
 number of addresses
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinfo_req\fR\fR
 .ad
 .RS 14n
-.rt  
 array of types of information requested
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinfo_count\fR\fR
 .ad
 .RS 14n
-.rt  
 number of pieces of information requested for each address in \fIinaddr\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutdata\fR\fR
 .ad
 .RS 14n
-.rt  
 array into which results are placed; array size must be the product of
 \fIinfo_count\fR and \fIaddr_count\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalidity\fR\fR
 .ad
 .RS 14n
-.rt  
 array of size \fIaddr_count\fR containing bitwise result codes; 0th bit
 evaluates validity of corresponding input address, 1st bit validity of response
 to first member of \fIinfo_req\fR, and so on
@@ -102,78 +90,64 @@ The caller of \fBmeminfo()\fR can obtain the following types of information
 about both virtual and physical memory.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_VPHYSICAL\fR\fR
 .ad
 .RS 26n
-.rt  
 physical address corresponding to virtual address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_VLGRP\fR\fR
 .ad
 .RS 26n
-.rt  
 locality group of physical page corresponding to virtual address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_VPAGESIZE\fR\fR
 .ad
 .RS 26n
-.rt  
 size of physical page corresponding to virtual address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_VREPLCNT\fR\fR
 .ad
 .RS 26n
-.rt  
 number of replicated physical pages corresponding to specified virtual address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_VREPL\fR | \fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 \fIn\fRth physical replica of specified virtual address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_VREPL_LGRP\fR | \fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 lgrp of \fIn\fRth physical replica of specified virtual address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMEMINFO_PLGRP\fR\fR
 .ad
 .RS 26n
-.rt  
 locality group of specified physical address
 .RE
 
@@ -188,24 +162,20 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBmeminfo()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The area pointed to by \fIoutdata\fR or \fIvalidity\fR could not be written, or
 the data pointed to by \fIinfo_req\fR or \fIinaddr\fR could not be read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIinfo_count\fR is greater than 31 or less than 1, or the value
 of \fIaddr_count\fR is less than 1.
 .RE
@@ -240,7 +210,7 @@ print_info(void **addrvec, int how_many)
     for (i = 0; i < how_many; i++)
         inaddr[i] = (uint64_t)addrvec[i];
 
-    if (meminfo(inaddr, how_many, info, info_num, outdata, 
+    if (meminfo(inaddr, how_many, info, info_num, outdata,
                 validity) < 0) {
         perror("meminfo");
         return;
@@ -267,7 +237,7 @@ print_info(void **addrvec, int how_many)
                 "page 0x%llx of size %s\en",
                 inaddr[i], outdata[i * info_num], buff);
         }
-    }    
+    }
 }
 .fi
 .in -2
@@ -280,15 +250,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

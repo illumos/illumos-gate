@@ -618,12 +618,6 @@ if ($opt_g) {
 	$ENV{'LD_PRELOAD'} = 'libumem.so';
 }
 
-#
-# Ensure that $PATH contains a cc(1) so that we can execute the
-# test programs that require compilation of C code.
-#
-$ENV{'PATH'} = $ENV{'PATH'} . ':/ws/onnv-tools/SUNWspro/SS11/bin';
-
 if ($opt_b) {
 	logmsg("badioctl'ing ... ");
 

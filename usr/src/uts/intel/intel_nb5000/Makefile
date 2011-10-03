@@ -19,6 +19,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 
 #
@@ -68,6 +69,11 @@ LINTS		= $(INTEL_NB5000_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ALL_TARGET      = $(BINARY)
 LINT_TARGET     = $(LINT_MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+#
+# Depends on smbios
+#
+LDFLAGS         += -dy -N drv/smbios
 
 #
 #       Default build targets.

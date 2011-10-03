@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfsadmin 1M "21 Feb 2004" "SunOS 5.11" "System Administration Commands"
+.TH CFSADMIN 1M "Feb 21, 2004"
 .SH NAME
 cfsadmin \- administer disk space used for caching file systems with the Cache
 File-System (CacheFS)
@@ -80,7 +80,6 @@ file system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR [ \fB-o\fR \fIcacheFS-parameters\fR ] \fIcache_directory\fR\fR
 .ad
@@ -92,7 +91,6 @@ directory must not exist prior to cache creation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR { \fIcache_ID\fR | all } \fIcache_directory\fR\fR
 .ad
@@ -109,7 +107,6 @@ As indicated by the syntax above, you must supply either a \fIcache_ID\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIcache_directory\fR\fR
 .ad
@@ -122,7 +119,6 @@ resource utilization and cache resource parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR { \fImntpt1\fR ... } | all\fR
 .ad
@@ -143,7 +139,6 @@ As indicated by the syntax above, you must supply one or more mount points, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR [ \fB-o\fR \fIcacheFS-parameters\fR ] \fIcache_directory\fR\fR
 .ad
@@ -164,12 +159,10 @@ You can specify the following CacheFS resource parameters as arguments to the
 \fB-o\fR option. Separate multiple parameters with commas.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxblocks=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Maximum amount of storage space that CacheFS can use, expressed as a percentage
 of the total number of blocks in the front file system. If CacheFS does not
 have exclusive use of the front file system, there is no guarantee that all the
@@ -179,12 +172,10 @@ space the \fBmaxblocks\fR parameter allows is available. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBminblocks=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Minimum amount of storage space, expressed as a percentage of the total number
 of blocks in the front file system, that CacheFS is always allowed to use
 without limitation by its internal control mechanisms. If CacheFS does not have
@@ -195,12 +186,10 @@ default is \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBthreshblocks=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 A percentage of the total blocks in the front file system beyond which CacheFS
 cannot claim resources once its block usage has reached the level specified by
 \fBminblocks\fR. The default is \fB85\fR.
@@ -208,12 +197,10 @@ cannot claim resources once its block usage has reached the level specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxfiles=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Maximum number of files that CacheFS can use, expressed as a percentage of the
 total number of inodes in the front file system. If CacheFS does not have
 exclusive use of the front file system, there is no guarantee that all the
@@ -223,12 +210,10 @@ inodes the \fBmaxfiles\fR parameter allows is available. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBminfiles=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Minimum number of files, expressed as a percentage of the total number of
 inodes in the front file system, that CacheFS is always allowed to use without
 limitation by its internal control mechanisms. If CacheFS does not have
@@ -239,12 +224,10 @@ default is \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBthreshfiles=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 A percentage of the total inodes in the front file system beyond which CacheFS
 cannot claim inodes once its usage has reached the level specified by
 \fBminfiles\fR. The default is \fB85\fR.
@@ -252,12 +235,10 @@ cannot claim inodes once its usage has reached the level specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxfilesize=\fR\fIn\fR\fR
 .ad
 .RS 18n
-.rt  
 Largest file size, expressed in megabytes, that CacheFS is allowed to cache.
 The default is \fB3\fR. You cannot decrease the block or inode allotment for a
 cache. To decrease the size of a cache, you must remove it and create it again
@@ -270,23 +251,19 @@ has no effect.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcache_directory\fR\fR
 .ad
 .RS 19n
-.rt  
 The directory under which the cache is actually stored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImntpt1\fR\fR
 .ad
 .RS 19n
-.rt  
 The directory where the CacheFS is mounted.
 .RE
 
@@ -413,23 +390,19 @@ example# \fBcfsadmin\fR \fB-s\fR \fBall\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 

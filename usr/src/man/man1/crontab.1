@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH crontab 1 "6 Apr 2009" "SunOS 5.11" "User Commands"
+.TH CRONTAB 1 "Apr 6, 2009"
 .SH NAME
 crontab \- user crontab file
 .SH SYNOPSIS
@@ -249,7 +249,6 @@ any generated output or errors are mailed to you.
 The following variables are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
@@ -269,7 +268,6 @@ HOME=/var/tmp
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
@@ -288,7 +286,6 @@ SHELL=/usr/bin/ksh
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
@@ -336,12 +333,10 @@ once, twice, or not at all.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Edits a copy of the current user's \fBcrontab\fR file, or creates an empty file
 to edit if \fBcrontab\fR does not exist. When editing is complete, the file is
 installed as the user's \fBcrontab\fR file.
@@ -365,12 +360,10 @@ editable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Lists the \fBcrontab\fR file for the invoking user. Only root or a user with
 the \fBsolaris.jobs.admin\fR authorization can specify a username following the
 \fB-l\fR option to list the \fBcrontab\fR file of the specified user.
@@ -381,12 +374,10 @@ Entries from both the user's \fB/var/spool/cron/crontabs\fR file and thhe user's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Removes a user's \fBcrontab\fR from the \fBcrontab\fR directory. Only root or a
 user with the \fBsolaris.jobs.admin\fR authorization can specify a username
 following the \fB-r\fR option to remove the \fBcrontab\fR file of the specified
@@ -403,7 +394,7 @@ This example cleans up \fBcore\fR files every weekday morning at 3:15 am:
 .sp
 .in +2
 .nf
-\fB15 3 * * 1-5 find $HOME\fR \fB-name\fR\fBcore 2>/dev/null | xargs rm\fR \fB-f\fR 
+\fB15 3 * * 1-5 find $HOME\fR \fB-name\fR\fBcore 2>/dev/null | xargs rm\fR \fB-f\fR
 .fi
 .in -2
 .sp
@@ -494,12 +485,10 @@ that affect the execution of \fBcrontab\fR: \fBLANG\fR, \fBLC_ALL\fR,
 .SS "\fB/usr/bin/crontab\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDITOR\fR\fR
 .ad
 .RS 10n
-.rt  
 Determine the editor to be invoked when the \fB-e\fR option is specified. This
 is overridden by the \fBVISUAL\fR environmental variable. The default editor is
 \fBvi\fR(1).
@@ -507,24 +496,20 @@ is overridden by the \fBVISUAL\fR environmental variable. The default editor is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBPATH\fR in \fBcrontab\fR's environment specifies the search path used to
 find the editor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVISUAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Determine the visual editor to be invoked when the \fB-e\fR option is
 specified. If \fBVISUAL\fR is not specified, then the environment variable
 \fBEDITOR\fR is used. If that is not set, the default is \fBvi\fR(1).
@@ -533,12 +518,10 @@ specified. If \fBVISUAL\fR is not specified, then the environment variable
 .SS "\fB/usr/xpg4/bin/crontab\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDITOR\fR\fR
 .ad
 .RS 10n
-.rt  
 Determine the editor to be invoked when the \fB-e\fR option is specified. The
 default editor is \fB/usr/xpg4/bin/vi\fR.
 .RE
@@ -546,12 +529,10 @@ default editor is \fB/usr/xpg4/bin/vi\fR.
 .SS "\fB/usr/xpg6/bin/crontab\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDITOR\fR\fR
 .ad
 .RS 10n
-.rt  
 Determine the editor to be invoked when the \fB-e\fR option is specified. The
 default editor is \fB/usr/xpg6/bin/vi\fR.
 .RE
@@ -562,74 +543,61 @@ default editor is \fB/usr/xpg6/bin/vi\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cron.d\fR\fR
 .ad
 .RS 28n
-.rt  
 main cron directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cron.d/cron.allow\fR\fR
 .ad
 .RS 28n
-.rt  
 list of allowed users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/cron\fR\fR
 .ad
 .RS 28n
-.rt  
 contains cron default settings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cron.d/cron.deny\fR\fR
 .ad
 .RS 28n
-.rt  
 list of denied users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cron.d/crontabs\fR\fR
 .ad
@@ -645,18 +613,15 @@ system spool area for \fBcrontab\fR
 \fB\fB/var/cron/log\fR\fR
 .ad
 .RS 28n
-.rt  
 accounting information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/cron/crontabs\fR\fR
 .ad
 .RS 28n
-.rt  
 spool area for \fBcrontab\fR
 .RE
 
@@ -669,13 +634,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "\fB/usr/xpg4/bin/crontab\fR"
@@ -683,13 +647,12 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "\fB/usr/xpg6/bin/crontab\fR"
@@ -697,13 +660,12 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

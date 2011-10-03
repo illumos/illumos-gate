@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldap 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.TH LDAP 3LDAP "Jan 27, 2002"
 .SH NAME
 ldap \- Lightweight Directory Access Protocol package
 .SH SYNOPSIS
@@ -179,7 +179,6 @@ not normally use the BER functions directly. Instead, these functions provide a
 .SH LIST OF INTERFACES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_open\fR(3LDAP)\fR
 .ad
@@ -190,7 +189,6 @@ Deprecated. Use \fBldap_init\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init\fR(3LDAP)\fR
 .ad
@@ -202,7 +200,6 @@ server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_result\fR(3LDAP)\fR
 .ad
@@ -213,7 +210,6 @@ Obtain the result from a previous asynchronous operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_abandon\fR(3LDAP)\fR
 .ad
@@ -224,7 +220,6 @@ Abandon or abort an asynchronous operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_add\fR(3LDAP)\fR
 .ad
@@ -235,7 +230,6 @@ Asynchronously add an entry
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_add_s\fR(3LDAP)\fR
 .ad
@@ -246,7 +240,6 @@ Synchronously add an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_add_ext\fR(3LDAP)\fR
 .ad
@@ -257,7 +250,6 @@ Asynchronously add an entry with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_add_ext_s\fR(3LDAP)\fR
 .ad
@@ -268,7 +260,6 @@ Synchronously add an entry with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_bind\fR(3LDAP)\fR
 .ad
@@ -279,7 +270,6 @@ Deprecated. Use \fBldap_sasl_bind\fR(3LDAP) or \fBldap_simple_bind\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_sasl_bind\fR(3LDAP)\fR
 .ad
@@ -290,7 +280,6 @@ Asynchronously bind to the directory using SASL authentication
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_sasl_bind_s\fR(3LDAP)\fR
 .ad
@@ -301,7 +290,6 @@ Synchronously bind to the directory using SASL authentication
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_bind_s\fR(3LDAP)\fR
 .ad
@@ -313,7 +301,6 @@ Deprecated. Use \fBldap_sasl_bind_s\fR(3LDAP) or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_simple_bind\fR(3LDAP)\fR
 .ad
@@ -324,7 +311,6 @@ Asynchronously bind to the directory using simple authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_simple_bind_s\fR(3LDAP)\fR
 .ad
@@ -335,7 +321,6 @@ Synchronously bind to the directory using simple authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_unbind\fR(3LDAP)\fR
 .ad
@@ -347,7 +332,6 @@ the session handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_unbind_ext\fR(3LDAP)\fR
 .ad
@@ -360,7 +344,6 @@ controls in the unbind request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_set_rebind_proc\fR(3LDAP)\fR
 .ad
@@ -371,7 +354,6 @@ Set callback function for obtaining credentials from a referral.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memcache_init\fR(3LDAP)\fR
 .ad
@@ -382,7 +364,6 @@ Create the in-memory client side cache.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memcache_set\fR(3LDAP)\fR
 .ad
@@ -394,7 +375,6 @@ Associate an in-memory cache that has been already created  by calling the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memcache_get\fR(3LDAP)\fR
 .ad
@@ -405,7 +385,6 @@ Get the cache associated with the specified LDAP structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memcache_flush\fR(3LDAP)\fR
 .ad
@@ -416,7 +395,6 @@ Flushes search requests from the cache.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memcache_destroy\fR(3LDAP)\fR
 .ad
@@ -428,7 +406,6 @@ memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memcache_update\fR(3LDAP)\fR
 .ad
@@ -439,7 +416,6 @@ Checks the cache for items that have expired and removes them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_compare\fR(3LDAP)\fR
 .ad
@@ -450,7 +426,6 @@ Asynchronous compare with a directory entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_compare_s\fR(3LDAP)\fR
 .ad
@@ -461,7 +436,6 @@ Synchronous compare with a directory entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_compare_ext\fR(3LDAP)\fR
 .ad
@@ -472,7 +446,6 @@ Asynchronous compare with a directory entry, with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_compare_ext_s\fR(3LDAP)\fR
 .ad
@@ -483,7 +456,6 @@ Synchronous compare with a directory entry, with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_control_free\fR(3LDAP)\fR
 .ad
@@ -494,7 +466,6 @@ Dispose of an LDAP control.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_controls_free\fR(3LDAP)\fR
 .ad
@@ -505,7 +476,6 @@ Dispose of an array of LDAP controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_delete\fR(3LDAP)\fR
 .ad
@@ -516,7 +486,6 @@ Asynchronously delete an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_delete_s\fR(3LDAP)\fR
 .ad
@@ -527,7 +496,6 @@ Synchronously delete an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_delete_ext\fR(3LDAP)\fR
 .ad
@@ -538,7 +506,6 @@ Asynchronously delete an entry, with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_delete_ext_s\fR(3LDAP)\fR
 .ad
@@ -549,7 +516,6 @@ Synchronously delete an entry, with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init_templates\fR(3LDAP)\fR
 .ad
@@ -560,7 +526,6 @@ Read a sequence of templates from a LDAP template configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init_templates_buf\fR(3LDAP)\fR
 .ad
@@ -571,7 +536,6 @@ Read a sequence of templates from a buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_free_templates\fR(3LDAP)\fR
 .ad
@@ -582,7 +546,6 @@ Dispose of the templates allocated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_reference\fR(3LDAP)\fR
 .ad
@@ -593,7 +556,6 @@ Step through a list of continuation references from a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_reference\fR(3LDAP)\fR
 .ad
@@ -604,7 +566,6 @@ Step through a list of continuation references from a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_count_references\fR(3LDAP)\fR
 .ad
@@ -615,7 +576,6 @@ Count the number of messages in a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_message\fR(3LDAP)\fR
 .ad
@@ -626,7 +586,6 @@ Step through a list of messages in a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_count_messages\fR(3LDAP)\fR
 .ad
@@ -637,7 +596,6 @@ Count the messages in a list of messages in a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_message\fR(3LDAP)\fR
 .ad
@@ -648,7 +606,6 @@ Step through a list of messages in a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_msgtype\fR(3LDAP)\fR
 .ad
@@ -659,7 +616,6 @@ Return the type of LDAP message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_disptmpl\fR(3LDAP)\fR
 .ad
@@ -670,7 +626,6 @@ Get first display template in a list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_disptmpl\fR(3LDAP)\fR
 .ad
@@ -681,7 +636,6 @@ Get next display template in a list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_oc2template\fR(3LDAP)\fR
 .ad
@@ -692,7 +646,6 @@ Return template appropriate for the objectclass.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_name2template\fR(3LDAP)\fR
 .ad
@@ -703,7 +656,6 @@ Return named template
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_tmplattrs\fR(3LDAP)\fR
 .ad
@@ -714,7 +666,6 @@ Return attributes needed by the template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_tmplrow\fR(3LDAP)\fR
 .ad
@@ -725,7 +676,6 @@ Return first row of displayable items in a template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_tmplrow\fR(3LDAP)\fR
 .ad
@@ -736,7 +686,6 @@ Return next row of displayable items in a template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_tmplcol\fR(3LDAP)\fR
 .ad
@@ -747,7 +696,6 @@ Return first column of displayable items in a template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_tmplcol\fR(3LDAP)\fR
 .ad
@@ -758,7 +706,6 @@ Return next column of displayable items in a template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_entry2text\fR(3LDAP)\fR
 .ad
@@ -769,7 +716,6 @@ Display an entry as text by using a display template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_entry2text_search\fR(3LDAP)\fR
 .ad
@@ -780,7 +726,6 @@ Search for and display an entry as text by using a display template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_vals2text\fR(3LDAP)\fR
 .ad
@@ -791,7 +736,6 @@ Display values as text.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_entry2html\fR(3LDAP)\fR
 .ad
@@ -803,7 +747,6 @@ template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_entry2html_search\fR(3LDAP)\fR
 .ad
@@ -814,7 +757,6 @@ Search for and display an entry as HTML by using a display template.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_vals2html\fR(3LDAP)\fR
 .ad
@@ -825,7 +767,6 @@ Display values as HTML.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_perror\fR(3LDAP)\fR
 .ad
@@ -836,7 +777,6 @@ Deprecated. Use \fBldap_parse_result\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_result2error\fR(3LDAP)\fR
 .ad
@@ -847,7 +787,6 @@ Deprecated. Use \fBldap_parse_result\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_err2string\fR(3LDAP)\fR
 .ad
@@ -858,7 +797,6 @@ Convert LDAP error indication to a string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_attribute\fR(3LDAP)\fR
 .ad
@@ -869,7 +807,6 @@ Return first attribute name in an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_attribute\fR(3LDAP)\fR
 .ad
@@ -880,7 +817,6 @@ Return next attribute name in an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_entry\fR(3LDAP)\fR
 .ad
@@ -891,7 +827,6 @@ Return first entry in a chain of search results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_entry\fR(3LDAP)\fR
 .ad
@@ -902,7 +837,6 @@ Return next entry in a chain of search results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_count_entries\fR(3LDAP)\fR
 .ad
@@ -913,7 +847,6 @@ Return number of entries in a search result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_friendly_name\fR(3LDAP)\fR
 .ad
@@ -924,7 +857,6 @@ Map from unfriendly to friendly names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_free_friendlymap\fR(3LDAP)\fR
 .ad
@@ -935,7 +867,6 @@ Free resources used by \fBldap_friendly\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_dn\fR(3LDAP)\fR
 .ad
@@ -946,7 +877,6 @@ Extract the DN from an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_explode_dn\fR(3LDAP)\fR
 .ad
@@ -957,7 +887,6 @@ Convert a DN into its component parts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_explode_dns\fR(3LDAP)\fR
 .ad
@@ -968,7 +897,6 @@ Convert a DNS-style DN into its component parts (experimental).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_is_dns_dn\fR(3LDAP)\fR
 .ad
@@ -979,7 +907,6 @@ Check to see if a DN is a DNS-style DN (experimental).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_dns_to_dn\fR(3LDAP)\fR
 .ad
@@ -990,7 +917,6 @@ Convert a DNS domain name into an X.500 distinguished name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_dn2ufn\fR(3LDAP)\fR
 .ad
@@ -1001,7 +927,6 @@ Convert a DN into user friendly form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_values\fR(3LDAP)\fR
 .ad
@@ -1012,7 +937,6 @@ Return an attribute's values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_values_len\fR(3LDAP)\fR
 .ad
@@ -1023,7 +947,6 @@ Return an attribute's values with lengths.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_value_free\fR(3LDAP)\fR
 .ad
@@ -1034,7 +957,6 @@ Free memory allocated by \fBldap_get_values\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_value_free_len\fR(3LDAP)\fR
 .ad
@@ -1045,7 +967,6 @@ Free memory allocated by \fBldap_get_values_len\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_count_values\fR(3LDAP)\fR
 .ad
@@ -1056,7 +977,6 @@ Return number of values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_count_values_len\fR(3LDAP)\fR
 .ad
@@ -1067,7 +987,6 @@ Return number of values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init_getfilter\fR(3LDAP)\fR
 .ad
@@ -1078,7 +997,6 @@ Initialize getfilter functions from a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init_getfilter_buf\fR(3LDAP)\fR
 .ad
@@ -1089,7 +1007,6 @@ Initialize getfilter functions from a buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_getfilter_free\fR(3LDAP)\fR
 .ad
@@ -1100,7 +1017,6 @@ Free resources allocated by \fBldap_init_getfilter\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_getfirstfilter\fR(3LDAP)\fR
 .ad
@@ -1111,7 +1027,6 @@ Return first search filter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_getnextfilter\fR(3LDAP)\fR
 .ad
@@ -1122,7 +1037,6 @@ Return next search filter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_build_filter\fR(3LDAP)\fR
 .ad
@@ -1133,7 +1047,6 @@ Construct an LDAP search filter from a pattern.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_setfilteraffixes\fR(3LDAP)\fR
 .ad
@@ -1144,7 +1057,6 @@ Set prefix and suffix for search filters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modify\fR(3LDAP)\fR
 .ad
@@ -1155,7 +1067,6 @@ Asynchronously modify an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modify_s\fR(3LDAP)\fR
 .ad
@@ -1166,7 +1077,6 @@ Synchronously modify an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modify_ext\fR(3LDAP)\fR
 .ad
@@ -1177,7 +1087,6 @@ Asynchronously modify an entry, return value, and place message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modify_ext_s\fR(3LDAP)\fR
 .ad
@@ -1188,7 +1097,6 @@ Synchronously modify an entry, return value, and place message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_mods_free\fR(3LDAP)\fR
 .ad
@@ -1199,7 +1107,6 @@ Free array of pointers to mod structures used by \fBldap_modify\fR(3LDAP).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modrdn2\fR(3LDAP)\fR
 .ad
@@ -1210,7 +1117,6 @@ Deprecated. Use \fBldap_rename\fR(3LDAP) instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modrdn2_s\fR(3LDAP)\fR
 .ad
@@ -1221,7 +1127,6 @@ Deprecated. Use \fBldap_rename_s\fR(3LDAP) instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modrdn\fR(3LDAP)\fR
 .ad
@@ -1232,7 +1137,6 @@ Deprecated. Use \fBldap_rename\fR(3LDAP) instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_modrdn_s\fR(3LDAP)\fR
 .ad
@@ -1243,7 +1147,6 @@ Depreciated. Use \fBldap_rename_s\fR(3LDAP) instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_rename\fR(3LDAP)\fR
 .ad
@@ -1254,7 +1157,6 @@ Asynchronously modify the name of an LDAP entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_rename_s\fR(3LDAP)\fR
 .ad
@@ -1265,7 +1167,6 @@ Synchronously modify the name of an LDAP entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_msgfree\fR(3LDAP)\fR
 .ad
@@ -1276,7 +1177,6 @@ Free result messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_parse_result\fR(3LDAP)\fR
 .ad
@@ -1287,7 +1187,6 @@ Search for a message to parse.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_parse_extended_result\fR(3LDAP)\fR
 .ad
@@ -1298,7 +1197,6 @@ Search for a message to parse.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_parse_sasl_bind_result\fR(3LDAP)\fR
 .ad
@@ -1309,7 +1207,6 @@ Search for a message to parse.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_search\fR(3LDAP)\fR
 .ad
@@ -1320,7 +1217,6 @@ Asynchronously search the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_search_s\fR(3LDAP)\fR
 .ad
@@ -1331,7 +1227,6 @@ Synchronously search the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_search_ext\fR(3LDAP)\fR
 .ad
@@ -1342,7 +1237,6 @@ Asynchronously search the directory with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_search_ext_s\fR(3LDAP)\fR
 .ad
@@ -1353,7 +1247,6 @@ Synchronously search the directory with support for LDAPv3 controls.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_search_st\fR(3LDAP)\fR
 .ad
@@ -1364,7 +1257,6 @@ Synchronously search the directory with support for a local timeout value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ufn_search_s\fR(3LDAP)\fR
 .ad
@@ -1375,7 +1267,6 @@ User friendly search the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ufn_search_c\fR(3LDAP)\fR
 .ad
@@ -1386,7 +1277,6 @@ User friendly search the directory with cancel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ufn_search_ct\fR(3LDAP)\fR
 .ad
@@ -1397,7 +1287,6 @@ User friendly search the directory with cancel and timeout.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ufn_setfilter\fR(3LDAP)\fR
 .ad
@@ -1408,7 +1297,6 @@ Set filter file used by \fBldap_ufn\fR(3LDAP) functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ufn_setprefix\fR(3LDAP)\fR
 .ad
@@ -1419,7 +1307,6 @@ Set prefix used by \fBldap_ufn\fR(3LDAP) functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_ufn_timeout\fR(3LDAP)\fR
 .ad
@@ -1430,7 +1317,6 @@ Set timeout used by \fBldap_ufn\fR(3LDAP) functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_is_ldap_url\fR(3LDAP)\fR
 .ad
@@ -1441,7 +1327,6 @@ Check a URL string to see if it is an LDAP URL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_url_parse\fR(3LDAP)\fR
 .ad
@@ -1452,7 +1337,6 @@ Break up an LDAP URL string into its components.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_free_urldesc\fR(3LDAP)\fR
 .ad
@@ -1463,7 +1347,6 @@ Free an LDAP URL structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_url_search\fR(3LDAP)\fR
 .ad
@@ -1474,7 +1357,6 @@ Asynchronously search by using an LDAP URL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_url_search_s\fR(3LDAP)\fR
 .ad
@@ -1485,7 +1367,6 @@ Synchronously search by using an LDAP URL.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_url_search_st\fR(3LDAP)\fR
 .ad
@@ -1497,7 +1378,6 @@ value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_dns_to_url\fR(3LDAP)\fR
 .ad
@@ -1508,7 +1388,6 @@ Locate the LDAP URL associated with a DNS domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_dn_to_url\fR(3LDAP)\fR
 .ad
@@ -1519,7 +1398,6 @@ Locate the LDAP URL associated with a distinguished name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init_searchprefs\fR(3LDAP)\fR
 .ad
@@ -1530,7 +1408,6 @@ Initialize searchprefs functions from a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_init_searchprefs_buf\fR(3LDAP)\fR
 .ad
@@ -1541,7 +1418,6 @@ Initialize searchprefs functions from a buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_free_searchprefs\fR(3LDAP)\fR
 .ad
@@ -1552,7 +1428,6 @@ Free memory allocated by searchprefs functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_first_searchobj\fR(3LDAP)\fR
 .ad
@@ -1563,7 +1438,6 @@ Return first searchpref object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_next_searchobj\fR(3LDAP)\fR
 .ad
@@ -1574,7 +1448,6 @@ Return next searchpref object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_sort_entries\fR(3LDAP)\fR
 .ad
@@ -1585,7 +1458,6 @@ Sort a list of search results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_sort_values\fR(3LDAP)\fR
 .ad
@@ -1596,7 +1468,6 @@ Sort a list of attribute values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_sort_strcasecmp\fR(3LDAP)\fR
 .ad
@@ -1607,7 +1478,6 @@ Case insensitive string comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_set_string_translators\fR(3LDAP)\fR
 .ad
@@ -1618,7 +1488,6 @@ Set character set translation functions used by LDAP library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_translate_from_t61\fR(3LDAP)\fR
 .ad
@@ -1629,7 +1498,6 @@ Translate from the T.61 character set to another character set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_translate_to_t61\fR(3LDAP)\fR
 .ad
@@ -1640,7 +1508,6 @@ Translate to the T.61 character set from another character set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_enable_translation\fR(3LDAP)\fR
 .ad
@@ -1651,7 +1518,6 @@ Enable or disable character translation for an LDAP entry result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_version\fR(3LDAP)\fR
 .ad
@@ -1662,7 +1528,6 @@ Get version information about the LDAP SDK for C.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_lang_values\fR(3LDAP)\fR
 .ad
@@ -1673,7 +1538,6 @@ Return an attribute's value that matches a specified language subtype.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_lang_values_len\fR(3LDAP)\fR
 .ad
@@ -1685,7 +1549,6 @@ with lengths.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_entry_controls\fR(3LDAP)\fR
 .ad
@@ -1697,7 +1560,6 @@ results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_get_option\fR(3LDAP)\fR
 .ad
@@ -1708,7 +1570,6 @@ Get session preferences in an LDAP structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_set_option\fR(3LDAP)\fR
 .ad
@@ -1719,7 +1580,6 @@ Set session preferences in an LDAP structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldap_memfree\fR(3LDAP)\fR
 .ad
@@ -1736,13 +1596,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelEvolving
+Stability Level	Evolving
 .TE
 
 .SH SEE ALSO

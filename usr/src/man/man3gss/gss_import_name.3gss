@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_import_name 3GSS "30 Jun 2005" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_IMPORT_NAME 3GSS "Jun 30, 2005"
 .SH NAME
 gss_import_name \- convert a contiguous string name to GSS_API internal format
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR] 
+\fBcc\fR [\fIflag \&.\|.\|.\fR]  \fIfile\fR\&.\|.\|. \fB-lgss\fR [\fIlibrary \&.\|.\|.\fR]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_import_name\fR(\fBOM_uint32 *\fR \fIminor_status\fR,
@@ -33,46 +33,38 @@ mechanism name for the mechanism that exported the name.
 The parameter descriptions for \fBgss_import_name()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 21n
-.rt  
 Status code returned by the underlying mechanism.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput_name_buffer\fR\fR
 .ad
 .RS 21n
-.rt  
 The \fBgss_buffer_desc\fR structure containing the name to be imported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput_name_type\fR\fR
 .ad
 .RS 21n
-.rt  
 A \fBgss_OID\fR that specifies the format that the \fIinput_name_buffer\fR is
 in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutput_name\fR\fR
 .ad
 .RS 21n
-.rt  
 The \fBgss_name_t\fR structure to receive the returned name in internal form.
 Storage associated with this name must be freed by the application after use
 with a call to \fBgss_release_name()\fR.
@@ -84,58 +76,48 @@ with a call to \fBgss_release_name()\fR.
 The \fBgss_import_name()\fR function may return the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fBgss_import_name()\fR function completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_NAMETYPE\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fIinput_name_type\fR was unrecognized.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_NAME\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fIinput_name\fR parameter could not be interpreted as a name of the
 specified type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_MECH\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fIinput_name_type\fR was \fBGSS_C_NT_EXPORT_NAME\fR, but the mechanism
 contained within the \fIinput_name\fR is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 22n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -149,13 +131,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

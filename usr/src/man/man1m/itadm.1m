@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH itadm 1M "4 Aug 2009" "SunOS 5.11" "System Administration Commands"
+.TH ITADM 1M "Aug 4, 2009"
 .SH NAME
 itadm \- administer iSCSI targets
 .SH SYNOPSIS
@@ -174,7 +174,6 @@ itadm create-target [-a,--auth-method radius | chap | none | default]
 Create a iSCSI target with the specified options. Options are as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR,\fB--auth-method\fR \fBradius | chap | none | default\fR\fR
 .ad
@@ -193,7 +192,6 @@ global setting of this property.  (See the \fBmodify-defaults\fR subcommand.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR,\fB--chap-secret\fR\fR
 .ad
@@ -206,7 +204,6 @@ for this property. Maximum length is 255 characters; minimum required length is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR,\fB--chap-secret-file\fR \fIpath\fR\fR
 .ad
@@ -218,7 +215,6 @@ Path to a temporary file containing the CHAP secret as described in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR,\fB--chap-user\fR \fIchap-user-name\fR\fR
 .ad
@@ -233,7 +229,6 @@ If no value is specified then the target node name is used as the username. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR,\fB--node-name\fR \fItarget_node_name\fR\fR
 .ad
@@ -245,7 +240,6 @@ IQN or EUI format (see RFC 3720). This option establishes that name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR,\fB--alias\fR \fIalias\fR\fR
 .ad
@@ -257,7 +251,6 @@ need to be unique.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR,\fB--tpg\fR \fItpg-name\fR[,\fItpg-name\fR,...]\fR
 .ad
@@ -287,7 +280,6 @@ Modify an iSCSI target according to the specified options. Options are as
 follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR,\fB--auth-method\fR \fBradius | chap | none | default\fR\fR
 .ad
@@ -298,7 +290,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR,\fB--chap-secret\fR\fR
 .ad
@@ -309,7 +300,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR,\fB--chap-secret-file\fR \fIpath\fR\fR
 .ad
@@ -320,7 +310,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR,\fB--chap-user\fR \fIchap-user-name\fR\fR
 .ad
@@ -332,7 +321,6 @@ explicitly set CHAP username use \fB-u\fR \fBnone\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR,\fB--node-name\fR \fItarget_node_name\fR\fR
 .ad
@@ -344,7 +332,6 @@ Renames the target. See also the description of \fB-n\fR under the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR,\fB--alias\fR \fIalias\fR\fR
 .ad
@@ -356,7 +343,6 @@ explicitly set alias use \fB-l\fR \fBnone\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR,\fB--tpg\fR \fItpg-name\fR[,\fItpg-name\fR,...]\fR
 .ad
@@ -380,7 +366,6 @@ List information about the configured targets. If \fItarget_node_name\fR is
 specified, list only the information for that target. Option is as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR,\fB--verbose\fR\fR
 .ad
@@ -404,7 +389,6 @@ Delete the target specified by \fItarget_node_name\fR. The target must be
 \fBoffline\fR before it can be deleted. Option is as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR,\fB--force\fR\fR
 .ad
@@ -449,7 +433,6 @@ specified then list only the information about the target portal group
 associated with that \fItpg_name\fR. Option is as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR,\fB--verbose\fR\fR
 .ad
@@ -473,7 +456,6 @@ Delete the target portal group associated with \fItpg_name\fR. Option is as
 follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR,\fB--force\fR\fR
 .ad
@@ -499,7 +481,6 @@ Configure parameters associated with the remote initiator named
 \fIinitiator_node_name\fR. Options are as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR,\fB--chap-secret\fR\fR
 .ad
@@ -510,7 +491,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR,\fB--chap-secret-file\fR \fIpath\fR\fR
 .ad
@@ -521,7 +501,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR,\fB--chap-user\fR \fIchap-user-name\fR\fR
 .ad
@@ -547,7 +526,6 @@ Modify parameters associated with the remote initiator named
 \fIinitiator_node_name\fR. Options are as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR,\fB--chap-secret\fR\fR
 .ad
@@ -558,7 +536,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR,\fB--chap-secret-file\fR \fIpath\fR\fR
 .ad
@@ -569,7 +546,6 @@ As described under the \fBcreate-target\fR subcommand, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR,\fB--chap-user\fR \fIchap-user-name\fR\fR
 .ad
@@ -607,7 +583,6 @@ List parameters associated with the initiator named \fIinitiator_node_name\fR.
 Option is as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR,\fB--verbose\fR\fR
 .ad
@@ -633,7 +608,6 @@ itadm modify-defaults [\fB-a\fR,\fB--auth-method\fR radius | chap | none]
 Modify default parameters. Options are as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR,\fB--auth-method\fR \fBradius | chap | none\fR\fR
 .ad
@@ -653,7 +627,6 @@ override this global setting using the \fB-a\fR option of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR,\fB--radius-secret\fR\fR
 .ad
@@ -664,7 +637,6 @@ RADIUS Shared Secret for centralized CHAP authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR,\fB--radius-secret-file\fR \fIpath\fR\fR
 .ad
@@ -676,7 +648,6 @@ Path to a temporary file containing the CHAP secret as described in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR,\fB--sns\fR \fBenable | disable\fR\fR
 .ad
@@ -688,7 +659,6 @@ Name Service (iSNS) servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR,\fB--isns-server\fR
 \fIIP-address\fR[:\fIport\fR][,\fIIP-address\fR[:\fIport\fR],...]\fR
@@ -703,7 +673,6 @@ eight iSNS servers can be specified. To remove all iSNS servers, use \fB-I\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR,\fB--radius-server\fR \fIIP-address\fR[:\fIport\fR]\fR
 .ad
@@ -960,13 +929,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

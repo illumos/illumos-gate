@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH netrc 4 "25 Aug 2006" "SunOS 5.11" "File Formats"
+.TH NETRC 4 "Aug 25, 2006"
 .SH NAME
 netrc \- file for ftp remote login data
 .SH DESCRIPTION
@@ -20,12 +20,10 @@ Tokens can be separated by \fBSPACE\fR, \fBTAB\fR, or \fBNEWLINE\fR characters.
 The following tokens are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaccount\fR \fIstring\fR\fR
 .ad
 .RS 19n
-.rt  
 Supply an additional account password. If this token is present, the auto-login
 process supplies the specified string if the remote server requires an
 additional account password. If the remote server does not require an
@@ -35,12 +33,10 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 19n
-.rt  
 Same as \fBmachine\fR \fIname\fR, except that default matches any name. There
 can be only one \fBdefault\fR token, and it must be after all \fBmachine\fR
 tokens. The \fBdefault\fR token is normally used as follows:
@@ -58,24 +54,20 @@ not specified in \fB\&.netrc\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogin\fR \fIname\fR\fR
 .ad
 .RS 19n
-.rt  
 Identify a user on the remote machine. If this token is present, the auto-login
 process initiates a login using the specified name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmachine\fR \fIname\fR\fR
 .ad
 .RS 19n
-.rt  
 Identify a remote machine name. The auto-login process searches the
 \fB\&.netrc\fR file for a \fBmachine\fR token that matches the remote machine
 specified on the \fBftp\fR command line or as an \fBopen\fR command argument.
@@ -86,12 +78,10 @@ encountered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmacdef\fR \fIname\fR\fR
 .ad
 .RS 19n
-.rt  
 Define a macro. This token functions the same as \fBftp\fR \fBmacdef\fR. A
 macro is defined with the specified name; its contents begin with the next
 \fB\&.netrc\fR line and continue until a null line (consecutive \fBNEWLINE\fR
@@ -101,12 +91,10 @@ automatically executed as the last step in the auto-login process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassword\fR \fIstring\fR\fR
 .ad
 .RS 19n
-.rt  
 Supply a password. If this token is present, the auto-login process supplies
 the specified string if the remote server requires a password as part of the
 login process. If this token is present in the \fB\&.netrc\fR file, \fBftp\fR
@@ -116,12 +104,10 @@ besides the user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBskipsyst\fR\fR
 .ad
 .RS 19n
-.rt  
 Skip the \fBSYST\fR command that is sent by default to all remote servers upon
 connection. The system command is what enables the automatic use of binary mode
 rather than the protocol default ascii mode.
@@ -152,12 +138,10 @@ with password \fBmypassword\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.netrc\fR\fR
 .ad
 .RS 12n
-.rt  
 
 .RE
 

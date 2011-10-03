@@ -21,46 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/source/network/pppdump@$(PKGVERS)
-set name=pkg.description \
-    value="Source for the optional GNU utilities for use with PPP"
-set name=pkg.summary value="Source for the GNU utilities for PPP"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Development/GNU
+set name=pkg.fmri value=pkg:/source/network/pppdump@0.5.11,5.11-0.148
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/share group=sys
-dir path=usr/share/src group=sys
-dir path=usr/share/src/ppputil
-dir path=usr/share/src/ppputil/plugins
-dir path=usr/share/src/ppputil/pppdump
-file path=usr/share/src/ppputil/CHANGES
-file path=usr/share/src/ppputil/COPYING
-file path=usr/share/src/ppputil/INSTALL
-file path=usr/share/src/ppputil/LICENSE
-file path=usr/share/src/ppputil/Makefile
-file path=usr/share/src/ppputil/README
-file path=usr/share/src/ppputil/plugins/Makefile
-file path=usr/share/src/ppputil/plugins/minconn.c
-file path=usr/share/src/ppputil/plugins/passprompt.c
-file path=usr/share/src/ppputil/plugins/pppd.h
-file path=usr/share/src/ppputil/pppdump/Makefile
-file path=usr/share/src/ppputil/pppdump/bsd-comp.c
-file path=usr/share/src/ppputil/pppdump/deflate.c
-file path=usr/share/src/ppputil/pppdump/ppp-comp.h
-file path=usr/share/src/ppputil/pppdump/pppdump.1m
-file path=usr/share/src/ppputil/pppdump/pppdump.c
-file path=usr/share/src/ppputil/pppdump/zlib.c
-file path=usr/share/src/ppputil/pppdump/zlib.h
-legacy pkg=SUNWpppgS \
-    desc="Source for the optional GNU utilities for use with PPP" \
-    name="Source for the GNU utilities for PPP"
-license cr_Sun license=cr_Sun
-license usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect \
-    license=usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect
-license usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd \
-    license=usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd
-license usr/src/cmd/cmd-inet/usr.bin/pppdump/THIRDPARTYLICENSE \
-    license=usr/src/cmd/cmd-inet/usr.bin/pppdump/THIRDPARTYLICENSE

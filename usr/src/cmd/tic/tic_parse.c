@@ -22,22 +22,22 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
 
-/* 
+/*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
  * All Rights Reserved
- * 
+ *
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  *******************************************************************
@@ -187,7 +187,7 @@ compile()
 		while (use_list.head != NULL && old_use_count != use_count) {
 			old_use_count = use_count;
 			for (ptr = use_list.tail; ptr != NULL;
-							ptr = ptr->bptr) {
+			    ptr = ptr->bptr) {
 				fseek(stdin, ptr->offset, 0);
 				reset_input();
 				if ((token_type = get_token()) != NAMES)
@@ -199,7 +199,7 @@ compile()
 			}
 
 			for (ptr = use_list.head; ptr != NULL;
-							ptr = ptr->fptr) {
+			    ptr = ptr->fptr) {
 				fseek(stdin, ptr->offset, 0);
 				reset_input();
 				if ((token_type = get_token()) != NAMES)
@@ -217,12 +217,9 @@ compile()
 
 	if (use_list.head != NULL && !check_only) {
 		fprintf(stderr,
-"\nError in following up use-links.  Either there is\n");
-		fprintf(stderr,
-"a loop in the links or they reference non-existant\n");
-		fprintf(stderr,
-			"terminals.  The following is a list of the entries\n");
-		fprintf(stderr, "involved:\n\n");
+"\nError in following use-links. Either there is a loop in the links\n"
+"or they reference non-existent terminals. The following is a list of\n"
+"the entries involved:\n\n");
 
 		for (ptr = use_list.head; ptr != NULL; ptr = ptr->fptr) {
 			fseek(stdin, ptr->offset, 0);
@@ -245,7 +242,7 @@ dump_list(char *str)
 		fseek(stdin, ptr->offset, 0);
 		fgets(line, 1024, stdin);
 		fprintf(stderr, "ptr %x off %d bptr %x fptr %x str %s",
-		ptr, ptr->offset, ptr->bptr, ptr->fptr, line);
+		    ptr, ptr->offset, ptr->bptr, ptr->fptr, line);
 	}
 	fprintf(stderr, "\n");
 }
@@ -372,14 +369,14 @@ struct use_item	*item_ptr;
 }
 
 /*
-    Change all cancellations to a non-entry.
-    For booleans, @ -> false
-    For nums, @ -> -1
-    For strings, @ -> -1
-
-    This only has to be done for entries which
-    have to be compatible with the pre-Vr3 format.
-*/
+ * Change all cancellations to a non-entry.
+ * For booleans, @ -> false
+ * For nums, @ -> -1
+ * For strings, @ -> -1
+ *
+ * This only has to be done for entries which
+ * have to be compatible with the pre-Vr3 format.
+ */
 #ifndef NOCANCELCOMPAT
 void
 elim_cancellations(short Booleans[], short Numbers[], short Strings[])
@@ -402,9 +399,9 @@ elim_cancellations(short Booleans[], short Numbers[], short Strings[])
 }
 #endif /* NOCANCELCOMPAT */
 /*
-    Change the cancellation signal from the -2 used internally to
-    the 2 used within the binary.
-*/
+ * Change the cancellation signal from the -2 used internally to
+ * the 2 used within the binary.
+ */
 void
 change_cancellations(short Booleans[])
 {
@@ -498,9 +495,9 @@ invalid_term_name(char *name)
 			return (1);
 	if (error) {
 		fprintf(stderr, "%s: Line %d: Illegal terminal name - '%s'\n",
-						progname, curr_line, name);
+		    progname, curr_line, name);
 		fprintf(stderr,
-			"Terminal names must start with a letter or digit\n");
+		    "Terminal names must start with a letter or digit\n");
 		exit(1);
 	}
 	return (0);
@@ -562,13 +559,10 @@ dump_structure(short Booleans[], short Numbers[], short Strings[])
 
 	sprintf(filename, "%c/%s", first_name[0], first_name);
 
-	if (strlen(filename) > 16)
-		warning("'%s' filename too long, truncating to '%.16s'\n",
-							filename, filename);
 	if (stat64(filename, &statbuf) >= 0 && statbuf.st_mtime >= start_time) {
 		warning("'%s' defined in more than one entry.", first_name);
 		fprintf(stderr, "Entry being used is '%s'.\n",
-			    (unsigned)term_names + string_table);
+		    (unsigned)term_names + string_table);
 	}
 
 	if (!check_only) {
@@ -576,15 +570,14 @@ dump_structure(short Booleans[], short Numbers[], short Strings[])
 		fp = fopen(filename, "w");
 		if (fp == NULL) {
 			perror(filename);
-			syserr_abort("Can't open %s/%s\n",
-							destination, filename);
+			syserr_abort("Can't open %s/%s\n", destination,
+			    filename);
 		}
-		DEBUG(1, "Created %.16s\n", filename);
-	} else DEBUG(1, "Would have created %.16s\n", filename);
+		DEBUG(1, "Created %s\n", filename);
+	} else DEBUG(1, "Would have created %s\n", filename);
 
 #ifndef NOCANCELCOMPAT
-	/* if there is no '+' in the name, eliminate */
-	/* cancellation markings. */
+	/* eliminate cancellation markings if there is no '+' in the name */
 	if (strchr(first_name, '+') == 0)
 		elim_cancellations(Booleans, Numbers, Strings);
 	else
@@ -593,8 +586,8 @@ dump_structure(short Booleans[], short Numbers[], short Strings[])
 
 	if (!check_only) {
 		if (write_object(fp, Booleans, Numbers, Strings) < 0) {
-			syserr_abort("Error in writing %s/%s",
-						destination, filename);
+			syserr_abort("Error writing %s/%s", destination,
+			    filename);
 		}
 		fclose(fp);
 	}
@@ -620,7 +613,7 @@ dump_structure(short Booleans[], short Numbers[], short Strings[])
 		if (invalid_term_name(cur_name)) {
 			if (other_names)
 				warning("'%s': bad term name found in list.",
-								cur_name);
+				    cur_name);
 			continue;
 		}
 
@@ -628,36 +621,28 @@ dump_structure(short Booleans[], short Numbers[], short Strings[])
 
 		sprintf(linkname, "%c/%s", cur_name[0], cur_name);
 
-		if (strlen(linkname) > 16) {
-			if (other_names) {
-				warning(
-"'%s' linkname too long, truncating to '%.16s'\n", linkname, linkname);
-			} else {
-				continue;
-			}
-		}
 		alphastart |= isalpha(cur_name[0]);
 
 		if (strcmp(first_name, cur_name) == 0) {
 			warning("Terminal name '%s' synonym for itself",
-							first_name);
+			    first_name);
 		} else  {
 			if (!check_only) {
 				if (stat64(linkname, &statbuf) >= 0 &&
-					    statbuf.st_mtime >= start_time) {
+				    statbuf.st_mtime >= start_time) {
 					warning(
 "'%s' defined in more than one entry.", cur_name);
 					fprintf(stderr,
 					    "Entry being used is '%s'.\n",
 					    (unsigned)term_names +
-								string_table);
+					    string_table);
 				}
 				unlink(linkname);
 				if (link(filename, linkname) < 0)
 					syserr_abort("Can't link %s to %s",
-							filename, linkname);
-				DEBUG(1, "Linked %.16s\n", linkname);
-			} else DEBUG(1, "Would have linked %.16s\n", linkname);
+					    filename, linkname);
+				DEBUG(1, "Linked %s\n", linkname);
+			} else DEBUG(1, "Would have linked %s\n", linkname);
 		}
 	}
 

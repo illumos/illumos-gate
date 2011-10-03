@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sdp 7D "13 Nov 2006" "SunOS 5.11" "Devices"
+.TH SDP 7D "Nov 13, 2006"
 .SH NAME
 sdp \- Sockets Direct Protocol driver
 .SH SYNOPSIS
@@ -103,91 +103,76 @@ SO_LINGER, SO_DEBUG, SO_REUSEADDR and SO_OOBINLINE.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 28n
-.rt  
 A connect() operation was attempted on a socket on which a connect() operation
 had already  been performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNRESET\fR\fR
 .ad
 .RS 28n
-.rt  
 The remote peer forced the connection to be closed. This usually occurs when
 the remote machine loses state information about the connection due to a crash.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNREFUSED\fR\fR
 .ad
 .RS 28n
-.rt  
 The remote peer actively refused connection establishment. This usually occurs
 because no process is listening to the port.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRINUSE\fR\fR
 .ad
 .RS 28n
-.rt  
 A bind() operation was attempted  on a socket with a network address/port pair
 that has already been bound to another socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEADDRNOTAVAIL\fR\fR
 .ad
 .RS 28n
-.rt  
 A bind() operation was attempted on a socket with a network address for which
 no network interface exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 28n
-.rt  
 A bind() operation was attempted with  a reserved port number and the effective
 user ID of the process was not the privileged user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 28n
-.rt  
 The system ran out of memory for internal data structures.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sdp\fR\fR
 .ad
@@ -198,7 +183,6 @@ The system ran out of memory for internal data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/sdp\fR\fR
 .ad
@@ -209,7 +193,6 @@ The system ran out of memory for internal data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/sdp\fR\fR
 .ad
@@ -220,7 +203,6 @@ The system ran out of memory for internal data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sdpib\fR\fR
 .ad
@@ -231,7 +213,6 @@ The system ran out of memory for internal data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/sdpib\fR\fR
 .ad
@@ -242,7 +223,6 @@ The system ran out of memory for internal data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/sdpib\fR\fR
 .ad
@@ -259,13 +239,12 @@ See \fBattributes\fR(5) for descriptions of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.38i) |cw(3.12i) 
-lw(2.38i) |lw(3.12i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86, SPARC
+Architecture	x86, SPARC
 .TE
 
 .SH SEE ALSO

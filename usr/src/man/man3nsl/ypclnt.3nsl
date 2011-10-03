@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ypclnt 3NSL "23 Jan 2004" "SunOS 5.11" "Networking Services Library Functions"
+.TH YPCLNT 3NSL "Jan 23, 2004"
 .SH NAME
 ypclnt, yp_get_default_domain, yp_bind, yp_unbind, yp_match, yp_first, yp_next,
 yp_all, yp_order, yp_master, yperr_string, ypprot_err \- NIS Version 2 client
@@ -114,12 +114,10 @@ are described in the \fBERRORS\fR section.
 .SS "Routines"
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_bind()\fR\fR
 .ad
 .RS 27n
-.rt  
 To use the NIS name services, the client process must be "bound" to an NIS
 server that serves the appropriate domain using \fByp_bind()\fR. Binding need
 not be done explicitly by user code. Binding is done automatically whenever an
@@ -132,12 +130,10 @@ resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_unbind()\fR\fR
 .ad
 .RS 27n
-.rt  
 Each binding allocates or uses up one client process socket descriptor. Each
 bound domain costs one socket descriptor. However, multiple requests to the
 same domain use that same descriptor. The \fByp_unbind()\fR function is
@@ -194,12 +190,10 @@ If a bound \fBypserv\fR process returns any answer (success or failure).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_get_default_domain()\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBNIS\fR lookup calls require a map name and a domain name, at minimum. The
 client process should know the name of the map of interest. Client processes
 fetch the node's default domain by calling \fByp_get_default_domain()\fR and
@@ -211,12 +205,10 @@ value returned in \fIoutdomain\fR should not be freed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_match()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByp_match()\fR function returns the value associated with a passed key.
 This key must be exact because no pattern matching is available.
 \fByp_match()\fR requires a full YP map name, such as \fBhosts.byname\fR,
@@ -225,24 +217,20 @@ instead of the nickname \fBhosts\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_first()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByp_first()\fR function returns the first key-value pair from the named
 map in the named domain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_next()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByp_next()\fR function returns the next key-value pair in a named map.
 The \fIinkey\fR parameter must be the \fIoutkey\fR returned from an initial
 call to \fByp_first()\fR (to get the second key-value pair) or the one returned
@@ -273,12 +261,10 @@ map, see \fByp_all()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_all()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByp_all()\fR function provides a way to transfer an entire map from
 server to client in a single request using TCP (rather than UDP as with other
 functions in this package). The entire transaction takes place as a single RPC
@@ -305,8 +291,8 @@ The function \fBforeach()\fR is called:
 .sp
 .in +2
 .nf
-foreach(int \fIinstatus\fR, char *\fIinkey\fR, 
-int \fIinkeylen\fR, char *\fIinval\fR, 
+foreach(int \fIinstatus\fR, char *\fIinkey\fR,
+int \fIinkeylen\fR, char *\fIinval\fR,
 int \fIinvallen\fR, char *\fIindata\fR);
 .fi
 .in -2
@@ -340,12 +326,10 @@ is then \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_order()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByp_order()\fR function returns the order number for a map. The function
 is not supported if the \fBypbind\fR process on the client's system is bound to
 an \fBNIS+\fR server running in "YP-compatibility mode".
@@ -353,36 +337,30 @@ an \fBNIS+\fR server running in "YP-compatibility mode".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByp_master()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByp_master()\fR function returns the machine name of the master NIS
 server for a map.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByperr_string()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fByperr_string()\fR function returns a pointer to an error message string
 that is null-terminated but contains no period or NEWLINE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBypprot_err()\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fBypprot_err()\fR function takes an NIS name service protocol error code
 as input, and returns a \fBypclnt()\fR layer error code, which can be used as
 an input to \fByperr_string()\fR.
@@ -395,177 +373,145 @@ All integer functions return \fB0\fR if the requested operation is successful,
 or one of the following errors if the operation fails:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_ACCESS\fR\fR
 .ad
 .RS 17n
-.rt  
 Access violation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_BADARGS\fR\fR
 .ad
 .RS 17n
-.rt  
 The arguments to the function are bad.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_BADDB\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fBYP\fR database is bad.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_BUSY\fR\fR
 .ad
 .RS 17n
-.rt  
 The database is busy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_DOMAIN\fR\fR
 .ad
 .RS 17n
-.rt  
 Cannot bind to server on this domain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_KEY\fR\fR
 .ad
 .RS 17n
-.rt  
 No such key in map.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_MAP\fR\fR
 .ad
 .RS 17n
-.rt  
 No such map in server's domain.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_NODOM\fR\fR
 .ad
 .RS 17n
-.rt  
 Local domain name not set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_NOMORE\fR\fR
 .ad
 .RS 17n
-.rt  
 No more records in map database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_PMAP\fR\fR
 .ad
 .RS 17n
-.rt  
 Cannot communicate with \fBrpcbind\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_RESRC\fR\fR
 .ad
 .RS 17n
-.rt  
 Resource allocation failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_RPC\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBRPC\fR failure; domain has been unbound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_YPBIND\fR\fR
 .ad
 .RS 17n
-.rt  
 Cannot communicate with \fBypbind\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_YPERR\fR\fR
 .ad
 .RS 17n
-.rt  
 Internal \fBYP\fR server or client error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_YPSERV\fR\fR
 .ad
 .RS 17n
-.rt  
 Cannot communicate with \fBypserv\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYPERR_VERS\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBYP\fR version mismatch.
 .RE
 
@@ -581,13 +527,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

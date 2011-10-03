@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wanboot.conf 4 "15 Nov 2003" "SunOS 5.11" "File Formats"
+.TH WANBOOT.CONF 4 "Nov 15, 2003"
 .SH NAME
 wanboot.conf \- repository for WANboot configuration data
 .SH SYNOPSIS
@@ -57,12 +57,10 @@ single or double quotes.
 The parameters currently supported and their meanings are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIboot_file\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the path of the bootstrap file relative to the directory from which
 the web server serves files. This parameter must be given if the bootstrap file
 (wanboot) is to be served via HTTP, and must be specified with a leading slash
@@ -71,12 +69,10 @@ the web server serves files. This parameter must be given if the bootstrap file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIroot_server\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the location of the CGI program that will serve up the information
 about the root filesystem that will be transmitted to the client. If present,
 the value must be a URL in one of the following forms:
@@ -107,12 +103,10 @@ http://webserver:8080/cgi-bin/wanboot-cgi
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIroot_file\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the path of the root filesystem image relative to the directory from
 which the web server serves files. This parameter must be given if the root
 filesystem is to be served by means of HTTP, and must be specified with a
@@ -121,12 +115,10 @@ leading \fB/\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsignature_type\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the signing algorithm to be used when signing the bootstrap (that is,
 wanboot), the boot filesystem, and the root filesystem (assuming the last is
 not being sent using secure HTTP), prior to transmission to the client. If
@@ -139,12 +131,10 @@ setup with a client key for that algorithm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIencryption_type\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the encryption algorithm to be used when encrypting the boot
 filesystem prior to transmission to the client. If absent, or the value is
 empty, no encryption of the boot filesystem will be performed. If present, its
@@ -157,12 +147,10 @@ a non-empty \fIencryption_type\fR must also be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver_authentication\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies whether server authentication should be requested during SSL
 connection setup. If absent, or the value is empty, server authentication will
 not be requested. If present, its value must be one of: \fByes\fR or \fBno\fR.
@@ -170,12 +158,10 @@ not be requested. If present, its value must be one of: \fByes\fR or \fBno\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclient_authentication\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies whether client authentication should be requested during SSL
 coonection setup. If absent, or the value is empty, client authentication will
 not be requested. If present, its value must be one of: \fByes\fR or \fBno\fR.
@@ -187,12 +173,10 @@ must also be specified, the URL scheme in \fIroot_server\fR must be
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresolve_hosts\fR\fR
 .ad
 .RS 25n
-.rt  
 Used to specify any host names that might need to be resolved for the client
 system. Host names appearing in URLs in \fBwanboot.conf\fR and any discovered
 in certificates associated with the client will automatically be resolved and
@@ -205,12 +189,10 @@ that differ from any of those used by the bootstrap.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIboot_logger\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the URL of a system to which logging messages will be sent. If
 absent, or the value is empty, then logging will be to the system console only.
 If present it must specify a URL in one of the following forms:
@@ -232,12 +214,10 @@ Logging can be insecure or secure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystem_conf\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the name of a file in the \fB/etc/netboot\fR hierarchy that will be
 incorporated in the boot filesystem named \fBsystem.conf\fR and which is
 intended for use by the system startup scripts only.
@@ -350,13 +330,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH types.h 3HEAD "6 Oct 2004" "SunOS 5.11" "Headers"
+.TH TYPES.H 3HEAD "Oct 6, 2004"
 .SH NAME
 types.h, types \- primitive system data types
 .SH SYNOPSIS
@@ -115,7 +115,6 @@ useful when keeping code portable between different instruction set
 architectures.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_LITTLE_ENDIAN\fR\fR
 .ad
@@ -124,14 +123,12 @@ architectures.
 \fB\fB_BIG_ENDIAN\fR\fR
 .ad
 .RS 27n
-.rt  
 The natural byte order of the processor.  A pointer to an \fBint\fR points to
 the least/most significant byte of that \fBint\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_STACK_GROWS_UPWARD\fR\fR
 .ad
@@ -140,7 +137,6 @@ the least/most significant byte of that \fBint\fR.
 \fB\fB_STACK_GROWS_DOWNWARD\fR\fR
 .ad
 .RS 27n
-.rt  
 The processor specific direction of stack growth. A push onto the stack
 increases/decreases the stack pointer, so it stores data at successively
 higher/lower addresses.
@@ -148,7 +144,6 @@ higher/lower addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CHAR_IS_UNSIGNED\fR\fR
 .ad
@@ -157,7 +152,6 @@ higher/lower addresses.
 \fB\fB_CHAR_IS_SIGNED\fR\fR
 .ad
 .RS 27n
-.rt  
 The C Compiler implements objects of type \fBchar\fR as \fBunsigned\fR or
 \fBsigned\fR respectively. This is really an implementation choice of the
 compiler, but it is specified in the ABI and tends to be uniform across
@@ -166,7 +160,6 @@ compilers for an instruction set architecture.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_CHAR_ALIGNMENT\fR\fR
 .ad
@@ -203,7 +196,6 @@ compilers for an instruction set architecture.
 \fB\fB_FLOAT_ALIGNMENT\fR\fR
 .ad
 .RS 27n
-.rt  
 The ABI defines alignment requirements of each of the primitive object types.
 Some, if not all, might be hardware requirements as well. The values are
 expressed in bytes.
@@ -211,24 +203,20 @@ expressed in bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_MAX_ALIGNMENT\fR\fR
 .ad
 .RS 27n
-.rt  
 The most stringent alignment requirement as specified by the ABI. Equal to the
 maximum of all the above _\fIXXX\fR_\fBALIGNMENT\fR values.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_LONG_LONG_ALIGNMENT_32\fR\fR
 .ad
 .RS 27n
-.rt  
 The 32-bit ABI supported by a 64-bit kernel may have different alignment
 requirements for primitive object types. The value of this identifier is
 expressed in bytes.
@@ -281,13 +269,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

@@ -229,6 +229,15 @@ static void 		drmach_fini(void);
 static void		drmach_swap_pa(drmach_mem_t *, drmach_mem_t *);
 static drmach_board_t	*drmach_get_board_by_bnum(int);
 
+static sbd_error_t	*drmach_board_release(drmachid_t);
+static sbd_error_t	*drmach_board_status(drmachid_t, drmach_status_t *);
+static void		drmach_cpu_dispose(drmachid_t);
+static sbd_error_t	*drmach_cpu_release(drmachid_t);
+static sbd_error_t	*drmach_cpu_status(drmachid_t, drmach_status_t *);
+static void		drmach_mem_dispose(drmachid_t);
+static sbd_error_t	*drmach_mem_release(drmachid_t);
+static sbd_error_t	*drmach_mem_status(drmachid_t, drmach_status_t *);
+
 /* options for the second argument in drmach_add_remove_cpu() */
 #define	HOTADD_CPU	1
 #define	HOTREMOVE_CPU	2
@@ -1021,9 +1030,6 @@ drmach_device_dispose(drmachid_t id)
 static drmach_board_t *
 drmach_board_new(int bnum, int boot_board)
 {
-	static sbd_error_t *drmach_board_release(drmachid_t);
-	static sbd_error_t *drmach_board_status(drmachid_t, drmach_status_t *);
-
 	drmach_board_t	*bp;
 
 	bp = kmem_zalloc(sizeof (drmach_board_t), KM_SLEEP);
@@ -1811,10 +1817,6 @@ drmach_board_unassign(drmachid_t id)
 static sbd_error_t *
 drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_cpu_dispose(drmachid_t);
-	static sbd_error_t *drmach_cpu_release(drmachid_t);
-	static sbd_error_t *drmach_cpu_status(drmachid_t, drmach_status_t *);
-
 	int		 portid;
 	drmach_cpu_t	*cp = NULL;
 
@@ -2208,9 +2210,6 @@ drmach_io_status(drmachid_t id, drmach_status_t *stat)
 static sbd_error_t *
 drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_mem_dispose(drmachid_t);
-	static sbd_error_t *drmach_mem_release(drmachid_t);
-	static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
 	dev_info_t *dip;
 	int rv;
 

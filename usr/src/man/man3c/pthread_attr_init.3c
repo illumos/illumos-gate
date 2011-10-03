@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Copyright 1991, 1992, 1994, The X/Open Company Ltd.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pthread_attr_init 3C "1 Apr 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH PTHREAD_ATTR_INIT 3C "Apr 1, 2008"
 .SH NAME
 pthread_attr_init, pthread_attr_destroy \- initialize or destroy threads
 attribute object
@@ -47,22 +47,20 @@ The \fBpthread_attr_init()\fR function initializes a thread attributes object (
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-AttributeDefault ValueMeaning of Default
+c c c
+l l l .
+Attribute	Default Value	Meaning of Default
 _
-\fIcontentionscope\fR\fBPTHREAD_SCOPE_PROCESS\fRresource competition within process
-\fIdetachstate\fR\fBPTHREAD_CREATE_JOINABLE\fRjoinable by other threads
-\fIstackaddr\fR\fBNULL\fRstack allocated by system
-\fIstacksize\fR01 or 2 megabyte
-\fIpriority\fR0priority of the thread
-\fIpolicy\fR\fBSCHED_OTHER\fRtraditional time-sharing policy
-\fIinheritsched\fR\fBPTHREAD_INHERIT_SCHED\fRT{
+\fIcontentionscope\fR	\fBPTHREAD_SCOPE_PROCESS\fR	resource competition within process
+\fIdetachstate\fR	\fBPTHREAD_CREATE_JOINABLE\fR	joinable by other threads
+\fIstackaddr\fR	\fBNULL\fR	stack allocated by system
+\fIstacksize\fR	0	1 or 2 megabyte
+\fIpriority\fR	0	priority of the thread
+\fIpolicy\fR	\fBSCHED_OTHER\fR	traditional time-sharing policy
+\fIinheritsched\fR	\fBPTHREAD_INHERIT_SCHED\fR	T{
 scheduling policy and parameters are inherited from the creating thread
 T}
-\fIguardsize\fR\fBPAGESIZE\fRT{
+\fIguardsize\fR	\fBPAGESIZE\fR	T{
 size of guard area for a thread's created stack
 T}
 .TE
@@ -86,12 +84,10 @@ number is returned to indicate the error.
 The  \fBpthread_attr_init()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient memory exists to initialize the thread attributes object.
 .RE
 
@@ -100,12 +96,10 @@ Insufficient memory exists to initialize the thread attributes object.
 The  \fBpthread_attr_destroy()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIattr\fR is invalid.
 .RE
 
@@ -117,17 +111,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ms 5 "25 Feb 1992" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH MS 5 "Feb 25, 1992"
 .SH NAME
 ms \- text formatting macros
 .SH SYNOPSIS
@@ -39,67 +39,55 @@ package. However, the first four requests below may be used with impunity after
 initialization, and the last two may be used even before initialization:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.bp\fR\fR
 .ad
 .RS 11n
-.rt  
 begin new page
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.br\fR\fR
 .ad
 .RS 11n
-.rt  
 break output line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sp\fR\fI n\fR\fR
 .ad
 .RS 11n
-.rt  
 insert n spacing lines
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.ce\fR\fI n\fR\fR
 .ad
 .RS 11n
-.rt  
 center next n lines
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.ls\fR\fI n\fR\fR
 .ad
 .RS 11n
-.rt  
 line spacing: \fIn\fR\fB=1\fR single, \fIn\fR\fB=2\fR double space
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.na\fR\fR
 .ad
 .RS 11n
-.rt  
 no alignment of right margin
 .RE
 
@@ -114,203 +102,201 @@ tables, and references is acceptable as input.
 
 .sp
 .TS
-tab();
-cw(.79i) |cw(.79i) |cw(.79i) |cw(3.14i) 
-lw(.79i) |lw(.79i) |lw(.79i) |lw(3.14i) 
-.
-Macro NameInitial ValueBreak? Reset?Explanation
+c | c | c | c
+l | l | l | l .
+Macro Name	Initial Value	Break? Reset?	Explanation
 _
-\fB\&.AB\fR \fIx\fR-yT{
+\fB\&.AB\fR \fIx\fR	-	y	T{
 begin abstract; if \fIx\fR=no do not label abstract
 T}
 _
-\fB\&.AE\fR-yend abstract
+\fB\&.AE\fR	-	y	end abstract
 _
-\fB\&.AI\fR-yauthor's institution
+\fB\&.AI\fR	-	y	author's institution
 _
-\fB\&.AM\fR-nbetter accent mark definitions
+\fB\&.AM\fR	-	n	better accent mark definitions
 _
-\fB\&.AU\fR-yauthor's name
+\fB\&.AU\fR	-	y	author's name
 _
-\fB\&.B\fR \fIx\fR-nembolden \fIx\fR; if no \fIx\fR, switch to boldface
+\fB\&.B\fR \fIx\fR	-	n	embolden \fIx\fR; if no \fIx\fR, switch to boldface
 _
-\fB\&.B1\fR-ybegin text to be enclosed in a box
+\fB\&.B1\fR	-	y	begin text to be enclosed in a box
 _
-\fB\&.B2\fR-yend boxed text and print it
+\fB\&.B2\fR	-	y	end boxed text and print it
 _
-\fB\&.BT\fRdatenbottom title, printed at foot of page
+\fB\&.BT\fR	date	n	bottom title, printed at foot of page
 _
-\fB\&.BX\fR \fIx\fR-nprint word \fIx\fR in a box
+\fB\&.BX\fR \fIx\fR	-	n	print word \fIx\fR in a box
 _
-\fB\&.CM\fRif tncut mark between pages
+\fB\&.CM\fR	if t	n	cut mark between pages
 _
-\fB\&.CT\fR-y,yT{
+\fB\&.CT\fR	-	y,y	T{
 chapter title: page number moved to CF (TM only)
 T}
 _
-\fB\&.DA\fR \fIx\fRif nnT{
+\fB\&.DA\fR \fIx\fR	if n	n	T{
 force date \fIx\fR at bottom of page; today if no \fIx\fR
 T}
 _
-\fB\&.DE\fR-yend display (unfilled text) of any kind
+\fB\&.DE\fR	-	y	end display (unfilled text) of any kind
 _
-\fB\&.DS\fR \fIx y\fRIyT{
-begin display with keep; \fIx\fR=I,\|L,\|C,\|B; \fIy\fR=indent 
+\fB\&.DS\fR \fIx y\fR	I	y	T{
+begin display with keep; \fIx\fR=I,\|L,\|C,\|B; \fIy\fR=indent
 T}
 _
-\fB\&.ID\fR\fI y\fR8n,.5iyindented display with no keep; \fIy\fR=indent
+\fB\&.ID\fR\fI y\fR	8n,.5i	y	indented display with no keep; \fIy\fR=indent
 _
-\fB\&.LD\fR-yleft display with no keep
+\fB\&.LD\fR	-	y	left display with no keep
 _
-\fB\&.CD\fR-ycentered display with no keep
+\fB\&.CD\fR	-	y	centered display with no keep
 _
-\fB\&.BD\fR-yblock display; center entire block
+\fB\&.BD\fR	-	y	block display; center entire block
 _
-\fB\&.EF\fR \fIx\fR-neven page footer \fIx\fR (3 part as for \fB\&.tl\fR)
+\fB\&.EF\fR \fIx\fR	-	n	even page footer \fIx\fR (3 part as for \fB\&.tl\fR)
 _
-\fB\&.EH\fR \fIx\fR-neven page header \fIx\fR (3 part as for \fB\&.tl\fR)
+\fB\&.EH\fR \fIx\fR	-	n	even page header \fIx\fR (3 part as for \fB\&.tl\fR)
 _
-\fB\&.EN\fR-yend displayed equation produced by \fBeqn\fR
+\fB\&.EN\fR	-	y	end displayed equation produced by \fBeqn\fR
 _
-\fB\&.EQ\fR \fIx y\fR-yT{
+\fB\&.EQ\fR \fIx y\fR	-	y	T{
 break out equation; \fIx\fR=L,I,C; \fIy\fR=equation number
 T}
 _
-\fB\&.FE\fR-nT{
+\fB\&.FE\fR	-	n	T{
 end footnote to be placed at bottom of page
 T}
 _
-\fB\&.FP\fR-nT{
+\fB\&.FP\fR	-	n	T{
 numbered footnote paragraph; may be redefined
 T}
 _
-\fB\&.FS\fR \fIx\fR-nT{
+\fB\&.FS\fR \fIx\fR	-	n	T{
 start footnote; \fIx\fR is optional footnote label
 T}
 _
-\fB\&.HD\fRundefnoptional page header below header margin
+\fB\&.HD\fR	undef	n	optional page header below header margin
 _
-\fB\&.I\fR \fIx\fR-nitalicize \fIx\fR; if no \fIx\fR, switch to italics
+\fB\&.I\fR \fIx\fR	-	n	italicize \fIx\fR; if no \fIx\fR, switch to italics
 _
-\fB\&.IP\fR \fIx y\fR-y,yT{
+\fB\&.IP\fR \fIx y\fR	-	y,y	T{
 indented paragraph, with hanging tag \fIx\fR; \fIy\fR=indent
 T}
 _
-\fB\&.IX\fR \fIx y\fR-yT{
+\fB\&.IX\fR \fIx y\fR	-	y	T{
 index words \fIx\fR \fIy\fR and so on (up to 5 levels)
 T}
 _
-\fB\&.KE\fR-nend keep of any kind
+\fB\&.KE\fR	-	n	end keep of any kind
 _
-\fB\&.KF\fR-nT{
+\fB\&.KF\fR	-	n	T{
 begin floating keep; text fills remainder of page
 T}
 _
-\fB\&.KS\fR-yT{
+\fB\&.KS\fR	-	y	T{
 begin keep; unit kept together on a single page
 T}
 _
-\fB\&.LG\fR-nlarger; increase point size by 2
+\fB\&.LG\fR	-	n	larger; increase point size by 2
 _
-\fB\&.LP\fR-y,yleft (block) paragraph.
+\fB\&.LP\fR	-	y,y	left (block) paragraph.
 _
-\fB\&.MC\fR \fIx\fR-y,ymultiple columns; \fIx\fR=column width
+\fB\&.MC\fR \fIx\fR	-	y,y	multiple columns; \fIx\fR=column width
 _
-\fB\&.ND\fR \fIx\fRif tnT{
+\fB\&.ND\fR \fIx\fR	if t	n	T{
 no date in page footer; \fIx\fR is date on cover
 T}
 _
-\fB\&.NH\fR \fIx y\fR-y,yT{
+\fB\&.NH\fR \fIx y\fR	-	y,y	T{
 numbered header; \fIx\fR=level, \fIx\fR=0 resets, \fIx\fR=S sets to \fIy\fR
 T}
 _
-\fB\&.NL\fR10pnset point size back to normal
+\fB\&.NL\fR	10p	n	set point size back to normal
 _
-\fB\&.OF\fR \fIx\fR-nodd page footer \fIx\fR (3 part as for \fB\&.tl\fR)
+\fB\&.OF\fR \fIx\fR	-	n	odd page footer \fIx\fR (3 part as for \fB\&.tl\fR)
 _
-\fB\&.OH\fR \fIx\fR-nodd page header \fIx\fR (3 part as for \fB\&.tl\fR)
+\fB\&.OH\fR \fIx\fR	-	n	odd page header \fIx\fR (3 part as for \fB\&.tl\fR)
 _
-\fB\&.P1\fRif TMnprint header on first page
+\fB\&.P1\fR	if TM	n	print header on first page
 _
-\fB\&.PP\fR-y,yparagraph with first line indented
+\fB\&.PP\fR	-	y,y	paragraph with first line indented
 _
-\fB\&.PT\fR- % -npage title, printed at head of page
+\fB\&.PT\fR	- % -	n	page title, printed at head of page
 _
-\fB\&.PX\fR \fIx\fR-yT{
+\fB\&.PX\fR \fIx\fR	-	y	T{
 print index (table of contents); \fIx\fR=no suppresses title
 T}
 _
-\fB\&.QP\fR-y,yquote paragraph (indented and shorter)
+\fB\&.QP\fR	-	y,y	quote paragraph (indented and shorter)
 _
-\fB\&.R\fRonnreturn to Roman font
+\fB\&.R\fR	on	n	return to Roman font
 _
-\fB\&.RE\fR5ny,yT{
+\fB\&.RE\fR	5n	y,y	T{
 retreat: end level of relative indentation
 T}
 _
-\fB\&.RP\fR \fIx\fR-nT{
+\fB\&.RP\fR \fIx\fR	-	n	T{
 released paper format; \fIx\fR=no stops title on first page
 T}
 _
-\fB\&.RS\fR5ny,yT{
+\fB\&.RS\fR	5n	y,y	T{
 right shift: start level of relative indentation
 T}
 _
-\fB\&.SH\fR-y,ysection header, in boldface
+\fB\&.SH\fR	-	y,y	section header, in boldface
 _
-\fB\&.SM\fR-nsmaller; decrease point size by 2
+\fB\&.SM\fR	-	n	smaller; decrease point size by 2
 _
-\fB\&.TA\fR8n,5nnT{
+\fB\&.TA\fR	8n,5n	n	T{
 set TAB characters to 8n 16n .\|.\|. (\fBnroff\fR)  or 5n 10n .\|.\|. (\fBtroff\fR)
 T}
 _
-\fB\&.TC\fR \fIx\fR-yT{
+\fB\&.TC\fR \fIx\fR	-	y	T{
 print table of contents at end; \fIx\fR=no suppresses title
 T}
 _
-\fB\&.TE\fR-yend of table processed by \fBtbl\fR
 _
-\fB\&.TH\fR-yend multi-page header of table
+\fB\&.TH\fR - Y "multi-page end, header"
 _
-\fB\&.TL\fR-ytitle in boldface and two points larger
+\fB\&.TL\fR	-	y	title in boldface and two points larger
 _
-\fB\&.TM\fRoffnUC Berkeley thesis mode
+\fB\&.TM\fR	off	n	UC Berkeley thesis mode
 _
-\fB\&.TS\fR \fIx\fR-y,yT{
+\fB\&.TE\fR	-	y	end of table processed by \fBtbl\fR
+\fB\&.TS\fR \fIx\fR	-	y,y	T{
 begin table; if \fIx\fR=H table has multi-page header
 T}
 _
-\fB\&.UL\fR \fIx\fR-nunderline \fIx\fR, even in \fBtroff\fR
+\fB\&.UL\fR \fIx\fR	-	n	underline \fIx\fR, even in \fBtroff\fR
 _
-\fB\&.UX\fR \fIx\fR-nT{
+\fB\&.UX\fR \fIx\fR	-	n	T{
 UNIX; trademark message first time; \fIx\fR appended
 T}
 _
-\fB\&.XA\fR \fIx y\fR-yT{
+\fB\&.XA\fR \fIx y\fR	-	y	T{
 another index entry; \fIx\fR=page or no for none;  y=indent
 T}
 _
-\fB\&.XE\fR-yT{
+\fB\&.XE\fR	-	y	T{
 end index entry (or series of \fB\&.IX\fR entries)
 T}
 _
-\fB\&.XP\fR-y,yT{
+\fB\&.XP\fR	-	y,y	T{
 paragraph with first line indented, others indented
 T}
 _
-\fB\&.XS\fR \fIx y\fR-yT{
+\fB\&.XS\fR \fIx y\fR	-	y	T{
 begin index entry; \fIx\fR=page or no for none; \fIy\fR=indent
 T}
 _
-\fB\&.1C\fRony,yone column format, on a new page
+\fB\&.1C\fR	on	y,y	one column format, on a new page
 _
-\fB\&.2C\fR-y,ybegin two column format
+\fB\&.2C\fR	-	y,y	begin two column format
 _
-\fB\&.]\|-\fR-nbeginning of \fBrefer\fR reference
+\fB\&.]\|-\fR	-	n	beginning of \fBrefer\fR reference
 _
-\fB\&.[\|0\fR-nend of unclassifiable type of reference
+\fB\&.[\|0\fR	-	n	end of unclassifiable type of reference
 _
-\fB\&.[\|N\fR-nT{
+\fB\&.[\|N\fR	-	n	T{
 N= 1:journal-article, 2:book, 3:book-article, 4:report
 T}
 .TE
@@ -334,39 +320,37 @@ Here is a table of number registers and their default values:
 
 .sp
 .TS
-tab();
-cw(.79i) |cw(1.57i) |cw(1.57i) |cw(1.57i) 
-lw(.79i) |lw(1.57i) |lw(1.57i) |lw(1.57i) 
-.
-NameRegister ControlsTakes EffectDefault
+c | c | c | c
+l | l | l | l .
+Name	Register Controls	Takes Effect	Default
 _
-\fBPS\fRpoint size      paragraph10
+\fBPS\fR	point size      	paragraph	10
 _
-\fBVS\fRvertical spacingparagraph12
+\fBVS\fR	vertical spacing	paragraph	12
 _
-\fBLL\fRline length     paragraph6i
+\fBLL\fR	line length     	paragraph	6i
 _
-\fBLT\fRtitle length    next pagesame as \fBLL\fR
+\fBLT\fR	title length    	next page	same as \fBLL\fR
 _
-\fBFL\fRfootnote length next \fB\&.FS\fR5.5i
+\fBFL\fR	footnote length 	next \fB\&.FS\fR	5.5i
 _
-\fBPD\fRparagraph distanceparagraph1v (if n), .3v (if t)
+\fBPD\fR	paragraph distance	paragraph	1v (if n), .3v (if t)
 _
-\fBDD\fRdisplay distancedisplays1v (if n), .5v (if t)
+\fBDD\fR	display distance	displays	1v (if n), .5v (if t)
 _
-\fBPI\fRparagraph indentparagraph5n
+\fBPI\fR	paragraph indent	paragraph	5n
 _
-\fBQI\fRquote indent    next \fB\&.QP\fR5n
+\fBQI\fR	quote indent    	next \fB\&.QP\fR	5n
 _
-\fBFI\fRfootnote indent next \fB\&.FS\fR2n
+\fBFI\fR	footnote indent 	next \fB\&.FS\fR	2n
 _
-\fBPO\fRpage offset     next page0 (if n), \(ap1i (if t)
+\fBPO\fR	page offset     	next page	0 (if n), \(ap1i (if t)
 _
-\fBHM\fRheader margin   next page1i
+\fBHM\fR	header margin   	next page	1i
 _
-\fBFM\fRfooter margin   next page1i
+\fBFM\fR	footer margin   	next page	1i
 _
-\fBFF\fRfootnote format next \fB\&.FS\fR0 (1, 2, 3 available)
+\fBFF\fR	footnote format 	next \fB\&.FS\fR	0 (1, 2, 3 available)
 .TE
 
 .sp
@@ -384,35 +368,33 @@ anywhere in the text:
 
 .sp
 .TS
-tab();
-cw(1.38i) |cw(4.13i) 
-lw(1.38i) |lw(4.13i) 
-.
-NameString's Function
+c | c
+l | l .
+Name	String's Function
 _
-\fB\e*Q\fRquote (\fB"\fR in \fBnroff,\fR\| \fB"\fR in \fBtroff\fR )
+\fB\e*Q\fR	quote (\fB"\fR in \fBnroff,\fR\| \fB"\fR in \fBtroff\fR )
 _
-\fB\e*U\fR unquote (\fB"\fR in \fBnroff,\fR\| \fB"\fR in \fBtroff\fR )
+\fB\e*U\fR 	unquote (\fB"\fR in \fBnroff,\fR\| \fB"\fR in \fBtroff\fR )
 _
-\fB\e*-\fRdash (\fB--\fR in \fBnroff,\fR \fB\(em\fR in \fBtroff\fR )
+\fB\e*-\fR	dash (\fB--\fR in \fBnroff,\fR \fB\(em\fR in \fBtroff\fR )
 _
-\fB\e*(MO\fRmonth (month of the year)
+\fB\e*(MO\fR	month (month of the year)
 _
-\fB\e*(DY\fRday (current date)
+\fB\e*(DY\fR	day (current date)
 _
-\fB\e**\fRautomatically numbered footnote
+\fB\e**\fR	automatically numbered footnote
 _
-\fB\e*'\fRacute accent (before letter)
+\fB\e*'\fR	acute accent (before letter)
 _
-\fB\e*`\fRgrave accent (before letter)
+\fB\e*`\fR	grave accent (before letter)
 _
-\fB\e*^\fRcircumflex (before letter)
+\fB\e*^\fR	circumflex (before letter)
 _
-\fB\e*,\fRcedilla (before letter)
+\fB\e*,\fR	cedilla (before letter)
 _
-\fB\e*:\fRumlaut (before letter)
+\fB\e*:\fR	umlaut (before letter)
 _
-\fB\e*~\fRtilde (before letter)
+\fB\e*~\fR	tilde (before letter)
 .TE
 
 .sp
@@ -422,23 +404,19 @@ these strings should come after, rather than before, the letter to be accented.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/s\fR\fR
 .ad
 .RS 30n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/ms.???\fR\fR
 .ad
 .RS 30n
-.rt  
 
 .RE
 

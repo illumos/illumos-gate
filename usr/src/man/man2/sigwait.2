@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sigwait 2 "16 Apr 2009" "SunOS 5.11" "System Calls"
+.TH SIGWAIT 2 "Apr 16, 2009"
 .SH NAME
 sigwait \- wait until a signal is posted
 .SH SYNOPSIS
@@ -65,34 +65,28 @@ standard-conforming version returns an error number to indicate the error.
 The \fBsigwait()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIset\fR argument points to an invalid address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The wait was interrupted by an unblocked, caught signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIset\fR argument contains an unsupported signal number.
 .RE
 
@@ -137,24 +131,24 @@ main(void)
     pthread_t    t;
     pthread_t    t2;
     pthread_t    t3;
-    
+
     sigfillset ( &signalSet );
     /*
      * Block signals in initial thread. New threads will
      * inherit this signal mask.
      */
     pthread_sigmask ( SIG_BLOCK, &signalSet, NULL );
-    
+
     printf("Creating threads\en");
-    
+
     pthread_create(&t, NULL, sigint, NULL);
     pthread_create(&t2, NULL, threadTwo, NULL);
     pthread_create(&t3, NULL, threadThree, NULL);
-    
+
     printf("##################\en");
     printf("press CTRL-C to deliver SIGINT to sigint thread\en");
     printf("##################\en");
-    
+
     pthread_exit((void *)0);
 }
 static void *
@@ -182,19 +176,19 @@ sigint(void *arg)
 {
     int    sig;
     int    err;
-    
+
     printf("thread sigint [tid: %d] awaiting SIGINT\en",
                             pthread_self());
-    
+
     /*
     /* use standard-conforming sigwait() -- 2 args: signal set, signum
      */
     err = sigwait ( &signalSet, &sig );
-    
+
     /* test for SIGINT; could catch other signals */
     if (err || sig != SIGINT)
         abort();
-    
+
     printf("\enSIGINT signal %d caught by sigint thread [tid: %d]\en",
                             sig, pthread_self());
     pthread_exit((void *)0);
@@ -210,17 +204,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

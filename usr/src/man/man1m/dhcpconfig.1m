@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcpconfig 1M "16 Jun 2004" "SunOS 5.11" "System Administration Commands"
+.TH DHCPCONFIG 1M "Jun 16, 2004"
 .SH NAME
 dhcpconfig \- DHCP service configuration utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBdhcpconfig\fR \fB-D\fR \fB-r\fR \fIresource\fR \fB-p\fR \fIpath\fR [\fB-u\fR \fIuninterpreted\fR] 
-     [\fB-l\fR \fIlease_length\fR] [\fB-n\fR ] [\fB-d\fR \fIDNS_domain\fR] 
-     [\fB-a\fR \fIDNS_server_addresses\fR] [\fB-h\fR \fIhosts_resource\fR] 
+\fBdhcpconfig\fR \fB-D\fR \fB-r\fR \fIresource\fR \fB-p\fR \fIpath\fR [\fB-u\fR \fIuninterpreted\fR]
+     [\fB-l\fR \fIlease_length\fR] [\fB-n\fR ] [\fB-d\fR \fIDNS_domain\fR]
+     [\fB-a\fR \fIDNS_server_addresses\fR] [\fB-h\fR \fIhosts_resource\fR]
      [\fB-y\fR \fIhosts_domain\fR]
 .fi
 
@@ -27,20 +27,20 @@ dhcpconfig \- DHCP service configuration utility
 
 .LP
 .nf
-\fBdhcpconfig\fR \fB-N\fR \fInetwork_address\fR [\fB-m\fR \fIsubnet_mask\fR] [\fB-b\fR ] 
-     [\fB-t\fR \fIrouter_addresses\fR] [\fB-y\fR \fINIS-domain\fR] 
+\fBdhcpconfig\fR \fB-N\fR \fInetwork_address\fR [\fB-m\fR \fIsubnet_mask\fR] [\fB-b\fR ]
+     [\fB-t\fR \fIrouter_addresses\fR] [\fB-y\fR \fINIS-domain\fR]
      [\fB-a\fR \fINIS_server_addresses\fR] [\fB-g\fR]
 .fi
 
 .LP
 .nf
-\fBdhcpconfig\fR \fB-C\fR \fB-r\fR \fIresource\fR \fB-p\fR \fIpath\fR [\fB-f\fR] [\fB-k\fR] 
+\fBdhcpconfig\fR \fB-C\fR \fB-r\fR \fIresource\fR \fB-p\fR \fIpath\fR [\fB-f\fR] [\fB-k\fR]
      [\fB-u\fR \fIuninterpreted\fR]
 .fi
 
 .LP
 .nf
-\fBdhcpconfig\fR \fB-X\fR \fIfilename\fR [\fB-m\fR \fImacro_list\fR] [\fB-o\fR \fIoption_list\fR] 
+\fBdhcpconfig\fR \fB-X\fR \fIfilename\fR [\fB-m\fR \fImacro_list\fR] [\fB-o\fR \fIoption_list\fR]
      [\fB-a\fR \fInetwork_addresses\fR] [\fB-f\fR] [\fB-x\fR] [\fB-g\fR]
 .fi
 
@@ -92,18 +92,17 @@ to the \fBdhcptab\fR configuration table. The following table lists information
 
 .sp
 .TS
-tab() box;
-lw(1.38i) |lw(2.06i) |lw(2.06i) 
-lw(1.38i) |lw(2.06i) |lw(2.06i) 
-.
-\fIInformation\fR\fISource\fR\fIWhere Used\fR
+box;
+l | l | l
+l | l | l .
+\fIInformation\fR	\fISource\fR	\fIWhere Used\fR
 _
-TimezoneSystem date, timezone settings\fBLocale\fR macro
-DNS parameters\fBnsswitch.conf\fR, \fB/etc/resolv.conf\fRServer macro
-NIS parametersSystem domainname, \fBnsswitch.conf\fR, NISNetwork macros
-SubnetmaskT{
+Timezone	System date, timezone settings	\fBLocale\fR macro
+DNS parameters	\fBnsswitch.conf\fR, \fB/etc/resolv.conf\fR	Server macro
+NIS parameters	System domainname, \fBnsswitch.conf\fR, NIS	Network macros
+Subnetmask	T{
 Network interface, \fBnetmasks\fR table in nameservice
-T}Network macros
+T}	Network macros
 .TE
 
 .sp
@@ -118,12 +117,10 @@ supply override the values obtained from the system files.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 23n
-.rt  
 Convert to using a new data store, recreating the DHCP data tables in a format
 appropriate to the new data store, and setting up the DHCP server to use the
 new data store.
@@ -131,12 +128,10 @@ new data store.
 The following sub-options are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpath_to_data\fR\fR
 .ad
 .RS 20n
-.rt  
 The paths for \fBSUNWfiles\fR and \fBSUNWbinfiles\fR must be absolute
 \fBUNIX\fR pathnames. The path for \fBSUNWnisplus\fR must be a fully specified
 \fBNIS+\fR directory (including the tailing period.) See \fBdhcp_modules\fR(5).
@@ -144,12 +139,10 @@ The paths for \fBSUNWfiles\fR and \fBSUNWbinfiles\fR must be absolute
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIdata_resource\fR\fR
 .ad
 .RS 20n
-.rt  
 New data store resource. One of the following must be specified:
 \fBSUNWfiles\fR, \fBSUNWbinfiles\fR, or \fBSUNWnisplus\fR. See
 \fBdhcp_modules\fR(5).
@@ -158,24 +151,20 @@ New data store resource. One of the following must be specified:
 The following sub-options are optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 20n
-.rt  
 Do not prompt for confirmation. If \fB-f\fR is not used, a warning and
 confirmation prompt are issued before the conversion starts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 20n
-.rt  
 Keep the old DHCP data tables after successful conversion. If any problem
 occurs during conversion, tables are not deleted even if \fB-k\fR sub-option is
 not specified.
@@ -183,12 +172,10 @@ not specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuninterpreted\fR\fR
 .ad
 .RS 20n
-.rt  
 Data which is ignored by \fBdhcpconfig\fR, but passed on to the datastore for
 interpretation. The private layer provides for module-specific configuration
 information through the use of the \fBRESOURCE_CONFIG \fR keyword.
@@ -202,23 +189,19 @@ Uninterpreted data is stored within \fBRESOURCE_CONFIG\fR keyword of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 23n
-.rt  
 Configure the \fBDHCP\fR service.
 .sp
 The following sub-options are required:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIdata_resource\fR\fR
 .ad
 .RS 20n
-.rt  
 One of the following must be specified: \fBSUNWfiles\fR, \fBSUNWbinfiles\fR, or
 \fBSUNWnisplus\fR. Other data stores may be available.See
 \fBdhcp_modules\fR(5).
@@ -226,12 +209,10 @@ One of the following must be specified: \fBSUNWfiles\fR, \fBSUNWbinfiles\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpath\fR\fR
 .ad
 .RS 20n
-.rt  
 The paths for \fBSUNWfiles\fR and \fBSUNWbinfiles\fR must be absolute
 \fBUNIX\fR pathnames. The path for \fBSUNWnisplus\fR must be a fully specified
 \fBNIS+\fR directory (including the tailing period.) . See
@@ -241,81 +222,67 @@ The paths for \fBSUNWfiles\fR and \fBSUNWbinfiles\fR must be absolute
 The following sub-options are optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIDNS_servers\fR\fR
 .ad
 .RS 21n
-.rt  
 IP addresses of DNS servers, separated with commas.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIDNS_domain\fR\fR
 .ad
 .RS 21n
-.rt  
 DNS domain name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhosts_resource\fR\fR
 .ad
 .RS 21n
-.rt  
 Resource in which to place hosts data. Usually, the name service in use on the
 server. Valid values are \fBnisplus\fR, \fBfiles\fR, or \fBdns\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIseconds\fR\fR
 .ad
 .RS 21n
-.rt  
 Lease length used for addresses not having a specified lease length, in
 seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 21n
-.rt  
 Non-negotiable leases
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fIhosts_domain\fR\fR
 .ad
 .RS 21n
-.rt  
 DNS or NIS+ domain name to be used for hosts data. Valid only if \fBdns\fR or
 \fBnisplus\fR is specified for \fB-h\fR sub-option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuninterpreted\fR\fR
 .ad
 .RS 21n
-.rt  
 Data which is ignored by \fBdhcpconfig\fR, but passed on to the datastore for
 interpretation. The private layer provides for module-specific configuration
 information through the use of the \fBRESOURCE_CONFIG \fR keyword.
@@ -329,12 +296,10 @@ Uninterpreted data is stored within \fBRESOURCE_CONFIG\fR keyword of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIfilename\fR\fR
 .ad
 .RS 23n
-.rt  
 Import data from \fIfilename\fR, containing data previously exported from a
 Solaris DHCP server. Note that after importing, you may have to edit macros to
 specify the correct domain names, and edit network tables to change the owning
@@ -344,23 +309,19 @@ do this.
 The following sub-options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Replace any conflicting data with the data being imported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 6n
-.rt  
 Signal the daemon to reload the \fBdhcptab\fR once the import has been
 completed.
 .RE
@@ -369,34 +330,28 @@ completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fInet_address\fR\fR
 .ad
 .RS 23n
-.rt  
 Configure an additional network for DHCP service.
 .sp
 The following sub-options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fINIS_server_addresses\fR\fR
 .ad
 .RS 27n
-.rt  
 List of IP addresses of NIS servers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 27n
-.rt  
 Network is a point-to-point (PPP) network, therefore no broadcast address
 should be configured. If \fB-\fRb is not used, the network is assumed to be a
 LAN, and the broadcast address is determined using the network address and
@@ -405,46 +360,38 @@ subnet mask.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 27n
-.rt  
 Signal the daemon to reload the \fBdhcptab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIxxx.xxx.xxx.xxx\fR\fR
 .ad
 .RS 27n
-.rt  
 Subnet mask for the network; if \fB-m\fR is not used, subnet mask is obtained
 from netmasks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIrouter_addresses\fR\fR
 .ad
 .RS 27n
-.rt  
 List of router IP addresses; if not specified, router discovery flag is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR \fINIS_domain_name\fR\fR
 .ad
 .RS 27n
-.rt  
 If NIS is used on this network, specify the NIS domain name.
 .RE
 
@@ -452,12 +399,10 @@ If NIS is used on this network, specify the NIS domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 23n
-.rt  
 Configure the DHCP service parameters. Each parameter and value are specified
 by the following pattern:
 .sp
@@ -471,12 +416,10 @@ by the following pattern:
 Where parameter and value are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIparameter\fR\fR
 .ad
 .RS 13n
-.rt  
 One of the DHCP service parameters listed in \fBdhcpsvc.conf\fR(4). If the
 corresponding \fIvalue\fR is not specified, the current parameter value is
 displayed. If \fIparameter\fR is not specified, all parameters and current
@@ -485,12 +428,10 @@ values are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 13n
-.rt  
 Optional string to set the servers parameter to if the value is acceptable. If
 the value is missing or is empty (\fB""\fR), the parameter and its current
 value are deleted.
@@ -502,12 +443,10 @@ can use new parameter values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIserver_addresses\fR\fR
 .ad
 .RS 23n
-.rt  
 Configure the BOOTP relay service. BOOTP or DHCP requests are forwarded to the
 list of servers specified.
 .sp
@@ -517,45 +456,37 @@ addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 23n
-.rt  
 Control the DHCP service.
 .sp
 The following sub-options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
  Disable and stop the DHCP service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Enable and start the DHCP service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the state of the DHCP service. The state is encoded into the exit
 status.
 .sp
@@ -573,12 +504,10 @@ status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Enable and restart the DHCP service.
 .RE
 
@@ -586,46 +515,38 @@ Enable and restart the DHCP service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 23n
-.rt  
 Unconfigure the DHCP service or BOOTP relay service.
 .sp
 The following sub-options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not prompt for confirmation. If \fB-f\fR is not used, a warning and
 confirmation prompt is issued.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Delete hosts entries from name service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Delete the \fBdhcptab\fR and network tables.
 .RE
 
@@ -633,72 +554,60 @@ Delete the \fBdhcptab\fR and network tables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fIfilename\fR\fR
 .ad
 .RS 23n
-.rt  
 Export data from the DHCP data tables, saving to \fIfilename\fR, to move the
 data to another Solaris DHCP server.
 .sp
 The following sub-options are optional:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fInetworks_to_export\fR\fR
 .ad
 .RS 25n
-.rt  
 List of networks whose addresses should be exported, or the keyword ALL to
 specify all networks. If \fB-a\fR is not specified, no networks are exported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fR
 .ad
 .RS 25n
-.rt  
 Signal the daemon to reload the \fBdhcptab\fR after the export has been
 completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImacros_to_export\fR\fR
 .ad
 .RS 25n
-.rt  
 List of macros to export, or the keyword \fBALL\fR to specify all macros. If
 \fB-m\fR is not specified, no macros are exported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoptions_to_export\fR\fR
 .ad
 .RS 25n
-.rt  
 List of options to export, or the keyword \fBALL\fR to specify all options. If
 \fB-o\fR is not specified, no options are exported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 25n
-.rt  
 Delete the data from this server after it is exported. If \fB-x\fR is not
 specified you are in effect copying the data.
 .RE
@@ -863,13 +772,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

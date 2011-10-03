@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add
 .\" the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH largefile 5 "2 Nov 2007" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH LARGEFILE 5 "Nov 2, 2007"
 .SH NAME
 largefile \- large file status of utilities
 .SH DESCRIPTION
@@ -35,24 +35,22 @@ The following \fB/usr/bin\fR utilities are large file aware:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBadb\fR\fBaliasadm\fR\fBawk\fR\fBbdiff\fR\fBcat\fR
-\fBchgrp\fR\fBchmod\fR\fBchown\fR\fBcksum\fR\fBcmp\fR
-\fBcompress\fR\fBcp\fR\fBcsh\fR\fBcsplit\fR\fBcut\fR
-\fBdd\fR\fBdircmp\fR\fBdu\fR\fBegrep\fR\fBfgrep\fR
-\fBfile\fR\fBfind\fR\fBftp\fR\fBgetconf\fR\fBgrep\fR
-\fBgzip\fR\fBhead\fR\fBjoin\fR\fBjsh\fR\fBksh\fR
-\fBksh93\fR\fBln\fR\fBls\fR\fBmailcompat\fR\fBmailstats\fR
-\fBmdb\fR\fBmkdir\fR\fBmkfifo\fR\fBmore\fR\fBmv\fR
-\fBnawk\fR\fBpage\fR\fBpaste\fR\fBpathchck\fR\fBpg\fR
-\fBpraliases\fR\fBrcp\fR\fBremsh\fR\fBrksh\fR\fBrksh93\fR
-\fBrm\fR\fBrmdir\fR\fBrsh\fR\fBsed\fR\fBsh\fR
-\fBsort\fR\fBsplit\fR\fBsum\fR\fBtail\fR\fBtar\fR
-\fBtee\fR\fBtest\fR\fBtouch\fR\fBtr\fR\fBuncompress\fR
-\fBuudcode\fR\fBuuencode\fR\fBvacation\fR\fBwc\fR\fBzcat\fR
+l l l l l
+l l l l l .
+\fBadb\fR	\fBaliasadm\fR	\fBawk\fR	\fBbdiff\fR	\fBcat\fR
+\fBchgrp\fR	\fBchmod\fR	\fBchown\fR	\fBcksum\fR	\fBcmp\fR
+\fBcompress\fR	\fBcp\fR	\fBcsh\fR	\fBcsplit\fR	\fBcut\fR
+\fBdd\fR	\fBdircmp\fR	\fBdu\fR	\fBegrep\fR	\fBfgrep\fR
+\fBfile\fR	\fBfind\fR	\fBftp\fR	\fBgetconf\fR	\fBgrep\fR
+\fBgzip\fR	\fBhead\fR	\fBjoin\fR	\fBjsh\fR	\fBksh\fR
+\fBksh93\fR	\fBln\fR	\fBls\fR	\fBmailcompat\fR	\fBmailstats\fR
+\fBmdb\fR	\fBmkdir\fR	\fBmkfifo\fR	\fBmore\fR	\fBmv\fR
+\fBnawk\fR	\fBpage\fR	\fBpaste\fR	\fBpathchck\fR	\fBpg\fR
+\fBpraliases\fR	\fBrcp\fR	\fBremsh\fR	\fBrksh\fR	\fBrksh93\fR
+\fBrm\fR	\fBrmdir\fR	\fBrsh\fR	\fBsed\fR	\fBsh\fR
+\fBsort\fR	\fBsplit\fR	\fBsum\fR	\fBtail\fR	\fBtar\fR
+\fBtee\fR	\fBtest\fR	\fBtouch\fR	\fBtr\fR	\fBuncompress\fR
+\fBuudcode\fR	\fBuuencode\fR	\fBvacation\fR	\fBwc\fR	\fBzcat\fR
 .TE
 
 .sp
@@ -62,14 +60,12 @@ The following \fB/usr/xpg4/bin\fR utilities are large file aware:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBawk\fR\fBcp\fR\fBchgrp\fR\fBchown\fR\fBdu\fR
-\fBegrep\fR\fBfgrep\fR\fBfile\fR\fBgrep\fR\fBln\fR
-\fBls\fR\fBmore\fR\fBmv\fR\fBrm\fR\fBsed\fR
-\fBsh\fRsorttailtr
+l l l l l
+l l l l l .
+\fBawk\fR	\fBcp\fR	\fBchgrp\fR	\fBchown\fR	\fBdu\fR
+\fBegrep\fR	\fBfgrep\fR	\fBfile\fR	\fBgrep\fR	\fBln\fR
+\fBls\fR	\fBmore\fR	\fBmv\fR	\fBrm\fR	\fBsed\fR
+\fBsh\fR	sort	tail	tr	
 .TE
 
 .sp
@@ -79,10 +75,8 @@ The following \fB/usr/xpg6/bin\fR utilities are large file aware:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBgetconf\fR\fBls\fR\fBtr\fR
+l l l l l .
+\fBgetconf\fR	\fBls\fR	\fBtr\fR		
 .TE
 
 .sp
@@ -92,12 +86,10 @@ The following \fB/usr/sbin\fR utilities are large file aware:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBeditmap\fR\fBinstall\fR\fBmakemap\fR\fBmkfile\fR\fBmknod\fR
-\fBmvdir\fR\fBswap\fR
+l l l l l
+l l l l l .
+\fBeditmap\fR	\fBinstall\fR	\fBmakemap\fR	\fBmkfile\fR	\fBmknod\fR
+\fBmvdir\fR	\fBswap\fR			
 .TE
 
 .sp
@@ -107,10 +99,8 @@ The following \fB/usr/lib\fR utilities are large file aware:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBmail.local\fR\fBsendmail\fR\fBsmrsh\fR
+l l l l l .
+\fBmail.local\fR	\fBsendmail\fR	\fBsmrsh\fR		
 .TE
 
 .sp
@@ -124,12 +114,10 @@ The following \fB/usr/ucb\fR utilities are large file aware:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBchown\fR\fBfrom\fR\fBln\fR\fBls\fR\fBsed\fR
-\fBsum\fR\fBtouch\fR
+l l l l l
+l l l l l .
+\fBchown\fR	\fBfrom\fR	\fBln\fR	\fBls\fR	\fBsed\fR
+\fBsum\fR	\fBtouch\fR			
 .TE
 
 .sp
@@ -149,10 +137,8 @@ file systems:
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-.
-\fBcachefspack\fR\fBcachefsstat\fR
+l l l l .
+\fBcachefspack\fR	\fBcachefsstat\fR		
 .TE
 
 .sp
@@ -163,12 +149,10 @@ file systems:
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-.
-\fBcachefslog\fR\fBcachefswssize\fR\fBcfsadmin\fR\fBfsck\fR
-\fBmount\fR\fBumount\fR
+l l l l
+l l l l .
+\fBcachefslog\fR	\fBcachefswssize\fR	\fBcfsadmin\fR	\fBfsck\fR
+\fBmount\fR	\fBumount\fR		
 .TE
 
 .SS "nfs file systems"
@@ -179,12 +163,10 @@ The following utilities are large file aware for \fBnfs\fR file systems:
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB/usr/lib/autofs/automountd\fR\fB/usr/sbin/mount\fR
-\fB/usr/lib/nfs/rquotad\fR
+l l
+l l .
+\fB/usr/lib/autofs/automountd\fR	\fB/usr/sbin/mount\fR
+\fB/usr/lib/nfs/rquotad\fR	
 .TE
 
 .SS "ufs file systems"
@@ -217,15 +199,13 @@ systems:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBclri\fR\fBdcopy\fR\fBedquota\fR\fBff\fR\fBfsck\fR
-\fBfsdb\fR\fBfsirand\fR\fBfstyp\fR\fBlabelit\fR\fBlockfs\fR
-\fBmkfs\fR\fBmount\fR\fBncheck\fR\fBnewfs\fR\fBquot\fR
-\fBquota\fR\fBquotacheck\fR\fBquotaoff\fR\fBquotaon\fR\fBrepquota\fR
-\fBtunefs\fR\fBufsdump\fR\fBufsrestore\fR\fBumount\fR
+l l l l l
+l l l l l .
+\fBclri\fR	\fBdcopy\fR	\fBedquota\fR	\fBff\fR	\fBfsck\fR
+\fBfsdb\fR	\fBfsirand\fR	\fBfstyp\fR	\fBlabelit\fR	\fBlockfs\fR
+\fBmkfs\fR	\fBmount\fR	\fBncheck\fR	\fBnewfs\fR	\fBquot\fR
+\fBquota\fR	\fBquotacheck\fR	\fBquotaoff\fR	\fBquotaon\fR	\fBrepquota\fR
+\fBtunefs\fR	\fBufsdump\fR	\fBufsrestore\fR	\fBumount\fR	
 .TE
 
 .SS "Large file safe utilities"
@@ -241,15 +221,13 @@ The following \fB/usr/bin\fR utilities are large file safe:
 
 .sp
 .TS
-tab();
-lw(1.36i) lw(1.04i) lw(1.21i) lw(1.11i) lw(.78i) 
-lw(1.36i) lw(1.04i) lw(1.21i) lw(1.11i) lw(.78i) 
-.
-\fBaudioconvert\fR\fBaudioplay\fR\fBaudiorecord\fR\fBcomm\fR\fBdiff\fR
-\fBdiff3\fR\fBdiffmk\fR\fBed\fR\fBlp\fR\fBmail\fR
-\fBmailcompat\fR\fBmailstats\fR\fBmailx\fR\fBpack\fR\fBpcat\fR
-\fBred\fR\fBrmail\fR\fBsdiff\fR\fBunpack\fR\fBvi\fR
-\fBview\fR
+l l l l l
+l l l l l .
+\fBaudioconvert\fR	\fBaudioplay\fR	\fBaudiorecord\fR	\fBcomm\fR	\fBdiff\fR
+\fBdiff3\fR	\fBdiffmk\fR	\fBed\fR	\fBlp\fR	\fBmail\fR
+\fBmailcompat\fR	\fBmailstats\fR	\fBmailx\fR	\fBpack\fR	\fBpcat\fR
+\fBred\fR	\fBrmail\fR	\fBsdiff\fR	\fBunpack\fR	\fBvi\fR
+\fBview\fR				
 .TE
 
 .sp
@@ -259,10 +237,8 @@ The following \fB/usr/xpg4/bin\fR utilities are large file safe:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBed\fR\fBvi\fR\fBview\fR
+l l l l l .
+\fBed\fR	\fBvi\fR	\fBview\fR		
 .TE
 
 .sp
@@ -272,10 +248,8 @@ The following \fB/usr/xpg6/bin\fR utility is large file safe:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBed\fR
+l l l l l .
+\fBed\fR				
 .TE
 
 .sp
@@ -285,10 +259,8 @@ The following \fB/usr/sbin\fR utilities are large file safe:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-lpfilter	lpforms
+l l l l l .
+lpfilter		lpforms			
 .TE
 
 .sp
@@ -298,10 +270,8 @@ The following \fB/usr/ucb\fR utilities are large file safe:
 
 .sp
 .TS
-tab();
-lw(1.1i) lw(1.1i) lw(1.1i) lw(1.1i) lw(1.11i) 
-.
-\fBMail\fR\fBlpr\fR
+l l l l l .
+\fBMail\fR	\fBlpr\fR			
 .TE
 
 .SH SEE ALSO

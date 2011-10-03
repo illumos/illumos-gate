@@ -1,9 +1,9 @@
 '\" te
-.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved 
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fcip 7D "18 Oct 2004" "SunOS 5.11" "Devices"
+.TH FCIP 7D "Oct 18, 2004"
 .SH NAME
 fcip \- IP/ARP over Fibre Channel datagram encapsulation driver
 .SH SYNOPSIS
@@ -155,56 +155,46 @@ resolve WorldWide Name and Port_ID to an IP address.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/fcip\fR\fR
 .ad
 .RS 28n
-.rt  
 fcip character-special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/fcip\fR\fR
 .ad
 .RS 28n
-.rt  
 32-bit ELF kernel driver (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/fcip\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit ELF kernel driver  (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/fcip\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit ELF kernel driver (SPARC)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/fcip.conf\fR\fR
 .ad
 .RS 28n
-.rt  
 fcip driver configuration file
 .RE
 
@@ -216,13 +206,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 .TE
 
 .SH SEE ALSO

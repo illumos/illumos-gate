@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metasync 1M "27 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METASYNC 1M "Mar 27, 2006"
 .SH NAME
 metasync \- handle metadevice resync during reboot
 .SH SYNOPSIS
@@ -53,12 +53,10 @@ Use the \fB-r\fR option in boot scripts to resync all possible submirrors.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fImetadevice\fR\fR
 .ad
 .RS 17n
-.rt  
 Cancels the resync that is in progress on the specified metadevice. The resync
 will be stopped at its current point and can be resumed by running the
 "\fBmetasync metadevice\fR" command. This option only applies to RAID1 volumes.
@@ -66,34 +64,28 @@ will be stopped at its current point and can be resumed by running the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 17n
-.rt  
 Displays usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fImetadevice\fR\fR
 .ad
 .RS 17n
-.rt  
 Regenerates parity information for RAID5 metadevices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the name of the diskset on which \fBmetasync\fR will work. Using the
 \fB-s\fR option will cause the command to perform its administrative function
 within the specified diskset. Without this option, the command will perform its
@@ -102,12 +94,10 @@ function on local metadevices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies that the \fBmetasync\fR command handle special resync requirements
 during a system reboot. \fBmetasync\fR \fB-r\fR should only be invoked from the
 \fBsvc:/system/mdmonitor\fR service. The \fBmetasync\fR command only resyncs
@@ -130,12 +120,10 @@ so that resyncs occur as quickly as possible.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuffer_size\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the size (number of 512-byte disk blocks) of the internal copy buffer
 for the mirror resync. The size defaults to 1024 512-byte disk blocks. It can
 be no more than 2048 blocks. For best performance (quickest completion of the
@@ -148,23 +136,19 @@ resync), 2048 blocks is the recommended size.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

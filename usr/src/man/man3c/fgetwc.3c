@@ -1,20 +1,20 @@
 '\" te
 .\" Copyright (c) 2003, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fgetwc 3C "15 Oct 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH FGETWC 3C "Oct 15, 2003"
 .SH NAME
 fgetwc \- get a wide-character code from a stream
 .SH SYNOPSIS
 .LP
 .nf
-#include <stdio.h> 
-#include <wchar.h> 
+#include <stdio.h>
+#include <wchar.h>
 
 \fBwint_t\fR \fBfgetwc\fR(\fBFILE*\fR\fIstream\fR);
 .fi
@@ -65,48 +65,40 @@ error.
 The \fBfgetwc()\fR function will fail if data needs to be read and:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 14n
-.rt  
 The \fBO_NONBLOCK\fR flag is set for the file descriptor underlying
 \fIstream\fR and the process would be delayed in the \fBfgetwc()\fR operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 14n
-.rt  
 The file descriptor underlying \fIstream\fR is not a valid file descriptor open
 for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 14n
-.rt  
 The read operation was terminated due to the receipt of a signal, and no data
 was transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 14n
-.rt  
 A physical I/O error has occurred, or the process is in a background process
 group attempting to read from its controlling terminal and either the process
 is ignoring or blocking the \fBSIGTTIN\fR signal or the process group is
@@ -115,12 +107,10 @@ orphaned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR \fR
 .ad
 .RS 14n
-.rt  
 The file is a regular file and an attempt was made to read at or beyond the
 offset maximum associated with the corresponding  \fIstream\fR.
 .RE
@@ -130,35 +120,29 @@ offset maximum associated with the corresponding  \fIstream\fR.
 The \fBfgetwc()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage space is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 A request was made of a non-existent device, or the request was outside the
 capabilities of the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 The data obtained from the input stream does not form a valid character.
 .RE
 
@@ -175,17 +159,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

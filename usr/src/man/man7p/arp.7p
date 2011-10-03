@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH arp 7P "5 Feb 2009" "SunOS 5.11" "Protocols"
+.TH ARP 7P "Feb 5, 2009"
 .SH NAME
 arp, ARP \- Address Resolution Protocol
 .SH SYNOPSIS
@@ -297,7 +297,6 @@ Physical out - ARP packets to be sent out via a  network interface
 For ARP packets, the hook_pkt_event structure is filled out as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_ifp\fR
 .ad
@@ -309,7 +308,6 @@ Identifier indicating the  inbound  interface for packets received with the
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_ofp\fR
 .ad
@@ -321,7 +319,6 @@ Identifier indicating the outbound  interface  for packets received with the
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_hdr\fR
 .ad
@@ -332,7 +329,6 @@ Pointer to the start of the ARP  header  (not  the ethernet header).
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_mp\fR
 .ad
@@ -343,7 +339,6 @@ Pointer to the start of the mblk_t chain containing the ARP packet.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhpe_mb\fR
 .ad
@@ -361,7 +356,6 @@ interfaces. These events are  all  reported back through the same callback. The
 list of events is as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBplumb\fR
 .ad
@@ -372,7 +366,6 @@ A new network interface has been instantiated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunplumb\fR
 .ad
@@ -403,7 +396,6 @@ colon (:) separated ASCII  representations of the link layer addresses, whose
 lengths depend on the underlying media (for example, 6 bytes for Ethernet).
 .sp
 .ne 2
-.mk
 .na
 \fBNode %x:%x ... %x:%x is using our IP address %d.%d.%d.%d on %s.\fR
 .ad
@@ -417,7 +409,6 @@ entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%s has duplicate address %d.%d.%d.%d (in use by %x:%x ... %x:%x);
 disabled.\fR
@@ -430,7 +421,6 @@ newly-configured interface has been shut down.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%s has duplicate address %d.%d.%d.%d (claimed by %x:%x ... %x:%x);
 disabled.\fR
@@ -443,7 +433,6 @@ resolved, and the interface has been disabled to protect the network.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRecovered address %d.%d.%d.%d on %s.\fR
 .ad
@@ -455,7 +444,6 @@ automatically and reenabled. The conflict has been resolved.
 
 .sp
 .ne 2
-.mk
 .na
 \fBProxy ARP problem?  Node '%x:%x ... %x:%x' is using %d.%d.%d.%d on %s\fR
 .ad

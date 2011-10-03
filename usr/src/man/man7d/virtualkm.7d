@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH virtualkm 7D "16 Jan 2007" " SunOS 5.11" "Devices"
+.TH VIRTUALKM 7D "Jan 16, 2007"
 .SH NAME
 virtualkm \- Virtual keyboard and mouse
 .SH SYNOPSIS
@@ -84,12 +84,10 @@ The virtual mouse provides the following event ID's for mouse capability
 changes:
 .sp
 .ne 2
-.mk
 .na
 \fBMOUSE_CAP_CHANGE_NUM_BUT\fR
 .ad
 .RS 30n
-.rt  
 This event is reported when the total number of mouse buttons changes. The
 \fBFirm_event.value\fR is set to the new button total, which is the maximum
 number of all mice buttons. Other fields are ignored.
@@ -97,12 +95,10 @@ number of all mice buttons. Other fields are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMOUSE_CAP_CHANGE_NUM_WHEEL\fR
 .ad
 .RS 30n
-.rt  
 This event is reported when the total number of mouse wheels changes. The
 \fBFirm_event.value\fR is set to the new wheel total. Other fields are ignored.
 The event value (\fBFirm_event.value\fR) can be 0 (no wheel), 1 (vertical
@@ -131,21 +127,19 @@ mouse display to indicate three buttons.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fBKIOCSETFREQ\fR
 .ad
 .RS 15n
-.rt  
 Sets the frequency for either keyboard beeper or console beeper. To set the
 corresponding beeper frequency,  \fIarg\fR must point to a \fBfreq_request\fR
 structure:
 .sp
 .in +2
 .nf
-struct freq_request {                              
-        enum fr_beep_type type; /* beep type */    
-        int16_t freq;           /* frequency */    
+struct freq_request {
+        enum fr_beep_type type; /* beep type */
+        int16_t freq;           /* frequency */
 };
 .fi
 .in -2
@@ -166,56 +160,46 @@ inclusive.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kbd\fR\fR
 .ad
 .RS 18n
-.rt  
 Virtual Keyboard device file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/mouse\fR\fR
 .ad
 .RS 18n
-.rt  
 Virtual Mouse device file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kdmouse\fR\fR
 .ad
 .RS 18n
-.rt  
 Physical PS/2 mouse device file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/usb/hid*\fR\fR
 .ad
 .RS 18n
-.rt  
 Physical USB keyboard/mouse device file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dacf.conf\fR\fR
 .ad
 .RS 18n
-.rt  
 Device auto-configuration file.
 .RE
 
@@ -227,13 +211,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-ArchitectureSPARC, x86
-Interface StabilityEvolving
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Architecture	SPARC, x86
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
@@ -260,7 +243,6 @@ WARNING: Error message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBconskbd: keyboard is not available for system debugging:
 \fIdevice_path\fR.\fR
@@ -273,7 +255,6 @@ mode. As a result, the keyboard is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBconskbd: keyboard is not available:  <\fIdevice_path\fR>\fR
 .ad
@@ -285,7 +266,6 @@ debugger mode. As a result, the keyboard is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFailed to relink the mouse <\fIdevice_path\fR> underneath virtual mouse\fR
 .ad

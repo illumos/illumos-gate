@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ld.so.1 1 "26 Aug 2009" "SunOS 5.11" "User Commands"
+.TH LD.SO.1 1 "Aug 26, 2009"
 .SH NAME
 ld.so.1 \- runtime linker for dynamic objects
 .SH SYNOPSIS
 .LP
 .nf
-\fB/lib/ld.so.1\fR 
+\fB/lib/ld.so.1\fR
 .fi
 
 .LP
@@ -158,12 +158,10 @@ dynamic object.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\ envar\fR
 .ad
 .RS 13n
-.rt  
 Specify a runtime linker specific environment variable. See ENVIRONMENT
 VARIABLES.
 .RE
@@ -179,7 +177,6 @@ variables specified without a value, that have a \fB_32\fR or \fB_64\fR suffix,
 effectively cancel any associated generic environment variable setting.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_AUDIT\fR, \fBLD_AUDIT_32\fR, and \fBLD_AUDIT_64\fR\fR
 .ad
@@ -194,7 +191,6 @@ Guide\fR. Also, see the \fB-p\fR and \fB-P\fR options of \fBld\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_BIND_LAZY\fR, \fBLD_BIND_LAZY_32\fR, and \fBLD_BIND_LAZY_64\fR\fR
 .ad
@@ -216,7 +212,6 @@ If both \fBLD_BIND_LAZY\fR and \fBLD_BIND_NOW\fR are specified, then
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_BIND_NOW\fR, \fBLD_BIND_NOW_32\fR, and \fBLD_BIND_NOW_64\fR\fR
 .ad
@@ -236,7 +231,6 @@ If both \fBLD_BIND_NOW\fR and \fBLD_BIND_LAZY\fR are specified, then
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_CONFIG\fR, \fBLD_CONFIG_32\fR, and \fBLD_CONFIG_64\fR\fR
 .ad
@@ -249,7 +243,6 @@ object dependencies. See \fBcrle\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_DEBUG\fR, \fBLD_DEBUG_32\fR, and \fBLD_DEBUG_64\fR\fR
 .ad
@@ -266,7 +259,6 @@ debugging information is sent. The filename is suffixed with the process
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_DEMANGLE\fR, \fBLD_DEMANGLE_32\fR, and \fBLD_DEMANGLE_64\fR\fR
 .ad
@@ -279,7 +271,6 @@ runtime linker attempts to decode (demangle) any C++ symbol name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_FLAGS\fR, \fBLD_FLAGS_32\fR, and \fBLD_FLAGS_64\fR\fR
 .ad
@@ -293,7 +284,6 @@ EXAMPLES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_LIBRARY_PATH\fR, \fBLD_LIBRARY_PATH_32\fR, and
 \fBLD_LIBRARY_PATH_64\fR\fR
@@ -309,7 +299,6 @@ adds additional semantics to \fBld\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_LOADFLTR\fR, \fBLD_LOADFLTR_32\fR, and \fBLD_LOADFLTR_64\fR\fR
 .ad
@@ -326,7 +315,6 @@ filter is loaded. Also, see the \fB-z\fR \fBloadfltr\fR option of \fBld\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOAUDIT\fR, \fBLD_NOAUDIT_32\fR, and \fBLD_NOAUDIT_64\fR\fR
 .ad
@@ -340,7 +328,6 @@ libraries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOAUXFLTR\fR, \fBLD_NOAUXFLTR_32\fR, and \fBLD_NOAUXFLTR_64\fR\fR
 .ad
@@ -355,7 +342,6 @@ value, the runtime linker disables this alternative shared object lookup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOCONFIG\fR, \fBLD_NOCONFIG_32\fR, and \fBLD_NOCONFIG_64\fR\fR
 .ad
@@ -368,7 +354,6 @@ disables this configuration file processing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NODIRCONFIG\fR, \fBLD_NODIRCONFIG_32\fR, and
 \fBLD_NODIRCONFIG_64\fR\fR
@@ -381,7 +366,6 @@ provided in a configuration file is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NODIRECT\fR, \fBLD_NODIRECT_32\fR, and \fBLD_NODIRECT_64\fR\fR
 .ad
@@ -396,7 +380,6 @@ value, the runtime linker ignores any direct binding information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOENVCONFIG\fR, \fBLD_NOENVCONFIG_32\fR, and
 \fBLD_NOENVCONFIG_64\fR\fR
@@ -409,7 +392,6 @@ provided in a configuration file are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOLAZYLOAD\fR, \fBLD_NOLAZYLOAD_32\fR, and \fBLD_NOLAZYLOAD_64\fR\fR
 .ad
@@ -424,7 +406,6 @@ and loads the dependency immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOOBJALTER\fR, \fBLD_NOOBJALTER_32\fR, and \fBLD_NOOBJALTER_64\fR\fR
 .ad
@@ -436,7 +417,6 @@ dependencies provided in a configuration file are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOVERSION\fR, \fBLD_NOVERSION_32\fR, and \fBLD_NOVERSION_64\fR\fR
 .ad
@@ -449,7 +429,6 @@ non-null value, the runtime linker disables this version checking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_ORIGIN\fR, \fBLD_ORIGIN_32\fR, and \fBLD_ORIGIN_64\fR\fR
 .ad
@@ -465,7 +444,6 @@ default thus making this option redundant.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_PRELOAD\fR, \fBLD_PRELOAD_32\fR, and \fBLD_PRELOAD_64\fR\fR
 .ad
@@ -481,7 +459,6 @@ interpose on the symbol definitions provided by the program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_PROFILE\fR, \fBLD_PROFILE_32\fR, and \fBLD_PROFILE_64\fR\fR
 .ad
@@ -511,7 +488,6 @@ objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_SIGNAL\fR, \fBLD_SIGNAL_32\fR, and \fBLD_SIGNAL_64\fR\fR
 .ad
@@ -637,7 +613,6 @@ example% \fBLD_FLAGS_64=library_path=/lib/one/64,preload=foo.so\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/ld.so.1\fR\fR
 .ad
@@ -648,7 +623,6 @@ Default runtime linker.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libc.so.1\fR\fR
 .ad
@@ -659,7 +633,6 @@ Alternate interpreter for \fBSVID ABI\fR compatibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ld.so\fR\fR
 .ad
@@ -670,7 +643,6 @@ Alternate interpreter for \fBSVID ABI\fR compatibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/0@0.so.1\fR\fR
 .ad
@@ -681,7 +653,6 @@ A compatibility library to support null character pointers. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/secure\fR and \fB/usr/lib/secure\fR\fR
 .ad
@@ -692,7 +663,6 @@ A compatibility library to support null character pointers. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/secure/64\fR and \fB/usr/lib/secure/64\fR\fR
 .ad
@@ -703,7 +673,6 @@ A compatibility library to support null character pointers. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/ld.so.1\fR\fR
 .ad
@@ -714,7 +683,6 @@ Default runtime linker for 64-bit applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/0@0.so.1\fR\fR
 .ad
@@ -725,7 +693,6 @@ A 64-bit compatibility library to support null character pointers. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ld/ld.config\fR\fR
 .ad
@@ -736,7 +703,6 @@ Default configuration file for 32-bit applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ld/64/ld.config\fR\fR
 .ad

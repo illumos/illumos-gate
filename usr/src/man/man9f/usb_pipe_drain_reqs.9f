@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_drain_reqs 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_DRAIN_REQS 9F "Jan 5, 2004"
 .SH NAME
 usb_pipe_drain_reqs \- Allow completion of pending pipe requests
 .SH SYNOPSIS
@@ -13,10 +13,10 @@ usb_pipe_drain_reqs \- Allow completion of pending pipe requests
 
 
 
-\fBint\fR \fBusb_pipe_drain_reqs\fR(\fBdev_info_t *\fR\fIdip\fR, \fBusb_pipe_handle_t\fR \fIpipe_handle\fR, 
-     \fBuint_t\fR \fItimeout\fR, \fBusb_flags_t\fR \fIusb_flags\fR, 
-     \fBvoid (*\fR\fIcallback\fR)(usb_pipe_handle_t \fIpipe_handle\fR, 
-     \fBusb_opaque_t\fR \fIcallback_arg\fR, \fBint\fR \fIrval\fR, \fBusb_cb_flags_t\fR \fIflags)\fR, 
+\fBint\fR \fBusb_pipe_drain_reqs\fR(\fBdev_info_t *\fR\fIdip\fR, \fBusb_pipe_handle_t\fR \fIpipe_handle\fR,
+     \fBuint_t\fR \fItimeout\fR, \fBusb_flags_t\fR \fIusb_flags\fR,
+     \fBvoid (*\fR\fIcallback\fR)(usb_pipe_handle_t \fIpipe_handle\fR,
+     \fBusb_opaque_t\fR \fIcallback_arg\fR, \fBint\fR \fIrval\fR, \fBusb_cb_flags_t\fR \fIflags)\fR,
      \fBusb_opaque_t\fR \fIcallback_arg\fR);
 .fi
 
@@ -27,69 +27,57 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 16n
-.rt  
 Handle of the pipe containing pending requests.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItimeout\fR\fR
 .ad
 .RS 16n
-.rt  
 Maximum wait time for requests to drain. Must be a non-negative value in
 seconds. Zero specifies no timeout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 16n
-.rt  
 USB_FLAGS_SLEEP is the only flag recognized. Wait for completion and do not
 call callback.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 16n
-.rt  
 Callback handler to notify of asynchronous completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback_arg\fR\fR
 .ad
 .RS 16n
-.rt  
 Second argument passed to callback function.
 .RE
 
@@ -121,7 +109,6 @@ The \fIcallback\fR parameter accepts the asynchronous callback handler, which
 takes the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fBusb_pipe_handle_t default_pipe_handle\fR
 .ad
@@ -132,7 +119,6 @@ Handle of the pipe to drain.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusb_opaque_t callback_arg\fR
 .ad
@@ -143,7 +129,6 @@ callback_arg specified to \fBusb_pipe_drain_reqs()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBint rval\fR
 .ad
@@ -154,7 +139,6 @@ Request status.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusb_cb_flags_t callback_flags\fR
 .ad
@@ -163,23 +147,19 @@ Request status.
 Status of the queueing operation. Can be:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_NO_INFO\fR
 .ad
 .RS 27n
-.rt  
 Callback was uneventful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_CB_ASYNC_REQ_FAILED\fR
 .ad
 .RS 27n
-.rt  
 Error starting asynchronous request.
 .RE
 
@@ -188,46 +168,38 @@ Error starting asynchronous request.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Request is successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 \fIdip\fR argument is \fBNULL\fR. USB_FLAGS_SLEEP is clear and callback is
 \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from callback context with the USB_FLAGS_SLEEP flag set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 23n
-.rt  
 Pipe is not open, is closing or is closed.
 .RE
 
@@ -258,17 +230,17 @@ information on callbacks.
           dip, pipe_handle, 0, USB_FLAGS_SLEEP, NULL, 0);
 
       /*
-       * Dismantle streams and tear down this instance, 
+       * Dismantle streams and tear down this instance,
        * now that all requests have been sent.
        */
       qprocsoff(q);
-      ...     
-      ...     
+      ...
+      ...
       ddi_remove_minor_node(dip, NULL);
-      ...     
-      ...     
+      ...
+      ...
  }
-            
+
 .fi
 .in -2
 
@@ -292,15 +264,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

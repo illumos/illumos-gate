@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfGetProviderDataProt 3STMF "7 Oct 2008" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.TH STMFGETPROVIDERDATAPROT 3STMF "Oct 7, 2008"
 .SH NAME
 stmfGetProviderDataProt \- retrieve data for the specified provider
 .SH SYNOPSIS
@@ -19,23 +19,19 @@ stmfGetProviderDataProt \- retrieve data for the specified provider
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIproviderName\fR\fR
 .ad
 .RS 16n
-.rt  
 The name of the provider for which data is being retrieved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvl\fR\fR
 .ad
 .RS 16n
-.rt  
 A pointer to a pointer to an \fBnvlist_t\fR. On success, this will contain the
 nvlist retrieved. The caller is responsible for freeing the returned nvlist by
 calling \fBnvlist_free\fR(3NVPAIR).
@@ -43,24 +39,20 @@ calling \fBnvlist_free\fR(3NVPAIR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIproviderType\fR\fR
 .ad
 .RS 16n
-.rt  
 The value for this parameter must be either \fBSTMF_LU_PROVIDER_TYPE\fR or
 \fBSTMF_PORT_PROVIDER_TYPE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItoken\fR\fR
 .ad
 .RS 16n
-.rt  
 A pointer to a \fBuint64_t\fR allocated by the caller. On success, this will
 contain a token for the returned data that can be used in a call to
 \fBstmfSetProviderDataProt\fR(3STMF) to ensure that the data returned in this
@@ -78,23 +70,19 @@ specified provider.
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_NOMEM\fR\fR
 .ad
 .RS 23n
-.rt  
 The library was unable to allocate sufficient memory to return the data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_STATUS_SUCCESS\fR\fR
 .ad
 .RS 23n
-.rt  
 The API call was successful.
 .RE
 
@@ -106,15 +94,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T 
+.\"  Copyright 1989 AT&T
 .\" Copyright (C) 2004 Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_svc_calls 3NSL "26 Jan 2004" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_SVC_CALLS 3NSL "Jan 26, 2004"
 .SH NAME
 rpc_svc_calls, svc_dg_enablecache, svc_done, svc_exit, svc_fdset, svc_freeargs,
 svc_getargs, svc_getreq_common, svc_getreq_poll, svc_getreqset,
@@ -257,13 +257,12 @@ See \fBattributes\fR(5) for descriptions of attribute types and values.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSee below.
+MT-Level	See below.
 .TE
 
 .sp

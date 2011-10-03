@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLPFindSrvs 3SLP "16 Jan 2003" "SunOS 5.11" "Service Location Protocol Library Functions"
+.TH SLPFINDSRVS 3SLP "Jan 16, 2003"
 .SH NAME
 SLPFindSrvs \- return service URLs
 .SH SYNOPSIS
@@ -30,24 +30,20 @@ codes is returned.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhSLP\fR\fR
 .ad
 .RS 18n
-.rt  
 The language-specific \fBSLPHandle\fR on which to  search for services. It
 cannot  be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcServiceType\fR\fR
 .ad
 .RS 18n
-.rt  
 The service type string for the request. The \fIpcServiceType\fR can be
 discovered by a call to \fBSLPSrvTypes()\fR. Examples of service type strings
 include
@@ -71,24 +67,20 @@ or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcScopeList\fR\fR
 .ad
 .RS 18n
-.rt  
 A pointer to a \fBchar\fR containing a comma-separated  list  of scope names.
 It cannot be \fINULL\fR or an empty string, \fB""\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpcSearchFilter\fR\fR
 .ad
 .RS 18n
-.rt  
 A query formulated of attribute pattern matching expressions in the form of a
 \fBLDAPv3\fR search filter. See \fIRFC 2254\fR. If this filter is empty,
 \fB""\fR, all services of the requested type in the specified scopes are
@@ -97,24 +89,20 @@ returned. It cannot be \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 18n
-.rt  
 A callback through which the results of the operation are reported. It cannot
 be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvCookie\fR\fR
 .ad
 .RS 18n
-.rt  
 Memory passed to the callback code from the client. It can be \fINULL\fR.
 .RE
 
@@ -139,10 +127,10 @@ SLPHandle hSLP;
 SLPSrvURLCallback srvngst;
 
 err = SLPFindSrvs(hSLP,
-                  "service:printer:lpr", 
-                  "default",  
-                  "(dpi=300)", 
-                  srvngst, 
+                  "service:printer:lpr",
+                  "default",
+                  "(dpi=300)",
+                  srvngst,
                   NULL);
 .fi
 .in -2
@@ -150,12 +138,10 @@ err = SLPFindSrvs(hSLP,
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLP_CONF_FILE\fR\fR
 .ad
 .RS 17n
-.rt  
 When set, use this file for configuration.
 .RE
 

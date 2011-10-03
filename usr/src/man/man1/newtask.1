@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH newtask 1 "17 Nov 2004" "SunOS 5.11" "User Commands"
+.TH NEWTASK 1 "Nov 17, 2004"
 .SH NAME
 newtask \- create new task and optionally change project
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ completion of the preceding system task.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIpid\fR\fR
 .ad
 .RS 10n
-.rt  
 Cause a running process to enter a newly created task. A project for the new
 task can also be specified using the \fB-p\fR option. The invoking user must
 either own the process or have super-user privileges.
@@ -57,12 +55,10 @@ This option is incompatible with the \fB-F\fR and \fB-l\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 10n
-.rt  
 Creates a finalized task, within which further \fBnewtask\fR or
 \fBsettaskid\fR(2) invocations would fail. Finalized tasks can be useful at
 some sites for simplifying the attribution of resource consumption.
@@ -70,24 +66,20 @@ some sites for simplifying the attribution of resource consumption.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 10n
-.rt  
 Changes the environment to what would be expected if the user actually logged
 in again as a member of the new project.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 10n
-.rt  
 Changes the project \fBID\fR of the new task to that associated with the given
 project name. The invoking user must be a valid member of the requested
 project, or must have super-user privileges, for the command to succeed. If no
@@ -97,12 +89,10 @@ current project.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 10n
-.rt  
 Verbose: displays the system task id as the new system task is begun.
 .RE
 
@@ -112,12 +102,10 @@ Verbose: displays the system task id as the new system task is begun.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIproject\fR\fR
 .ad
 .RS 11n
-.rt  
 The project to which resource usage by the created task should be charged. The
 requested project must be defined in the project databases defined in
 \fBnsswitch.conf\fR(4).
@@ -125,12 +113,10 @@ requested project must be defined in the project databases defined in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR\fR
 .ad
 .RS 11n
-.rt  
 The command to be executed as the new task. If no command is given, the user's
 login shell is invoked. (If the login shell is not available, \fB/bin/sh\fR is
 invoked.)
@@ -193,57 +179,47 @@ example$ \fBnewtask -c 9999 -p russia\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred during execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/project\fR\fR
 .ad
 .RS 16n
-.rt  
 Local database containing valid project definitions for this machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/pid/*\fR\fR
 .ad
 .RS 16n
-.rt  
 Process information and control files.
 .RE
 

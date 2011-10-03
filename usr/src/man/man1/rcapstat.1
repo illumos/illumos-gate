@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rcapstat 1 "16 Jun 2009" "SunOS 5.11" "User Commands"
+.TH RCAPSTAT 1 "Jun 16, 2009"
 .SH NAME
 rcapstat \- report resource cap enforcement daemon statistics
 .SH SYNOPSIS
@@ -35,12 +35,10 @@ Reports are issued every \fIinterval\fR seconds up to the quantity specified by
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 12n
-.rt  
 Global statistics. Reports the minimum memory utilization for memory cap
 enforcement (see \fBrcapadm\fR(1M)) and reports current memory utilization as a
 percentage of installed physical memory.
@@ -48,24 +46,20 @@ percentage of installed physical memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 12n
-.rt  
 Report statistics for capped projects.  This is the default if no option is
 specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fBu\fR | \fBd\fR\fR
 .ad
 .RS 12n
-.rt  
 Display a time stamp.
 .sp
 Specify \fBu\fR for a printed representation of the internal representation of
@@ -75,12 +69,10 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 12n
-.rt  
 Report statistics for capped zones.
 .RE
 
@@ -91,56 +83,46 @@ The following list defines the column headings in the \fBrcapstat\fR report and
 provides information about how to interpret the report.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBid\fR\fR
 .ad
 .RS 11n
-.rt  
 The project ID or zone \fBID\fR of the capped project or zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject\fR\fR
 .ad
 .RS 11n
-.rt  
 The project name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone\fR\fR
 .ad
 .RS 11n
-.rt  
 The zone name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnproc\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of processes in the project or zone since the last report.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvm\fR\fR
 .ad
 .RS 11n
-.rt  
 The total virtual memory size of the project or zone's processes, including all
 mapped files and devices, in kilobytes (\fBK\fR), megabytes (\fBM\fR), or
 gigabytes (\fBG\fR).
@@ -148,12 +130,10 @@ gigabytes (\fBG\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrss\fR\fR
 .ad
 .RS 11n
-.rt  
 The total resident set size (\fBRSS\fR) of the project or zone's processes, in
 kilobytes (\fBK\fR), megabytes (\fBM\fR), or gigabytes (\fBG\fR). The count
 does not account for shared pages.
@@ -161,24 +141,20 @@ does not account for shared pages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcap\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBRSS\fR cap for the project or zone. See \fBrcapd\fR(1M) for information
 about how to specify memory caps.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBat\fR\fR
 .ad
 .RS 11n
-.rt  
 The total amount of memory that \fBrcapd\fR attempted to page out.
 .sp
 Paging refers to the act of relocating portions of memory, called pages, to or
@@ -187,12 +163,10 @@ from physical memory. \fBrcapd\fR pages out the most infrequently used pages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBavgat\fR\fR
 .ad
 .RS 11n
-.rt  
 The average amount of memory that \fBrcapd\fR attempted to page out during
 each sample cycle. The rate at which \fBrcapd\fR samples \fBRSS\fR can be set
 with \fBrcapadm\fR(1M).
@@ -200,24 +174,20 @@ with \fBrcapadm\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpg\fR\fR
 .ad
 .RS 11n
-.rt  
 An estimate of the total amount of memory that \fBrcapd\fR successfully paged
 out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBavgpg\fR\fR
 .ad
 .RS 11n
-.rt  
 An estimate of the average amount of memory that \fBrcapd\fR successfully paged
 out during each sample cycle. The rate at which \fBrcapd\fR samples process
 \fBRSS\fR sizes can be set with \fBrcapadm\fR.
@@ -229,23 +199,19 @@ out during each sample cycle. The rate at which \fBrcapd\fR samples process
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the reporting interval in seconds. The default interval is 5 seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the number of reports to produce. By default, \fBrcapstat\fR reports
 statistics until a termination signal is received or until the \fBrcapd\fR
 process exits.
@@ -281,7 +247,7 @@ example# \fBrcapstat 5 5\fR
  78194   user2      1  2368K  1928K   10M    0K    0K    0K    0K
     id project  nproc     vm    rss   cap    at avgat    pg avgpg
 112270   user1     24   123M    35M   50M    0K    0K    0K    0K
- 78194   user2      1  2368K  1928K   10M    0K    0K    0K    0K 
+ 78194   user2      1  2368K  1928K   10M    0K    0K    0K    0K
 .fi
 .in -2
 .sp
@@ -373,34 +339,28 @@ processes to operate without perpetually incurring page faults.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 

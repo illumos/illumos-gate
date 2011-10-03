@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH forms 3CURSES "31 Dec 1996" "SunOS 5.11" "Curses Library Functions"
+.TH FORMS 3CURSES "Dec 31, 1996"
 .SH NAME
 forms \- character based forms package
 .SH SYNOPSIS
@@ -48,793 +48,649 @@ The following table lists each \fBforms\fR routine and the name of the manual
 page on which it is described.
 .sp
 .ne 2
-.mk
 .na
 \fBforms Routine Name\fR
 .ad
 .RS 25n
-.rt  
 \fBManual Page Name\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcurrent_field\fR
 .ad
 .RS 25n
-.rt  
 form_page(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdata_ahead\fR
 .ad
 .RS 25n
-.rt  
 form_data(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdata_behind\fR
 .ad
 .RS 25n
-.rt  
 form_data(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdup_field\fR
 .ad
 .RS 25n
-.rt  
 form_field_new(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdynamic_field_info\fR
 .ad
 .RS 25n
-.rt  
 form_field_info(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_arg\fR
 .ad
 .RS 25n
-.rt  
 form_field_validation(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_back\fR
 .ad
 .RS 25n
-.rt  
 form_field_attributes(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_buffer\fR
 .ad
 .RS 25n
-.rt  
 form_field_buffer(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_count\fR
 .ad
 .RS 25n
-.rt  
 form_field(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_fore\fR
 .ad
 .RS 25n
-.rt  
 form_field_attributes(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_index\fR
 .ad
 .RS 25n
-.rt  
 form_page(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_info\fR
 .ad
 .RS 25n
-.rt  
-	form_field_info(3X)
+form_field_info(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_init\fR
 .ad
 .RS 25n
-.rt  
-	form_hook(3X)
+form_hook(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfield_just\fR
 .ad
 .RS 25n
-.rt  
-	form_field_just(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_opts\fR
-.ad
-.RS 25n
-.rt  
-form_field_opts(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_opts_off\fR
-.ad
-.RS 25n
-.rt  
-form_field_opts(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_opts_on\fR
-.ad
-.RS 25n
-.rt  
-form_field_opts(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_pad\fR
-.ad
-.RS 25n
-.rt  
-form_field_attributes(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_status\fR
-.ad
-.RS 25n
-.rt  
-form_field_buffer(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_term\fR
-.ad
-.RS 25n
-.rt  
-form_hook(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_type\fR
-.ad
-.RS 25n
-.rt  
-form_field_validation(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfield_userptr\fR
-.ad
-.RS 25n
-.rt  
-form_field_userptr(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_driver\fR
-.ad
-.RS 25n
-.rt  
-form_driver(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_fields\fR
-.ad
-.RS 25n
-.rt  
-form_field(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_init\fR
-.ad
-.RS 25n
-.rt  
-	form_hook(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_opts\fR
-.ad
-.RS 25n
-.rt  
-form_opts(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_opts_off\fR
-.ad
-.RS 25n
-.rt  
-form_opts(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_opts_on\fR
-.ad
-.RS 25n
-.rt  
-form_opts(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_page\fR
-.ad
-.RS 25n
-.rt  
-form_page(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_sub\fR
-.ad
-.RS 25n
-.rt  
-form_win(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_term\fR
-.ad
-.RS 25n
-.rt  
-form_hook(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_userptr\fR
-.ad
-.RS 25n
-.rt  
-form_userptr(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBform_win\fR
-.ad
-.RS 25n
-.rt  
-	form_win(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfree_field	\fR
-.ad
-.RS 25n
-.rt  
-form_field_new(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfree_fieldtype\fR
-.ad
-.RS 25n
-.rt  
-form_fieldtype(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBfree_form\fR
-.ad
-.RS 25n
-.rt  
-form_new(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBlink_field\fR
-.ad
-.RS 25n
-.rt  
-	form_field_new(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBlink_fieldtype\fR
-.ad
-.RS 25n
-.rt  
-form_fieldtype(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBmove_field\fR
-.ad
-.RS 25n
-.rt  
-form_field(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBnew_field\fR
-.ad
-.RS 25n
-.rt  
-	form_field_new(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBnew_fieldtype\fR
-.ad
-.RS 25n
-.rt  
-	form_fieldtype(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBnew_form\fR
-.ad
-.RS 25n
-.rt  
-	form_new(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBnew_page\fR
-.ad
-.RS 25n
-.rt  
-form_new_page(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBpos_form_cursor\fR
-.ad
-.RS 25n
-.rt  
-form_cursor(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBpost_form\fR
-.ad
-.RS 25n
-.rt  
-form_post(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBscale_form	\fR
-.ad
-.RS 25n
-.rt  
-form_win(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBset_current_field\fR
-.ad
-.RS 25n
-.rt  
-form_page(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBset_field_back\fR
-.ad
-.RS 25n
-.rt  
-form_field_attributes(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBset_field_buffer\fR
-.ad
-.RS 25n
-.rt  
- 	form_field_buffer(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBset_field_fore\fR
-.ad
-.RS 25n
-.rt  
-form_field_attributes(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBset_field_init\fR
-.ad
-.RS 25n
-.rt  
-form_hook(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fB set_field_just\fR
-.ad
-.RS 25n
-.rt  
 form_field_just(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_field_opts\fR
+\fBfield_opts\fR
 .ad
 .RS 25n
-.rt  
 form_field_opts(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_field_pad\fR
+\fBfield_opts_off\fR
 .ad
 .RS 25n
-.rt  
+form_field_opts(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBfield_opts_on\fR
+.ad
+.RS 25n
+form_field_opts(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBfield_pad\fR
+.ad
+.RS 25n
 form_field_attributes(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_field_status\fR
+\fBfield_status\fR
 .ad
 .RS 25n
-.rt  
 form_field_buffer(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_field_term\fR
+\fBfield_term\fR
 .ad
 .RS 25n
-.rt  
 form_hook(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_field_type\fR
+\fBfield_type\fR
 .ad
 .RS 25n
-.rt  
 form_field_validation(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_field_userptr\fR
+\fBfield_userptr\fR
 .ad
 .RS 25n
-.rt  
 form_field_userptr(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_fieldtype_arg\fR
+\fBform_driver\fR
 .ad
 .RS 25n
-.rt  
-form_fieldtype(3X)
+form_driver(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_fieldtype_choice	\fR
+\fBform_fields\fR
 .ad
 .RS 25n
-.rt  
-form_fieldtype(3X)
-.RE
-
-.sp
-.ne 2
-.mk
-.na
-\fBset_form_fields\fR
-.ad
-.RS 25n
-.rt  
 form_field(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_init\fR
+\fBform_init\fR
 .ad
 .RS 25n
-.rt  
 form_hook(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_opts\fR
+\fBform_opts\fR
 .ad
 .RS 25n
-.rt  
 form_opts(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_page\fR
+\fBform_opts_off\fR
 .ad
 .RS 25n
-.rt  
+form_opts(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBform_opts_on\fR
+.ad
+.RS 25n
+form_opts(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBform_page\fR
+.ad
+.RS 25n
 form_page(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_sub\fR
+\fBform_sub\fR
 .ad
 .RS 25n
-.rt  
 form_win(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_term\fR
+\fBform_term\fR
 .ad
 .RS 25n
-.rt  
 form_hook(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_userptr\fR
+\fBform_userptr\fR
 .ad
 .RS 25n
-.rt  
 form_userptr(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_form_win\fR
+\fBform_win\fR
 .ad
 .RS 25n
-.rt  
 form_win(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_max_field\fR
+\fBfree_field\fR
 .ad
 .RS 25n
-.rt  
-form_field_buffer(3X)
+form_field_new(3X)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
-\fBset_new_page\fR
+\fBfree_fieldtype\fR
 .ad
 .RS 25n
-.rt  
+form_fieldtype(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBfree_form\fR
+.ad
+.RS 25n
+form_new(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBlink_field\fR
+.ad
+.RS 25n
+form_field_new(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBlink_fieldtype\fR
+.ad
+.RS 25n
+form_fieldtype(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBmove_field\fR
+.ad
+.RS 25n
+form_field(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBnew_field\fR
+.ad
+.RS 25n
+form_field_new(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBnew_fieldtype\fR
+.ad
+.RS 25n
+form_fieldtype(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBnew_form\fR
+.ad
+.RS 25n
+form_new(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBnew_page\fR
+.ad
+.RS 25n
 form_new_page(3X)
 .RE
 
 .sp
 .ne 2
-.mk
+.na
+\fBpos_form_cursor\fR
+.ad
+.RS 25n
+form_cursor(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBpost_form\fR
+.ad
+.RS 25n
+form_post(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBscale_form\fR
+.ad
+.RS 25n
+form_win(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_current_field\fR
+.ad
+.RS 25n
+form_page(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_back\fR
+.ad
+.RS 25n
+form_field_attributes(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_buffer\fR
+.ad
+.RS 25n
+form_field_buffer(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_fore\fR
+.ad
+.RS 25n
+form_field_attributes(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_init\fR
+.ad
+.RS 25n
+form_hook(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fB set_field_just\fR
+.ad
+.RS 25n
+form_field_just(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_opts\fR
+.ad
+.RS 25n
+form_field_opts(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_pad\fR
+.ad
+.RS 25n
+form_field_attributes(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_status\fR
+.ad
+.RS 25n
+form_field_buffer(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_term\fR
+.ad
+.RS 25n
+form_hook(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_type\fR
+.ad
+.RS 25n
+form_field_validation(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_field_userptr\fR
+.ad
+.RS 25n
+form_field_userptr(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_fieldtype_arg\fR
+.ad
+.RS 25n
+form_fieldtype(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_fieldtype_choice\fR
+.ad
+.RS 25n
+form_fieldtype(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_fields\fR
+.ad
+.RS 25n
+form_field(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_init\fR
+.ad
+.RS 25n
+form_hook(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_opts\fR
+.ad
+.RS 25n
+form_opts(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_page\fR
+.ad
+.RS 25n
+form_page(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_sub\fR
+.ad
+.RS 25n
+form_win(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_term\fR
+.ad
+.RS 25n
+form_hook(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_userptr\fR
+.ad
+.RS 25n
+form_userptr(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_form_win\fR
+.ad
+.RS 25n
+form_win(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_max_field\fR
+.ad
+.RS 25n
+form_field_buffer(3X)
+.RE
+
+.sp
+.ne 2
+.na
+\fBset_new_page\fR
+.ad
+.RS 25n
+form_new_page(3X)
+.RE
+
+.sp
+.ne 2
 .na
 \fBunpost_form\fR
 .ad
 .RS 25n
-.rt  
 form_post(3X)
 .RE
 
@@ -845,144 +701,118 @@ Routines that return a pointer always return \fINULL\fR on error. Routines that
 return an integer return one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_OK\fR\fR
 .ad
 .RS 21n
-.rt  
 The function returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_CONNECTED\fR\fR
 .ad
 .RS 21n
-.rt  
 The field is already connected to a form.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_SYSTEM_ERROR\fR\fR
 .ad
 .RS 21n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_BAD_ARGUMENT\fR\fR
 .ad
 .RS 21n
-.rt  
 An argument is incorrect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_CURRENT\fR\fR
 .ad
 .RS 21n
-.rt  
 The field is the current field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_POSTED\fR\fR
 .ad
 .RS 21n
-.rt  
 The form is posted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NOT_POSTED\fR\fR
 .ad
 .RS 21n
-.rt  
 The form is not posted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_INVALID_FIELD\fR\fR
 .ad
 .RS 21n
-.rt  
 The field contents are invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NOT_CONNECTED\fR\fR
 .ad
 .RS 21n
-.rt  
 The field is not connected to a form.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_NO_ROOM\fR\fR
 .ad
 .RS 21n
-.rt  
 The form does not fit in the subwindow.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_BAD_STATE\fR\fR
 .ad
 .RS 21n
-.rt  
 The routine was called from an initialization or termination function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_REQUEST_DENIED\fR\fR
 .ad
 .RS 21n
-.rt  
 The form driver request failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE_UNKNOWN_COMMAND\fR\fR
 .ad
 .RS 21n
-.rt  
 An unknown request was passed to the form driver.
 .RE
 
@@ -994,13 +824,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_minor_next 3DEVINFO "1 Dec 1998" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_MINOR_NEXT 3DEVINFO "Dec 1, 1998"
 .SH NAME
 di_minor_next \- libdevinfo minor node traversal functions
 .SH SYNOPSIS
@@ -18,23 +18,19 @@ di_minor_next \- libdevinfo minor node traversal functions
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 9n
-.rt  
 Handle to the current minor node or \fBDI_MINOR_NIL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInode\fR\fR
 .ad
 .RS 9n
-.rt  
 Device node with which the minor node is associated.
 .RE
 
@@ -56,34 +52,28 @@ the error.
 The \fBdi_minor_next()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 Minor node information is not available in snapshot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 End of minor node list.
 .RE
 
@@ -95,15 +85,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

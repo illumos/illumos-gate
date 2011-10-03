@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kadm5.acl 4 "26 Apr 2004" "SunOS 5.11" "File Formats"
+.TH KADM5.ACL 4 "Apr 26, 2004"
 .SH NAME
 kadm5.acl \- Kerberos access control list (ACL) file
 .SH SYNOPSIS
@@ -50,12 +50,10 @@ Lines containing \fBACL\fR entries must have the following format:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprincipal\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the principal on which the \fIoperation-mask\fR applies. Can specify
 either a partially or fully qualified Kerberos principal name. Each component
 of the name can be substituted with a wildcard, using the asterisk ( \fB*\fR )
@@ -64,12 +62,10 @@ character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoperation-mask\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies what operations can or cannot be performed by a principal matching a
 particular entry. Specify \fIoperation-mask\fR as one or more \fIprivilege\fRs.
 .sp
@@ -83,201 +79,165 @@ allowed and if the character is uppercase, the operation is disallowed. The
 The following \fIprivilege\fRs are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows the addition of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallows the addition of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows the changing of passwords for principals in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallows the changing of passwords for principals in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows the deletion of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallows the deletion of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows inquiries to the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallows inquiries to the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows the listing of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallows the listing of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows the modification of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallows the modification of principals or policies in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 Allow the propagation of the principal database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
 .RS 5n
-.rt  
 Disallow the propagation of the principal database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 5n
-.rt  
 Allows the creation of one-component user principals whose password can be
 validated with PAM.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU\fR\fR
 .ad
 .RS 5n
-.rt  
 Negates the \fBu\fR privilege.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 Short for specifying privileges \fBa\fR, \fBd\fR,\fBm\fR,\fBc\fR,\fBi\fR, and
 \fBl\fR. The same as \fB*\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 5n
-.rt  
 Short for specifying privileges \fBa\fR, \fBd\fR,\fBm\fR,\fBc\fR,\fBi\fR, and
 \fBl\fR. The same as \fBx\fR.
 .RE
@@ -286,12 +246,10 @@ Short for specifying privileges \fBa\fR, \fBd\fR,\fBm\fR,\fBc\fR,\fBi\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoperation-target\fR\fR
 .ad
 .RS 20n
-.rt  
 Optional. When specified, the \fIprivileges\fR apply to the \fIprincipal\fR
 when it operates on the \fIoperation-target\fR. For the \fIoperation-target\fR,
 you can specify a partially or fully qualified Kerberos principal name. Each
@@ -309,7 +267,7 @@ The following ACL entry specifies a standard, fully qualified name:
 .sp
 .in +2
 .nf
-user/instance@realm adm 
+user/instance@realm adm
 .fi
 .in -2
 .sp
@@ -329,7 +287,7 @@ The following ACL entry specifies a standard, fully qualified name:
 .sp
 .in +2
 .nf
-user/instance@realm cim service/instance@realm 
+user/instance@realm cim service/instance@realm
 .fi
 .in -2
 .sp
@@ -350,7 +308,7 @@ The following ACL entry specifies a name using a wildcard:
 .sp
 .in +2
 .nf
-user/*@realm ac 
+user/*@realm ac
 .fi
 .in -2
 .sp
@@ -406,12 +364,10 @@ updates.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kdc.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 KDC configuration information.
 .RE
 
@@ -423,13 +379,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

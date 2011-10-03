@@ -22,8 +22,7 @@
 # uts/sun4u/cpr/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the cpr misc kernel module.
 #
@@ -74,6 +73,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+#
+# Depends on bootdev
+#
+LDFLAGS += -dy -N misc/bootdev
 
 #
 # For now, disable these lint checks; maintainers should endeavor

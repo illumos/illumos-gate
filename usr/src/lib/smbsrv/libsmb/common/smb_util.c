@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -418,8 +419,8 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 	char *host;
 	int off;
 	int i;
-	int netgroup_match;
 	int response;
+	int clres;
 	struct nd_hostservlist *clnames;
 	struct in_addr inaddr;
 	struct sockaddr_in sa;
@@ -450,10 +451,7 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 	if (config == NULL)
 		return (1);
 
-	if (__netdir_getbyaddr_nosrv(config, &clnames, &buf)) {
-		freenetconfigent(config);
-		return (0);
-	}
+	clres = __netdir_getbyaddr_nosrv(config, &clnames, &buf);
 	freenetconfigent(config);
 
 	for (gr = strtok_r(access_list, ":", &lasts);
@@ -472,8 +470,20 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 		}
 
 		/*
-		 * The following loops through all the
-		 * client's aliases.  Usually it's just one name.
+		 * First check if we have '@' entry, as smb_netmatch doesn't
+		 * care if client address can be resolved.
+		 */
+		if (*gr == '@')
+			if (smb_netmatch(&buf, gr + 1))
+				return (response);
+		/*
+		 * No other checks can be performed if client address
+		 * can't be resolved.
+		 */
+		if (clres)
+			continue;
+		/*
+		 * Otherwise loop through all client hostname aliases.
 		 */
 		for (i = 0; i < clnames->h_cnt; i++) {
 			host = clnames->h_hostservs[i].h_host;
@@ -495,30 +505,21 @@ smb_chk_hostaccess(smb_inaddr_t *ipaddr, char *access_list)
 					}
 				}
 			} else {
-
 				/*
-				 * If the list name begins with an at
-				 * sign then do a network comparison.
+				 * Just do a hostname match
 				 */
-				if (*gr == '@') {
-					if (smb_netmatch(&buf, gr + 1))
-						return (response);
-				} else {
-					/*
-					 * Just do a hostname match
-					 */
-					if (strcasecmp(gr, host) == 0)
-						return (response);
+				if (strcasecmp(gr, host) == 0)
+					return (response);
 				}
 			}
-		}
 
 		nentries++;
 	}
 
-	netgroup_match = smb_netgroup_match(clnames, access_list, nentries);
+	if (clres)
+		return (0);
 
-	return (netgroup_match);
+	return (smb_netgroup_match(clnames, access_list, nentries));
 }
 
 /*

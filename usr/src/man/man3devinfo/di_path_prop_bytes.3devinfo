@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_path_prop_bytes 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_PATH_PROP_BYTES 3DEVINFO "May 15, 2008"
 .SH NAME
 di_path_prop_bytes, di_path_prop_ints, di_path_prop_int64s, di_path_prop_name,
 di_path_prop_strings, di_path_prop_type \- access path property information
@@ -44,23 +44,19 @@ di_path_prop_strings, di_path_prop_type \- access path property information
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop\fR\fR
 .ad
 .RS 13n
-.rt  
 A handle to a property returned by \fBdi_path_prop_next\fR(3DEVINFO).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprop_data\fR\fR
 .ad
 .RS 13n
-.rt  
 For \fBdi_path_prop_bytes()\fR, the address of a pointer to an unsigned
 character.
 .sp
@@ -89,45 +85,37 @@ excluding \fBDI_PROP_TYPE_UNKNOWN\fR and \fBDI_PROP_UNDEFINED\fR. Thus,
 \fBdi_path_prop_type()\fR can return one of the following constants:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_INT\fR\fR
 .ad
 .RS 23n
-.rt  
 Use \fBdi_path_prop_ints()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_INT64\fR\fR
 .ad
 .RS 23n
-.rt  
 Use \fBdi_path_prop_int64s()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_STRING\fR\fR
 .ad
 .RS 23n
-.rt  
 Use \fBdi_path_prop_strings()\fR to access property data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PROP_TYPE_BYTE\fR\fR
 .ad
 .RS 23n
-.rt  
 Use \fBdi_path_prop_bytes()\fR to access property data.
 .RE
 
@@ -186,35 +174,29 @@ Description.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 One of the arguments is invalid. For example, the property type does not match
 the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The snapshot contains no property information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 The path property does not exist.
 .RE
 
@@ -226,15 +208,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

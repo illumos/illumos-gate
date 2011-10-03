@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Put8 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_PUT8 9F "Jul 19, 1996"
 .SH NAME
 csx_Put8, csx_Put16, csx_Put32, csx_Put64 \- write to device register
 .SH SYNOPSIS
@@ -38,35 +38,29 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR \fR
 .ad
 .RS 11n
-.rt  
 The access handle returned from \fBcsx_RequestIO\fR(9F),
 \fBcsx_RequestWindow\fR(9F), or \fBcsx_DupHandle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR \fR
 .ad
 .RS 11n
-.rt  
 The offset in bytes from the base of the mapped resource.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR \fR
 .ad
 .RS 11n
-.rt  
 The data to be written to the device.
 .RE
 

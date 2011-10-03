@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ct_dev_tmpl_set_aset 3CONTRACT "9 Aug 2007" "SunOS 5.11" "Contract Management Library Functions"
+.TH CT_DEV_TMPL_SET_ASET 3CONTRACT "Aug 9, 2007"
 .SH NAME
 ct_dev_tmpl_set_aset, ct_dev_tmpl_get_aset, ct_dev_tmpl_set_minor,
 ct_dev_tmpl_get_minor, ct_dev_tmpl_set_noneg, ct_dev_tmpl_clear_noneg,
@@ -51,45 +51,37 @@ int ct_dev_tmpl_set_aset(int fd, uint_t aset);
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaset\fR\fR
 .ad
 .RS 11n
-.rt  
 a bitset of one or more of device states
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIasetp\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to a variable into which the current A-set is to be returned
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 11n
-.rt  
 a buffer into which the minor path is to be returned
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuflenp\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to variable of type \fBsize_t\fR in which the size of the buffer
 \fIbuf\fR is passed in. If the buffer is too small the size of the buffer
 needed for a successful call is passed back to the caller.
@@ -97,36 +89,30 @@ needed for a successful call is passed back to the caller.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfd\fR\fR
 .ad
 .RS 11n
-.rt  
 a file descriptor from an open of the device contract template file in the
 contract filesystem (ctfs)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 11n
-.rt  
 the \fBdevfs\fR path (the \fB/devices\fR path without the "\fB/devices\fR"
 prefix) of a minor which is to be the subject of a contract
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInonegp\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to a \fIuint_t\fR variable for receiving the current setting of the
 "nonnegotiable" term in the template
 .RE
@@ -176,12 +162,10 @@ non-zero error value.
 The \fBct_dev_tmpl_set_aset()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A template file descriptor or A-set is invalid
 .RE
 
@@ -190,23 +174,19 @@ A template file descriptor or A-set is invalid
 The \fBct_dev_tmpl_set_minor()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more arguments is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The minor named by minor path does not exist.
 .RE
 
@@ -215,12 +195,10 @@ The minor named by minor path does not exist.
 The \fBct_dev_tmpl_set_noneg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 A process lacks sufficient privilege to NACK a device state change.
 .RE
 
@@ -230,23 +208,19 @@ The \fBct_dev_tmpl_get_aset()\fR and \fBct_dev_tmpl_get_minor()\fR functions
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more arguments is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested term is not set.
 .RE
 
@@ -255,12 +229,10 @@ The requested term is not set.
 The \fBct_dev_tmpl_get_noneg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more arguments is invalid.
 .RE
 
@@ -269,12 +241,10 @@ One or more arguments is invalid.
 The \fBct_dev_tmpl_get_minor()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVEFLOW\fR\fR
 .ad
 .RS 12n
-.rt  
 The supplied buffer is too small.
 .RE
 
@@ -286,15 +256,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

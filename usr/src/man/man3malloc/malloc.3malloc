@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH malloc 3MALLOC "11 May 2005" "SunOS 5.11" "Memory Allocation Library Functions"
+.TH MALLOC 3MALLOC "May 11, 2005"
 .SH NAME
 malloc, free, memalign, realloc, valloc, calloc, mallopt, mallinfo \- memory
 allocator
@@ -109,12 +109,10 @@ The \fBmallopt()\fR function provides for control over the allocation
 algorithm. The available values for \fIcmd\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_MXFAST\fR\fR
 .ad
 .RS 12n
-.rt  
 Set \fImaxfast\fR to  \fIvalue\fR. The algorithm allocates all blocks below the
 size of \fImaxfast\fR in large groups and then doles them out very quickly. The
 default value for \fImaxfast\fR is 24.
@@ -122,12 +120,10 @@ default value for \fImaxfast\fR is 24.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_NLBLKS\fR\fR
 .ad
 .RS 12n
-.rt  
 Set \fInumlblks\fR to \fIvalue\fR. The above mentioned ``large groups'' each
 contain \fInumlblks\fR blocks.   \fInumlblks\fR must be greater than 0. The
 default value for \fInumlblks\fR is 100.
@@ -135,12 +131,10 @@ default value for \fInumlblks\fR is 100.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_GRAIN\fR\fR
 .ad
 .RS 12n
-.rt  
 Set \fIgrain\fR to  \fIvalue\fR. The sizes of all blocks smaller than
 \fImaxfast\fR are considered to be rounded up to the nearest multiple of
 \fIgrain\fR. \fIgrain\fR must be greater than 0. The default value of
@@ -151,12 +145,10 @@ data type. Value will be rounded up to a multiple of the default when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_KEEP\fR\fR
 .ad
 .RS 12n
-.rt  
 Preserve data in a freed block until the next \fBmalloc()\fR, \fBrealloc()\fR,
 or \fBcalloc()\fR. This option is provided only for compatibility with the old
 version of \fBmalloc()\fR, and it is not recommended.
@@ -214,24 +206,20 @@ If \fBmalloc()\fR, \fBcalloc()\fR, or \fBrealloc()\fR returns  unsuccessfully,
 \fBerrno\fR is set to indicate the error:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIsize\fR bytes of memory exceeds the physical limits of your system, and
 cannot be allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 There is not enough memory available at this point in time to allocate
 \fIsize\fR bytes of memory; but the application could try again later.
 .RE
@@ -262,13 +250,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

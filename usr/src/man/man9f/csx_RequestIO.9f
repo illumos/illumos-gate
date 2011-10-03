@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_RequestIO 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_REQUESTIO 9F "Jul 19, 1996"
 .SH NAME
 csx_RequestIO, csx_ReleaseIO \- request or release I/O resources for the client
 .SH SYNOPSIS
@@ -28,23 +28,19 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI\fR)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 6n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIir\fR\fR
 .ad
 .RS 6n
-.rt  
 Pointer to an \fBio_req_t\fR structure.
 .RE
 
@@ -80,15 +76,15 @@ The structure members of \fBio_req_t\fR are:
 uint32_t      Socket;            /* socket number*/
 
 uint32_t      Baseport1.base;    /* IO range base port address */
-acc_handle_t  Baseport1.handle;  /* IO range base address 
+acc_handle_t  Baseport1.handle;  /* IO range base address
                                   /*   or port num */
-uint32_t      NumPorts1;         /* first IO range number contiguous 
+uint32_t      NumPorts1;         /* first IO range number contiguous
                                   /*   ports */
 uint32_t      Attributes1;       /* first IO range attributes */
 
 uint32_t      Baseport2.base;    /* IO range base port address */
 acc_handle_t  Baseport2.handle;  /* IO range base address or port num */
-uint32_t      NumPorts2;         /* second IO range number contiguous 
+uint32_t      NumPorts2;         /* second IO range number contiguous
                                   /*   ports */
 uint32_t      Attributes2;       /* second IO range attributes */
 
@@ -101,19 +97,16 @@ uint32_t      IOAddrLines;       /* number of IO address lines decoded */
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSocket\fR\fR
 .ad
 .RS 20n
-.rt  
 Not used in Solaris, but for portability with other Card Services
 implementations, it should be set to the logical socket number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBasePort1.base\fR\fR
 .ad
@@ -130,7 +123,6 @@ implementations, it should be set to the logical socket number.
 \fB\fBBasePort2.handle\fR\fR
 .ad
 .RS 20n
-.rt  
 Two \fBI/O\fR address ranges can be requested by \fBcsx_RequestIO()\fR. Each
 \fBI/O\fR address range is specified by the \fBBasePort\fR, \fBNumPorts\fR, and
 \fBAttributes\fR fields. If only a single \fBI/O\fR range is being requested,
@@ -160,131 +152,107 @@ fields must be non-zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNumPorts\fR\fR
 .ad
 .RS 20n
-.rt  
 This field is the number of contiguous ports being requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAttributes\fR\fR
 .ad
 .RS 20n
-.rt  
 This field is bit-mapped. The following bits are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIO_DATA_WIDTH_8\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBI/O\fR resource uses 8-bit data path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIO_DATA_WIDTH_16\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBI/O\fR resource uses 16-bit data path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_NEVER_SWAP\fR\fR
 .ad
 .RS 27n
-.rt  
 Host endian byte ordering.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_BIG_ENDIAN\fR\fR
 .ad
 .RS 27n
-.rt  
 Big endian byte ordering
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_LITTLE_ENDIAN\fR\fR
 .ad
 .RS 27n
-.rt  
 Little endian byte ordering.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STRICT_ORDER\fR\fR
 .ad
 .RS 27n
-.rt  
 Program ordering references.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_UNORDERED_OK\fR\fR
 .ad
 .RS 27n
-.rt  
 May re-order references.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_MERGING_OK\fR\fR
 .ad
 .RS 27n
-.rt  
 Merge stores to consecutive locations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_LOADCACHING_OK\fR\fR
 .ad
 .RS 27n
-.rt  
 May cache load operations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STORECACHING_OK\fR\fR
 .ad
 .RS 27n
-.rt  
 May cache store operations.
 .RE
 
@@ -310,7 +278,6 @@ in the data access functions. The ability to specify the order in which the
 bits. Only one of the following bits may be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STRICT_ORDER\fR\fR
 .ad
@@ -322,7 +289,6 @@ ordering is the default behavior.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_UNORDERED_OK\fR\fR
 .ad
@@ -335,7 +301,6 @@ followed by a load).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_MERGING_OK\fR\fR
 .ad
@@ -350,7 +315,6 @@ implies re-ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_LOADCACHING_OK\fR\fR
 .ad
@@ -363,7 +327,6 @@ occurs. The default behavior is to fetch new data on every load.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWIN_ACC_STORECACHING_OK\fR\fR
 .ad
@@ -383,12 +346,10 @@ to \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOAddrLines\fR\fR
 .ad
 .RS 20n
-.rt  
 This field is the number of \fBI/O\fR address lines decoded by the \fBPC\fR
 Card in the specified socket.
 .RE
@@ -402,112 +363,92 @@ Services to allocate \fBI/O\fR resources for the client. (See \fBNOTES\fR).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_ATTRIBUTE\fR\fR
 .ad
 .RS 27n
-.rt  
 Invalid \fBAttributes\fR specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_BASE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBBasePort\fR value is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_CONFIGURATION_LOCKED\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBcsx_RequestConfiguration\fR(9F) has already been done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_IN_USE\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBcsx_RequestIO()\fR has already been done without a corresponding
 \fBcsx_ReleaseIO()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC\fR Card in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_WINDOW\fR\fR
 .ad
 .RS 27n
-.rt  
 Unable to allocate \fBI/O\fR resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_OUT_OF_RESOURCE\fR\fR
 .ad
 .RS 27n
-.rt  
 Unable to allocate \fBI/O\fR resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA\fR hardware installed.
 .RE
 

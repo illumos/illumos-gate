@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kiconvstr 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH KICONVSTR 9F "Oct 16, 2007"
 .SH NAME
 kiconvstr \- string-based code conversion function
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ kiconvstr \- string-based code conversion function
 
 
 
-\fBsize_t\fR \fBkiconvstr\fR(\fBconst char *\fR\fItocode\fR, \fBconst char *\fR\fIfromcode\fR, \fBchar *\fR\fIinarray\fR, 
+\fBsize_t\fR \fBkiconvstr\fR(\fBconst char *\fR\fItocode\fR, \fBconst char *\fR\fIfromcode\fR, \fBchar *\fR\fIinarray\fR,
      \fBsize_t *\fR\fIinlen\fR, \fBchar *\fR\fIoutarray\fR, \fBsize_t *\fR\fIoutlen\fR, \fBint\fR \fIflag\fR, \fBint *\fR\fIerrno\fR);
 .fi
 
@@ -29,48 +29,40 @@ Solaris DDI specific (Solaris DDI).
 The parameters for the \fBkiconvstr\fR function are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fItocode\fR\fR
 .ad
 .RS 12n
-.rt  
 Points to a target codeset name string. Supported names are specified at
 \fBkiconv_open()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfromcode\fR\fR
 .ad
 .RS 12n
-.rt  
 Points to a source codeset name string. Supported names are specified at
 \fBkiconv_open()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinarray\fR\fR
 .ad
 .RS 12n
-.rt  
 Points to a byte array containing a sequence of character bytes in
 \fIfromcode\fR codeset to be converted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinlen\fR\fR
 .ad
 .RS 12n
-.rt  
 As an input parameter, the number of bytes to be converted in \fIinarray\fR. As
 an output parameter, the number of bytes in \fIinarray\fR still not converted
 after the conversion.
@@ -78,24 +70,20 @@ after the conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutarray\fR\fR
 .ad
 .RS 12n
-.rt  
 Points to a byte array where converted character bytes in \fItocode\fR codeset
 can be saved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutlen\fR\fR
 .ad
 .RS 12n
-.rt  
 As an input parameter, the number of available bytes at \fIoutarray\fR where
 converted character bytes can be saved. As an output parameter, the number of
 bytes still available at \fIoutarray\fR after the conversion.
@@ -103,17 +91,14 @@ bytes still available at \fIoutarray\fR after the conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates possible conversion options constructed by a bitwise-inclusive-OR of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKICONV_IGNORE_NULL\fR\fR
 .ad
@@ -129,7 +114,6 @@ conversion continues until the number of \fIinarray\fR bytes pointed by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKICONV_REPLACE_INVALID\fR\fR
 .ad
@@ -146,57 +130,47 @@ instead treats such characters as non-identical conversion  cases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrno\fR\fR
 .ad
 .RS 12n
-.rt  
 Indicates the error when conversion is not completed or failed. The following
 are possible values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 13n
-.rt  
 The input conversion was stopped due to an input byte that does not belong to
 the input codeset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 13n
-.rt  
 The input conversion was stopped due to lack of space in the output array.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The input conversion was stopped due to an incomplete character or shift
 sequence at the end of the input array.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The requested conversion is not supported.
 .RE
 
@@ -326,13 +300,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

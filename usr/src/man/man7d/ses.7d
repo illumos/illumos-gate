@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ses 7D "27 May 2008" "SunOS 5.11" "Devices"
+.TH SES 7D "May 27, 2008"
 .SH NAME
 ses \- SCSI enclosure services device driver
 .SH SYNOPSIS
@@ -69,60 +69,50 @@ SES compliant data structures. This enables the SES driver to work seamlessly
 with  different protocols and eliminates the need to enhance user applications.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSESIOC_GETNOBJ\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns an unsigned integer that represents the number of SES data structures
 in the enclosure services chip.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSESIOC_GETOBJMAP\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns a size array containing \fBses_object\fR elements communicated through
 \fBSESIOC_GETNOBJ()\fR. \fBses_object\fR is defined in \fBsesio.h\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSESIOC_INIT\fR\fR
 .ad
 .RS 21n
-.rt  
 Instructs the device to perform a self-diagnostic test. Currently SES & SEN
 devices always return success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSESIOC_GETENCSTAT\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns an unsigned character that represents status enclosure as defined by
 Table 25 in Section 7.1.2 of the SES specification \fINCITS 305-199\fR\fIx\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSESIOC_GETOBJSTAT\fR\fR
 .ad
 .RS 21n
-.rt  
 This ioctl is passed an \fBses_objarg\fR containing the \fBobj_id\fR you want
 to set, then fills in the remaining fields according to element status page of
 the SES specification.
@@ -130,12 +120,10 @@ the SES specification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSESIOC_SETOBJSTAT\fR\fR
 .ad
 .RS 21n
-.rt  
 Sets options in the control field. You set control field options by filling out
 all fields in \fBses_objarg\fR. Field definitions are presented in Section
 7.2.2 of the SES specification.
@@ -144,12 +132,10 @@ all fields in \fBses_objarg\fR. Field definitions are presented in Section
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/ses.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 Driver configuration file
 .RE
 
@@ -161,13 +147,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 .TE
 
 .SH SEE ALSO

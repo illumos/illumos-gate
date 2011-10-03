@@ -3,25 +3,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH wificonfig 1M "31 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH WIFICONFIG 1M "Oct 31, 2007"
 .SH NAME
 wificonfig \- WLAN configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] autoconf 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] autoconf
      [\fIwait\fR={\fIn\fR|\fIforever\fR}]
 .fi
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] connect profile 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] connect profile
      [\fIwait\fR={\fIn\fR|\fIforever\fR}]
 .fi
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] connect essid 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] connect essid
      [\fIwait\fR={\fIn\fR|\fIforever\fR}]
 .fi
 
@@ -32,13 +32,13 @@ wificonfig \- WLAN configuration
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] getparam 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] getparam
      [\fIparameter\fR []...]
 .fi
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] setparam 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] [\fB-i\fR \fIinterface\fR] setparam
      [\fIparameter\fR=\fIvalue\fR []...]
 .fi
 
@@ -64,13 +64,13 @@ wificonfig \- WLAN configuration
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] createprofile profile 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] createprofile profile
      [\fIparameter\fR=\fIvalue\fR []...]
 .fi
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] deleteprofile \fIprofile1\fR 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] deleteprofile \fIprofile1\fR
      [\fIprofile2\fR []...]
 .fi
 
@@ -86,13 +86,13 @@ wificonfig \- WLAN configuration
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] getprofileparam \fIprofile\fR 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] getprofileparam \fIprofile\fR
      [\fIparameter\fR []...]
 .fi
 
 .LP
 .nf
-\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] setprofileparam 
+\fBwificonfig\fR [\fB-R\fR \fIroot_path\fR] setprofileparam
      [\fIparameter\fR=\fIvalue\fR []...]
 .fi
 
@@ -172,23 +172,19 @@ heuristics). A few subcommands (\fBlistprefer\fR, \fBsetprefer\fR,
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterface\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies a wireless network interface to do the configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot_path\fR\fR
 .ad
 .RS 16n
-.rt  
 Defines the full path name of a directory to use as the \fIroot_path\fR. This
 affects the location of the private files where \fBwificonfig\fR stores the
 Configuration Profiles and \fBWEP\fR keys.
@@ -200,12 +196,10 @@ Configuration Profiles and \fBWEP\fR keys.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fBprofile\fR
 .ad
 .RS 11n
-.rt  
 The name of a \fBWiFi\fR profile. It can be a string between 1 and 32
 characters. However, "all", "{preference}", "{history}", "{active_profile}",
 and any strings contained in brackets, such as "[foo]", are not allowed as a
@@ -218,7 +212,6 @@ profile name.
 The following subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautoconf\fR [wait={\fIn\fR|\fIforever\fR}]\fR
 .ad
@@ -252,7 +245,6 @@ before the \fBwificonfig autoconf\fR subcommand is given.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect\fR \fIprofile\fR[wait={\fIn\fR|\fIforever\fR}]\fR
 .ad
@@ -279,7 +271,7 @@ tries until the \fBNIC\fR is successfully connected to the profile or essid
 that was specified.
 .sp
 The \fBconnect\fR subcommand prints one of the following lines depending on
-whether or not a Configuration Profile was 	 found for the specified name:
+whether or not a Configuration Profile was found for the specified name:
 .sp
 .in +2
 .nf
@@ -300,7 +292,6 @@ before the \fBwificonfig autoconf\fR subcommand is given.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisconnect\fR\fR
 .ad
@@ -315,7 +306,6 @@ subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetparam\fR [parameter [...]]\fR
 .ad
@@ -353,7 +343,6 @@ $ wificonfig getparam <parameter1> [parameter2 [...]]
 case insensitive).
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbssid\fR\fR
 .ad
@@ -369,7 +358,6 @@ value is "none". This parameter is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIessid\fR\fR
 .ad
@@ -382,7 +370,6 @@ the built-in heuristics. The default value is an empty string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbsstype\fR\fR
 .ad
@@ -398,7 +385,6 @@ of "auto" automatically switches between the two types. The default value is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcreateibss\fR\fR
 .ad
@@ -415,7 +401,6 @@ to join a \fBWLAN\fR first. If this is successful, the setting of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchannel\fR\fR
 .ad
@@ -432,7 +417,6 @@ the card.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrates\fR\fR
 .ad
@@ -449,7 +433,6 @@ chip.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpowermode\fR\fR
 .ad
@@ -462,7 +445,6 @@ combination of speed and power saving. The default value is "off".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIauthmode\fR\fR
 .ad
@@ -475,7 +457,6 @@ authentication mode. The default value is "opensystem".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIencryption\fR\fR
 .ad
@@ -488,7 +469,6 @@ value is "none".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwepkey1\fR|\fIwepkey2\fR|\fIwepkey3\fR|\fIwepkey4\fR\fR
 .ad
@@ -510,7 +490,6 @@ allow \fBps\fR(1) to read the keys.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwepkeyindex\fR\fR
 .ad
@@ -523,7 +502,6 @@ subcommand is only valid when \fBWEP\fR is on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsignal\fR\fR
 .ad
@@ -537,7 +515,6 @@ parameter is read-only and indicates the radio signal strength received by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIradio\fR\fR
 .ad
@@ -551,7 +528,6 @@ turn on the radio and "off" to turn off the radio. The default value is "on".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestoredef\fR\fR
 .ad
@@ -567,7 +543,6 @@ subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBscan\fR\fR
 .ad
@@ -578,7 +553,6 @@ Scans and lists the currently available \fBWLAN\fRs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowstatus\fR\fR
 .ad
@@ -592,13 +566,12 @@ encrypted or not, and the signal strength.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetwepkey\fR 1|2|3|4\fR
 .ad
 .sp .6
 .RS 4n
-Sets one of the 4 \fBWEP\fR encryption keys. 	\fBWEP\fR keys are used to
+Sets one of the 4 \fBWEP\fR encryption keys. \fBWEP\fR keys are used to
 encrypt the content of the network packets which are transmitted on air. There
 are 4 \fBWEP\fR keys in the \fBNIC\fR according to the 802.11 standards. The
 \fBsetwepkey\fR subcommand is used to update one of the 4 keys by prompting the
@@ -634,7 +607,6 @@ The "solaris.network.wifi.wep" authorization is required for this subcommand.
 The following profile subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreateprofile\fR \fIprofile\fR [parameter=value] [...]\fR
 .ad
@@ -650,7 +622,6 @@ subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeleteprofile\fR \fIprofile1\fR [\fIprofile2\fR [...]]\fR
 .ad
@@ -666,7 +637,6 @@ subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowprofile\fR [\fIprofile\fR]\fR
 .ad
@@ -680,7 +650,6 @@ the profiles are shown.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetprofilewepkey\fR 1|2|3|4\fR
 .ad
@@ -712,7 +681,6 @@ The "solaris.network.wifi.wep" authorization is required for this subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetprofileparam\fR \fIprofile\fR [parameter]\  [...]]\fR
 .ad
@@ -723,10 +691,10 @@ The "solaris.network.wifi.wep" authorization is required for this subcommand.
 .sp .6
 .RS 4n
 Gets or sets parameters in the specified Configuration Profile "\fIprofile\fR".
-Like 	 the other profile subcommands, these subcommands do not affect the
-configuration of a network interface, even if a \fBWiFi\fR 	 interface is
-currently running with the specified profile. 	 In order for the modified
-profile to be applied to the 	 network interface, the \fBconnect\fR or
+Like the other profile subcommands, these subcommands do not affect the
+configuration of a network interface, even if a \fBWiFi\fR interface is
+currently running with the specified profile. In order for the modified
+profile to be applied to the network interface, the \fBconnect\fR or
 \fBautoconf\fR subcommands have to be used after the profile has been updated.
 .sp
 A \fBgetprofileparam\fR without any parameters will display all the parameters
@@ -756,7 +724,6 @@ for the \fBsetparam\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhistory\fR\fR
 .ad
@@ -770,7 +737,6 @@ time. These records can be listed by using this subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlistprefer\fR\fR
 .ad
@@ -781,7 +747,6 @@ Lists the content of the Preference List.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremoveprefer\fR \fIprofile\fR\fR
 .ad
@@ -796,7 +761,6 @@ subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetprefer\fR \fIprofile\fR [\fIn\fR]\fR
 .ad
@@ -827,7 +791,7 @@ modes of the parameters:
 .sp
 .in +2
 .nf
-% wificonfig -i ath0 setparam 
+% wificonfig -i ath0 setparam
           parameter     property
               bssid     read only
               essid     read/write
@@ -837,7 +801,7 @@ modes of the parameters:
          encryption     read/write
         wepkeyindex     read/write
              signal     read only
-  
+
 .fi
 .in -2
 .sp
@@ -852,7 +816,7 @@ To get the current rates and signal strength from the driver:
 .in +2
 .nf
 % wificonfig -i ath0 getparam rates signal
-      ath0: 
+      ath0:
          rates = 1,2,5.5,11
          signal = 10
 .fi
@@ -900,7 +864,7 @@ removes \fImy_neighbor\fR from the Preference List
 .nf
 % wificonfig setprefer myXXX 1
 % ifconfig ath0 plumb
-% wificonfig -i ath0 autoconf 
+% wificonfig -i ath0 autoconf
 % wificonfig removeprefer my_neighbor
 .fi
 .in -2
@@ -1049,46 +1013,38 @@ roomlinx        00:40:96:a0:ab:39 access point  none            8
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful operation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Fatal Error; the operation failed. For example, a connect failed to associate
 with an Access Point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Improper Use; help information will be printed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Minor error
 .RE
 
@@ -1100,13 +1056,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO

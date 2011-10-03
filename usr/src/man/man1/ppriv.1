@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ppriv 1 "24 Feb 2008" "SunOS 5.11" "User Commands"
+.TH PPRIV 1 "Feb 24, 2008"
 .SH NAME
 ppriv \- inspect or modify process privilege sets and attributes
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ ppriv \- inspect or modify process privilege sets and attributes
 
 .LP
 .nf
-\fB/usr/bin/ppriv\fR [\fB-v\fR] [\fB-S\fR] [\fB-D\fR | \fB-N\fR] [\fB-s\fR \fIspec\fR] 
+\fB/usr/bin/ppriv\fR [\fB-v\fR] [\fB-S\fR] [\fB-D\fR | \fB-N\fR] [\fB-s\fR \fIspec\fR]
      [\fIpid\fR | \fIcore\fR]...
 .fi
 
@@ -43,46 +43,38 @@ specified privileges or privileges set specifications.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 11n
-.rt  
 Turns on privilege debugging for the processes or command supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 11n
-.rt  
 Interprets the remainder of the arguments as a command line and runs the
 command line with specified privilege attributes and sets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 11n
-.rt  
 Lists all currently defined privileges on stdout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 11n
-.rt  
 When a system is configured with Trusted Extensions, this option turns on the
 \fBNET_MAC_AWARE\fR and \fBNET_MAC_AWARE_INHERIT\fR process attributes.
 .sp
@@ -92,34 +84,28 @@ communicate with lower-level remote peers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR\fR
 .ad
 .RS 11n
-.rt  
 Turns off privilege debugging for the processes or command supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIspec\fR\fR
 .ad
 .RS 11n
-.rt  
 Modifies a process's privilege sets according to \fIspec\fR, a specification
 with the format \fB[AEILP][+-=]\fR\fIprivsetspec\fR, containing no spaces,
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAEILP\fR\fR
 .ad
 .RS 15n
-.rt  
 Indicates one or more letters indicating which privilege sets to change. These
 are case insensitive, for example, either \fBa\fR or \fBA\fR indicates all
 privilege sets.
@@ -127,24 +113,20 @@ privilege sets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+-=\fR\fR
 .ad
 .RS 15n
-.rt  
 Indicates a modifier to respectively add (\fB+\fR), remove (\fB-\fR), or assign
 (\fB=\fR) the listed privileges to the specified set(s) in \fIprivsetspec\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprivsetspec\fR\fR
 .ad
 .RS 15n
-.rt  
 Indicates a comma-separated privilege set specification
 (\fBpriv1\fR,\fBpriv2\fR, and so on), as described in
 \fBpriv_str_to_set\fR(3C).
@@ -158,24 +140,20 @@ are mutually exclusive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 11n
-.rt  
 Short. Reports the shortest possible output strings for sets. The default is
 portable output. See \fBpriv_str_to_set\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 11n
-.rt  
 Verbose. Reports privilege sets using privilege names.
 .RE
 
@@ -235,7 +213,7 @@ effective set.
 .sp
 .in +2
 .nf
-example$ \fBppriv -s EI-proc_session $$\fR 
+example$ \fBppriv -s EI-proc_session $$\fR
 .fi
 .in -2
 .sp
@@ -341,46 +319,38 @@ See \fBsetpflags\fR(2) for explanations of the flags.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error has occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/*\fR\fR
 .ad
 .RS 23n
-.rt  
 Process files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/name_to_sysnum\fR\fR
 .ad
 .RS 23n
-.rt  
 system call name to number mapping
 .RE
 
@@ -392,13 +362,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

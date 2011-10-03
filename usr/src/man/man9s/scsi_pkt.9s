@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_pkt 9S "11 Jan 2009" "SunOS 5.11" "Data Structures for Drivers"
+.TH SCSI_PKT 9S "Jan 11, 2009"
 .SH NAME
 scsi_pkt \- SCSI packet structure
 .SH SYNOPSIS
@@ -31,24 +31,24 @@ failure of the command.
 .sp
 .in +2
 .nf
-opaque_t             pkt_ha_private;           /* private data for 
+opaque_t             pkt_ha_private;           /* private data for
                                                   host adapter */
 struct scsi_address  pkt_address;              /* destination packet */
-opaque_t             pkt_private;              /* private data 
+opaque_t             pkt_private;              /* private data
                                                   for target driver */
 void                 (*pkt_comp)(struct scsi_pkt *); /* callback */
 uint_t               pkt_flags;                /* flags */
-int                  pkt_time;                 /* time allotted to 
+int                  pkt_time;                 /* time allotted to
                                                   complete command */
-uchar_t              *pkt_scbp;                /* pointer to 
+uchar_t              *pkt_scbp;                /* pointer to
                                                   status block */
-uchar_t              *pkt_cdbp;                /* pointer to 
+uchar_t              *pkt_cdbp;                /* pointer to
                                                   command block */
-ssize_t              pkt_resid;                /* number of bytes 
+ssize_t              pkt_resid;                /* number of bytes
                                                   not transferred */
 uint_t               pkt_state;                /* state of command */
 uint_t               pkt_statistics;           /* statistics */
-uchar_t              pkt_reason;               /* reason completion 
+uchar_t              pkt_reason;               /* reason completion
                                                   called */
 uint_t               pkt_cdblen;               /* length of pkt_cdbp */
 uint_t               pkt_scdblen;              /* length of pkt_scbp */
@@ -61,48 +61,40 @@ uint_t               pkt_dma_flags;            /* DMA flags */
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_ha_private\fR\fR
 .ad
 .RS 18n
-.rt  
 Opaque pointer that the HBA uses to reference a private data structure that
 transfers \fBscsi_pkt\fR requests.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_address\fR\fR
 .ad
 .RS 18n
-.rt  
 Initialized by \fBscsi_init_pkt\fR(9F), \fBpkt_address\fR records the intended
 route and the recipient of a request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_private\fR\fR
 .ad
 .RS 18n
-.rt  
 Reserved for the use of the target driver, \fBpkt_private\fR is not changed by
 the HBA driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_comp\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the command completion callback routine. When the host adapter driver
 has gone as far as it can in transporting a command to a \fBSCSI\fR target, and
 the command has either run to completion or can go no further for some other
@@ -114,24 +106,20 @@ might sleep.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_flags\fR\fR
 .ad
 .RS 18n
-.rt  
 Provides additional information about how the target driver expects the command
 to be executed. See \fBpkt_flag Definitions\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_time\fR\fR
 .ad
 .RS 18n
-.rt  
 Set by the target driver to represent the maximum time allowed in seconds for
 this command to complete. Timeout starts when the command is transmitted on the
 \fBSCSI\fR bus. The \fBpkt_time\fR may be \fB0\fR if no timeout is required.
@@ -139,12 +127,10 @@ this command to complete. Timeout starts when the command is transmitted on the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_scbp\fR\fR
 .ad
 .RS 18n
-.rt  
 Points to either a struct \fBscsi_status\fR(9S) or, if \fBauto-rqsense\fR is
 enabled and \fBpkt_state\fR includes \fBSTATE_ARQ_DONE\fR, a struct
 \fBscsi_arq_status\fR. If \fBscsi_status\fR is returned, the \fBSCSI\fR status
@@ -154,24 +140,20 @@ byte resulting from the requested command is available. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_cdbp\fR\fR
 .ad
 .RS 18n
-.rt  
 Points to a kernel-addressable buffer with a length specified by a call to the
 proper resource allocation routine, \fBscsi_init_pkt\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_resid\fR\fR
 .ad
 .RS 18n
-.rt  
 Contains a residual count, either the number of data bytes that have not been
 transferred (\fBscsi_transport\fR(9F)) or the number of data bytes for which
 DMA resources could not be allocated \fBscsi_init_pkt\fR(9F). In the latter
@@ -181,103 +163,85 @@ called with the \fBPKT_DMA_PARTIAL\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_state\fR\fR
 .ad
 .RS 18n
-.rt  
 Has bit positions that represent the six most important states that a
 \fBSCSI\fR command can go through. See \fBpkt_state Definitions\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_statistics\fR\fR
 .ad
 .RS 18n
-.rt  
 Maintains some transport-related statistics. See \fBpkt_statistics
 Definitions\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_reason\fR\fR
 .ad
 .RS 18n
-.rt  
 Contains a completion code that indicates why the \fBpkt_comp\fR function was
 called. See \fBpkt_reason Definitions\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_cdblen\fR\fR
 .ad
 .RS 18n
-.rt  
 Length of buffer pointed to by \fBpkt_cdbp\fR. See \fBtran_setup_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_scblen\fR\fR
 .ad
 .RS 18n
-.rt  
 Length of buffer pointed to by \fBpkt_scbp\fR. See \fBtran_setup_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_tgtlen\fR\fR
 .ad
 .RS 18n
-.rt  
 Length of buffer pointed to by \fBpkt_private\fR. See \fBtran_setup_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_numcookies\fR\fR
 .ad
 .RS 18n
-.rt  
 Length \fBpkt_cookies\fR array. See \fBtran_setup_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_cookies\fR\fR
 .ad
 .RS 18n
-.rt  
 Array of DMA cookies. See \fBtran_setup_pkt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpkt_dma_flags\fR\fR
 .ad
 .RS 18n
-.rt  
 DMA flags used, such as \fBDDI_DMA_READ\fR and \fBDDI_DMA_WRITE\fR. See
 \fBtran_setup_pkt\fR.
 .RE
@@ -292,101 +256,83 @@ The host adapter driver will update the \fBpkt_resid\fR, \fBpkt_reason\fR,
 The appropriate definitions for the structure member \fBpkt_flags\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_NOINTR\fR\fR
 .ad
 .RS 30n
-.rt  
 Run command with no command completion callback. Command is complete upon
 return from \fBscsi_transport\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_NODISCON\fR\fR
 .ad
 .RS 30n
-.rt  
 Run command without disconnects.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_NOPARITY\fR\fR
 .ad
 .RS 30n
-.rt  
 Run command without parity checking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_HTAG\fR\fR
 .ad
 .RS 30n
-.rt  
 Run command as the head-of-queue-tagged command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_OTAG\fR\fR
 .ad
 .RS 30n
-.rt  
 Run command as an ordered-queue-tagged command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_STAG\fR\fR
 .ad
 .RS 30n
-.rt  
 Run command as a simple-queue-tagged command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_SENSING\fR\fR
 .ad
 .RS 30n
-.rt  
 Indicates a request sense command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_HEAD\fR\fR
 .ad
 .RS 30n
-.rt  
 Place command at the head of the queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLAG_RENEGOTIATE_WIDE_SYNC\fR\fR
 .ad
 .RS 30n
-.rt  
 Before transporting this command, the host adapter should initiate the
 renegotiation of wide mode and synchronous transfer speed. Normally, the HBA
 driver manages negotiations but under certain conditions forcing a
@@ -403,254 +349,208 @@ performance.
 The appropriate definitions for the structure member \fBpkt_reason\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_CMPLT\fR\fR
 .ad
 .RS 20n
-.rt  
 No transport errors; normal completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_INCOMPLETE\fR\fR
 .ad
 .RS 20n
-.rt  
 Transport stopped with abnormal state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_DMA_DERR\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBDMA\fRd irection error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_TRAN_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Unspecified transport error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_RESET\fR\fR
 .ad
 .RS 20n
-.rt  
 \fBSCSI\fR bus reset destroyed command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_ABORTED\fR\fR
 .ad
 .RS 20n
-.rt  
 Command transport aborted on request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_TIMEOUT\fR\fR
 .ad
 .RS 20n
-.rt  
 Command timed out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_DATA_OVR\fR\fR
 .ad
 .RS 20n
-.rt  
 Data overrun.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_CMD_OVR\fR\fR
 .ad
 .RS 20n
-.rt  
 Command overrun.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_STS_OVR\fR\fR
 .ad
 .RS 20n
-.rt  
 Status overrun.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_BADMSG\fR\fR
 .ad
 .RS 20n
-.rt  
 Message not command complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_NOMSGOUT\fR\fR
 .ad
 .RS 20n
-.rt  
 Target refused to go to message out phase.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_XID_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 Extended identify message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_IDE_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 "Initiator Detected Error" message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_ABORT_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 Abort message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_REJECT_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 Reject message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_NOP_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 "No Operation" message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_PER_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 "Message Parity Error" message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_BDR_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 "Bus Device Reset" message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_ID_FAIL\fR\fR
 .ad
 .RS 20n
-.rt  
 Identify message rejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_UNX_BUS_FREE\fR\fR
 .ad
 .RS 20n
-.rt  
 Unexpected bus free phase.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_TAG_REJECT\fR\fR
 .ad
 .RS 20n
-.rt  
 Target rejected the tag message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD_DEV_GONE\fR\fR
 .ad
 .RS 20n
-.rt  
 The device has been removed.
 .RE
 
@@ -660,79 +560,65 @@ The device has been removed.
 The appropriate definitions for the structure member \fBpkt_state\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_GOT_BUS\fR\fR
 .ad
 .RS 22n
-.rt  
 Bus arbitration succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_GOT_TARGET\fR\fR
 .ad
 .RS 22n
-.rt  
 Target successfully selected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_SENT_CMD\fR\fR
 .ad
 .RS 22n
-.rt  
 Command successfully sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_XFERRED_DATA\fR\fR
 .ad
 .RS 22n
-.rt  
 Data transfer took place.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_GOT_STATUS\fR\fR
 .ad
 .RS 22n
-.rt  
 Status received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_ARQ_DONE\fR\fR
 .ad
 .RS 22n
-.rt  
 The command resulted in a check condition and the host adapter driver executed
 an automatic request sense command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTATE_XARQ_DONE\fR\fR
 .ad
 .RS 22n
-.rt  
 The command requested in extra sense data using a \fBPKT_XARQ\fR flag got a
 check condition. The host adapter driver was able to successfully request and
 return this. The \fBscsi_pkt.pkt_scbp->sts_rqpkt_resid\fR returns the sense
@@ -748,78 +634,64 @@ The definitions that are appropriate for the structure member
 \fBpkt_statistics\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_DISCON\fR\fR
 .ad
 .RS 18n
-.rt  
 Device disconnect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_SYNC\fR\fR
 .ad
 .RS 18n
-.rt  
 Command did a synchronous data transfer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_PERR\fR\fR
 .ad
 .RS 18n
-.rt  
 \fBSCSI\fR parity error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_BUS_RESET\fR\fR
 .ad
 .RS 18n
-.rt  
 Bus reset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_DEV_RESET\fR\fR
 .ad
 .RS 18n
-.rt  
 Device reset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_ABORTED\fR\fR
 .ad
 .RS 18n
-.rt  
 Command was aborted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTAT_TIMEOUT\fR\fR
 .ad
 .RS 18n
-.rt  
 Command timed out.
 .RE
 

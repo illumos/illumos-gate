@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metahs 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METAHS 1M "Mar 26, 2006"
 .SH NAME
 metahs \- manage hot spares and hot spare pools
 .SH SYNOPSIS
@@ -88,7 +88,6 @@ Root privileges are required for any of the following options except \fB-i\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fBall\fR \fIcomponent\fR\fR
 .ad
@@ -99,7 +98,6 @@ Add \fIcomponent\fR to all hot spare pools. \fBall\fR is not case sensitive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIhot_spare_pool\fR \fB[\fR\fIcomponent\fR\fB]\fR\fR
 .ad
@@ -111,7 +109,6 @@ Add the \fIcomponent\fR to the specified \fIhot_spare_pool\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fBall\fR \fIcomponent\fR\fR
 .ad
@@ -123,7 +120,6 @@ be deleted if it is in the in-use state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIhot_spare_pool\fR \fB[\fR\fIcomponent\fR\fB]\fR\fR
 .ad
@@ -136,7 +132,6 @@ the \fIhot_spare_pool\fR. Hot spares in the in-use state cannot be deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIcomponent\fR\fR
 .ad
@@ -149,7 +144,6 @@ repaired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fB[\fR\fIhot_spare_pool\fR\fB\|.\|.\|.]\fR\fR
 .ad
@@ -161,7 +155,6 @@ pools if one is not specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fBall\fR \fIcomponent-old component-new\fR\fR
 .ad
@@ -174,7 +167,6 @@ spare pool if the old hot spare is in the in-use state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIhot_spare_pool component-old component-new\fR\fR
 .ad
@@ -187,7 +179,6 @@ the old hot spare is in the in-use state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
@@ -205,24 +196,20 @@ local hot spare pools.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 18n
-.rt  
 The logical name for the physical slice (partition) on a disk drive, such as
 \fB/dev/dsk/c0t0d0s2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhot_spare_pool\fR\fR
 .ad
 .RS 18n
-.rt  
 Names for hot spare pools can be any legal file name that is composed of
 alphanumeric characters, a dash ("-"), an underscore ("_"), or a period (".").
 Names must begin with a letter. The words "all" and "none" are reserved and
@@ -318,23 +305,19 @@ In this example, the hot spare \fB/dev/dsk/c0t1d0s0\fR is replaced by
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -346,13 +329,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

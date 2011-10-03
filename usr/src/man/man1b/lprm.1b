@@ -1,13 +1,13 @@
 '\" te
-.\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.  
+.\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
-.TH lprm 1B "2 Jun 2006" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH LPRM 1B "Jun 2, 2006"
 .SH NAME
 lprm \- remove print requests from the print queue
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/ucb/lprm\fR [\fB-P\fR \fIdestination\fR] [\fB-\fR] [\fIrequest-ID\fR]... 
+\fB/usr/ucb/lprm\fR [\fB-P\fR \fIdestination\fR] [\fB-\fR] [\fIrequest-ID\fR]...
      [\fIuser\fR]...
 .fi
 
@@ -37,12 +37,10 @@ database in the name service switch. See \fBnsswitch.conf\fR(4),
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIdestination\fR\fR
 .ad
 .RS 18n
-.rt  
 The name of the printer or class of printers (see \fBlpadmin\fR(1M)) from which
 to remove print requests. Specify destination using atomic, URI-style
 (\fIscheme\fR\fB://\fR\fBendpoint\fR), or POSIX-style
@@ -52,12 +50,10 @@ information regarding the naming naming conventions for destination names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 18n
-.rt  
 If a user specifies this option,  removes all print requests owned by that
 user. If a superuser specifies this option, removes all requests in the print
 queue.  Job ownership is determined by the user's login name and host name on
@@ -70,12 +66,10 @@ the machine from which \fBlpr\fR was executed. See Notes.
 The following operands are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest-ID\fR\fR
 .ad
 .RS 14n
-.rt  
 Removes a specific print request. Specify  \fIrequest-ID\fR as the job number
 (\fBJob\fR) associated with a print request and  reported by \fBlpq\fR. See
 \fBlpq\fR(1B).
@@ -83,12 +77,10 @@ Removes a specific print request. Specify  \fIrequest-ID\fR as the job number
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser\fR\fR
 .ad
 .RS 14n
-.rt  
 Removes print requests associated with  a specific user. Specify \fIuser\fR as
 a valid user name. This option can only be used by a superuser.
 .RE
@@ -115,79 +107,65 @@ example% \fBlprm \(miP killtree 385\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.printers\fR\fR
 .ad
 .RS 24n
-.rt  
 User-configurable printer database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 System printer configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.conf.byname\fR\fR
 .ad
 .RS 24n
-.rt  
 NIS version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprinters.org_dir\fR\fR
 .ad
 .RS 24n
-.rt  
 NIS+ version of \fB/etc/printers.conf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
-.rt  
 LDAP version of \fB/etc/printers.conf\fR
 .RE
 
@@ -199,13 +177,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

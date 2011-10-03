@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*
@@ -193,12 +194,6 @@ static struct modlinkage_big modlinkage = {
 	&modlfs4,
 	NULL
 };
-
-/*
- * specfs - for getfsname only??
- * rpcmod - too many symbols to build stubs for them all
- */
-char _depends_on[] = "fs/specfs strmod/rpcmod misc/rpcsec";
 
 /*
  * This routine is invoked automatically when the kernel module

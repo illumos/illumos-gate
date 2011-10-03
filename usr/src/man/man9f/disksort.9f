@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH disksort 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DISKSORT 9F "Jan 16, 2006"
 .SH NAME
 disksort \- single direction elevator seek sort for buffers
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdp\fR\fR
 .ad
 .RS 6n
-.rt  
 A pointer to a \fBdiskhd\fR structure. A \fBdiskhd\fR structure is essentially
 identical to head of a buffer structure (see \fBbuf\fR(9S)). The only defined
 items of interest for this structure are the \fBav_forw\fR and \fBav_back\fR
@@ -39,12 +37,10 @@ the forward linked \fBI/O\fR request queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR\fR
 .ad
 .RS 6n
-.rt  
 A pointer to a buffer structure. Typically this is the \fBI/O\fR request that
 the driver receives in its strategy routine (see \fBstrategy\fR(9E)). The
 driver is responsible for initializing the \fBb_resid\fR structure element to a

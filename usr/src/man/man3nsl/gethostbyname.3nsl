@@ -2,14 +2,14 @@
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T.
 .\" Portions Copyright (c) 1992, X/Open Company Limited. All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gethostbyname 3NSL "24 Aug 2007" "SunOS 5.11" "Networking Services Library Functions"
+.TH GETHOSTBYNAME 3NSL "Aug 24, 2007"
 .SH NAME
 gethostbyname, gethostbyname_r, gethostbyaddr, gethostbyaddr_r, gethostent,
 gethostent_r, sethostent, endhostent \- get network host entry
@@ -296,35 +296,29 @@ applications.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 22n
-.rt  
 hosts file that associates the names of hosts with their Internet Protocol (IP)
 addresses
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netconfig\fR\fR
 .ad
 .RS 22n
-.rt  
 network configuration database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 configuration file for the name service switch
 .RE
 
@@ -336,13 +330,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelT{
+MT-Level	T{
 See \fBReentrant Interfaces\fR in the \fBDESCRIPTION\fR section.
 T}
 .TE

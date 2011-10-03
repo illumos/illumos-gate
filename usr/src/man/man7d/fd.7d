@@ -3,30 +3,30 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fd 7D "2 Mar 2007" "SunOS 5.11" "Devices"
+.TH FD 7D "Mar 2, 2007"
 .SH NAME
 fd, fdc \- drivers for floppy disks and floppy disk controllers
 .SH SYNOPSIS
 .SS "SPARC"
 .LP
 .nf
-\fB/dev/diskette0\fR 
+\fB/dev/diskette0\fR
 .fi
 
 .LP
 .nf
-\fB/dev/rdiskette0\fR 
+\fB/dev/rdiskette0\fR
 .fi
 
 .SS "x86"
 .LP
 .nf
-\fB/dev/diskette[0-1]\fR 
+\fB/dev/diskette[0-1]\fR
 .fi
 
 .LP
 .nf
-\fB/dev/rdiskette[0-1]\fR 
+\fB/dev/rdiskette[0-1]\fR
 .fi
 
 .SH DESCRIPTION
@@ -40,34 +40,28 @@ based systems.
 The default partitions for the floppy driver are:
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
 .RS 5n
-.rt  
 All cylinders except the last
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBb\fR
 .ad
 .RS 5n
-.rt  
 Only the last cylinder
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBc\fR
 .ad
 .RS 5n
-.rt  
 Entire diskette
 .RE
 
@@ -103,79 +97,65 @@ For 3.5" double-sided diskettes, the following densities are supported:
 .SS "SPARC"
 .sp
 .ne 2
-.mk
 .na
 \fB1.7 Mbyte density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 21 sectors per track, 1.7 Mbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhigh density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 18 sectors per track, 1.44 Mbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 9 sectors per track, 720 Kbyte capacity
 .RE
 
 .SS "x86"
 .sp
 .ne 2
-.mk
 .na
 \fBextended density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 36 sectors per track, 2.88 Mbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1.7 Mbyte density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 21 sectors per track, 1.7 Mbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhigh density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 18 sectors per track, 1.44 Mbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble density\fR
 .ad
 .RS 21n
-.rt  
 80 cylinders, 9 sectors per track, 760 Kbyte capacity
 .RE
 
@@ -191,79 +171,65 @@ are supported:
 .SS "x86"
 .sp
 .ne 2
-.mk
 .na
 \fBhigh density\fR
 .ad
 .RS 18n
-.rt  
 80 cylinders, 15 sectors per track, 1.2 Mbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble density\fR
 .ad
 .RS 18n
-.rt  
 40 cylinders, 9 sectors per track, 360 Kbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble density\fR
 .ad
 .RS 18n
-.rt  
 40 cylinders, 8 sectors per track, 320 Kbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBquad density\fR
 .ad
 .RS 18n
-.rt  
 80 cylinders, 9 sectors per track, 720 Kbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble density\fR
 .ad
 .RS 18n
-.rt  
 40 cylinders, 16 sectors per track (256 bytes per sector), 320 Kbyte capacity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble density\fR
 .ad
 .RS 18n
-.rt  
 40 cylinders, 4 sectors per track (1024 bytes per sector), 320 Kbyte capacity
 .RE
 
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 During opening, the partition has been opened for exclusive access and another
 process wants to open the partition. Once open, this error is returned if the
 floppy disk driver attempted to pass a command to the floppy disk controller
@@ -273,23 +239,19 @@ application should try the operation again.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 An invalid address was specified in an ioctl command (see \fBfdio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The number of bytes read or written is not a multiple of the diskette's sector
 size. This error is also returned when an unsupported command is specified
 using the \fBFDIOCMD\fR ioctl command (see \fBfdio\fR(7I)).
@@ -297,12 +259,10 @@ using the \fBFDIOCMD\fR ioctl command (see \fBfdio\fR(7I)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 During opening, the diskette does not have a label or there is no diskette in
 the drive. Once open, this error is returned if the requested I/O transfer
 could not be completed.
@@ -310,46 +270,38 @@ could not be completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 10n
-.rt  
 An attempt was made to write past the end of the diskette.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTTY\fR\fR
 .ad
 .RS 10n
-.rt  
 The floppy disk driver does not support the requested ioctl functions (see
 \fBfdio\fR(7I)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-.rt  
 The floppy disk device does not exist or the device is not ready.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 10n
-.rt  
 The floppy disk device is opened for write access and the diskette in the drive
 is write protected.
 .RE
@@ -357,12 +309,10 @@ is write protected.
 .SS "x86 Only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 10n
-.rt  
 The floppy disk device does not support the requested ioctl function (
 \fBFDEJECT\fR).
 .RE
@@ -376,7 +326,7 @@ configuration file, \fB/platform/i86pc/kernel/drv/fd.conf\fR.
 .in +2
 .nf
 name="fd"  parent="fdc"  unit=0;
-name="fd"  parent="fdc"  unit=1; 
+name="fd"  parent="fdc"  unit=1;
 .fi
 .in -2
 
@@ -384,7 +334,6 @@ name="fd"  parent="fdc"  unit=1;
 .SS "SPARC"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4u/kernel/drv/fd\fR\fR
 .ad
@@ -395,7 +344,6 @@ driver module
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/fdreg.h\fR\fR
 .ad
@@ -406,7 +354,6 @@ structs and definitions for Intel 82072 and 82077 controllers
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/fdvar.h\fR\fR
 .ad
@@ -417,7 +364,6 @@ structs and definitions for floppy drivers
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette\fR\fR
 .ad
@@ -428,7 +374,6 @@ device file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette0\fR\fR
 .ad
@@ -439,7 +384,6 @@ device file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette\fR\fR
 .ad
@@ -450,7 +394,6 @@ raw device file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette0\fR\fR
 .ad
@@ -462,63 +405,52 @@ raw device file
 .SS "For ucb Compatibility"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/fd0[a-c]\fR\fR
 .ad
 .RS 24n
-.rt  
 block file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rfd0[a-c]\fR\fR
 .ad
 .RS 24n
-.rt  
 raw file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette0\fR\fR
 .ad
 .RS 24n
-.rt  
 directory containing volume management character device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette0\fR\fR
 .ad
 .RS 24n
-.rt  
 directory containing the volume management raw character device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases/floppy0\fR\fR
 .ad
 .RS 24n
-.rt  
 symbolic link to the entry in \fB/dev/rdiskette0\fR
 .RE
 
 .SS "x86"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/fd\fR\fR
 .ad
@@ -529,7 +461,6 @@ driver module
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/fd.conf\fR\fR
 .ad
@@ -540,7 +471,6 @@ configuration file for floppy driver
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/fdc\fR\fR
 .ad
@@ -551,7 +481,6 @@ floppy-controller driver module
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/fdc.con\fRf\fR
 .ad
@@ -562,7 +491,6 @@ configuration file for the floppy-controller
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/fdc.h\fR\fR
 .ad
@@ -573,7 +501,6 @@ structs and definitions for x86 floppy devices
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/fdmedia.h\fR\fR
 .ad
@@ -585,180 +512,148 @@ structs and definitions for x86 floppy media
 .SS "x86 First Drive"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette\fR\fR
 .ad
 .RS 19n
-.rt  
 device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette0\fR\fR
 .ad
 .RS 19n
-.rt  
 device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette\fR\fR
 .ad
 .RS 19n
-.rt  
 raw device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette0\fR\fR
 .ad
 .RS 19n
-.rt  
 raw device file
 .RE
 
 .SS "For ucb Compatibility"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/fd0[a-c]\fR\fR
 .ad
 .RS 24n
-.rt  
 block file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rfd0[a-c]\fR\fR
 .ad
 .RS 24n
-.rt  
 raw file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette0\fR\fR
 .ad
 .RS 24n
-.rt  
 directory containing volume management character device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette0\fR\fR
 .ad
 .RS 24n
-.rt  
 directory containing the volume management raw character device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases/floppy0\fR\fR
 .ad
 .RS 24n
-.rt  
 symbolic link to the entry in /dev/rdiskette0
 .RE
 
 .SS "x86 Second Drive"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette1\fR\fR
 .ad
 .RS 19n
-.rt  
 device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette1\fR\fR
 .ad
 .RS 19n
-.rt  
 raw device file
 .RE
 
 .SS "For ucb Compatibility"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/fd1[a-c]\fR\fR
 .ad
 .RS 24n
-.rt  
 block file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rfd1[a-c]\fR\fR
 .ad
 .RS 24n
-.rt  
 raw file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette1\fR\fR
 .ad
 .RS 24n
-.rt  
 directory containing volume management character device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdiskette1\fR\fR
 .ad
 .RS 24n
-.rt  
 directory containing the volume management raw character device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/aliases/floppy1\fR\fR
 .ad
 .RS 24n
-.rt  
 symbolic link to the entry in \fB/dev/rdiskette1\fR
 .RE
 
@@ -771,7 +666,6 @@ symbolic link to the entry in \fB/dev/rdiskette1\fR
 .SS "All Platforms"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<n>: <command name> failed (<sr1> <sr2> <sr3>)\fR\fR
 .ad
@@ -785,23 +679,19 @@ sheet for that part. This error message is usually followed by one of the
 following, interpreting the bits of the status register:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBnot writable\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBcrc error blk <block number>\fR
 .sp
 There was a data error on <block number>.
@@ -809,56 +699,46 @@ There was a data error on <block number>.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBbad format\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBtimeout\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBdrive not ready\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBunformatted diskette or no diskette in drive\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBblock <block number> is past the end!\fR
 .sp
 \fB(nblk=<total number of blocks>)\fR
@@ -869,12 +749,10 @@ number of blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBb_bcount 0x<op_size> not % 0x<sect_size>\fR
 .sp
 The size of an operation is not a multiple of the sector size.
@@ -882,23 +760,19 @@ The size of an operation is not a multiple of the sector size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBoverrun/underrun\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBhost bus error\fR. There was a hardware error on a system bus.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfOfflineTarget 3STMF "9 Jun 2008" "SunOS 5.11" "SCSI Target Mode Framework Library Functions"
+.TH STMFOFFLINETARGET 3STMF "Jun 9, 2008"
 .SH NAME
 stmfOfflineTarget \- take offline a target port that is currently in the online
 state
@@ -19,12 +19,10 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lstmf\fR [ \fIlibrary\fR... ]
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fItarget\fR\fR
 .ad
 .RS 10n
-.rt  
 The identifier of the target port to offline.
 .RE
 
@@ -46,23 +44,19 @@ have sessions established by the offlined target port will be logged out.
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_ERROR_BUSY\fR\fR
 .ad
 .RS 23n
-.rt  
 The device is currently busy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTMF_STATUS_SUCCESS\fR\fR
 .ad
 .RS 23n
-.rt  
 The API call was successful.
 .RE
 
@@ -74,15 +68,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

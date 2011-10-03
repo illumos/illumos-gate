@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH d_passwd 4 "2 Sep 2004" "SunOS 5.11" "File Formats"
+.TH D_PASSWD 4 "Sep 2, 2004"
 .SH NAME
 d_passwd \- dial-up password file
 .SH SYNOPSIS
@@ -45,23 +45,19 @@ Each entry in \fBd_passwd\fR is a single line of the form:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlogin-shell\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the login program that will require an additional dial-up password.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpassword\fR\fR
 .ad
 .RS 15n
-.rt  
 An encrypted password. Users accessing the computer through a  dial-up port or
 modem using \fIlogin-shell\fR  will be required to enter this password before
 gaining access to the computer.
@@ -152,45 +148,37 @@ These steps must be executed as the \fBroot\fR user.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/d_passwd\fR\fR
 .ad
 .RS 17n
-.rt  
 dial-up password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dialups\fR\fR
 .ad
 .RS 17n
-.rt  
 list of dial-up ports requiring dial-up passwords
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 17n
-.rt  
 password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/shadow\fR\fR
 .ad
 .RS 17n
-.rt  
 shadow password file
 .RE
 

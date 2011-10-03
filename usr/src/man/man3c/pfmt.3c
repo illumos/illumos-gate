@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pfmt 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.TH PFMT 3C "Dec 29, 1996"
 .SH NAME
 pfmt \- display error message in standard format
 .SH SYNOPSIS
@@ -82,12 +82,10 @@ following values (one from each group):
 \fIOutput format control\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOSTD\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not use the standard message format, interpret \fBformat\fR as
 \fBprintf()\fR \fBformat\fR. Only \fIcatalog access control flags\fR should be
 specified if \fBMM_NOSTD\fR is used; all other flags will be ignored.
@@ -95,12 +93,10 @@ specified if \fBMM_NOSTD\fR is used; all other flags will be ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_STD\fR\fR
 .ad
 .RS 12n
-.rt  
 Output using the standard message format (default value 0).
 .RE
 
@@ -109,24 +105,20 @@ Output using the standard message format (default value 0).
 \fICatalog access control\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOGET\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not retrieve a localized version of \fBformat\fR. In this case, only the
 \fIdefmsg\fR field of the \fBformat\fR is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_GET\fR\fR
 .ad
 .RS 12n
-.rt  
 Retrieve a localized version of \fBformat\fR from the \fIcatalog\fR, using
 \fImsgid\fR as the index and \fIdefmsg\fR as the default message (default value
 0).
@@ -137,45 +129,37 @@ Retrieve a localized version of \fBformat\fR from the \fIcatalog\fR, using
 \fISeverity (standard message format only)\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_HALT\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of \fBHALT,\fR but do not halt the machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_ERROR\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of \fBERROR\fR (default value 0).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_WARNING\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of \fBWARNING.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_INFO\fR\fR
 .ad
 .RS 14n
-.rt  
 Generate a localized version of \fBINFO.\fR
 .RE
 
@@ -198,12 +182,10 @@ display of either a severity string (if defined) or the string
 \fIAction\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_ACTION\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify an action message. Any severity value is superseded and replaced by a
 localized version of \fBTO FIX\fR.
 .RE
@@ -256,12 +238,10 @@ Upon success, \fBpfmt()\fR returns the number of bytes transmitted. Upon
 failure, it returns a negative value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-.rt  
 Write error to \fIstream\fR.
 .RE
 
@@ -323,13 +303,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-safe
+MT-Level	MT-safe
 .TE
 
 .SH SEE ALSO

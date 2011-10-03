@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH svcprop 1 "13 Sep 2007" "SunOS 5.11" "User Commands"
+.TH SVCPROP 1 "Sep 13, 2007"
 .SH NAME
 svcprop \- retrieve values of service configuration properties
 .SH SYNOPSIS
 .LP
 .nf
 \fBsvcprop\fR [\fB-fqtv\fR] [\fB-C\fR | \fB-c\fR | \fB-s\fR \fIsnapshot\fR]
-     [\fB-z\fR \fIzone\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR]... 
+     [\fB-z\fR \fIzone\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR]...
      {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
@@ -69,46 +69,38 @@ Error messages are printed to the standard error stream.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 14n
-.rt  
 Uses the directly attached properties, without composition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 14n
-.rt  
 For service instances, uses the composed view of their directly attached
 properties.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Selects the multi-property output format, with full FMRIs as designators.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 For each service or service instance specified by the operands, selects all
 properties in the \fIname\fR property group. For property groups specified by
 the operands, selects the \fIname\fR property.
@@ -116,69 +108,57 @@ the operands, selects the \fIname\fR property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpg\fR/\fIprop\fR\fR
 .ad
 .RS 14n
-.rt  
 Selects property \fIprop\fR in property group \fIpg\fR for each of the services
 or service instances specified by the operands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 14n
-.rt  
 Quiet. Produces no output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 Uses the composed view of the \fIname\fR snapshot for service instances.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 14n
-.rt  
 Selects the multi-property output format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 14n
-.rt  
 Verbose. Prints error messages for nonexistent properties, even if option -q is
 also used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 14n
-.rt  
 Waits until the specified property group or the property group containing the
 specified property changes before printing.
 .sp
@@ -189,12 +169,10 @@ message is printed and no action is taken. The -C option is implied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB-z\fR \fIzone\fR
 .ad
 .RS 14n
-.rt
 Uses properties from the service or instance in the specified \fIzone\fR.
 This option is only applicable from the global zone, see \fBzones\fR(5).
 
@@ -204,12 +182,10 @@ This option is only applicable from the global zone, see \fBzones\fR(5).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIFMRI\fR\fR
 .ad
 .RS 11n
-.rt  
 The FMRI of a service, a service instance, a property group, or a property.
 .sp
 Instances and services can be abbreviated by specifying the instance name, or
@@ -254,12 +230,10 @@ other permanent tools. If an abbreviation matches multiple instances,
 
 .sp
 .ne 2
-.mk
 .na
 \fBpattern\fR
 .ad
 .RS 11n
-.rt  
 A glob pattern which is matched against the FMRIs of services and instances in
 the repository. See \fBfnmatch\fR(5). If a pattern matches multiple services or
 instances, \fBsvcprop\fR acts on each service or instance.
@@ -362,7 +336,7 @@ The following example retrieves the value of a boolean property in a script:
 set -- `svcprop -c -t -p general/enabled service`
 code=$?
 if [ $code -ne 0 ]; then
-        echo "svcprop failed with exit code $code"           
+        echo "svcprop failed with exit code $code"
         return 1
 fi
 if [ $2 != boolean ]; then
@@ -402,34 +376,28 @@ svcprop -p $1 $2 | (
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 

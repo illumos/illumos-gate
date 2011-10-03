@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+#
 
 LIBRARY =	libwrap.a
 MAJOR =		.1
@@ -29,7 +31,7 @@ VERS =		$(MAJOR)$(MINOR)
 OBJECTS =	hosts_access.o options.o shell_cmd.o rfc931.o eval.o \
 		hosts_ctl.o refuse.o percent_x.o clean_exit.o \
 		fromhost.o fix_options.o socket.o tli.o workarounds.o \
-		update.o misc.o diag.o percent_m.o
+		update.o misc.o diag.o percent_m.o libvars.o
 
 include ../../Makefile.lib
 
@@ -51,15 +53,6 @@ CFLAGS +=	$(CCVERBOSE) -erroff=E_FUNC_EXPECTS_TO_RETURN_VALUE \
 		-erroff=E_OLD_STYLE_DECL_HIDES_PROTO \
 		-_gcc=-Wno-return-type
 
-DISTFILES =	clean_exit.c diag.c eval.c fix_options.c fromhost.c \
-		hosts_access.c hosts_ctl.c misc.c mystdarg.h options.c \
-		patchlevel.h percent_m.c percent_x.c refuse.c rfc931.c \
-		setenv.c shell_cmd.c socket.c tcpd.h tli.c update.c \
-		workarounds.c
-
-ROOTSRC =	$(ROOT)/usr/share/src/tcp_wrappers
-ROOTSRCFILES = $(DISTFILES:%=$(ROOTSRC)/%)
-
 .KEEP_STATE:
 
 all: $(LIBS)
@@ -68,15 +61,6 @@ lint: lintcheck
 
 $(ROOTLIBDIR)/$(LIBLINKS)$(MAJOR): $(ROOTLIBDIR)/$(LIBLINKS)$(VERS)
 	$(INS.liblink)
-
-$(ROOTSRCFILES) := FILEMODE = 0444
-$(ROOTSRCFILES): $(ROOTSRC)
-
-$(ROOTSRC):
-	$(INS.dir)
-
-$(ROOTSRC)/%: $(SRCDIR)/%
-	$(INS.file)
 
 include ../../Makefile.targ
 

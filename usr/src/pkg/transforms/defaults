@@ -78,6 +78,9 @@
 <transform file path=usr/share/.+ -> default mode 0444>
 <transform file path=usr/has/man/.+ -> default mode 0444>
 
+<transform dir path=usr/share$ -> default group sys>
+<transform dir path=usr/share/lib$ -> default group sys>
+
 #
 # For what's left, go with root:bin 0644, +x for directories
 #

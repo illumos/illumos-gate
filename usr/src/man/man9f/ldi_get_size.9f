@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_get_size 9F "18 Mar 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_GET_SIZE 9F "Mar 18, 2004"
 .SH NAME
 ldi_get_size \- Retrieve device size
 .SH SYNOPSIS
@@ -17,23 +17,19 @@ ldi_get_size \- Retrieve device size
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR \fR
 .ad
 .RS 10n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsizep\fR \fR
 .ad
 .RS 10n
-.rt  
 Pointer to the caller's unsigned 64-bit integer buffer.
 .RE
 
@@ -51,23 +47,19 @@ via the \fBldi_open_by_name\fR(9F) interface prior to calling
 The \fBldi_get_size()\fR function returns the following values:
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_SUCCESS\fR
 .ad
 .RS 15n
-.rt  
 The device size has been returned within the caller supplied buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_FAILURE\fR
 .ad
 .RS 15n
-.rt  
 The device size could not be found or determined.
 .RE
 

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pppoec 1M "9 Jan 2002" "SunOS 5.11" "System Administration Commands"
+.TH PPPOEC 1M "Jan 9, 2002"
 .SH NAME
 pppoec \- PPPoE chat utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBpppoec\fR [\fB-o\fImillisecs\fR\fR] [\fB-s\fR\fImillisecs\fR] [\fB-v\fR] \fIdevice\fR 
+\fBpppoec\fR [\fB-o\fImillisecs\fR\fR] [\fB-s\fR\fImillisecs\fR] [\fB-v\fR] \fIdevice\fR
      [\fIservice\fR [ [except]\fIserver\fR... [only]]]
 .fi
 
@@ -56,23 +56,19 @@ is used instead. To exclude non-matching servers entirely, append the keyword
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Sends out broadcast query over interface specified by \fIdevice\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the initial wait time in milliseconds for PADO from the server before PADI
 is retried. The default is 500 milliseconds for normal operation, or 3000
 milliseconds (3 seconds) for inquiry (\fB-i\fR) mode.
@@ -80,24 +76,20 @@ milliseconds (3 seconds) for inquiry (\fB-i\fR) mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the initial wait time in milliseconds for PADS from the server before PADR
 is retried. The default is 2000 milliseconds (2 seconds).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays verbose progress messages, including all PPPoE messages sent, and all
 state machine transitions.
 .RE
@@ -112,34 +104,28 @@ You normally do not need to adjust the parameters set with \fB-o\fR and
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 11n
-.rt  
 plumbed Ethernet interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver\fR\fR
 .ad
 .RS 11n
-.rt  
 preferred server or, if you specify \fBonly\fR, the specified server
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice\fR\fR
 .ad
 .RS 11n
-.rt  
 desired service; other available services are ignored
 .RE
 
@@ -220,57 +206,47 @@ because the filters are first-match.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/inet/pppoec\fR \fR
 .ad
 .RS 27n
-.rt  
 executable command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sppptun\fR\fR
 .ad
 .RS 27n
-.rt  
 Solaris PPP tunneling device driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/connect-errors\fR\fR
 .ad
 .RS 27n
-.rt  
 usual location of error output (see DIAGNOSTICS, below)
 .RE
 

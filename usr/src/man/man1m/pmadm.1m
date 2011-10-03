@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pmadm 1M "10 Nov 1998" "SunOS 5.11" "System Administration Commands"
+.TH PMADM 1M "Nov 10, 1998"
 .SH NAME
 pmadm \- port monitor administration
 .SH SYNOPSIS
 .LP
 .nf
-\fBpmadm\fR \fB-a\fR [\fB-p\fR \fIpmtag\fR | \fB-t\fR \fItype\fR] \fB-s\fR \fIsvctag\fR \fB-i\fR \fIid\fR \fB-m\fR \fIpmspecific\fR \fB-v\fR \fIver\fR 
-     [\fB-f\fR xu] 
+\fBpmadm\fR \fB-a\fR [\fB-p\fR \fIpmtag\fR | \fB-t\fR \fItype\fR] \fB-s\fR \fIsvctag\fR \fB-i\fR \fIid\fR \fB-m\fR \fIpmspecific\fR \fB-v\fR \fIver\fR
+     [\fB-f\fR xu]
      [\fB-y\fR \fIcomment\fR] [\fB-z\fR \fI script\fR]
 .fi
 
@@ -98,12 +98,10 @@ only by a privileged user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 17n
-.rt  
 Add a service. \fBpmadm\fR adds an entry for the new service to the port
 monitor's administrative file. Because of the complexity of the options and
 arguments that follow the \fB-a\fR option, it may be convenient to use a
@@ -112,12 +110,10 @@ command script or the menu system to add services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 17n
-.rt  
 Disable a service. Add \fBx\fR to the flag field in the entry for the service
 \fIsvctag\fR in the port monitor's administrative file. This is the entry used
 by port monitor \fIpmtag\fR. See the \fB-f\fR option, below, for a description
@@ -126,12 +122,10 @@ of the flags available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 17n
-.rt  
 Enable a service. Remove \fBx\fR from the flag field in the entry for the
 service \fIsvctag\fR in the port monitor administrative file. This is the entry
 used by port monitor \fIpmtag\fR. See the \fB-f\fR option, below, for a
@@ -140,12 +134,10 @@ description of the flags available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fBxu\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fB-f\fR option specifies one or both of the following two flags which are
 then included in the flag field of the entry for the new service in the port
 monitor's administrative file. If the \fB-f\fR option is not included, no flags
@@ -154,24 +146,20 @@ enabled and no \fButmpx\fR entry is created for it. An \fB-f\fR option without
 a following argument is illegal.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 Do not enable the service \fIsvctag\fR available through port monitor
 \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 5n
-.rt  
 Create a \fButmpx\fR entry for service \fIsvctag\fR available through port
 monitor \fIpmtag\fR.
 .RE
@@ -180,12 +168,10 @@ monitor \fIpmtag\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 17n
-.rt  
 Print, install, or replace a per-service configuration script. The \fB-g\fR
 option with a \fB-p\fR option and a \fB-s\fR option prints the per-service
 configuration script for service \fIsvctag\fR available through port monitor
@@ -201,90 +187,74 @@ combinations of options with \fB-g\fR are invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI id\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBid\fR is the identity that is to be assigned to service \fIsvctag\fR when it
 is started. \fBid\fR must be an entry in \fB/etc/passwd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fB-l\fR option requests service information. Used by itself and with the
 options described below, it provides a filter for extracting information in
 several different groupings.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 23n
-.rt  
 By itself, the \fB-l\fR option lists all services on the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR\fB \fR\fB-p\fR\fB \fR\fIpmtag\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists all services available through port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR\fB \fR\fB-s\fR\fB \fR\fIsvctag\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists all services with tag \fIsvctag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR\fB \fR\fB-p\fR\fB \fR\fIpmtag\fR\fB-s\fR\fIsvctag\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists service \fIsvctag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR\fB \fR\fB-t\fR\fB \fR\fItype\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists all services available through port monitors of type \fBtype\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR\fB \fR\fB-t\fR\fB \fR\fItype\fR\fB-s\fR\fIsvctag\fR\fR
 .ad
 .RS 23n
-.rt  
 Lists all services with tag \fIsvctag\fR available through a port monitor of
 type \fBtype\fR.
 .RE
@@ -294,60 +264,50 @@ Other combinations of options with \fB-l\fR are invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fB-L\fR option is identical to the \fB-l\fR option except that output is
 printed in a condensed format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI pmspecific\fR\fR
 .ad
 .RS 17n
-.rt  
 \fIpmspecific\fR is the port monitor-specific portion of the port monitor
 administrative file entry for the service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI pmtag\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the tag associated with the port monitor through which a service
 (specified as \fB\fR\fB-s\fR\fB \fR\fIsvctag\fR) is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 17n
-.rt  
 Remove a service. When \fBpmadm\fR removes a service, the entry for the service
 is removed from the port monitor's administrative file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI svctag\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the service tag associated with a given service. The service tag is
 assigned by the system administrator and is part of the entry for the service
 in the port monitor's administrative file.
@@ -355,23 +315,19 @@ in the port monitor's administrative file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI type\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the port monitor type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fI ver\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the version number of the port monitor administrative file. The
 version number may be given as
 .sp
@@ -391,24 +347,20 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fI comment\fR\fR
 .ad
 .RS 17n
-.rt  
 Associate \fIcomment\fR with the service entry in the port monitor
 administrative file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fI script\fR\fR
 .ad
 .RS 17n
-.rt  
 Used with the \fB-g\fR option to specify the name of the file that contains the
 per-service configuration script. Modifying a configuration script is a
 three-step procedure. First a copy of the existing script is made (\fB-g\fR
@@ -584,57 +536,47 @@ pmadm -g -p pmtag -s svctag
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 Operation failed.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_config\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fB/\fR\fIsvctag\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/saf/\fR\fIpmtag\fR\fB/*\fR\fR
 .ad
 .RS 26n
-.rt  
 
 .RE
 

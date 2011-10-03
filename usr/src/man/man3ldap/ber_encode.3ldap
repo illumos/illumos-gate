@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ber_encode 3LDAP "6 Oct 2008" "SunOS 5.11" "LDAP Library Functions"
+.TH BER_ENCODE 3LDAP "Oct 6, 2008"
 .SH NAME
 ber_encode, ber_alloc, ber_printf, ber_put_int, ber_put_ostring,
 ber_put_string, ber_put_null, ber_put_boolean, ber_put_bitstring,
@@ -112,24 +112,20 @@ formats its arguments according to the format string \fBfmt\fR. The format
 string can contain the following characters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 Boolean.  An integer parameter should be supplied.  A boolean element is
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB\fR\fR
 .ad
 .RS 5n
-.rt  
 Bitstring.  A \fBchar *\fR pointer to the start of the bitstring is supplied,
 followed by the number of bits in the bitstring.  A bitstring element is
 output.
@@ -137,83 +133,69 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Integer.  An integer parameter should be supplied.  An integer element is
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 5n
-.rt  
 Null.  No parameter is required.  A null element is output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 Octet string.  A \fBchar *\fR is supplied, followed by the length of the string
 pointed to.  An octet string element is output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO\fR\fR
 .ad
 .RS 5n
-.rt  
 Octet string.  A \fBstruct berval *\fR is supplied.  An octet string element is
 output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 Octet string.  A null-terminated string is supplied.  An octet string element
 is output, not including the trailing null octet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 Tag.  An int specifying the tag to give the next element is provided. This
 works across calls.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 Several octet strings.  A null-terminated array of \fBchar *\fR is supplied.
 Note that a construct like '{v}' is required to get an actual sequence of octet
 strings.
@@ -221,45 +203,37 @@ strings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR\fR
 .ad
 .RS 5n
-.rt  
 Begin sequence.  No parameter is required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB}\fR\fR
 .ad
 .RS 5n
-.rt  
 End sequence.  No parameter is required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fR
 .ad
 .RS 5n
-.rt  
 Begin set.  No parameter is required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB]\fR\fR
 .ad
 .RS 5n
-.rt  
 End set.  No parameter is required.
 .RE
 
@@ -363,13 +337,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

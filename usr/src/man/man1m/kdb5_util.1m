@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kdb5_util 1M "29 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH KDB5_UTIL 1M "Feb 29, 2008"
 .SH NAME
 kdb5_util \- Kerberos Database maintenance utility
 .SH SYNOPSIS
@@ -26,7 +26,6 @@ containing the Kerberos database master key.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdbname\fR\fR
 .ad
@@ -39,7 +38,6 @@ option, the default database name is \fB/var/krb5/principal\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIstashfile_name\fR\fR
 .ad
@@ -50,7 +48,6 @@ Specify the stash file name. You can specify an absolute path.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fImkeytype\fR\fR
 .ad
@@ -64,7 +61,6 @@ Specify the master key type. Valid values are \fBdes3-cbc-sha1\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -75,7 +71,6 @@ Enter the master key manually.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fImkeyname\fR\fR
 .ad
@@ -86,7 +81,6 @@ Specify the master key name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpassword\fR\fR
 .ad
@@ -97,7 +91,6 @@ Use the specified \fIpassword\fR instead of the stash file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -108,7 +101,6 @@ Use \fIrealm\fR as the default database realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdb_args\fR\fR
 .ad
@@ -118,7 +110,6 @@ Pass database-specific arguments to \fBkadmin\fR. Supported arguments are for
 LDAP and the \fBBerkeley-db2\fR plug-in. These arguments are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinddn\fR=\fIbinddn\fR\fR
 .ad
@@ -130,7 +121,6 @@ LDAP simple bind DN for authorization on the directory server. Overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbindpwd\fR=\fIbindpwd\fR\fR
 .ad
@@ -141,7 +131,6 @@ Bind password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdbname\fR=\fIname\fR\fR
 .ad
@@ -152,7 +141,6 @@ For the \fBBerkeley-db2\fR plug-in, specifies a name for the Kerberos database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnconns\fR=\fInum\fR\fR
 .ad
@@ -163,7 +151,6 @@ Maximum number of server connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport\fR=\fInum\fR\fR
 .ad
@@ -180,7 +167,6 @@ Directory server connection port.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd\fR\fR
 .ad
@@ -192,7 +178,6 @@ a stash file.
 You can specify the following commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR \fB-s\fR\fR
 .ad
@@ -208,7 +193,6 @@ same options when modifying or destroying the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdestroy\fR\fR
 .ad
@@ -219,7 +203,6 @@ Destroys the database specified by the \fB-d\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstash\fR\fR
 .ad
@@ -233,7 +216,6 @@ the password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdump\fR [\fB-old\fR] [\fB-b6\fR] [\fB-b7\fR] [\fB-ov\fR] [\fB-verbose\fR]
 [\fB-mkey_convert\fR] [\fB-new_mkey_file\fR \fImkey_file\fR] [\fB-rev\fR]
@@ -247,7 +229,6 @@ If \fIfilename\fR is not specified or is the string "-", the dump is sent to
 standard output. Options are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-old\fR\fR
 .ad
@@ -259,7 +240,6 @@ Causes the dump to be in the Kerberos 5 Beta 5 and earlier dump format
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b6\fR\fR
 .ad
@@ -271,7 +251,6 @@ version 3.0\fR").
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b7\fR\fR
 .ad
@@ -283,7 +262,6 @@ version 4\fR"). This was the dump format produced on releases prior to 1.2.2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-ov\fR\fR
 .ad
@@ -294,7 +272,6 @@ Causes the dump to be in \fBovsec_adm_export\fR format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-verbose\fR\fR
 .ad
@@ -305,7 +282,6 @@ Causes the name of each principal and policy to be displayed as it is dumped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-mkey_convert\fR\fR
 .ad
@@ -317,7 +293,6 @@ the key data in the dumpfile. The key data in the database will not be changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-new_mkey_file\fR \fImkey_file\fR\fR
 .ad
@@ -330,7 +305,6 @@ be changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-rev\fR\fR
 .ad
@@ -342,7 +316,6 @@ normally, in cases where database corruption has occured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-recurse\fR\fR
 .ad
@@ -358,7 +331,6 @@ retrieve more principals than will the \fB-rev\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBload\fR [\fB-old\fR] [\fB-b6\fR] [\fB-b7\fR] [\fB-ov\fR] [\fB-hash\fR]
 [\fB-verbose\fR] [\fB-update\fR] \fIfilename\fR \fIdbname\fR
@@ -375,7 +347,6 @@ The \fB-old\fR option requires the database to be in the Kerberos 5 Beta 5 or
 earlier format ("\fBkdb5_edit load_dump version 2.0\fR").
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b6\fR\fR
 .ad
@@ -387,7 +358,6 @@ load_dump version 3.0\fR").
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b7\fR\fR
 .ad
@@ -399,7 +369,6 @@ load_dump version 4\fR").
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-ov\fR\fR
 .ad
@@ -411,7 +380,6 @@ the \fB-update\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-hash\fR\fR
 .ad
@@ -425,7 +393,6 @@ principals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-verbose\fR\fR
 .ad
@@ -436,7 +403,6 @@ Causes the name of each principal and policy to be displayed as it is dumped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-update\fR\fR
 .ad
@@ -449,7 +415,6 @@ and the old one is destroyed upon successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
@@ -460,7 +425,6 @@ Required argument that specifies a path to a file containing database dump.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdbname\fR\fR
 .ad
@@ -472,7 +436,6 @@ overrides the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIadmin_dbname\fR\fR
 .ad
@@ -505,7 +468,6 @@ jdb@ACME.COM pak@ACME.COM
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal\fR\fR
 .ad
@@ -516,7 +478,6 @@ Kerberos principal database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5\fR\fR
 .ad
@@ -527,7 +488,6 @@ Kerberos administrative database. Contains policy information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5.lock\fR\fR
 .ad
@@ -540,7 +500,6 @@ file does not exist).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.ulog\fR\fR
 .ad
@@ -557,13 +516,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

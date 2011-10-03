@@ -2,14 +2,14 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 1995 IEEE  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mutex_init 3C "5 Jun 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH MUTEX_INIT 3C "Jun 5, 2007"
 .SH NAME
 mutex_init, mutex_lock, mutex_trylock, mutex_unlock, mutex_consistent,
 mutex_destroy \- mutual exclusion locks
@@ -17,8 +17,8 @@ mutex_destroy \- mutual exclusion locks
 .LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
-#include <thread.h> 
-#include <synch.h> 
+#include <thread.h>
+#include <synch.h>
 
 \fBint\fR \fBmutex_init\fR(\fBmutex_t *\fR\fImp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR \fIarg\fR);
 .fi
@@ -87,7 +87,6 @@ state of the mutex becomes initialized and unlocked. Only the attribute type
 the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSYNC_THREAD\fR\fR
 .ad
@@ -98,7 +97,6 @@ The mutex can synchronize threads only in this process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSYNC_PROCESS\fR\fR
 .ad
@@ -117,7 +115,6 @@ The \fItype\fR argument can be augmented by the bitwise-inclusive-\fBOR\fR of
 zero or more of the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCK_ROBUST\fR\fR
 .ad
@@ -154,7 +151,6 @@ error value \fBEBUSY\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCK_RECURSIVE\fR\fR
 .ad
@@ -167,7 +163,6 @@ locked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCK_ERRORCHECK\fR\fR
 .ad
@@ -181,7 +176,6 @@ owning it will return with an error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCK_PRIO_INHERIT\fR\fR
 .ad
@@ -195,7 +189,6 @@ of the mutexes owned by this thread and initialized with this attribute.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCK_PRIO_PROTECT\fR\fR
 .ad
@@ -302,7 +295,6 @@ Statically allocated mutexes can also be initialized with macros specifying
 \fBLOCK_RECURSIVE\fR and/or \fBLOCK_ERRORCHECK\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmutex_t mp = RECURSIVEMUTEX;\fR\fR
 .ad
@@ -313,7 +305,6 @@ Same as (\fBUSYNC_THREAD\fR | \fBLOCK_RECURSIVE\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmutex_t mp = ERRORCHECKMUTEX;\fR\fR
 .ad
@@ -324,7 +315,6 @@ Same as (\fBUSYNC_THREAD\fR | \fBLOCK_ERRORCHECK\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmutex_t mp = RECURSIVE_ERRORCHECKMUTEX;\fR\fR
 .ad
@@ -396,12 +386,10 @@ returned.
 The \fBmutex_init()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value specified by \fItype\fR is invalid, or the \fBLOCK_PRIO_INHERIT\fR
 and \fBLOCK_PRIO_PROTECT\fR attributes are both specified.
 .RE
@@ -411,24 +399,20 @@ and \fBLOCK_PRIO_PROTECT\fR attributes are both specified.
 The \fBmutex_init()\fR function will fail for  \fBLOCK_ROBUST\fR type mutex if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 The mutex pointed to by  \fImp\fR was previously initialized and has not yet
 been destroyed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The mutex pointed to by \fImp\fR was previously initialized with a different
 set of attribute flags.
 .RE
@@ -438,12 +422,10 @@ set of attribute flags.
 The \fBmutex_trylock()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 The mutex pointed to by \fImp\fR is already locked.
 .RE
 
@@ -453,12 +435,10 @@ The \fBmutex_lock()\fR and \fBmutex_trylock()\fR functions will fail for a
 \fBLOCK_RECURSIVE\fR mutex if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 The mutex could not be acquired because the maximum number of recursive locks
 for the mutex has been reached.
 .RE
@@ -469,12 +449,10 @@ The \fBmutex_lock()\fR function will fail for a \fBLOCK_ERRORCHECK\fR and
 non-\fBLOCK_RECURSIVE\fR mutex if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR\fR
 .ad
 .RS 11n
-.rt  
 The caller already owns the mutex.
 .RE
 
@@ -484,12 +462,10 @@ The \fBmutex_lock()\fR function may fail for a non-\fBLOCK_ERRORCHECK\fR and
 non-\fBLOCK_RECURSIVE\fR mutex if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR\fR
 .ad
 .RS 11n
-.rt  
 The caller already owns the mutex.
 .RE
 
@@ -499,12 +475,10 @@ The \fBmutex_unlock()\fR function will fail for a \fBLOCK_ERRORCHECK\fR mutex
 if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 The caller does not own the mutex.
 .RE
 
@@ -514,12 +488,10 @@ The \fBmutex_lock()\fR or \fBmutex_trylock()\fR functions will fail for
 \fBLOCK_ROBUST\fR type mutex if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOWNERDEAD\fR\fR
 .ad
 .RS 19n
-.rt  
 The last owner of this mutex died while holding the mutex. This mutex is now
 owned by the caller. The caller must now attempt to make the state protected by
 the mutex consistent. If it is able to clean up the state, then it should
@@ -535,12 +507,10 @@ the lock with  \fBEOWNERDEAD\fR dies, the next owner will acquire the lock with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTRECOVERABLE\fR\fR
 .ad
 .RS 19n
-.rt  
 The mutex trying to be acquired was protecting the state that has been left
 unrecoverable when the mutex's last owner could not make the state protected by
 the mutex consistent. The mutex has not been acquired. This condition occurs
@@ -554,12 +524,10 @@ not able to clean up the state and unlocked the mutex without calling
 The \fBmutex_consistent()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The caller does not own the mutex or the mutex is not a \fBLOCK_ROBUST\fR mutex
 having an inconsistent state (\fBEOWNERDEAD\fR).
 .RE
@@ -695,7 +663,7 @@ mutex-protected data.
 #define NUM_SUBTRACTTHREADS 10
 #define INCREMENT '0'
 #define DECREMENT '1'
-typedef struct { 
+typedef struct {
                mutex_t     Interprocess_mutex;
                int         Interprocess_data;
 } buffer_t;
@@ -808,7 +776,7 @@ The following example shows how to use a \fBUSYNC_PROCESS\fR |
  typedef struct {
            mutex_t   Interprocess_mutex;
            int       Interprocess_data;
- } buffer_t;  
+ } buffer_t;
  buffer_t *buffer;
  int make_date_consistent();
  void create_shared_memory();
@@ -862,7 +830,7 @@ The following example shows how to use a \fBUSYNC_PROCESS\fR |
                 */
                mutex_unlock(&buffer->Interprocess_mutex);
                break;
-        } 
+        }
    }
 } /* end main */
 void create_shared_memory() {
@@ -871,7 +839,7 @@ void create_shared_memory() {
       for (i=0; i<sizeof(buffer_t); i++) {
            zeroed[i] = 0;
            write(ipc_fd, &zeroed[i],2);
-      } 
+      }
       close(ipc_fd);
       chmod(INTERPROCESS_FILE, S_IRWXU | S_IRWXG | S_IRWXO);
  }
@@ -951,15 +919,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

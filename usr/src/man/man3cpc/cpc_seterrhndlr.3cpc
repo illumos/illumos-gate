@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_seterrhndlr 3CPC "30 Jan 2004" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_SETERRHNDLR 3CPC "Jan 30, 2004"
 .SH NAME
 cpc_seterrhndlr \- control libcpc error reporting
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcpc.h>
 
 \fBtypedef void(\fR\fBcpc_errhndlr_t\fR)(\fBcpc_t *\fR\fIcpc\fR, \fBconst char *\fR\fIfn\fR, \fBint\fR \fIsubcode\fR,
@@ -47,7 +47,6 @@ conditions while using \fBlibcpc\fR. The \fIfmt\fR string is provided as a
 convenience for easy printing. The error subcodes are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_INVALID_EVENT\fR\fR
 .ad
@@ -58,7 +57,6 @@ A specified event is not supported by the processor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_INVALID_PICNUM\fR\fR
 .ad
@@ -69,7 +67,6 @@ The counter number does not fall in the range of available counters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_INVALID_ATTRIBUTE\fR\fR
 .ad
@@ -80,7 +77,6 @@ A specified attribute is not supported by the processor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_ATTRIBUTE_OUT_OF_RANGE\fR\fR
 .ad
@@ -91,7 +87,6 @@ The value of an attribute is outside the range supported by the processor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_RESOURCE_UNAVAIL\fR\fR
 .ad
@@ -102,7 +97,6 @@ A hardware resource necessary for completing an operation was unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_PIC_NOT_CAPABLE\fR\fR
 .ad
@@ -113,7 +107,6 @@ The requested counter cannot count an assigned event.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_REQ_INVALID_FLAGS\fR\fR
 .ad
@@ -124,7 +117,6 @@ One or more requests has invalid flags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_CONFLICTING_REQS\fR\fR
 .ad
@@ -135,7 +127,6 @@ The requests in a set cannot be programmed onto the hardware at the same time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_ATTR_REQUIRES_PRIVILEGE\fR\fR
 .ad
@@ -182,15 +173,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

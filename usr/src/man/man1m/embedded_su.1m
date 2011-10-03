@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH embedded_su 1M "10 Feb 2005" "SunOS 5.11" "System Administration Commands"
+.TH EMBEDDED_SU 1M "Feb 10, 2005"
 .SH NAME
 embedded_su \- allow an application to prompt for credentials and execute
 commands as the super user or another user
@@ -65,46 +65,38 @@ A message header line consists of a \fBPAM\fR message style name, as described
 in \fBpam_start\fR(3PAM). The message header values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_PROMPT_ECHO_OFF\fR\fR
 .ad
 .RS 23n
-.rt  
 The application is to prompt the user for a value, with echoing disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_PROMPT_ECHO_ON\fR\fR
 .ad
 .RS 23n
-.rt  
 The application is to prompt the user for a value, with echoing enabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_ERROR_MSG\fR\fR
 .ad
 .RS 23n
-.rt  
 The application is to display the message in a form appropriate for displaying
 an error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_TEXT_INFO\fR\fR
 .ad
 .RS 23n
-.rt  
 The application is to display the message in a form appropriate for general
 information.
 .RE
@@ -319,13 +311,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fmtmsg 1 "20 Jul 1994" "SunOS 5.11" "User Commands"
+.TH FMTMSG 1 "Jul 20, 1994"
 .SH NAME
 fmtmsg \- display a message on stderr or system console
 .SH SYNOPSIS
 .LP
 .nf
-\fBfmtmsg\fR [\fB-c\fR \fIclass\fR] [\fB-u\fR \fIsubclass\fR] [\fB-l\fR \fIlabel\fR] [\fB-s\fR \fIseverity\fR] 
+\fBfmtmsg\fR [\fB-c\fR \fIclass\fR] [\fB-u\fR \fIsubclass\fR] [\fB-l\fR \fIlabel\fR] [\fB-s\fR \fIseverity\fR]
      [\fB-t\fR \fItag\fR] [\fB-a\fR \fIaction\fR] \fItext\fR
 .fi
 
@@ -33,43 +33,35 @@ display of the formatted message.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR \fR
 .ad
 .RS 16n
-.rt  
 Describes the source of the message. Valid keywords are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhard\fR \fR
 .ad
 .RS 9n
-.rt  
 The source of the condition is hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsoft\fR \fR
 .ad
 .RS 9n
-.rt  
 The source of the condition is software.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirm\fR \fR
 .ad
 .RS 9n
-.rt  
 The source of the condition is firmware.
 .RE
 
@@ -77,93 +69,77 @@ The source of the condition is firmware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIsubclass\fR \fR
 .ad
 .RS 16n
-.rt  
 A list of keywords (separated by commas) that further defines the message and
 directs the display of the message. Valid keywords are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBappl\fR \fR
 .ad
 .RS 12n
-.rt  
 The condition originated in an application. This keyword should not be used in
 combination with either \fButil\fR or \fBopsys\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fButil\fR \fR
 .ad
 .RS 12n
-.rt  
 The condition originated in a utility. This keyword should not be used in
 combination with either \fBappl\fR or \fBopsys\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopsys\fR \fR
 .ad
 .RS 12n
-.rt  
 The message originated in the kernel. This keyword should not be used in
 combination with either \fBappl\fR or \fButil\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrecov\fR \fR
 .ad
 .RS 12n
-.rt  
 The application will recover from the condition. This keyword should not be
 used in combination with \fBnrecov\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnrecov\fR \fR
 .ad
 .RS 12n
-.rt  
 The application will not recover from the condition. This keyword should not be
 used in combination with \fBrecov\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprint\fR \fR
 .ad
 .RS 12n
-.rt  
 Print the message to the standard error stream \fBstderr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconsole\fR \fR
 .ad
 .RS 12n
-.rt  
 Write the message to the system console. \fBprint\fR, \fBconsole\fR, or both
 may be used.
 .RE
@@ -172,67 +148,55 @@ may be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlabel\fR \fR
 .ad
 .RS 16n
-.rt  
 Identifies the source of the message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIseverity\fR \fR
 .ad
 .RS 16n
-.rt  
 Indicates the seriousness of the error. The keywords and definitions of the
 standard levels of \fIseverity\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhalt\fR \fR
 .ad
 .RS 9n
-.rt  
 The application has encountered a severe fault and is halting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerror\fR\fR
 .ad
 .RS 9n
-.rt  
 The application has detected a fault.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwarn\fR\fR
 .ad
 .RS 9n
-.rt  
 The application has detected a condition that is out of the ordinary and might
 be a problem.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinfo\fR \fR
 .ad
 .RS 9n
-.rt  
 The application is providing information about a condition that is not in
 error.
 .RE
@@ -241,23 +205,19 @@ error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItag\fR \fR
 .ad
 .RS 16n
-.rt  
 The string containing an identifier for the message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIaction\fR \fR
 .ad
 .RS 16n
-.rt  
 A text string describing the first step in the error recovery process. This
 string must be written so that the entire \fIaction\fR argument is interpreted
 as a single argument. \fBfmtmsg\fR precedes each action string with the \fBTO
@@ -266,12 +226,10 @@ FIX:\fR prefix.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItext\fR \fR
 .ad
 .RS 16n
-.rt  
 A text string describing the condition. Must be written so that the entire
 \fItext\fR argument is interpreted as a single argument.
 .RE
@@ -300,7 +258,7 @@ produces:
 .sp
 .in +2
 .nf
-UX:cat: ERROR: invalid syntax 
+UX:cat: ERROR: invalid syntax
 TO FIX: refer to manual   UX:cat:138
 .fi
 .in -2
@@ -327,7 +285,7 @@ and Example 1 is used, \fBfmtmsg\fR produces:
 .sp
 .in +2
 .nf
-ERROR: invalid syntax 
+ERROR: invalid syntax
 TO FIX: refer to manual
 .fi
 .in -2
@@ -423,56 +381,46 @@ for use by \fBfmtmsg\fR. The standard severity levels shown below cannot be
 modified. Additional severity levels can be defined, redefined, and removed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 (no severity is used)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 6n
-.rt  
 \fBHALT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 6n
-.rt  
 \fBERROR\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR \fR
 .ad
 .RS 6n
-.rt  
 \fBWARNING\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 6n
-.rt  
 \fBINFO\fR
 .RE
 
@@ -521,59 +469,49 @@ that \fIdescription\fR in the colon separated list is ignored.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 All the requested functions were executed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 7n
-.rt  
 The command contains a syntax error, an invalid option, or an invalid argument
 to an option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 7n
-.rt  
 The function executed with partial success, however the message was not
 displayed on \fBstderr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 7n
-.rt  
 The function executed with partial success; however, the message was not
 displayed on the system console.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB32\fR \fR
 .ad
 .RS 7n
-.rt  
 No requested functions were executed successfully.
 .RE
 

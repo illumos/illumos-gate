@@ -31,6 +31,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -110,6 +111,8 @@ int  smb_rq_dmem(struct mbdata *, const char *, size_t);
 int  smb_rq_internal(struct smb_ctx *, struct smb_rq *);
 void smb_rq_sign(struct smb_rq *);
 int  smb_rq_verify(struct smb_rq *);
+int  smb_t2_request(int, int, uint16_t *, const char *,
+	int, void *, int, void *, int *, void *, int *, void *, int *);
 
 /*
  * This library extends the mchain.h function set a little.
@@ -169,6 +172,8 @@ char *smb_printb(char *, int, const struct smb_bitname *);
 
 int smb_ctx_getaddr(struct smb_ctx *ctx);
 int smb_ctx_gethandle(struct smb_ctx *ctx);
+
+int  smb_iod_start(struct smb_ctx *);
 
 int smb_ssn_send(struct smb_ctx *, struct mbdata *);
 int smb_ssn_recv(struct smb_ctx *, struct mbdata *);

@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -88,8 +87,6 @@ static struct modlfs modlfs = {
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlfs, NULL
 };
-
-char _depends_on[] = "strmod/rpcmod";
 
 int
 _init(void)

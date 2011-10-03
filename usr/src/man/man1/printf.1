@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH printf 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.TH PRINTF 1 "Aug 11, 2009"
 .SH NAME
 printf \- write formatted output
 .SH SYNOPSIS
@@ -39,12 +39,10 @@ The \fBprintf\fR utility writes each string operand to standard output using
 The following operands are supported by \fB/usr/bin/printf\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIformat\fR\fR
 .ad
 .RS 12n
-.rt  
 A string describing the format to use to write the remaining operands. The
 \fIformat\fR operand is used as the \fIformat\fR string described on the
 \fBformats\fR(5) manual page, with the following exceptions:
@@ -141,12 +139,10 @@ specification, the behavior is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR\fR
 .ad
 .RS 12n
-.rt  
 The strings to be written to standard output, under the control of
 \fBformat\fR. The \fIargument\fR operands are treated as strings if the
 corresponding conversion character is \fBb\fR, \fBc\fR or \fBs\fR. Otherwise,
@@ -180,121 +176,99 @@ The \fIformat\fR operands support the full range of ANSI C/C99/XPG6 formatting
 specifiers as well as additional specifiers:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%b\fR\fR
 .ad
 .RS 6n
-.rt  
 Each character in the string operand is processed specially, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ea\fR\fR
 .ad
 .RS 8n
-.rt  
 Alert character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eb\fR\fR
 .ad
 .RS 8n
-.rt  
 Backspace character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ec\fR\fR
 .ad
 .RS 8n
-.rt  
 Terminate output without appending NEWLINE. The remaining string operands are
 ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eE\fR\fR
 .ad
 .RS 8n
-.rt  
 Escape character (\fBASCII\fR octal \fB033\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ef\fR\fR
 .ad
 .RS 8n
-.rt  
 FORM FEED character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\en\fR\fR
 .ad
 .RS 8n
-.rt  
 NEWLINE character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\et\fR\fR
 .ad
 .RS 8n
-.rt  
 TAB character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ev\fR\fR
 .ad
 .RS 8n
-.rt  
 Vertical tab character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\e\fR\fR
 .ad
 .RS 8n
-.rt  
 Backslash character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e0\fR\fIx\fR\fR
 .ad
 .RS 8n
-.rt  
 The 8-bit character whose \fBASCII\fR code is the \fB1\fR-, \fB2\fR-, or
 \fB3\fR-digit octal number \fIx\fR.
 .RE
@@ -303,48 +277,40 @@ The 8-bit character whose \fBASCII\fR code is the \fB1\fR-, \fB2\fR-, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%B\fR\fR
 .ad
 .RS 6n
-.rt  
 Treat the argument as a variable name and output the value without converting
 it to a string. This is most useful for variables of type \fB-b\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%H\fR\fR
 .ad
 .RS 6n
-.rt  
 Output string with characters \fB<\fR, \fB&\fR, \fB>\fR, \fB"\fR, and
 non-printable characters, properly escaped for use in HTML and XML documents.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P\fR\fR
 .ad
 .RS 6n
-.rt  
 Treat \fIstring\fR as an extended regular expression and convert it to a shell
 pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%q\fR\fR
 .ad
 .RS 6n
-.rt  
 Output \fIstring\fR quoted in a manner that it can be read in by the shell to
 get back the same string. However, empty strings resulting from missing string
 operands are not quoted.
@@ -352,24 +318,20 @@ operands are not quoted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%R\fR\fR
 .ad
 .RS 6n
-.rt  
 Treat \fIstring\fR as an shell pattern expression and convert it to an extended
 regular expression.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%T\fR\fR
 .ad
 .RS 6n
-.rt  
 Treat \fIstring\fR as a date/time string and format it. The \fBT\fR can be
 preceded by (\fIdformat\fR), where \fIdformat\fR is a date format as defined by
 the \fBdate\fR(1) command.
@@ -377,12 +339,10 @@ the \fBdate\fR(1) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Z\fR\fR
 .ad
 .RS 6n
-.rt  
 Output a byte whose value is \fB0\fR.
 .RE
 
@@ -595,15 +555,14 @@ as the \fIformat\fR operand:
 
 .sp
 .TS
-tab() box;
-cw(1.27i) cw(1.27i) cw(2.96i) 
-lw(1.27i) lw(1.27i) lw(2.96i) 
-.
-ArgumentsStandardDiagnostic
-5a5printf: 5a not completely converted
-99999999992147483647printf: 9999999999: Results too large 
--9999999999-2147483648printf: -9999999999: Results too large 
-ABC0printf: ABC expected numeric value
+box;
+c c c
+l l l .
+Arguments	Standard	Diagnostic
+5a	5	printf: 5a not completely converted
+9999999999	2147483647	printf: 9999999999: Results too large
+-9999999999	-2147483648	printf: -9999999999: Results too large
+ABC	0	printf: ABC expected numeric value
 .TE
 
 .sp
@@ -636,20 +595,19 @@ produces:
 
 .sp
 .TS
-tab() box;
-lw(.5i) lw(5i) 
-lw(.5i) lw(5i) 
-.
-\fB3\fRNumeric value of constant 3
-\fB3\fRNumeric value of constant 3
-\fB\(mi3\fRNumeric value of constant \(mi3
-\fB51\fRT{
+box;
+l l
+l l .
+\fB3\fR	Numeric value of constant 3
+\fB3\fR	Numeric value of constant 3
+\fB\(mi3\fR	Numeric value of constant \(mi3
+\fB51\fR	T{
 Numeric value of the character `3' in the ISO/IEC 646:1991 standard codeset
 T}
-\fB43\fRT{
+\fB43\fR	T{
 Numeric value of the character `+' in the ISO/IEC 646:1991 standard codeset
 T}
-\fB45\fRT{
+\fB45\fR	T{
 Numeric value of the character `\(mi' in the SO/IEC 646:1991 standard codeset
 T}
 .TE
@@ -909,23 +867,19 @@ that affect the execution of \fBprintf\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -938,17 +892,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -956,13 +909,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

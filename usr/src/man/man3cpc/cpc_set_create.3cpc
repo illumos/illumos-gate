@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpc_set_create 3CPC "20 Aug 2007" "SunOS 5.11" "CPU Performance Counters Library Functions"
+.TH CPC_SET_CREATE 3CPC "Aug 20, 2007"
 .SH NAME
 cpc_set_create, cpc_set_destroy, cpc_set_add_request, cpc_walk_requests \-
 manage sets of counter requests
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lcpc\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcpc.h>
 
 \fBcpc_set_t *\fR\fBcpc_set_create\fR(\fBcpc_t *\fR\fIcpc\fR);
@@ -64,12 +64,10 @@ The \fBcpc_set_add_request()\fR function specifies a configuration of a
 hardware counter.  The arguments to \fBcpc_set_add_request()\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevent\fR\fR
 .ad
 .RS 17n
-.rt  
 A string containing the name of an event supported by the system's processor.
 The \fBcpc_walk_events_all()\fR and \fBcpc_walk_events_pic()\fR functions (both
 described on \fBcpc_npic\fR(3CPC)) can be used to query the processor for the
@@ -80,28 +78,23 @@ in which case a string representation of an event code in a form acceptable to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpreset\fR\fR
 .ad
 .RS 17n
-.rt  
 The value with which the system initializes the counter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 17n
-.rt  
 Three flags are defined that modify the behavior of the counter acting on
 behalf of this request:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_COUNT_USER\fR\fR
 .ad
@@ -112,7 +105,6 @@ The counter should count events that occur while the processor is in user mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_COUNT_SYSTEM\fR\fR
 .ad
@@ -124,7 +116,6 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCPC_OVF_NOTIFY_EMT\fR\fR
 .ad
@@ -143,12 +134,10 @@ specified to program the hardware for counting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInattrs\fR, \fIattrs\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fInattrs\fR argument specifies the number of attributes pointed to by the
 \fIattrs\fR argument, which is an array of \fBcpc_attr_t\fR structures
 containing processor-specific attributes that modify the request's
@@ -185,12 +174,10 @@ error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An event, attribute, or flag passed to \fBcpc_set_add_request()\fR was invalid.
 .sp
 For \fBcpc_set_destroy()\fR and \fBcpc_set_add_request()\fR, the set parameter
@@ -199,12 +186,10 @@ was not created with the given cpc_t.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There was not enough memory available to the process to create the library's
 data structures.
 .RE
@@ -217,15 +202,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

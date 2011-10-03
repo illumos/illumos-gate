@@ -24,11 +24,25 @@
 #ifndef _SYS_VDEV_IMPL_H
 #define	_SYS_VDEV_IMPL_H
 
+/* helper macros */
+#undef	offsetof
+#define	offsetof(t, m)		((int)&(((t *)0)->m))
+#define	MAX(x, y)		((x) > (y) ? (x) : (y))
+
 #define	VDEV_PAD_SIZE 		(8 << 10)
 /* 2 padding areas (vl_pad1 and vl_pad2) to skip */
 #define	VDEV_SKIP_SIZE		VDEV_PAD_SIZE * 2
 #define	VDEV_PHYS_SIZE		(112 << 10)
 #define	VDEV_UBERBLOCK_RING	(128 << 10)
+
+#define	VDEV_UBERBLOCK_SHIFT(sh)		\
+	MAX((sh), UBERBLOCK_SHIFT)
+#define	VDEV_UBERBLOCK_COUNT(sh)		\
+	(VDEV_UBERBLOCK_RING >> VDEV_UBERBLOCK_SHIFT(sh))
+#define	VDEV_UBERBLOCK_OFFSET(sh, n)	\
+	offsetof(vdev_label_t, vl_uberblock[(n) << VDEV_UBERBLOCK_SHIFT(sh)])
+#define	VDEV_UBERBLOCK_SIZE(sh)			\
+	(1ULL << VDEV_UBERBLOCK_SHIFT(sh))
 
 typedef struct vdev_phys {
 	char		vp_nvlist[VDEV_PHYS_SIZE - sizeof (zio_eck_t)];

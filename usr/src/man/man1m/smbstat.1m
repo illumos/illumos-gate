@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smbstat 1M "4 Aug 2008" "SunOS 5.11" "System Administration Commands"
+.TH SMBSTAT 1M "Aug 4, 2008"
 .SH NAME
 smbstat \- show Solaris CIFS file server statistics
 .SH SYNOPSIS
@@ -29,7 +29,6 @@ By default, the \fBsmbstat\fR command shows all statistics.
 The \fBsmbstat\fR command includes the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -41,7 +40,6 @@ option shows count statistics based on request activity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -50,7 +48,6 @@ option shows count statistics based on request activity.
 Shows the following information for the \fBCIFS\fR server:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnections\fR\fR
 .ad
@@ -61,7 +58,6 @@ Number of \fBCIFS\fR connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopen_files\fR\fR
 .ad
@@ -72,7 +68,6 @@ Number of files open on the \fBCIFS\fR server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsessions\fR\fR
 .ad
@@ -89,23 +84,19 @@ Number of active \fBCIFS\fR sessions.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
@@ -118,15 +109,14 @@ attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 _
-Utility Output FormatNot-an-Interface
+Utility Output Format	Not-an-Interface
 .TE
 
 .SH SEE ALSO

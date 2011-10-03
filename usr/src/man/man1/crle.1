@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH crle 1 "6 Oct 2008" "SunOS 5.11" "User Commands"
+.TH CRLE 1 "Oct 6, 2008"
 .SH NAME
 crle \- configure runtime linking environment
 .SH SYNOPSIS
 .LP
 .nf
-\fBcrle\fR [\fB-64\fR] [\fB-a\fR \fIname\fR] [\fB-A\fR \fIname\fR] [\fB-c\fR \fIconf\fR] [\fB-e\fR \fIenv\fR] [\fB-E\fR \fIenv\fR] 
-     [\fB-f\fR \fIflags\fR] [\fB-i\fR \fIname\fR] [\fB-I\fR \fIname\fR] [\fB-g\fR \fIname\fR] [\fB-G\fR \fIname\fR] 
+\fBcrle\fR [\fB-64\fR] [\fB-a\fR \fIname\fR] [\fB-A\fR \fIname\fR] [\fB-c\fR \fIconf\fR] [\fB-e\fR \fIenv\fR] [\fB-E\fR \fIenv\fR]
+     [\fB-f\fR \fIflags\fR] [\fB-i\fR \fIname\fR] [\fB-I\fR \fIname\fR] [\fB-g\fR \fIname\fR] [\fB-G\fR \fIname\fR]
      [\fB-l\fR \fIdir\fR] [\fB-o\fR \fIdir\fR] [\fB-s\fR \fIdir\fR] [\fB-t\fR [ ELF | AOUT]] [\fB-u\fR] [\fB-v\fR]
 .fi
 
@@ -62,7 +62,6 @@ experimentation.
 A configuration file can contain the following information.
 .sp
 .ne 2
-.mk
 .na
 \fBDefault Search Paths\fR
 .ad
@@ -79,7 +78,6 @@ any system default. See the \fB-l\fR and \fB-u\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTrusted Directories\fR
 .ad
@@ -97,7 +95,6 @@ be augmented with any system defaults. See the \fB-s\fR and \fB-u\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fBEnvironment Variables\fR
 .ad
@@ -109,7 +106,6 @@ within the configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDirectory Cache\fR
 .ad
@@ -122,7 +118,6 @@ overhead of searching for application dependencies.
 
 .sp
 .ne 2
-.mk
 .na
 \fBAlternative Objects\fR
 .ad
@@ -193,7 +188,6 @@ option, or default to \fBRTLD_REL_RELATIVE\fR.
 The following options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-64\fR\fR
 .ad
@@ -205,7 +199,6 @@ create a 64-bit specific configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIname\fR\fR
 .ad
@@ -224,7 +217,6 @@ Typically, this option is used with the \fB-o\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIname\fR\fR
 .ad
@@ -243,7 +235,6 @@ Typically, this option is used with the \fB-o\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIconf\fR\fR
 .ad
@@ -255,7 +246,6 @@ supplied, the default configuration file is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIenv\fR\fR
 .ad
@@ -278,7 +268,6 @@ removed by the process environment at runtime.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fIenv\fR\fR
 .ad
@@ -309,7 +298,6 @@ or removed by the process environment at runtime.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIflags\fR\fR
 .ad
@@ -325,7 +313,6 @@ the default flag is \fBRTLD_REL_RELATIVE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIname\fR\fR
 .ad
@@ -340,7 +327,6 @@ cache as a nonexistent directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIname\fR\fR
 .ad
@@ -355,7 +341,6 @@ manner, as the cache that is created is specific to this application.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIname\fR\fR
 .ad
@@ -371,7 +356,6 @@ directory, and its dependencies, are added to the cache.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIname\fR\fR
 .ad
@@ -387,7 +371,6 @@ specific to this application.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIdir\fR\fR
 .ad
@@ -415,7 +398,6 @@ before the new paths specified with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIdir\fR\fR
 .ad
@@ -435,7 +417,6 @@ Typically, this option is used with the \fB-a\fR or \fB-A\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIdir\fR\fR
 .ad
@@ -465,7 +446,6 @@ added before the new directories specified with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fBELF\fR | \fBAOUT\fR\fR
 .ad
@@ -477,7 +457,6 @@ that follow. The default object type is \fBELF\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -502,7 +481,6 @@ versions of Solaris. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -573,7 +551,7 @@ objects.
 Configuration file [version 4]: /var/ld/ld.config
   Platform:     32-bit MSB SPARC
   Default Library Path (ELF):  /lib:/usr/lib:/local/lib
-  Trusted Directories (ELF):   /lib/secure:/usr/lib/secure  \e 
+  Trusted Directories (ELF):   /lib/secure:/usr/lib/secure  \e
                                (system default)
 
 Command line:
@@ -616,7 +594,7 @@ variable \fBLD_CONFIG\fR used to experiment with these files.
 .nf
 # \fBcrle -l /local/lib\fR
 # \fBdate\fR
-ld.so.1: date: fatal: libc.so.1: open failed:  \e 
+ld.so.1: date: fatal: libc.so.1: open failed:  \e
    No such file or directory
 Killed
 # \fBLD_NOCONFIG=yes rm /var/ld/ld.config\fR
@@ -872,7 +850,6 @@ to the result.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ld/ld.config\fR\fR
 .ad
@@ -883,7 +860,6 @@ Default configuration file for 32-bit applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/ld/64/ld.config\fR\fR
 .ad
@@ -894,7 +870,6 @@ Default configuration file for 64-bit applications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/tmp\fR\fR
 .ad
@@ -905,7 +880,6 @@ Default location for temporary configuration file. See \fBtempnam\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/lddstub\fR\fR
 .ad
@@ -916,7 +890,6 @@ Stub application that is employed to \fBdldump\fR(3C) 32-bit objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/lddstub\fR\fR
 .ad
@@ -927,7 +900,6 @@ Stub application that is employed to \fBdldump\fR(3C) 64-bit objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libcrle.so.1\fR\fR
 .ad
@@ -938,7 +910,6 @@ Audit library that is employed to \fBdldump\fR(3C) 32-bit objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libcrle.so.1\fR\fR
 .ad
@@ -955,7 +926,6 @@ several environment variables affect the runtime linkers behavior in regard to
 the processing of configuration files that are created by \fBcrle\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_CONFIG\fR, \fBLD_CONFIG_32\fR and \fBLD_CONFIG_64\fR\fR
 .ad
@@ -966,7 +936,6 @@ Provide an alternative configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOCONFIG\fR, \fBLD_NOCONFIG_32\fR and \fBLD_NOCONFIG_64\fR\fR
 .ad
@@ -977,7 +946,6 @@ Disable configuration file processing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NODIRCONFIG\fR, \fBLD_NODIRCONFIG_32\fR and \fBLD_NODIRCONFIG_64\fR\fR
 .ad
@@ -988,7 +956,6 @@ Disable directory cache processing from a configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOENVCONFIG\fR, \fBLD_NOENVCONFIG_32\fR and \fBLD_NOENVCONFIG_64\fR\fR
 .ad
@@ -999,7 +966,6 @@ Disable environment variable processing from a configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLD_NOOBJALTER\fR, \fBLD_NOOBJALTER_32\fR and \fBLD_NOOBJALTER_64\fR\fR
 .ad
@@ -1016,13 +982,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

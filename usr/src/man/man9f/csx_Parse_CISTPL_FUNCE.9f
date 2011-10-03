@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Parse_CISTPL_FUNCE 9F "20 Dec 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_PARSE_CISTPL_FUNCE 9F "Dec 20, 1996"
 .SH NAME
 csx_Parse_CISTPL_FUNCE \- parse Function Extension tuple
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ csx_Parse_CISTPL_FUNCE \- parse Function Extension tuple
 
 
 
-\fBint32_t\fR \fBcsx_Parse_CISTPL_FUNCE\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR, 
+\fBint32_t\fR \fBcsx_Parse_CISTPL_FUNCE\fR(\fBclient_handle_t\fR \fIch\fR, \fBtuple_t *\fR\fItu\fR,
      \fBcistpl_funce_t *\fR\fIcf\fR,
      \fBuint32_t\fR \fIfid\fR);
 .fi
@@ -25,47 +25,39 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIch\fR\fR
 .ad
 .RS 7n
-.rt  
 Client handle returned from \fBcsx_RegisterClient\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItu\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBtuple_t\fR structure (see \fBtuple\fR(9S)) returned by a call
 to \fBcsx_GetFirstTuple\fR(9F) or \fBcsx_GetNextTuple\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcf\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBcistpl_funce_t\fR structure which contains the parsed
 \fBCISTPL_FUNCE\fR tuple information upon return from this function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfid\fR\fR
 .ad
 .RS 7n
-.rt  
 The function \fBID \fRcode to which this \fBCISTPL_FUNCE\fR tuple refers. See
 \fBcsx_Parse_CISTPL_FUNCID\fR(9F).
 .RE
@@ -104,7 +96,7 @@ union {
        struct data_modem {
               uint32_t  ud;      /* highest data rate */
               uint32_t  ms;      /* modulation standards */
-              uint32_t  em;      /* err correct proto and 
+              uint32_t  em;      /* err correct proto and
 								 /* non-CCITT modulation */
               uint32_t  dc;      /* data compression protocols */
               uint32_t  cm;      /* command protocols */
@@ -148,132 +140,108 @@ union {
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBfunction\fR
 .ad
 .RS 15n
-.rt  
 This field identifies the type of extended information provided about a
 function by the \fBCISTPL_FUNCE\fR tuple. This field is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_SUB_SERIAL\fR
 .ad
 .RS 26n
-.rt  
 Serial port interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_SUB_MODEM_COMMON\fR
 .ad
 .RS 26n
-.rt  
 Common modem interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_SUB_MODEM_DATA\fR
 .ad
 .RS 26n
-.rt  
 Data modem services
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_SUB_MODEM_FAX\fR
 .ad
 .RS 26n
-.rt  
 Fax modem services
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_SUB_VOICE\fR
 .ad
 .RS 26n
-.rt  
 Voice services
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CAP_MODEM_DATA\fR
 .ad
 .RS 26n
-.rt  
 Capabilities of the data modem interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CAP_MODEM_FAX\fR
 .ad
 .RS 26n
-.rt  
 Capabilities of the fax modem interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CAP_MODEM_VOICE\fR
 .ad
 .RS 26n
-.rt  
 Capabilities of the voice modem interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CAP_SERIAL_DATA\fR
 .ad
 .RS 26n
-.rt  
 Serial port interface for data modem services
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CAP_SERIAL_FAX\fR
 .ad
 .RS 26n
-.rt  
 Serial port interface for fax modem services
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CAP_SERIAL_VOICE\fR
 .ad
 .RS 26n
-.rt  
 Serial port interface for voice modem services
 .RE
 
@@ -281,12 +249,10 @@ Serial port interface for voice modem services
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubfunction\fR\fR
 .ad
 .RS 15n
-.rt  
 This is for identifying a sub-category of services provided by a function in
 the \fBCISTPL_FUNCE\fR tuple. The numeric value of the code is in the range of
 \fB1\fR to \fB15\fR.
@@ -294,43 +260,35 @@ the \fBCISTPL_FUNCE\fR tuple. The numeric value of the code is in the range of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBua\fR\fR
 .ad
 .RS 15n
-.rt  
 This is the serial port \fBUART \fRidentification and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UA_8250\fR
 .ad
 .RS 18n
-.rt  
 Intel 8250
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UA_16450\fR
 .ad
 .RS 18n
-.rt  
 NS 16450
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UA_16550\fR
 .ad
 .RS 18n
-.rt  
 NS 16550
 .RE
 
@@ -338,132 +296,108 @@ NS 16550
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuc\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies the serial port \fBUART \fRcapabilities and is defined as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_PARITY_SPACE\fR
 .ad
 .RS 25n
-.rt  
 Space parity supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_PARITY_MARK\fR
 .ad
 .RS 25n
-.rt  
 Mark parity supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_PARITY_ODD\fR
 .ad
 .RS 25n
-.rt  
 Odd parity supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_PARITY_EVEN\fR
 .ad
 .RS 25n
-.rt  
 Even parity supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_CS5\fR
 .ad
 .RS 25n
-.rt  
 5 bit characters supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_CS6\fR
 .ad
 .RS 25n
-.rt  
 6 bit characters supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_CS7\fR
 .ad
 .RS 25n
-.rt  
 7 bit characters supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_CS8\fR
 .ad
 .RS 25n
-.rt  
 8 bit characters supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_STOP_1\fR
 .ad
 .RS 25n
-.rt  
 1 stop bit supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_STOP_15\fR
 .ad
 .RS 25n
-.rt  
 1.5 stop bits supported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_UC_STOP_2\fR
 .ad
 .RS 25n
-.rt  
 2 stop bits supported
 .RE
 
@@ -471,219 +405,179 @@ Even parity supported
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfc\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies the modem flow control methods and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FC_TX_XONOFF\fR
 .ad
 .RS 22n
-.rt  
 Transmit XON/XOFF
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FC_RX_XONOFF\fR
 .ad
 .RS 22n
-.rt  
 Receiver XON/XOFF
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FC_TX_HW\fR
 .ad
 .RS 22n
-.rt  
 Transmit hardware flow control (CTS)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FC_RX_HW\fR
 .ad
 .RS 22n
-.rt  
 Receiver hardware flow control (RTS)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FC_TRANS\fR
 .ad
 .RS 22n
-.rt  
 Transparent flow control
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBms\fR
 .ad
 .RS 6n
-.rt  
 This identifies the modem modulation standards and is defined as follows:
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_BELL103\fR
 .ad
 .RS 20n
-.rt  
 300bps
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V21\fR
 .ad
 .RS 20n
-.rt  
 300bps (V.21)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V23\fR
 .ad
 .RS 20n
-.rt  
 600/1200bps (V.23)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V22AB\fR
 .ad
 .RS 20n
-.rt  
 1200bps (V.22A V.22B)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_BELL212\fR
 .ad
 .RS 20n
-.rt  
 2400bps (US Bell 212
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V22BIS\fR
 .ad
 .RS 20n
-.rt  
 2400bps (V.22bis)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V26\fR
 .ad
 .RS 20n
-.rt  
 2400bps leased line (V.26)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V26BIS\fR
 .ad
 .RS 20n
-.rt  
 2400bps (V.26bis)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V27BIS\fR
 .ad
 .RS 20n
-.rt  
 4800/2400bps leased line (V.27bis)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V29\fR
 .ad
 .RS 20n
-.rt  
 9600/7200/4800 leased line (V.29)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V32\fR
 .ad
 .RS 20n
-.rt  
 Up to 9600bps (V.32)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_V32BIS\fR
 .ad
 .RS 20n
-.rt  
 Up to 14400bps (V.32bis)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_MS_VFAST\fR
 .ad
 .RS 20n
-.rt  
 Up to 28800 V.FAST
 .RE
 
@@ -691,33 +585,27 @@ Up to 28800 V.FAST
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBem\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies modem error correction/detection protocols and is defined as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_EM_MNP\fR
 .ad
 .RS 16n
-.rt  
 MNP levels 2-4
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_EM_V42\fR
 .ad
 .RS 16n
-.rt  
 CCITT LAPM (V.42)
 .RE
 
@@ -725,32 +613,26 @@ CCITT LAPM (V.42)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdc\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies modem data compression protocols and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_DC_V42BI\fR
 .ad
 .RS 18n
-.rt  
 CCITT compression V.42
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_DC_MNP5\fR
 .ad
 .RS 18n
-.rt  
 MNP compression (uses MNP 2, 3 or 4)
 .RE
 
@@ -758,87 +640,71 @@ MNP compression (uses MNP 2, 3 or 4)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcm\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies modem command protocols and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_AT1\fR
 .ad
 .RS 19n
-.rt  
 ANSI/EIA/TIA 602 "Action" commands
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_AT2\fR
 .ad
 .RS 19n
-.rt  
 ANSI/EIA/TIA 602 "ACE/DCE IF Params"
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_AT3\fR
 .ad
 .RS 19n
-.rt  
 ANSI/EIA/TIA 602 "Ace Parameters"
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_MNP_AT\fR
 .ad
 .RS 19n
-.rt  
 MNP specification AT commands
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_V25BIS\fR
 .ad
 .RS 19n
-.rt  
 V.25bis calling commands
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_V25A\fR
 .ad
 .RS 19n
-.rt  
 V.25bis test procedures
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_CM_DMCL\fR
 .ad
 .RS 19n
-.rt  
 DMCL command mode
 .RE
 
@@ -846,43 +712,35 @@ DMCL command mode
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBex\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies the modem escape mechanism and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_EX_BREAK\fR
 .ad
 .RS 18n
-.rt  
 BREAK support standardized
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_EX_PLUS\fR
 .ad
 .RS 18n
-.rt  
 +++ returns to command mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_EX_UD\fR
 .ad
 .RS 18n
-.rt  
 User defined escape character
 .RE
 
@@ -890,33 +748,27 @@ User defined escape character
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdy\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies modem standardized data encryption and is a reserved field for
 future use and must be set to \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBef\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies modem miscellaneous features and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_EF_CALLERID\fR
 .ad
 .RS 21n
-.rt  
 Caller ID is supported
 .RE
 
@@ -924,65 +776,53 @@ Caller ID is supported
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfm\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies fax modulation standards and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FM_V21C2\fR
 .ad
 .RS 19n
-.rt  
 300bps (V.21-C2)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FM_V27TER\fR
 .ad
 .RS 19n
-.rt  
 4800/2400bps (V.27ter)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FM_V29\fR
 .ad
 .RS 19n
-.rt  
 9600/7200/4800 leased line (V.29)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FM_V17\fR
 .ad
 .RS 19n
-.rt  
 14.4K/12K/9600/7200bps (V.17)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FM_V33\fR
 .ad
 .RS 19n
-.rt  
 4.4K/12K/9600/7200 leased line (V.33)
 .RE
 
@@ -990,98 +830,80 @@ This identifies fax modulation standards and is defined as follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfs\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies the fax feature selection and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_T3\fR
 .ad
 .RS 21n
-.rt  
 Group 2 (T.3) service class
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_T4\fR
 .ad
 .RS 21n
-.rt  
 Group 3 (T.4) service class
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_T6\fR
 .ad
 .RS 21n
-.rt  
 Group 4 (T.6) service class
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_ECM\fR
 .ad
 .RS 21n
-.rt  
 Error Correction Mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_VOICEREQ\fR
 .ad
 .RS 21n
-.rt  
 Voice requests allowed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_POLLING\fR
 .ad
 .RS 21n
-.rt  
 Polling support
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_FTP\fR
 .ad
 .RS 21n
-.rt  
 File transfer support
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_FS_PASSWORD\fR
 .ad
 .RS 21n
-.rt  
 Password support
 .RE
 
@@ -1089,87 +911,71 @@ Password support
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtech\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies the \fBLAN \fRtechnology type and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_ARCNET\fR
 .ad
 .RS 28n
-.rt  
 Arcnet
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_ETHERNET\fR
 .ad
 .RS 28n
-.rt  
 Ethernet
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_TOKENRING\fR
 .ad
 .RS 28n
-.rt  
 Token Ring
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_LOCALTALK\fR
 .ad
 .RS 28n
-.rt  
 Local Talk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_FDDI\fR
 .ad
 .RS 28n
-.rt  
 FDDI/CDDI
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_ATM\fR
 .ad
 .RS 28n
-.rt  
 ATM
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_TECH_WIRELESS\fR
 .ad
 .RS 28n
-.rt  
 Wireless
 .RE
 
@@ -1177,131 +983,107 @@ Wireless
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmedia\fR\fR
 .ad
 .RS 15n
-.rt  
 This identifies the \fBLAN \fRmedia type and is defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_INHERENT\fR
 .ad
 .RS 30n
-.rt  
 Generic interface
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_UTP\fR
 .ad
 .RS 30n
-.rt  
 Unshielded twisted pair
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_STP\fR
 .ad
 .RS 30n
-.rt  
 Shielded twisted pair
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_THIN_COAX\fR
 .ad
 .RS 30n
-.rt  
 Thin coax
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_THICK_COAX\fR
 .ad
 .RS 30n
-.rt  
 Thick coax
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_FIBER\fR
 .ad
 .RS 30n
-.rt  
 Fiber
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_SSR_902\fR
 .ad
 .RS 30n
-.rt  
 Spread spectrum radio 902-928 MHz
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_SSR_2_4\fR
 .ad
 .RS 30n
-.rt  
 Spread spectrum radio 2.4 GHz
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_SSR_5_4\fR
 .ad
 .RS 30n
-.rt  
 Spread spectrum radio 5.4 GHz
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_DIFFUSE_IR\fR
 .ad
 .RS 30n
-.rt  
 Diffuse infra red
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTPLFE_LAN_MEDIA_PTP_IR\fR
 .ad
 .RS 30n
-.rt  
 Point to point infra red
 .RE
 
@@ -1310,67 +1092,55 @@ Point to point infra red
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR\fR
 .ad
 .RS 27n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNKNOWN_TUPLE\fR\fR
 .ad
 .RS 27n
-.rt  
 Parser does not know how to parse tuple.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CIS\fR\fR
 .ad
 .RS 27n
-.rt  
 No Card Information Structure (CIS) on \fBPC \fRCard.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR\fR
 .ad
 .RS 27n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

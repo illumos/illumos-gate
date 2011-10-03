@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH eeprom 1M "28 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.TH EEPROM 1M "Mar 28, 2007"
 .SH NAME
 eeprom \- EEPROM display and load utility
 .SH SYNOPSIS
@@ -57,7 +57,6 @@ systems.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdevice\fR\fR
 .ad
@@ -70,7 +69,6 @@ Use \fIdevice\fR as the \fBEEPROM\fR device.
 .SS "x86 Only"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIacpi-user-options\fR\fR
 .ad
@@ -101,7 +99,6 @@ and then, if you do not obtain satisfactory results, \fB0x02\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconsole\fR\fR
 .ad
@@ -125,7 +122,6 @@ column of the \fBprintenv\fR command, as entered at the \fBok\fR (OpenBoot)
 prompt, to determine the default for your system.
 .sp
 .ne 2
-.mk
 .na
 \fBauto-boot?\fR
 .ad
@@ -138,7 +134,6 @@ If \fBtrue\fR, boots automatically after power-on or reset. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBansi-terminal?\fR
 .ad
@@ -152,7 +147,6 @@ escape sequences; instead, echoes them to the output device. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-args\fR
 .ad
@@ -165,7 +159,6 @@ installation. See \fBboot\fR(1M), \fBkadb\fR(1M) and \fBkernel\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-command\fR
 .ad
@@ -176,7 +169,6 @@ Command executed if \fBauto-boot?\fR is \fBtrue\fR. Defaults to \fBboot\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-device\fR
 .ad
@@ -192,7 +184,6 @@ the device to boot from. Defaults to \fBdisk net\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-file\fR
 .ad
@@ -204,7 +195,6 @@ Defaults to empty string.
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-from\fR
 .ad
@@ -216,7 +206,6 @@ Boot device and file (OpenBoot PROM version 1.\fIx\fR only). Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-from-diag\fR
 .ad
@@ -228,7 +217,6 @@ Defaults to \fBle(\|)unix\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot-ncpus\fR
 .ad
@@ -241,7 +229,6 @@ of processors.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcom\fIX\fR-noprobe\fR
 .ad
@@ -253,7 +240,6 @@ port \fIX.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBdiag-device\fR
 .ad
@@ -264,7 +250,6 @@ Diagnostic boot source device. Defaults to \fBnet\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdiag-file\fR
 .ad
@@ -275,7 +260,6 @@ File from which to boot in diagnostic mode. Defaults to empty string.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdiag-level\fR
 .ad
@@ -290,7 +274,6 @@ available as an argument to, and is interpreted by \fBPOST.\fR Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBdiag-switch?\fR
 .ad
@@ -302,7 +285,6 @@ systems, \fBtrue\fR on most servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fBerror-reset-recovery\fR
 .ad
@@ -317,7 +299,6 @@ On platforms supporting this variable, it replaces the \fBwatchdog-reboot?\fR,
 The options are:
 .sp
 .ne 2
-.mk
 .na
 \fBnone\fR
 .ad
@@ -329,7 +310,6 @@ interface, \fBaka\fR \fBOK\fR prompt.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsync\fR
 .ad
@@ -341,7 +321,6 @@ treat this as \fBnone\fR after an externally initiated reset (\fBXIR\fR) trap.
 
 .sp
 .ne 2
-.mk
 .na
 \fBboot\fR
 .ad
@@ -355,7 +334,6 @@ an \fBXIR\fR trap.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfcode-debug?\fR
 .ad
@@ -367,7 +345,6 @@ If \fBtrue\fR, include name parameter for plug-in device FCodes. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBhardware-revision\fR
 .ad
@@ -378,7 +355,6 @@ System version information.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinput-device\fR
 .ad
@@ -390,7 +366,6 @@ Input device used at power-on (usually \fBkeyboard\fR, \fBttya\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fBkeyboard-click?\fR
 .ad
@@ -401,7 +376,6 @@ If \fBtrue\fR, enable keyboard click. Defaults to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBkeyboard-layout\fR
 .ad
@@ -414,7 +388,6 @@ names. See \fBkbd\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fBkeymap\fR
 .ad
@@ -425,7 +398,6 @@ Keymap for custom keyboard.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlast-hardware-update\fR
 .ad
@@ -436,7 +408,6 @@ System update information.
 
 .sp
 .ne 2
-.mk
 .na
 \fBload-base\fR
 .ad
@@ -447,7 +418,6 @@ Default load address for client programs. Default value is \fB16384\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBlocal-mac-address?\fR
 .ad
@@ -459,7 +429,6 @@ to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmfg-mode\fR
 .ad
@@ -472,7 +441,6 @@ or \fBchamber\fR. The value is passed as an argument to \fBPOST.\fR Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBmfg-switch?\fR
 .ad
@@ -484,7 +452,6 @@ If true, repeat system self-tests until interrupted with STOP-A. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBnvramrc\fR
 .ad
@@ -495,7 +462,6 @@ Contents of NVRAMRC. Defaults to empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fBnetwork-boot-arguments\fR
 .ad
@@ -526,7 +492,6 @@ Configuration parameters, listed below, are specified as \fIkey\fR=\fIvalue\fR
 attribute pairs.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtftp-server\fR\fR
 .ad
@@ -537,7 +502,6 @@ IP address of the TFTP server
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
@@ -548,7 +512,6 @@ file to download using TFTP or URL for WAN boot
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost-ip\fR\fR
 .ad
@@ -559,7 +522,6 @@ IP address of the client (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrouter-ip\fR\fR
 .ad
@@ -570,7 +532,6 @@ IP address of the default router (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubnet-mask\fR\fR
 .ad
@@ -581,7 +542,6 @@ subnet mask (in dotted-decimal notation)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclient-id\fR\fR
 .ad
@@ -592,7 +552,6 @@ DHCP client identifier
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhostname\fR\fR
 .ad
@@ -603,7 +562,6 @@ hostname to use in DHCP transactions
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhttp-proxy\fR\fR
 .ad
@@ -614,7 +572,6 @@ HTTP proxy server specification (IPADDR[:PORT])
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtftp-retries\fR\fR
 .ad
@@ -625,7 +582,6 @@ maximum number of TFTP retries
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdhcp-retries\fR\fR
 .ad
@@ -657,7 +613,6 @@ also be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoem-banner\fR
 .ad
@@ -669,7 +624,6 @@ Defaults to empty string.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoem-banner?\fR
 .ad
@@ -680,7 +634,6 @@ If \fBtrue\fR, use custom \fBOEM\fR banner. Defaults to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoem-logo\fR
 .ad
@@ -692,7 +645,6 @@ Displayed in hexadecimal.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoem-logo?\fR
 .ad
@@ -704,7 +656,6 @@ If \fBtrue\fR, use custom OEM logo (else, use Sun logo). Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBpci-mem64?\fR
 .ad
@@ -724,7 +675,6 @@ specific platform.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoutput-device\fR
 .ad
@@ -736,7 +686,6 @@ Output device used at power-on (usually \fBscreen\fR, \fBttya\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fBredmode-reboot?\fR
 .ad
@@ -748,7 +697,6 @@ Specify \fBtrue\fR to reboot after a redmode reset trap. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBredmode-sync?\fR
 .ad
@@ -760,7 +708,6 @@ reset trap. Defaults to \fBfalse\fR. (Sun Enterprise 10000 only.)
 
 .sp
 .ne 2
-.mk
 .na
 \fBrootpath\fR
 .ad
@@ -771,7 +718,6 @@ Specifies the root device of the operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsbus-probe-list\fR
 .ad
@@ -783,7 +729,6 @@ Designate which SBus slots are probed and in what order. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBscreen-#columns\fR
 .ad
@@ -794,7 +739,6 @@ Number of on-screen columns (characters/line). Defaults to \fB80\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBscreen-#rows\fR
 .ad
@@ -805,7 +749,6 @@ Number of on-screen rows (lines). Defaults to \fB34\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBscsi-initiator-id\fR
 .ad
@@ -816,7 +759,6 @@ Number of on-screen rows (lines). Defaults to \fB34\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsd-targets\fR
 .ad
@@ -829,7 +771,6 @@ target \fB1\fR, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsecurity-#badlogins\fR
 .ad
@@ -841,7 +782,6 @@ meaning or behavior on x86 based systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsecurity-mode\fR
 .ad
@@ -855,7 +795,6 @@ behavior on x86 based systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsecurity-password\fR
 .ad
@@ -879,7 +818,6 @@ Retype new password:
 
 .sp
 .ne 2
-.mk
 .na
 \fBselftest-#megs\fR
 .ad
@@ -891,7 +829,6 @@ Defaults to \fB1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsir-sync?\fR
 .ad
@@ -904,7 +841,6 @@ Enterprise 10000 only.)
 
 .sp
 .ne 2
-.mk
 .na
 \fBskip-vme-loopback?\fR
 .ad
@@ -915,7 +851,6 @@ If \fBtrue\fR, POST does not do VMEbus loopback tests. Defaults to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBst-targets\fR
 .ad
@@ -928,7 +863,6 @@ target \fB5\fR, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsunmon-compat?\fR
 .ad
@@ -940,7 +874,6 @@ If \fBtrue\fR, display Restricted Monitor prompt (\|>). Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBtestarea\fR
 .ad
@@ -951,7 +884,6 @@ One-byte scratch field, available for read/write test. Defaults to \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBtpe-link-test?\fR
 .ad
@@ -963,7 +895,6 @@ Enable 10baseT link test for built-in twisted pair Ethernet. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBttya-mode\fR
 .ad
@@ -975,7 +906,6 @@ Enable 10baseT link test for built-in twisted pair Ethernet. Defaults to
 Fields, in left-to-right order, are:
 .sp
 .ne 2
-.mk
 .na
 \fBBaud rate:\fR
 .ad
@@ -986,7 +916,6 @@ Fields, in left-to-right order, are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBData bits:\fR
 .ad
@@ -997,7 +926,6 @@ Fields, in left-to-right order, are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBParity:\fR
 .ad
@@ -1008,7 +936,6 @@ n(none), e(even), o(odd), m(mark), s(space)
 
 .sp
 .ne 2
-.mk
 .na
 \fBStop bits:\fR
 .ad
@@ -1019,7 +946,6 @@ n(none), e(even), o(odd), m(mark), s(space)
 
 .sp
 .ne 2
-.mk
 .na
 \fBHandshake:\fR
 .ad
@@ -1032,7 +958,6 @@ n(none), e(even), o(odd), m(mark), s(space)
 
 .sp
 .ne 2
-.mk
 .na
 \fBttyb-mode\fR
 .ad
@@ -1044,7 +969,6 @@ n(none), e(even), o(odd), m(mark), s(space)
 Fields, in left-to-right order, are:
 .sp
 .ne 2
-.mk
 .na
 \fBBaud rate:\fR
 .ad
@@ -1055,7 +979,6 @@ Fields, in left-to-right order, are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBData bits:\fR
 .ad
@@ -1066,7 +989,6 @@ Fields, in left-to-right order, are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBStop bits:\fR
 .ad
@@ -1077,7 +999,6 @@ Fields, in left-to-right order, are:
 
 .sp
 .ne 2
-.mk
 .na
 \fBParity:\fR
 .ad
@@ -1088,7 +1009,6 @@ n(none), e(even), o(odd), m(mark), s(space)
 
 .sp
 .ne 2
-.mk
 .na
 \fBHandshake:\fR
 .ad
@@ -1101,7 +1021,6 @@ n(none), e(even), o(odd), m(mark), s(space)
 
 .sp
 .ne 2
-.mk
 .na
 \fBttya-ignore-cd\fR
 .ad
@@ -1113,7 +1032,6 @@ If \fBtrue\fR, operating system ignores carrier-detect on TTYA. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBttyb-ignore-cd\fR
 .ad
@@ -1125,7 +1043,6 @@ If \fBtrue\fR, operating system ignores carrier-detect on TTYB. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fBttya-rts-dtr-off\fR
 .ad
@@ -1137,7 +1054,6 @@ to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBttyb-rts-dtr-off\fR
 .ad
@@ -1149,7 +1065,6 @@ to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBuse-nvramrc?\fR
 .ad
@@ -1161,7 +1076,6 @@ Defaults to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBverbosity\fR
 .ad
@@ -1173,7 +1087,6 @@ Controls the level of verbosity of PROM messages. Can be one of \fBdebug\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fBversion2?\fR
 .ad
@@ -1185,7 +1098,6 @@ Defaults to \fBtrue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwatchdog-reboot?\fR
 .ad
@@ -1196,7 +1108,6 @@ If \fBtrue\fR, reboot after watchdog reset. Defaults to \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwatchdog-sync?\fR
 .ad
@@ -1208,7 +1119,6 @@ reset trap. Defaults to \fBfalse\fR. ( Sun Enterprise 10000 only.)
 
 .sp
 .ne 2
-.mk
 .na
 \fBxir-sync?\fR
 .ad
@@ -1361,7 +1271,6 @@ you could set console to \fBttyb\fR if the second serial port is present.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/boot/solaris/bootenv.rc\fR\fR
 .ad
@@ -1372,7 +1281,6 @@ File storing \fBeeprom\fR values on x86 machines.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/openprom\fR\fR
 .ad
@@ -1383,7 +1291,6 @@ Device file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fIplatform-name\fR\fB/sbin/eeprom\fR\fR
 .ad

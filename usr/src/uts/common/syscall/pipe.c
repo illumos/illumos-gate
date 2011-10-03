@@ -21,13 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.11 */
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -48,8 +47,6 @@
  */
 #include <sys/modctl.h>
 #include <sys/syscall.h>
-
-char _depends_on[] = "fs/fifofs";
 
 longlong_t pipe();
 

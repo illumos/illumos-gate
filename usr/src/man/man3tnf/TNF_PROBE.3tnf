@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TNF_PROBE 3TNF "1 Mar 2004" "SunOS 5.11" "TNF Library Functions"
+.TH TNF_PROBE 3TNF "Mar 1, 2004"
 .SH NAME
 TNF_PROBE, TNF_PROBE_0, TNF_PROBE_1, TNF_PROBE_2, TNF_PROBE_3, TNF_PROBE_4,
 TNF_PROBE_5, TNF_PROBE_0_DEBUG, TNF_PROBE_1_DEBUG, TNF_PROBE_2_DEBUG,
@@ -178,7 +178,7 @@ variable; it must be a string constant. For example, the  \fIdetail\fR string:
 .sp
 .in +2
 .nf
-"XYZ%debug 'entering function A'; XYZ%exception 'no file'; 
+"XYZ%debug 'entering function A'; XYZ%exception 'no file';
 XYZ%func_entry; XYZ%color red blue"
 .fi
 .in -2
@@ -190,21 +190,20 @@ consists of 4 units:
 
 .sp
 .TS
-tab() box;
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBAttribute\fR\fBValue\fR\fBValues that\fR \fBprex\fR \fBmatches on\fR
+box;
+c c c
+l l l .
+\fBAttribute\fR	\fBValue\fR	\fBValues that\fR \fBprex\fR \fBmatches on\fR
 _
-XYZ%debug\&'entering function A'\&'entering function A'
-XYZ%exception\&'no file'\&'no file'
-XYZ%func_entry/.*/(regular expression)
-XYZ%colorred bluered <or> blue
+XYZ%debug	\&'entering function A'	\&'entering function A'
+XYZ%exception	\&'no file'	\&'no file'
+XYZ%func_entry	/.*/	(regular expression)
+XYZ%color	red blue	red <or> blue
 .TE
 
 .sp
 .LP
-Attribute names must be prefixed by the vendor stock symbol followed by 
+Attribute names must be prefixed by the vendor stock symbol followed by
 the '%' character. This avoids conflicts in the attribute name space. All
 attributes that do not have a '%' character are reserved.  The following
 attributes are predefined:
@@ -212,25 +211,24 @@ attributes are predefined:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBAttribute\fR\fBSemantics\fR
+box;
+c c
+l l .
+\fBAttribute\fR	\fBSemantics\fR
 _
-namename of probe
-keysT{
+name	name of probe
+keys	T{
 keys of the probe (value is space\(mi separated tokens)
 T}
-filefile name of the probe
-lineline number of the probe
-slotsT{
+file	file name of the probe
+line	line number of the probe
+slots	T{
 slot names of the probe event (\fIarg_name_n\fR)
 T}
-objectT{
+object	T{
 the executable or shared object that this probe is in.
 T}
-debugT{
+debug	T{
 distinguishes debug probes from production probes
 T}
 .TE
@@ -244,26 +242,25 @@ This is the type of the  \fIn\fRth argument. The following are predefined
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBtnf Type\fR\fBAssociated C type (and semantics)\fR
+box;
+c c
+l l .
+\fBtnf Type\fR	\fBAssociated C type (and semantics)\fR
 _
-tnf_intint
-tnf_uintunsigned int
-tnf_longlong
-tnf_ulongunsigned long
-tnf_longlongT{
+tnf_int	int
+tnf_uint	unsigned int
+tnf_long	long
+tnf_ulong	unsigned long
+tnf_longlong	T{
 long long (if implemented in compilation system)
 T}
-tnf_ulonglongT{
+tnf_ulonglong	T{
 unsigned long long (if implemented in compilation system)
 T}
-tnf_floatfloat
-tnf_doubledouble
-tnf_stringchar *
-tnf_opaquevoid *
+tnf_float	float
+tnf_double	double
+tnf_string	char *
+tnf_opaque	void *
 .TE
 
 .sp
@@ -303,13 +300,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe
+MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO

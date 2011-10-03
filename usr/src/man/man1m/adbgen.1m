@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH adbgen 1M "20 Feb 1998" "SunOS 5.11" "System Administration Commands"
+.TH ADBGEN 1M "Feb 20, 1998"
 .SH NAME
 adbgen \- generate adb script
 .SH SYNOPSIS
@@ -57,67 +57,55 @@ format specifiers are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{POINTER}\fR\fR
 .ad
 .RS 14n
-.rt  
 pointer value in hexadecimal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{LONGDEC}\fR\fR
 .ad
 .RS 14n
-.rt  
 long value in decimal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{ULONGDEC}\fR\fR
 .ad
 .RS 14n
-.rt  
 unsigned long value in decimal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{ULONGHEX}\fR\fR
 .ad
 .RS 14n
-.rt  
 unsigned long value in hexadecimal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{LONGOCT}\fR\fR
 .ad
 .RS 14n
-.rt  
 long value in octal
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{ULONGOCT}\fR\fR
 .ad
 .RS 14n
-.rt  
 unsigned long value in octal
 .RE
 
@@ -186,12 +174,10 @@ against the size of the \fBadb\fR format code and warns if they are not equal.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImodel\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the data type model to be used by \fBadbgen\fR for the macro. This
 affects the outcome of the \fB{\fR\fIformat specifier\fR\fB}\fR requests
 described under \fBDESCRIPTION\fR and the offsets and sizes of data types.
@@ -205,12 +191,10 @@ given, the data type model defaults to \fBilp32\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fB\&.adb\fR\fR
 .ad
 .RS 18n
-.rt  
 Input file that contains header information, followed by a null line, the name
 of the structure, and finally an \fBadb\fR script.
 .RE
@@ -314,7 +298,6 @@ x$<script
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fIplatform-name\fR\fB/lib/adb/*\fR\fR
 .ad
@@ -325,7 +308,6 @@ platform-specific \fBadb\fR scripts for debugging the 32-bit kernel
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/platform/\fR\fIplatform-name\fR\fB/lib/adb/sparcv9/*\fR\fR
 .ad
@@ -336,7 +318,6 @@ platform-specific \fBadb\fR scripts for debugging the 64-bit SPARC V9 kernel
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/adb/*\fR\fR
 .ad
@@ -347,7 +328,6 @@ platform-specific \fBadb\fR scripts for debugging the 64-bit SPARC V9 kernel
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/adb/sparcv9/*\fR\fR
 .ad

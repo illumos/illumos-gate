@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_get_cap 9F "20 Apr 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_GET_CAP 9F "Apr 20, 2005"
 .SH NAME
 ddi_intr_get_cap, ddi_intr_set_cap \- get or set interrupt capabilities for a
 given interrupt type
@@ -33,23 +33,19 @@ Solaris DDI specific (Solaris DDI).
 \fBddi_intr_get_cap()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 10n
-.rt  
 DDI interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflagsp\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to the capability flags returned for this handle
 .RE
 
@@ -58,23 +54,19 @@ Pointer to the capability flags returned for this handle
 \fBddi_intr_set_cap()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 9n
-.rt  
 DDI interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 Contains the capability flag to be set
 .RE
 
@@ -89,12 +81,10 @@ returned in the integer pointed to by the \fIflagsp\fR argument.
 These flags are typically combinations of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_FLAG_EDGE\fR\fR
 .ad
 .RS 26n
-.rt  
 For discrete interrupts, the host supports \fBedge\fR type of trigger. This
 flag is not returned for \fBDDI_INTR_TYPE_MSI\fR or \fBDDI_INTR_TYPE_MSIX\fR
 interrupt types. This is a read-write (RW) flag.
@@ -102,12 +92,10 @@ interrupt types. This is a read-write (RW) flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_FLAG_LEVEL\fR\fR
 .ad
 .RS 26n
-.rt  
 For discrete interrupts the host supports \fBlevel\fR, \fBedge\fR, or both
 types of triggers. This flag is not returned for \fBDDI_INTR_TYPE_MSI\fR or
 \fBDDI_INTR_TYPE_MSIX\fR interrupt types.
@@ -115,36 +103,30 @@ types of triggers. This flag is not returned for \fBDDI_INTR_TYPE_MSI\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_FLAG_MASKABLE\fR\fR
 .ad
 .RS 26n
-.rt  
 The interrupt can be masked either by the device or by the host bridge, or
 optionally by the host. This is a read-only (\fBRO\fR) flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_FLAG_PENDING\fR\fR
 .ad
 .RS 26n
-.rt  
 The interrupt supports an interrupt pending bit. This is a read-only (\fBRO\fR)
 flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_INTR_FLAG_BLOCK\fR\fR
 .ad
 .RS 26n
-.rt  
 All interrupts of the given type must be block-enabled and are not individually
 maskable. This is a read-only (\fBRO\fR) flag.
 .RE
@@ -167,45 +149,37 @@ returns failure.
 The \fBddi_intr_get_cap()\fR and \fBddi_intr_set_cap()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 On encountering invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 On any implementation specific failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ENOTSUP\fR\fR
 .ad
 .RS 15n
-.rt  
 On device not supporting operation.
 .RE
 
@@ -222,13 +196,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

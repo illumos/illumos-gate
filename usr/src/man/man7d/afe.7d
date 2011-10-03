@@ -6,7 +6,7 @@
 .\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
 .\" OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\" Portions Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
-.TH afe 7D "1 Apr 2007" "SunOS 5.11" "Devices"
+.TH AFE 7D "Apr 1, 2007"
 .SH NAME
 afe \- ADMtek Fast Ethernet device driver
 .SH SYNOPSIS
@@ -89,7 +89,6 @@ The following properties  may  be  configured  using  either \fBndd\fR(1M) or
 the \fBafe.conf\fR configuration file as described by \fBdriver.conf\fR(4):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_autoneg_cap\fR\fR
 .ad
@@ -105,7 +104,6 @@ preferences.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_100T4_cap\fR\fR
 .ad
@@ -118,7 +116,6 @@ than one.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_100fdx_cap\fR\fR
 .ad
@@ -131,7 +128,6 @@ mode.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_100hdx_cap\fR\fR
 .ad
@@ -143,7 +139,6 @@ partner is a 100 Mbps hub.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_10fdx_cap\fR\fR
 .ad
@@ -155,7 +150,6 @@ is typically used when the link partner is a 10 Mbps switch.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_10hdx_cap\fR\fR
 .ad
@@ -174,21 +168,19 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface Stability Committed
+Interface Stability 	Committed
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/afe\fR\fR
 .ad
@@ -199,7 +191,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/afe\fR\fR
 .ad
@@ -210,7 +201,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/afe\fR\fR
 .ad
@@ -221,7 +211,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/afe\fR\fR
 .ad
@@ -232,7 +221,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/afe.conf\fR\fR
 .ad

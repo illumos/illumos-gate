@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldap_url 3LDAP "02 Dec 2003" "SunOS 5.11" "LDAP Library Functions"
+.TH LDAP_URL 3LDAP "Dec 02, 2003"
 .SH NAME
 ldap_url, ldap_is_ldap_url, ldap_url_parse, ldap_url_parse_nodn,
 ldap_free_urldesc, ldap_url_search, ldap_url_search_s, ldap_url_search_st,
@@ -79,56 +79,46 @@ following shows the formatting used for LDAP URLs.
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostport\fR\fR
 .ad
 .RS 14n
-.rt  
 Host name with an optional \fB:portnumber\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdn\fR\fR
 .ad
 .RS 14n
-.rt  
 Base DN to be used for an LDAP search operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattributes\fR\fR
 .ad
 .RS 14n
-.rt  
 Comma separated list of attributes to be retrieved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIscope\fR\fR
 .ad
 .RS 14n
-.rt  
 One of these three strings: base one sub (default=base).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilter\fR\fR
 .ad
 .RS 14n
-.rt  
 LDAP search filter as used in a call to \fBldap_search\fR(3LDAP).
 .RE
 
@@ -214,56 +204,46 @@ non-zero.
 Upon error, one of these values is returned for \fBldap_url_parse()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_URL_ERR_BADSCOPE\fR\fR
 .ad
 .RS 25n
-.rt  
 URL scope string is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_URL_ERR_HOSTPORT\fR\fR
 .ad
 .RS 25n
-.rt  
 URL hostport is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_URL_ERR_MEM\fR\fR
 .ad
 .RS 25n
-.rt  
 Can't allocate memory space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_URL_ERR_NODN\fR\fR
 .ad
 .RS 25n
-.rt  
 URL has no DN (required).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_URL_ERR_NOTLDAP\fR\fR
 .ad
 .RS 25n
-.rt  
 URL doesn't begin with \fBldap://\fR.
 .RE
 
@@ -275,12 +255,11 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

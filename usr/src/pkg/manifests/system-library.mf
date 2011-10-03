@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -214,6 +215,7 @@ file path=lib/$(ARCH64)/libsecdb.so.1
 file path=lib/$(ARCH64)/libsendfile.so.1
 file path=lib/$(ARCH64)/libsocket.so.1
 file path=lib/$(ARCH64)/libsysevent.so.1
+file path=lib/$(ARCH64)/libtermcap.so.1
 file path=lib/$(ARCH64)/libthread.so.1
 file path=lib/$(ARCH64)/libtsnet.so.1
 file path=lib/$(ARCH64)/libtsol.so.2
@@ -296,6 +298,7 @@ file path=lib/libsecdb.so.1
 file path=lib/libsendfile.so.1
 file path=lib/libsocket.so.1
 file path=lib/libsysevent.so.1
+file path=lib/libtermcap.so.1
 file path=lib/libthread.so.1
 file path=lib/libtsnet.so.1
 file path=lib/libtsol.so.2
@@ -624,7 +627,6 @@ link path=lib/$(ARCH64)/libsendfile.so target=libsendfile.so.1
 link path=lib/$(ARCH64)/libsocket.so target=libsocket.so.1
 link path=lib/$(ARCH64)/libsysevent.so target=libsysevent.so.1
 link path=lib/$(ARCH64)/libtermcap.so target=libtermcap.so.1
-link path=lib/$(ARCH64)/libtermcap.so.1 target=libcurses.so.1
 link path=lib/$(ARCH64)/libtermlib.so target=libtermlib.so.1
 link path=lib/$(ARCH64)/libtermlib.so.1 target=libcurses.so.1
 link path=lib/$(ARCH64)/libthread.so target=libthread.so.1
@@ -690,7 +692,6 @@ link path=lib/libsendfile.so target=libsendfile.so.1
 link path=lib/libsocket.so target=libsocket.so.1
 link path=lib/libsysevent.so target=./libsysevent.so.1
 link path=lib/libtermcap.so target=libtermcap.so.1
-link path=lib/libtermcap.so.1 target=libcurses.so.1
 link path=lib/libtermlib.so target=libtermlib.so.1
 link path=lib/libtermlib.so.1 target=libcurses.so.1
 link path=lib/libthread.so target=libthread.so.1
@@ -718,7 +719,7 @@ link path=usr/ccs/lib/$(ARCH64)/libmenu.so \
 link path=usr/ccs/lib/$(ARCH64)/libpanel.so \
     target=../../../lib/$(ARCH64)/libpanel.so.1
 link path=usr/ccs/lib/$(ARCH64)/libtermcap.so \
-    target=../../../../lib/$(ARCH64)/libcurses.so.1
+    target=../../../../lib/$(ARCH64)/libtermcap.so.1
 link path=usr/ccs/lib/$(ARCH64)/libtermlib.so \
     target=../../../../lib/$(ARCH64)/libcurses.so.1
 link path=usr/ccs/lib/$(ARCH64)/liby.so \
@@ -730,7 +731,7 @@ link path=usr/ccs/lib/libl.so target=../../lib/libl.so.1
 link path=usr/ccs/lib/libmalloc.so target=../../lib/libmalloc.so.1
 link path=usr/ccs/lib/libmenu.so target=../../lib/libmenu.so.1
 link path=usr/ccs/lib/libpanel.so target=../../lib/libpanel.so.1
-link path=usr/ccs/lib/libtermcap.so target=../../../lib/libcurses.so.1
+link path=usr/ccs/lib/libtermcap.so target=../../../lib/libtermcap.so.1
 link path=usr/ccs/lib/libtermlib.so target=../../../lib/libcurses.so.1
 link path=usr/ccs/lib/liby.so target=../../lib/liby.so.1
 link path=usr/lib/$(ARCH64)/libadm.so \
@@ -940,9 +941,9 @@ link path=usr/lib/$(ARCH64)/libsysevent.so \
 link path=usr/lib/$(ARCH64)/libsysevent.so.1 \
     target=../../../lib/$(ARCH64)/libsysevent.so.1
 link path=usr/lib/$(ARCH64)/libtermcap.so \
-    target=../../../lib/$(ARCH64)/libcurses.so.1
+    target=../../../lib/$(ARCH64)/libtermcap.so.1
 link path=usr/lib/$(ARCH64)/libtermcap.so.1 \
-    target=../../../lib/$(ARCH64)/libcurses.so.1
+    target=../../../lib/$(ARCH64)/libtermcap.so.1
 link path=usr/lib/$(ARCH64)/libtermlib.so \
     target=../../../lib/$(ARCH64)/libcurses.so.1
 link path=usr/lib/$(ARCH64)/libtermlib.so.1 \
@@ -1139,8 +1140,8 @@ link path=usr/lib/libsoftcrypto.so target=./libsoftcrypto.so.1
 link path=usr/lib/libsys.so target=./libsys.so.1
 link path=usr/lib/libsysevent.so target=../../lib/libsysevent.so.1
 link path=usr/lib/libsysevent.so.1 target=../../lib/libsysevent.so.1
-link path=usr/lib/libtermcap.so target=../../lib/libcurses.so.1
-link path=usr/lib/libtermcap.so.1 target=../../lib/libcurses.so.1
+link path=usr/lib/libtermcap.so target=../../lib/libtermcap.so.1
+link path=usr/lib/libtermcap.so.1 target=../../lib/libtermcap.so.1
 link path=usr/lib/libtermlib.so target=../../lib/libcurses.so.1
 link path=usr/lib/libtermlib.so.1 target=../../lib/libcurses.so.1
 link path=usr/lib/libthread.so target=../../lib/libthread.so.1
@@ -1264,7 +1265,6 @@ link path=usr/lib/straddr.so target=./straddr.so.2
 link path=usr/xpg4/lib/$(ARCH64)/libcurses.so target=libcurses.so.2
 link path=usr/xpg4/lib/64 target=$(ARCH64)
 link path=usr/xpg4/lib/libcurses.so target=./libcurses.so.2
-depend fmri=runtime/python-26 type=require
 #
 # libses.so needs to dlopen(3C) plugins from usr/lib/scsi/plugins/ses/vendor/,
 # a dependency which cannot be automatically derived

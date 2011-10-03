@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_pcfs 1M "12 May 2008" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_PCFS 1M "May 12, 2008"
 .SH NAME
 mount_pcfs \- mount pcfs file systems
 .SH SYNOPSIS
 .LP
 .nf
-\fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR] 
+\fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR]
      [\fB-o\fR \fIFSType-specific_options\fR] \fIspecial\fR | \fImount_point\fR
 .fi
 
 .LP
 .nf
-\fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR] 
+\fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR]
      [\fB-o\fR \fIFSType-specific_options\fR] \fIspecial\fR \fImount_point\fR
 .fi
 
@@ -63,7 +63,6 @@ system with either a 12-bit, 16-bit, or 32-bit File Allocation Table.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgeneric_options\fR\fR
 .ad
@@ -74,7 +73,6 @@ See \fBmount\fR(1M) for the list of supported options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -84,7 +82,6 @@ Specify \fBpcfs\fR file system-specific options. The following options are
 supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclamptime\fR | \fBnoclamptime\fR\fR
 .ad
@@ -107,7 +104,6 @@ encounter \fBEOVERFLOW\fR errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfoldcase\fR | \fBnofoldcase\fR\fR
 .ad
@@ -120,7 +116,6 @@ The default is \fBnofoldcase\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhidden\fR | \fBnohidden\fR\fR
 .ad
@@ -134,7 +129,6 @@ of the Solaris operating system used the \fBnohidden\fR option as the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatime\fR | \fBnoatime\fR\fR
 .ad
@@ -148,7 +142,6 @@ be minimized, to prolong lifetime.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimezone=\fItimezone\fR\fR\fR
 .ad
@@ -170,7 +163,6 @@ variable.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -181,7 +173,6 @@ table of mounted file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad

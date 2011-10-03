@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipaddrsel 1M "6 Feb 2006" "SunOS 5.11" "System Administration Commands"
+.TH IPADDRSEL 1M "Feb 6, 2006"
 .SH NAME
 ipaddrsel \- configure IPv6 default address selection
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/ipaddrsel\fR 
+\fB/usr/sbin/ipaddrsel\fR
 .fi
 
 .LP
@@ -107,24 +107,20 @@ all possible addresses match a policy.
 The \fBippadrsel\fR utility supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 11n
-.rt  
 Replace the address selection policy table with the policy specified in the
 \fIfile\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 11n
-.rt  
 Revert the kernel's address selection policy table back to the default table.
 Invoking \fBipaddrsel\fR in this way only changes the currently running
 kernel's policy table, and does not alter the configuration file
@@ -256,23 +252,19 @@ all global prefixes are assigned to that physical interface.
 \fBipaddrsel\fR returns the following exit values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBipaddrsel\fR successfully completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred. If a failure is encountered, the kernel's current policy
 table is unchanged.
 .RE
@@ -280,12 +272,10 @@ table is unchanged.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ipaddrsel.conf\fR\fR
 .ad
 .RS 28n
-.rt  
 The file that contains the IPv6 default address selection policy to be
 installed at boot time. This file is loaded before any Internet services are
 started.
@@ -299,13 +289,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

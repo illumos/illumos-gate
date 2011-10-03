@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH service_provider.conf 4 "18 Jun 2004" "SunOS 5.11" "File Formats"
+.TH SERVICE_PROVIDER.CONF 4 "Jun 18, 2004"
 .SH NAME
 service_provider.conf \- service provider configuration file
 .SH SYNOPSIS
@@ -52,7 +52,6 @@ entry:
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriver_name\fR\fR
 .ad
@@ -64,7 +63,6 @@ for example, \fBdriver_name=tavor\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIAPI_version\fR\fR
 .ad
@@ -76,7 +74,6 @@ Specifies the API version of the service provide library: For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIthreadsafe_library\fR | \fInonthreadsafe_librar\fR\fR
 .ad
@@ -87,7 +84,6 @@ Specifies a threadsafe or non-threadsafe library.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdefault_version\fR | \fInondefault_version\fR\fR
 .ad
@@ -100,7 +96,6 @@ offer several versions of the library. If so, one version is designated as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_provider_library_pathname\fR\fR
 .ad
@@ -111,7 +106,6 @@ Specifies the pathname of the library image.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_provider_version\fR\fR
 .ad
@@ -124,7 +118,6 @@ version numbers, for example, \fBSUNW1.0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_provider_instance_data\fR\fR
 .ad
@@ -146,7 +139,7 @@ name:
 .nf
 #
 # Sample service_provider.conf entry showing an uDAPL 1.2 service
-# provider, udapl_tavor.so.1 supporting a device with a driver named 
+# provider, udapl_tavor.so.1 supporting a device with a driver named
 # tavor
 driver_name=tavor u1.2 nonthreadsafe default udapl_tavor.so.1 \e
     SUNW.1.0 ""
@@ -163,12 +156,12 @@ The following example \fBservice_provider.conf\fR uses a physical device name:
 .in +2
 .nf
 #
-# Sample service_provider.conf entry showing an uDAPL 1.2 
+# Sample service_provider.conf entry showing an uDAPL 1.2
 # service provider, udapl_tavor.so.1 supporting a device named
 # pci15b3,5a44 that can be located under /devices
 #
 pci15b3,5a44 u1.2 nonthreadsafe default \e
-    /usr/lib/tavor/udapl_tavor.so.1 SUNWudaplt1.0 "" 
+    /usr/lib/tavor/udapl_tavor.so.1 SUNWudaplt1.0 ""
 .fi
 .in -2
 
@@ -180,12 +173,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Stability	Evolving
 .TE
 
 .SH SEE ALSO

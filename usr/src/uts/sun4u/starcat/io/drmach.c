@@ -378,12 +378,25 @@ static int		 drmach_xt_mb_size;
 uint64_t		 drmach_bus_sync_list[18 * 4 * 4 + 1];
 static kmutex_t		 drmach_bus_sync_lock;
 
+static void		drmach_fini(void);
+
 static sbd_error_t	*drmach_device_new(drmach_node_t *,
 				drmach_board_t *, int, drmachid_t *);
 static sbd_error_t	*drmach_cpu_new(drmach_device_t *, drmachid_t *);
 static sbd_error_t	*drmach_mem_new(drmach_device_t *, drmachid_t *);
 static sbd_error_t	*drmach_pci_new(drmach_device_t *, drmachid_t *);
 static sbd_error_t	*drmach_io_new(drmach_device_t *, drmachid_t *);
+
+static sbd_error_t 	*drmach_board_release(drmachid_t);
+static sbd_error_t 	*drmach_board_status(drmachid_t, drmach_status_t *);
+
+static void 		drmach_cpu_dispose(drmachid_t);
+static sbd_error_t 	*drmach_cpu_release(drmachid_t);
+static sbd_error_t 	*drmach_cpu_status(drmachid_t, drmach_status_t *);
+
+static void 		drmach_mem_dispose(drmachid_t);
+static sbd_error_t 	*drmach_mem_release(drmachid_t);
+static sbd_error_t 	*drmach_mem_status(drmachid_t, drmach_status_t *);
 
 static dev_info_t	*drmach_node_ddi_get_dip(drmach_node_t *np);
 static int		 drmach_node_ddi_get_prop(drmach_node_t *np,
@@ -546,7 +559,6 @@ _init(void)
 int
 _fini(void)
 {
-	static void	drmach_fini(void);
 	int		err;
 
 	if ((err = mod_remove(&modlinkage)) == 0)
@@ -1181,9 +1193,6 @@ drmach_device_dispose(drmachid_t id)
 static drmach_board_t *
 drmach_board_new(int bnum)
 {
-	static sbd_error_t *drmach_board_release(drmachid_t);
-	static sbd_error_t *drmach_board_status(drmachid_t, drmach_status_t *);
-
 	drmach_board_t	*bp;
 
 	bp = kmem_zalloc(sizeof (drmach_board_t), KM_SLEEP);
@@ -5226,10 +5235,6 @@ drmach_cpu_read_cpuid(drmach_cpu_t *cp, processorid_t *cpuid)
 static sbd_error_t *
 drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_cpu_dispose(drmachid_t);
-	static sbd_error_t *drmach_cpu_release(drmachid_t);
-	static sbd_error_t *drmach_cpu_status(drmachid_t, drmach_status_t *);
-
 	sbd_error_t	*err;
 	uint64_t	scr_pa;
 	drmach_cpu_t	*cp = NULL;
@@ -6257,10 +6262,6 @@ drmach_mem_init_size(drmachid_t id)
 static sbd_error_t *
 drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 {
-	static void drmach_mem_dispose(drmachid_t);
-	static sbd_error_t *drmach_mem_release(drmachid_t);
-	static sbd_error_t *drmach_mem_status(drmachid_t, drmach_status_t *);
-
 	sbd_error_t	*err;
 	uint64_t	 madr_pa;
 	drmach_mem_t	*mp;

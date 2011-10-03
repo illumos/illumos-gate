@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -390,6 +391,11 @@ tcp_timers_stop(tcp_t *tcp)
  * (tcp_ka_interval + tcp_ka_abort_thres) we have not heard anything,
  * kill the connection unless the keepalive abort threshold is 0.  In
  * that case, we will probe "forever."
+ * If tcp_ka_cnt and tcp_ka_rinterval are non-zero, then we do not follow
+ * the exponential backoff, but send probes tcp_ka_cnt times in regular
+ * intervals of tcp_ka_rinterval milliseconds until we hear back from peer.
+ * Kill the connection if we don't hear back from peer after tcp_ka_cnt
+ * probes are sent.
  */
 void
 tcp_keepalive_timer(void *arg)
@@ -455,7 +461,9 @@ tcp_keepalive_timer(void *arg)
 			if (mp != NULL) {
 				tcp_send_data(tcp, mp);
 				TCPS_BUMP_MIB(tcps, tcpTimKeepaliveProbe);
-				if (tcp->tcp_ka_last_intrvl != 0) {
+				if (tcp->tcp_ka_rinterval) {
+					firetime = tcp->tcp_ka_rinterval;
+				} else if (tcp->tcp_ka_last_intrvl != 0) {
 					int max;
 					/*
 					 * We should probe again at least

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_unix_account 5 "14 Feb 2005" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_UNIX_ACCOUNT 5 "Feb 14, 2005"
 .SH NAME
 pam_unix_account \- PAM account management module for UNIX
 .SH SYNOPSIS
@@ -26,34 +26,28 @@ account information from the configured databases in \fBnsswitch.conf\fR(4).
 The following options can be passed to the module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBsyslog\fR(3C) debugging information at the \fBLOG_DEBUG\fR level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnowarn\fR\fR
 .ad
 .RS 17n
-.rt  
 Turn off warning messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserver_policy\fR\fR
 .ad
 .RS 17n
-.rt  
 If the account authority for the user, as specified by \fBPAM_USER\fR, is a
 server, do not apply the Unix policy from the passwd entry in the name service
 switch.
@@ -65,100 +59,82 @@ switch.
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_UNIX_ACCOUNT\fR\fR
 .ad
 .RS 24n
-.rt  
 User account has expired
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_EXPIRED\fR\fR
 .ad
 .RS 24n
-.rt  
 Password expired and no longer usable
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_BUF_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Memory buffer error
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 24n
-.rt  
 Ignore module, not participating in result
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
 .ad
 .RS 24n
-.rt  
 Obtain new authentication token from the user
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_PERM_DENIED\fR\fR
 .ad
 .RS 24n
-.rt  
 The account is locked or has been inactive for too long
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SERVICE_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Error in underlying service module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 24n
-.rt  
 The account is valid for use at this time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 24n
-.rt  
 No account is present for the user
 .RE
 
@@ -170,15 +146,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT LevelMT-Safe with exceptions
+MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nroff 1 "1 Nov 2007" "SunOS 5.11" "User Commands"
+.TH NROFF 1 "Nov 1, 2007"
 .SH NAME
 nroff \- format documents for display or line-printer
 .SH SYNOPSIS
 .LP
 .nf
-\fBnroff\fR [\fB-ehiq\fR] [\fB-m\fR\fIname\fR] [\fB-n\fR\fIN\fR] [\fB-o\fR\fIpagelist\fR] [\fB-r\fR\fIaN\fR] [\fB-s\fR\fIN\fR] 
+\fBnroff\fR [\fB-ehiq\fR] [\fB-m\fR\fIname\fR] [\fB-n\fR\fIN\fR] [\fB-o\fR\fIpagelist\fR] [\fB-r\fR\fIaN\fR] [\fB-s\fR\fIN\fR]
      [\fB-T\fR\fIname\fR] [\fB-u\fR\fIN\fR] [\fIfilename...\fR]
 .fi
 
@@ -30,24 +30,20 @@ The following options are supported. Options can appear in any order so long as
 they appear \fIbefore\fR the files.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 14n
-.rt  
 Produces equally-spaced words in adjusted lines, using full terminal
 resolution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 14n
-.rt  
 Uses output \fITAB\fR characters during horizontal spacing to speed output and
 reduces output character count. \fITAB\fR settings are assumed to be every 8
 nominal character widths.
@@ -55,57 +51,47 @@ nominal character widths.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 14n
-.rt  
 Reads the standard input after the input files are exhausted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 14n
-.rt  
 Does not print output that was read from an \fB\&.rd\fR request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 Prepends the macro file \fB/usr/share/lib/tmac/\fIname\fR\fR to the input
 files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fIN\fR\fR
 .ad
 .RS 14n
-.rt  
 Numbers first generated page \fIN\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fIpagelist\fR\fR
 .ad
 .RS 14n
-.rt  
 Prints only pages whose page numbers appear in the comma-separated \fIlist\fR
 of numbers and ranges. A range \fIN\fR\fB-\fR\fIM\fR means pages \fIN\fR
 through \fIM\fR; an initial \fB-N\fR means from the beginning to page \fIN\fR;
@@ -114,23 +100,19 @@ and a final \fIN\fR\(mi means from \fIN\fR to the end.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fIaN\fR\fR
 .ad
 .RS 14n
-.rt  
 Sets register \fIa\fR (one-character) to \fIN\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIN\fR\fR
 .ad
 .RS 14n
-.rt  
 Stops every \fIN\fR pages. \fBnroff\fR halts prior to every \fIN\fR pages
 (default \fIN\fR=1) to allow paper loading or changing, and resumes upon
 receipt of a \fINEWLINE\fR.
@@ -138,121 +120,99 @@ receipt of a \fINEWLINE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fIname\fR\fR
 .ad
 .RS 14n
-.rt  
 Prepares output for a device of the specified \fIname\fR. Known \fIname\fRs
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB37\fR\fR
 .ad
 .RS 14n
-.rt  
 Teletype Corporation Model 37 terminal \(em this is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlp\fR | \fBtn300\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBGE\fR \(em any line printer or terminal without half-line capability.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB300\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-300.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB300-12\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-300 \(em 12-pitch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB300S\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-300S.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB300S-12\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-300S.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB382\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-382 (fancy \fBDTC\fR 382).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB450\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-450 (Diablo Hyterm).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB450-12\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBDASI\fR-450 (Diablo Hyterm) \(em 12-pitch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB832\fR\fR
 .ad
 .RS 14n
-.rt  
 \fBAJ\fR 832.
 .RE
 
@@ -260,12 +220,10 @@ Teletype Corporation Model 37 terminal \(em this is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fIN\fR\fR
 .ad
 .RS 14n
-.rt  
 Set the emboldening factor for the font mounted in position \fB3\fR to \fIN\fR.
 If \fIN\fR is missing, then set the emboldening factor to \fB0\fR.
 .RE
@@ -276,12 +234,10 @@ If \fIN\fR is missing, then set the emboldening factor to \fB0\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 The file containing text to be processed by \fBnroff\fR.
 .RE
 
@@ -310,7 +266,6 @@ and \fBNLSPATH\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/tmp/trtmp*\fR\fR
 .ad
@@ -321,7 +276,6 @@ temporary file (see NOTES)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/tmac.*\fR\fR
 .ad
@@ -332,7 +286,6 @@ standard macro files
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/nterm/*\fR\fR
 .ad
@@ -343,7 +296,6 @@ terminal driving tables for \fBnroff\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/nterm/README\fR\fR
 .ad
@@ -360,13 +312,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

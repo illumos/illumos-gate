@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kstat_queue 9F "4 Apr 1994" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH KSTAT_QUEUE 9F "Apr 4, 1994"
 .SH NAME
 kstat_queue, kstat_waitq_enter, kstat_waitq_exit, kstat_runq_enter,
 kstat_runq_exit, kstat_waitq_to_runq, kstat_runq_back_to_waitq \- update I/O
@@ -51,12 +51,10 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkiop\fR \fR
 .ad
 .RS 9n
-.rt  
 Pointer to a \fBkstat_io\fR(9S) structure.
 .RE
 
@@ -75,24 +73,20 @@ The \fBkstat_queue()\fR family of functions manage these times based on the
 transitions between the driver wait queue and run queue.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkstat_waitq_enter()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBkstat_waitq_enter()\fR should be called when a request arrives and is placed
 into a pre-service state (such as just prior to calling \fBdisksort\fR(9F)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkstat_waitq_exit()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBkstat_waitq_exit()\fR should be used when a request is removed from its
 pre-service state. (such as just prior to calling the driver's \fBstart\fR
 routine).
@@ -100,12 +94,10 @@ routine).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkstat_runq_enter()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBkstat_runq_enter()\fR is also called when a request is placed in its service
 state (just prior to calling the driver's start routine, but after
 \fBkstat_waitq_exit()\fR).
@@ -113,24 +105,20 @@ state (just prior to calling the driver's start routine, but after
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkstat_runq_exit()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBkstat_runq_exit()\fR is used when a request is removed from its service
 state (just prior to calling \fBbiodone\fR(9F)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkstat_waitq_to_runq()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBkstat_waitq_to_runq()\fR transitions a request from the wait queue to the
 run queue. This is useful wherever the driver would have normally done a
 \fBkstat_waitq_exit()\fR followed by a call to \fBkstat_runq_enter()\fR.
@@ -138,12 +126,10 @@ run queue. This is useful wherever the driver would have normally done a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkstat_runq_back_to_waitq()\fR\fR
 .ad
 .RS 30n
-.rt  
 \fBkstat_runq_back_to_waitq()\fR transitions a request from the run queue back
 to the wait queue. This may be necessary in some cases (write throttling is an
 example).

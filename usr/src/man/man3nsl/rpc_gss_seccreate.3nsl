@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_gss_seccreate 3NSL "29 Jun 2001" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_GSS_SECCREATE 3NSL "Jun 29, 2001"
 .SH NAME
 rpc_gss_seccreate \- create a security context using the RPCSEC_GSS protocol
 .SH SYNOPSIS
 .LP
 .nf
-#include <rpc/rpcsec_gss.h> 
+#include <rpc/rpcsec_gss.h>
 
 \fBAUTH  *\fR\fBrpc_gss_seccreate\fR(\fBCLIENT\fR \fI*clnt\fR, \fBchar\fR \fI*principal\fR, \fBchar\fR \fI*mechanism\fR,
      \fBrpc_gss_service_t\fR \fIservice_type\fR, \fBchar\fR \fI*qop\fR,
@@ -33,24 +33,20 @@ Information on  \fBRPCSEC_GSS\fR data types for parameters may be found on the
 \fBrpcsec_gss\fR(3NSL) man page.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclnt\fR\fR
 .ad
 .RS 16n
-.rt  
 This is the RPC client handle. \fIclnt\fR may be obtained, for example, from
 \fBclnt_create()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprincipal\fR\fR
 .ad
 .RS 16n
-.rt  
 This is the identity of the server principal, specified in the form
 \fIservice\fR@\fIhost\fR, where \fIservice\fR is the name of the service the
 client wishes to access and \fIhost\fR is the fully qualified name of the host
@@ -59,12 +55,10 @@ where the service resides \(em for example, nfs@mymachine.eng.company.com.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImechanism\fR\fR
 .ad
 .RS 16n
-.rt  
 This is an ASCII string which indicates which security mechanism to use with
 this data.  Appropriate mechanisms may be found in the file
 \fB/etc/gss/mech\fR; additionally, \fBrpc_gss_get_mechanisms()\fR returns a
@@ -73,24 +67,20 @@ list of supported security mechanisms (as null-terminated strings).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservice_type\fR\fR
 .ad
 .RS 16n
-.rt  
 This sets the initial type of service for the session \(em privacy, integrity,
 authentication, or none.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqop\fR\fR
 .ad
 .RS 16n
-.rt  
 This is an ASCII string which sets the quality of protection (QOP) for the
 session. Appropriate values for this string may be found in the file
 \fB/etc/gss/qop\fR. Additionally, supported QOPs are returned (as
@@ -99,12 +89,10 @@ null-terminated strings) by \fBrpc_gss_get_mech_info()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptions_req\fR\fR
 .ad
 .RS 16n
-.rt  
 This structure contains options which are passed directly to the underlying
 \fBGSS_API\fR layer.  If the caller specifies \fINULL\fR for this parameter,
 defaults are used. (See  \fBNOTES\fR, below.)
@@ -112,12 +100,10 @@ defaults are used. (See  \fBNOTES\fR, below.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptions_ret\fR\fR
 .ad
 .RS 16n
-.rt  
 These \fBGSS-API\fR options are returned to the caller. If the caller does not
 need to see these options, then it may specify \fINULL\fR for this parameter.
 (See \fBNOTES,\fR below.)
@@ -133,23 +119,19 @@ return successfully, the application can get an error number by calling
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gss/mech\fR\fR
 .ad
 .RS 17n
-.rt  
 File containing valid security mechanisms
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gss/qop\fR\fR
 .ad
 .RS 17n
-.rt  
 File containing valid QOP values.
 .RE
 
@@ -161,19 +143,18 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
-_
+MT-Level	MT-Safe
+.TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBauth_destroy\fR(3NSL), \fBrpc\fR(3NSL), \fBrpc_gss_get_error\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5) 
+\fBauth_destroy\fR(3NSL), \fBrpc\fR(3NSL), \fBrpc_gss_get_error\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5)
 .sp
 .LP
 \fIONC+ Developer\&'s Guide\fR
@@ -182,5 +163,3 @@ _
 Linn, J. \fIRFC 2743, Generic Security Service Application Program Interface Version 2, Update 1\fR. Network Working Group. January 2000.
 .SH NOTES
 .sp
-.LP
-Contexts may be destroyed normally, with  \fBauth_destroy()\fR. See \fBauth_destroy\fR(3NSL)

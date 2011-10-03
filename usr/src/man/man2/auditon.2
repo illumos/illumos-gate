@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH auditon 2 "6 Apr 2009" "SunOS 5.11" "System Calls"
+.TH AUDITON 2 "Apr 6, 2009"
 .SH NAME
 auditon \- manipulate auditing
 .SH SYNOPSIS
@@ -28,7 +28,6 @@ command. The \fIdata\fR argument is a pointer to command-specific data. The
 The following commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETCOND\fR\fR
 .ad
@@ -38,45 +37,37 @@ Return the system audit on/off/disabled condition in the integer pointed to by
 \fIdata\fR. The following values can be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUC_AUDITING\fR\fR
 .ad
 .RS 16n
-.rt  
 Auditing has been turned on.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUC_DISABLED\fR\fR
 .ad
 .RS 16n
-.rt  
 Auditing system has not been enabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUC_NOAUDIT\fR\fR
 .ad
 .RS 16n
-.rt  
 Auditing has been turned off.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUC_NOSPACE\fR\fR
 .ad
 .RS 16n
-.rt  
 Auditing has blocked due to lack of space in audit partition.
 .RE
 
@@ -84,7 +75,6 @@ Auditing has blocked due to lack of space in audit partition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETCOND\fR\fR
 .ad
@@ -95,23 +85,19 @@ by \fIdata\fR. The Solaris Audit subsystem must be enabled by \fBbsmconv\fR(1M)
 before auditing can be turned on. The following audit states can be set:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUC_AUDITING\fR\fR
 .ad
 .RS 16n
-.rt  
 Turns on audit record generation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUC_NOAUDIT\fR\fR
 .ad
 .RS 16n
-.rt  
 Turns off audit record generation.
 .RE
 
@@ -119,7 +105,6 @@ Turns off audit record generation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETCLASS\fR\fR
 .ad
@@ -132,7 +117,6 @@ event number. The preselection class mask is returned in the same structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETCLASS\fR\fR
 .ad
@@ -145,7 +129,6 @@ event number and class mask.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETKMASK\fR\fR
 .ad
@@ -158,7 +141,6 @@ events.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETKMASK\fR\fR
 .ad
@@ -171,7 +153,6 @@ preselect non-attributable audit events.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETPINFO\fR\fR
 .ad
@@ -187,7 +168,6 @@ should be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETPINFO_ADDR\fR\fR
 .ad
@@ -200,7 +180,6 @@ the specified process in the \fBauditpinfo_addr\fR structure pointed to by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETPMASK\fR\fR
 .ad
@@ -214,7 +193,6 @@ set to \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETUMASK\fR\fR
 .ad
@@ -228,7 +206,6 @@ ignored and should be set to \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETSMASK\fR\fR
 .ad
@@ -242,7 +219,6 @@ structure are ignored and should be set to \fINULL.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETQCTRL\fR\fR
 .ad
@@ -261,7 +237,6 @@ parameters are returned in the \fBau_qctrl\fR structure pointed to by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETQCTRL\fR\fR
 .ad
@@ -273,45 +248,37 @@ structure containing the audit queue control parameters. The default and
 maximum values 'A/B' for the audit queue control parameters are:
 .sp
 .ne 2
-.mk
 .na
 \fBhigh water\fR
 .ad
 .RS 22n
-.rt  
 \fB100/10000\fR (audit records)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlow water\fR
 .ad
 .RS 22n
-.rt  
 \fB10/1024\fR (audit records)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBoutput buffer size\fR
 .ad
 .RS 22n
-.rt  
 \fB1024/1048576\fR (bytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelay\fR
 .ad
 .RS 22n
-.rt  
 \fB20/20000\fR (hundredths second)
 .RE
 
@@ -319,7 +286,6 @@ maximum values 'A/B' for the audit queue control parameters are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETCWD\fR\fR
 .ad
@@ -333,7 +299,6 @@ argument is the length of the buffer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETCAR\fR\fR
 .ad
@@ -347,7 +312,6 @@ The \fIdata\fR argument points to a buffer into which the path is copied. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETSTAT\fR\fR
 .ad
@@ -359,7 +323,6 @@ by \fIdata\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETSTAT\fR\fR
 .ad
@@ -372,7 +335,6 @@ the corresponding field in the statistics structure pointed to by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_GETPOLICY\fR\fR
 .ad
@@ -383,7 +345,6 @@ Return the audit policy flags in the integer pointed to by \fIdata\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SETPOLICY\fR\fR
 .ad
@@ -393,7 +354,6 @@ Set the audit policy flags to the values in the integer pointed to by
 \fIdata\fR. The following policy flags are recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_CNT\fR\fR
 .ad
@@ -405,7 +365,6 @@ default action is to suspend processes until storage becomes available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_AHLT\fR\fR
 .ad
@@ -417,7 +376,6 @@ default action is to count the number of events that could not be recorded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_ARGV\fR\fR
 .ad
@@ -429,7 +387,6 @@ family of functions. The default action is not to include this information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_ARGE\fR\fR
 .ad
@@ -441,7 +398,6 @@ record. The default action is not to include this information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_SEQ\fR\fR
 .ad
@@ -453,7 +409,6 @@ include it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_TRAIL\fR\fR
 .ad
@@ -465,7 +420,6 @@ include it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_GROUP\fR\fR
 .ad
@@ -477,7 +431,6 @@ not to include it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_PATH\fR\fR
 .ad
@@ -491,7 +444,6 @@ the system call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_WINDATA_DOWN\fR\fR
 .ad
@@ -504,7 +456,6 @@ By default, this information is not included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_WINDATA_UP\fR\fR
 .ad
@@ -517,7 +468,6 @@ default, this information is not included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_PERZONE\fR\fR
 .ad
@@ -531,7 +481,6 @@ from the global zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUDIT_ZONENAME\fR\fR
 .ad
@@ -553,47 +502,39 @@ is returned and \fBerrno\fR is set to indicate the error.
 The \fBauditon()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIlength\fR field for the command was too small to hold the returned
 value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The copy of data to/from the kernel failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One of the arguments was illegal, Solaris Audit has not been installed, or the
 operation is not valid from a local zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_SYS_AUDIT\fR} privilege is not asserted in the effective set of
 the calling process.
 .sp
@@ -624,15 +565,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

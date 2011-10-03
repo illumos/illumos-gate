@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH shm_open 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH SHM_OPEN 3C "Feb 5, 2008"
 .SH NAME
 shm_open \- open a shared memory object
 .SH SYNOPSIS
@@ -52,23 +52,19 @@ Applications specify exactly one of the first two values (access modes) below
 in the value of \fIoflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDONLY\fR \fR
 .ad
 .RS 13n
-.rt  
 Open for read access only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_RDWR\fR \fR
 .ad
 .RS 13n
-.rt  
 Open for read or write access.
 .RE
 
@@ -78,12 +74,10 @@ Any combination of the remaining flags may be specified in the value of
 \fIoflag\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_CREAT\fR \fR
 .ad
 .RS 12n
-.rt  
 If the shared memory object exists, this flag has no effect, except as noted
 under \fBO_EXCL\fR below. Otherwise the shared memory object is created; the
 user \fBID\fR of the shared memory object will be set to the effective user
@@ -99,12 +93,10 @@ for both. The shared memory object has a size of zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_EXCL\fR \fR
 .ad
 .RS 12n
-.rt  
 If \fBO_EXCL\fR and \fBO_CREAT\fR are set, \fBshm_open()\fR fails if the shared
 memory object exists. The check for the existence of the shared memory object
 and the creation of the object if it does not exist is atomic with respect to
@@ -115,12 +107,10 @@ with \fBO_EXCL\fR and \fBO_CREAT\fR set. If \fBO_EXCL\fR is set and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO_TRUNC\fR \fR
 .ad
 .RS 12n
-.rt  
 If the shared memory object exists, and it is successfully opened \fBO_RDWR\fR,
 the object will be truncated to zero length and the mode and owner will be
 unchanged by this function call. The result of using \fBO_TRUNC\fR with
@@ -147,12 +137,10 @@ condition.
 The \fBshm_open()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR \fR
 .ad
 .RS 17n
-.rt  
 The shared memory object exists and the permissions specified by \fIoflag\fR
 are denied, or the shared memory object does not exist and permission to create
 the shared memory object is denied, or \fBO_TRUNC\fR is specified and write
@@ -161,57 +149,47 @@ permission is denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR \fR
 .ad
 .RS 17n
-.rt  
 \fBO_CREAT\fR and \fBO_EXCL\fR are set and the named shared memory object
 already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR \fR
 .ad
 .RS 17n
-.rt  
 The \fBshm_open()\fR operation was interrupted by a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 17n
-.rt  
 The \fBshm_open()\fR operation is not supported for the given name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR \fR
 .ad
 .RS 17n
-.rt  
 Too many file descriptors are currently in use by this process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR \fR
 .ad
 .RS 17n
-.rt  
 The length of the \fIname\fR string exceeds \fBPATH_MAX\fR, or a pathname
 component is longer than \fINAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
 effect.
@@ -219,45 +197,37 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR \fR
 .ad
 .RS 17n
-.rt  
 Too many shared memory objects are currently open in the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR \fR
 .ad
 .RS 17n
-.rt  
 \fBO_CREAT\fR is not set and the named shared memory object does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR \fR
 .ad
 .RS 17n
-.rt  
 There is insufficient space for the creation of the new shared memory object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR \fR
 .ad
 .RS 17n
-.rt  
 The \fBshm_open()\fR function is not supported by the system.
 .RE
 
@@ -269,17 +239,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

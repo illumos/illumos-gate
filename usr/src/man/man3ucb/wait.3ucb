@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH wait 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH WAIT 3UCB "Oct 30, 2007"
 .SH NAME
 wait, wait3, wait4, waitpid, WIFSTOPPED, WIFSIGNALED, WIFEXITED \- wait for
 process to terminate or stop
@@ -152,12 +152,10 @@ whose process group \fBID\fR is equal to the absolute value of \fIpid\fR.
 more of the following flags, defined in the header \fB<sys/wait.h>\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOHANG\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBwaitpid()\fR does not suspend execution of the calling process if status is
 not immediately available for one of the child processes specified by
 \fIpid\fR.
@@ -165,12 +163,10 @@ not immediately available for one of the child processes specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWUNTRACED\fR\fR
 .ad
 .RS 13n
-.rt  
 The status of any child processes specified by \fIpid\fR that are stopped, and
 whose status has not yet been reported since they stopped, are also reported to
 the requesting process.
@@ -241,23 +237,19 @@ The \fBwait()\fR, \fBwait3()\fR and \fBwait4()\fR functions will fail and
 return immediately if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHILD\fR\fR
 .ad
 .RS 10n
-.rt  
 The calling process has no existing unwaited-for child processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIstatus\fR or \fIrusage\fR arguments point to an illegal address.
 .RE
 
@@ -266,36 +258,30 @@ The \fIstatus\fR or \fIrusage\fR arguments point to an illegal address.
 \fBwaitpid()\fR may set \fBerrno\fR to:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHILD\fR\fR
 .ad
 .RS 10n
-.rt  
 The process or process group specified by \fIpid\fR does not exist or is not a
 child of the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The function was interrupted by a signal. The value of the location pointed to
 by \fIstatusp\fR is undefined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIoptions\fR is not valid.
 .RE
 

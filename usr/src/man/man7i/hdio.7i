@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hdio 7I "13 Aug 2002" "SunOS 5.11" "Ioctl Requests"
+.TH HDIO 7I "Aug 13, 2002"
 .SH NAME
 hdio \- SMD and IPI disk control operations
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/hdio.h> 
+#include <sys/hdio.h>
 .fi
 
 .SH DESCRIPTION
@@ -28,24 +28,20 @@ these  \fBioctl()\fR requests are the definitions in <\fBsys/hdio.h\fR>.
 .SH IOCTLS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHDKIOCGTYPE\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to a \fBhdk_type\fR structure (described below).
 This \fBioctl()\fR gets specific information from the hard disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHDKIOCSTYPE\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to a \fBhdk_type\fR structure (described below).
 This \fBioctl()\fR sets specific information about the hard disk.
 .RE
@@ -67,24 +63,20 @@ struct hdk_type {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHDKIOCGBAD\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBhdk_badmap\fR structure (described below).
 This \fBioctl()\fR is used to get the bad sector map from the disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHDKIOCSBAD\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBhdk_badmap\fR structure (described below).
 This \fBioctl()\fR is used to set the bad sector map on the disk.
 .RE
@@ -103,12 +95,10 @@ struct hdk_badmap {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHDKIOCGDIAG\fR\fR
 .ad
 .RS 15n
-.rt  
 The argument is a pointer to a \fBhdk_diag\fR structure (described below).
 This \fBioctl()\fR gets the most recent command that failed along with the
 sector and error number from the hard disk.

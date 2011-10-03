@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_appname.conf 4 "14 Oct 2003" "SunOS 5.11" "File Formats"
+.TH SASL_APPNAME.CONF 4 "Oct 14, 2003"
 .SH NAME
 sasl_appname.conf \- SASL options and configuration file
 .SH SYNOPSIS
@@ -35,7 +35,7 @@ The format for each option setting is:
 .sp
 .in +2
 .nf
-option_name:value. 
+option_name:value.
 .fi
 .in -2
 
@@ -47,12 +47,10 @@ You can comment lines in the file by using a leading #.
 The SASL library supports the following options for server applications:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto_transition\fR\fR
 .ad
 .RS 25n
-.rt  
 When set to \fByes\fR, plain users and login plug-ins are automatically
 transitioned to other mechanisms when they do a successful plaintext
 authentication. The default value for \fBauto_transition\fR is \fBno\fR.
@@ -60,24 +58,20 @@ authentication. The default value for \fBauto_transition\fR is \fBno\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauxprop_plugin\fR\fR
 .ad
 .RS 25n
-.rt  
 A space-separated list of names of auxiliary property plug-ins to use. By
 default, SASL will use or query all available auxiliary property plug-ins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcanon_user_plugin\fR\fR
 .ad
 .RS 25n
-.rt  
 The name of the canonical user plug-in to use. By default, the value of
 \fBcanon_user_plugin\fR is \fBINTERNAL\fR, to indicated the use of built-in
 plug-ins..
@@ -85,12 +79,10 @@ plug-ins..
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog_level\fR\fR
 .ad
 .RS 25n
-.rt  
 An integer value for the desired level of logging for a server, as defined in
 <\fBsasl.h\fR>. This sets the \fBlog_level\fR in the \fBsasl_server_params_t
 struct\fR in \fB/usr/include/sasl/saslplug.h\fR. The default value for
@@ -99,12 +91,10 @@ struct\fR in \fB/usr/include/sasl/saslplug.h\fR. The default value for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmech_list\fR\fR
 .ad
 .RS 25n
-.rt  
 Whitespace separated list of SASL mechanisms to allow, for example,
 \fBDIGEST-MD5 GSSAPI\fR. The \fBmech_list\fR option is used to restrict the
 mechanisms to a subset of the installed plug-ins. By default, SASL will use all
@@ -113,12 +103,10 @@ available mechanisms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpw_check\fR\fR
 .ad
 .RS 25n
-.rt  
 Whitespace separated list of mechanisms used to verify passwords that are used
 by \fBsasl_checkpass\fR(3SASL). The default value for \fBpw_check\fR is
 \fBauxprop\fR.
@@ -126,12 +114,10 @@ by \fBsasl_checkpass\fR(3SASL). The default value for \fBpw_check\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreauth_timeout\fR\fR
 .ad
 .RS 25n
-.rt  
 This SASL option is used by the server DIGEST-MD5 plug-in. The value of
 \fBreauth_timeout\fR is the length in time (in minutes) that authentication
 information will be cached for a fast reauthorization. A value of 0 will
@@ -141,12 +127,10 @@ hours).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserver_load_mech_list\fR\fR
 .ad
 .RS 25n
-.rt  
 A space separated list of mechanisms to load. If in the process of loading
 server plug-ns no desired mechanisms are included in the plug-in, the plug-in
 will be unloaded. By default, SASL loads all server plug-ins.
@@ -154,12 +138,10 @@ will be unloaded. By default, SASL loads all server plug-ins.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser_authid\fR\fR
 .ad
 .RS 25n
-.rt  
 If the value of \fBuser_authid\fR is \fByes\fR, then the GSSAPI will acquire
 the client credentials rather than use the default credentials when it creates
 the GSS client security context. The default value of \fBuser_authid\fR is
@@ -174,13 +156,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fpathconf 2 "1 Sep 2009" "SunOS 5.11" "System Calls"
+.TH FPATHCONF 2 "Sep 1, 2009"
 .SH NAME
 fpathconf, pathconf \- get configurable pathname variables
 .SH SYNOPSIS
@@ -49,65 +49,64 @@ file or directory. The variables in the following table come from
 
 .sp
 .TS
-tab() box;
-cw(2.14i) |cw(2.15i) |cw(1.21i) 
-lw(2.14i) |lw(2.15i) |lw(1.21i) 
-.
-VariableValue of \fIname\fRNotes
+box;
+c | c | c
+l | l | l .
+Variable	Value of \fIname\fR	Notes
 _
-{\fBACL_ENABLED\fR}\fB_PC_ACL_ENABLED\fR10
+{\fBACL_ENABLED\fR}	\fB_PC_ACL_ENABLED\fR	10
 _
-{\fBFILESIZEBITS\fR}\fB_PC_FILESIZEBITS\fR3,4
+{\fBFILESIZEBITS\fR}	\fB_PC_FILESIZEBITS\fR	3,4
 _
-{\fBLINK_MAX\fR}\fB_PC_LINK_MAX\fR1
+{\fBLINK_MAX\fR}	\fB_PC_LINK_MAX\fR	1
 _
-{\fBMAX_CANON\fR}\fB_PC_MAX_CANON\fR2
+{\fBMAX_CANON\fR}	\fB_PC_MAX_CANON\fR	2
 _
-{\fBMAX_INPUT\fR}\fB_PC_MAX_INPUT\fR2
+{\fBMAX_INPUT\fR}	\fB_PC_MAX_INPUT\fR	2
 _
-{\fBMIN_HOLE_SIZE\fR}\fB_PC_MIN_HOLE_SIZE\fR11
+{\fBMIN_HOLE_SIZE\fR}	\fB_PC_MIN_HOLE_SIZE\fR	11
 _
-{\fBNAME_MAX\fR}\fB_PC_NAME_MAX\fR3, 4
+{\fBNAME_MAX\fR}	\fB_PC_NAME_MAX\fR	3, 4
 _
-{\fBPATH_MAX\fR}\fB_PC_PATH_MAX\fR4,5
+{\fBPATH_MAX\fR}	\fB_PC_PATH_MAX\fR	4,5
 _
-{\fBPIPE_BUF\fR}\fB_PC_PIPE_BUF\fR6
+{\fBPIPE_BUF\fR}	\fB_PC_PIPE_BUF\fR	6
 _
-{\fBPOSIX_ALLOC_SIZE_MIN\fR}\fB_PC_ALLOC_SIZE_MIN\fR
+{\fBPOSIX_ALLOC_SIZE_MIN\fR}	\fB_PC_ALLOC_SIZE_MIN\fR	
 _
-{\fBPOSIX_REC_INCR_XFER_SIZE\fR}\fB_PC_REC_INCR_XFER_SIZE\fR
+{\fBPOSIX_REC_INCR_XFER_SIZE\fR}	\fB_PC_REC_INCR_XFER_SIZE\fR	
 _
-{\fBPOSIX_REC_MAX_XFER_SIZE\fR}\fB_PC_REC_MAX_XFER_SIZE\fR
+{\fBPOSIX_REC_MAX_XFER_SIZE\fR}	\fB_PC_REC_MAX_XFER_SIZE\fR	
 _
-{\fBPOSIX_REC_MIN_XFER_SIZE\fR}\fB_PC_REC_MIN_XFER_SIZE\fR
+{\fBPOSIX_REC_MIN_XFER_SIZE\fR}	\fB_PC_REC_MIN_XFER_SIZE\fR	
 _
-{\fBPOSIX_REC_XFER_ALIGN\fR}\fB_PC_REC_XFER_ALIGN\fR
+{\fBPOSIX_REC_XFER_ALIGN\fR}	\fB_PC_REC_XFER_ALIGN\fR	
 _
-{\fBSYMLINK_MAX\fR}\fB_PC_SYMLINK_MAX\fR4, 9
+{\fBSYMLINK_MAX\fR}	\fB_PC_SYMLINK_MAX\fR	4, 9
 _
-{\fBXATTR_ENABLED\fR}\fB_PC_XATTR_ENABLED\fR1
+{\fBXATTR_ENABLED\fR}	\fB_PC_XATTR_ENABLED\fR	1
 _
-{\fBSATTR_ENABLED\fR}\fB_PC_SATTR_ENABLED\fR
+{\fBSATTR_ENABLED\fR}	\fB_PC_SATTR_ENABLED\fR	
 _
-{\fBXATTR_EXISTS\fR}\fB_PC_XATTR_EXISTS\fR1
+{\fBXATTR_EXISTS\fR}	\fB_PC_XATTR_EXISTS\fR	1
 _
-{\fBSATTR_EXISTS\fR}\fB_PC_SATTR_EXISTS\fR
+{\fBSATTR_EXISTS\fR}	\fB_PC_SATTR_EXISTS\fR	
 _
-{\fBACCESS_FILTERING\fR}\fB_PC_ACCESS_FILTERING\fR12
+{\fBACCESS_FILTERING\fR}	\fB_PC_ACCESS_FILTERING\fR	12
 _
-\fB_POSIX_CHOWN_RESTRICTED\fR\fB_PC_CHOWN_RESTRICTED\fR7
+\fB_POSIX_CHOWN_RESTRICTED\fR	\fB_PC_CHOWN_RESTRICTED\fR	7
 _
-\fB_POSIX_NO_TRUNC\fR\fB_PC_NO_TRUNC\fR3, 4
+\fB_POSIX_NO_TRUNC\fR	\fB_PC_NO_TRUNC\fR	3, 4
 _
-\fB_POSIX_VDISABLE\fR\fB_PC_VDISABLE\fR2
+\fB_POSIX_VDISABLE\fR	\fB_PC_VDISABLE\fR	2
 _
-\fB_POSIX_ASYNC_IO\fR\fB_PC_ASYNC_IO\fR8
+\fB_POSIX_ASYNC_IO\fR	\fB_PC_ASYNC_IO\fR	8
 _
-\fB_POSIX_PRIO_IO\fR\fB_PC_PRIO_IO\fR8
+\fB_POSIX_PRIO_IO\fR	\fB_PC_PRIO_IO\fR	8
 _
-\fB_POSIX_SYNC_IO\fR\fB_PC_SYNC_IO\fR8
+\fB_POSIX_SYNC_IO\fR	\fB_PC_SYNC_IO\fR	8
 _
-\fB_POSIX_TIMESTAMP_RESOLUTION\fR\fB_PC_TIMESTAMP_RESOLUTION\fR1
+\fB_POSIX_TIMESTAMP_RESOLUTION\fR	\fB_PC_TIMESTAMP_RESOLUTION\fR	1
 .TE
 
 .sp
@@ -186,23 +185,19 @@ the following flags associated with ACL types supported by the file system;
 otherwise 0 is returned.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_ACL_ACE_ENABLED\fR\fR
 .ad
 .RS 23n
-.rt  
 The file system supports ACE ACLs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_ACL_ACLENT_ENABLED\fR\fR
 .ad
 .RS 23n
-.rt  
 The file system supports UFS aclent ACLs.
 .RE
 
@@ -257,23 +252,19 @@ the application when it was compiled with <\fBlimits.h\fR> or <\fBunistd.h\fR>.
 The \fBpathconf()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIname\fR is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 10n
-.rt  
 A loop exists in symbolic links encountered during resolution of the \fIpath\fR
 argument.
 .RE
@@ -283,12 +274,10 @@ argument.
 The \fBfpathconf()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIname\fR is not valid.
 .RE
 
@@ -297,47 +286,39 @@ The value of \fIname\fR is not valid.
 The \fBpathconf()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied for a component of the path prefix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 An association of the variable \fIname\fR with the specified file is not
 supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIpath\fR argument exceeds {\fBPATH_MAX\fR} or a pathname
 component is longer than {\fBNAME_MAX\fR}.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 As a result of encountering a symbolic link in resolution of the \fIpath\fR
 argument, the length of the substituted pathname string exceeded
 {\fBPATH_MAX\fR}.
@@ -345,24 +326,20 @@ argument, the length of the substituted pathname string exceeded
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of \fIpath\fR does not name an existing file or \fIpath\fR is an
 empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix is not a directory.
 .RE
 
@@ -371,23 +348,19 @@ A component of the path prefix is not a directory.
 The \fBfpathconf()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An association of the variable \fIname\fR with the specified file is not
 supported.
 .RE
@@ -405,17 +378,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

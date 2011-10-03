@@ -22,8 +22,7 @@
 # uts/intel/md_stripe/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
 #	This makefile drives the production of the md_stripe module
 #
@@ -66,6 +65,11 @@ LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+#
+# Depends on md
+#
+LDFLAGS         += -dy -N drv/md
 
 #
 #	Default build targets.

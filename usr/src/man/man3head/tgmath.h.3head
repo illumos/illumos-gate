@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tgmath.h 3HEAD "17 Dec 2003" "SunOS 5.11" "Headers"
+.TH TGMATH.H 3HEAD "Dec 17, 2003"
 .SH NAME
 tgmath.h, tgmath \- type-generic macros
 .SH SYNOPSIS
@@ -66,29 +66,27 @@ type-generic macro for \fBfabs()\fR and \fBcabs()\fR is \fBfabs()\fR.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-<\fBmath.h\fR> Function<\fBcomplex.h\fR> FunctionType-Generic Macro
+c c c
+l l l .
+<\fBmath.h\fR> Function	<\fBcomplex.h\fR> Function	Type-Generic Macro
 _
-\fBacos()\fR\fBcacos()\fR\fBacos()\fR
-\fBasin()\fR\fBcasin()\fR\fBasin()\fR
-\fBatan()\fR\fBcatan()\fR\fBatan()\fR
-\fBacosh()\fR\fBcacosh()\fR\fBacosh()\fR
-\fBasinh()\fR\fBcasinh()\fR\fBasinh()\fR
-\fBatanh()\fR\fBcatanh()\fR\fBatanh()\fR
-\fBcos()\fR\fBccos()\fR\fBcos()\fR
-\fBsin()\fR\fBcsin()\fR\fBsin()\fR
-\fBtan()\fR\fBctan()\fR\fBtan()\fR
-\fBcosh()\fR\fBccosh()\fR\fBcosh()\fR
-\fBsinh()\fR\fBcsinh()\fR\fBsinh()\fR
-\fBtanh()\fR\fBctanh()\fR\fBtanh()\fR
-\fBexp()\fR\fBcexp()\fR\fBexp()\fR
-\fBlog()\fR\fBclog()\fR\fBlog()\fR
-\fBpow()\fR\fBcpow()\fR\fBpow()\fR
-\fBsqrt()\fR\fBcsqrt()\fR\fBsqrt()\fR
-\fBfabs()\fR\fBcfabs()\fR\fBfabs()\fR
+\fBacos()\fR	\fBcacos()\fR	\fBacos()\fR
+\fBasin()\fR	\fBcasin()\fR	\fBasin()\fR
+\fBatan()\fR	\fBcatan()\fR	\fBatan()\fR
+\fBacosh()\fR	\fBcacosh()\fR	\fBacosh()\fR
+\fBasinh()\fR	\fBcasinh()\fR	\fBasinh()\fR
+\fBatanh()\fR	\fBcatanh()\fR	\fBatanh()\fR
+\fBcos()\fR	\fBccos()\fR	\fBcos()\fR
+\fBsin()\fR	\fBcsin()\fR	\fBsin()\fR
+\fBtan()\fR	\fBctan()\fR	\fBtan()\fR
+\fBcosh()\fR	\fBccosh()\fR	\fBcosh()\fR
+\fBsinh()\fR	\fBcsinh()\fR	\fBsinh()\fR
+\fBtanh()\fR	\fBctanh()\fR	\fBtanh()\fR
+\fBexp()\fR	\fBcexp()\fR	\fBexp()\fR
+\fBlog()\fR	\fBclog()\fR	\fBlog()\fR
+\fBpow()\fR	\fBcpow()\fR	\fBpow()\fR
+\fBsqrt()\fR	\fBcsqrt()\fR	\fBsqrt()\fR
+\fBfabs()\fR	\fBcfabs()\fR	\fBfabs()\fR
 .TE
 
 .sp
@@ -169,33 +167,31 @@ invoked with the preceding declarations.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-MacroUse Invokes
+c c
+l l .
+Macro	Use Invokes
 _
-exp(n)exp(n), the function
-acosh(f)acoshf(f)
-sin(d)sin(d), the function
-atan(ld)atanl(ld)
-log(fc)clogf(fc)
-sqrt(dc)csqrt(dc)
-pow(ldc,f)cpowl(ldc, f)
-remainder(n,n)remainder(n, n), the function
-nextafter(d,f)nextafter(d, f), the function
-nexttoward(f,ld)nexttowardf(f, ld)
-copysign(n,ld)copysignl(n, ld)
-ceil(fc)undefined behavior
-rint(dc)undefined behavior
-fmax(ldc,ld)undefined behavior
-carg(n)carg(n), the function
-cproj(f)cprojf(f)
-creal(d)creal(d), the function
-cimag(ld)cimagl(ld)
-cabs(fc)cabsf(fc)
-carg(dc)carg(dc), the function
-cproj(ldc)cprojl(ldc)
+exp(n)	exp(n), the function
+acosh(f)	acoshf(f)
+sin(d)	sin(d), the function
+atan(ld)	atanl(ld)
+log(fc)	clogf(fc)
+sqrt(dc)	csqrt(dc)
+pow(ldc,f)	cpowl(ldc, f)
+remainder(n,n)	remainder(n, n), the function
+nextafter(d,f)	nextafter(d, f), the function
+nexttoward(f,ld)	nexttowardf(f, ld)
+copysign(n,ld)	copysignl(n, ld)
+ceil(fc)	undefined behavior
+rint(dc)	undefined behavior
+fmax(ldc,ld)	undefined behavior
+carg(n)	carg(n), the function
+cproj(f)	cprojf(f)
+creal(d)	creal(d), the function
+cimag(ld)	cimagl(ld)
+cabs(fc)	cabsf(fc)
+carg(dc)	carg(dc), the function
+cproj(ldc)	cprojl(ldc)
 .TE
 
 .SH ATTRIBUTES
@@ -206,13 +202,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

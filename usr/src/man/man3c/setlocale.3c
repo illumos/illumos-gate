@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setlocale 3C "19 Sep 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH SETLOCALE 3C "Sep 19, 2005"
 .SH NAME
 setlocale \- modify and query a program's locale
 .SH SYNOPSIS
@@ -72,23 +72,22 @@ for the various categories is given below:
 
 .sp
 .TS
-tab() box;
-cw(1.38i) |cw(1.38i) |cw(1.38i) |cw(1.38i) 
-lw(1.38i) |lw(1.38i) |lw(1.38i) |lw(1.38i) 
-.
-Category1st Env Var2nd Env Var3rd Env Var
+box;
+c | c | c | c
+l | l | l | l .
+Category	1st Env Var	2nd Env Var	3rd Env Var
 _
-LC_CTYPE:LC_ALLLC_CTYPELANG
+LC_CTYPE:	LC_ALL	LC_CTYPE	LANG
 _
-LC_COLLATE:LC_ALLLC_COLLATELANG
+LC_COLLATE:	LC_ALL	LC_COLLATE	LANG
 _
-LC_TIME:LC_ALLLC_TIMELANG
+LC_TIME:	LC_ALL	LC_TIME	LANG
 _
-LC_NUMERIC:LC_ALLLC_NUMERICLANG
+LC_NUMERIC:	LC_ALL	LC_NUMERIC	LANG
 _
-LC_MONETARY:LC_ALLLC_MONETARYLANG
+LC_MONETARY:	LC_ALL	LC_MONETARY	LANG
 _
-LC_MESSAGES:LC_ALLLC_MESSAGESLANG
+LC_MESSAGES:	LC_ALL	LC_MESSAGES	LANG
 .TE
 
 .sp
@@ -132,12 +131,10 @@ No errors are defined.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/\fIlocale\fR\fR\fR
 .ad
 .RS 26n
-.rt  
 locale database directory for \fIlocale\fR
 .RE
 
@@ -149,17 +146,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nfs 4 "13 Oct 2004" "SunOS 5.11" "File Formats"
+.TH NFS 4 "Oct 13, 2004"
 .SH NAME
 nfs \- file containing parameter values for NFS-related daemons
 .SH SYNOPSIS
@@ -35,7 +35,6 @@ equals (\fB=\fR) sign followed by the parameter value, of the form:
 The following parameters are currently supported in the \fBnfs\fR file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFS_CLIENT_VERSMIN=\fR\fInum\fR\fR
 .ad
@@ -55,7 +54,6 @@ override this range on a per-mount basis by using the \fB-o vers=\fR option to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFS_SERVER_VERSMIN=\fR\fInum\fR\fR
 .ad
@@ -74,7 +72,6 @@ default minimum version is \fB2\fR, while the default maximum version is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFS_SERVER_DELEGATION=on | off\fR\fR
 .ad
@@ -88,7 +85,6 @@ variable only applies to NFS Version 4.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFSMAPID_DOMAIN=\fR\fIdomain-string\fR\fR
 .ad
@@ -104,7 +100,6 @@ details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFSD_MAX_CONNECTIONS=\fR\fInum\fR\fR
 .ad
@@ -117,7 +112,6 @@ default is unlimited and is obtained by not setting (that is, commenting out)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFSD_LISTEN_BACKLOG=\fR\fInum\fR\fR
 .ad
@@ -130,7 +124,6 @@ The default value is 32, meaning 32 entries in the queue. Equivalent to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFSD_PROTOCOL=ALL\fR\fR
 .ad
@@ -146,7 +139,6 @@ not supported for the UDP protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFSD_DEVICE=\fR\fIdevname\fR\fR
 .ad
@@ -160,7 +152,6 @@ Equivalent to the \fB-t\fR option in \fBnfsd\fR. Mutually exclusive of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNFSD_SERVERS=\fR\fInum\fR\fR
 .ad
@@ -172,7 +163,6 @@ on the \fBnfsd\fR command line. The default is \fB16\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCKD_LISTEN_BACKLOG=\fR\fInum\fR\fR
 .ad
@@ -184,7 +174,6 @@ transport. The default and minimum value is \fB32\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCKD_SERVERS=\fR\fInum\fR\fR
 .ad
@@ -195,7 +184,6 @@ Maximum number of concurrent \fBlockd\fR requests. The default is \fB20\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCKD_RETRANSMIT_TIMEOUT=\fR\fInum\fR\fR
 .ad
@@ -207,7 +195,6 @@ Retransmit timeout, in seconds, before \fBlockd\fR retries. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGRACE_PERIOD=\fR\fInum\fR\fR
 .ad
@@ -221,7 +208,6 @@ have to reclaim locks after a server reboot. This parameter also controls the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCKD_GRACE_PERIOD=\fR\fInum\fR\fR
 .ad

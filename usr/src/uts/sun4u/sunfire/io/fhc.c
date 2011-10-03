@@ -94,6 +94,8 @@ static int fhc_int_priorities[] = {
 };
 
 static void fhc_tod_fault(enum tod_fault_type tod_bad);
+static void fhc_cpu_shutdown_self(void);
+static void os_completes_shutdown(void);
 
 /*
  * The dont_calibrate variable is meant to be set to one in /etc/system
@@ -3194,7 +3196,6 @@ fhc_cpu_poweroff(struct cpu *cp)
 	fhc_bd_t *bd_list;
 	int delays;
 	extern void idle_stop_xcall(void);
-	static void fhc_cpu_shutdown_self(void);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT((cp->cpu_flags & (CPU_EXISTS | CPU_OFFLINE | CPU_QUIESCED)) ==
@@ -3271,7 +3272,6 @@ static void
 fhc_cpu_shutdown_self(void)
 {
 	extern void flush_windows(void);
-	static void os_completes_shutdown(void);
 
 	flush_windows();
 

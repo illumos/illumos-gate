@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libresolv 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBRESOLV 3LIB "Mar 24, 2004"
 .SH NAME
 libresolv \- resolver library
 .SH SYNOPSIS
@@ -32,27 +32,25 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB__dn_skipname\fR\fB__fp_query\fR
-\fB__hostalias\fR\fB__p_cdname\fR
-\fB__p_class\fR\fB__p_query\fR
-\fB__p_time\fR\fB__p_type\fR
-\fB__putlong\fR\fB_getlong\fR
-\fB_getshort\fR\fB_res\fR
-\fBdn_comp\fR\fBdn_expand\fR
-\fBfp_resstat\fR\fBh_errno\fR
-\fBherror\fR\fBhstrerror\fR
-\fBres_hostalias\fR\fBres_init\fR
-\fBres_mkquery\fR\fBres_nclose\fR
-\fBres_ninit\fR\fBres_nmkquery\fR
-\fBres_nquery\fR\fBres_nquerydomain\fR
-\fBres_nsearch\fR\fBres_nsend\fR
-\fBres_nsendsigned\fR\fBres_query\fR
-\fBres_querydomain\fR\fBres_search\fR
-\fBres_send\fR\fBres_update\fR
+l l
+l l .
+\fB__dn_skipname\fR	\fB__fp_query\fR
+\fB__hostalias\fR	\fB__p_cdname\fR
+\fB__p_class\fR	\fB__p_query\fR
+\fB__p_time\fR	\fB__p_type\fR
+\fB__putlong\fR	\fB_getlong\fR
+\fB_getshort\fR	\fB_res\fR
+\fBdn_comp\fR	\fBdn_expand\fR
+\fBfp_resstat\fR	\fBh_errno\fR
+\fBherror\fR	\fBhstrerror\fR
+\fBres_hostalias\fR	\fBres_init\fR
+\fBres_mkquery\fR	\fBres_nclose\fR
+\fBres_ninit\fR	\fBres_nmkquery\fR
+\fBres_nquery\fR	\fBres_nquerydomain\fR
+\fBres_nsearch\fR	\fBres_nsend\fR
+\fBres_nsendsigned\fR	\fBres_query\fR
+\fBres_querydomain\fR	\fBres_search\fR
+\fBres_send\fR	\fBres_update\fR
 .TE
 
 .sp
@@ -64,62 +62,52 @@ Use of the routines in the first column is discouraged.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBFUNCTION REFERENCED\fR \fBALIAS TO USE\fR
-\fB__dn_skipname\fR\fBdn_skipname\fR
-\fB__fp_query\fR\fBfp_query\fR
-\fB__putlong\fR\fBputlong\fR
-\fB__p_cdname\fR\fBp_cdname\fR
-\fB__p_class\fR\fBp_class\fR
-\fB__p_time\fR\fBp_time\fR
-\fB__p_type\fR\fBp_type\fR
+c c
+l l .
+\fBFUNCTION REFERENCED\fR 	\fBALIAS TO USE\fR
+\fB__dn_skipname\fR	\fBdn_skipname\fR
+\fB__fp_query\fR	\fBfp_query\fR
+\fB__putlong\fR	\fBputlong\fR
+\fB__p_cdname\fR	\fBp_cdname\fR
+\fB__p_class\fR	\fBp_class\fR
+\fB__p_time\fR	\fBp_time\fR
+\fB__p_type\fR	\fBp_type\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libresolv.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object for backward compatibility only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libresolv.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object for backward compatibility only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libresolv.so.2\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libresolv.so.2\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object
 .RE
 
@@ -131,15 +119,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard:  BIND 8.2.4
+Interface Stability	Standard:  BIND 8.2.4
 _
-MT-LevelSee \fBresolver\fR(3RESOLV)
+MT-Level	See \fBresolver\fR(3RESOLV)
 .TE
 
 .SH SEE ALSO

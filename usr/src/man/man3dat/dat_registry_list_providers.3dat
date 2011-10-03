@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_registry_list_providers 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_REGISTRY_LIST_PROVIDERS 3DAT "Jul 16, 2004"
 .SH NAME
 dat_registry_list_providers \- obtain a list of available pProviders from the
 Static Registry
@@ -18,7 +18,7 @@ typedef struct dat_provider_info {
     DAT_BOOLEAN     is_thread_safe;
     } DAT_PROVIDER_INFO;
 
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -32,36 +32,30 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImax_to_return\fR\fR
 .ad
 .RS 21n
-.rt  
 Maximum number of entries that can be returned to the Consumer in the
 \fIdat_provider_list\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumber_entries\fR\fR
 .ad
 .RS 21n
-.rt  
 The actual number of entries returned to the Consumer in the
 \fIdat_provider_list\fR if successful or the number of Providers available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdat_provider_list\fR\fR
 .ad
 .RS 21n
-.rt  
 Points to an array of \fBDAT_PROVIDER_INFO\fR pointers supplied by the
 Consumer. Each Provider's information will be copied to the destination
 specified.
@@ -107,35 +101,29 @@ the registry entries, then the operation fails with the return
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 25n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 25n
-.rt  
 Invalid parameter. For example, \fIdat_provider_list\fR is too small or
 \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INTERNAL_ERROR\fR\fR
 .ad
 .RS 25n
-.rt  
 Internal error. The DAT static registry is missing.
 .RE
 
@@ -151,15 +139,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

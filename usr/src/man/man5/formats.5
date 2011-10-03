@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH formats 5 "28 Mar 1995" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH FORMATS 5 "Mar 28, 1995"
 .SH NAME
 formats \- file format notation
 .SH DESCRIPTION
@@ -37,35 +37,29 @@ The \fBformat\fR is a character string that contains three types of objects
 defined below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIcharacters\fR\fI\fR \fR
 .ad
 .RS 30n
-.rt  
 Characters that are not \fIescape sequences\fR or \fIconversion
 specifications\fR, as described below, are copied to the output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIescape sequences\fR\fI\fR \fR
 .ad
 .RS 30n
-.rt  
 Represent non-graphic characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIconversion specifications\fR\fI\fR \fR
 .ad
 .RS 30n
-.rt  
 Specifies the output format of each argument. (See below.)
 .RE
 
@@ -75,23 +69,19 @@ The following characters have the following special meaning in the format
 string:
 .sp
 .ne 2
-.mk
 .na
 \fB`` \&''\fR
 .ad
 .RS 11n
-.rt  
 (An empty character position.) One or more blank characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/\e \fR
 .ad
 .RS 11n
-.rt  
 Exactly one space character.
 .RE
 
@@ -112,32 +102,30 @@ devices capable of the action.
 
 .sp
 .TS
-tab();
-cw(1.21i) cw(1.15i) cw(3.14i) 
-lw(1.21i) lw(1.15i) lw(3.14i) 
-.
-\fBSequence\fR\fBCharacter\fR\fBTerminal Action\fR
+c c c
+l l l .
+\fBSequence\fR	\fBCharacter\fR	\fBTerminal Action\fR
 _
-\fB\e\e\fRbackslashNone.
-\fB\ea\fRalertT{
+\fB\e\e\fR	backslash	None.
+\fB\ea\fR	alert	T{
 Attempts to alert the user through audible or visible notification.
 T}
-\fB\eb\fRbackspaceT{
+\fB\eb\fR	backspace	T{
 Moves the printing position to one column before the current position, unless the current position is the start of a line.
 T}
-\fB\ef\fRform-feedT{
+\fB\ef\fR	form-feed	T{
 Moves the printing position to the initial printing position of the next logical page.
 T}
-\fB\en\fRnewlineT{
+\fB\en\fR	newline	T{
 Moves the printing position to the start of the next line.
 T}
-\fB\er\fRcarriage-returnT{
+\fB\er\fR	carriage-return	T{
 Moves the printing position to the start of the current line.
 T}
-\fB\et\fRtabT{
+\fB\et\fR	tab	T{
 Moves the printing position to the next tab position on the current line. If there are no more tab positions left on the line, the behavior is undefined.
 T}
-\fB\ev\fRvertical-tabT{
+\fB\ev\fR	vertical-tab	T{
 Moves the printing position to the start of the next vertical tab position. If there are no more vertical tab positions left on the page, the behavior is undefined.
 T}
 .TE
@@ -149,24 +137,20 @@ Each conversion specification is introduced by the percent-sign character (%).
 After the character %, the following appear in sequence:
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIflags\fR\fI\fR \fR
 .ad
 .RS 26n
-.rt  
 Zero or more \fIflags\fR, in any order, that modify the meaning of the
 conversion specification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIfield width\fR\fI\fR \fR
 .ad
 .RS 26n
-.rt  
 An optional string of decimal digits to specify a minimum \fIfield width\fR.
 For an output field, if the converted value has fewer bytes than the field
 width, it is padded on the left (or right, if the left-adjustment flag (\(mi),
@@ -175,12 +159,10 @@ described below, has been given to the field width).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIprecision\fR\fI\fR \fR
 .ad
 .RS 26n
-.rt  
 Gives the minimum number of digits to appear for the d, o, i, u, x or X
 conversions (the field is padded with leading zeros), the number of digits to
 appear after the radix character for the e and f conversions, the maximum
@@ -192,12 +174,10 @@ treated as zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\fR\fIconversion characters\fR\fI\fR \fR
 .ad
 .RS 26n
-.rt  
 A conversion character (see below) that indicates the type of conversion to be
 applied.
 .RE
@@ -208,34 +188,28 @@ applied.
 The \fIflags\fR and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fI\(mi\fR \fR
 .ad
 .RS 12n
-.rt  
 The result of the conversion is left-justified within the field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI+\fR \fR
 .ad
 .RS 12n
-.rt  
 The result of a signed conversion always begins with a sign (+ or \(mi).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI<space>\fR \fR
 .ad
 .RS 12n
-.rt  
 If the first character of a signed conversion is not a sign, a space character
 is prefixed to the result. This means that if the space character and + flags
 both appear, the space character flag is ignored.
@@ -243,12 +217,10 @@ both appear, the space character flag is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI#\fR \fR
 .ad
 .RS 12n
-.rt  
 The value is to be converted to an alternative form. For c, d, i, u, and s
 conversions, the behaviour is undefined. For o conversion, it increases the
 precision to force the first digit of the result to be a zero. For x or X
@@ -260,12 +232,10 @@ zeros are not removed from the result as they usually are.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI0\fR \fR
 .ad
 .RS 12n
-.rt  
 For d, i, o, u, x, X, e, E, f, g, and G conversions, leading zeros (following
 any indication of sign or base) are used to pad to the field width; no space
 padding is performed. If the 0 and \(mi flags both appear, the 0 flag is
@@ -285,12 +255,10 @@ ignored.
 The \fIconversion characters\fR and their meanings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fId,i,o,u,x,X\fR \fR
 .ad
 .RS 16n
-.rt  
 The integer argument is written as signed decimal (d or i), unsigned octal (o),
 unsigned decimal (u), or unsigned hexadecimal notation (x and X). The d and i
 specifiers convert to signed decimal in the style \fB[\fR\(mi\fB]\fR\fIdddd\fR.
@@ -328,12 +296,10 @@ addition to \fBprintf(\|).\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIf\fR \fR
 .ad
 .RS 16n
-.rt  
 The floating point number argument is written in decimal notation in the style
 \fB[\fR\(mi\fB]\fR\fIddd\fR.\fIddd\fR, where the number of digits after the
 radix character (shown here as a decimal point) is equal to the \fIprecision\fR
@@ -345,12 +311,10 @@ argument, six digits are written after the radix character; if the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIe,E\fR \fR
 .ad
 .RS 16n
-.rt  
 The floating point number argument is written in the style
 \fB[\fR\(mi\fB]\fR\fId\fR.\fIddd\fRe\(+-\fBdd\fR (the symbol \(+- indicates
 either a plus or minus sign), where there is one digit before the radix
@@ -366,12 +330,10 @@ two digits, additional exponent digits are written as necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIg,G\fR \fR
 .ad
 .RS 16n
-.rt  
 The floating point number argument is written in style f or e (or in style E in
 the case of a G conversion character), with the precision specifying the number
 of significant digits. The style used depends on the value converted: style g
@@ -382,24 +344,20 @@ result. A radix character appears only if it is followed by a digit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc\fR \fR
 .ad
 .RS 16n
-.rt  
 The integer argument is converted to an \fBunsigned char\fR and the resulting
 byte is written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs\fR \fR
 .ad
 .RS 16n
-.rt  
 The argument is taken to be a string and bytes from the string are written
 until the end of the string or the number of bytes indicated by the
 \fIprecision\fR specification of the argument is reached. If the precision is
@@ -409,12 +367,10 @@ end of the string are written.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI%\fR \fR
 .ad
 .RS 16n
-.rt  
 Write a % character; no argument is converted.
 .RE
 

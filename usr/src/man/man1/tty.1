@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tty 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.TH TTY 1 "Aug 11, 2009"
 .SH NAME
 tty \- return user's terminal name
 .SH SYNOPSIS
@@ -45,24 +45,20 @@ The following options are supported:
 .SS "/usr/bin/tty"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Prints the synchronous line number to which the user's terminal is connected,
 if it is on an active synchronous line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Inhibits printing of the terminal path name, allowing one to test just the exit
 status.
 .RE
@@ -70,7 +66,6 @@ status.
 .SS "ksh93"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -79,7 +74,6 @@ status.
 \fB\fB--line-number\fR\fR
 .ad
 .RS 18n
-.rt  
 Write the synchronous line number of the terminal on a separate line following
 the terminal name line.  If the standard input is not a synchronous terminal
 then "not on an active synchronous line" is written.
@@ -87,7 +81,6 @@ then "not on an active synchronous line" is written.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -96,7 +89,6 @@ then "not on an active synchronous line" is written.
 \fB\fB--silent\fR|\fBquiet\fR\fR
 .ad
 .RS 18n
-.rt  
 Disable the terminal name line. Portable applications should use [[ -t 0 ]]
 instead.
 .RE
@@ -113,34 +105,28 @@ that affect the execution of  \fBtty\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Standard input is a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 Standard input is not a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>1\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -152,17 +138,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-Standard\fBstandards\fR(5).
+Standard	\fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
@@ -173,7 +158,6 @@ Standard\fBstandards\fR(5).
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnot on an active synchronous line\fR\fR
 .ad
@@ -184,7 +168,6 @@ The standard input is not a synchronous terminal and \fB-l\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnot a tty\fR\fR
 .ad

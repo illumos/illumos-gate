@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_read 9F "3 June 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_READ 9F "Jun 3, 2003"
 .SH NAME
 ldi_read, ldi_write \- Read and write from a device
 .SH SYNOPSIS
@@ -22,34 +22,28 @@ ldi_read, ldi_write \- Read and write from a device
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR \fR
 .ad
 .RS 9n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcr\fR \fR
 .ad
 .RS 9n
-.rt  
 Pointer to a credential structure used to open a device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuiop\fR \fR
 .ad
 .RS 9n
-.rt  
 Pointer to the \fBuio(9S)\fR structure. \fBuio(9S)\fR specifies  the location
 of the read or write data.  (Either userland or kernel.)
 .RE
@@ -74,23 +68,19 @@ possible return values are shown below. Otherwise any other error number may be
 returned by the device.
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 11n
-.rt  
 Invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENOTSUP\fR
 .ad
 .RS 11n
-.rt  
 Operation is not supported for this device.
 .RE
 

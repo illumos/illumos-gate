@@ -22,15 +22,15 @@
 .\" Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
+.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+.\"
 .\" Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
 .\" All Rights Reserved
 .\"
 .\" Portions of this source code were derived from Berkeley 4.3 BSD
 .\" under license from the Regents of the University of California.
 .\"
-.\" ident	"%Z%%M%	%I%	%E% SMI"
-.\"
-.ds ]W SunOS 5.10
+.ds ]W Illumos
 .	# month name
 .  \".if "\nd"0" .nr m \n(mo-1
 .  \".if "\nm"0" .ds ]m January
@@ -144,6 +144,8 @@
 .if '\\$2'1f' .ds ]D FMLI Commands
 .if '\\$2'1G' .ds ]D Graphics and CAD Commands 
 .if '\\$2'1g' .ds ]D Graphics and CAD Commands 
+.if '\\$2'1HAS' .ds ]D User Commands
+.if '\\$2'1has' .ds ]D User Commands
 .if '\\$2'1M' .ds ]D Maintenance Commands
 .if '\\$2'1m' .ds ]D Maintenance Commands
 .if '\\$2'1S' .ds ]D SunOS Specific Commands
@@ -156,28 +158,52 @@
 .if '\\$2'3bsm' .ds ]D Security and Auditing Library Functions
 .if '\\$2'3C' .ds ]D Standard C Library Functions
 .if '\\$2'3c' .ds ]D Standard C Library Functions
+.if '\\$2'3C_DB' .ds ]D Threads Debugging Library Functions
+.if '\\$2'3C_db' .ds ]D Threads Debugging Library Functions
 .if '\\$2'3CFGADM' .ds ]D Configuration Administration Library Functions
 .if '\\$2'3cfgadm' .ds ]D Configuration Administration Library Functions
+.if '\\$2'3COMPPUTIL' .ds ]D Communication Protocol Parser Utilities Library Functions
+.if '\\$2'3compputil' .ds ]D Communication Protocol Parser Utilities Library Functions
+.if '\\$2'3CONTRACT' .ds ]D Contract Management Library Functions
+.if '\\$2'3contract' .ds ]D Contract Management Library Functions
+.if '\\$2'3CPC' .ds ]D CPU Performance Counters Library Functions
+.if '\\$2'3cpc' .ds ]D CPU Performance Counters Library Functions
 .if '\\$2'3CURSES' .ds ]D Curses Library Functions
 .if '\\$2'3curses' .ds ]D Curses Library Functions
+.if '\\$2'3DAT' .ds ]D Direct Access Transport Library Functions
+.if '\\$2'3dat' .ds ]D Direct Access Transport Library Functions
 .if '\\$2'3DEVID' .ds ]D Device ID Library Functions
 .if '\\$2'3devid' .ds ]D Device ID Library Functions
 .if '\\$2'3DEVINFO' .ds ]D Device Information Library Functions
 .if '\\$2'3devinfo' .ds ]D Device Information Library Functions
 .if '\\$2'3DL' .ds ]D Dynamic Linking Library Functions
 .if '\\$2'3dl' .ds ]D Dynamic Linking Library Functions
+.if '\\$2'3DLPI' .ds ]D Data Link Provider Interface Library Functions
+.if '\\$2'3dlpi' .ds ]D Data Link Provider Interface Library Functions
 .if '\\$2'3DMI' .ds ]D DMI Library Functions
 .if '\\$2'3dmi' .ds ]D DMI Library Functions
+.if '\\$2'3DNS_SD' .ds ]D DNS Service Discovery Library Functions
+.if '\\$2'3dns_sd' .ds ]D DNS Service Discovery Library Functions
 .if '\\$2'3DOOR' .ds ]D Door Library Functions
 .if '\\$2'3door' .ds ]D Door Library Functions
 .if '\\$2'3ELF' .ds ]D ELF Library Functions
 .if '\\$2'3elf' .ds ]D ELF Library Functions
+.if '\\$2'3EXACCT' .ds ]D Extended Accounting File Access Library Functions
+.if '\\$2'3exacct' .ds ]D Extended Accounting File Access Library Functions
 .if '\\$2'3EXT' .ds ]D Extended Library Functions
 .if '\\$2'3ext' .ds ]D Extended Library Functions
+.if '\\$2'3FCOE' .ds ]D FCoE Port Management Library Functions
+.if '\\$2'3fcoe' .ds ]D FCoE Port Management Library Functions
+.if '\\$2'3FSTYP' .ds ]D File System Type Identification Library Functions
+.if '\\$2'3fstyp' .ds ]D File System Type Identification Library Functions
 .if '\\$2'3GEN' .ds ]D String Pattern-Matching Library Functions
 .if '\\$2'3gen' .ds ]D String Pattern-Matching Library Functions
+.if '\\$2'3GSS' .ds ]D Generic Security Services API Library Functions
+.if '\\$2'3gss' .ds ]D Generic Security Services API Library Functions
 .if '\\$2'3HEAD' .ds ]D Headers
 .if '\\$2'3head' .ds ]D Headers
+.if '\\$2'3ISCSIT' .ds ]D iSCSI Management Library Functions
+.if '\\$2'3iscsit' .ds ]D iSCSI Management Library Functions
 .if '\\$2'3KRB' .ds ]D Kerberos Library Functions
 .if '\\$2'3krb' .ds ]D Kerberos Library Functions
 .if '\\$2'3KSTAT' .ds ]D Kernel Statistics Library Functions
@@ -186,6 +212,8 @@
 .if '\\$2'3kvm' .ds ]D Kernel VM Library Functions
 .if '\\$2'3LDAP' .ds ]D LDAP Library Functions
 .if '\\$2'3ldap' .ds ]D LDAP Library Functions
+.if '\\$2'3LGRP' .ds ]D Locality Group Library Functions
+.if '\\$2'3lgrp' .ds ]D Locality Group Library Functions
 .if '\\$2'3LIB' .ds ]D Interface Libraries
 .if '\\$2'3lib' .ds ]D Interface Libraries
 .if '\\$2'3LIBUCB' .ds ]D SunOS/BSD Compatibility Interface Libraries
@@ -198,36 +226,74 @@
 .if '\\$2'3malloc' .ds ]D Memory Allocation Library Functions
 .if '\\$2'3MP' .ds ]D Multiple Precision Library Functions
 .if '\\$2'3mp' .ds ]D Multiple Precision Library Functions
+.if '\\$2'3MPAPI' .ds ]D Common Multipath Management Library Functions
+.if '\\$2'3mpapi' .ds ]D Common Multipath Management Library Functions
 .if '\\$2'3NSL' .ds ]D Networking Services Library Functions
 .if '\\$2'3nsl' .ds ]D Networking Services Library Functions
+.if '\\$2'3NVPAIR' .ds ]D Name-value Pair Library Functions
+.if '\\$2'3nvpair' .ds ]D Name-value Pair Library Functions
 .if '\\$2'3PAM' .ds ]D PAM Library Functions
 .if '\\$2'3pam' .ds ]D PAM Library Functions
+.if '\\$2'3PAPI' .ds ]D PAPI Library Functions
+.if '\\$2'3papi' .ds ]D PAPI Library Functions
+.if '\\$2'3PERL' .ds ]D Perl Library Functions
+.if '\\$2'3perl' .ds ]D Perl Library Functions
+.if '\\$2'3PICL' .ds ]D PICL Library Functions
+.if '\\$2'3picl' .ds ]D PICL Library Functions
+.if '\\$2'3PICLTREE' .ds ]D PICL Plug-In Library Functions
+.if '\\$2'3picltree' .ds ]D PICL Plug-In Library Functions
 .if '\\$2'3PLOT' .ds ]D Graphics Interface Library Functions
 .if '\\$2'3plot' .ds ]D Graphics Interface Library Functions
+.if '\\$2'3POOL' .ds ]D Pool Configuration Manipulation Library Functions
+.if '\\$2'3pool' .ds ]D Pool Configuration Manipulation Library Functions
 .if '\\$2'3PROC' .ds ]D Process Control Library Functions
 .if '\\$2'3proc' .ds ]D Process Control Library Functions
+.if '\\$2'3PROJECT' .ds ]D Project Database Access Library Functions
+.if '\\$2'3project' .ds ]D Project Database Access Library Functions
 .if '\\$2'3RAC' .ds ]D Remote Asynchronous Calls Library Functions
 .if '\\$2'3rac' .ds ]D Remote Asynchronous Calls Library Functions
 .if '\\$2'3RESOLV' .ds ]D Resolver Library Functions
 .if '\\$2'3resolv' .ds ]D Resolver Library Functions
 .if '\\$2'3RPC' .ds ]D RPC Library Functions
 .if '\\$2'3rpc' .ds ]D RPC Library Functions
+.if '\\$2'3RSM' .ds ]D Remote Shared Memory Library Functions
+.if '\\$2'3rsm' .ds ]D Remote Shared Memory Library Functions
 .if '\\$2'3RT' .ds ]D Realtime Library Functions
 .if '\\$2'3rt' .ds ]D Realtime Library Functions
+.if '\\$2'3SASL' .ds ]D Simple Authentication Security Layer Library Functions
+.if '\\$2'3sasl' .ds ]D Simple Authentication Security Layer Library Functions
+.if '\\$2'3SCF' .ds ]D Service Configuration Facility Library Functions
+.if '\\$2'3scf' .ds ]D Service Configuration Facility Library Functions
 .if '\\$2'3SCHED' .ds ]D LWP Scheduling Library Functions
 .if '\\$2'3sched' .ds ]D LWP Scheduling Library Functions
 .if '\\$2'3SEC' .ds ]D File Access Control Library Functions
 .if '\\$2'3sec' .ds ]D File Access Control Library Functions
+.if '\\$2'3SECDB' .ds ]D Security Attributes Database Library Functions
+.if '\\$2'3secdb' .ds ]D Security Attributes Database Library Functions
+.if '\\$2'3SIP' .ds ]D Session Initiation Protocol Library Functions
+.if '\\$2'3sip' .ds ]D Session Initiation Protocol Library Functions
+.if '\\$2'3SLP' .ds ]D Service Location Protocol Library Functions
+.if '\\$2'3slp' .ds ]D Service Location Protocol Library Functions
 .if '\\$2'3SNMP' .ds ]D SNMP Library Functions
 .if '\\$2'3snmp' .ds ]D SNMP Library Functions
 .if '\\$2'3SOCKET' .ds ]D Sockets Library Functions
 .if '\\$2'3socket' .ds ]D Sockets Library Functions
+.if '\\$2'3STMF' .ds ]D SCSI Target Mode Framework Library Functions
+.if '\\$2'3stmf' .ds ]D SCSI Target Mode Framework Library Functions
+.if '\\$2'3SYSEVENT' .ds ]D System Event Library Functions
+.if '\\$2'3sysevent' .ds ]D System Event Library Functions
+.if '\\$2'3TECLA' .ds ]D Interactive Command-line Input Library Functions
+.if '\\$2'3tecla' .ds ]D Interactive Command-line Input Library Functions
 .if '\\$2'3THR' .ds ]D Threads Library Functions
 .if '\\$2'3thr' .ds ]D Threads Library Functions
 .if '\\$2'3TNF' .ds ]D TNF Library Functions
 .if '\\$2'3tnf' .ds ]D TNF Library Functions
+.if '\\$2'3TSOL' .ds ]D Trusted Extensions Library Functions
+.if '\\$2'3tsol' .ds ]D Trusted Extensions Library Functions
 .if '\\$2'3UCB' .ds ]D SunOS/BSD Compatibility Library Functions
 .if '\\$2'3ucb' .ds ]D SunOS/BSD Compatibility Library Functions
+.if '\\$2'3UUID' .ds ]D Universally Unique Identifier Library Functions
+.if '\\$2'3uuid' .ds ]D Universally Unique Identifier Library Functions
 .if '\\$2'3VOLMGT' .ds ]D Volume Management Library Functions
 .if '\\$2'3volmgt' .ds ]D Volume Management Library Functions
 .if '\\$2'3XCURSES' .ds ]D X/Open Curses Library Functions
@@ -278,6 +344,8 @@
 .if '\\$2'7fs' .ds ]D File Systems
 .if '\\$2'7I' .ds ]D Ioctl Requests
 .if '\\$2'7i' .ds ]D Ioctl Requests
+.if '\\$2'7IPP' .ds ]D IP Quality of Service Modules
+.if '\\$2'7ipp' .ds ]D IP Quality of Service Modules
 .if '\\$2'7M' .ds ]D STREAMS Modules
 .if '\\$2'7m' .ds ]D STREAMS Modules
 .if '\\$2'7P' .ds ]D Protocols
@@ -292,6 +360,8 @@
 .if '\\$2'9e' .ds ]D Driver Entry Points
 .if '\\$2'9F' .ds ]D Kernel Functions for Drivers
 .if '\\$2'9f' .ds ]D Kernel Functions for Drivers
+.if '\\$2'9P' .ds ]D Kernel Properties for Drivers
+.if '\\$2'9p' .ds ]D Kernel Properties for Drivers
 .if '\\$2'9S' .ds ]D Data Structures for Drivers
 .if '\\$2'9s' .ds ]D Data Structures for Drivers
 .if '\\$2'L' .ds ]D Local Commands

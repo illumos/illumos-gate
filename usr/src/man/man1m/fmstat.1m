@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fmstat 1M "16 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH FMSTAT 1M "Jun 16, 2009"
 .SH NAME
 fmstat \- report fault management module statistics
 .SH SYNOPSIS
@@ -38,124 +38,102 @@ If the \fB-m\fR option is not present, \fBfmstat\fR reports the following
 statistics for each of its client modules:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodule\fR\fR
 .ad
 .RS 11n
-.rt  
 The name of the fault management module, as reported by \fBfmadm config\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBev_recv\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of telemetry events received by the module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBev_acpt\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of events accepted by the module as relevant to a diagnosis.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR\fR
 .ad
 .RS 11n
-.rt  
 The average number of telemetry events waiting to be examined by the module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvc_t\fR\fR
 .ad
 .RS 11n
-.rt  
 The average service time for telemetry events received by the module, in
 milliseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%w\fR\fR
 .ad
 .RS 11n
-.rt  
 The percentage of time that there were telemetry events waiting to be examined
 by the module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%b\fR\fR
 .ad
 .RS 11n
-.rt  
 The percentage of time that the module was busy processing telemetry events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopen\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of active cases (open problem investigations) owned by the module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsolve\fR\fR
 .ad
 .RS 11n
-.rt  
 The total number of cases solved by this module since it was loaded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmemsz\fR\fR
 .ad
 .RS 11n
-.rt  
 The amount of dynamic memory currently allocated by this module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbufsz\fR\fR
 .ad
 .RS 11n
-.rt  
 The amount of persistent buffer space currently allocated by this module.
 .RE
 
@@ -170,12 +148,10 @@ Solaris privileges.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 13n
-.rt  
 Print all statistics for a module, including those kept on its behalf by
 \fBfmd\fR. If the \fB-a\fR option is not present, only those statistics kept by
 the module are reported. If the \fB-a\fR option is used without the \fB-m\fR
@@ -185,12 +161,10 @@ displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fBu\fR | \fBd\fR\fR
 .ad
 .RS 13n
-.rt  
 Display a time stamp.
 .sp
 Specify \fBu\fR for a printed representation of the internal representation of
@@ -200,12 +174,10 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fImodule\fR\fR
 .ad
 .RS 13n
-.rt  
 Print a report on the statistics associated with the specified fault management
 module, instead of the default statistics report. Modules can publish an
 arbitrary set of statistics to help Sun service the fault management software
@@ -217,12 +189,10 @@ module statistics as they can change without notice.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Print a report on Soft Error Rate Discrimination (SERD) engines associated with
 the module instead of the default module statistics report. A SERD engine is a
 construct used by fault management software to determine if a statistical
@@ -232,12 +202,10 @@ The \fB-s\fR option can only be used in combination with the \fB-m\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 13n
-.rt  
 Print a report on the statistics associated with each fault management event
 transport. Each fault management module can provide the implementation of one
 or more event transports.
@@ -245,12 +213,10 @@ or more event transports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 13n
-.rt  
 Print a table of the authority information associated with each fault
 management event transport. If the \fB-m\fR option is present, only transports
 associated with the specified module are displayed.
@@ -258,12 +224,10 @@ associated with the specified module are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 13n
-.rt  
 Omit statistics with a zero value from the report associated with the specified
 fault management module. The \fB-z\fR option can only be used in combination
 with the \fB-m\fR option.
@@ -275,23 +239,19 @@ with the \fB-m\fR option.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Print only count reports, and then exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 Print a new report every \fIinterval\fR seconds.
 .RE
 
@@ -307,23 +267,19 @@ seconds indefinitely until the command is interrupted.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred. A fatal error could be the failure to communicate with
 \fBfmd\fR(1M). It could also be that insufficient privileges were available to
 perform the requested operation.
@@ -331,12 +287,10 @@ perform the requested operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 
@@ -348,13 +302,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

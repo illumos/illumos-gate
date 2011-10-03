@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_sample 5 "4 Apr 2007" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_SAMPLE 5 "Apr 4, 2007"
 .SH NAME
 pam_sample \- a sample PAM module
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/security/pam_sample.so.1\fR 
+\fB/usr/lib/security/pam_sample.so.1\fR
 .fi
 
 .SH DESCRIPTION
@@ -31,91 +31,75 @@ been set. The following options can be passed in to the SAMPLE Authentication
 module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR \fR
 .ad
 .RS 20n
-.rt  
 Syslog debugging information at the \fBLOG_DEBUG\fR level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpass=newone\fR \fR
 .ad
 .RS 20n
-.rt  
 Sets the password to be "newone".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirst_pass_good\fR \fR
 .ad
 .RS 20n
-.rt  
 The first password is always good when used with the use_first_pass or
 try_first_pass option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfirst_pass_bad\fR \fR
 .ad
 .RS 20n
-.rt  
 The first password is always bad when used with the use_first_pass or
 try_first_pass option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalways_fail\fR \fR
 .ad
 .RS 20n
-.rt  
 Always returns \fBPAM_AUTH_ERR.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalways_succeed\fR \fR
 .ad
 .RS 20n
-.rt  
 Always returns \fBPAM_SUCCESS.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalways_ignore\fR \fR
 .ad
 .RS 20n
-.rt  
 Always returns \fBPAM_IGNORE.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuse_first_pass\fR \fR
 .ad
 .RS 20n
-.rt  
 Use the user's initial password (entered when the user is authenticated to the
 first authentication module in the stack) to authenticate with the SAMPLE
 module. If the passwords do not match, or if this is the first authentication
@@ -126,12 +110,10 @@ is designated as \fIoptional\fR in the \fBpam.conf\fR configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtry_first_pass\fR \fR
 .ad
 .RS 20n
-.rt  
 Use the user's initial password (entered when the user is authenticated to the
 first authentication module in the stack) to authenticate with the SAMPLE
 module. If the passwords do not match, or if this is the first authentication
@@ -162,14 +144,12 @@ in, the user can use \fBsu\fR if the user are sam or eric.
 
 .sp
 .TS
-tab();
-lw(0i) lw(0i) lw(0i) lw(0i) lw(5.5i) 
-lw(0i) lw(0i) lw(0i) lw(0i) lw(5.5i) 
-.
-loginaccountrequirepam_sample.so.1allow=larry
-dtloginaccountrequirepam_sample.so.1allow=larry
-rloginaccountrequirepam_sample.so.1allow=don allow=larry
-suaccountrequirepam_sample.so.1allow=sam,eric
+l l l l l
+l l l l l .
+login	account	require	pam_sample.so.1	allow=larry
+dtlogin	account	require	pam_sample.so.1	allow=larry
+rlogin	account	require	pam_sample.so.1	allow=don allow=larry
+su	account	require	pam_sample.so.1	allow=sam,eric
 .TE
 
 .sp
@@ -194,12 +174,12 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT LevelMT-Safe with exceptions
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

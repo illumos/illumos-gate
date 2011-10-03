@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH str_to_label 3TSOL "15 Jun 2009" "SunOS 5.11" "Trusted Extensions Library Functions"
+.TH STR_TO_LABEL 3TSOL "Jun 15, 2009"
 .SH NAME
 str_to_label \- parse human readable strings to label
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ str_to_label \- parse human readable strings to label
 .nf
 #include <tsol/label.h>
 
-\fBint\fR \fBstr_to_label\fR(\fBconst char *\fR\fIstring\fR, \fBm_label_t **\fR\fIlabel\fR, 
+\fBint\fR \fBstr_to_label\fR(\fBconst char *\fR\fIstring\fR, \fBm_label_t **\fR\fIlabel\fR,
     \fBconst m_label_type_t\fR \fIlabel_type\fR, \fBuint_t\fR \fIflags\fR, \fBint *\fR\fIerror\fR);
 .fi
 
@@ -68,23 +68,19 @@ The caller is responsible for freeing the allocated resources by calling the
 allocated label. The label type can be:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAC_LABEL\fR\fR
 .ad
 .RS 14n
-.rt  
 The string should be translated as a Mandatory Access Control (MAC) label.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSER_CLEAR\fR\fR
 .ad
 .RS 14n
-.rt  
 The string should be translated as a label that represents the least upper
 bound of the labels that the user is allowed to access.
 .RE
@@ -113,12 +109,10 @@ Otherwise, \fB-1\fR is returned, \fIerrno\fR is set to indicate the error, and
 The \fBstr_to_label()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Invalid parameter. \fBM_BAD_STRING\fR indicates that \fIstring\fR could not be
 parsed. \fBM_BAD_LABEL\fR indicates that the label passed in was in error.
 \fBM_OUTSIDE_AR\fR indicates that the resulting label is not within the
@@ -127,23 +121,19 @@ parsed. \fBM_BAD_LABEL\fR indicates that the label passed in was in error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The system does not support label translations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 The physical limits of the system are exceeded by size bytes of memory which
 cannot be allocated.
 .RE
@@ -156,17 +146,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

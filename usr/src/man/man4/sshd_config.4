@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sshd_config 4 "26 Mar 2009" "SunOS 5.11" "File Formats"
+.TH SSHD_CONFIG 4 "Mar 26, 2009"
 .SH NAME
 sshd_config \- sshd configuration file
 .SH SYNOPSIS
@@ -26,7 +26,6 @@ The \fBsshd_config\fR file supports the following keywords. Unless otherwise
 noted, keywords and their arguments are case-insensitive.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAllowGroups\fR\fR
 .ad
@@ -42,7 +41,6 @@ allowed regardless of the primary group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAllowTcpForwarding\fR\fR
 .ad
@@ -55,7 +53,6 @@ shell access, as they can always install their own forwarders.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAllowUsers\fR\fR
 .ad
@@ -74,7 +71,6 @@ particular hosts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAuthorizedKeysFile\fR\fR
 .ad
@@ -92,7 +88,6 @@ default is \fB\&.ssh/authorized_keys\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBanner\fR\fR
 .ad
@@ -106,7 +101,6 @@ available for protocol version 2. By default, no banner is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBChrootDirectory\fR\fR
 .ad
@@ -138,7 +132,6 @@ The default is not to \fBchroot\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCiphers\fR\fR
 .ad
@@ -167,7 +160,6 @@ issues in connection with the SSH protocol version 2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClientAliveCountMax\fR\fR
 .ad
@@ -190,7 +182,6 @@ clients are disconnected after approximately 45 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClientAliveInterval\fR\fR
 .ad
@@ -205,7 +196,6 @@ version 2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCompression\fR\fR
 .ad
@@ -217,7 +207,6 @@ compression. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDenyGroups\fR\fR
 .ad
@@ -232,7 +221,6 @@ login is allowed regardless of the primary group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDenyUsers\fR\fR
 .ad
@@ -251,7 +239,6 @@ particular hosts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGatewayPorts\fR\fR
 .ad
@@ -273,7 +260,6 @@ the address to which the forwarding is bound. The default is \fBno\fR. See also
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSSAPIAuthentication\fR\fR
 .ad
@@ -288,7 +274,6 @@ principal is authorized. Otherwise, GSS-API authentication fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSSAPIKeyExchange\fR\fR
 .ad
@@ -308,7 +293,6 @@ principal is authorized. Otherwise, GSS-API authentication fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSSAPIStoreDelegatedCredentials\fR\fR
 .ad
@@ -332,7 +316,6 @@ destroy credentials associated with a session.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostbasedAuthentication\fR\fR
 .ad
@@ -347,7 +330,6 @@ host-based authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostbasedUsesNameFromPacketOnly\fR\fR
 .ad
@@ -366,7 +348,6 @@ port-forwarding firewall.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHostKey\fR\fR
 .ad
@@ -383,7 +364,6 @@ version 2 of the SSH protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIgnoreRhosts\fR\fR
 .ad
@@ -397,7 +377,6 @@ versions 1 and 2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIgnoreUserKnownHosts\fR\fR
 .ad
@@ -410,7 +389,6 @@ is \fBno\fR. This parameter applies to both protocol versions 1 and 2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKbdInteractiveAuthentication\fR\fR
 .ad
@@ -423,7 +401,6 @@ this parameter can only be set to \fByes\fR.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKeepAlive\fR\fR
 .ad
@@ -446,7 +423,6 @@ and the client configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKeyRegenerationInterval\fR\fR
 .ad
@@ -461,7 +437,6 @@ is never regenerated. The default is 3600 (seconds).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBListenAddress\fR\fR
 .ad
@@ -489,7 +464,6 @@ are permitted. Additionally, the \fBPorts\fR options must precede this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLoginGraceTime\fR\fR
 .ad
@@ -502,7 +476,6 @@ is 120 (seconds).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLogLevel\fR\fR
 .ad
@@ -518,7 +491,6 @@ and is not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLookupClientHostnames\fR\fR
 .ad
@@ -530,7 +502,6 @@ yes.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMACs\fR
 .ad
@@ -544,7 +515,6 @@ algorithms must be comma-separated. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaxStartups\fR\fR
 .ad
@@ -566,7 +536,6 @@ number of unauthenticated connections reaches \fIfull\fR (60 in our example).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPasswordAuthentication\fR\fR
 .ad
@@ -578,7 +547,6 @@ This option applies to both protocol versions 1 and 2.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPermitEmptyPasswords\fR\fR
 .ad
@@ -597,7 +565,6 @@ instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPermitRootLogin\fR\fR
 .ad
@@ -628,7 +595,6 @@ the root account using passwords.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPermitUserEnvironment\fR\fR
 .ad
@@ -648,7 +614,6 @@ authentication method. Of the two files used, values of variables set in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPidFile\fR\fR
 .ad
@@ -661,7 +626,6 @@ file for storing the PID of the \fBsshd\fR listening for connections. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPort\fR\fR
 .ad
@@ -673,7 +637,6 @@ Multiple options of this type are permitted. See also \fBListenAddress\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPrintLastLog\fR\fR
 .ad
@@ -685,7 +648,6 @@ last logged in. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPrintMotd\fR\fR
 .ad
@@ -699,7 +661,6 @@ shell or a shell startup file, such as \fB/etc/profile\fR.) The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBProtocol\fR\fR
 .ad
@@ -713,7 +674,6 @@ version 2 and falls back to version 1 if version 2 is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPubkeyAuthentication\fR\fR
 .ad
@@ -725,7 +685,6 @@ Specifies whether public key authentication is allowed. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRhostsAuthentication\fR\fR
 .ad
@@ -741,7 +700,6 @@ applies only to protocol version 1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRhostsRSAAuthentication\fR\fR
 .ad
@@ -754,7 +712,6 @@ together with successful RSA host authentication is allowed. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSAAuthentication\fR\fR
 .ad
@@ -766,7 +723,6 @@ This option applies to protocol version 1 only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBServerKeyBits\fR\fR
 .ad
@@ -778,7 +734,6 @@ minimum value is 512, and the default is 768.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStrictModes\fR\fR
 .ad
@@ -792,7 +747,6 @@ world-writable. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSubsystem\fR\fR
 .ad
@@ -813,7 +767,6 @@ By default, no subsystems are defined. This option applies to protocol version
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSyslogFacility\fR\fR
 .ad
@@ -827,7 +780,6 @@ possible values are: \fBDAEMON\fR, \fBUSER\fR, \fBAUTH\fR, \fBLOCAL0\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUseOpenSSLEngine\fR\fR
 .ad
@@ -842,7 +794,6 @@ effect. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVerifyReverseMapping\fR\fR
 .ad
@@ -859,7 +810,6 @@ to a name. This feature is useful for Internet-facing servers. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX11DisplayOffset\fR\fR
 .ad
@@ -872,7 +822,6 @@ This prevents \fBsshd\fR from interfering with real X11 servers. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX11Forwarding\fR\fR
 .ad
@@ -899,7 +848,6 @@ users can always install their own forwarders.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX11UseLocalhost\fR\fR
 .ad
@@ -917,7 +865,6 @@ address. The argument must be \fByes\fR or \fBno\fR. The default is \fByes\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXAuthLocation\fR\fR
 .ad
@@ -937,67 +884,55 @@ time can be expressed using a sequence of the form:
 \fIqualifier\fR is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fI<none>\fR\fR
 .ad
 .RS 10n
-.rt  
 seconds
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR | \fBS\fR\fR
 .ad
 .RS 10n
-.rt  
 seconds
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR | \fBM\fR\fR
 .ad
 .RS 10n
-.rt  
 minutes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR | \fBH\fR\fR
 .ad
 .RS 10n
-.rt  
 hours
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR | \fBD\fR\fR
 .ad
 .RS 10n
-.rt  
 days
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR | \fB\fR\fR
 .ad
 .RS 10n
-.rt  
 weeks
 .RE
 
@@ -1007,46 +942,38 @@ Each element of the sequence is added together to calculate the total time
 value. For example:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB600\fR\fR
 .ad
 .RS 9n
-.rt  
 600 seconds (10 minutes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10m\fR\fR
 .ad
 .RS 9n
-.rt  
 10 minutes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1h30m\fR\fR
 .ad
 .RS 9n
-.rt  
 1 hour, 30 minutes (90 minutes)
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh/sshd_config\fR\fR
 .ad
 .RS 24n
-.rt  
 Contains configuration data for \fBsshd\fR. This file should be writable by
 root only, but it is recommended (though not necessary) that it be
 world-readable.
@@ -1060,13 +987,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

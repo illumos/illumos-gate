@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_inquire_context 3GSS "17 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_INQUIRE_CONTEXT 3GSS "Jan 17, 2003"
 .SH NAME
 gss_inquire_context \- obtain information about a security context
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_inquire_context\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -31,34 +31,28 @@ context, although the context need not be fully established.
 The parameter descriptions for \fBgss_inquire_context()\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 21n
-.rt  
 A mechanism-specific status code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext_handle\fR\fR
 .ad
 .RS 21n
-.rt  
 A handle that refers to the security context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrc_name\fR\fR
 .ad
 .RS 21n
-.rt  
 The name of the context initiator. If the context was established using
 anonymous authentication, and if the application invoking
 \fBgss_inquire_context()\fR is the context acceptor, an anonymous name is
@@ -69,12 +63,10 @@ parameter is not required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItarg_name\fR\fR
 .ad
 .RS 21n
-.rt  
 The name of the context acceptor. Storage associated with this name must be
 freed by the application after use with a call to \fBgss_release_name()\fR. If
 the context acceptor did not authenticate itself, and if the initiator did not
@@ -85,12 +77,10 @@ required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlifetime_rec\fR\fR
 .ad
 .RS 21n
-.rt  
 The number of seconds for which the context will remain valid. If the context
 has expired, this parameter will be set to zero. Specify \fBNULL\fR if the
 parameter is not required.
@@ -98,12 +88,10 @@ parameter is not required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImech_type\fR\fR
 .ad
 .RS 21n
-.rt  
 The security mechanism providing the context. The returned \fBOID\fR is a
 pointer to static storage that should be treated as read-only by the
 application; in particular, the application should not attempt to free it.
@@ -112,12 +100,10 @@ Specify \fBNULL\fR if the parameter is not required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIctx_flags\fR\fR
 .ad
 .RS 21n
-.rt  
 Contains various independent flags, each of which indicates that the context
 supports (or is expected to support, if \fBctx_open\fR is false) a specific
 service option. If not needed, specify \fBNULL\fR.  Symbolic names are provided
@@ -126,60 +112,50 @@ should be logically \fBAND\fRed with the \fBret_flags\fR value to test whether
 a given option is supported by the context.  The flags are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_DELEG_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, credentials were delegated from the initiator to the acceptor. If
 false, no credentials were delegated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_MUTUAL_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, the acceptor was authenticated to the initiator. If false, the
 acceptor did not authenticate itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_REPLAY_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, the replay of protected messages will be detected. If false, replayed
 messages will not be detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_SEQUENCE_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, out-of-sequence protected messages will be detected. If false,
 out-of-sequence messages will not be detected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_CONF_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, confidential service may be invoked by calling the
 \fBgss_wrap\fR(3GSS) routine. If false, no confidential service is available
 through \fBgss_wrap()\fR. \fBgss_wrap()\fR provides message encapsulation,
@@ -188,12 +164,10 @@ data-origin authentication, and integrity services only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_INTEG_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, integrity service can be invoked by calling either the
 \fBgss_get_mic()\fR or the \fBgss_wrap()\fR routine. If false, per-message
 integrity service is unavailable.
@@ -201,12 +175,10 @@ integrity service is unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_ANON_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, the initiator's identity is not revealed to the acceptor. The
 \fIsrc_name\fR parameter, if requested, contains an anonymous internal name. If
 false, the initiator has been authenticated normally.
@@ -214,12 +186,10 @@ false, the initiator has been authenticated normally.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_PROT_READY_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, the protection services, as specified by the states of the
 \fBGSS_C_CONF_FLAG\fR and \fBGSS_C_INTEG_FLAG\fR, are available for use. If
 false, they are available only if the context is fully established, that is, if
@@ -228,12 +198,10 @@ the \fIopen\fR parameter is non-zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_C_TRANS_FLAG\fR\fR
 .ad
 .RS 25n
-.rt  
 If true, resultant security context can be transferred to other processes
 through a call to \fBgss_export_sec_context()\fR. If false, the security
 context is not transferable.
@@ -243,24 +211,20 @@ context is not transferable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlocally_initiated\fR\fR
 .ad
 .RS 21n
-.rt  
 Non-zero if the invoking application is the context initiator. Specify
 \fBNULL\fR if the parameter is not required.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIopen\fR\fR
 .ad
 .RS 21n
-.rt  
 Non-zero if the context is fully established; zero if a context-establishment
 token is expected from the peer application. Specify \fBNULL\fR if the
 parameter is not required.
@@ -272,34 +236,28 @@ parameter is not required.
 \fBgss_inquire_context()\fR returns one of the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 20n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CONTEXT\fR\fR
 .ad
 .RS 20n
-.rt  
 The referenced context could not be accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 20n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -313,13 +271,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

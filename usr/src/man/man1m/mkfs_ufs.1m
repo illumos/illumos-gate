@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mkfs_ufs 1M "8 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH MKFS_UFS 1M "Mar 8, 2006"
 .SH NAME
 mkfs_ufs \- construct a UFS file system
 .SH SYNOPSIS
 .LP
 .nf
-\fBmkfs\fR \fB-F\fR ufs [\fIgeneric_options\fR] [\fB-o\fR \fIFSType_specific_options\fR] \fIraw_device_file\fR 
+\fBmkfs\fR \fB-F\fR ufs [\fIgeneric_options\fR] [\fB-o\fR \fIFSType_specific_options\fR] \fIraw_device_file\fR
      [\fIsize\fR]
 .fi
 
@@ -42,23 +42,19 @@ and is required (even with \fB\fR\fB-o\fR\fB N\fR), unless the \fB-V\fR or
 The following generic options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Print the command line that was used to create the existing file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Print the current \fBmkfs\fR command line.
 .RE
 
@@ -68,22 +64,18 @@ Print the current \fBmkfs\fR command line.
 The following UFS-specific options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Use one or more of the following values separated by commas (with no
 intervening spaces) to specify UFS-specific options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBapc=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of alternate sectors per cylinder to reserve for bad block
 replacement for SCSI devices only. The default is \fB0\fR.
 .sp
@@ -92,12 +84,10 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbsize=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The logical block size of the file system in bytes, either \fB4096\fR or
 \fB8192\fR. The default is \fB8192\fR. The sun4u architecture does not support
 the \fB4096\fR block size.
@@ -105,12 +95,10 @@ the \fB4096\fR block size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcalcbinsb\fR\fR
 .ad
 .RS 15n
-.rt  
 Sends to stdout a binary (machine-readable) version of the superblock that
 would be used to create a file system with the specified configuration
 parameters.
@@ -118,24 +106,20 @@ parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcalcsb\fR\fR
 .ad
 .RS 15n
-.rt  
 Sends to stdout a human-readable version of the superblock that would be used
 to create a file system with the specified configuration parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcgsize=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of cylinders per cylinder group, ranging from \fB16\fR to \fB256\fR.
 The default is calculated by dividing the number of sectors in the file system
 by the number of sectors in a gigabyte. Then, the result is multiplied by
@@ -148,12 +132,10 @@ requested, it is changed by the minimum amount necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfragsize=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The smallest amount of disk space in bytes that can be allocated to a file.
 \fBfragsize\fR must be a power of 2 divisor of \fBbsize\fR, where:
 .sp
@@ -170,12 +152,10 @@ For file systems greater than 1 terabyte or for file systems created with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfree=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The minimum percentage of free space to maintain in the file system between 0%
 and 99%, inclusively. This space is off-limits to users. Once the file system
 is filled to this threshold, only the superuser can continue writing to the
@@ -189,24 +169,20 @@ This parameter can be subsequently changed using the \fBtunefs\fR(1M) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgap=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 Rotational delay. This option is obsolete in the Solaris 10 release. The value
 is always set to \fB0\fR, regardless of the input value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxcontig=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The maximum number of logical blocks, belonging to one file, that are allocated
 contiguously. The default is calculated as follows:
 .sp
@@ -234,12 +210,10 @@ You can subsequently change this parameter by using \fBtunefs\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmtb=y\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the parameters of the file system to allow eventual growth to over a
 terabyte in total file system size. This option sets \fIfragsize\fR to be the
 same as \fIbsize\fR, and sets \fInbpi\fR to 1 Mbyte, unless the \fB-i\fR option
@@ -250,24 +224,20 @@ user-supplied value of \fIfragsize\fR or \fInbpi\fR is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN\fR\fR
 .ad
 .RS 15n
-.rt  
 Print out the file system parameters that would be used to create the file
 system without actually creating the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbpi=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of bytes per inode, which specifies the density of inodes in the
 file system. The number is divided into the total size of the file system to
 determine the number of inodes to create.
@@ -282,12 +252,10 @@ The number of inodes can increase if the file system is expanded with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnrpos=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of different rotational positions in which to divide a cylinder
 group. The default is \fB8\fR.
 .sp
@@ -296,23 +264,19 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnsect=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of sectors per track on the disk. The default is \fB32\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBntrack=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The number of tracks per cylinder on the disk. The default is \fB16\fR.
 .sp
 This option is not applicable for disks with EFI labels and is ignored.
@@ -320,12 +284,10 @@ This option is not applicable for disks with EFI labels and is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopt=\fR\fIs\fR\||\|\fIt\fR\fR
 .ad
 .RS 15n
-.rt  
 The file system can either be instructed to try to minimize the \fBtime\fR
 spent allocating blocks, or to try to minimize the \fBspace\fR fragmentation on
 the disk. The default is \fItime\fR.
@@ -335,12 +297,10 @@ This parameter can be subsequently changed with the \fBtunefs\fR(1M) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrps=\fR\fIn\fR\fR
 .ad
 .RS 15n
-.rt  
 The rotational speed of the disk, in revolutions per second. The default is
 \fB60\fR.
 .sp
@@ -361,12 +321,10 @@ option is omitted and the list follows the size operand. This is the way
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw_device_file\fR\fR
 .ad
 .RS 19n
-.rt  
 The disk partition on which to write.
 .RE
 
@@ -386,8 +344,8 @@ warning that performance might be impaired can be safely ignored.
 .sp
 .in +2
 .nf
-Warning: insufficient space in super block for 
-rotational layout tables with nsect \fIsblock.fs_nsect\fR 
+Warning: insufficient space in super block for
+rotational layout tables with nsect \fIsblock.fs_nsect\fR
 and ntrak \fIsblock.fs_ntrak\fR. (File system performance may be impaired.)
 .fi
 .in -2

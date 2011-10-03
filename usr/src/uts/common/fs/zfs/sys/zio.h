@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _ZIO_H
 #define	_ZIO_H
@@ -421,6 +424,8 @@ struct zio {
 	zoneid_t	io_zoneid;	/* zone which originated this I/O */
 	hrtime_t	io_start;	/* time I/O entered zio pipeline */
 	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
+	/* Taskq dispatching state */
+	taskq_ent_t	io_tqent;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,

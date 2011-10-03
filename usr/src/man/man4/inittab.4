@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH inittab 4 "9 Dec 2004" "SunOS 5.11" "File Formats"
+.TH INITTAB 4 "Dec 9, 2004"
 .SH NAME
 inittab \- script for init
 .SH DESCRIPTION
@@ -40,12 +40,10 @@ the convention for comments described in \fBsh\fR(1). There are no limits
 \fBinittab\fR file. The entry fields are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIid\fR\fR
 .ad
 .RS 11n
-.rt  
 One to four characters used to uniquely identify an entry. Do not use the
 characters "r" or "t" as the first or only character in this field. These
 characters are reserved for the use of \fBrlogin\fR(1) and \fBtelnet\fR(1).
@@ -53,12 +51,10 @@ characters are reserved for the use of \fBrlogin\fR(1) and \fBtelnet\fR(1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrstate\fR\fR
 .ad
 .RS 11n
-.rt  
 Define the run level in which this entry is to be processed. Run-levels
 effectively correspond to a configuration of processes in the system. That is,
 each process spawned by \fBinit\fR is assigned a run level(s) in which it is
@@ -91,22 +87,18 @@ are killed only if their line in \fBinittab\fR is marked \fBoff\fR in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaction\fR\fR
 .ad
 .RS 11n
-.rt  
 Key words in this field tell \fBinit\fR how to treat the process specified in
 the \fIprocess\fR field. The actions recognized by \fBinit\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrespawn\fR\fR
 .ad
 .RS 13n
-.rt  
 If the process does not exist, then start the process; do not wait for its
 termination (continue scanning the \fBinittab\fR file), and when the process
 dies, restart the process. If the process currently exists, do nothing and
@@ -115,12 +107,10 @@ continue scanning the \fBinittab\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR\fR
 .ad
 .RS 13n
-.rt  
 When \fBinit\fR enters the run level that matches the entry's \fIrstate\fR,
 start the process and wait for its termination. All subsequent reads of the
 \fBinittab\fR file while \fBinit\fR is in the same run level cause \fBinit\fR
@@ -129,12 +119,10 @@ to ignore this entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonce\fR\fR
 .ad
 .RS 13n
-.rt  
 When \fBinit\fR enters a run level that matches the entry's \fIrstate\fR, start
 the process, do not wait for its termination. When it dies, do not restart the
 process. If \fBinit\fR enters a new run level and the process is still running
@@ -143,12 +131,10 @@ from a previous run level change, the program is not restarted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBboot\fR\fR
 .ad
 .RS 13n
-.rt  
 The entry is to be processed only at \fBinit\fR's boot-time read of the
 \fBinittab\fR file. \fBinit\fR is to start the process and not wait for its
 termination; when it dies, it does not restart the process. In order for this
@@ -159,12 +145,10 @@ initialization function following a hardware reboot of the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbootwait\fR\fR
 .ad
 .RS 13n
-.rt  
 The entry is to be processed the first time \fBinit\fR goes from single-user to
 multi-user state after the system is booted. \fBinit\fR starts the process,
 waits for its termination and, when it dies, does not restart the process.
@@ -172,24 +156,20 @@ waits for its termination and, when it dies, does not restart the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpowerfail\fR\fR
 .ad
 .RS 13n
-.rt  
 Execute the process associated with this entry only when \fBinit\fR receives a
 power fail signal, \fBSIGPWR\fR (see \fBsignal\fR(3C)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpowerwait\fR\fR
 .ad
 .RS 13n
-.rt  
 Execute the process associated with this entry only when \fBinit\fR receives a
 power fail signal, \fBSIGPWR\fR, and wait until it terminates before continuing
 any processing of \fBinittab\fR.
@@ -197,12 +177,10 @@ any processing of \fBinittab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoff\fR\fR
 .ad
 .RS 13n
-.rt  
 If the process associated with this entry is currently running, send the
 warning signal \fBSIGTERM\fR and wait 5 seconds before forcibly terminating the
 process with the kill signal \fBSIGKILL\fR. If the process is nonexistent,
@@ -211,12 +189,10 @@ ignore the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBondemand\fR\fR
 .ad
 .RS 13n
-.rt  
 This instruction is really a synonym for the \fBrespawn\fR action. It is
 functionally identical to \fBrespawn\fR but is given a different keyword in
 order to divorce its association with run levels. This instruction is used only
@@ -226,12 +202,10 @@ field.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsysinit\fR\fR
 .ad
 .RS 13n
-.rt  
 Entries of this type are executed before \fBinit\fR tries to access the console
 (that is, before the \fBConsole Login:\fR prompt). It is expected that this
 entry will be used only to initialize devices that \fBinit\fR might try to ask
@@ -243,12 +217,10 @@ their completion before continuing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocess\fR\fR
 .ad
 .RS 11n
-.rt  
 Specify a command to be executed. The entire \fBprocess\fR field is prefixed
 with \fBexec\fR and passed to a forked \fBsh\fR as \fBsh \(mic 'exec\fR
 \fBcommand\fR'. For this reason, any legal \fBsh\fR syntax can appear in the

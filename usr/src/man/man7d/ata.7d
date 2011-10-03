@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ata 7D "18 Apr 2007" "SunOS 5.11" "Devices"
+.TH ATA 7D "Apr 18, 2007"
 .SH NAME
 ata \- AT attachment disk driver
 .SH SYNOPSIS
 .LP
 .nf
-\fBide@unit-\fR\fIaddress\fR 
+\fBide@unit-\fR\fIaddress\fR
 .fi
 
 .SH DESCRIPTION
@@ -146,12 +146,10 @@ want to disable DMA when booting from a CD/DVD, you must first set
 atapi-cd-dma-enabled  to 0 using the GRUB kernel boot command line.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBata-dma-enabled\fR\fR
 .ad
 .RS 27n
-.rt  
 This property is examined before the DMA properties discussed below. If it is
 set to '0,' DMA is disabled for all ATA/ATAPI devices, and no further property
 checks are made. If this property is absent or is set to '1,' DMA status is
@@ -160,12 +158,10 @@ determined by further examining one of the other properties listed below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBata-disk-dma-enabled\fR\fR
 .ad
 .RS 27n
-.rt  
 This property is examined only for ATA disk devices, and only if
 ata-dma-enabled is not set to '0.'
 .sp
@@ -178,12 +174,10 @@ be created by the administrator using the GRUB kernel boot command line or the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatapi-cd-dma-enabled\fR\fR
 .ad
 .RS 27n
-.rt  
 This property is examined only for ATAPI CD/DVD devices, and only if
 ata-dma-enabled is not set to '0.'
 .sp
@@ -198,12 +192,10 @@ or \fBeeprom\fR(1M) as shown in the Example section of this manpage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatapi-other-dma-enabled\fR\fR
 .ad
 .RS 27n
-.rt  
 This property is examined only for non-CD/DVD ATAPI devices such as ATAPI tape
 drives, and only if ata-dma-enabled is not set to '0.'
 .sp
@@ -217,7 +209,6 @@ kernel boot command line or the \fBeeprom\fR(1M) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrive0_block_factor\fR\fR
 .ad
@@ -226,7 +217,6 @@ kernel boot command line or the \fBeeprom\fR(1M) command.
 \fB\fBdrive1_block_factor\fR\fR
 .ad
 .RS 27n
-.rt  
 \fBATA\fR controllers support some amount of buffering (blocking). The purpose
 is to interrupt the host when an entire buffer full of data has been read or
 written instead of using an interrupt for each sector. This reduces interrupt
@@ -248,7 +238,6 @@ event of a failed test.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBata-revert-to-defaults\fR\fR
 .ad
@@ -257,7 +246,6 @@ event of a failed test.
 \fB\fBrevert\(em<diskmodel>\fR\fR
 .ad
 .RS 27n
-.rt  
 When rebooting or shutting down, the driver can set a feature which allows the
 drive to return to the power-on settings when the drive receives a software
 reset (SRST) sequence. If this property is present and set to 1, the driver
@@ -377,7 +365,6 @@ eeprom 'atapi-cd-dma-enabled=1'
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/ata\fR\fR
 .ad
@@ -388,7 +375,6 @@ Device driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/i86pc/kernel/drv/ata.conf\fR\fR
 .ad
@@ -399,7 +385,6 @@ Configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/boot/solaris/bootenv.rc\fR\fR
 .ad
@@ -417,13 +402,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

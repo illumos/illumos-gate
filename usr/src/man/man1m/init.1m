@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH init 1M "2 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH INIT 1M "Sep 2, 2009"
 .SH NAME
 init, telinit \- process control initialization
 .SH SYNOPSIS
@@ -58,7 +58,6 @@ page.) \fBinit\fR then looks in \fB/etc/inittab\fR for the \fBinitdefault\fR
 entry (see \fBinittab\fR(4)). If the \fBinitdefault\fR entry:
 .sp
 .ne 2
-.mk
 .na
 \fBexists\fR
 .ad
@@ -71,7 +70,6 @@ specified for \fBsvc.startd\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fBdoes not exist\fR
 .ad
@@ -88,7 +86,6 @@ The \fBinitdefault\fR entry in \fB/etc/inittab\fR corresponds to the following
 run levels:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR or \fBs\fR\fR
 .ad
@@ -104,7 +101,6 @@ single-user state if \fB/etc/inittab\fR does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0-6\fR\fR
 .ad
@@ -205,7 +201,6 @@ If there are no entries for the \fBinit\fR service, then the entries for the
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -216,7 +211,6 @@ Go into firmware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -233,7 +227,6 @@ milestone to svc:/milestone/single-user:default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -249,7 +242,6 @@ milestone to svc:/milestone/multi-user:default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
@@ -263,7 +255,6 @@ milestone to svc:/milestone/multi-user-server:default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
@@ -276,7 +267,6 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
@@ -288,7 +278,6 @@ remove power, if possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
@@ -304,7 +293,6 @@ default. When the \fBconfig/fastreboot_default\fR property is set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR,\fBb\fR,\fBc\fR\fR
 .ad
@@ -317,7 +305,6 @@ certain commands, but which do not cause the current run level to change.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ\fR,\fBq\fR\fR
 .ad
@@ -328,7 +315,6 @@ Re-examine \fB/etc/inittab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR, \fBs\fR\fR
 .ad
@@ -355,7 +341,6 @@ milestone to svc:/milestone/single-user:default.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/console\fR\fR
 .ad
@@ -366,7 +351,6 @@ System console device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/init\fR\fR
 .ad
@@ -377,7 +361,6 @@ timezone variable, \fBTZ\fR, you might specify \fBTZ=US/Pacific\fR. The
 variables are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
@@ -391,7 +374,6 @@ Refer to the \fBTIMEZONE\fR(4) man page before changing this setting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMASK\fR\fR
 .ad
@@ -406,7 +388,6 @@ inherits from the kernel. Note that \fBinit\fR always attempts to apply a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
@@ -417,7 +398,6 @@ Character characterization information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
@@ -428,7 +408,6 @@ Message translation
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MONETARY\fR\fR
 .ad
@@ -439,7 +418,6 @@ Monetary formatting information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
@@ -450,7 +428,6 @@ Numeric formatting information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
@@ -461,7 +438,6 @@ Time formatting information
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_ALL\fR\fR
 .ad
@@ -472,7 +448,6 @@ If set, all other \fBLC_*\fR environmental variables take-on this value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLANG\fR\fR
 .ad
@@ -486,7 +461,6 @@ value of \fBLANG\fR is used for that particular environmental variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inittab\fR\fR
 .ad
@@ -497,7 +471,6 @@ Controls process dispatching by \fBinit\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ioctl.syscon\fR\fR
 .ad
@@ -509,7 +482,6 @@ entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/svc/volatile/init.state\fR\fR
 .ad
@@ -520,7 +492,6 @@ entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
@@ -531,7 +502,6 @@ User access and administration information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
@@ -542,7 +512,6 @@ History of user access and administration information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB/var/run/initpipe\fR
 .ad

@@ -4,37 +4,37 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rsh 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.TH RSH 1 "Dec 23, 2008"
 .SH NAME
 rsh, remsh, remote_shell \- remote shell
 .SH SYNOPSIS
 .LP
 .nf
-\fBrsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR] 
+\fBrsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR]
      [\fB-k\fR \fIrealm\fR] \fIhostname\fR \fIcommand\fR
 .fi
 
 .LP
 .nf
-\fBrsh\fR \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] 
+\fBrsh\fR \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR]
      [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIcommand\fR
 .fi
 
 .LP
 .nf
-\fBremsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR] 
+\fBremsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR]
      [\fB-k\fR \fIrealm\fR] \fIhostname\fR \fIcommand\fR
 .fi
 
 .LP
 .nf
-\fBremsh\fR \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] 
+\fBremsh\fR \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR]
      [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIcommand\fR
 .fi
 
 .LP
 .nf
- \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] 
+ \fIhostname\fR [\fB-n\fR] [\fB-a\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR]
      [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIcommand\fR
 .fi
 
@@ -91,12 +91,10 @@ session traffic is encrypted. See \fB-x\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Explicitly enable Kerberos authentication and trusts the \fB\&.k5login\fR file
 for access-control. If the authorization check by \fBin.rshd\fR(1M) on the
 server-side succeeds and if the \fB\&.k5login\fR file permits access, the user
@@ -105,12 +103,10 @@ is allowed to carry out the command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Forward a copy of the local credentials (Kerberos Ticket Granting Ticket) to
 the remote system. This is a non-forwardable ticket granting ticket. Forward a
 ticket granting ticket if you need to authenticate yourself to other Kerberized
@@ -122,12 +118,10 @@ directory. This option is mutually exclusive with the \fB-F\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 15n
-.rt  
 Forward a forwardable copy of the local credentials (Kerberos Ticket Granting
 Ticket) to the remote system. The \fB-F\fR option provides a superset of the
 functionality offered by the \fB-f\fR option. For example, with the \fB-f\fR
@@ -141,36 +135,30 @@ the \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIrealm\fR\fR
 .ad
 .RS 15n
-.rt  
 Causes \fBrsh\fR to obtain tickets for the remote host in \fIrealm\fR instead
 of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
 .RS 15n
-.rt  
 This option explicitly disables Kerberos authentication. It can be used to
 override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-l\fR \fIusername\fR\fR
 .ad
 .RS 15n
-.rt  
 Uses \fIusername\fR as the remote username instead of your local username. In
 the absence of this option, the remote username is the same as your local
 username.
@@ -178,12 +166,10 @@ username.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Redirect the input of \fBrsh\fR to \fB/dev/null\fR. You sometimes need this
 option to avoid unfortunate interactions between \fBrsh\fR and the shell which
 invokes it. For example, if you are running \fBrsh\fR and invoke a \fBrsh\fR in
@@ -194,7 +180,6 @@ this.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-PO\fR\fR
 .ad
@@ -203,7 +188,6 @@ this.
 \fB\fB-PN\fR\fR
 .ad
 .RS 15n
-.rt  
 Explicitly request new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
 "\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalant
 in the old one and is regarded much more secure, but is not interoperable with
@@ -216,12 +200,10 @@ new, more secure "\fBrcmd\fR" protocol is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 Cause the network session traffic to be encrypted. See \fBDESCRIPTION\fR.
 .RE
 
@@ -235,12 +217,10 @@ user's entry in the file \fB/etc/passwd\fR on the remote system.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR\fR
 .ad
 .RS 11n
-.rt  
 The command to be executed on the specified \fIhostname\fR.
 .RE
 
@@ -351,79 +331,65 @@ example% \fBrsh lizard cat lizard.file ">>" lizard.file2\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 23n
-.rt  
 Internet host table
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts.equiv\fR\fR
 .ad
 .RS 23n
-.rt  
 Trusted remote hosts and users
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 23n
-.rt  
 System password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.k5login\fR\fR
 .ad
 .RS 23n
-.rt  
 File containing Kerberos principals that are allowed access
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Kerberos configuration file
 .RE
 
@@ -435,13 +401,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

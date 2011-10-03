@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hermon 7D "31 Jul 2008" "SunOS 5.11" "Devices"
+.TH HERMON 7D "Jul 31, 2008"
 .SH NAME
 hermon \- ConnectX MT25408/MT25418/MT25428 InfiniBand (IB) Driver
 .SH DESCRIPTION
@@ -24,7 +24,6 @@ agents to access the IB fabric.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/hermon\fR\fR
 .ad
@@ -35,7 +34,6 @@ agents to access the IB fabric.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/hermon\fR\fR
 .ad
@@ -46,7 +44,6 @@ agents to access the IB fabric.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/hermon\fR\fR
 .ad
@@ -57,7 +54,6 @@ agents to access the IB fabric.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/hermon.conf\fR\fR
 .ad
@@ -74,13 +70,12 @@ See \fBattributes\fR(5) for descriptions of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCIe-based systems
+Architecture	PCIe-based systems
 .TE
 
 .SH SEE ALSO
@@ -97,7 +92,6 @@ In addition to being  logged, the following  messages may appear on the system
 console:
 .sp
 .ne 2
-.mk
 .na
 \fBhermon\fBi\fR: driver attached for maintenance mode only.\fR
 .ad
@@ -110,7 +104,6 @@ function that can be performed is to re-flash  firmware on the ASSP. (Note that
 
 .sp
 .ne 2
-.mk
 .na
 \fBhermon\fBi:\fR driver failed to attach\fR
 .ad
@@ -123,7 +116,6 @@ instance of the hermon device number.)
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnexpected port number in port state change event.\fR
 .ad
@@ -136,7 +128,6 @@ the port state changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBHermon driver successfully detached.\fR
 .ad
@@ -148,7 +139,6 @@ for transfer operations.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhermon\fBi:\fR port \fBm\fR up.\fR
 .ad
@@ -161,7 +151,6 @@ the Hermon device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhermon\fBi:\fR port \fBm\fR down.\fR
 .ad
@@ -172,7 +161,6 @@ A port up asynchronous event has occurred. Similar to port up event.
 
 .sp
 .ne 2
-.mk
 .na
 \fBhermon: <command name> command failed.\fR
 .ad

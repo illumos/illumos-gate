@@ -8,7 +8,7 @@
 .\" copyright notice(s) and this permission notice appear in all copies of
 .\" the Software and that both the above copyright notice(s) and this
 .\" permission notice appear in supporting documentation.
-.\" 
+.\"
 .\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 .\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 .\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -18,13 +18,13 @@
 .\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
 .\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 .\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-.\" 
+.\"
 .\" Except as contained in this notice, the name of a copyright holder
 .\" shall not be used in advertising or otherwise to promote the sale, use
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH pca_lookup_file 3TECLA "13 Aug 2007" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.TH PCA_LOOKUP_FILE 3TECLA "Aug 13, 2007"
 .SH NAME
 pca_lookup_file, del_PathCache, del_PcaPathConf, new_PathCache,
 new_PcaPathConf, pca_last_error, pca_path_completions, pca_scan_path,
@@ -33,7 +33,7 @@ list of directories
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libtecla.h>
 
 \fBchar *\fR\fBpca_lookup_file\fR(\fBPathCache *\fR\fIpc\fR, \fBconst char *\fR\fIname\fR,
@@ -333,15 +333,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

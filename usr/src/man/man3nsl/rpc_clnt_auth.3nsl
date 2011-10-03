@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_clnt_auth 3NSL "14 Jan 2002" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_CLNT_AUTH 3NSL "Jan 14, 2002"
 .SH NAME
 rpc_clnt_auth, auth_destroy, authnone_create, authsys_create,
 authsys_create_default \- library routines for client side remote procedure
@@ -68,12 +68,10 @@ The following routines require that the header \fB<rpc/rpc.h>\fR be included
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth_destroy()\fR\fR
 .ad
 .RS 26n
-.rt  
 A function macro that destroys the authentication information associated with
 \fIauth\fR. Destruction usually involves deallocation of private data
 structures. The use of \fIauth\fR is undefined after calling
@@ -82,12 +80,10 @@ structures. The use of \fIauth\fR is undefined after calling
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthnone_create()\fR\fR
 .ad
 .RS 26n
-.rt  
 Create and return an RPC authentication handle that passes nonusable
 authentication information with each remote procedure call. This is the default
 authentication used by RPC.
@@ -95,12 +91,10 @@ authentication used by RPC.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthsys_create()\fR\fR
 .ad
 .RS 26n
-.rt  
 Create and return an \fBRPC\fR authentication handle that contains
 \fBAUTH_SYS\fR authentication information. The parameter \fIhost\fR is the name
 of the machine on which the information was created; \fIuid\fR is the user's
@@ -110,12 +104,10 @@ user \fBID;\fR \fIgid\fR is the user's current group \fBID;\fR \fIlen\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fBauthsys_create_default\fR
 .ad
 .RS 26n
-.rt  
 Call \fBauthsys_create()\fR with the appropriate parameters.
 .RE
 
@@ -127,13 +119,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

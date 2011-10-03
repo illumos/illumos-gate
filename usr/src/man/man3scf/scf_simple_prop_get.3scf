@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_simple_prop_get 3SCF "7 Nov 2007" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_SIMPLE_PROP_GET 3SCF "Nov 7, 2007"
 .SH NAME
 scf_simple_prop_get, scf_simple_prop_free, scf_simple_app_props_get,
 scf_simple_app_props_free, scf_simple_app_props_next,
@@ -17,7 +17,7 @@ Configuration Facility
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_simple_prop_t *\fR\fBscf_simple_prop_get\fR(\fBscf_handle_t *\fR\fIhandle\fR,
@@ -275,7 +275,6 @@ The \fBscf_simple_prop_get()\fR and \fBscf_simple_app_props_get()\fR functions
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -286,7 +285,6 @@ The connection to the datastore is broken.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -297,7 +295,6 @@ The instance FMRI is invalid or property name is \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
@@ -308,7 +305,6 @@ The memory allocation failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -319,7 +315,6 @@ The connection handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
@@ -330,7 +325,6 @@ The specified instance or property does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -344,12 +338,10 @@ The caller is not authorized to read the property's value(s).
 The \fBscf_simple_app_props_next()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 21n
-.rt  
 The value of the \fIpropblock\fR argument is \fINULL\fR.
 .RE
 
@@ -358,23 +350,19 @@ The value of the \fIpropblock\fR argument is \fINULL\fR.
 The \fBscf_simple_app_props_search()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
 .RS 23n
-.rt  
 The property was not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of the \fIpropblock\fR or \fIpropname\fR argument is \fINULL\fR.
 .RE
 
@@ -385,12 +373,10 @@ The \fBscf_simple_prop_numvalues()\fR, \fBscf_simple_prop_type()\fR,
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 21n
-.rt  
 The property is \fINULL\fR.
 .RE
 
@@ -402,23 +388,19 @@ The \fBscf_simple_prop_next_boolean()\fR, \fBscf_simple_prop_next_count()\fR,
 \fBscf_simple_prop_next_opaque()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 27n
-.rt  
 The property is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_TYPE_MISMATCH\fR\fR
 .ad
 .RS 27n
-.rt  
 The requested type does not match the property type.
 .RE
 
@@ -498,35 +480,35 @@ scf_simple_app_props_free(appprops);
  * is a list of integers that are pulled into an array.
  * Note how val is passed back into each call, as described above.
  */
- 
+
 scf_simple_app_props_t         *appprops;
 scf_simple_prop_t              *prop;
 int                     i;
 int64_t                 *intlist;
 ssize_t                 numvals;
- 
+
 appprops = scf_simple_app_props_get(
               "svc://localhost/category/service/instance");
- 
+
 prop = scf_simple_app_props_search(appprops, "appname", "numlist");
- 
+
 if(prop != NULL){
- 
+
         numvals = scf_simple_prop_numvalues(prop);
- 
+
         if(numvals > 0){
- 
+
         intlist = malloc(numvals * sizeof(int64_t));
- 
+
         val = scf_simple_prop_next_integer(prop);
- 
+
                 for(i=0, i < numvals, i++){
                         intlist[i] = *val;
                         val = scf_simple_prop_next_integer(prop);
                 }
         }
 }
- 
+
 scf_simple_app_props_free(appprops);
 .fi
 .in -2
@@ -539,15 +521,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

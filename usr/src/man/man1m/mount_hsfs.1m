@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_hsfs 1M "29 May 2008" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_HSFS 1M "May 29, 2008"
 .SH NAME
 mount_hsfs \- mount hsfs file systems
 .SH SYNOPSIS
 .LP
 .nf
-\fBmount\fR \fB-F\fR hsfs [\fIgeneric_options\fR] 
+\fBmount\fR \fB-F\fR hsfs [\fIgeneric_options\fR]
      [\fB-o\fR \fIFSType-specific_options\fR] [\fB-O\fR ] \fIspecial\fR | \fImount_point\fR
 .fi
 
 .LP
 .nf
-\fBmount\fR \fB-F\fR hsfs [\fIgeneric_options\fR] 
+\fBmount\fR \fB-F\fR hsfs [\fIgeneric_options\fR]
      [\fB-o\fR \fIFSType-specific_options\fR] [\fB-O\fR] \fIspecial\fR \fImount_point\fR
 .fi
 
@@ -46,7 +46,6 @@ overcome limitations of the original ISO 9660:1988 (version 1) standard. The
 following types of extensions are supported by \fBhsfs\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBRock Ridge extensions\fR
 .ad
@@ -64,7 +63,6 @@ of Rock Ridge or to use a different extension.
 
 .sp
 .ne 2
-.mk
 .na
 \fBISO9660:1999 (version 2) extensions\fR
 .ad
@@ -82,7 +80,6 @@ the media.
 
 .sp
 .ne 2
-.mk
 .na
 \fBJoliet extensions\fR
 .ad
@@ -103,7 +100,6 @@ truncated.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgeneric_options\fR\fR
 .ad
@@ -114,7 +110,6 @@ See \fBmount\fR(1M) for the list of supported options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -125,7 +120,6 @@ specified, a warning message is printed and the invalid options are ignored.
 The following options are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglobal\fR |  \fBnoglobal\fR\fR
 .ad
@@ -139,7 +133,6 @@ globally visible. The default behavior is \fBnoglobal\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBro\fR\fR
 .ad
@@ -150,7 +143,6 @@ Mount the file system read-only.  This option is required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrr\fR | \fBnrr\fR\fR
 .ad
@@ -164,7 +156,6 @@ available extensions or fall back to plain ISO9660.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvers2\fR | \fBnovers2\fR\fR
 .ad
@@ -180,7 +171,6 @@ are available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjoliet\fR | \fBnojoliet\fR\fR
 .ad
@@ -194,7 +184,6 @@ If \fBnojoliet\fR is specified, it will fall back to using plain ISO9660.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotraildot\fR\fR
 .ad
@@ -216,7 +205,6 @@ active, \fBhsfs\fR quietly ignores this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnomaplcase\fR\fR
 .ad
@@ -233,7 +221,6 @@ off this mapping. The exceptions for  \fBnotraildot\fR discussed above apply to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
@@ -264,7 +251,6 @@ The following commands mount and unmount a DVD image.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -275,7 +261,6 @@ table of mounted file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad

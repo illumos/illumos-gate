@@ -21,6 +21,10 @@
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 
 /*
  * nfs_tbind.c, common part for nfsd and lockd.
@@ -595,6 +599,11 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
 		}
 	}
 
+	/*
+	 * Register services with CLTS semantics right now.
+	 * Note: services with COTS/COTS_ORD semantics will be
+	 * registered later from cots_listen_event function.
+	 */
 	if (retnconf->nc_semantics == NC_TPI_CLTS) {
 		/* Don't drop core if supporting module(s) aren't loaded. */
 		(void) signal(SIGSYS, SIG_IGN);
@@ -617,6 +626,7 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
 			exit(1);
 		}
 	}
+	free(addrmask.buf);
 
 	/*
 	 * We successfully set up the server over this transport.
@@ -1703,6 +1713,18 @@ set_addrmask(fd, nconf, mask)
 	}
 	mask->len = mask->maxlen = info.addr;
 	if (info.addr <= 0) {
+		/*
+		 * loopback devices have infinite addr size
+		 * (it is identified by -1 in addr field of t_info structure),
+		 * so don't build the netmask for them. It's a special case
+		 * that should be handled properly.
+		 */
+		if ((info.addr == -1) &&
+		    (0 == strcmp(nconf->nc_protofmly, NC_LOOPBACK))) {
+			memset(mask, 0, sizeof (*mask));
+			return (0);
+		}
+
 		syslog(LOG_ERR, "set_addrmask: address size: %ld",
 			info.addr);
 		return (-1);

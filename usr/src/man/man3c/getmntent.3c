@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getmntent 3C "22 Mar 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH GETMNTENT 3C "Mar 22, 2004"
 .SH NAME
 getmntent, getmntany, getextmntent, hasmntopt, putmntent, resetmnttab \- get
 mounted device information
@@ -126,34 +126,28 @@ value greater than 0 is returned. The following error values are defined in
 \fB<sys/mnttab.h>\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNT_TOOLONG\fR\fR
 .ad
 .RS 15n
-.rt  
 A line in the file exceeded the internal buffer size of \fBMNT_LINE_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNT_TOOMANY\fR\fR
 .ad
 .RS 15n
-.rt  
 A line in the file contains too many fields.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNT_TOOFEW\fR\fR
 .ad
 .RS 15n
-.rt  
 A line in the file contains too few fields.
 .RE
 
@@ -174,13 +168,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

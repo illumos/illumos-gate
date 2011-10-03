@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_getprop 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_GETPROP 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_getprop \- get a SASL property
 .SH SYNOPSIS
@@ -27,167 +27,137 @@ strength of the security level that was negotiated.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 11n
-.rt  
 The SASL connection context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpropnum\fR\fR
 .ad
 .RS 11n
-.rt  
 The identifier for the property requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpvalue\fR\fR
 .ad
 .RS 11n
-.rt  
 The value of the SASL property. This value is filled in upon a successful call.
 Possible SASL values include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_USERNAME\fR\fR
 .ad
 .RS 21n
-.rt  
 A pointer to a null-terminated user name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_SSF\fR\fR
 .ad
 .RS 21n
-.rt  
 The security layer security strength factor. If the value of \fBSASL_SSF\fR is
 0, a call to \fBsasl_encode()\fR or \fBsasl_decode()\fR is unnecessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_MAXOUTBUF\fR\fR
 .ad
 .RS 21n
-.rt  
 The maximum size of output buffer returned by the selected security mechanism
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_DEFUSERREALM\fR\fR
 .ad
 .RS 21n
-.rt  
 Server authentication realm used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_GETOPTCTX\fR\fR
 .ad
 .RS 21n
-.rt  
 The context for \fBgetopt()\fR callback.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_IPLOCALPORT\fR\fR
 .ad
 .RS 21n
-.rt  
 Local address string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_IPREMOTEPORT\fR\fR
 .ad
 .RS 21n
-.rt  
 Remote address string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_SERVICE\fR\fR
 .ad
 .RS 21n
-.rt  
 Service passed on to \fBsasl_*_new()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_SERVERFQDN\fR\fR
 .ad
 .RS 21n
-.rt  
 Server FQDN passed on to \fBsasl_*_new()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_AUTHSOURCE\fR\fR
 .ad
 .RS 21n
-.rt  
 Name of authentication source last used. Useful for failed authentication
 tracking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_MECHNAME\fR\fR
 .ad
 .RS 21n
-.rt  
 Active mechanism name, if any.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_PLUGERR\fR\fR
 .ad
 .RS 21n
-.rt  
 Similar to \fBsasl_errdetail()\fR.
 .RE
 
@@ -196,12 +166,10 @@ Similar to \fBsasl_errdetail()\fR.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 11n
-.rt  
 The call to \fBsasl_getprop()\fR was successful.
 .RE
 
@@ -216,15 +184,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

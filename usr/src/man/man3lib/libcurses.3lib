@@ -1,9 +1,23 @@
 '\" te
+.\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libcurses 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.TH LIBCURSES 3LIB "Mar 24, 2004"
 .SH NAME
 libcurses, libtermcap, libtermlib \- screen handling and optimization library
 .SH SYNOPSIS
@@ -15,10 +29,16 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
 .SH DESCRIPTION
 .sp
 .LP
-Functions in the \fBlibcurses\fR library provide a terminal-independent method
-of updating character screens with reasonable optimization. The
-\fBlibtermcap\fR and \fBlibtermlib\fR libraries are identical to
-\fBlibcurses\fR and are maintained for backward compatibility.
+Functions in the \fBlibcurses\fR library provide a terminal-independent
+method of updating character screens with reasonable optimization.
+.LP
+The \fBlibtermcap\fR library is a "filter" on \fBlibcurses\fR
+that provides the traditional BSD-style termcap functions,
+and does so in a way that allows the consuming library or
+application to link with an alternate curses library.
+.LP
+The \fBlibtermlib\fR library is identical to \fBlibcurses\fR and
+is maintained for backward compatibility.
 .sp
 .LP
 See \fBlibcurses\fR(3XCURSES) for information about the curses library that
@@ -26,259 +46,260 @@ conforms to X/Open Curses, Issue 4, Version 2.
 .SH INTERFACES
 .sp
 .LP
-The shared objects \fBlibcurses.so.1\fR, \fBlibtermcap.so.1\fR, and
+The shared objects \fBlibcurses.so.1\fR and
 \fBlibtermlib.so.1\fR provide the public interfaces defined below. See
 \fBIntro\fR(3) for additional information on shared object interfaces.
 .sp
 
-.sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fB_getsyx\fR\fB_meta\fR
-\fB_ring\fR\fB_setecho\fR
-\fB_setnonl\fR\fB_setqiflush\fR
-\fBaddch\fR\fBaddchnstr\fR
-\fBaddchstr\fR\fBaddnstr\fR
-\fBaddnwstr\fR\fBaddstr\fR
-\fBaddwch\fR\fBaddwchnstr\fR
-\fBaddwchstr\fR\fBaddwstr\fR
-\fBattroff\fR\fBattron\fR
-\fBattrset\fR\fBbaudrate\fR
-\fBbeep\fR\fBbkgd\fR
-\fBbkgdset\fR\fBborder\fR
-\fBbox\fR\fBcan_change_color\fR
-\fBcbreak\fR\fBclear\fR
-\fBclearok\fR\fBclrtobot\fR
-\fBclrtoeol\fR\fBcolor_content\fR
-\fBcopywin\fR\fBcrmode\fR
-\fBcurs_set\fR\fBcurserr\fR
-\fBdef_prog_mode\fR\fBdef_shell_mode\fR
-\fBdel_curterm\fR\fBdelay_output\fR
-\fBdelch\fR\fBdeleteln\fR
-\fBdelkeymap\fR\fBdelscreen\fR
-\fBdelwin\fR\fBderwin\fR
-\fBdoupdate\fR\fBdupwin\fR
-\fBecho\fR\fBechochar\fR
-\fBechowchar\fR\fBendwin\fR
-\fBerase\fR\fBerasechar\fR
-\fBfilter\fR\fBflash\fR
-\fBflushinp\fR\fBgetbmap\fR
-\fBgetch\fR\fBgetmouse\fR
-\fBgetnwstr\fR\fBgetstr\fR
-\fBgetwch\fR\fBgetwin\fR
-\fBgetwstr\fR\fBhalfdelay\fR
-\fBhas_colors\fR\fBhas_ic\fR
-\fBhas_il\fR\fBidcok\fR
-\fBidlok\fR\fBimmedok\fR
-\fBinch\fR\fBinchnstr\fR
-\fBinchstr\fR\fBinit_color\fR
-\fBinit_pair\fR\fBinitscr\fR
-\fBinnstr\fR\fBinnwstr\fR
-\fBinsch\fR\fBinsdelln\fR
-\fBinsertln\fR\fBinsnstr\fR
-\fBinsnwstr\fR\fBinsstr\fR
-\fBinstr\fR\fBinswch\fR
-\fBinswstr\fR\fBintrflush\fR
-\fBinwch\fR\fBinwchnstr\fR
-\fBinwchstr\fR\fBinwstr\fR
-\fBis_linetouched\fR\fBis_wintouched\fR
-\fBisendwin\fR\fBkeyname\fR
-\fBkeypad\fR\fBkillchar\fR
-\fBleaveok\fR\fBlongname\fR
-\fBm_addch\fR\fBm_addstr\fR
-\fBm_clear\fR\fBm_erase\fR
-\fBm_initscr\fR\fBm_move\fR
-\fBm_newterm\fR\fBm_refresh\fR
-\fBmap_button\fR\fBmeta\fR
-\fBmouse_off\fR\fBmouse_on\fR
-\fBmouse_set\fR\fBmove\fR
-\fBmvaddch\fR\fBmvaddchnstr\fR
-\fBmvaddchstr\fR\fBmvaddnstr\fR
-\fBmvaddnwstr\fR\fBmvaddstr\fR
-\fBmvaddwch\fR\fBmvaddwchnstr\fR
-\fBmvaddwchstr\fR\fBmvaddwstr\fR
-\fBmvcur\fR\fBmvdelch\fR
-\fBmvderwin\fR\fBmvgetch\fR
-\fBmvgetnwstr\fR\fBmvgetstr\fR
-\fBmvgetwch\fR\fBmvgetwstr\fR
-\fBmvinch\fR\fBmvinchnstr\fR
-\fBmvinchstr\fR\fBmvinnstr\fR
-\fBmvinnwstr\fR\fBmvinsch\fR
-\fBmvinsnstr\fR\fBmvinsnwstr\fR
-\fBmvinsstr\fR\fBmvinstr\fR
-\fBmvinswch\fR\fBmvinswstr\fR
-\fBmvinwch\fR\fBmvinwchnstr\fR
-\fBmvinwchstr\fR\fBmvinwstr\fR
-\fBmvprintw\fR\fBmvscanw\fR
-\fBmvwaddch\fR\fBmvwaddchnstr\fR
-\fBmvwaddchstr\fR\fBmvwaddnstr\fR
-\fBmvwaddnwstr\fR\fBmvwaddstr\fR
-\fBmvwaddwch\fR\fBmvwaddwchnstr\fR
-\fBmvwaddwchstr\fR\fBmvwaddwstr\fR
-\fBmvwdelch\fR\fBmvwgetch\fR
-\fBmvwgetnwstr\fR\fBmvwgetstr\fR
-\fBmvwgetwch\fR\fBmvwgetwstr\fR
-\fBmvwin\fR\fBmvwinch\fR
-\fBmvwinchnstr\fR\fBmvwinchstr\fR
-\fBmvwinnstr\fR\fBmvwinnwstr\fR
-\fBmvwinsch\fR\fBmvwinsnstr\fR
-\fBmvwinsnwstr\fR\fBmvwinsstr\fR
-\fBmvwinstr\fR\fBmvwinswch\fR
-\fBmvwinswstr\fR\fBmvwinwch\fR
-\fBmvwinwchnstr\fR\fBmvwinwchstr\fR
-\fBmvwinwstr\fR\fBmvwprintw\fR
-\fBmvwscanw\fR\fBnapms\fR
-\fBnewkey\fR\fBnewpad\fR
-\fBnewscreen\fR\fBnewterm\fR
-\fBnewwin\fR\fBnl\fR
-\fBnocbreak\fR\fBnocrmode\fR
-\fBnodelay\fR\fBnoecho\fR
-\fBnonl\fR\fBnoqiflush\fR
-\fBnoraw\fR\fBnotimeout\fR
-\fBoverlay\fR\fBoverwrite\fR
-\fBpair_content\fR\fBpechochar\fR
-\fBpechowchar\fR\fBpnoutrefresh\fR
-\fBprefresh\fR\fBprintw\fR
-\fBputp\fR\fBputwin\fR
-\fBqiflush\fR\fBraw\fR
-\fBredrawwin\fR\fBrefresh\fR
-\fBrequest_mouse_pos\fR\fBreset_prog_mode\fR
-\fBreset_shell_mode\fR\fBresetty\fR
-\fBrestartterm\fR\fBripoffline\fR
-\fBsavetty\fR\fBscanw\fR
-\fBscr_dump\fR\fBscr_init\fR
-\fBscr_restore\fR\fBscr_set\fR
-\fBscrl\fR\fBscroll\fR
-\fBscrollok\fR\fBset_term\fR
-\fBsetcurscreen\fR\fBsetscrreg\fR
-\fBsetsyx\fR\fBsetterm\fR
-\fBsetupterm\fR\fBslk_attroff\fR
-\fBslk_attron\fR\fBslk_attrset\fR
-\fBslk_clear\fR\fBslk_init\fR
-\fBslk_label\fR\fBslk_noutrefresh\fR
-\fBslk_refresh\fR\fBslk_restore\fR
-\fBslk_set\fR\fBslk_start\fR
-\fBslk_touch\fR\fBstandend\fR
-\fBstandout\fR\fBstart_color\fR
-\fBsubpad\fR\fBsubwin\fR
-\fBsyncok\fR\fBtermattrs\fR
-\fBtermname\fR\fBtgetent\fR
-\fBtgetflag\fR\fBtgetnum\fR
-\fBtgetstr\fR\fBtgoto\fR
-\fBtigetflag\fR\fBtigetnum\fR
-\fBtigetstr\fR\fBtimeout\fR
-\fBtouchline\fR\fBtouchwin\fR
-\fBtparm\fR\fBtputs\fR
-\fBtraceoff\fR\fBtraceon\fR
-\fBtypeahead\fR\fBunctrl\fR
-\fBungetch\fR\fBungetwch\fR
-\fBuntouchwin\fR\fBvidattr\fR
-\fBvidputs\fR\fBvidupdate\fR
-\fBvwprintw\fR\fBvwscanw\fR
-\fBwaddch\fR\fBwaddchnstr\fR
-\fBwaddchstr\fR\fBwaddnstr\fR
-\fBwaddnwstr\fR\fBwaddstr\fR
-\fBwaddwch\fR\fBwaddwchnstr\fR
-\fBwaddwchstr\fR\fBwaddwstr\fR
-\fBwadjcurspos\fR\fBwattroff\fR
-\fBwattron\fR\fBwattrset\fR
-\fBwbkgd\fR\fBwbkgdset\fR
-\fBwborder\fR\fBwclear\fR
-\fBwclrtobot\fR\fBwclrtoeol\fR
-\fBwcursyncup\fR\fBwdelch\fR
-\fBwdeleteln\fR\fBwechochar\fR
-\fBwechowchar\fR\fBwerase\fR
-\fBwgetch\fR\fBwgetnstr\fR
-\fBwgetnwstr\fR\fBwgetstr\fR
-\fBwgetwch\fR\fBwgetwstr\fR
-\fBwhline\fR\fBwinch\fR
-\fBwinchnstr\fR\fBwinchstr\fR
-\fBwinnstr\fR\fBwinnwstr\fR
-\fBwinsch\fR\fBwinsdelln\fR
-\fBwinsertln\fR\fBwinsnstr\fR
-\fBwinsnwstr\fR\fBwinsstr\fR
-\fBwinstr\fR\fBwinswch\fR
-\fBwinswstr\fR\fBwinwch\fR
-\fBwinwchnstr\fR\fBwinwchstr\fR
-\fBwinwstr\fR\fBwmouse_position\fR
-\fBwmove\fR\fBwmovenextch\fR
-\fBwmoveprevch\fR\fBwnoutrefresh\fR
-\fBwprintw\fR\fBwredrawln\fR
-\fBwrefresh\fR\fBwscanw\fR
-\fBwscrl\fR\fBwsetscrreg\fR
-\fBwstandend\fR\fBwstandout\fR
-\fBwsyncdown\fR\fBwsyncup\fR
-\fBwtimeout\fR\fBwtouchln\fR
-\fBwvline\fR
+l l
+l l .
+\fB_getsyx\fR	\fB_meta\fR
+\fB_ring\fR	\fB_setecho\fR
+\fB_setnonl\fR	\fB_setqiflush\fR
+\fBaddch\fR	\fBaddchnstr\fR
+\fBaddchstr\fR	\fBaddnstr\fR
+\fBaddnwstr\fR	\fBaddstr\fR
+\fBaddwch\fR	\fBaddwchnstr\fR
+\fBaddwchstr\fR	\fBaddwstr\fR
+\fBattroff\fR	\fBattron\fR
+\fBattrset\fR	\fBbaudrate\fR
+\fBbeep\fR	\fBbkgd\fR
+\fBbkgdset\fR	\fBborder\fR
+\fBbox\fR	\fBcan_change_color\fR
+\fBcbreak\fR	\fBclear\fR
+\fBclearok\fR	\fBclrtobot\fR
+\fBclrtoeol\fR	\fBcolor_content\fR
+\fBcopywin\fR	\fBcrmode\fR
+\fBcurs_set\fR	\fBcurserr\fR
+\fBdef_prog_mode\fR	\fBdef_shell_mode\fR
+\fBdel_curterm\fR	\fBdelay_output\fR
+\fBdelch\fR	\fBdeleteln\fR
+\fBdelkeymap\fR	\fBdelscreen\fR
+\fBdelwin\fR	\fBderwin\fR
+\fBdoupdate\fR	\fBdupwin\fR
+\fBecho\fR	\fBechochar\fR
+\fBechowchar\fR	\fBendwin\fR
+\fBerase\fR	\fBerasechar\fR
+\fBfilter\fR	\fBflash\fR
+\fBflushinp\fR	\fBgetbmap\fR
+\fBgetch\fR	\fBgetmouse\fR
+\fBgetnwstr\fR	\fBgetstr\fR
+\fBgetwch\fR	\fBgetwin\fR
+\fBgetwstr\fR	\fBhalfdelay\fR
+\fBhas_colors\fR	\fBhas_ic\fR
+\fBhas_il\fR	\fBidcok\fR
+\fBidlok\fR	\fBimmedok\fR
+\fBinch\fR	\fBinchnstr\fR
+\fBinchstr\fR	\fBinit_color\fR
+\fBinit_pair\fR	\fBinitscr\fR
+\fBinnstr\fR	\fBinnwstr\fR
+\fBinsch\fR	\fBinsdelln\fR
+\fBinsertln\fR	\fBinsnstr\fR
+\fBinsnwstr\fR	\fBinsstr\fR
+\fBinstr\fR	\fBinswch\fR
+\fBinswstr\fR	\fBintrflush\fR
+\fBinwch\fR	\fBinwchnstr\fR
+\fBinwchstr\fR	\fBinwstr\fR
+\fBis_linetouched\fR	\fBis_wintouched\fR
+\fBisendwin\fR	\fBkeyname\fR
+\fBkeypad\fR	\fBkillchar\fR
+\fBleaveok\fR	\fBlongname\fR
+\fBm_addch\fR	\fBm_addstr\fR
+\fBm_clear\fR	\fBm_erase\fR
+\fBm_initscr\fR	\fBm_move\fR
+\fBm_newterm\fR	\fBm_refresh\fR
+\fBmap_button\fR	\fBmeta\fR
+\fBmouse_off\fR	\fBmouse_on\fR
+\fBmouse_set\fR	\fBmove\fR
+\fBmvaddch\fR	\fBmvaddchnstr\fR
+\fBmvaddchstr\fR	\fBmvaddnstr\fR
+\fBmvaddnwstr\fR	\fBmvaddstr\fR
+\fBmvaddwch\fR	\fBmvaddwchnstr\fR
+\fBmvaddwchstr\fR	\fBmvaddwstr\fR
+\fBmvcur\fR	\fBmvdelch\fR
+\fBmvderwin\fR	\fBmvgetch\fR
+\fBmvgetnwstr\fR	\fBmvgetstr\fR
+\fBmvgetwch\fR	\fBmvgetwstr\fR
+\fBmvinch\fR	\fBmvinchnstr\fR
+\fBmvinchstr\fR	\fBmvinnstr\fR
+\fBmvinnwstr\fR	\fBmvinsch\fR
+\fBmvinsnstr\fR	\fBmvinsnwstr\fR
+\fBmvinsstr\fR	\fBmvinstr\fR
+\fBmvinswch\fR	\fBmvinswstr\fR
+\fBmvinwch\fR	\fBmvinwchnstr\fR
+\fBmvinwchstr\fR	\fBmvinwstr\fR
+\fBmvprintw\fR	\fBmvscanw\fR
+\fBmvwaddch\fR	\fBmvwaddchnstr\fR
+\fBmvwaddchstr\fR	\fBmvwaddnstr\fR
+\fBmvwaddnwstr\fR	\fBmvwaddstr\fR
+\fBmvwaddwch\fR	\fBmvwaddwchnstr\fR
+\fBmvwaddwchstr\fR	\fBmvwaddwstr\fR
+\fBmvwdelch\fR	\fBmvwgetch\fR
+\fBmvwgetnwstr\fR	\fBmvwgetstr\fR
+\fBmvwgetwch\fR	\fBmvwgetwstr\fR
+\fBmvwin\fR	\fBmvwinch\fR
+\fBmvwinchnstr\fR	\fBmvwinchstr\fR
+\fBmvwinnstr\fR	\fBmvwinnwstr\fR
+\fBmvwinsch\fR	\fBmvwinsnstr\fR
+\fBmvwinsnwstr\fR	\fBmvwinsstr\fR
+\fBmvwinstr\fR	\fBmvwinswch\fR
+\fBmvwinswstr\fR	\fBmvwinwch\fR
+\fBmvwinwchnstr\fR	\fBmvwinwchstr\fR
+\fBmvwinwstr\fR	\fBmvwprintw\fR
+\fBmvwscanw\fR	\fBnapms\fR
+\fBnewkey\fR	\fBnewpad\fR
+\fBnewscreen\fR	\fBnewterm\fR
+\fBnewwin\fR	\fBnl\fR
+\fBnocbreak\fR	\fBnocrmode\fR
+\fBnodelay\fR	\fBnoecho\fR
+\fBnonl\fR	\fBnoqiflush\fR
+\fBnoraw\fR	\fBnotimeout\fR
+\fBoverlay\fR	\fBoverwrite\fR
+\fBpair_content\fR	\fBpechochar\fR
+\fBpechowchar\fR	\fBpnoutrefresh\fR
+\fBprefresh\fR	\fBprintw\fR
+\fBputp\fR	\fBputwin\fR
+\fBqiflush\fR	\fBraw\fR
+\fBredrawwin\fR	\fBrefresh\fR
+\fBrequest_mouse_pos\fR	\fBreset_prog_mode\fR
+\fBreset_shell_mode\fR	\fBresetty\fR
+\fBrestartterm\fR	\fBripoffline\fR
+\fBsavetty\fR	\fBscanw\fR
+\fBscr_dump\fR	\fBscr_init\fR
+\fBscr_restore\fR	\fBscr_set\fR
+\fBscrl\fR	\fBscroll\fR
+\fBscrollok\fR	\fBset_term\fR
+\fBsetcurscreen\fR	\fBsetscrreg\fR
+\fBsetsyx\fR	\fBsetterm\fR
+\fBsetupterm\fR	\fBslk_attroff\fR
+\fBslk_attron\fR	\fBslk_attrset\fR
+\fBslk_clear\fR	\fBslk_init\fR
+\fBslk_label\fR	\fBslk_noutrefresh\fR
+\fBslk_refresh\fR	\fBslk_restore\fR
+\fBslk_set\fR	\fBslk_start\fR
+\fBslk_touch\fR	\fBstandend\fR
+\fBstandout\fR	\fBstart_color\fR
+\fBsubpad\fR	\fBsubwin\fR
+\fBsyncok\fR	\fBtermattrs\fR
+\fBtermname\fR	\fBtgetent\fR
+\fBtgetflag\fR	\fBtgetnum\fR
+\fBtgetstr\fR	\fBtgoto\fR
+\fBtigetflag\fR	\fBtigetnum\fR
+\fBtigetstr\fR	\fBtimeout\fR
+\fBtouchline\fR	\fBtouchwin\fR
+\fBtparm\fR	\fBtputs\fR
+\fBtraceoff\fR	\fBtraceon\fR
+\fBtypeahead\fR	\fBunctrl\fR
+\fBungetch\fR	\fBungetwch\fR
+\fBuntouchwin\fR	\fBvidattr\fR
+\fBvidputs\fR	\fBvidupdate\fR
+\fBvwprintw\fR	\fBvwscanw\fR
+\fBwaddch\fR	\fBwaddchnstr\fR
+\fBwaddchstr\fR	\fBwaddnstr\fR
+\fBwaddnwstr\fR	\fBwaddstr\fR
+\fBwaddwch\fR	\fBwaddwchnstr\fR
+\fBwaddwchstr\fR	\fBwaddwstr\fR
+\fBwadjcurspos\fR	\fBwattroff\fR
+\fBwattron\fR	\fBwattrset\fR
+\fBwbkgd\fR	\fBwbkgdset\fR
+\fBwborder\fR	\fBwclear\fR
+\fBwclrtobot\fR	\fBwclrtoeol\fR
+\fBwcursyncup\fR	\fBwdelch\fR
+\fBwdeleteln\fR	\fBwechochar\fR
+\fBwechowchar\fR	\fBwerase\fR
+\fBwgetch\fR	\fBwgetnstr\fR
+\fBwgetnwstr\fR	\fBwgetstr\fR
+\fBwgetwch\fR	\fBwgetwstr\fR
+\fBwhline\fR	\fBwinch\fR
+\fBwinchnstr\fR	\fBwinchstr\fR
+\fBwinnstr\fR	\fBwinnwstr\fR
+\fBwinsch\fR	\fBwinsdelln\fR
+\fBwinsertln\fR	\fBwinsnstr\fR
+\fBwinsnwstr\fR	\fBwinsstr\fR
+\fBwinstr\fR	\fBwinswch\fR
+\fBwinswstr\fR	\fBwinwch\fR
+\fBwinwchnstr\fR	\fBwinwchstr\fR
+\fBwinwstr\fR	\fBwmouse_position\fR
+\fBwmove\fR	\fBwmovenextch\fR
+\fBwmoveprevch\fR	\fBwnoutrefresh\fR
+\fBwprintw\fR	\fBwredrawln\fR
+\fBwrefresh\fR	\fBwscanw\fR
+\fBwscrl\fR	\fBwsetscrreg\fR
+\fBwstandend\fR	\fBwstandout\fR
+\fBwsyncdown\fR	\fBwsyncup\fR
+\fBwtimeout\fR	\fBwtouchln\fR
+\fBwvline\fR	
+.TE
+
+.LP
+The shared object \fBlibtermcap.so.1\fR provides the traditional
+BSD-style interfaces defined below:
+.sp
+
+.TS
+l l
+l l .
+\fBtgetent\fR
+\fBtgetflag\fR
+\fBtgetnum\fR
+\fBtgetstr\fR
+\fBtgoto\fR
+\fBtputs\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libcurses.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libcurses.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libtermcap.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 shared object (symbolic link to \fB/lib/libcurses.so.1\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libtermcap.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object (symbolic link to \fB/lib/64/libcurses.so.1\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libtermlib.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 shared object (symbolic link to \fB/lib/libcurses.so.1\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libtermlib.so.1\fR \fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object (symbolic link to \fB/lib/64/libcurses.so.1\fR)
 .RE
 
@@ -290,12 +311,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-MT-LevelUnsafe
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

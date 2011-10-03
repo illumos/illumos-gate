@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_intr_add_softint 9F "16 Oct 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_INTR_ADD_SOFTINT 9F "Oct 16, 2005"
 .SH NAME
 ddi_intr_add_softint, ddi_intr_remove_softint, ddi_intr_trigger_softint,
 ddi_intr_get_softint_pri, ddi_intr_set_softint_pri \- software interrupt
@@ -18,8 +18,8 @@ handling routines
 
 
 
-\fBint\fR \fBddi_intr_add_softint\fR(\fBdev_info_t *\fR\fIdip\fR, 
-     \fBddi_softint_handle_t *\fR\fIh\fR, \fBint\fR \fIsoft_pri\fR, 
+\fBint\fR \fBddi_intr_add_softint\fR(\fBdev_info_t *\fR\fIdip\fR,
+     \fBddi_softint_handle_t *\fR\fIh\fR, \fBint\fR \fIsoft_pri\fR,
      \fBddi_intr_handler_t\fR \fIhandler\fR, \fBvoid *\fR\fIarg1\fR);
 .fi
 
@@ -56,56 +56,46 @@ Solaris DDI specific (Solaris DDI).
 \fBddi_intr_add_softint()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the DDI soft interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsoft_pri\fR\fR
 .ad
 .RS 12n
-.rt  
 Priority to associate with a soft interrupt
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandler\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to soft interrupt handler
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg1\fR\fR
 .ad
 .RS 12n
-.rt  
 Argument for the soft interrupt handler
 .RE
 
@@ -114,23 +104,19 @@ Argument for the soft interrupt handler
 \fBddi_intr_trigger_softint()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 8n
-.rt  
 DDI soft interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg2\fR\fR
 .ad
 .RS 8n
-.rt  
 Additional argument for the soft interrupt handler
 .RE
 
@@ -139,12 +125,10 @@ Additional argument for the soft interrupt handler
 \fBddi_intr_remove_softint()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 5n
-.rt  
 DDI soft interrupt handle
 .RE
 
@@ -153,23 +137,19 @@ DDI soft interrupt handle
 \fBddi_intr_get_softint_pri()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 13n
-.rt  
 DDI soft interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsoft_prip\fR\fR
 .ad
 .RS 13n
-.rt  
 Soft interrupt priority of the handle
 .RE
 
@@ -178,23 +158,19 @@ Soft interrupt priority of the handle
 \fBddi_intr_set_softint_pri()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIh\fR\fR
 .ad
 .RS 13n
-.rt  
 DDI soft interrupt handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsoft_prip\fR\fR
 .ad
 .RS 13n
-.rt  
 Soft interrupt priority of the handle
 .RE
 
@@ -271,56 +247,46 @@ The \fBddi_intr_add_softint()\fR, \fBddi_intr_remove_softint()\fR,
 \fBddi_intr_set_softint_pri()\fR functions return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 16n
-.rt  
 On success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EAGAIN\fR\fR
 .ad
 .RS 16n
-.rt  
 On encountering internal error regarding currently unavailable resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 On encountering invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 16n
-.rt  
 On any implementation specific failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EPENDING\fR\fR
 .ad
 .RS 16n
-.rt  
 On encountering a previously triggered softint event that is pending.
 .RE
 
@@ -530,13 +496,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

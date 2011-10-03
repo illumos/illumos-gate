@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mnttab 4 "20 Dec 2003" "SunOS 5.11" "File Formats"
+.TH MNTTAB 4 "Dec 20, 2003"
 .SH NAME
 mnttab \- mounted file system table
 .SH DESCRIPTION
@@ -36,57 +36,47 @@ Each entry is a line of fields separated by TABs in the form:
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspecial\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the resource that has been mounted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImount_point\fR\fR
 .ad
 .RS 15n
-.rt  
 The pathname of the directory on which the filesystem is mounted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfstype\fR\fR
 .ad
 .RS 15n
-.rt  
 The file system type of the mounted file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoptions\fR\fR
 .ad
 .RS 15n
-.rt  
 The mount options. See respective mount file system man page in the See Also
 section below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime\fR\fR
 .ad
 .RS 15n
-.rt  
 The time at which the file system was mounted.
 .RE
 
@@ -102,24 +92,20 @@ with \fBmkfile\fR(1M).
 The following \fBioctl\fR(2) calls are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNTIOC_NMNTS\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns the count of mounted resources in the current snapshot in the
 \fBuint32_t\fR pointed to by \fIarg\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNTIOC_GETDEVLIST\fR\fR
 .ad
 .RS 21n
-.rt  
 Returns an array of \fBuint32_t\fR's that is twice as long as the length
 returned by \fBMNTIOC_NMNTS\fR. Each pair of numbers is the major and minor
 device number for the file system at the corresponding  line in the current
@@ -129,12 +115,10 @@ the device number information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNTIOC_SETTAG\fR\fR
 .ad
 .RS 21n
-.rt  
 Sets a tag word into the options list for a mounted file system. A tag is a
 notation that will appear in the options string of a mounted file system but it
 is not recognized or interpreted by the file system code. \fIarg\fR points to a
@@ -158,12 +142,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMNTIOC_CLRTAG\fR\fR
 .ad
 .RS 21n
-.rt  
 Marks a tag in the options list for a mounted file system as not set. \fIarg\fR
 points to the same structure as \fBMNTIOC_SETTAG\fR, which identifies the file
 system and tag to be cleared.
@@ -175,12 +157,10 @@ privilege.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The arg pointer in an \fBMNTIOC_ ioctl\fR call pointed to an inaccessible
 memory location or a character pointer in a \fBmnttagdesc\fR structure pointed
 to an inaccessible memory location.
@@ -188,24 +168,20 @@ to an inaccessible memory location.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The tag specified in a \fBMNTIOC_SETTAG\fR call already exists as a file system
 option, or the tag specified in a \fBMNTIOC_CLRTAG\fR call does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The tag specified in a \fBMNTIOC_SETTAG\fR call is too long or the tag would
 make the total length of the option string for the mounted file system too
 long.
@@ -213,12 +189,10 @@ long.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 16n
-.rt  
 The calling process does not have \fB{PRIV_SYS_MOUNT}\fR privilege and either a
 \fBMNTIOC_SETTAG\fR or \fBMNTIOC_CLRTAG\fR call was made.
 .RE
@@ -226,23 +200,19 @@ The calling process does not have \fB{PRIV_SYS_MOUNT}\fR privilege and either a
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
 .RS 28n
-.rt  
 Usual mount point for \fBmnttab\fR file system
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/sys/mntio.h\fR\fR
 .ad
 .RS 28n
-.rt  
 Header file that contains \fBIOCTL\fR definitions
 .RE
 

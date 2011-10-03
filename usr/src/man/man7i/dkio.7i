@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dkio 7I "3 Aug 2009" "SunOS 5.11" "Ioctl Requests"
+.TH DKIO 7I "Aug 3, 2009"
 .SH NAME
 dkio \- disk control operations
 .SH SYNOPSIS
@@ -31,7 +31,6 @@ The following \fBioctl()\fR requests set and/or retrieve the current disk
 controller, partitions, or geometry information on all architectures:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCINFO\fR\fR
 .ad
@@ -49,7 +48,7 @@ processing done on the controller.
  * Structures and definitions for disk I/O control commands
  */
 #define DK_DEVLEN 16   /* device name max length, */
-                       /* including unit # and NULL */ 
+                       /* including unit # and NULL */
                        /* Used for controller info */
 struct dk_cinfo {
      char      dki_cname[DK_DEVLEN];    /* controller name */
@@ -109,7 +108,7 @@ struct dk_cinfo {
                                             /* bad  sector fwding */
      #define DKI_MAPTRK       0x02          /* controller does */
                                             /* track mapping */
-     #define DKI_FMTTRK       0x04          /* formats only  full  
+     #define DKI_FMTTRK       0x04          /* formats only  full
                                             /* track at a time*/
      #define DKI_FMTVOL       0x08          /* formats only full */
                                             /* volume at a time*/
@@ -124,7 +123,6 @@ struct dk_cinfo {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGAPART\fR\fR
 .ad
@@ -137,7 +135,6 @@ for disk drive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSAPART\fR\fR
 .ad
@@ -168,12 +165,10 @@ struct dk_allmap {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGGEOM\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBdk_geom\fR structure (described below). This
 \fBioctl()\fR gets the controller's notion of the current geometry of the disk
 drive.
@@ -181,12 +176,10 @@ drive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSGEOM\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBdk_geom\fR structure (described below). This
 \fBioctl()\fR sets the controller's notion of the geometry without changing the
 disk itself.
@@ -194,12 +187,10 @@ disk itself.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGVTOC\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBvtoc\fR structure (described below). This
 \fBioctl()\fR returns the device's current volume table of contents (VTOC.) For
 disks larger than 1TB, DKIOCGEXTVTOC must be used instead.
@@ -207,12 +198,10 @@ disks larger than 1TB, DKIOCGEXTVTOC must be used instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSVTOC\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to a \fBvtoc\fR structure (described below). This
 \fBioctl()\fR changes the VTOC associated with the device. For disks larger
 than 1TB, DKIOCSEXTVTOC must be used instead.
@@ -223,10 +212,10 @@ than 1TB, DKIOCSEXTVTOC must be used instead.
 .nf
 struct partition {
 ushort_t      p_tag;         /* ID tag of partition */
-ushort_t      p_flag;        /* permission flags */ 
-daddr_t       p_start;       /* start sector of partition */ 
-long          p_size;        /* # of blocks in partition */ 
-}; 
+ushort_t      p_flag;        /* permission flags */
+daddr_t       p_start;       /* start sector of partition */
+long          p_size;        /* # of blocks in partition */
+};
 .fi
 .in -2
 
@@ -238,50 +227,47 @@ cylinder, multiply the number of heads by the number of sectors per track.
 .sp
 .in +2
 .nf
-struct vtoc {      
+struct vtoc {
 unsigned long     v_bootinfo[3];               /* info needed by mboot
-                                               /* (unsupported)*/ 
+                                               /* (unsupported)*/
 unsigned long     v_sanity;                    /* to verify vtoc */
                                                /* sanity */
-unsigned long     v_version;                   /* layout version */ 
+unsigned long     v_version;                   /* layout version */
 char              v_volume[LEN_DKL_VVOL];      /* volume name */
-ushort_t          v_sectorsz;                  \* 
-     sector size in bytes*/                      
-ushort_t          v_nparts;                    \* 
-     number of partitions*/                       
-unsigned long     v_reserved[10];              /* free space */ 
-struct partition  v_part[V_NUMPAR];            /* partition headers */ 
+ushort_t          v_sectorsz;                  /* sector size in bytes*/
+ushort_t          v_nparts;                    /* number of partitions*/
+unsigned long     v_reserved[10];              /* free space */
+struct partition  v_part[V_NUMPAR];            /* partition headers */
 time_t            timestamp[V_NUMPAR];         /* partition timestamp */
-                                               /* (unsupported) */ 
-char              v_asciilabel[LEN_DKL_ASCII]; /* compatibility */ 
-};       
+                                               /* (unsupported) */
+char              v_asciilabel[LEN_DKL_ASCII]; /* compatibility */
+};
 
-/*       
-* Partition permission flags       
-*/       
+/*
+* Partition permission flags
+*/
 
-#define V_UNMNT      0x01    /* Unmountable partition */ 
-#define V_RONLY      0x10    /* Read only */ 
+#define V_UNMNT      0x01    /* Unmountable partition */
+#define V_RONLY      0x10    /* Read only */
 
-/*       
-* Partition identification tags       
-*/       
+/*
+* Partition identification tags
+*/
 
-#define V_UNASSIGNED   0x00  /* unassigned partition */ 
-#define V_BOOT         0x01  /* Boot partition */ 
-#define V_ROOT         0x02  /* Root filesystem */ 
-#define V_SWAP         0x03  /* Swap filesystem */ 
-#define V_USR          0x04  /* Usr filesystem */ 
-#define V_BACKUP       0x05  /* full disk */ 
-#define V_VAR          0x07  /* Var partition */ 
-#define V_HOME         0x08  /* Home partition */ 
-#define V_ALTSCTR      0x09  /* Alternate sector partition */  
+#define V_UNASSIGNED   0x00  /* unassigned partition */
+#define V_BOOT         0x01  /* Boot partition */
+#define V_ROOT         0x02  /* Root filesystem */
+#define V_SWAP         0x03  /* Swap filesystem */
+#define V_USR          0x04  /* Usr filesystem */
+#define V_BACKUP       0x05  /* full disk */
+#define V_VAR          0x07  /* Var partition */
+#define V_HOME         0x08  /* Home partition */
+#define V_ALTSCTR      0x09  /* Alternate sector partition */
 .fi
 .in -2
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGEXTVTOC\fR\fR
 .ad
@@ -295,7 +281,6 @@ ioctl must be used instead of \fBDKIOCGVTOC\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSEXTVTOC\fR\fR
 .ad
@@ -315,8 +300,8 @@ ushort_t p_pad[2];       /* reserved */
 diskaddr_t p_start;      /* start sector no of partition */
 diskaddr_t p_size;       /* # of blocks in partition */
 };
- 
- 
+
+
 struct extvtoc {
 uint64_t   v_bootinfo[3]; /* info needed by mboot (unsupported) */
 uint64_t   v_sanity;     /* to verify vtoc sanity */
@@ -331,7 +316,7 @@ uint64_t timestamp[V_NUMPAR]; /* partition timestamp (unsupported)*/
 char    v_asciilabel[LEN_DKL_ASCII];    /* for compatibility */
 };
 
-Partition permissions flags and identification tags 
+Partition permissions flags and identification tags
 are defined the same as vtoc structure.
 .fi
 .in -2
@@ -340,7 +325,6 @@ are defined the same as vtoc structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCEJECT\fR\fR
 .ad
@@ -352,7 +336,6 @@ drive to eject its disk.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCREMOVABLE\fR\fR
 .ad
@@ -366,7 +349,6 @@ to \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCHOTPLUGGABLE\fR\fR
 .ad
@@ -380,7 +362,6 @@ to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSTATE\fR\fR
 .ad
@@ -394,10 +375,10 @@ to by the argument is updated with the current state of the drive.
 .sp
 .in +2
 .nf
-enum dkio_state { 
-DKIO_NONE,          /* Return disk's current state */ 
-DKIO_EJECTED,       /* Disk state is 'ejected' */ 
-DKIO_INSERTED       /* Disk state is 'inserted' */ 
+enum dkio_state {
+DKIO_NONE,          /* Return disk's current state */
+DKIO_EJECTED,       /* Disk state is 'ejected' */
+DKIO_INSERTED       /* Disk state is 'inserted' */
 };
 .fi
 .in -2
@@ -406,7 +387,6 @@ DKIO_INSERTED       /* Disk state is 'inserted' */
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCLOCK\fR\fR
 .ad
@@ -418,7 +398,6 @@ lock the door.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCUNLOCK\fR\fR
 .ad
@@ -430,7 +409,6 @@ unlock the door.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGMEDIAINFO\fR\fR
 .ad
@@ -446,7 +424,6 @@ blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGMEDIAINFOEXT\fR\fR
 .ad
@@ -489,8 +466,8 @@ uint_t dki_pbsize; /* Physical blocksize of media */
 #define DK_UNKNOWN         0x00    /* Media inserted - type unknown */
 
 /*
-* SFF 8090 Specification Version 3, media types 0x01 - 0xfffe are 
-* retained to maintain compatibility with SFF8090.  The following 
+* SFF 8090 Specification Version 3, media types 0x01 - 0xfffe are
+* retained to maintain compatibility with SFF8090.  The following
 * define the optical media type.
 */
 #define DK_MO_ERASABLE     0x03 /* MO Erasable */
@@ -532,7 +509,6 @@ If identification is not possible, the host returns media type
 \fBDK_UNKNOWN\fR. See \fINOTES\fR for blocksize usage and capacity information.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSMBOOT\fR\fR
 .ad
@@ -604,7 +580,6 @@ partitions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCGETVOLCAP\fR\fR
 .ad
@@ -617,10 +592,10 @@ This ioctl provides information and status of available capabilities.
 .in +2
 .nf
 DKV_ABR_CAP -  Capable of application-based recovery
-DKV_DMR_CAP -  Ability to read specific copy of data when 
-               multiple copies exist. For example, in a two 
+DKV_DMR_CAP -  Ability to read specific copy of data when
+               multiple copies exist. For example, in a two
                way mirror, this ioctl is used to read each
-               side of the mirror. 
+               side of the mirror.
 .fi
 .in -2
 
@@ -630,7 +605,7 @@ DKV_DMR_CAP -  Ability to read specific copy of data when
 .nf
 DKV_ABR_CAP - This flag is set if ABR has been set on a device
               that supports ABR functionality.
-DKV_DMR_CAP - Directed read has been enabled. 
+DKV_DMR_CAP - Directed read has been enabled.
 .fi
 .in -2
 
@@ -646,23 +621,19 @@ persistent so that the VM know whether or not to perform recovery.
 Return Errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Invalid device for this operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 Functionality that is attempted to be set is not supported.
 .RE
 
@@ -670,7 +641,6 @@ Functionality that is attempted to be set is not supported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSETVOLCAP\fR\fR
 .ad
@@ -686,7 +656,7 @@ is not set in vc_set, that capability is cleared.
 .in +2
 .nf
 DKV_ABR_CAP - Flag to set application-based recovery. A device can
-              successfully support ABR only if it is capable. 
+              successfully support ABR only if it is capable.
 DKV_DMR_CAP - Flag to set directed read.
 
 
@@ -699,7 +669,6 @@ ioctl(int , DKIODMR, vol_directed_rd *);
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIODMR\fR\fR
 .ad
@@ -713,8 +682,8 @@ from the underlying devices of a replicated device.
 vdr_offset      - offset at which the read should occur.
 vdr_nbytes      - number of bytes to be read
 vdr_bytesread   - number of bytes successfully read by the kernel.
-vdr_data        - pointer to a user allocated buffer to return the 
-                  data read 
+vdr_data        - pointer to a user allocated buffer to return the
+                  data read
 vdr_side        - side to be read. Initialized to DKV_SIDE_INIT
 vdr_side_name   - The volume name that has been read.
 
@@ -796,7 +765,6 @@ The following \fBioctl()\fR requests set and/or retrieve the current disk
 controller, partitions, or geometry information on the x86 architecture.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCG_PHYGEOM\fR\fR
 .ad
@@ -809,7 +777,6 @@ drive. It is functionally identical to the \fBDKIOCGGEOM\fR \fBioctl()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCG_VIRTGEOM\fR\fR
 .ad
@@ -826,26 +793,26 @@ geometry is not relevant or useful for this drive.
 .sp
 .in +2
 .nf
-/*  
-* Definition of a disk's geometry  
+/*
+* Definition of a disk's geometry
 */
-*/struct dk_geom { 
-unsigned shor    dkg_ncyl;             /* # of data cylinders */ 
-unsigned shor    dkg_acyl;             /* # of alternate cylinders */  
+*/struct dk_geom {
+unsigned shor    dkg_ncyl;             /* # of data cylinders */
+unsigned shor    dkg_acyl;             /* # of alternate cylinders */
 unsigned short   dkg_bcyl;             /* cyl offset (for fixed head */
                                        /* area) */
-unsigned short   dkg_nhead;            /* # of heads */      
-unsigned short   dkg_obs1;             /* obsolete */      
+unsigned short   dkg_nhead;            /* # of heads */
+unsigned short   dkg_obs1;             /* obsolete */
 unsigned short   dkg_nsect;            /* # of sectors per track*/
-unsigned short   dkg_intrlv;           /* interleave factor */ 
-unsigned short   dkg_obs2;             /* obsolete */  
-unsigned short   dkg_obs3;             /* obsolete */ 
+unsigned short   dkg_intrlv;           /* interleave factor */
+unsigned short   dkg_obs2;             /* obsolete */
+unsigned short   dkg_obs3;             /* obsolete */
 unsigned short   dkg_apc;              /* alternates per cylinder */
-                                       /* (SCSI only) */  
-unsigned short   dkg_rpm;              /* revolutions per min*/ 
-unsigned short   dkg_pcyl;             /* # of physical cylinders */ 
+                                       /* (SCSI only) */
+unsigned short   dkg_rpm;              /* revolutions per min*/
+unsigned short   dkg_pcyl;             /* # of physical cylinders */
 unsigned short   dkg_write_reinstruct; /* # sectors to skip, writes*/
-unsigned short   dkg_read_reinstruct;  /* # sectors to skip, reads*/ 
+unsigned short   dkg_read_reinstruct;  /* # sectors to skip, reads*/
 unsigned short   dkg_extra[7];         /* for compatible expansion*/
 };
 .fi
@@ -853,7 +820,6 @@ unsigned short   dkg_extra[7];         /* for compatible expansion*/
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCADDBAD\fR\fR
 .ad
@@ -869,7 +835,6 @@ alternate sectors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCPARTINFO\fR\fR
 .ad
@@ -895,7 +860,6 @@ int        p_length;
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCEXTPARTINFO\fR\fR
 .ad
@@ -922,7 +886,6 @@ diskaddr_t       p_length;
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDKIOCSETEXTPART\fR\fR
 .ad

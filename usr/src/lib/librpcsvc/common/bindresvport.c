@@ -18,10 +18,11 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,8 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * XXX This routine should be changed to use
@@ -85,7 +84,7 @@ __clnt_bindresvport(cl)
 		return (-1);
 	if ((nconf->nc_semantics != NC_TPI_CLTS) ||
 		(strcmp(nconf->nc_protofmly, NC_INET) &&
-		strcmp(nconf->nc_protofmly, NC_INET)) ||
+		strcmp(nconf->nc_protofmly, NC_INET6)) ||
 		strcmp(nconf->nc_proto, NC_UDP)) {
 		freenetconfigent(nconf);
 		return (0);	/* not udp - don't need resv port */
@@ -159,7 +158,10 @@ __clnt_bindresvport(cl)
 	port = (getpid() % NPORTS) + STARTPORT;
 
 	for (i = 0; i < NPORTS; i++) {
-		sin->sin_port = htons(port++);
+		if (ipv6_fl == TRUE)
+			sin6->sin6_port = htons(port++);
+		else
+			sin->sin_port = htons(port++);
 		if (port > ENDPORT)
 			port = STARTPORT;
 		/*

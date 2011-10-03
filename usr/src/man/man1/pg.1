@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pg 1 "25 Feb 1996" "SunOS 5.11" "User Commands"
+.TH PG 1 "Feb 25, 1996"
 .SH NAME
 pg \- files perusal filter for CRTs
 .SH SYNOPSIS
 .LP
 .nf
-\fBpg\fR [\fB-\fInumber\fR\fR] [\fB-p\fR \fIstring\fR] [\fB-cefnrs\fR] [+ \fIlinenumber\fR] 
+\fBpg\fR [\fB-\fInumber\fR\fR] [\fB-p\fR \fIstring\fR] [\fB-cefnrs\fR] [+ \fIlinenumber\fR]
      [+/ \fIpattern\fR /] [\fIfilename\fR]...
 .fi
 
@@ -36,12 +36,10 @@ base for the terminal type specified by the environment variable \fBTERM\fR. If
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fInumber\fR\fR
 .ad
 .RS 15n
-.rt  
 An integer specifying the size (in lines) of the window that \fBpg\fR is to use
 instead of the default. (On a terminal containing 24 lines, the default window
 size is 23).
@@ -49,12 +47,10 @@ size is 23).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fIstring\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBpg\fR uses \fIstring\fR as the prompt. If the prompt string contains a
 \fB%d\fR, the first occurrence of \fB%d\fR in the prompt will be replaced by
 the current page number when the prompt is issued. The default prompt string is
@@ -63,12 +59,10 @@ the current page number when the prompt is issued. The default prompt string is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 15n
-.rt  
 Home the cursor and clear the screen before displaying each page. This option
 is ignored if \fBclear_screen\fR is not defined for this terminal type in the
 \fBterminfo\fR(4) data base.
@@ -76,23 +70,19 @@ is ignored if \fBclear_screen\fR is not defined for this terminal type in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBpg\fR does \fInot\fR pause at the end of each file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Normally, \fBpg\fR splits lines longer than the screen width, but some
 sequences of characters in the text being displayed (for instance, escape
 sequences for underlining) generate undesirable results. The \fB-f\fR option
@@ -101,12 +91,10 @@ inhibits \fBpg\fR from splitting lines.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Normally, commands must be terminated by a <\fInewline\fR> character. This
 option causes an automatic end of command as soon as a command letter is
 entered.
@@ -114,47 +102,39 @@ entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 15n
-.rt  
 Restricted mode. The shell escape is disallowed. \fBpg\fR prints an error
 message but does not exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBpg\fR prints all messages and prompts in the standard output mode (usually
 inverse video).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIlinenumber\fR\fR
 .ad
 .RS 15n
-.rt  
 Start up at \fIlinenumber\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+/\fR\fIpattern\fR\fB/\fR\fR
 .ad
 .RS 15n
-.rt  
 Start up at the first line containing the regular expression pattern.
 .RE
 
@@ -164,12 +144,10 @@ Start up at the first line containing the regular expression pattern.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 A path name of a text file to be displayed. If no \fIfilename\fR is given, or
 if it is \(mi, the standard input is read.
 .RE
@@ -195,23 +173,19 @@ is used if none is provided.
 The perusal commands and their defaults are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB(+1)<\fInewline\fR> or <\fIblank\fR>\fR
 .ad
 .RS 28n
-.rt  
 This causes one page to be displayed. The address is specified in pages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB(+1) \fBl\fR\fR
 .ad
 .RS 28n
-.rt  
 With a relative address this causes \fBpg\fR to simulate scrolling the screen,
 forward or backward, the number of lines specified. With an absolute address
 this command prints a screenful beginning at the specified line.
@@ -219,34 +193,28 @@ this command prints a screenful beginning at the specified line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB(+1) \fBd\fR or \fB^D\fR\fR
 .ad
 .RS 28n
-.rt  
 Simulates scrolling half a screen forward or backward.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fBf\fR\fR
 .ad
 .RS 28n
-.rt  
 Skip \fIi\fR screens of text.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fBz\fR\fR
 .ad
 .RS 28n
-.rt  
 Same as <\fInewline\fR> except that \fIi\fR, if present, becomes the new
 default number of lines per screenful.
 .RE
@@ -256,23 +224,19 @@ default number of lines per screenful.
 The following perusal commands take no \fIaddress\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.\fR or \fB^L\fR\fR
 .ad
 .RS 13n
-.rt  
 Typing a single period causes the current page of text to be redisplayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 13n
-.rt  
 Displays the last full window in the file. Use with caution when the input is a
 pipe.
 .RE
@@ -285,12 +249,10 @@ They must always be terminated by a <\fInewline\fR>, even if the \fB-n\fR
 option is specified.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fB/\fR\fIpattern\fR\fB/\fR\fR
 .ad
 .RS 14n
-.rt  
 Search forward for the \fIi\fRth (default \fIi\fR=1) occurrence of
 \fIpattern\fR. Searching begins immediately after the current page and
 continues to the end of the current file, without wrap-around.
@@ -298,23 +260,19 @@ continues to the end of the current file, without wrap-around.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fB^\fR\fIpattern\fR\fB^\fR\fR
 .ad
 .RS 14n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fB?\fR\fIpattern\fR\fB?\fR\fR
 .ad
 .RS 14n
-.rt  
 Search backwards for the \fIi\fRth (default \fIi\fR=1) occurrence of
 \fIpattern\fR. Searching begins immediately before the current page and
 continues to the beginning of the current file, without wrap-around. The ^
@@ -333,48 +291,40 @@ The user of \fBpg\fR can modify the environment of perusal with the following
 commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fBn\fR\fR
 .ad
 .RS 14n
-.rt  
 Begin perusing the \fIi\fRth next file in the command line. The \fIi\fR is an
 unsigned number, default value is 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fBp\fR\fR
 .ad
 .RS 14n
-.rt  
 Begin perusing the \fIi\fRth previous file in the command line. \fIi\fR is an
 unsigned number, default is 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIi\fR\fBw\fR\fR
 .ad
 .RS 14n
-.rt  
 Display another window of text. If \fIi\fR is present, set the window size to
 \fIi\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR \fIfilename\fR\fR
 .ad
 .RS 14n
-.rt  
 Save the input in the named file. Only the current file being perused is saved.
 The white space between the \fBs\fR and \fIfilename\fR is optional. This
 command must always be terminated by a <\fInewline\fR>, even if the \fB-n\fR
@@ -383,34 +333,28 @@ option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 14n
-.rt  
 Help by displaying an abbreviated summary of available commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR or \fBQ\fR\fR
 .ad
 .RS 14n
-.rt  
 Quit \fBpg\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fBcommand\fR\fR
 .ad
 .RS 14n
-.rt  
 \fICommand\fR is passed to the shell, whose name is taken from the \fBSHELL\fR
 environment variable. If this is not available, the default shell is used. This
 command must always be terminated by a <\fInewline\fR>, even if the \fB-n\fR
@@ -457,12 +401,10 @@ that affect the execution of \fBpg\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 The following environment variables affect the execution of \fBpg\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLUMNS\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the horizontal screen size. If unset or \fINULL,\fR use the value of
 \fBTERM\fR, the window size, baud rate, or some combination of these, to
 indicate the terminal type for the screen size calculation.
@@ -470,12 +412,10 @@ indicate the terminal type for the screen size calculation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINES\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the number of lines to be displayed on the screen. If unset or
 \fINULL,\fR use the value of \fBTERM\fR, the window size, baud rate, or some
 combination of these, to indicate the terminal type for the screen size
@@ -484,23 +424,19 @@ calculation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine the name of the command interpreter executed for a !command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERM\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine terminal attributes. Optionally attempt to search a system-dependent
 database, keyed on the value of the \fBTERM\fR environment variable. If no
 information is available, a terminal incapable of cursor-addressable movement
@@ -513,30 +449,25 @@ is assumed.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/pg*\fR\fR
 .ad
@@ -547,7 +478,6 @@ temporary file when input is from a pipe
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR\fR
 .ad

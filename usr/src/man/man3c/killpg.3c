@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH killpg 3C "24 Jul 2002" "SunOS 5.11" "Standard C Library Functions"
+.TH KILLPG 3C "Jul 24, 2002"
 .SH NAME
 killpg \- send signal to a process group
 .SH SYNOPSIS
@@ -37,23 +37,19 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBkillpg()\fR function will fail and no signal will be sent if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIsig\fR argument is not a valid signal number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective user \fBID\fR of the sending process is not privileged user, and
 neither its real nor effective user \fBID\fR matches the real or saved set-user
 \fBID\fR of one or more of the target processes.
@@ -61,12 +57,10 @@ neither its real nor effective user \fBID\fR matches the real or saved set-user
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 No processes were found in the specified process group.
 .RE
 
@@ -78,15 +72,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

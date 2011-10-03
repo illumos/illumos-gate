@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH touch 1 "9 Sep 2009" "SunOS 5.11" "User Commands"
+.TH TOUCH 1 "Sep 9, 2009"
 .SH NAME
 touch, settime \- change file access and modification times
 .SH SYNOPSIS
@@ -65,7 +65,6 @@ utilities:
 The following options are supported for the \fBtouch\fR utility:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -77,7 +76,6 @@ unless \fB-m\fR is also specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -89,7 +87,6 @@ diagnostic messages concerning this condition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdate_time\fR\fR
 .ad
@@ -154,7 +151,6 @@ value of the \fBTZ\fR environment variable
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -166,7 +162,6 @@ unless \fB-a\fR is also specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIref_file\fR\fR
 .ad
@@ -178,7 +173,6 @@ current time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItime\fR\fR
 .ad
@@ -197,7 +191,6 @@ decimal number of the form:
 where each two digits represent the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIMM\fR\fR
 .ad
@@ -208,7 +201,6 @@ The month of the year [01-12].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIDD\fR\fR
 .ad
@@ -219,7 +211,6 @@ The day of the month [01-31].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhh\fR\fR
 .ad
@@ -230,7 +221,6 @@ The hour of the day [00-23].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImm\fR\fR
 .ad
@@ -241,7 +231,6 @@ The minute of the hour [00-59].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fICC\fR\fR
 .ad
@@ -252,7 +241,6 @@ The first two digits of the year.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIYY\fR\fR
 .ad
@@ -263,7 +251,6 @@ The second two digits of the year.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fISS\fR\fR
 .ad
@@ -279,15 +266,14 @@ as follows:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-If YY is:CC becomes:
+box;
+c c
+l l .
+If YY is:	CC becomes:
 _
-69-9919
-00-3820
-39-68ERROR
+69-99	19
+00-38	20
+39-68	ERROR
 .TE
 
 The resulting time is affected by the value of the \fBTZ\fR environment
@@ -308,7 +294,6 @@ it is assumed to be 0.
 The following option is supported for the \fBsettime\fR utility:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIref_file\fR\fR
 .ad
@@ -325,7 +310,6 @@ The following operands are supported for the \fBtouch\fR and \fBsettime\fR
 utilities:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
@@ -336,7 +320,6 @@ A path name of a file whose times are to be modified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime_spec\fR\fR
 .ad
@@ -355,7 +338,6 @@ a decimal number of the form:
 where each two digits represent the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIMM\fR\fR
 .ad
@@ -366,7 +348,6 @@ The month of the year [01-12].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIDD\fR\fR
 .ad
@@ -377,7 +358,6 @@ The day of the month [01-31].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhh\fR\fR
 .ad
@@ -388,7 +368,6 @@ The hour of the day [00-23].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImm\fR\fR
 .ad
@@ -399,7 +378,6 @@ The minute of the hour [00-59].
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIYY\fR\fR
 .ad
@@ -415,14 +393,13 @@ The second two digits of the year.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-YYCorresponding Year
-69-991969-1999
-00-382000-2038
-39-68ERROR
+box;
+c c
+l l .
+YY	Corresponding Year
+69-99	1969-1999
+00-38	2000-2038
+39-68	ERROR
 .TE
 
 If no \fB-d\fR, \fB-r\fR, or \fB-t\fRoption is specified, at least two operands
@@ -444,7 +421,6 @@ that affect the execution of \fBtouch\fR: \fBLANG\fR, \fBLC_ALL\fR, \fBLANG\fR,
 \fBLC_ALL\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
@@ -460,7 +436,6 @@ Determine the timezone to be used for interpreting the \fItime\fR or
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -472,7 +447,6 @@ made.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -490,17 +464,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

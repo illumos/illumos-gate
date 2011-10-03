@@ -162,11 +162,11 @@ struct tss16 {
 
 #if defined(__amd64)
 
-#define	tss	tss64
+typedef	struct tss64	tss_t;
 
 #elif defined(__i386)
 
-#define	tss	tss32
+typedef	struct tss32	tss_t;
 
 #endif	/* __i386 */
 

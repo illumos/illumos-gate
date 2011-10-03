@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1988 Sun Microsystems, Inc. - All Rights Reserved.  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software
 .\" License Agreement  specifies the terms and conditions for redistribution.
-.TH logger 1B "14 Sep 1992" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH LOGGER 1B "Sep 14, 1992"
 .SH NAME
 logger \- add entries to the system log
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/ucb/logger\fR [\fB-f\fR \fIfilename\fR] [\fB-i\fR] [\fB-p\fR \fIpriority\fR] [\fB-t\fR \fItag\fR] mm 
+\fB/usr/ucb/logger\fR [\fB-f\fR \fIfilename\fR] [\fB-i\fR] [\fB-p\fR \fIpriority\fR] [\fB-t\fR \fItag\fR] mm
      [\fImessage\fR]...
 .fi
 
@@ -28,34 +28,28 @@ the standard input.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-.rt  
 Log the process \fBID\fR of the \fBlogger\fR process with each line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Use the contents of \fIfilename\fR as the message to log.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpriority\fR\fR
 .ad
 .RS 15n
-.rt  
 Enter the message with the specified \fIpriority\fR. The message priority can
 be specified numerically, or as a \fIfacility.level\fR pair. For example,
 \fB`\fR\fB-p\fR \fBlocal3.info'\fR assigns the message priority to the
@@ -65,12 +59,10 @@ be specified numerically, or as a \fIfacility.level\fR pair. For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItag\fR\fR
 .ad
 .RS 15n
-.rt  
 Mark each line added to the log with the specified \fItag\fR.
 .RE
 

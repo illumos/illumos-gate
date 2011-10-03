@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dcs 1M "25 Apr 2006" "SunOS 5.11" "System Administration Commands"
+.TH DCS 1M "Apr 25, 2006"
 .SH NAME
 dcs \- domain configuration server
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/dcs\fR [\fB-s\fR \fIsessions\fR] 
+\fB/usr/lib/dcs\fR [\fB-s\fR \fIsessions\fR]
      [ [\fB-a\fR \fIauth\fR] [\fB-e\fR \fIencr\fR] [\fB-u\fR \fIesp_auth\fR] ] [\fB-l\fR]
 .fi
 
@@ -73,48 +73,40 @@ should be used on SPARC Enterprise Servers.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIauth\fR\fR
 .ad
 .RS 15n
-.rt  
 Controls the IPsec Authentication Header (AH) algorithm. \fIauth\fR can be one
 of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIencr\fR\fR
 .ad
 .RS 15n
-.rt  
 Controls the IPsec Encapsulating Security Payload (ESP) encryption algorithm.
 \fIencr\fR can be one of \fBnone\fR, \fBdes\fR, or \fB3des\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 15n
-.rt  
 Enables the use of platform-specific security options on SPARC Enterprise
 Servers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsessions\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets the number of active sessions that the DCS allows at any one time. When
 the limit is reached, the DCS stops accepting connections until active sessions
 complete the execution of their DR operation. If this option is not specified,
@@ -123,12 +115,10 @@ a default value of 128 is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIesp_auth\fR\fR
 .ad
 .RS 15n
-.rt  
 Controls the IPsec Encapsulating Security Payload (ESP) authentication
 algorithm. \fIesp_auth\fR can be one of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
 .RE
@@ -170,13 +160,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

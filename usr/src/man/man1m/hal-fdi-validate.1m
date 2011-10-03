@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hal-fdi-validate 1M "28 Aug 2006" "SunOS 5.11" "System Administration Commands"
+.TH HAL-FDI-VALIDATE 1M "Aug 28, 2006"
 .SH NAME
 hal-fdi-validate \- validate HAL device information files
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ option is used to specify a different file.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdtd\fR\fR
 .ad
 .RS 10n
-.rt  
 Specify path to a DTD file.
 .RE
 
@@ -39,12 +37,10 @@ Specify path to a DTD file.
 The \fBhal-fdi-validate\fR command accepts the following operand(s):
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR [\fIfile\fR...]\fR
 .ad
 .RS 18n
-.rt  
 One or more DTD files to be validated.
 .RE
 
@@ -56,13 +52,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO
