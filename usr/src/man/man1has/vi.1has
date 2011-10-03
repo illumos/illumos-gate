@@ -1,76 +1,76 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vi "1has" "16 May 2007" "SunOS 5.11" "User Commands"
+.TH VI 1HAS "May 16, 2007"
 .SH NAME
 vi, view, vedit \- screen-oriented (visual) display editor based on ex
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/vi\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] [\fB-S\fR] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/bin/vi\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] [\fB-S\fR]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/bin/view\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] [\fB-S\fR] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/bin/view\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] [\fB-S\fR]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/bin/vedit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] [\fB-S\fR] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/bin/vedit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] [\fB-S\fR]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/vi\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg4/bin/vi\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/view\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg4/bin/view\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/vedit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg4/bin/vedit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/vi\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg6/bin/vi\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/view\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg6/bin/view\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/vedit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg6/bin/vedit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-S\fR] [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [\fB+\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
@@ -110,24 +110,20 @@ The following invocation options are interpreted by \fBvi\fR (previously
 documented options are discussed under NOTES):
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR | \fB-s\fR\fR
 .ad
 .RS 25n
-.rt  
 Suppresses all interactive user feedback. This is useful when processing editor
 scripts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 25n
-.rt  
 Encryption option. Same as the \fB-x\fR option, except that \fBvi\fR simulates
 the \fBC\fR command of \fBex\fR. The \fBC\fR command is like the \fBX\fR
 command of \fBex\fR, except that all text read in is assumed to have been
@@ -136,58 +132,48 @@ encrypted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets up for editing \fBLISP\fR programs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 25n
-.rt  
 Lists the name of all files saved as the result of an editor or system crash.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIfilename\fR\fR
 .ad
 .RS 25n
-.rt  
 Edits \fIfilename\fR after an editor or system crash. (Recovers the version of
 \fIfilename\fR that was in the buffer when the crash occurred.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBReadonly\fR mode. The \fBreadonly\fR flag is set, preventing accidental
 overwriting of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 25n
-.rt  
 This option is used in conjunction with the \fB-t\fR \fItag\fR option to tell
 \fBvi\fR that the tags file can not be sorted and that, if the binary search
 (which relies on a sorted tags file) for \fItag\fR fails to find it, the much
@@ -199,36 +185,30 @@ See \fBctags\fR(1) for more information on tags files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItag\fR\fR
 .ad
 .RS 25n
-.rt  
 Edits the file containing \fItag\fR and position the editor at its definition.
 It is an error to specify more than one \fB-t\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 25n
-.rt  
 Starts up in display editing state, using \fBvi\fR. You can achieve the same
 effect by typing the \fBvi\fR command itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 25n
-.rt  
 Verbose. When \fBex\fR commands are read by means of standard input, the input
 is echoed to standard error. This can be useful when processing \fBex\fR
 commands within shell scripts.
@@ -236,24 +216,20 @@ commands within shell scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fIn\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the default window size to \fIn\fR. This is useful when using the editor
 over a slow speed line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 25n
-.rt  
 Encryption option. When used, \fBvi\fR simulates the \fBX\fR command of
 \fBex\fR and prompts the user for a key. This key is used to encrypt and
 decrypt text using the algorithm of the \fBcrypt\fR command. The \fBX\fR
@@ -267,12 +243,10 @@ encrypted with a mistyped encryption key, such as a backspace or undo key.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIcommand\fR | \fB-c\fR \fIcommand\fR\fR
 .ad
 .RS 25n
-.rt  
 Begins editing by executing the specified editor \fIcommand\fR (usually a
 search or positioning command).
 .RE
@@ -289,12 +263,10 @@ containing \fItag\fR is selected by \fB-t\fR and then the command is executed.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 A file to be edited.
 .RE
 
@@ -305,24 +277,20 @@ The \fBvi\fR command modes are summarized in this section.
 .SS "vi Modes"
 .sp
 .ne 2
-.mk
 .na
 \fBCommand\fR
 .ad
 .RS 13n
-.rt  
 Normal and initial mode. Other modes return to command mode upon completion.
 \fIESC\fR (escape) is used to cancel a partial command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBInput\fR
 .ad
 .RS 13n
-.rt  
 Entered by setting any of the following options:
 .sp
 .in +2
@@ -338,12 +306,10 @@ Arbitrary text can then be entered. Input mode is normally terminated with the
 
 .sp
 .ne 2
-.mk
 .na
 \fBLast line\fR
 .ad
 .RS 13n
-.rt  
 Reading input for \fB: / ?\fR or \fB!\fR. Terminate by typing a carriage
 return. An interrupt cancels termination.
 .RE
@@ -355,7 +321,6 @@ In the descriptions, \fICR\fR stands for carriage return and \fIESC\fR stands
 for the escape key.
 .sp
 .ne 2
-.mk
 .na
 \fB\(<-, \(->\fR
 .ad
@@ -368,161 +333,132 @@ for the escape key.
 \fBup-arrow\fR
 .ad
 .RS 14n
-.rt  
 arrow keys move the cursor
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBh j k l\fR
 .ad
 .RS 14n
-.rt  
 same as arrow keys
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBi\fItext\fR\fIESC\fR\fR
 .ad
 .RS 14n
-.rt  
 insert \fItext\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcw\fInew\fR\fIESC\fR\fR
 .ad
 .RS 14n
-.rt  
 change word to \fInew\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBea\fIs\fR\fIESC\fR\fR
 .ad
 .RS 14n
-.rt  
 pluralize word (end of word; append \fBs\fR; escape from input state)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBx\fR
 .ad
 .RS 14n
-.rt  
 delete a character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdw\fR
 .ad
 .RS 14n
-.rt  
 delete a word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdd\fR
 .ad
 .RS 14n
-.rt  
 delete a line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3dd\fR
 .ad
 .RS 14n
-.rt  
 delete 3 lines
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBu\fR
 .ad
 .RS 14n
-.rt  
 undo previous change
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBZZ\fR
 .ad
 .RS 14n
-.rt  
 exit \fBvi\fR, saving changes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:q!\fICR\fR\fR
 .ad
 .RS 14n
-.rt  
 quit, discarding changes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/\fItext\fR\fICR\fR\fR
 .ad
 .RS 14n
-.rt  
 search for \fItext\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^U ^D\fR
 .ad
 .RS 14n
-.rt  
 scroll up or down
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:\fIcmd\fR\fICR\fR\fR
 .ad
 .RS 14n
-.rt  
 any \fBex\fR or \fBed\fR command
 .RE
 
@@ -533,267 +469,219 @@ Numbers can be typed as a prefix to some commands. They are interpreted in one
 of these ways:
 .sp
 .ne 2
-.mk
 .na
 \fBline/column number\fR
 .ad
 .RS 22n
-.rt  
 z  G  |
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscroll amount\fR
 .ad
 .RS 22n
-.rt  
 ^D  ^U
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrepeat effect\fR
 .ad
 .RS 22n
-.rt  
 most of the rest
 .RE
 
 .SS "Interrupting, Canceling"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIESC\fR\fR
 .ad
 .RS 7n
-.rt  
 end insert or incomplete command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIDEL\fR\fR
 .ad
 .RS 7n
-.rt  
 (delete or rubout) interrupts
 .RE
 
 .SS "File Manipulation"
 .sp
 .ne 2
-.mk
 .na
 \fBZZ\fR
 .ad
 .RS 15n
-.rt  
 if file modified, write and exit; otherwise, exit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:w\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 write back changes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:w!\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 forced write, if permission originally not valid
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:q\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 quit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:q!\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 quit, discard changes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:e \fIname\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 edit file \fIname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:e!\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 reedit, discard changes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:e + \fIname\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 edit, starting at end
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:e +\fIn\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 edit, starting at line \fIn\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:e #\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 edit alternate file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:e! #\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 edit alternate file, discard changes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:w \fIname\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 write file \fIname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:w! \fIname\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 overwrite file \fIname\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:sh\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 run shell, then return
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:!\fIcmd\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 run \fIcmd\fR, then return
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:n\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 edit next file in arglist
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:n \fIargs\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 specify new arglist
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^G\fR
 .ad
 .RS 15n
-.rt  
 show current file and line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB:ta \fItag\fR\fICR\fR\fR
 .ad
 .RS 15n
-.rt  
 position cursor to \fItag\fR
 .RE
 
@@ -805,429 +693,352 @@ return.
 .SS "Positioning Within a File"
 .sp
 .ne 2
-.mk
 .na
 \fBF\fR
 .ad
 .RS 14n
-.rt  
 forward screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^B\fR
 .ad
 .RS 14n
-.rt  
 backward screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^D\fR
 .ad
 .RS 14n
-.rt  
 scroll down half screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^U\fR
 .ad
 .RS 14n
-.rt  
 scroll up half screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fRG\fR
 .ad
 .RS 14n
-.rt  
 go to the beginning of the specified line (end default), where \fIn\fR is a
 line number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/\fIpat\fR\fR
 .ad
 .RS 14n
-.rt  
 next line matching \fIpat\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB?\fIpat\fR\fR
 .ad
 .RS 14n
-.rt  
 previous line matching \fIpat\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBn\fR
 .ad
 .RS 14n
-.rt  
 repeat last \fB/\fR or \fB?\fR command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBN\fR
 .ad
 .RS 14n
-.rt  
 reverse last \fB/\fR or \fB?\fR command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/\fIpat\fR/+\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIn\fRth line after \fIpat\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB?\fIpat\fR?\(mi\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIn\fRth line before \fIpat\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB]]\fR
 .ad
 .RS 14n
-.rt  
 next section/function
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB[[\fR
 .ad
 .RS 14n
-.rt  
 previous section/function
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB(\fR
 .ad
 .RS 14n
-.rt  
 beginning of sentence
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB)\fR
 .ad
 .RS 14n
-.rt  
 end of sentence
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fR
 .ad
 .RS 14n
-.rt  
 beginning of paragraph
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB}\fR
 .ad
 .RS 14n
-.rt  
 end of paragraph
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%\fR
 .ad
 .RS 14n
-.rt  
 find matching \fB( )\fR or \fB{ }\fR
 .RE
 
 .SS "Adjusting the Screen"
 .sp
 .ne 2
-.mk
 .na
 \fB^L\fR
 .ad
 .RS 16n
-.rt  
 clear and redraw window
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^R\fR
 .ad
 .RS 16n
-.rt  
 clear and redraw window if \fB^L\fR is \(-> key
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBz\fICR\fR\fR
 .ad
 .RS 16n
-.rt  
 redraw screen with current line at top of window
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBz\(mi\fICR\fR\fR
 .ad
 .RS 16n
-.rt  
 redraw screen with current line at bottom of window
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBz.\fICR\fR\fR
 .ad
 .RS 16n
-.rt  
 redraw screen with current line at center of window
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/\fIpat\fR/z\(mi\fICR\fR\fR
 .ad
 .RS 16n
-.rt  
 move \fIpat\fR line to bottom of window
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBz\fIn\fR.\fICR\fR\fR
 .ad
 .RS 16n
-.rt  
 use \fIn\fR\(miline window
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^E\fR
 .ad
 .RS 16n
-.rt  
 scroll window down one line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^Y\fR
 .ad
 .RS 16n
-.rt  
 scroll window up one line
 .RE
 
 .SS "Marking and Returning"
 .sp
 .ne 2
-.mk
 .na
 \fB\(ga\(ga\fR
 .ad
 .RS 12n
-.rt  
 move cursor to previous context
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBa\'a\'\fR
 .ad
 .RS 12n
-.rt  
 move cursor to first non-white space in line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBm\fIx\fR\fR
 .ad
 .RS 12n
-.rt  
 mark current position with the \fBASCII\fR lower-case letter \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\(ga\fIx\fR\fR
 .ad
 .RS 12n
-.rt  
 move cursor to mark \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBa\'\fIx\fR\fR
 .ad
 .RS 12n
-.rt  
 move cursor to first non-white space in line marked by \fIx\fR
 .RE
 
 .SS "Line Positioning"
 .sp
 .ne 2
-.mk
 .na
 \fBH\fR
 .ad
 .RS 14n
-.rt  
 top line on screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBL\fR
 .ad
 .RS 14n
-.rt  
 last line on screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBM\fR
 .ad
 .RS 14n
-.rt  
 middle line on screen
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB+\fR
 .ad
 .RS 14n
-.rt  
 next line, at first non-white space character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\(mi\fR
 .ad
 .RS 14n
-.rt  
 previous line, at first non-white space character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fICR\fR\fR
 .ad
 .RS 14n
-.rt  
 return, same as \fB+\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdown-arrow\fR\fR
 .ad
@@ -1236,13 +1047,11 @@ return, same as \fB+\fR
 \fBor \fBj\fR\fR
 .ad
 .RS 14n
-.rt  
 next line, same column
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBup-arrow\fR\fR
 .ad
@@ -1251,496 +1060,407 @@ next line, same column
 \fBor \fBk\fR\fR
 .ad
 .RS 14n
-.rt  
 previous line, same column
 .RE
 
 .SS "Character Positioning"
 .sp
 .ne 2
-.mk
 .na
 \fB^\fR
 .ad
 .RS 13n
-.rt  
 first non-white space character
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 13n
-.rt  
 beginning of line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB$\fR
 .ad
 .RS 13n
-.rt  
 end of line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR or \fB\(->\fR\fR
 .ad
 .RS 13n
-.rt  
 forward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR or \fB\(<-\fR\fR
 .ad
 .RS 13n
-.rt  
 backward
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^H\fR
 .ad
 .RS 13n
-.rt  
 same as \fB\(<-\fR (backspace)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBspace\fR
 .ad
 .RS 13n
-.rt  
 same as \fB\(->\fR (space bar)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBf\fIx\fR\fR
 .ad
 .RS 13n
-.rt  
 find next \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBF\fIx\fR\fR
 .ad
 .RS 13n
-.rt  
 find previous \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBt\fIx\fR\fR
 .ad
 .RS 13n
-.rt  
 move to character following the next \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBT\fIx\fR\fR
 .ad
 .RS 13n
-.rt  
 move to character following the previous \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB;\fR
 .ad
 .RS 13n
-.rt  
 repeat last \fBf\fR, \fBF\fR, \fBt\fR, or \fBT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB,\fR
 .ad
 .RS 13n
-.rt  
 repeat inverse of last \fBf\fR, \fBF\fR, \fBt\fR, or \fBT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR|\fR
 .ad
 .RS 13n
-.rt  
 move to column \fIn\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%\fR
 .ad
 .RS 13n
-.rt  
 find matching \fB( )\fR or \fB{ }\fR
 .RE
 
 .SS "Words, Sentences, Paragraphs"
 .sp
 .ne 2
-.mk
 .na
 \fBw\fR
 .ad
 .RS 5n
-.rt  
 forward a word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBb\fR
 .ad
 .RS 5n
-.rt  
 back a word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBe\fR
 .ad
 .RS 5n
-.rt  
 end of word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB)\fR
 .ad
 .RS 5n
-.rt  
 to next sentence
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB}\fR
 .ad
 .RS 5n
-.rt  
 to next paragraph
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB(\fR
 .ad
 .RS 5n
-.rt  
 back a sentence
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fR
 .ad
 .RS 5n
-.rt  
 back a paragraph
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBW\fR
 .ad
 .RS 5n
-.rt  
 forward a blank-delimited word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBB\fR
 .ad
 .RS 5n
-.rt  
 back a blank-delimited word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBE\fR
 .ad
 .RS 5n
-.rt  
 end of a blank-delimited word
 .RE
 
 .SS "Corrections During Insert"
 .sp
 .ne 2
-.mk
 .na
 \fB^H\fR
 .ad
 .RS 16n
-.rt  
 erase last character (backspace)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^W\fR
 .ad
 .RS 16n
-.rt  
 erase last word
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBerase\fR
 .ad
 .RS 16n
-.rt  
 your erase character, same as \fB^H\fR (backspace)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkill\fR
 .ad
 .RS 16n
-.rt  
 your kill character, erase this line of input
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\e\fR
 .ad
 .RS 16n
-.rt  
 quotes your erase and kill characters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIESC\fR\fR
 .ad
 .RS 16n
-.rt  
 ends insertion, back to command mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBControl\(miC\fR
 .ad
 .RS 16n
-.rt  
 interrupt, suspends insert mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^D\fR
 .ad
 .RS 16n
-.rt  
 backtab one character; reset left margin of \fIautoindent\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^^D\fR
 .ad
 .RS 16n
-.rt  
 caret (\fB^\fR) followed by control-d (\fB^D\fR); backtab to beginning of line;
 do not reset left margin of \fIautoindent\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0^D\fR
 .ad
 .RS 16n
-.rt  
 backtab to beginning of line; reset left margin of \fIautoindent\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^V\fR
 .ad
 .RS 16n
-.rt  
 quote non-printable character
 .RE
 
 .SS "Insert and Replace"
 .sp
 .ne 2
-.mk
 .na
 \fBa\fR
 .ad
 .RS 12n
-.rt  
 append after cursor
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBA\fR
 .ad
 .RS 12n
-.rt  
 append at end of line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBi\fR
 .ad
 .RS 12n
-.rt  
 insert before cursor
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBI\fR
 .ad
 .RS 12n
-.rt  
 insert before first non-blank
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBo\fR
 .ad
 .RS 12n
-.rt  
 open line below
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBO\fR
 .ad
 .RS 12n
-.rt  
 open line above
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBr\fIx\fR\fR
 .ad
 .RS 12n
-.rt  
 replace single character with \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBR\fItext\fR\fIESC\fR\fR
 .ad
 .RS 12n
-.rt  
 replace characters
 .RE
 
@@ -1753,156 +1473,128 @@ the word that would be moved over. Double the operator, for example \fBdd\fR,
 to affect whole lines.
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 5n
-.rt  
 delete
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBc\fR
 .ad
 .RS 5n
-.rt  
 change
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBy\fR
 .ad
 .RS 5n
-.rt  
 yank lines to buffer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fR
 .ad
 .RS 5n
-.rt  
 left shift
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fR
 .ad
 .RS 5n
-.rt  
 right shift
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB!\fR
 .ad
 .RS 5n
-.rt  
 filter through command
 .RE
 
 .SS "Miscellaneous Operations"
 .sp
 .ne 2
-.mk
 .na
 \fBC\fR
 .ad
 .RS 5n
-.rt  
 change rest of line (\fBc$\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBD\fR
 .ad
 .RS 5n
-.rt  
 delete rest of line (\fBd$\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBs\fR
 .ad
 .RS 5n
-.rt  
 substitute characters (\fBcl\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBS\fR
 .ad
 .RS 5n
-.rt  
 substitute lines (\fBcc\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBJ\fR
 .ad
 .RS 5n
-.rt  
 join lines
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBx\fR
 .ad
 .RS 5n
-.rt  
 delete characters (\fBdl\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBX\fR
 .ad
 .RS 5n
-.rt  
 delete characters before cursor \fBdh\fR)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBY\fR
 .ad
 .RS 5n
-.rt  
 yank lines (\fByy\fR)
 .RE
 
@@ -1914,123 +1606,101 @@ named (using the \fBASCII\fR lower-case letters \fBa\fR - \fBz\fR), the text in
 that buffer is put instead.
 .sp
 .ne 2
-.mk
 .na
 \fB3yy\fR
 .ad
 .RS 7n
-.rt  
 yank 3 lines
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB3yl\fR
 .ad
 .RS 7n
-.rt  
 yank 3 characters
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBp\fR
 .ad
 .RS 7n
-.rt  
 put back text after cursor
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBP\fR
 .ad
 .RS 7n
-.rt  
 put back text before cursor
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI"x\fRp\fR
 .ad
 .RS 7n
-.rt  
 put from buffer \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB"\fIx\fRy\fR
 .ad
 .RS 7n
-.rt  
 yank to buffer \fIx\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB"\fIx\fRd\fR
 .ad
 .RS 7n
-.rt  
 delete into buffer \fIx\fR
 .RE
 
 .SS "Undo, Redo, Retrieve"
 .sp
 .ne 2
-.mk
 .na
 \fBu\fR
 .ad
 .RS 7n
-.rt  
 undo last change
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBU\fR
 .ad
 .RS 7n
-.rt  
 restore current line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.\fR
 .ad
 .RS 7n
-.rt  
 repeat last change
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB"\fId\fRp\fR
 .ad
 .RS 7n
-.rt  
 retrieve \fId\fR'th last delete
 .RE
 
@@ -2049,23 +1719,19 @@ that affect the execution of \fBvi\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBNLSPATH\fR, \fBPATH\fR, \fBSHELL\fR, and \fBTERM\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLUMNS\fR\fR
 .ad
 .RS 11n
-.rt  
 Override the system-selected horizontal screen size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXINIT\fR\fR
 .ad
 .RS 11n
-.rt  
 Determine a list of \fBex\fR commands that are executed on editor start-up,
 before reading the first file. The list can contain multiple commands by
 separating them using a vertical-line (\fB|\fR) character.
@@ -2073,12 +1739,10 @@ separating them using a vertical-line (\fB|\fR) character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINES\fR\fR
 .ad
 .RS 11n
-.rt  
 Override the system-selected vertical screen size, used as the number of lines
 in a screenful and the vertical screen size in visual mode.
 .RE
@@ -2086,7 +1750,6 @@ in a screenful and the vertical screen size in visual mode.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/tmp\fR\fR
 .ad
@@ -2098,7 +1761,6 @@ using the \fBdirectory\fR option (see the \fBex\fR(1) command)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR\fR
 .ad
@@ -2109,7 +1771,6 @@ compiled terminal description database
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/.COREterm/?/*\fR\fR
 .ad
@@ -2127,13 +1788,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSINot enabled
+CSI	Not enabled
 .TE
 
 .SS "/usr/xpg4/bin/vi, /usr/xpg4/bin/view, /usr/xpg4/bin/vedit"
@@ -2141,15 +1801,14 @@ CSINot enabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SS "/usr/xpg6/bin/vi, /usr/xpg6/bin/view, /usr/xpg6/bin/vedit"
@@ -2157,15 +1816,14 @@ Interface StabilityStandard
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

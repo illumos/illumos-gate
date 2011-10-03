@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH from 1B "28 Jan 2004" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH FROM 1B "Jan 28, 2004"
 .SH NAME
 from \- display the sender and date of newly-arrived mail messages
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ show you who your mail is from. If  \fIusername\fR is specified,
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsender\fR\fR
 .ad
 .RS 13n
-.rt  
 Only display headers for mail sent by  \fIsender\fR.
 .RE
 
@@ -41,12 +39,10 @@ encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/mail/*\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sndradm 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH SNDRADM 1M "Oct 2, 2007"
 .SH NAME
 sndradm \- control Sun StorageTek Availability Suite Remote Mirror operations
 .SH SYNOPSIS
@@ -207,7 +207,6 @@ print (\fB-p\fR, \fB-P\fR and \fB-i\fR), help (\fB-h\fR), and version
 The \fBsndradm\fR utility supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIvolset-file\fR\fR
 .ad
@@ -220,7 +219,6 @@ Remote Mirror sets in the same format as the fully specified command line
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIio_groupname\fR\fR
 .ad
@@ -235,7 +233,6 @@ primary and the secondary hosts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fItag\fR\fR
 .ad
@@ -248,7 +245,6 @@ belonging to the cluster resource group or disk group name specified by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -263,7 +259,6 @@ prompts: \fB"Overwrite secondary with primary? (Y/N) [N]"\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsndr_set\fR\fR
 .ad
@@ -283,7 +278,6 @@ fully specified Remote Mirror set in the same format as a configuration file:
 These parameters are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIphost\fR\fR
 .ad
@@ -294,7 +288,6 @@ Specifies the server on which the primary volume resides.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpdev\fR\fR
 .ad
@@ -306,7 +299,6 @@ only (for example, \fB/dev/rdsk/c0t1d0s2\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpbitmap\fR\fR
 .ad
@@ -319,7 +311,6 @@ primary partition is stored. Specify full pathnames only (for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIshost\fR\fR
 .ad
@@ -330,7 +321,6 @@ Specifies the server on which the secondary volume resides.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsdev\fR\fR
 .ad
@@ -342,7 +332,6 @@ example, \fB/dev/rdsk/c0t1d0s4\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsbitmap\fR\fR
 .ad
@@ -355,7 +344,6 @@ secondary partition is stored. Specify full path names only (for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBip\fR\fR
 .ad
@@ -366,7 +354,6 @@ Specifies the network transfer protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsync | async\fR\fR
 .ad
@@ -381,7 +368,6 @@ volume.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIio_groupname\fR\fR
 .ad
@@ -400,7 +386,6 @@ primary and the secondary hosts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItag\fR\fR
 .ad
@@ -425,7 +410,6 @@ system that is not clustered.
 A valid \fBsndradm\fR command must specify one of the parameters listed below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fBa\fR \fImaster\fR \fIshadow\fR \fIbitmap\fR\fR
 .ad
@@ -441,7 +425,6 @@ See \fBiiadm\fR(1M)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fBd\fR \fImaster\fR \fB\fIshadow\fR\fR \fB\fIbitmap\fR\fR\fR
 .ad
@@ -454,7 +437,6 @@ list \fBndr_ii\fR configuration entries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIvalue\fR\fR
 .ad
@@ -473,7 +455,6 @@ set, look for the"\fBauto=on;\fR" tag for the set in the output of \fBdscfg\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIvalue\fR\fR
 .ad
@@ -486,7 +467,6 @@ is \fB2\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIvalue\fR\fR
 .ad
@@ -503,7 +483,6 @@ async I/O queues. This value is ignored when disk based I/O queues are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fB{block\fR \fB|\fR \fBnoblock}\fR\fR
 .ad
@@ -522,7 +501,6 @@ secondary site.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIvalue\fR\fR
 .ad
@@ -537,7 +515,6 @@ async I/O queues. This value isignored when disk-based I/O queues are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -548,7 +525,6 @@ Prints the \fBsndradm\fR usage summary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -559,7 +535,6 @@ Prints the Remote Mirror version number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -574,7 +549,6 @@ local volume and the bitmap volume are enabled for the Storage Volume driver
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -589,7 +563,6 @@ volume are enabled for the Storage Volume driver (see \fBsv\fR(7D)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -602,7 +575,6 @@ track temporary differences between primary and secondary volumes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -626,7 +598,6 @@ synchronizing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -638,7 +609,6 @@ if invoked on the secondary system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
@@ -654,7 +624,6 @@ indicate a problem with the link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -665,7 +634,6 @@ Displays a list of configured Remote Mirror volumes or sets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -677,7 +645,6 @@ Displays a list of configured Remote Mirror volumes or sets with extra details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fBa\fR \fIvolume\fR\fR
 .ad
@@ -689,7 +656,6 @@ group is in logging mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fBd\fR\fR
 .ad
@@ -701,7 +667,6 @@ or group is in logging mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fBr\fR \fIvolume\fR\fR
 .ad
@@ -715,7 +680,6 @@ logging mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -727,7 +691,6 @@ as the \fIvolset-file\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
@@ -738,7 +701,6 @@ Attempt to reset a Remote Mirror set's error condition such as failed bitmaps.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fBb\fR \fBp\fR \fIbitmap\fR\fR
 .ad
@@ -751,7 +713,6 @@ reconfigure the primary bitmap for one set at a time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fBb\fR \fBs\fR \fIbitmap\fR\fR
 .ad
@@ -764,7 +725,6 @@ reconfigure the secondary bitmap for one set at a time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fBC\fR \fItag\fR\fR
 .ad
@@ -778,7 +738,6 @@ is not clustered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fBm\fR \fB{sync\fR \fB|\fR \fBasync}\fR\fR
 .ad
@@ -791,7 +750,6 @@ not possible to mix modes within a group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fBg\fR \fIgroup\fR\fR
 .ad
@@ -809,7 +767,6 @@ reconfiguring the consistency group.
 The following parameters can be issued only from the primary server:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -824,7 +781,6 @@ incrementally resynchronize the volumes. See EXIT STATUS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -850,7 +806,6 @@ volumes match before replication of new updates resumes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -870,7 +825,6 @@ the primary volume.
 The following are the states that can be returned from \fBsndradm\fR \fB-P\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvolume\fR \fBfailed\fR\fR
 .ad
@@ -881,7 +835,6 @@ An I/O operation to the local data volume has failed
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbitmap\fR \fBfailed\fR\fR
 .ad
@@ -892,7 +845,6 @@ An I/O operation to the local bitmap volume has failed
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk\fR \fBqueue\fR \fBfailed\fR\fR
 .ad
@@ -903,7 +855,6 @@ An I/O operation to disk queue volume has failed
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBneed\fR \fBsync\fR\fR
 .ad
@@ -916,7 +867,6 @@ changed until one or the other is done.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBneed\fR \fBreverse\fR \fBsync\fR\fR
 .ad
@@ -929,7 +879,6 @@ be changed until one or the other is done.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogging\fR\fR
 .ad
@@ -944,7 +893,6 @@ queues the request for later replication by the async flushers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreverse\fR \fBsyncing\fR\fR
 .ad
@@ -955,7 +903,6 @@ A secondary to primary copy is in progress.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsyncing\fR\fR
 .ad
@@ -966,7 +913,6 @@ A primary to secondary copy is in progress.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqueuing\fR\fR
 .ad
@@ -1053,23 +999,19 @@ example% \fBsndradm -d example-remote:/dev/rdsk/c2t3d0s5\fR
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Command completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
@@ -1086,13 +1028,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

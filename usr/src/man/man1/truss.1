@@ -4,16 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH truss 1 "31 Jul 2004" "SunOS 5.11" "User Commands"
+.TH TRUSS 1 "Jul 31, 2004"
 .SH NAME
 truss \- trace system calls and signals
 .SH SYNOPSIS
 .LP
 .nf
-\fBtruss\fR [\fB-fcaeildDE\fR] [\fB-\fR [tTvx] [!] \fIsyscall\fR ,...] 
-     [\fB-\fR [sS] [!] \fIsignal\fR ,...] [\fB-\fR [mM] [!] \fIfault\fR ,...] 
-     [\fB-\fR [rw] [!] \fIfd\fR ,...] 
-     [\fB-\fR [uU] [!] \fIlib\fR ,... : [:] [!] \fIfunc\fR ,...] 
+\fBtruss\fR [\fB-fcaeildDE\fR] [\fB-\fR [tTvx] [!] \fIsyscall\fR ,...]
+     [\fB-\fR [sS] [!] \fIsignal\fR ,...] [\fB-\fR [mM] [!] \fIfault\fR ,...]
+     [\fB-\fR [rw] [!] \fIfd\fR ,...]
+     [\fB-\fR [uU] [!] \fIlib\fR ,... : [:] [!] \fIfunc\fR ,...]
      [\fB-o\fR \fIoutfile\fR] \fIcommand\fR | \fB-p\fR \fIpid\fR[\fI/lwps\fR]...
 .fi
 
@@ -49,7 +49,6 @@ previous ones (those to the left).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -60,7 +59,6 @@ Shows the argument strings that are passed in each \fBexec()\fR system call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -75,7 +73,6 @@ processes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -94,7 +91,6 @@ system call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -109,7 +105,6 @@ time spent within the system call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -120,7 +115,6 @@ Shows the environment strings that are passed in each \fBexec()\fR system call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
@@ -136,7 +130,6 @@ the system call.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -151,7 +144,6 @@ executed the system call or received the signal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -167,7 +159,6 @@ option causes such system calls to be reported only once, when they complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -180,7 +171,6 @@ the LWP-id are included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR [\fB!\fR]\fIfault\fR,...\fR
 .ad
@@ -195,7 +185,6 @@ are excluded from the trace output. Default is \fB-mall\fR \fB-m\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR [\fB!\fR]\fIfault\fR,...\fR
 .ad
@@ -209,7 +198,6 @@ leaves the process stopped and abandoned (see the \fB-T\fR option). Default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutfile\fR\fR
 .ad
@@ -221,7 +209,6 @@ error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -241,7 +228,6 @@ also be specified by their names in the \fB/proc\fR directory, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR [\fB!\fR]\fIfd\fR,...\fR
 .ad
@@ -260,7 +246,6 @@ are shown even in the absence of \fB-r\fR.) Default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR [\fB!\fR]\fIsignal\fR,...\fR
 .ad
@@ -276,7 +261,6 @@ signals are excluded from the trace output. Default is \fB-sall\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR [\fB!\fR]\fIsignal\fR,...\fR
 .ad
@@ -290,7 +274,6 @@ leaves the process stopped and abandoned (see the \fB-T\fR option). Default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR [\fB!\fR]\fIsyscall\fR,...\fR
 .ad
@@ -304,7 +287,6 @@ specified system calls are excluded from the trace output. Default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR [\fB!\fR]\fIsyscall\fR,...\fR
 .ad
@@ -328,7 +310,6 @@ can be used to set the stopped process running again.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR
 [\fB!\fR]\fIlib\fR,...\fB:\fR[\fB:\fR][\fB!\fR]\fIfunc\fR,\|.\|.\|.\fR
@@ -376,7 +357,6 @@ it has not been stripped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR
 [\fB!\fR]\fIlib\fR,\|.\|.\|.\|\fB:\fR[\fB:\fR][\fB!\fR]\fIfunc\fR,\|.\|.\|.\fR
@@ -391,7 +371,6 @@ option).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR [\fB!\fR]\fIsyscall\fR,...\fR
 .ad
@@ -406,7 +385,6 @@ and output, only the output value is shown. Default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR [\fB!\fR]\fIfd\fR,...\fR
 .ad
@@ -419,7 +397,6 @@ specified file descriptors (see the \fB-r\fR option). Default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR [\fB!\fR]\fIsyscall\fR,...\fR
 .ad
@@ -477,7 +454,7 @@ system calls:
 .sp
 .in +2
 .nf
-example$ \fBtruss -t open,close,read,write find . -print >find.out\fR 
+example$ \fBtruss -t open,close,read,write find . -print >find.out\fR
 .fi
 .in -2
 .sp
@@ -512,7 +489,7 @@ The following example abreviates output:
 .sp
 .in +2
 .nf
-example$ \fBtruss nroff -mm \fIdocument\fR >nroff.out\fR 
+example$ \fBtruss nroff -mm \fIdocument\fR >nroff.out\fR
 .fi
 .in -2
 .sp
@@ -525,7 +502,7 @@ because 97% of the output reports \fBlseek()\fR, \fBread()\fR, and
 .sp
 .in +2
 .nf
-example$ \fBtruss -t !lseek,read,write nroff -mm \fIdocument\fR >nroff.out\fR 
+example$ \fBtruss -t !lseek,read,write nroff -mm \fIdocument\fR >nroff.out\fR
 .fi
 .in -2
 .sp
@@ -627,12 +604,10 @@ Interrupting \fBtruss\fR returns \fBinit\fR to normal operation.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/*\fR\fR
 .ad
 .RS 11n
-.rt  
 Process files
 .RE
 

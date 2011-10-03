@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.timed 1M "23 Aug 2004" "SunOS 5.11" "System Administration Commands"
+.TH IN.TIMED 1M "Aug 23, 2004"
 .SH NAME
 in.timed \- UDP or TCP time protocol service daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fBin.timed\fR 
+\fBin.timed\fR
 .fi
 
 .LP
@@ -35,24 +35,20 @@ The in.timed service is an \fBinetd\fR(1M) \fBsmf\fR(5) delegated service. The
 is passed by the \fBinetd\fR daemon.
 .sp
 .ne 2
-.mk
 .na
 \fBTCP-based service\fR
 .ad
 .RS 21n
-.rt  
 Once a connection is established, the \fBin.timed\fR sends the time as a 32-bit
 binary number and closes the connection. Any received data is ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUDP-based service\fR
 .ad
 .RS 21n
-.rt  
 The \fBin.timed\fR listens for UDP datagrams. When a datagram is received, the
 server generates a UDP datagram containing the time as a 32-bit binary number
 and sends it to the client. Any received data is ignored.
@@ -66,13 +62,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

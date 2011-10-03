@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgtrans 1 "30 Oct 2007" "SunOS 5.11" "User Commands"
+.TH PKGTRANS 1 "Oct 30, 2007"
 .SH NAME
 pkgtrans \- translate package format
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkgtrans\fR [\fB-inosg\fR] [\fB-k\fR \fIkeystore\fR] [\fB-a\fR \fIalias\fR] [\fB-P\fR \fIpasswd\fR] \fIdevice1\fR \fIdevice2\fR 
+\fBpkgtrans\fR [\fB-inosg\fR] [\fB-k\fR \fIkeystore\fR] [\fB-a\fR \fIalias\fR] [\fB-P\fR \fIpasswd\fR] \fIdevice1\fR \fIdevice2\fR
      [\fIpkginst\fR]...
 .fi
 
@@ -49,12 +49,10 @@ one file system format to another file system format
 The options and arguments for this command are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIalias\fR\fR
 .ad
 .RS 15n
-.rt  
 Use public key certificate associated with friendlyName alias, and the
 corresponding private key. See \fBKEYSTORE LOCATIONS\fR and \fBKEYSTORE AND
 CERTIFICATE FORMATS\fR in \fBpkgadd\fR(1M) for more information.
@@ -62,34 +60,28 @@ CERTIFICATE FORMATS\fR in \fBpkgadd\fR(1M) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 15n
-.rt  
 Sign resulting datastream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-.rt  
 Copies only the \fBpkginfo\fR(4) and \fBpkgmap\fR(4) files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkeystore\fR\fR
 .ad
 .RS 15n
-.rt  
 Use keystore to retrieve private key used to generate signature. If it not
 specified, default locations are searched to find the specified private key
 specified by \fB-a\fR. If no alias is given, and multiple keys exist in the key
@@ -104,12 +96,10 @@ directory of the user invoking \fBpkgtrans\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Creates a new instance of the package on the destination device if any instance
 of this package already exists, up to the number specified by the \fBMAXINST\fR
 variable in the \fBpkginfo\fR(4) file.
@@ -117,36 +107,30 @@ variable in the \fBpkginfo\fR(4) file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 15n
-.rt  
 Overwrites the same instance on the destination device. Package instance will
 be overwritten if it already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpasswd\fR\fR
 .ad
 .RS 15n
-.rt  
 Supply password used to decrypt the keystore. See \fBPASS PHRASE ARGUMENTS\fR
 in \fBpkgadd\fR(1M) for details on the syntax of the argument to this option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 Indicates that the package should be written to \fIdevice2\fR as a datastream
 rather than as a file system. The default behavior is to write a file system
 format on devices that support both formats.
@@ -155,36 +139,30 @@ format on devices that support both formats.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice1\fR\fR
 .ad
 .RS 11n
-.rt  
 Indicates the source device. The package or packages on this device will be
 translated and placed on \fIdevice2\fR. See DEVICE SPECIFIERS, below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice2\fR\fR
 .ad
 .RS 11n
-.rt  
 Indicates the destination device. Translated packages will be placed on this
 device. See DEVICE SPECIFIERS, below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies which package instance or instances on \fIdevice1\fR should be
 translated. The token \fBall\fR may be used to indicate all packages.
 \fBpkginst.*\fR can be used to indicate all instances of a package. If no
@@ -206,12 +184,10 @@ package can be stored to and retrieved from. Note that source and destination
 devices cannot be the same.
 .sp
 .ne 2
-.mk
 .na
 \fBdevice\fR
 .ad
 .RS 16n
-.rt  
 Packages can be stored to a character or block device by specifying the device
 identifier as the device. Common examples of this device type are
 \fB/dev/rmt/0\fR for a removable magnetic tape and \fB/floppy/floppy0\fR for
@@ -222,12 +198,10 @@ character device, web server, or as input to \fBpkgadd\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fBdevice alias\fR
 .ad
 .RS 16n
-.rt  
 Devices that have been specified in \fB/etc/device.tab\fR are eligible for
 being the recipient or source of a package. Common examples of this type of
 device specification are \fBspool\fR (the default package device location) and
@@ -237,12 +211,10 @@ device specification are \fBspool\fR (the default package device location) and
 
 .sp
 .ne 2
-.mk
 .na
 \fBdirectory\fR
 .ad
 .RS 16n
-.rt  
 Packages can be stored onto a directory by specifying an absolute path to a
 file system directory. The package contents reside in a directory within the
 specified directory. The package directory name must be identical to its
@@ -336,23 +308,19 @@ maximum number of package instances.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -364,13 +332,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devfree 1M "5 Jul 1990" "SunOS 5.11" "System Administration Commands"
+.TH DEVFREE 1M "Jul 5, 1990"
 .SH NAME
 devfree \- release devices from exclusive use
 .SH SYNOPSIS
@@ -29,24 +29,20 @@ devices that have been reserved with that  \fIkey\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 10n
-.rt  
 Defines device that this command will release from exclusive use. \fIdevice\fR
 can be the pathname of the device or the device alias.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkey\fR\fR
 .ad
 .RS 10n
-.rt  
 Designates the unique key on which the device was reserved.
 .RE
 
@@ -56,46 +52,38 @@ Designates the unique key on which the device was reserved.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command syntax was incorrect, an invalid option was used, or an internal error
 occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Device table or device reservation table could not be opened for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Reservation release could not be completely fulfilled because one or more of
 the devices was not reserved or was not reserved on the specified key.
 .RE
@@ -103,24 +91,20 @@ the devices was not reserved or was not reserved on the specified key.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/device.tab\fR\fR
 .ad
 .RS 19n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/devlkfile\fR\fR
 .ad
 .RS 19n
-.rt  
- 
+
 .RE
 
 .SH SEE ALSO

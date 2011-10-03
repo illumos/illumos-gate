@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH copyin 9F "27 Sep 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH COPYIN 9F "Sep 27, 2002"
 .SH NAME
 copyin \- copy data from a user program to a driver buffer
 .SH SYNOPSIS
@@ -24,34 +24,28 @@ This interface is obsolete. \fBddi_copyin\fR(9F) should be used instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuserbuf\fR \fR
 .ad
 .RS 14n
-.rt  
 User program source address from which data is transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriverbuf\fR \fR
 .ad
 .RS 14n
-.rt  
 Driver destination address to which data is transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcn\fR \fR
 .ad
 .RS 14n
-.rt  
 Number of bytes transferred.
 .RE
 
@@ -120,7 +114,7 @@ returned.
 .sp
 .in +2
 .nf
- 
+
  1  struct device  {         /* layout of physical device registers  */
  2       int      control;   /* physical device control word  */
  3       int      status;    /* physical device status word   */
@@ -156,13 +150,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

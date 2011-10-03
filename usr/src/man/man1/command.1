@@ -2,14 +2,14 @@
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH command 1 "8 Apr 2008" "SunOS 5.11" "User Commands"
+.TH COMMAND 1 "Apr 8, 2008"
 .SH NAME
 command \- execute a simple command
 .SH SYNOPSIS
@@ -63,24 +63,20 @@ to \fBwhence\fR(1).
 The following options are supported by \fB/usr/bin/command\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Performs the command search using a default value for \fBPATH\fR that is
 guaranteed to find all of the standard utilities.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Writes a string to standard output that indicates the path or command that is
 be used by the shell, in the current shell execution environment to invoke
 \fIcommand_name\fR, but does not invoke \fIcommand_name\fR.
@@ -117,12 +113,10 @@ not found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Writes a string to standard output that indicates how the name specified in the
 \fIcommand_name\fR operand is interpreted by the shell, in the current shell
 execution environment, but does not invoke \fIcommand_name\fR. Although the
@@ -176,24 +170,20 @@ Shell reserved words are identified as reserved words.
 The following options are supported by \fBksh93\fR \fBcommand\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Causes a default path to be searched rather than the one defined by the value
 of \fBPATH\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Equivalent to:
 .sp
 .in +2
@@ -207,12 +197,10 @@ whence \fIcommand\fR [\fIargument\fR ...]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Equivalent to:
 .sp
 .in +2
@@ -226,12 +214,10 @@ whence -v \fIcommand\fR [\fIargument\fR ...]
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 If command fails because there are too many arguments, it is invoked multiple
 times with a subset of the arguments on each invocation. Arguments that occur
 prior to the first word that expand to multiple arguments and arguments that
@@ -245,23 +231,19 @@ invocation. The exit status is the maximum invocation exit status.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR\fR
 .ad
 .RS 16n
-.rt  
 One of the strings treated as an argument to \fIcommand_name\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand_name\fR\fR
 .ad
 .RS 16n
-.rt  
 The name of a utility or a special built-in utility.
 .RE
 
@@ -332,12 +314,10 @@ that affect the execution of \fBcommand\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
 .RS 8n
-.rt  
 Determine the search path used during the command search, except as described
 under the \fB-p\fR option.
 .RE
@@ -350,23 +330,19 @@ When the \fB-v\fR or \fB-V\fR options are specified, the following exit values
 are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 The \fIcommand_name\fR could not be found or an error occurred.
 .RE
 
@@ -375,23 +351,19 @@ The \fIcommand_name\fR could not be found or an error occurred.
 Otherwise, the following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 7n
-.rt  
 The utility specified by \fIcommand_name\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 7n
-.rt  
 An error occurred in the \fBcommand\fR utility or the utility specified by
 \fIcommand_name\fR could not be found.
 .RE
@@ -407,45 +379,37 @@ If \fIcommand\fR is invoked, the exit status of \fBcommand\fR is that of
 \fIcommand\fR. Otherwise, it is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIcommand_name\fR completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB-v\fR or \fB-V\fR has been specified and an error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIcommand_name\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIcommand_name\fR could not be found.
 .RE
 
@@ -458,15 +422,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -474,13 +437,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Lgrp 3PERL "30 Aug 2006" "SunOS 5.11" "Perl Library Functions"
+.TH LGRP 3PERL "Aug 30, 2006"
 .SH NAME
 Lgrp \- Perl interface to Solaris liblgrp library
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ use Sun::Solaris::Lgrp qw(:ALL);
 
 # initialize lgroup interface
 my $cookie = lgrp_init(LGRP_VIEW_OS | LGRP_VIEW_CALLER);
-my $l = Sun::Solaris::Lgrp->new(LGRP_VIEW_OS | 
+my $l = Sun::Solaris::Lgrp->new(LGRP_VIEW_OS |
      LGRP_VIEW_CALLER);
 
 my $version = lgrp_version(LGRP_VER_CURRENT | LGRP_VER_NONE);
@@ -59,7 +59,7 @@ $is_leaf = $l->is_leaf($\fIlgrp\fR);
 
 my @cpus = lgrp_cpus($\fIcookie\fR, $\fIlgrp\fR,
      LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
-@cpus = l->cpus($\fIlgrp\fR, LGRP_CONTENT_HIERARCHY | 
+@cpus = l->cpus($\fIlgrp\fR, LGRP_CONTENT_HIERARCHY |
      LGRP_CONTENT_DIRECT);
 
 my $memsize = lgrp_mem_size($\fIcookie\fR, $\fIlgrp\fR,
@@ -212,7 +212,6 @@ pages. Any differences or additional functionality in the Perl module are
 highlighted and fully documented here.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_init([LGRP_VIEW_CALLER | LGRP_VIEW_OS])\fR\fR
 .ad
@@ -234,7 +233,6 @@ See \fBlgrp_init\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_fini\fR($\fIcookie\fR)\fR
 .ad
@@ -253,7 +251,6 @@ See \fBlgrp_fini\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_view\fR($\fIcookie\fR)\fR
 .ad
@@ -276,7 +273,6 @@ See \fBlgrp_view\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_home\fR($\fIidtype\fR, $\fIid\fR)\fR
 .ad
@@ -298,7 +294,6 @@ See \fBlgrp_home\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_cookie_stale\fR($\fIcookie\fR)\fR
 .ad
@@ -315,7 +310,6 @@ See \fBlgrp_cookie_stale\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_cpus\fR($\fIcookie\fR, $\fIlgrp\fR, $\fIcontext\fR)\fR
 .ad
@@ -328,23 +322,19 @@ whether the direct contents or everything in this lgroup including its children
 should be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_CONTENT_HIERARCHY\fR\fR
 .ad
 .RS 26n
-.rt  
 everything within this hierarchy
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_CONTENT_DIRECT\fR\fR
 .ad
 .RS 26n
-.rt  
 directly contained in lgroup
 .RE
 
@@ -360,7 +350,6 @@ See \fBlgrp_cpus\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_children\fR($\fIcookie\fR, $\fIlgrp\fR)\fR
 .ad
@@ -380,7 +369,6 @@ See \fBlgrp_children\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_parents\fR($\fIcookie\fR, $\fIlgrp\fR)\fR
 .ad
@@ -400,7 +388,6 @@ See \fBlgrp_parents\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_nlgrps\fR($\fIcookie\fR)\fR
 .ad
@@ -418,7 +405,6 @@ See \fBlgrp_nlgrps\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_root\fR($\fIcookie\fR)\fR
 .ad
@@ -434,7 +420,6 @@ See \fBlgrp_root\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_mem_size\fR($\fIcookie\fR, $\fIlgrp\fR, $\fItype\fR,
 $\fIcontent\fR)\fR
@@ -446,23 +431,19 @@ The function returns the memory size of the given lgroup in bytes. The
 $\fItype\fR argument should be set to one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_MEM_SZ_FREE\fR\fR
 .ad
 .RS 25n
-.rt  
 free memory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_MEM_SZ_INSTALLED\fR\fR
 .ad
 .RS 25n
-.rt  
 installed memory
 .RE
 
@@ -471,23 +452,19 @@ specify whether the direct contents or everything in this lgroup including its
 children should be returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_CONTENT_HIERARCHY\fR\fR
 .ad
 .RS 26n
-.rt  
 Return everything within this hierarchy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_CONTENT_DIRECT\fR\fR
 .ad
 .RS 26n
-.rt  
 Return that which is directly contained in this lgroup.
 .RE
 
@@ -503,7 +480,6 @@ See \fBlgrp_mem_size\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_version\fR([$\fIversion\fR])\fR
 .ad
@@ -536,7 +512,6 @@ See \fBlgrp_version\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_affinity_set\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR,
 $\fIaffinity\fR)\fR
@@ -558,34 +533,28 @@ particuliar lgroup. The levels of affinity are the following from strongest to
 weakest:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_AFF_STRONG\fR\fR
 .ad
 .RS 19n
-.rt  
 strong affinity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_AFF_WEAK\fR\fR
 .ad
 .RS 19n
-.rt  
 weak affinity
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_AFF_NONE\fR\fR
 .ad
 .RS 19n
-.rt  
 no affinity
 .RE
 
@@ -597,7 +566,6 @@ See \fBlgrp_affinity_set\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_affinity_get\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR)\fR
 .ad
@@ -610,7 +578,6 @@ See \fBlgrp_affinity_get\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_latency_cookie\fR($\fIcookie\fR, $\fIfrom\fR, $\fIto\fR,
 [$\fIbetween\fR=\fBLGRP_LAT_CPU_TO_MEM\fR])\fR
@@ -637,7 +604,6 @@ See \fBlgrp_latency_cookie\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_latency\fR($\fIfrom\fR, $\fIto\fR)\fR
 .ad
@@ -654,7 +620,6 @@ See \fBlgrp_latency\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_resources\fR($\fIcookie\fR, $\fIlgrp\fR, $\fItype\fR)\fR
 .ad
@@ -667,23 +632,19 @@ lgroup directly contains CPU and/or memory resources.
 The \fItype\fR can be specified as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_RSRC_CPU\fR\fR
 .ad
 .RS 17n
-.rt  
 CPU resources
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLGRP_RSRC_MEM\fR\fR
 .ad
 .RS 17n
-.rt  
 memory resources
 .RE
 
@@ -698,7 +659,6 @@ See \fBlgrp_resources\fR(3LGRP) for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_lgrps\fR($\fIcookie\fR, [$\fIlgrp\fR])\fR
 .ad
@@ -715,7 +675,6 @@ lgroups in the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_leaves\fR($\fIcookie\fR, [$\fIlgrp\fR])\fR
 .ad
@@ -732,7 +691,6 @@ lgroups in the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp_isleaf\fR($\fIcookie\fR, $\fIlgrp\fR)\fR
 .ad
@@ -745,7 +703,6 @@ Otherwise it returns False.
 .SS "Object methods"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnew\fR([$\fIview\fR])\fR
 .ad
@@ -758,7 +715,6 @@ is passed to the \fBlgrp_init()\fR function. By default this method uses
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcookie()\fR\fR
 .ad
@@ -770,7 +726,6 @@ accepting the cookie.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBversion\fR([$\fIversion\fR])\fR
 .ad
@@ -783,7 +738,6 @@ with \fBLGRP_VER_NONE\fR as the default version argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstale()\fR\fR
 .ad
@@ -795,7 +749,6 @@ otherwise. It is a wrapper for \fBlgrp_cookie_stale()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBview()\fR\fR
 .ad
@@ -807,7 +760,6 @@ wrapper for \fBlgrp_view()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot()\fR\fR
 .ad
@@ -818,7 +770,6 @@ This method returns the root lgroup. It is a wrapper for \fBlgrp_root()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchildren\fR($\fIlgrp\fR)\fR
 .ad
@@ -830,7 +781,6 @@ lgroup. It is a wrapper for \fBlgrp_children()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBparents\fR($\fIlgrp\fR)\fR
 .ad
@@ -842,7 +792,6 @@ lgroup. It is a wrapper for \fBlgrp_parents()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnlgrps()\fR\fR
 .ad
@@ -854,7 +803,6 @@ This method returns the number of lgroups in the hierarchy. It is a wrapper for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmem_size\fR($\fIlgrp\fR, $\fItype\fR, $\fIcontent\fR)\fR
 .ad
@@ -866,7 +814,6 @@ wrapper for \fBlgrp_mem_size()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpus\fR($\fIlgrp\fR, $\fIcontext\fR)\fR
 .ad
@@ -878,7 +825,6 @@ wrapper for \fBlgrp_cpus()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresources\fR($\fIlgrp\fR, $\fItype\fR)\fR
 .ad
@@ -890,7 +836,6 @@ specified type. It is a wrapper for \fBlgrp_resources()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhome\fR($\fIidtype\fR, $\fIid\fR)\fR
 .ad
@@ -902,7 +847,6 @@ wrapper for \fBlgrp_home()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaffinity_get\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR)\fR
 .ad
@@ -914,7 +858,6 @@ wrapper for \fBlgrp_affinity_get()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaffinity_set\fR($\fIidtype\fR, $\fIid\fR, $\fIlgrp\fR,
 $\fIaffinity\fR)\fR
@@ -928,7 +871,6 @@ lgrp_affinity_set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrps\fR([$\fIlgrp\fR])\fR
 .ad
@@ -941,7 +883,6 @@ wrapper for \fBlgrp_lgrps()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBleaves\fR([$\fIlgrp\fR])\fR
 .ad
@@ -954,7 +895,6 @@ $\fIlgrp\fR.  If $\fIlgrp\fR is not specified, this method uses the value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisleaf\fR($\fIlgrp\fR)\fR
 .ad
@@ -966,7 +906,6 @@ otherwise. It is a wrapper for \fBlgrp_isleaf()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlatency\fR($\fIfrom\fR, $\fIto\fR)\fR
 .ad
@@ -985,12 +924,10 @@ By default nothing is exported from this module. The following tags can be used
 to selectively import constants and functions defined in this module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:LGRP_CONSTANTS\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBLGRP_AFF_NONE\fR, \fBLGRP_AFF_STRONG\fR, \fBLGRP_AFF_WEAK\fR,
 \fBLGRP_CONTENT_DIRECT\fR, \fBLGRP_CONTENT_HIERARCHY\fR,
 \fBLGRP_MEM_SZ_FREE\fR, \fBLGRP_MEM_SZ_INSTALLED\fR, \fBLGRP_VER_CURRENT\fR,
@@ -1001,34 +938,28 @@ to selectively import constants and functions defined in this module:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:PROC_CONSTANTS\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBP_PID\fR, \fBP_LWPID\fR, \fBP_MYID\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:CONSTANTS\fR\fR
 .ad
 .RS 19n
-.rt  
 \fB:LGRP_CONSTANTS\fR, \fB:PROC_CONSTANTS\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:FUNCTIONS\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBlgrp_affinity_get()\fR, \fBlgrp_affinity_set()\fR, \fBlgrp_children()\fR,
 \fBlgrp_cookie_stale()\fR, \fBlgrp_cpus()\fR, \fBlgrp_fini()\fR,
 \fBlgrp_home()\fR, \fBlgrp_init()\fR, \fBlgrp_latency()\fR,
@@ -1040,12 +971,10 @@ to selectively import constants and functions defined in this module:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:ALL\fR\fR
 .ad
 .RS 19n
-.rt  
 \fB:CONSTANTS\fR, \fB:FUNCTIONS\fR
 .RE
 
@@ -1057,34 +986,28 @@ underlying library function fails. The \fB$!\fR is set to provide more
 information values for the error. The following error codes are possible:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value supplied is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 There was not enough system memory to complete an operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective user of the calling process does not have appropriate privileges,
 and its real or effective user ID does not match the real or effective user ID
 of one of the threads.
@@ -1092,12 +1015,10 @@ of one of the threads.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified process or thread was not found.
 .RE
 
@@ -1148,13 +1069,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO

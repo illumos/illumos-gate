@@ -2,7 +2,7 @@
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T Copyright
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.TH typeset 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.TH TYPESET 1 "Aug 11, 2009"
 .SH NAME
 typeset, whence \- shell built-in functions to set/get attributes and values
 for shell variables and functions
@@ -39,12 +39,10 @@ restored when the function completes. The following list of attributes can be
 specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 The names refer to function names rather than variable names. No assignments
 can be made and the only other valid flags are \fB-t\fR, \fB-u\fR and \fB-x\fR.
 The flag \fB-t\fR turns on execution tracing for this function. The flag
@@ -56,23 +54,19 @@ effect across shell procedures invoked by name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 6n
-.rt  
 This flag provides UNIX to hostname file mapping on non-UNIX machines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Parameter is an integer. This makes arithmetic faster. If \fIn\fR is
 \fBnon-zero\fR it defines the output arithmetic base; otherwise, the first
 assignment determines the output base.
@@ -80,24 +74,20 @@ assignment determines the output base.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 All uppercase characters are converted to lowercase. The uppercase flag,
 \fB-u\fR is turned off.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Left justify and remove leading blanks from \fIvalue\fR. If \fIn\fR is
 \fBnon-zero\fR it defines the width of the field; otherwise, it is determined
 by the width of the value of first assignment. When the variable is assigned
@@ -108,24 +98,20 @@ into the field. Leading zeros are removed if the \fB-Z\fR flag is also set. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 The specified \fIname\fRs are marked \fBreadonly\fR and these names cannot be
 changed by subsequent assignment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Right justify and fill with leading blanks. If \fIn\fR is \fBnon-zero\fR it
 defines the width of the field, otherwise it is determined by the width of the
 value of first assignment. The field is left filled with blanks or truncated
@@ -134,48 +120,40 @@ from the end if the variable is reassigned. The \fB-L\fR flag is turned off.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Tags the variables. Tags are user definable and have no special meaning to the
 shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 All lowercase characters are converted to uppercase characters. The lowercase
 flag, \fB-l\fR is turned off.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 The specified \fIname\fRs are marked for automatic export to the
 \fBenvironment\fR of subsequently-executed commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
 .RS 6n
-.rt  
 Right justify and fill with leading zeros if the first non-blank character is a
 digit and the \fB-L\fR flag has not been set. If \fIn\fR is \fBnon-zero\fR it
 defines the width of the field. Otherwise, it is determined by the width of the
@@ -257,45 +235,37 @@ options \fB-L\fR, \fB-R\fR, and \fB-Z\fR.
 The following preset aliases are set by the shell:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfloat\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBtypeset\fR \fB-E\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfunctions\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBtypeset\fR \fB-f\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinteger\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBtypeset\fR \fB-i\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnameref\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBtypeset\fR \fB-n\fR
 .RE
 
@@ -324,35 +294,29 @@ The following options are supported by the \fBtypeset\fR built-in command in
 \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 13n
-.rt  
 Indexed array. This is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 13n
-.rt  
 Associative array. Each \fIname\fR is converted to an associative array. If a
 variable already exists, the current value becomes index \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 13n
-.rt  
 Each name can contain binary data. Its value is the mime \fBbase64\fR encoding
 of the data. This option can be used with \fB-Z\fR, to specify fixed sized
 fields.
@@ -360,23 +324,19 @@ fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 13n
-.rt  
 Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR [\fIn\fR]\fR
 .ad
 .RS 13n
-.rt  
 Floating point number represented in scientific notation. \fIn\fR specifies the
 number of significant figures when the value is expanded. The default value is
 \fB10\fR.
@@ -384,46 +344,38 @@ number of significant figures when the value is expanded. The default value is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 13n
-.rt  
 Each of the options and names refers to a function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR [\fIn\fR]\fR
 .ad
 .RS 13n
-.rt  
 Floating point. \fIn\fR is the number of places after the decimal point when
 the value is expanded. The default value is \fB10\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 13n
-.rt  
 Reserved for future use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 13n
-.rt  
 Hostname mapping. Each name holds a native pathname. Assigning a UNIX format
 pathname causes it to be converted to a pathname suitable for the current host.
 This has no effect when the native system is UNIX.
@@ -431,36 +383,30 @@ This has no effect when the native system is UNIX.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR [\fIbase\fR]\fR
 .ad
 .RS 13n
-.rt  
 An integer. \fIbase\fR represents the arithmetic base from \fB2\fR to \fB64\fR.
 The option value can be omitted. The default value is \fB10\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 13n
-.rt  
 Convert uppercase characters to lowercase characters. Unsets the \fB-u\fR
 option. When used with \fB-i\fR, \fB-E\fR, or \fB-F\fR indicates long variant.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR [\fIn\fR]\fR
 .ad
 .RS 13n
-.rt  
 Left justify. If \fIn\fR is specified, it represents the field width. If the
 \fB-Z\fR attribute is also specified, then leading zeros are stripped. The
 option value can be omitted.
@@ -468,48 +414,40 @@ option value can be omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 13n
-.rt  
 Name reference. The value is the name of a variable that \fIname\fR references.
 \fIname\fR cannot contain a \fB\&.\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Causes the output to be in a format that can be used as input to the shell to
 recreate the attributes for variables.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 13n
-.rt  
 Enables read-only. Once this option is enabled, it cannot be disabled. See
 \fBreadonly\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR [\fIn\fR]\fR
 .ad
 .RS 13n
-.rt  
 Right justify. If \fIn\fR is specified it represents the field width. If the
 \fB-Z\fR option is also specified, zeros are used as the fill character.
 Otherwise, SPACEs are used.
@@ -517,35 +455,29 @@ Otherwise, SPACEs are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Restricts integer size to short when used with \fB-i\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 13n
-.rt  
 When used inside a function defined with the function reserved word, the
 specified variables will have function static scope.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 13n
-.rt  
 When used with \fB-f\fR, enables tracing for each of the specified functions.
 Otherwise, \fB-t\fR is a user defined attribute and has no meaning to the
 shell.
@@ -553,23 +485,19 @@ shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItname\fR\fR
 .ad
 .RS 13n
-.rt  
 \fItname\fR is the name of a type name given to each name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 13n
-.rt  
 Without \fB-f\fR or \fB-i\fR, converts lowercase characters to uppercase and
 unsets \fB-l\fR. When used with \fB-f\fR, specifies that \fIname\fR is a
 function that has not yet been loaded. When used with \fB-i\fR specifies that
@@ -578,24 +506,20 @@ the value is displayed as an unsigned integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 13n
-.rt  
 Puts each name on the export list. See \fBexport\fR(1). \fIname\fR cannot
 contain a \fB\&.\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR [\fIn\fR]\fR
 .ad
 .RS 13n
-.rt  
 Floating point number represented in hexadecimal notation. \fIn\fR specifies
 the number of significant figures when the value is expanded. The option value
 may be omitted. The default value is 10.
@@ -603,12 +527,10 @@ may be omitted. The default value is 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR [\fIn\fR]\fR
 .ad
 .RS 13n
-.rt  
 Zero fill. If \fIn\fR is specified it represents the field width. The option
 value can be omitted.
 .RE
@@ -618,23 +540,19 @@ value can be omitted.
 The following exit values are returned by \fBtypeset\fR in \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -655,46 +573,38 @@ The following options are supported by the \fBwhence\fR built-in command in
 \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Display all uses for each name rather than the first.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not check for functions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not check to see if name is a reserved word, a built-in, an alias, or a
 function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 For each name specified, the shell displays a line that indicates if that name
 is one of the following:
 .RS +4
@@ -752,34 +662,28 @@ Not found
 The following exit values are returned by \fBwhence\fR in \fBksh93\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion. Each name was found by the shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 One or more names were not found by the shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>1\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

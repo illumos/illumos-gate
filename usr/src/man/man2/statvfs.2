@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH statvfs 2 "22 Mar 2004" "SunOS 5.11" "System Calls"
+.TH STATVFS 2 "Mar 22, 2004"
 .SH NAME
 statvfs, fstatvfs \- get file system information
 .SH SYNOPSIS
 .LP
 .nf
 #include <sys/types.h>
-#include <sys/statvfs.h> 
+#include <sys/statvfs.h>
 
 \fBint\fR \fBstatvfs\fR(\fBconst char *restrict\fR \fIpath\fR, \fBstruct statvfs *restrict\fR \fIbuf\fR);
 .fi
@@ -53,7 +53,7 @@ fsfilcnt_t  f_ffree;             /* total # of free file nodes */
 fsfilcnt_t  f_favail;            /* # of inodes avail to
                                     non-privileged user*/
 u_long      f_fsid;              /* file system id (dev for now) */
-char        f_basetype[FSTYPSZ]; /* target fs type name, 
+char        f_basetype[FSTYPSZ]; /* target fs type name,
                                     null-terminated */
 u_long      f_flag;              /* bit mask of flags */
 u_long      f_namemax;           /* maximum file name length */
@@ -96,12 +96,10 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBstatvfs()\fR and \fBfstatvfs()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 One of the values to be returned cannot be represented correctly in the
 structure pointed to by \fIbuf\fR.
 .RE
@@ -111,103 +109,85 @@ structure pointed to by \fIbuf\fR.
 The \fBstatvfs()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied on a component of the path prefix.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR or \fIbuf\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal was caught during the execution of the \fBstatvfs()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while reading the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating \fIpath\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of a \fIpath\fR component exceeds \fBNAME_MAX\fR characters, or the
 length of \fIpath\fR The exceeds \fBPATH_MAX\fR characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 Either a component of the path prefix or the file referred to by \fIpath\fR
 does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIpath\fR argument points to a remote machine and the link to that machine
 is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of \fIpath\fR is not a directory.
 .RE
 
@@ -216,45 +196,37 @@ A component of the path prefix of \fIpath\fR is not a directory.
 The \fBfstatvfs()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIfildes\fR argument is not an open file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIbuf\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was caught during the execution of the \fBfstatvfs()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error occurred while reading the file system.
 .RE
 
@@ -271,13 +243,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

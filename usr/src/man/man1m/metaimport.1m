@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metaimport 1M "28 Oct 2005" "SunOS 5.11" "System Administration Commands"
+.TH METAIMPORT 1M "Oct 28, 2005"
 .SH NAME
 metaimport \- imports disk sets into existing Solaris Volume Manager
 configurations
@@ -58,12 +58,10 @@ before it runs.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Force the import, even if a quorum of replicas from the imported disk set is
 not available. This option could result in corrupt configurations and should
 only be used when \fBmetaimport\fR fails with the "Insufficient quorum
@@ -74,24 +72,20 @@ or unavailable when importing a partial set or a set lacking a replica quorum.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 14n
-.rt  
 Does not actually perform the operation, but shows the output or errors that
 would have resulted from the operation, had it been run.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 14n
-.rt  
 Report on the non-configured disk sets found on the system. If no disk device
 or LUN is specified, \fBmetaimport\fR reports on all non-configured disk sets
 attached to the system. When the name of one disk is specified,
@@ -108,12 +102,10 @@ output on each disk set reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsetname\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify the disk set name to use when importing. The imported disk set will be
 called \fIsetname\fR, without regard to the name it may have had on a different
 system.
@@ -121,12 +113,10 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 14n
-.rt  
 Verbose. Provides detailed information about the \fBmetadb\fR replica location
 and status. It also provides detailed information about the disk set
 configuration and status similar to the "\fBmetastat -c\fR" output.
@@ -134,23 +124,19 @@ configuration and status similar to the "\fBmetastat -c\fR" output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 14n
-.rt  
 Version information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
 .RS 14n
-.rt  
 Display a help message.
 .RE
 
@@ -198,23 +184,19 @@ generate results more quickly.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -226,13 +208,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

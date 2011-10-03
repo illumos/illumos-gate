@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_movwin 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_MOVWIN 9F "Jan 16, 2006"
 .SH NAME
 ddi_dma_movwin \- shift current DMA window
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ ddi_dma_movwin \- shift current DMA window
 
 
 
-\fBint\fR \fBddi_dma_movwin\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t *\fR\fIoffp\fR, 
+\fBint\fR \fBddi_dma_movwin\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBoff_t *\fR\fIoffp\fR,
      \fBuint_t *\fR\fIlenp\fR, \fBddi_dma_cookie_t *\fR\fIcookiep\fR);
 .fi
 
@@ -25,23 +25,19 @@ This interface is obsolete. \fBddi_dma_getwin\fR(9F) should be used instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBDMA\fR handle filled in by a call to \fBddi_dma_setup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to an offset to set the \fBDMA\fR window to. Upon a successful
 return, it will be filled in with the new offset from the beginning of the
 object resources are allocated for.
@@ -49,12 +45,10 @@ object resources are allocated for.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlenp\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a value which must either be the current size of the \fBDMA\fR
 window (as known from a call to \fBddi_dma_curwin\fR(9F) or from a previous
 call to \fBddi_dma_movwin()\fR). Upon a successful return, it will be filled in
@@ -63,12 +57,10 @@ with the size, in bytes, of the current window.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to a \fBDMA\fR cookie (see \fBddi_dma_cookie\fR(9S)). Upon a
 successful return, cookiep is filled in just as if an implicit
 \fBddi_dma_htoc\fR(9F) had been made.
@@ -110,23 +102,19 @@ transfer.
 The \fBddi_dma_movwin()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 The current length and offset are legal and have been set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Otherwise.
 .RE
 
@@ -143,13 +131,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

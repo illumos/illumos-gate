@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nfslogd 1M "2 Dec 2004" "SunOS 5.11" "System Administration Commands"
+.TH NFSLOGD 1M "Dec 2, 2004"
 .SH NAME
 nfslogd \- nfs logging daemon
 .SH SYNOPSIS
@@ -94,24 +94,20 @@ There are various configurable parameters that affect the behavior of the
 and are described below:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMASK\fR\fR
 .ad
 .RS 27n
-.rt  
 Sets the file mode for the log files, work buffer files and file handle mapping
 database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMIN_PROCESSING_SIZE\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies the minimum size, in bytes, that the buffer  file must reach before
 processing the work information and  writing to the log file. The value of
 \fBMIN_PROCESSING_SIZE\fR must be between 1 and \fBulimit\fR.
@@ -119,12 +115,10 @@ processing the work information and  writing to the log file. The value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIDLE_TIME\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies the amount of time, in seconds, the daemon should sleep while waiting
 for more information to be placed in the buffer file. \fBIDLE_TIME\fR also
 determines how often the configuration file will be reread. The value of
@@ -133,12 +127,10 @@ determines how often the configuration file will be reread. The value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAX_LOGS_PRESERVE\fR\fR
 .ad
 .RS 27n
-.rt  
 The \fBnfslogd\fR periodically cycles its logs. \fBMAX_LOGS_PRESERVE\fR
 specifies the maximum number of log files to save. When \fBMAX_LOGS_PRESERVE\fR
 is reached, the oldest files will be overwritten as new log files are created.
@@ -150,12 +142,10 @@ to the value configured for \fBMAX_LOGS_PRESERVE\fR. The value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCYCLE_FREQUENCY\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies how often, in hours, the log files are cycled. \fBCYCLE_FREQUENCY\fR
 is used to insure that the log files  do not get too large. The  value of
 \fBCYCLE_FREQUENCY\fR must be between 1  and \fBINT_MAX\fR.
@@ -163,12 +153,10 @@ is used to insure that the log files  do not get too large. The  value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAPPING_UPDATE_INTERVAL\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies the time interval, in seconds, between updates of the records in the
 file handle to path mapping tables. Instead of updating the \fBatime\fR of a
 record each time that record is accessed, it is only updated if it has aged
@@ -179,12 +167,10 @@ of this parameter must be between 1 and \fBINT_MAX\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRUNE_TIMEOUT\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies when a database record times out, in hours. If the time that elapsed
 since the record was last accessed is greater than \fBPRUNE_TIMEOUT\fR then the
 record can be pruned from the database. The default value for
@@ -198,57 +184,47 @@ must  be between 1 and \fBINT_MAX\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Daemon started successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Daemon failed to start.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfs/nfslogtab\fR \fR
 .ad
 .RS 24n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nfs/nfslog.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/nfslogd\fR\fR
 .ad
 .RS 24n
-.rt  
 
 .RE
 

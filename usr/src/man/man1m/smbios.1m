@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smbios 1M "31 Aug 2005" "SunOS 5.11" "System Administration Commands"
+.TH SMBIOS 1M "Aug 31, 2005"
 .SH NAME
 smbios \- display the contents of a System Management BIOS image
 .SH SYNOPSIS
@@ -42,12 +42,10 @@ content, the raw hexadecimal data for the structure is displayed.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 11n
-.rt  
 Disable header validation for broken BIOSes.
 .sp
 By default, \fBsmbios\fR attempts to validate the SMBIOS header by verifying
@@ -57,35 +55,29 @@ necessary when a BIOS has a non-compliant header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 11n
-.rt  
  Display the contents of the SMBIOS entry point rather than the contents of the
 SMBIOS structure table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIid\fR\fR
 .ad
 .RS 11n
-.rt  
 Display only the specified structure, named by its integer id.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
 .RS 11n
-.rt  
  Display obsolete structure types.
 .sp
 By default, \fBsmbios\fR elides output for structures whose type is marked as
@@ -94,36 +86,30 @@ obsolete in the DMTF SMBIOS specification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 11n
-.rt  
 Display only a summary listing of the structure identifiers and types, instead
 of the content of each selected structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 Display only those structures whose type matches the specified integer type, as
 defined the DMTF SMBIOS specification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIfile\fR\fR
 .ad
 .RS 11n
-.rt  
 Write a copy of the SMBIOS image to the specified file and exit.
 .sp
 The SMBIOS entry point is written to the start of the file with its structure
@@ -133,12 +119,10 @@ point checksum is computed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 11n
-.rt  
 Display raw hexadecimal data for the selected structures in addition to
 human-readable output.
 .sp
@@ -152,12 +136,10 @@ human-readable output for the selected structures.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies an alternate SMBIOS image to display instead of the current system's
 SMBIOS image.
 .RE
@@ -168,48 +150,40 @@ SMBIOS image.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 Successful completion. All structures in the SMBIOS image were examined
 successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 A fatal error occurred, such as failure to open the specified file or device,
 or corruption in the image.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 Invalid command-line options were specified.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/smbios\fR \fR
 .ad
 .RS 16n
-.rt  
 Kernel SMBIOS image device. This device special file is used to export a
 snapshot of the current system SMBIOS image.
 .RE
@@ -222,13 +196,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below. 
+Interface Stability	See below.
 .TE
 
 .sp

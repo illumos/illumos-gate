@@ -7,7 +7,7 @@
 .\" OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
 .\" IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH route 7P "5 Feb 2009" "SunOS 5.11" "Protocols"
+.TH ROUTE 7P "Feb 5, 2009"
 .SH NAME
 route \- kernel packet forwarding database
 .SH SYNOPSIS
@@ -104,45 +104,37 @@ The kernel might reject certain messages, and indicates this by filling in the
 codes are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 11n
-.rt  
 If requested to duplicate an existing entry
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 11n
-.rt  
 If requested to delete a non-existent entry
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 If insufficient resources were available to install a new route.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 11n
-.rt  
 If the calling process does not have appropriate privileges to alter the
 routing table.
 .RE
@@ -178,23 +170,19 @@ application to indicate its awareness of certain features, which control
 routing socket behavior. The supported values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTAW_DEFAULT\fR\fR
 .ad
 .RS 20n
-.rt  
 Default awareness.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRTAW_UNDER_IPMP\fR\fR
 .ad
 .RS 20n
-.rt  
 IPMP underlying interface awareness. When enabled, underlying IP interfaces in
 an IPMP group remain visible to the routing socket and events related to them
 continue to be generated.
@@ -279,7 +267,7 @@ where
 .nf
 struct rt_metrics {
   uint32_t rmx_locks;      /* Kernel must leave  these  values alone */
-  uint32_t rmx_mtu;        /* MTU for this path */     
+  uint32_t rmx_mtu;        /* MTU for this path */
   uint32_t rmx_hopcount;   /* max hops expected */
   uint32_t rmx_expire;     /* lifetime for route, e.g., redirect */
   uint32_t rmx_recvpipe;   /* inbound delay-bandwidth  product */

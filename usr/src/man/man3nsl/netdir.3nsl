@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH netdir 3NSL "28 Jan 2005" "SunOS 5.11" "Networking Services Library Functions"
+.TH NETDIR 3NSL "Jan 28, 2005"
 .SH NAME
 netdir, netdir_getbyname, netdir_getbyaddr, netdir_free, netdir_options,
 taddr2uaddr, uaddr2taddr, netdir_perror, netdir_sperror, netdir_mergeaddr \-
@@ -98,12 +98,10 @@ host names are defined in <\fBnetdir.h\fR>. The currently defined host names
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOST_SELF\fR\fR
 .ad
 .RS 21n
-.rt  
 Represents the address to which local programs will bind their endpoints.
 \fBHOST_SELF\fR differs from the host name provided by \fBgethostname\fR(3C),
 which represents the address to which \fIremote\fR programs will bind their
@@ -112,12 +110,10 @@ endpoints.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOST_ANY\fR\fR
 .ad
 .RS 21n
-.rt  
 Represents any host accessible by this transport provider. \fBHOST_ANY\fR
 allows applications to specify a required service without specifying a
 particular host name.
@@ -125,23 +121,19 @@ particular host name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOST_SELF_CONNECT\fR\fR
 .ad
 .RS 21n
-.rt  
 Represents the host address that can be used to connect to the local host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOST_BROADCAST\fR\fR
 .ad
 .RS 21n
-.rt  
 Represents the address for all hosts accessible by this transport provider.
 Network requests to this address are received by all machines.
 .RE
@@ -236,12 +228,10 @@ returns \fB-1\fR and the error message can be printed through
 The specific actions of each option follow.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBND_SET_BROADCAST\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the transport provider up to allow broadcast if the transport supports
 broadcast. \fIfildes\fR is a file descriptor into the transport, that is, the
 result of a \fBt_open\fR of \fB/dev/udp\fR. \fIpointer_to_args\fR is not used.
@@ -251,12 +241,10 @@ If this completes, broadcast operations can be performed on file descriptor
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBND_SET_RESERVEDPORT\fR\fR
 .ad
 .RS 25n
-.rt  
 Allows the application to bind to a reserved port if that concept exists for
 the transport provider. \fIfildes\fR is an unbound file descriptor into the
 transport. If \fIpointer_to_args\fR is \fINULL,\fR \fIfildes\fR is bound to a
@@ -267,12 +255,10 @@ address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBND_CHECK_RESERVEDPORT\fR\fR
 .ad
 .RS 25n
-.rt  
 Used to verify that the address corresponds to a reserved port if that concept
 exists for the transport provider. \fIfildes\fR is not used.
 \fIpointer_to_args\fR is a pointer to a \fBnetbuf\fR structure that contains
@@ -282,12 +268,10 @@ the address. This option returns \fB0\fR only if the address specified in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBND_MERGEADDR\fR\fR
 .ad
 .RS 25n
-.rt  
 Used to take a ``local address'' such as a \fB0.0.0.0\fR TCP address and return
 a ``real address'' to which client machines can connect. \fIfildes\fR is not
 used. \fIpointer_to_args\fR is a pointer to a \fBstruct nd_mergearg\fR which
@@ -334,13 +318,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

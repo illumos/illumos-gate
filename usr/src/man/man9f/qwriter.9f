@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH qwriter 9F "1 Mar 1993" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH QWRITER 9F "Mar 1, 1993"
 .SH NAME
 qwriter \- asynchronous STREAMS perimeter upgrade
 .SH SYNOPSIS
 .LP
 .nf
 #include <sys/stream.h>
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 
 
 
@@ -24,46 +24,38 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqp\fR \fR
 .ad
 .RS 14n
-.rt  
 Pointer to the queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR \fR
 .ad
 .RS 14n
-.rt  
 Pointer to a message that will be passed in to the callback function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfunc\fR \fR
 .ad
 .RS 14n
-.rt  
 A function that will be called when exclusive (writer) access has been acquired
 at the specified perimeter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIperimeter\fR \fR
 .ad
 .RS 14n
-.rt  
 Either \fBPERIM_INNER\fR or \fBPERIM_OUTER\fR.
 .RE
 

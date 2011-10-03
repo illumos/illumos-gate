@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kdb5_ldap_util 1M "28 Aug 2007" "SunOS 5.11" "System Administration Commands"
+.TH KDB5_LDAP_UTIL 1M "Aug 28, 2007"
 .SH NAME
 kdb5_ldap_util \- Kerberos configuration utility
 .SH SYNOPSIS
@@ -35,7 +35,6 @@ multiple commands and are described in their own section, below.
 The following general options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIuser_dn\fR\fR
 .ad
@@ -47,7 +46,6 @@ perform the operation on the LDAP server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR \fIldap_uri\fR\fR
 .ad
@@ -58,7 +56,6 @@ Specifies the URI of the LDAP server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIpasswd\fR\fR
 .ad
@@ -73,7 +70,6 @@ Specifies the password of \fIuser_dn\fR. This option is not recommended.
 The following options apply to a number of \fBkdb5_ldap_util\fR commands.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-subtrees\fR \fIsubtree_dn_list\fR\fR
 .ad
@@ -85,7 +81,6 @@ contains the DNs of the subtree objects separated by a colon.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-sscope\fR \fIsearch_scope\fR\fR
 .ad
@@ -97,7 +92,6 @@ values are 1 or \fBone\fR (one level), 2 or \fBsub\fR (subtrees).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-containerref\fR \fIcontainer_reference_dn\fR\fR
 .ad
@@ -110,7 +104,6 @@ principals will be created in the realm container.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxtktlife\fR \fImax_ticket_life\fR\fR
 .ad
@@ -121,7 +114,6 @@ Specifies maximum ticket life for principals in this realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxrenewlife\fR \fImax_renewable_ticket_life\fR\fR
 .ad
@@ -132,7 +124,6 @@ Specifies maximum renewable life of tickets for principals in this realm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -157,7 +148,7 @@ following syntax:
 .nf
 create \e
 [-subtrees \fIsubtree_dn_list\fR]
-[-sscope \fIsearch_scope\fR] 
+[-sscope \fIsearch_scope\fR]
 [-containerref \fIcontainer_reference_dn\fR]
 [-k \fImkeytype\fR]
 [-m|-P \fIpassword\fR| -sf \fIstashfilename\fR]
@@ -177,7 +168,6 @@ create \e
 The \fBcreate\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-subtree\fR \fIsubtree_dn_list\fR\fR
 .ad
@@ -188,7 +178,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-sscope\fR \fIsearch_scope\fR\fR
 .ad
@@ -199,7 +188,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-containerref\fR \fIcontainer_reference_dn\fR\fR
 .ad
@@ -210,7 +198,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fImkeytype\fR\fR
 .ad
@@ -222,7 +209,6 @@ given in \fBkdc.conf\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -234,7 +220,6 @@ than fetched from a file on the disk.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIpassword\fR\fR
 .ad
@@ -245,7 +230,6 @@ Specifies the master database password. This option is not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-sf\fR \fIstashfilename\fR\fR
 .ad
@@ -256,7 +240,6 @@ Specifies the stash file of the master database password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -267,7 +250,6 @@ Specifies that the stash file is to be created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxtktlife\fR \fImax_ticket_life\fR\fR
 .ad
@@ -278,7 +260,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxrenewlife\fR \fImax_renewable_ticket_life\fR\fR
 .ad
@@ -289,7 +270,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -300,7 +280,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIticket_flags\fR\fR
 .ad
@@ -337,7 +316,6 @@ modify \e
 The \fBmodify\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-subtree\fR \fIsubtree_dn_list\fR\fR
 .ad
@@ -348,7 +326,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-sscope\fR \fIsearch_scope\fR\fR
 .ad
@@ -359,7 +336,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-containerref\fR \fIcontainer_reference_dn\fR\fR
 .ad
@@ -370,7 +346,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxtktlife\fR \fImax_ticket_life\fR\fR
 .ad
@@ -381,7 +356,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxrenewlife\fR \fImax_renewable_ticket_life\fR\fR
 .ad
@@ -392,7 +366,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -403,7 +376,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIticket_flags\fR\fR
 .ad
@@ -433,7 +405,6 @@ view [-r \fIrealm\fR]
 The \fBview\fR command has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -460,7 +431,6 @@ destroy [-f] [-r \fIrealm\fR]
 The \fBdestroy\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -471,7 +441,6 @@ If specified, \fBdestroy\fR does not prompt you for confirmation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -515,7 +484,6 @@ stashsrvpw [-f \fIfilename\fR] \fIservicedn\fR
 The \fBstashsrvpw\fR command has the following option and argument:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
@@ -534,7 +502,6 @@ Specifies the complete path of the service password file. The default is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIservicedn\fR\fR
 .ad
@@ -567,7 +534,6 @@ create_policy \e
 The \fBcreate_policy\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -578,7 +544,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxtktlife\fR \fImax_ticket_life\fR\fR
 .ad
@@ -589,7 +554,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-maxrenewlife\fR \fImax_renewable_ticket_life\fR\fR
 .ad
@@ -600,7 +564,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIticket_flags\fR\fR
 .ad
@@ -614,7 +577,6 @@ these flags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpolicy_name\fR\fR
 .ad
@@ -663,7 +625,6 @@ view_policy [-r \fIrealm\fR] \fIpolicy_name\fR
 The \fBview_policy\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -674,7 +635,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpolicy_name\fR\fR
 .ad
@@ -701,7 +661,6 @@ destroy_policy [-r \fIrealm\fR] [-force] \fIpolicy_name\fR
 The \fBdestroy_policy\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -712,7 +671,6 @@ See "Common Command-specific Options," above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-force\fR\fR
 .ad
@@ -725,7 +683,6 @@ confirm the deletion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpolicy_name\fR\fR
 .ad
@@ -752,7 +709,6 @@ list_policy [-r \fIrealm\fR]
 The \fBlist_policy\fR command has the following option:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -768,7 +724,6 @@ A number of \fBkdb5_ldap_util\fR commands have \fBticket_flag\fR options. These
 flags are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_dup_skey\fR\fR
 .ad
@@ -782,7 +737,6 @@ clears this flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_forwardable\fR\fR
 .ad
@@ -795,7 +749,6 @@ tickets. This setting sets the \fBKRB5_KDB_DISALLOW_FORWARDABLE\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_postdated\fR\fR
 .ad
@@ -808,7 +761,6 @@ This setting sets the \fBKRB5_KDB_DISALLOW_POSTDATED\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_proxiable\fR\fR
 .ad
@@ -821,7 +773,6 @@ This setting sets the \fBKRB5_KDB_DISALLOW_PROXIABLE\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_renewable\fR\fR
 .ad
@@ -834,7 +785,6 @@ This setting sets the \fBKRB5_KDB_DISALLOW_RENEWABLE\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_svr\fR\fR
 .ad
@@ -847,7 +797,6 @@ this flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_tgs_req\fR\fR
 .ad
@@ -862,7 +811,6 @@ most purposes.  \fB+allow_tgs_req\fR clears this flag. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}allow_tix\fR\fR
 .ad
@@ -876,7 +824,6 @@ the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}needchange\fR\fR
 .ad
@@ -890,7 +837,6 @@ principals in the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}password_changing_service\fR\fR
 .ad
@@ -906,7 +852,6 @@ sets the \fBKRB5_KDB_PWCHANGE_SERVICE\fR flag on principals in the database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}requires_hwauth\fR\fR
 .ad
@@ -919,7 +864,6 @@ device before being allowed to \fBkinit\fR(1).  This setting sets the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{-|+}requires_preauth\fR\fR
 .ad
@@ -1259,13 +1203,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

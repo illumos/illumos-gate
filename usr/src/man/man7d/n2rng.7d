@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH n2rng 7d "15 Apr 2009" "SunOS 5.11" "Devices"
+.TH N2RNG 7D "Apr 15, 2009"
 .SH NAME
 n2rng \- Ultra-SPARC T2 random number generator device driver
 .SH DESCRIPTION
@@ -25,12 +25,10 @@ You configure the \fBn2rng\fR driver by defining properties in
 The following property is supported:
 .sp
 .ne 2
-.mk
 .na
 \fBnostats\fR
 .ad
 .RS 28n
-.rt  
 Disables the generation of statistics. The nostats property may be used to help
 prevent traffic analysis, however, this may inhibit support personnel.
 .RE
@@ -43,34 +41,28 @@ reported by \fBn2rng\fR using  the \fBkstat\fR(7D) and \fBkstat\fR(9S)
 mechanisms. The \fBn2rng\fR driver maintains the following statistics:
 .sp
 .ne 2
-.mk
 .na
 \fBstatus\fR
 .ad
 .RS 28n
-.rt  
 Status (online, offline, fail) of RNG device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrngjobs\fR
 .ad
 .RS 28n
-.rt  
 Number of requests for random data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrngbytes\fR
 .ad
 .RS 28n
-.rt  
 Number of bytes read from the RNG device.
 .RE
 
@@ -83,85 +75,70 @@ Control domain. Statistics are reported by \fBn2rng\fR using  the
 as unsigned, and all are 64 bits.
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-cell0-bias\fR
 .ad
 .RS 28n
-.rt  
 Bias setting for noise cell 0 of RNG \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-cell0-entropy\fR
 .ad
 .RS 28n
-.rt  
 Entropy value for noise cell 0 of RNG \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-cell1-bias\fR
 .ad
 .RS 28n
-.rt  
 Bias setting for noise cell 1 of RNG \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-cell1-entropy\fR
 .ad
 .RS 28n
-.rt  
 Entropy value for noise cell 1 of RNG n.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-cell2-bias\fR
 .ad
 .RS 28n
-.rt  
 Bias setting for noise cell 2 of RNG \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-cell3-entropy\fR
 .ad
 .RS 28n
-.rt  
 Entropy value for noise cell 2 of RNG \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrng(n)-state\fR
 .ad
 .RS 28n
-.rt  
 State of rng number n (online, offline, error,  health check).
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4v/kernel/drv/sparcv9/n2cp\fR\fR
 .ad
@@ -172,7 +149,6 @@ State of rng number n (online, offline, error,  health check).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/sun4v/kernel/drv/n2rng.conf\fR\fR
 .ad
@@ -189,15 +165,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC
+Architecture	SPARC
 _
-Interface stability Committed
+Interface stability 	Committed
 .TE
 
 .SH SEE ALSO

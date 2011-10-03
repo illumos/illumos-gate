@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ioctl 9E "3 Dec 1996" "SunOS 5.11" "Driver Entry Points"
+.TH IOCTL 9E "Dec 3, 1996"
 .SH NAME
 ioctl \- control a character device
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ ioctl \- control a character device
 
 
 
-\fBint prefix\fR\fBioctl\fR(\fBdev_t\fR \fIdev\fR, \fBint\fR \fIcmd\fR, \fBintptr_t\fR \fIarg\fR, \fBint\fR \fImode\fR, 
+\fBint prefix\fR\fBioctl\fR(\fBdev_t\fR \fIdev\fR, \fBint\fR \fIcmd\fR, \fBintptr_t\fR \fIarg\fR, \fBint\fR \fImode\fR,
      \fBcred_t *\fR\fIcred_p\fR, \fBint *\fR\fIrval_p\fR);
 .fi
 
@@ -29,35 +29,29 @@ Architecture independent level 1 (DDI/DKI). This entry point is \fBoptional\fR.
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 10n
-.rt  
 Device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd\fR\fR
 .ad
 .RS 10n
-.rt  
 Command argument the driver  \fBioctl()\fR routine interprets as the  operation
 to be performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 10n
-.rt  
 Passes parameters between a user program and the driver.  When used with
 terminals, the argument is the address of a user program structure containing
 driver or hardware settings.  Alternatively, the argument may be a value that
@@ -68,12 +62,10 @@ interpret the argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 10n
-.rt  
 A bit field that contains:
 .RS +4
 .TP
@@ -102,23 +94,19 @@ See below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_p\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to the  user credential structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrval_p\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to return value for calling process.  The driver may elect to set the
 value which is valid only if the  \fBioctl()\fR succeeds.
 .RE
@@ -237,22 +225,22 @@ struct passargs32 {
         int len;
         caddr32_t addr;
 };
- 
+
 struct passargs {
         int len;
         caddr_t addr;
 };
- 
+
 xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp) {
         struct passargs pa;
- 
+
 #ifdef  _MULTI_DATAMODEL
         switch (ddi_model_convert_from(mode & FMODELS)) {
             case DDI_MODEL_ILP32:
             {
                 struct passargs32 pa32;
- 
+
                 ddi_copyin(arg, &pa32, sizeof (struct passargs32),\e
                 mode);
                 pa.len = pa32.len;
@@ -267,7 +255,7 @@ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 #else /* _MULTI_DATAMODEL */
         ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
 #endif  /* _MULTI_DATAMODEL */
- 
+
         do_ioctl(&pa);
         .\|.\|.\|.
 }

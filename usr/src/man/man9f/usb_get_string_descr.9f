@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_get_string_descr 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_GET_STRING_DESCR 9F "Jan 5, 2004"
 .SH NAME
 usb_get_string_descr \- Get string descriptor from device
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ usb_get_string_descr \- Get string descriptor from device
 
 
 
-\fBint\fR \fBusb_get_string_descr\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBusb_get_string_descr\fR(\fBdev_info_t *\fR\fIdip\fR,
      \fBuint16_t\fR \fIlangid\fR, \fBuint8_t\fR \fIindex\fR,
      \fBchar *\fR\fIbuf\fR, \fBsize_t\fR \fIbuflen\fR);
 .fi
@@ -26,56 +26,46 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlangid\fR\fR
 .ad
 .RS 10n
-.rt  
 Language ID. Currently only USB_LANG_ID (English ascii) is valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIindex\fR\fR
 .ad
 .RS 10n
-.rt  
 String index indicating descriptor to retrieve.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 10n
-.rt  
 Address into which the string descriptor is placed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuflen\fR\fR
 .ad
 .RS 10n
-.rt  
 Size of buf in bytes.
 .RE
 
@@ -100,35 +90,29 @@ All returned descriptors are null-terminated.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 20n
-.rt  
 String descriptor is returned in \fIbuf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 20n
-.rt  
 \fIdip\fR or \fIbuf\fR are \fBNULL\fR, or \fIindex\fR or \fIbuflen\fR is
 \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 20n
-.rt  
 Descriptor cannot be retrieved.
 .RE
 
@@ -160,15 +144,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH keyserv 1M "4 Jan 2002" "SunOS 5.11" "System Administration Commands"
+.TH KEYSERV 1M "Jan 4, 2002"
 .SH NAME
 keyserv \- server for storing private encryption keys
 .SH SYNOPSIS
@@ -38,12 +38,10 @@ The \fB/etc/default/keyserv\fR file contains the following default parameter
 settings. See .
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENABLE_NOBODY_KEYS\fR\fR
 .ad
 .RS 22n
-.rt  
 Specifies whether default keys for \fBnobody\fR are used.
 \fBENABLE_NOBODY_KEYS=NO\fR is equivalent to the \fB-d\fR command-line option.
 The default value for \fBENABLE_NOBODY_KEYS\fR is \fBYES\fR.
@@ -55,57 +53,47 @@ The default value for \fBENABLE_NOBODY_KEYS\fR is \fBYES\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 15n
-.rt  
 Do not use disk caches. This option overrides any \fB-s\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 15n
-.rt  
 Run in debugging mode and log all requests to \fBkeyserv\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 Disable the use of default keys for \fBnobody\fR. See .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 Enable the use of default keys for \fBnobody\fR. This is the default behavior.
 See .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Root's secret key is not read from \fB/etc/.rootkey\fR. Instead, \fBkeyserv\fR
 prompts the user for the password to decrypt root's key stored in the
 \fBpublickey\fR database and then stores the decrypted key in
@@ -115,22 +103,18 @@ prompts the user for the password to decrypt root's key stored in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsizespec\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify the size of the extended Diffie-Hellman common key disk caches. The
 \fIsizespec\fR can be one of the following forms:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImechtype\fR=\fBsize\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBsize\fR is an integer specifying the maximum number of entries in the cache,
 or an integer immediately followed by the letter \fIM\fR, denoting the maximum
 size in MB.
@@ -138,12 +122,10 @@ size in MB.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize\fR\fR
 .ad
 .RS 17n
-.rt  
 This form of \fIsizespec\fR applies to all caches.
 .RE
 
@@ -154,23 +136,19 @@ mechanism, \fBAUTH_DES\fR, does not use a disk cache.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/.rootkey\fR\fR
 .ad
 .RS 24n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/keyserv\fR\fR
 .ad
 .RS 24n
-.rt  
 Contains default settings. You can use command-line options to override these
 settings.
 .RE

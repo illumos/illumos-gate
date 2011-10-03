@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tput 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH TPUT 1 "Feb 1, 1995"
 .SH NAME
 tput \- initialize a terminal or query terminfo database
 .SH SYNOPSIS
@@ -41,12 +41,10 @@ STATUS section.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fItype\fR \fR
 .ad
 .RS 11n
-.rt  
 Indicates the \fItype\fR of terminal. Normally this option is unnecessary,
 because the default is taken from the environment variable \fBTERM\fR. If
 \fB-T\fR is specified, then the shell variables \fBLINES\fR and \fBCOLUMNS\fR
@@ -55,12 +53,10 @@ and the layer size will not be referenced.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fR
 .ad
 .RS 11n
-.rt  
 Allows more than one capability per invocation of \fBtput\fR. The capabilities
 must be passed to \fBtput\fR from the standard input instead of from the
 command line (see the example in the EXAMPLES section). Only one \fIcapname\fR
@@ -74,12 +70,10 @@ is allowed per line. The \fB-S\fR option changes the meaning of the \fB0\fR and
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcapname\fR \fR
 .ad
 .RS 12n
-.rt  
 Indicates the capability attribute from the \fBterminfo\fR database. See
 \fBterminfo\fR(4) for a complete list of capabilities and the \fIcapname\fR
 associated with each.
@@ -88,23 +82,19 @@ The following strings will be supported as operands by the implementation in
 the "C" locale:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear\fR \fR
 .ad
 .RS 13n
-.rt  
 Display the clear-screen sequence.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinit\fR \fR
 .ad
 .RS 13n
-.rt  
 If the \fBterminfo\fR database is present and an entry for the user's terminal
 exists (see \fB-T\fR\fItype\fR, above), the following will occur:
 .RS +4
@@ -136,12 +126,10 @@ activities, that activity will silently be skipped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreset\fR \fR
 .ad
 .RS 13n
-.rt  
 Instead of putting out initialization strings, the terminal's reset strings
 will be output if present (\fBrs1\fR, \fBrs2\fR, \fBrs3\fR, \fBrf\fR). If the
 reset strings are not present, but initialization strings are, the
@@ -151,12 +139,10 @@ to \fBinit\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlongname\fR \fR
 .ad
 .RS 13n
-.rt  
 If the \fBterminfo\fR database is present and an entry for the user's terminal
 exists (see \fB-T\fR\fItype\fR above), then the long name of the terminal will
 be put out. The long name is the last name in the first line of the terminal's
@@ -167,12 +153,10 @@ description in the \fBterminfo\fR database (see \fBterm\fR(5)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIparm\fR \fR
 .ad
 .RS 12n
-.rt  
 If the attribute is a string that takes parameters, the argument \fIparm\fR
 will be instantiated into the string. An all numeric argument will be passed to
 the attribute as a number.
@@ -291,7 +275,7 @@ terminal. This might be followed by a prompt:
 .sp
 .in +2
 .nf
-\fBecho "${bold}Please type in your name: ${offbold}\ec"\fR 
+\fBecho "${bold}Please type in your name: ${offbold}\ec"\fR
 example% \fBbold='tput smso'\fR
 example% \fBoffbold='tput rmso'\fR
 .fi
@@ -340,10 +324,10 @@ terminated by an exclamation mark (\fB!\fR) on a line by itself.
 .sp
 .in +2
 .nf
-example% \fBtput -S <<! 
-> clear 
+example% \fBtput -S <<!
+> clear
 > cup 10 10
-> bold 
+> bold
 > !\fR
 .fi
 .in -2
@@ -357,12 +341,10 @@ that affect the execution of \fBtput\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERM\fR \fR
 .ad
 .RS 9n
-.rt  
 Determine the terminal type. If this variable is unset or null, and if the
 \fB-T\fR option is not specified, an unspecified default terminal type will be
 used.
@@ -374,12 +356,10 @@ used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 10n
-.rt  
 .RS +4
 .TP
 .ie t \(bu
@@ -417,12 +397,10 @@ The requested string was written successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR \fR
 .ad
 .RS 10n
-.rt  
 .RS +4
 .TP
 .ie t \(bu
@@ -441,56 +419,46 @@ that \fIcapname\fR is not defined for this terminal type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR \fR
 .ad
 .RS 10n
-.rt  
 Usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR \fR
 .ad
 .RS 10n
-.rt  
 No information is available about the specified terminal type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR \fR
 .ad
 .RS 10n
-.rt  
 The specified operand is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>4\fR \fR
 .ad
 .RS 10n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi1\fR \fR
 .ad
 .RS 10n
-.rt  
 \fIcapname\fR is a numeric variable that is not specified in the \fBterminfo\fR
 database. For instance, \fBtput\fR \fB-T450\fR lines and \fBtput\fR
 \fB-T2621\fR xmc.
@@ -499,7 +467,6 @@ database. For instance, \fBtput\fR \fB-T450\fR lines and \fBtput\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/curses.h\fR \fR
 .ad
@@ -510,7 +477,6 @@ database. For instance, \fBtput\fR \fB-T450\fR lines and \fBtput\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/term.h\fR \fR
 .ad
@@ -521,7 +487,6 @@ database. For instance, \fBtput\fR \fB-T450\fR lines and \fBtput\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/tabset/*\fR \fR
 .ad
@@ -534,7 +499,6 @@ see the "Tabs and Initialization" section of \fBterminfo\fR(4)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR \fR
 .ad
@@ -551,13 +515,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

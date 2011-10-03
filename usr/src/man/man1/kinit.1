@@ -4,15 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kinit 1 "12 Nov 2008" "SunOS 5.11" "User Commands"
+.TH KINIT 1 "Nov 12, 2008"
 .SH NAME
 kinit \- obtain and cache Kerberos ticket-granting ticket
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/kinit\fR [\fB-ARvV\fR] [\fB-p\fR | \fB-P\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR] [\fB-c\fR \fIcache_name\fR] 
-     [\fB-k\fR [\fB-t\fR \fIkeytab_file\fR]] [\fB-l\fR \fIlifetime\fR] 
-     [\fB-r\fR \fIrenewable_life\fR] [\fB-s\fR \fIstart_time\fR] [\fB-S\fR \fIservice_name\fR] 
+\fB/usr/bin/kinit\fR [\fB-ARvV\fR] [\fB-p\fR | \fB-P\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR] [\fB-c\fR \fIcache_name\fR]
+     [\fB-k\fR [\fB-t\fR \fIkeytab_file\fR]] [\fB-l\fR \fIlifetime\fR]
+     [\fB-r\fR \fIrenewable_life\fR] [\fB-s\fR \fIstart_time\fR] [\fB-S\fR \fIservice_name\fR]
      [\fIprincipal\fR]
 .fi
 
@@ -52,57 +52,47 @@ you end your login session.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests tickets with the local addresses.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests address-less tickets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcache_name\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses \fIcache_name\fR as the credentials (ticket) cache name and location. If
 this option is not used, the default cache name and location are used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests forwardable tickets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 24n
-.rt  
 Not forwardable. Does not request forwardable tickets.
 .sp
 Tickets that have been acquired on one host cannot normally be used on another
@@ -115,12 +105,10 @@ option allows a user to explicitly obtain a non-forwardable ticket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR [\fB-t\fR \fIkeytab_file\fR]\fR
 .ad
 .RS 24n
-.rt  
 Requests a host ticket, obtained from a key in the local host's \fIkeytab\fR
 file. The name and location of the keytab file can be specified with the
 \fB-t\fR \fIkeytab_file\fR option. Otherwise, the default name and location is
@@ -129,12 +117,10 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlifetime\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests a ticket with the lifetime \fIlifetime\fR. If the \fB-l\fR option is
 not specified, the default ticket lifetime (configured by each site) is used.
 Specifying a ticket lifetime longer than the maximum ticket lifetime
@@ -174,23 +160,19 @@ Value specified in the Kerberos database for the user principal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests proxiable tickets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 24n
-.rt  
 Not proxiable. Does not request proxiable tickets.
 .sp
 A proxiable ticket is a ticket that allows you to get a ticket for a service
@@ -200,12 +182,10 @@ option allows a user to explicitly obtain a non-proxiable ticket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrenewable_life\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests renewable tickets, with a total lifetime of \fIrenewable_life\fR. See
 the \fBTime\fR \fBFormats\fR section for the valid time duration formats that
 you can specify for \fIrenewable_life\fR. See \fBkdc.conf\fR(4) and
@@ -242,24 +222,20 @@ Value specified in the Kerberos database for the user principal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests renewal of the ticket-granting ticket. Notice that an expired ticket
 cannot be renewed, even if the ticket is still within its renewable life.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIstart_time\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests a postdated ticket, valid starting at \fIstart_time\fR. Postdated
 tickets are issued with the \fIinvalid\fR flag set, and need to be fed back to
 the \fBKDC\fR before use. See the \fBTime\fR \fBFormats\fR section for either
@@ -270,23 +246,19 @@ trying to match a time duration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIservice_name\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies an alternate service name to use when getting initial tickets.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 24n
-.rt  
 Requests that the ticket granting ticket in the cache (with the \fIinvalid\fR
 flag set) be passed to the \fBKDC\fR for validation. If the ticket is within
 its requested time range, the cache is replaced with the validated ticket.
@@ -294,24 +266,20 @@ its requested time range, the cache is replaced with the validated ticket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 24n
-.rt  
 Verbose output. Displays further information to the user, such as confirmation
 of authentication and version.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fB\fIattribute\fR[=\fIvalue\fR]\fR\fR
 .ad
 .RS 24n
-.rt  
 Specifies a pre-authentication attribute and value to be passed to
 pre-authentication plugins. The acceptable \fIattribute\fR and \fIvalue\fR
 values vary from pre-authentication plugin to plugin. This option can be
@@ -322,12 +290,10 @@ The following attributes are recognized by the OpenSSL \fBpkinit\fR
 pre-authentication mechanism:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX509_user_identity=URI\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies where to find user's X509 identity information.
 .sp
 Valid URI types are \fBFILE\fR, \fBDIR\fR, \fBPKCS11\fR, \fBPKCS12\fR, and
@@ -336,12 +302,10 @@ Valid URI types are \fBFILE\fR, \fBDIR\fR, \fBPKCS11\fR, \fBPKCS12\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX509_anchors=URI\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies where to find trusted X509 anchor information.
 .sp
 Valid URI types are \fBFILE\fR and \fBDIR\fR. See the\fBPKINIT URI Types\fR
@@ -350,12 +314,10 @@ section for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflag_RSA_PROTOCOL[=yes]\fR\fR
 .ad
 .RS 27n
-.rt  
 Specifies the use of RSA, rather than the default Diffie-Hellman protoco.
 .RE
 
@@ -364,7 +326,6 @@ Specifies the use of RSA, rather than the default Diffie-Hellman protoco.
 .SS "PKINIT URI Types"
 .sp
 .ne 2
-.mk
 .na
 \fBFILE:\fIfile-name\fR[,\fIkey-file-name\fR]\fR
 .ad
@@ -373,12 +334,10 @@ Specifies the use of RSA, rather than the default Diffie-Hellman protoco.
 This option has context-specific behavior.
 .sp
 .ne 2
-.mk
 .na
 \fBX509_user_identity\fR
 .ad
 .RS 22n
-.rt  
 \fIfile-name\fR specifies the name of a PEM-format file containing the user's
 certificate. If \fIkey-file-name\fR is not specified, the user's private key is
 expected to be in \fIfile-name\fR as well. Otherwise, \fIkey-file-name\fR is
@@ -387,12 +346,10 @@ the name of the file  containing the private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fBX509_anchors\fR
 .ad
 .RS 22n
-.rt  
 \fIfile-name\fR is assumed to be the name of an OpenSSL-style ca-bundle file.
 The \fBca-bundle\fR file should be base-64 encoded.
 .RE
@@ -401,7 +358,6 @@ The \fBca-bundle\fR file should be base-64 encoded.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDIR:\fIdirectory-name\fR\fR
 .ad
@@ -410,12 +366,10 @@ The \fBca-bundle\fR file should be base-64 encoded.
 This option has context-specific behavior.
 .sp
 .ne 2
-.mk
 .na
 \fBX509_user_identity\fR
 .ad
 .RS 22n
-.rt  
 \fIdirectory-name\fR specifies a directory with files named \fB*.crt\fR and
 \fB*.key\fR, where the first part of the file name is the same for matching
 pairs of certificate and private key files. When a file with a name ending with
@@ -426,12 +380,10 @@ contain the private key. If no such file is found, then the certificate in the
 
 .sp
 .ne 2
-.mk
 .na
 \fBX509_anchors\fR
 .ad
 .RS 22n
-.rt  
 \fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
 where each CA cert is stored in a file named \fBhash-of-ca-cert.\fR\fI#\fR.
 This infrastructure is encouraged, but all files in the directory are examined
@@ -442,7 +394,6 @@ and if they contain certificates (in PEM format), and are used.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPKCS12:\fIpkcs12-file-name\fR\fR
 .ad
@@ -454,7 +405,6 @@ the user's certificate and private key.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPKCS11:[slotid=\fIslot-id\fR][:token=\fItoken-label\fR][:certid=\fIcert-id\fR][:certlabel=\fIcert-label\fR]\fR
 .ad
@@ -472,7 +422,6 @@ particular certificate to use for \fBpkinit\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBENV:\fIenvironment-variable-name\fR\fR
 .ad
@@ -494,39 +443,36 @@ The following absolute time formats can be used for the \fB-s\fR
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-Absolute Time FormatExample 
-\fIyymmddhhmm\fR[\fIss\fR]990702133530
-\fIhhmm\fR[\fIss\fR]133530
-\fIyy\fR.\fImm\fR.\fBdd\fR.\fIhh\fR.\fImm\fR.\fIss\fR99:07:02:13:35:30
-\fIhh\fR:\fImm\fR[:\fIss\fR]13:35:30
-\fIldate\fR:\fIltime\fR07-07-99:13:35:30
-\fBdd\fR-\fImonth\fR-\fIyyyy\fR:\fIhh\fR:\fImm\fR[:\fIss\fR]02-july-1999:13:35:30
+box;
+c c
+l l .
+Absolute Time Format	Example
+\fIyymmddhhmm\fR[\fIss\fR]	990702133530
+\fIhhmm\fR[\fIss\fR]	133530
+\fIyy\fR.\fImm\fR.\fBdd\fR.\fIhh\fR.\fImm\fR.\fIss\fR	99:07:02:13:35:30
+\fIhh\fR:\fImm\fR[:\fIss\fR]	13:35:30
+\fIldate\fR:\fIltime\fR	07-07-99:13:35:30
+\fBdd\fR-\fImonth\fR-\fIyyyy\fR:\fIhh\fR:\fImm\fR[:\fIss\fR]	02-july-1999:13:35:30
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-VariableDescription
-\fBdd\fRday
-\fIhh\fRhour (24-hour clock)
-\fImm\fRminutes
-\fIss\fRseconds
-\fIyy\fRT{
+c c
+l l .
+Variable	Description
+\fBdd\fR	day
+\fIhh\fR	hour (24-hour clock)
+\fImm\fR	minutes
+\fIss\fR	seconds
+\fIyy\fR	T{
 year within century (0-68 is 2000 to 2068; 69-99 is 1969 to 1999)
 T}
-\fIyyyy\fRyear including century
-\fImonth\fRlocale's full or abbreviated month name
-\fIldate\fRlocale's appropriate date representation
-\fIltime\fRlocale's appropriate time representation
+\fIyyyy\fR	year including century
+\fImonth\fR	locale's full or abbreviated month name
+\fIldate\fR	locale's appropriate date representation
+\fIltime\fR	locale's appropriate time representation
 .TE
 
 .sp
@@ -539,51 +485,46 @@ minutes, and 30 seconds.
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-Time Duration FormatExample
-\fI#\fRd14d
-\fI#\fRh7h
-\fI#\fRm5m
-\fI#\fRs30s
-\fI#\fRd\fI#\fRh\fI#\fRm\fI#\fRs14d7h5m30s 
-\fI#\fRh\fI#\fRm[\fI#\fRs]7h5m30s
-\fIdays\fR-\fIhh\fR:\fImm\fR:\fIss\fR14-07:05:30
-\fIhours\fR:\fImm\fR[:\fIss\fR]7:05:30
+box;
+c c
+l l .
+Time Duration Format	Example
+\fI#\fRd	14d
+\fI#\fRh	7h
+\fI#\fRm	5m
+\fI#\fRs	30s
+\fI#\fRd\fI#\fRh\fI#\fRm\fI#\fRs	14d7h5m30s
+\fI#\fRh\fI#\fRm[\fI#\fRs]	7h5m30s
+\fIdays\fR-\fIhh\fR:\fImm\fR:\fIss\fR	14-07:05:30
+\fIhours\fR:\fImm\fR[:\fIss\fR]	7:05:30
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-DelimiterDescription
-dnumber of days
-hnumber of hours 
-mnumber of minutes
-snumber of seconds
+c c
+l l .
+Delimiter	Description
+d	number of days
+h	number of hours
+m	number of minutes
+s	number of seconds
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-VariableDescription
-\fI#\fRnumber
-\fIdays\fRnumber of days
-\fIhours\fRnumber of hours
-\fIhh\fRhour (24-hour clock)
-\fImm\fRminutes
-\fIss\fRseconds
+c c
+l l .
+Variable	Description
+\fI#\fR	number
+\fIdays\fR	number of days
+\fIhours\fR	number of hours
+\fIhh\fR	hour (24-hour clock)
+\fImm\fR	minutes
+\fIss\fR	seconds
 .TE
 
 .SH ENVIRONMENT VARIABLES
@@ -592,12 +533,10 @@ VariableDescription
 \fBkinit\fR uses the following environment variable:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKRB5CCNAME\fR\fR
 .ad
 .RS 14n
-.rt  
 Location of the credentials (ticket) cache. See \fBkrb5envvar\fR(5) for syntax
 and details.
 .RE
@@ -605,34 +544,28 @@ and details.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/krb5cc_\fIuid\fR\fR\fR
 .ad
 .RS 25n
-.rt  
 Default credentials cache (\fIuid\fR is the decimal \fBUID\fR of the user).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.keytab\fR\fR
 .ad
 .RS 25n
-.rt  
 Default location for the local host's \fBkeytab\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 25n
-.rt  
 Default location for the local host's configuration file. See
 \fBkrb5.conf\fR(4).
 .RE
@@ -645,13 +578,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

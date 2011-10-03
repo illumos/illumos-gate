@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kadmind 1M "29 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH KADMIND 1M "Feb 29, 2008"
 .SH NAME
 kadmind \- Kerberos administration daemon
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ automatically when the \fBKDC\fR is rebooted.
 work:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kdc.conf\fR\fR
 .ad
@@ -48,7 +47,6 @@ which are mandatory and some of which are optional. In particular,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.keytab\fR\fR
 .ad
@@ -65,7 +63,6 @@ keytab is determined by the \fBadmin_keytab\fR relation in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
 .ad
@@ -102,7 +99,6 @@ policy updates incrementally instead of receiving full dumps of the database.
 These settings can be changed in the \fBkdc.conf\fR(4) file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_enable = [true | false]\fR\fR
 .ad
@@ -113,7 +109,6 @@ Enable or disable incremental database propagation. Default is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_master_ulogsize = N\fR\fR
 .ad
@@ -160,7 +155,6 @@ k5migrate        account required        pam_unix_account.so.1
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -173,7 +167,6 @@ default behavior, which is to allow the daemon to put itself in the background.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -188,7 +181,6 @@ explicitly place the daemon in the background.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport-number\fR\fR
 .ad
@@ -201,7 +193,6 @@ The default is controlled by the \fBkadmind_port\fR relation in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
@@ -215,7 +206,6 @@ which the appropriate principals are in its \fBkeytab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIdb_args\fR\fR
 .ad
@@ -225,7 +215,6 @@ Pass database-specific arguments to \fBkadmind\fR. Supported arguments are for
 LDAP and the \fBBerkeley-db2\fR plug-in. These arguments are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinddn\fR=\fIbinddn\fR\fR
 .ad
@@ -237,7 +226,6 @@ LDAP simple bind DN for authorization on the directory server. Overrides the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbindpwd\fR=\fIbindpwd\fR\fR
 .ad
@@ -248,7 +236,6 @@ Bind password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdbname\fR=\fIname\fR\fR
 .ad
@@ -259,7 +246,6 @@ For the \fBBerkeley-db2\fR plug-in, specifies a name for the Kerberos database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnconns\fR=\fInum\fR\fR
 .ad
@@ -270,7 +256,6 @@ Maximum number of server connections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport\fR=\fInum\fR\fR
 .ad
@@ -284,7 +269,6 @@ Directory server connection port.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal\fR\fR
 .ad
@@ -295,7 +279,6 @@ Kerberos principal database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.ulog\fR\fR
 .ad
@@ -306,7 +289,6 @@ The update log file for incremental propagation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5\fR\fR
 .ad
@@ -317,7 +299,6 @@ Kerberos administrative database containing policy information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.kadm5.lock\fR\fR
 .ad
@@ -330,7 +311,6 @@ not exist).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/kadm5.dict\fR\fR
 .ad
@@ -341,7 +321,6 @@ Dictionary of strings explicitly disallowed as passwords.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.acl\fR\fR
 .ad
@@ -352,7 +331,6 @@ List of principals and their \fBkadmin\fR administrative privileges.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kadm5.keytab\fR\fR
 .ad
@@ -364,7 +342,6 @@ Keytab for \fBkadmin\fR principals: \fBkadmin\fR/\fIfqdn\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kdc.conf\fR\fR
 .ad
@@ -381,13 +358,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

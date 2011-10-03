@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_devlink_walk 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_DEVLINK_WALK 3DEVINFO "May 15, 2008"
 .SH NAME
 di_devlink_walk \- walk through links in a devlink snapshot
 .SH SYNOPSIS
@@ -20,23 +20,19 @@ di_devlink_walk \- walk through links in a devlink snapshot
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhdl\fR\fR
 .ad
 .RS 11n
-.rt  
 A handle to a snapshot of devlinks in "\fB/dev\fR".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIre\fR\fR
 .ad
 .RS 11n
-.rt  
 An extended regular expression as specified in \fBregex\fR(5) describing the
 paths of devlinks to visit. A null value matches all devlinks.  The expression
 should not involve the "\fB/dev\fR" prefix. For example, the "^\fBdsk/\fR" will
@@ -45,12 +41,10 @@ invoke \fIdevlink_callback\fR() for all "\fB/dev/dsk/\fR" links.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImpath\fR\fR
 .ad
 .RS 11n
-.rt  
 A path to a minor node below "\fB/devices\fR" for which "\fB/dev\fR" links are
 to be looked up. A null value selects all devlinks.  This path should not have
 a "\fB/devices\fR" prefix.
@@ -58,12 +52,10 @@ a "\fB/devices\fR" prefix.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 11n
-.rt  
 Specify the type of devlinks to be selected.  If \fBDI_PRIMARY_LINK\fR is used,
 only primary links (for instance, links which point only to "\fB/devices\fR"
 entries) are selected. If \fBDI_SECONDARY_LINK\fR is specified, only secondary
@@ -73,23 +65,19 @@ neither flag is specified, all devlinks are selected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to caller private data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevlink\fR\fR
 .ad
 .RS 11n
-.rt  
 The devlink being visited.
 .RE
 
@@ -99,7 +87,7 @@ The devlink being visited.
 The \fBdi_devlink_walk()\fR function visits every link in the snapshot that
 meets the criteria specified by the caller. For each such devlink, the
 caller-supplied function \fIdevlink_callback\fR() is invoked. The return value
-of 	\fIdevlink_callback\fR() determines subsequent walk behavior.
+of \fIdevlink_callback\fR() determines subsequent walk behavior.
 .SH RETURN VALUES
 .sp
 .LP
@@ -110,23 +98,19 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fIdevlink_callback\fR() function can return the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_WALK_CONTINUE\fR\fR
 .ad
 .RS 21n
-.rt  
 Continue walking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_WALK_TERMINATE\fR\fR
 .ad
 .RS 21n
-.rt  
 Terminate the walk immediately.
 .RE
 
@@ -136,23 +120,19 @@ Terminate the walk immediately.
 The \fBdevlink_callback()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more arguments is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient memory is available.
 .RE
 
@@ -164,15 +144,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

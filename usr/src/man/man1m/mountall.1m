@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mountall 1M "17 Dec 2008" "SunOS 5.11" "System Administration Commands"
+.TH MOUNTALL 1M "Dec 17, 2008"
 .SH NAME
 mountall, umountall \- mount, unmount multiple file systems
 .SH SYNOPSIS
@@ -60,35 +60,29 @@ specified, \fBmountall\fR and \fBumountall\fR limit their actions to the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 11n
-.rt  
 Specify the \fIFSType\fR of the file system to be mounted or unmounted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhost\fR\fR
 .ad
 .RS 11n
-.rt  
 Unmount all file systems listed in \fB/etc/mnttab\fR that are remote-mounted
 from host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 11n
-.rt  
 Use the \fBfuser\fR \fB-k\fR \fImount-point\fR command. See the \fBfuser\fR(1M)
 for details. The \fB-k\fR option sends the \fBSIGKILL\fR signal to each process
 using the file. As this option spawns kills for each process, the kill messages
@@ -98,23 +92,19 @@ unmounts \fIbusy\fR file systems, even if the \fB-k\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 11n
-.rt  
 Limit the action to local file systems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 11n
-.rt  
 List the actions that would be performed for the specified options, but do not
 actually execute these actions. Repeating the command without the \fB-n\fR
 option executes the listed actions, assuming that the \fB/etc/mnttab\fR file
@@ -123,34 +113,28 @@ has not changed in the interval prior to repeating the command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 11n
-.rt  
 Limit the action to remote file system types.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not perform the \fBumount\fR operation in parallel.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
 .RS 11n
-.rt  
 Apply the action(s) only to the file systems  mounted in non-global zones. By
 default, \fBumountall\fR unmounts only file systems mounted in the current
 zone. Option \fB-Z\fR is ignored if used in a non-global zone.
@@ -159,7 +143,6 @@ zone. Option \fB-Z\fR is ignored if used in a non-global zone.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -170,7 +153,6 @@ Mounted file system table
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
@@ -181,7 +163,6 @@ Table of file system defaults
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/fs/\fIFSType\fR/fsckall\fR\fR
 .ad
@@ -199,15 +180,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-Output StabilityUncommitted
+Output Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

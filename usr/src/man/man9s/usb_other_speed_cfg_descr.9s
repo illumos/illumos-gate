@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_other_speed_cfg_descr 9S "5 Jan 2004" "SunOS 5.11" "Data Structures for Drivers"
+.TH USB_OTHER_SPEED_CFG_DESCR 9S "Jan 5, 2004"
 .SH NAME
 usb_other_speed_cfg_descr \- USB other speed configuration descriptor
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/usb/usba.h> 
+#include <sys/usb/usba.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -51,14 +51,14 @@ uint8_t     bConfigurationValue    ID of the current other-speed
                                    configuration (1-based).
 
 uint8_t     iConfiguration         Configuration value.
-                                   Valid if > 0. Pass to 
+                                   Valid if > 0. Pass to
                                    usb_get_string_descr(9F)
                                    to retrieve string.
 
 uint8_t     bmAttributes           Configuration characteristics
                                    [See usb_cfg_descr(9S).]
 
-uint8_t     bMaxPower              Maximum power consumption 
+uint8_t     bMaxPower              Maximum power consumption
                                    in 2mA units.
 .fi
 .in -2
@@ -71,15 +71,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

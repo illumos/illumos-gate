@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getent 1M "26 Mar 2007" "SunOS 5.11" "System Administration Commands"
+.TH GETENT 1M "Mar 26, 2007"
 .SH NAME
 getent \- get entries from administrative database
 .SH SYNOPSIS
@@ -94,157 +94,129 @@ group name and searches the \fBgroup\fR database for a matching group name.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command syntax was incorrect, an invalid option was used, or an internal error
 occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 At least one of the specified entry names was not found in the database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 There is no support for enumeration on this database.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 name service switch configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 22n
-.rt  
 password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 22n
-.rt  
 group file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/hosts\fR\fR
 .ad
 .RS 22n
-.rt  
 IPv4 and IPv6 host name database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/services\fR\fR
 .ad
 .RS 22n
-.rt  
 Internet services and aliases
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/project\fR\fR
 .ad
 .RS 22n
-.rt  
 project file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/protocols\fR\fR
 .ad
 .RS 22n
-.rt  
 protocol name database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ethers\fR\fR
 .ad
 .RS 22n
-.rt  
 Ethernet address to hostname database or domain
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/networks\fR\fR
 .ad
 .RS 22n
-.rt  
 network name database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netmasks\fR\fR
 .ad
 .RS 22n
-.rt  
 network mask database
 .RE
 

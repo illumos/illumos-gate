@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH whereis 1B "10 Jan 2000" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH WHEREIS 1B "Jan 10, 2000"
 .SH NAME
 whereis \- locate the binary, source, and manual page files for a command
 .SH SYNOPSIS
@@ -54,35 +54,29 @@ program in a list of standard places:
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Searches only for binaries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 6n
-.rt  
 Changes or otherwise limits the places where \fBwhereis\fR searches for
 binaries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Terminates the last directory list and signals the start of file names, and
 \fImust\fR be used when any of the \fB-B\fR, \fB-M\fR, or \fB-S\fR options are
 used.
@@ -90,57 +84,47 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Searches only for manual sections.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 6n
-.rt  
 Changes or otherwise limits the places where \fBwhereis\fR searches for manual
 sections.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Searches only for sources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 6n
-.rt  
 Changes or otherwise limit the places where \fBwhereis\fR searches for sources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Searches for unusual entries. A file is said to be unusual if it does not have
 one entry of each requested type. Thus `\fBwhereis\fR \fB-m\fR \fB-u\fR
 \fB*\fR' asks for those files in the current directory which have no

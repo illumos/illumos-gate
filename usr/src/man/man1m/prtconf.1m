@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prtconf 1M "13 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH PRTCONF 1M "Mar 13, 2009"
 .SH NAME
 prtconf \- print system configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR] 
+\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
      [\fIdev_path\fR]
 .fi
 
@@ -30,24 +30,20 @@ that device node.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Display all the ancestors device nodes, up to the root node of the device tree,
 for the device specified on the command line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the firmware device tree root properties for the purpose of platform
 identification. These properties are "name", "compatible", "banner-name" and
 "model".
@@ -55,12 +51,10 @@ identification. These properties are "name", "compatible", "banner-name" and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the device subtree rooted at the device node specified on the command
 line, that is, display all the children of the device node specified on the
 command line.
@@ -68,36 +62,30 @@ command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Display vendor ID and device ID for PCI and PCI Express devices, in addition to
 the nodename.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 6n
-.rt  
 For each system peripheral in the device tree, displays the name of the device
 driver used to manage the peripheral.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 A SPARC-only option. Returns the device path name of the console frame buffer,
 if one exists. If there is no frame buffer, \fBprtconf\fR returns a non-zero
 exit code. This flag must be used by itself. It returns only the name of the
@@ -109,12 +97,10 @@ console frame buffer on a SUNW,Ultra-30 is \fBffb\fR, the command returns:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays information derived from the device tree provided by the firmware
 (PROM) on SPARC platforms or the booting system on x86 platforms.The device
 tree information displayed using this option is a snapshot of the initial
@@ -124,35 +110,29 @@ later.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 6n
-.rt  
 Includes information about pseudo devices. By default, information regarding
 pseudo devices is omitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies verbose mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays platform-dependent \fBPROM\fR (on SPARC platforms) or booting system
 (on x86 platforms) version information. This flag must be used by itself. The
 output is a string. The format of the string is arbitrary and
@@ -161,12 +141,10 @@ platform-dependent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports if the firmware on this system is 64-bit ready. Some existing platforms
 may need a firmware upgrade in order to run the 64-bit kernel. If the operation
 is not applicable to this platform or the firmware is already 64-bit ready, it
@@ -185,12 +163,10 @@ This flag overrides all other flags and must be used by itself.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_path\fR\fR
 .ad
 .RS 12n
-.rt  
 The path to a target device minor node, device nexus node, or device link for
 which device node configuration information is displayed
 .RE
@@ -201,23 +177,19 @@ which device node configuration information is displayed
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 No error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 With the \fB-F\fR option (SPARC only), a non-zero return value means that the
 output device is not a frame buffer. With the \fB-x\fR option, a non-zero
 return value means that the firmware is not 64-bit ready. In all other cases, a
@@ -232,12 +204,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityUnstable
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO

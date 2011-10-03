@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH xdr_complex 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.TH XDR_COMPLEX 3NSL "Dec 30, 1996"
 .SH NAME
 xdr_complex, xdr_array, xdr_bytes, xdr_opaque, xdr_pointer, xdr_reference,
 xdr_string, xdr_union, xdr_vector, xdr_wrapstring \- library routines for
@@ -29,7 +29,6 @@ four.
 \fB#include <rpc/xdr.h>\fR
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_array(XDR *\fIxdrs\fR, caddr_t *\fIarrp\fR, uint_t *\fIsizep\fR,
 const uint_t \fImaxsize\fR, const uint_t \fIelsize\fR, const xdrproc_t
@@ -51,7 +50,6 @@ elements' C form and their external representation. If \fB*\fR\fIaarp\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_bytes(XDR *\fIxdrs\fR, char **\fIsp\fR, uint_t *\fIsizep\fR,
 const uint_t \fImaxsize\fR);\fR
@@ -68,7 +66,6 @@ routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_opaque(XDR *\fIxdrs\fR, caddr_t \fIcp\fR, const uint_t
 \fIcnt\fR);\fR
@@ -83,7 +80,6 @@ representation. The parameter \fBcp\fR is the address of the opaque object, and
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_pointer(XDR *\fIxdrs\fR, char **objpp, uint_t \fIobjsize\fR,
 const xdrproc_t \fIxdrobj\fR);\fR
@@ -99,7 +95,6 @@ memory and \fB*\fR\fIobjpp\fR points to it.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_reference(XDR *\fIxdrs\fR, caddr_t *\fIpp\fR, uint_t \fIsize\fR,
 const xdrproc_t \fIproc\fR);\fR
@@ -120,7 +115,6 @@ Warning: this routine does not understand null pointers. Use
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_string(XDR *\fIxdrs\fR, char **\fIsp\fR, const uint_t
 \fImaxsize\fR);\fR
@@ -138,7 +132,6 @@ string ("\|"), but not a null string.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_union(XDR *\fIxdrs\fR, enum_t *\fIdscmp\fR, char *\fIunp\fR,
 const struct xdr_discrim *\fIchoices\fR, const xdrproc_t
@@ -161,7 +154,6 @@ not \fINULL\fR). It returns \fBTRUE\fR if it succeeds, \fBFALSE\fR otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_vector(XDR *\fIxdrs\fR, char *\fIarrp\fR, const uint_t
 \fIsize\fR, const uint_t \fIelsize\fR, const xdrproc_t \fIelproc\fR);\fR
@@ -179,7 +171,6 @@ array elements' C form and their external representation. This routine returns
 
 .sp
 .ne 2
-.mk
 .na
 \fBbool_t xdr_wrapstring(XDR *\fIxdrs\fR, char **\fIsp\fR);\fR
 .ad
@@ -205,13 +196,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

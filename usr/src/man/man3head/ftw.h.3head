@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftw.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH FTW.H 3HEAD "Sep 10, 2004"
 .SH NAME
 ftw.h, ftw \- file tree traversal
 .SH SYNOPSIS
@@ -36,78 +36,64 @@ argument to the application-supplied function that is  passed as the second
 argument to \fBftw()\fR and \fBnftw()\fR (see \fBftw\fR(3C)):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_F\fR\fR
 .ad
 .RS 11n
-.rt  
 file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_D\fR\fR
 .ad
 .RS 11n
-.rt  
 directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DNR\fR\fR
 .ad
 .RS 11n
-.rt  
 directory without read permission
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DP\fR\fR
 .ad
 .RS 11n
-.rt  
 directory with subdirectories visited
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_NS\fR\fR
 .ad
 .RS 11n
-.rt  
 unknown type; \fBstat()\fR failed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_SL\fR\fR
 .ad
 .RS 11n
-.rt  
 symbolic link
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_SLN\fR\fR
 .ad
 .RS 11n
-.rt  
 symbolic link that names a nonexistent file
 .RE
 
@@ -117,46 +103,38 @@ The <\fBftw.h\fR> header defines macros for use as values of the fourth
 argument to \fBnftw()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_PHYS\fR\fR
 .ad
 .RS 13n
-.rt  
 Physical walk, does not follow symbolic links. Otherwise, \fBnftw()\fR follows
 links but does not walk down any path that crosses itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_MOUNT\fR\fR
 .ad
 .RS 13n
-.rt  
 The walk does not cross a mount point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_DEPTH\fR\fR
 .ad
 .RS 13n
-.rt  
 All subdirectories are visited before the directory itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFTW_CHDIR\fR\fR
 .ad
 .RS 13n
-.rt  
 The walk changes to each direct ory before reading it.
 .RE
 
@@ -177,13 +155,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

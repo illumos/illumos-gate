@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_get8 9F "1 Nov 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_GET8 9F "Nov 1, 2005"
 .SH NAME
 ddi_get8, ddi_get16, ddi_get32, ddi_get64, ddi_getb, ddi_getw, ddi_getl,
 ddi_getll \- read data from the mapped memory address, device register or
@@ -11,7 +11,7 @@ allocated DMA memory address
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
@@ -45,24 +45,20 @@ function replaces \fBddi_getl()\fR. The \fBddi_get64()\fR function replaces
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 12n
-.rt  
 The data access handle returned from setup calls, such as
 \fBddi_regs_map_setup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_addr\fR\fR
 .ad
 .RS 12n
-.rt  
 Base device address.
 .RE
 
@@ -101,13 +97,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 \fBddi_getb()\fR, \fBddi_getl()\fR, \fBddi_getll()\fR, and \fBddi_getw()\fR are Obsolete; \fBddi_get8()\fR, \fBddi_get16()\fR, \fBddi_get32()\fR, \fBddi_get64()\fR are Committed
 T}
 .TE

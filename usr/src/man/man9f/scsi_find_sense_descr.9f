@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_find_sense_descr 9F "30 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_FIND_SENSE_DESCR 9F "Jun 30, 2006"
 .SH NAME
 scsi_find_sense_descr \- find descriptor in SCSI sense data
 .SH SYNOPSIS
@@ -24,35 +24,29 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsense_buffer\fR\fR
 .ad
 .RS 18n
-.rt  
 Pointer to a buffer containing \fBSCSI\fR descriptor sense data. The data is
 expected in wire format starting at the response code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsense_buf_len\fR\fR
 .ad
 .RS 18n
-.rt  
 Integer that contains the length of sense buffer in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreq_descr_type\fR\fR
 .ad
 .RS 18n
-.rt  
 Integer that contains the descriptor type value for the desired sense
 descriptor.
 .RE

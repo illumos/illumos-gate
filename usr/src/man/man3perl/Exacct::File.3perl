@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH Exacct::File 3PERL "1 Dec 2002" "SunOS 5.11" "Perl Library Functions"
+.TH EXACCT::FILE 3PERL "Dec 1, 2002"
 .SH NAME
 Exacct::File \- exacct file manipulation
 .SH SYNOPSIS
@@ -40,7 +40,6 @@ None.
 .SS "Class methods"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnew($name, $oflags, creator => $creator,\fR\fR
 .ad
@@ -68,25 +67,23 @@ See \fBExacct\fR(3PERL).
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fB$oflags\fR\fB$aflags\fRAction
-\fBO_RDONLY\fRAbsent or \fBEO_HEAD\fRT{
+c c c
+l l l .
+\fB$oflags\fR	\fB$aflags\fR	Action
+\fBO_RDONLY\fR	Absent or \fBEO_HEAD\fR	T{
 Open for reading at the start of the file.
 T}
-\fBO_RDONLY\fR\fBEO_TAIL\fROpen for reading at the end of the file.
-\fBO_WRONLY\fRIgnoredT{
+\fBO_RDONLY\fR	\fBEO_TAIL\fR	Open for reading at the end of the file.
+\fBO_WRONLY\fR	Ignored	T{
 File must exist, open for writing at the end of the file.
 T}
-\fBO_WRONLY\fR | \fBO_CREAT\fRIgnoredT{
+\fBO_WRONLY\fR | \fBO_CREAT\fR	Ignored	T{
 Create file if it does not exist, otherwise truncate and open for writing.
 T}
-\fBO_RDWR\fRIgnoredT{
+\fBO_RDWR\fR	Ignored	T{
 File must exist, open for reading/writing, positioned at the end of the file.
 T}
-\fBO_RDWR\fR | \fBO_CREAT\fRIgnoredT{
+\fBO_RDWR\fR | \fBO_CREAT\fR	Ignored	T{
 Create file if it does not exist, otherwise truncate and open for reading/writing.
 T}
 .TE
@@ -101,7 +98,6 @@ There is no explicit \fBclose()\fR method for a
 object is undefined or reassigned.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreator()\fR\fR
 .ad
@@ -113,7 +109,6 @@ if the file does not contain the information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhostname()\fR\fR
 .ad
@@ -125,7 +120,6 @@ created, or \fBundef\fR if the file does not contain the information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnext()\fR\fR
 .ad
@@ -144,7 +138,6 @@ function.See \fBExacct\fR(3PERL).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprevious()\fR\fR
 .ad
@@ -159,7 +152,6 @@ manner as the \fBnext()\fR method.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget()\fR\fR
 .ad
@@ -176,7 +168,6 @@ the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite(@ea_obj)\fR\fR
 .ad
@@ -196,7 +187,6 @@ By default nothing is exported from this module. The following tags can be used
 to selectively import constants defined in this module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:CONSTANTS\fR\fR
 .ad
@@ -208,7 +198,6 @@ to selectively import constants defined in this module:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:ALL\fR\fR
 .ad
@@ -225,13 +214,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

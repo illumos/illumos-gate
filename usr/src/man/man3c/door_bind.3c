@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH door_bind 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH DOOR_BIND 3C "Mar 22, 2005"
 .SH NAME
 door_bind, door_unbind \- bind or unbind the current thread with the door
 server pool
@@ -68,35 +68,29 @@ returned and \fBerrno\fR is set to indicate the error.
 The  \fBdoor_bind()\fR and  \fBdoor_unbind()\fR functions fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIdid\fR argument is not a valid door.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBdoor_unbind()\fR function was called by a thread that is currently not
 bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIdid\fR was not created with the \fBDOOR_PRIVATE\fR attribute.
 .RE
 
@@ -187,17 +181,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architectureall
+Architecture	all
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

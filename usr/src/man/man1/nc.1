@@ -6,7 +6,7 @@
 .\" BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 .\" STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH nc 1 "Apr 9 2009" "SunOS 5.11" "User Commands"
+.TH NC 1 "Apr 9, 2009"
 .SH NAME
 nc \- arbitrary TCP and UDP connections and listens
 .SH SYNOPSIS
@@ -17,7 +17,7 @@ nc \- arbitrary TCP and UDP connections and listens
 
 .LP
 .nf
-\fBnc\fR [\fB-46dnrtuvz\fR] [\fB-i\fR \fIinterval\fR] [\fB-P\fR \fIproxy_username\fR] [\fB-p\fR \fIport\fR] 
+\fBnc\fR [\fB-46dnrtuvz\fR] [\fB-i\fR \fIinterval\fR] [\fB-P\fR \fIproxy_username\fR] [\fB-p\fR \fIport\fR]
      [\fB-s\fR \fIsource_ip_address\fR] [\fB-T\fR \fIToS\fR] [\fB-w\fR \fItimeout\fR]
      [\fB-X\fR \fIproxy_protocol\fR] [\fB-x\fR \fIproxy_address\fR[:\fIport\fR]]
      \fIhostname\fR \fIport_list\fR
@@ -85,7 +85,6 @@ a SOCKS or HTTP \fBProxyCommand\fR for \fBssh\fR(1)
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-4\fR\fR
 .ad
@@ -96,7 +95,6 @@ Force \fBnc\fR to use IPv4 addresses only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
@@ -107,7 +105,6 @@ Force \fBnc\fR to use IPv6 addresses only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -118,7 +115,6 @@ Enable debugging on the socket.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -129,7 +125,6 @@ Do not attempt to read from \fBstdin\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -140,7 +135,6 @@ Print \fBnc\fR help.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterval\fR\fR
 .ad
@@ -152,7 +146,6 @@ This option also causes a delay time between connections to multiple ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
@@ -166,7 +159,6 @@ It is an error to use this option without the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -182,7 +174,6 @@ ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -200,7 +191,6 @@ not have any effect when used in conjunction with the \fB-U\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIproxy_username\fR\fR
 .ad
@@ -216,7 +206,6 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport\fR\fR
 .ad
@@ -232,7 +221,6 @@ is not specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -246,7 +234,6 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsource_ip_address\fR\fR
 .ad
@@ -259,7 +246,6 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIToS\fR\fR
 .ad
@@ -272,7 +258,6 @@ hexadecimal value preceded by \fB0x\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -285,7 +270,6 @@ Cause \fBnc\fR to send \fIRFC 854\fR \fBDON'T\fR and \fBWON'T\fR responses to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
@@ -301,7 +285,6 @@ has to be provided to \fBnc\fR, not a host name or port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -312,7 +295,6 @@ Use UDP instead of the default option of TCP.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -323,7 +305,6 @@ Specify verbose output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fItimeout\fR\fR
 .ad
@@ -339,7 +320,6 @@ timeout.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fIproxy_protocol\fR\fR
 .ad
@@ -355,7 +335,6 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIproxy_address\fR[:\fIport\fR]\fR
 .ad
@@ -370,7 +349,6 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
@@ -387,12 +365,10 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostname\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify host name.
 .sp
 \fIhostname\fR can be a numerical IP address or a symbolic hostname (unless the
@@ -408,18 +384,15 @@ port. If \fIhostname\fR argument is not specified with \fB-l\fR option then
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIport\fR\fR
 .ad
@@ -428,7 +401,6 @@ Specify pathname.
 \fB\fIport_list\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify port.
 .sp
 \fIport_list\fR can be specified as single integers, ranges or combinations of
@@ -870,13 +842,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

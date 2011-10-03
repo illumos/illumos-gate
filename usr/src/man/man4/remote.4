@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH remote 4 "13 Jun 2002" "SunOS 5.11" "File Formats"
+.TH REMOTE 4 "Jun 13, 2002"
 .SH NAME
 remote \- remote host description file
 .SH SYNOPSIS
@@ -46,132 +46,108 @@ capability is specified by \fIcapability\fR#\fIvalue\fR; for example,
 capability.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBat\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Auto call unit type. The following lists valid '\fBat\fR' types and
 their corresponding hardware:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbiz31f\fR\fR
 .ad
 .RS 10n
-.rt  
 Bizcomp 1031, tone dialing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbiz31w\fR\fR
 .ad
 .RS 10n
-.rt  
 Bizcomp 1031, pulse dialing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbiz22f\fR\fR
 .ad
 .RS 10n
-.rt  
 Bizcomp 1022, tone dialing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbiz22w\fR\fR
 .ad
 .RS 10n
-.rt  
 Bizcomp 1022, pulse dialing
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdf02\fR\fR
 .ad
 .RS 10n
-.rt  
 DEC DF02
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdf03\fR\fR
 .ad
 .RS 10n
-.rt  
 DEC DF03
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBventel\fR\fR
 .ad
 .RS 10n
-.rt  
 Ventel 212+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv3451\fR\fR
 .ad
 .RS 10n
-.rt  
 Vadic 3451 Modem
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv831\fR\fR
 .ad
 .RS 10n
-.rt  
 Vadic 831
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhayes\fR\fR
 .ad
 .RS 10n
-.rt  
 Any Hayes-compatible modem
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBat\fR\fR
 .ad
 .RS 10n
-.rt  
 Any Hayes-compatible modem
 .RE
 
@@ -179,24 +155,20 @@ Any Hayes-compatible modem
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbr\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(num)\fR The baud rate used in establishing a connection to the remote host.
 This is a decimal number. The default baud rate is  \fB300\fR baud.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcm\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR An initial connection message to be sent to the remote host. For
 example, if a host is reached through a port selector, this might be set to the
 appropriate sequence required to switch to the host.
@@ -204,24 +176,20 @@ appropriate sequence required to switch to the host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcu\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Call unit if making a phone call. Default is the same as the
 \fBdv\fR field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdb\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Cause \fBtip\fR(1) to ignore the first hangup it sees.  \fBdb\fR
 (dialback) allows the user to remain in \fBtip\fR while the remote machine
 disconnects and places a call back to the local machine. For more information
@@ -231,35 +199,29 @@ Services\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdi\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Disconnect message sent to the host when a disconnect is requested
 by the user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdu\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR This host is on a dial-up line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdv\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Device(s) to open to establish a connection. If this file refers to
 a terminal line, \fBtip\fR attempts to perform an exclusive open on the device
 to insure only one user at a time has access to the port.
@@ -267,12 +229,10 @@ to insure only one user at a time has access to the port.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBec\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBechocheck\fR to \fBon\fR, so
 that \fBtip\fR will synchronize with the remote host during file transfer by
 waiting for the echo of the last character transmitted.
@@ -280,12 +240,10 @@ waiting for the echo of the last character transmitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBel\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Characters marking an end-of-line.  The default is no characters.
 \fBtip\fR only recognizes `\fB~\fR' escapes after one of the characters in
 \fBel\fR, or after a \fBRETURN.\fR
@@ -293,118 +251,98 @@ waiting for the echo of the last character transmitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBes\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR The command prefix (escape) character for \fBtip\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBet\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(num)\fR Number of seconds to wait for an echo response when echo-check mode
 is on.  This is a decimal number.  The default value is  \fB10\fR seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBex\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Set of non-printable characters not to be discarded when scripting
 with beautification turned on.  The default value is "\fB\et\en\eb\ef\fR".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfo\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Character used to force literal data transmission.  The default
 value is  `\fB\e377\fR\&'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfs\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(num)\fR Frame size for transfers. The default frame size is equal to
 \fB1024\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhd\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBhalfduplex\fR to \fBon\fR, so
 local echo should be performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhf\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBhardwareflow\fR to \fBon\fR,
 so hardware flow control is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBie\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Input end-of-file marks.  The default is a null string ("").
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnb\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBbeautify\fR to \fIoff\fR, so
 that unprintable characters will not be discarded when scripting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnt\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBtandem\fR to \fIoff\fR, so
 that  \fBXON/XOFF\fR flow control will not be used to throttle data from the
 remote host.
@@ -412,36 +350,30 @@ remote host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnv\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBverbose\fR to \fIoff\fR, so
 that verbose mode will be turned on.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoe\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Output end-of-file string.  The default is a null string ("").
 When  \fBtip\fR is transferring a file, this string is sent at end-of-file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpa\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR The type of parity to use when sending data to the host.  This may
 be one of \fBeven\fR, \fBodd\fR, \fBnone\fR, \fBzero\fR (always set bit
 \fB8\fR to \fB0\fR), \fBone\fR (always set bit  \fB8\fR to \fB1\fR).  The
@@ -450,12 +382,10 @@ default is \fBnone\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpn\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Telephone number(s) for this host. If the telephone number field
 contains an `\fB@\fR' sign, \fBtip\fR searches the \fB/etc/phones\fR file for a
 list of telephone numbers \(em see \fBphones\fR(4). A `\fB%\fR' sign in the
@@ -471,24 +401,20 @@ restrict the modem to return only the basic result codes:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpr\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Character that indicates end-of-line on the remote host.  The
 default value is  \fB`\fR\en\fB\&'.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBra\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBraise\fR to \fBon\fR, so that
 lower case letters are mapped to upper case before sending them to the remote
 host.
@@ -496,72 +422,60 @@ host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrc\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Character that toggles case-mapping mode.  The default value is
 `\fB\e377\fR\&'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBre\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR The file in which to record session scripts.  The default value is
 \fBtip.record\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrw\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBrawftp\fR to \fBon\fR, so
 that all characters will be sent as is during file transfers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsc\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBscript\fR to \fBon\fR, so
 that everything transmitted by the remote host will be recorded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtb\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(bool)\fR Initialize the \fBtip\fR variable \fBtabexpand\fR to \fBon\fR, so
 that tabs will be expanded to spaces during file transfers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtc\fR\fR
 .ad
 .RS 6n
-.rt  
 \fB(str)\fR Indicates that the list of capabilities is continued in the named
 description.  This is used primarily to share common capability information.
 .RE
@@ -587,23 +501,19 @@ UNIX-1200:\e
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/remote\fR\fR
 .ad
 .RS 15n
-.rt  
 remote host description file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/phones\fR\fR
 .ad
 .RS 15n
-.rt  
 remote host phone number database.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poolstat 1M "16 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH POOLSTAT 1M "Jun 16, 2009"
 .SH NAME
 poolstat \- report active pool statistics
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ poolstat \- report active pool statistics
 
 .LP
 .nf
-\fBpoolstat\fR [\fB-p\fR \fIpool-list\fR] [\fB-o\fR \fIformat\fR \fB-r\fR \fIrset-list\fR] 
+\fBpoolstat\fR [\fB-p\fR \fIpool-list\fR] [\fB-o\fR \fIformat\fR \fB-r\fR \fIrset-list\fR]
      [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -40,100 +40,82 @@ of statistical data for the processor set attached to the pool.
 The columns are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBid\fR\fR
 .ad
 .RS 8n
-.rt  
 Pool ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpool\fR\fR
 .ad
 .RS 8n
-.rt  
 Pool name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrid\fR\fR
 .ad
 .RS 8n
-.rt  
 Resource set id.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrset\fR\fR
 .ad
 .RS 8n
-.rt  
 Resource set name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR\fR
 .ad
 .RS 8n
-.rt  
 Resource set type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmin\fR\fR
 .ad
 .RS 8n
-.rt  
 Minimum resource set size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax\fR\fR
 .ad
 .RS 8n
-.rt  
 Maximum resource set size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize\fR\fR
 .ad
 .RS 8n
-.rt  
 Current resource set size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBused\fR\fR
 .ad
 .RS 8n
-.rt  
 The measure of how much of the resource set is currently is use. This is
 calculated as the percentage utilization of the resource set multiplied by its
 size. If resource set has been reconfigured during last sampling interval, this
@@ -142,12 +124,10 @@ value might be not reported (\fB-\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBload\fR\fR
 .ad
 .RS 8n
-.rt  
 The absolute representation of the load that is put on the resource set. For
 the definition of this property see \fBlibpool\fR(3LIB).
 .RE
@@ -158,12 +138,10 @@ the definition of this property see \fBlibpool\fR(3LIB).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIformat\fR\fR
 .ad
 .RS 16n
-.rt  
 Report statistics according to the format specification given in format. See
 \fBDISPLAY FORMATS\fR.
 .sp
@@ -179,12 +157,10 @@ The \fB-o\fR option must be used in conjunction with the \fB-r\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpool-list\fR\fR
 .ad
 .RS 16n
-.rt  
 Report only pools whose names are in the given list. If the -r option is also
 used, this option selects only resource sets which belong to pools in the given
 list. Statistics for pools or resource sets are reported in the same order in
@@ -197,12 +173,10 @@ only be separated by spaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrset-list\fR\fR
 .ad
 .RS 16n
-.rt  
 Report resource set statistics. If the \fIrset-list\fR argument is "\fBall\fR",
 then all possible resource set types are selected.
 .sp
@@ -212,23 +186,19 @@ separated by commas or enclosed in quotes and separated by commas or spaces.
 The following resource set types are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 8n
-.rt  
 All resource set types
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpset\fR\fR
 .ad
 .RS 8n
-.rt  
 Processor set
 .RE
 
@@ -236,12 +206,10 @@ Processor set
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fBu\fR | \fBd\fR\fR
 .ad
 .RS 16n
-.rt  
 Display a time stamp.
 .sp
 Specify \fBu\fR for a printed representation of the internal representation of
@@ -255,12 +223,10 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of times that the statistics are repeated. By default, poolstat
 reports statistics only once.
 .sp
@@ -270,12 +236,10 @@ interval is specified and count is not, statistics are reported indefinitely.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 The sampling interval in seconds.
 .sp
 If neither interval nor count are specified, statistics are reported once. If
@@ -310,7 +274,7 @@ The following example reports resource set statistics.
 .sp
 .in +2
 .nf
- 
+
 % poolstat -r pset
   id pool           type rid rset          min  max size used load
   0 pool_default    pset  -1 pset_default    1  65K    2  1.2  8.3
@@ -376,34 +340,28 @@ The following example customizes output:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
@@ -415,13 +373,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-StabilityEvolving
+Stability	Evolving
 .TE
 
 .SH SEE ALSO

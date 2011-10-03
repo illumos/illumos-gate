@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metaset 1M "4 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH METASET 1M "Mar 4, 2009"
 .SH NAME
 metaset \- configure disk sets
 .SH SYNOPSIS
@@ -89,7 +89,7 @@ metaset \- configure disk sets
 
 .LP
 .nf
-\fB/usr/sbin/metaset\fR [\fB-s\fR \fIsetname\fR] \fB-a\fR | \fB-d\fR 
+\fB/usr/sbin/metaset\fR [\fB-s\fR \fIsetname\fR] \fB-a\fR | \fB-d\fR
      [ [m] \fImediator_host_list\fR]
 .fi
 
@@ -259,7 +259,6 @@ Use the \fB-m\fR option to add or delete a mediator host. See \fBOPTIONS\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIdrivename\fR\fR
 .ad
@@ -292,7 +291,6 @@ pathname for each drive. Such a name has the form:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR | \fB-d\fR | \fB-m\fR \fImediator_host_list\fR\fR
 .ad
@@ -311,7 +309,6 @@ hosts. See \fBEXAMPLES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fB{enable | disable}\fR\fR
 .ad
@@ -330,7 +327,6 @@ unavailable for mounting through \fB/etc/vfstab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -345,7 +341,6 @@ that the distribution of replicas matches the replica layout algorithm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fB{take | release | purge}\fR\fR
 .ad
@@ -357,7 +352,6 @@ Repository. These options should only be used to fix a broken disk set
 configuration.
 .sp
 .ne 2
-.mk
 .na
 \fBtake\fR
 .ad
@@ -369,7 +363,6 @@ disk set is available. This option is not for use with a multi-owner disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrelease\fR
 .ad
@@ -383,7 +376,6 @@ multi-owner disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpurge\fR
 .ad
@@ -398,7 +390,6 @@ accessible and requires rebuilding.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdrivename\fR\fR
 .ad
@@ -427,7 +418,6 @@ master node while other nodes are in the set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -458,7 +448,6 @@ list of hosts to clean up after one-host administration has been performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fB\fIhostname...\fR\fR\fR
 .ad
@@ -473,7 +462,6 @@ host. The host name is the same name found in \fB/etc/nodename\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR\fR
 .ad
@@ -521,7 +509,6 @@ disk set starts any necessary resynchronizations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
@@ -533,7 +520,6 @@ standard Solaris Volume Manager algorithm. See \fBDESCRIPTION\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlength\fR\fR
 .ad
@@ -548,7 +534,6 @@ not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -564,7 +549,6 @@ Existing disk sets cannot be converted to multi-owner sets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -576,7 +560,6 @@ the \fB-h\fR option is the owner of the disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
@@ -592,7 +575,6 @@ If you need to delete a disk set but cannot take ownership of the set, use the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -606,7 +588,6 @@ This option is not for use with a multi-owner disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -620,7 +601,6 @@ This option is not for use with a multi-owner disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
@@ -632,7 +612,6 @@ Specify the name of a disk set on which \fBmetaset\fR works. If no
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -654,7 +633,6 @@ This option is not for use with a multi-owner disk set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fItagnumber\fR\fR
 .ad
@@ -666,7 +644,6 @@ can be executed to select the data associated with the given \fItagnumber\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBw\fR
 .ad
@@ -701,7 +678,6 @@ host from the ownership list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
@@ -853,7 +829,6 @@ drives within the set have been deleted.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lvm/md.tab\fR\fR
 .ad
@@ -868,7 +843,6 @@ Contains list of metadevice configurations.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -879,7 +853,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -896,13 +869,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

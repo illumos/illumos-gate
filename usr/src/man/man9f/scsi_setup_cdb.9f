@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_setup_cdb 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_SETUP_CDB 9F "Jan 16, 2006"
 .SH NAME
 scsi_setup_cdb \- setup SCSI command descriptor block (CDB)
 .SH SYNOPSIS
 .LP
 .nf
-\fBint\fR \fBscsi_setup_cdb\fR(\fBunion scsi_cdb\fR \fI*cdbp\fR, \fBuchar_t\fR \fIcmd\fR, \fBuint_t\fR \fIaddr\fR, 
+\fBint\fR \fBscsi_setup_cdb\fR(\fBunion scsi_cdb\fR \fI*cdbp\fR, \fBuchar_t\fR \fIcmd\fR, \fBuint_t\fR \fIaddr\fR,
      \fBuint_t\fR \fIcnt\fR, \fBuint_t\fR \fIothr_cdb_data\fR);
 .fi
 
@@ -20,45 +20,37 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcdbp\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to command descriptor block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd\fR\fR
 .ad
 .RS 17n
-.rt  
 The first byte of the \fBSCSI\fR group 0, 1, 2, 4, or 5 \fBCDB\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to the location of the data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcnt\fR\fR
 .ad
 .RS 17n
-.rt  
 Data transfer length in units defined by the SCSI device type. For sequential
 devices \fIcnt\fR is the number of bytes. For block devices, \fIcnt\fR is the
 number of blocks.
@@ -66,12 +58,10 @@ number of blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIothr_cdb_data\fR\fR
 .ad
 .RS 17n
-.rt  
 Additional \fBCDB\fR data.
 .RE
 
@@ -98,23 +88,19 @@ sequential access device commands is not set.
 The \fBscsi_setup_cdb()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Upon success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Upon failure.
 .RE
 

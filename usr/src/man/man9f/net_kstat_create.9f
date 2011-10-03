@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH net_kstat_create 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NET_KSTAT_CREATE 9F "May 1, 2008"
 .SH NAME
 net_kstat_create \- create and initialize a new kstat for a specific instance
 of IP
@@ -14,8 +14,8 @@ of IP
 #include <sys/kstat.h>
 #include <sys/neti.h>
 
-\fBkstat_t\fR *\fBnet_kstat_create\fR(\fBnetid_t\fR \fInetid\fR, \fBchar\fR *\fImodule\fR, 
-     \fBint\fR \fIinstance\fR, \fBchar\fR *\fIname\fR, \fBchar\fR *\fIclass\fR, \fBuchar_type\fR \fItype\fR, 
+\fBkstat_t\fR *\fBnet_kstat_create\fR(\fBnetid_t\fR \fInetid\fR, \fBchar\fR *\fImodule\fR,
+     \fBint\fR \fIinstance\fR, \fBchar\fR *\fIname\fR, \fBchar\fR *\fIclass\fR, \fBuchar_type\fR \fItype\fR,
      \fBulong_t\fR \fIndata\fR, \fBuchar_t\fR \fIks_flag\fR);
 .fi
 
@@ -26,59 +26,49 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetid\fR\fR
 .ad
 .RS 12n
-.rt  
 \fBIP\fR instance identifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodule\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the provider's module (such as "\fBsd\fR", "\fBesp\fR", ...). The
 "\fBcore\fR" kernel uses the name "unix".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinstance\fR\fR
 .ad
 .RS 12n
-.rt  
 The provider's instance number, as from \fBddi_get_instance\fR(9F). Modules
 which do not have a meaningful instance number should use \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a string that uniquely identifies this structure. Only
 \fBKSTAT_STRLEN \(mi 1\fR characters are significant.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclass\fR\fR
 .ad
 .RS 12n
-.rt  
 The general class that this kstat belongs to. The following classes are
 currently in use: \fBdisk\fR, \fBtape\fR, \fBnet\fR, \fBcontroller\fR,
 \fBvm\fR, \fBkvm\fR, \fBhat\fR, \fBstreams\fR, \fBkstat\fR, and \fBmisc\fR.
@@ -86,16 +76,13 @@ currently in use: \fBdisk\fR, \fBtape\fR, \fBnet\fR, \fBcontroller\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 12n
-.rt  
 The type of \fBkstat\fR to allocate. Valid types are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_NAMED\fR\fR
 .ad
@@ -106,7 +93,6 @@ Allows more than one data record per \fBkstat\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_INTR\fR\fR
 .ad
@@ -117,7 +103,6 @@ Interrupt; only one data record per \fBkstat\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_TYPE_IO\fR\fR
 .ad
@@ -130,28 +115,23 @@ Interrupt; only one data record per \fBkstat\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIndata\fR\fR
 .ad
 .RS 12n
-.rt  
 The number of type-specific data records to allocate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIks_flag\fR\fR
 .ad
 .RS 12n
-.rt  
 A bit-field of various flags for this \fBkstat\fR. \fIks_flag\fR is some
 combination of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_FLAG_VIRTUAL\fR\fR
 .ad
@@ -165,7 +145,6 @@ data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_FLAG_WRITABLE\fR\fR
 .ad
@@ -176,7 +155,6 @@ Makes the \fBkstat\fR data section writable by root.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBKSTAT_FLAG_PERSISTENT\fR\fR
 .ad
@@ -217,13 +195,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

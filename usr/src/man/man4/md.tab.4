@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH md.tab 4 "15 Dec 2004" "SunOS 5.11" "File Formats"
+.TH MD.TAB 4 "Dec 15, 2004"
 .SH NAME
 md.tab, md.cf \- Solaris Volume Manager utility files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/lvm/md.tab\fR 
-\fB/etc/lvm/md.cf\fR 
+\fB/etc/lvm/md.tab\fR
+\fB/etc/lvm/md.cf\fR
 .fi
 
 .SH DESCRIPTION
@@ -103,7 +103,7 @@ concatenation of four disks.
 #
 # (concatenation of four disks)
 #
-d7 4 1 c0t1d0s0 1 c0t2d0s0 1 c0t3d0s0 1 c0t4d0s0 
+d7 4 1 c0t1d0s0 1 c0t2d0s0 1 c0t3d0s0 1 c0t4d0s0
 .fi
 .in -2
 
@@ -183,7 +183,7 @@ three submirrors. This mirror does not contain any existing data.
 #
 # (mirror)
 #
-d50 -m d51 
+d50 -m d51
 d51 1 1 c0t1d0s2
 d52 1 1 c0t2d0s2
 d53 1 1 c0t3d0s2
@@ -292,7 +292,7 @@ three submirrors and three hot spare pools.
 #
 # (mirror and hot spare)
 #
-d10 -m d20 
+d10 -m d20
 d20 1 1 c1t0d0s2 -h hsp001
 d30 1 1 c2t0d0s2 -h hsp002
 d40 1 1 c3t0d0s2 -h hsp003

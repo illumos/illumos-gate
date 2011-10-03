@@ -1,10 +1,10 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 1989 AT&T  
+.\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH inet 3SOCKET "28 Nov 2007" "SunOS 5.11" "Sockets Library Functions"
+.TH INET 3SOCKET "Nov 28, 2007"
 .SH NAME
 inet, inet6, inet_ntop, inet_pton, inet_aton, inet_addr, inet_network,
 inet_makeaddr, inet_lnaof, inet_netof, inet_ntoa \- Internet address
@@ -291,15 +291,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .sp

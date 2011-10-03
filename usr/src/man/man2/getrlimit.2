@@ -2,14 +2,14 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1994, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getrlimit 2 "21 Aug 2006" "SunOS 5.11" "System Calls"
+.TH GETRLIMIT 2 "Aug 21, 2006"
 .SH NAME
 getrlimit, setrlimit \- control maximum system resource consumption
 .SH SYNOPSIS
@@ -64,12 +64,10 @@ The possible resources, their descriptions, and the actions taken when the
 current limit is exceeded are summarized as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_CORE\fR\fR
 .ad
 .RS 17n
-.rt  
 The maximum size of a core file in bytes that may be created by a process. A
 limit of  \fB0\fR will prevent the creation of a core file. The writing of a
 core file will terminate at this size.
@@ -77,12 +75,10 @@ core file will terminate at this size.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_CPU\fR\fR
 .ad
 .RS 17n
-.rt  
 The maximum amount of CPU time in seconds used by a process. This is a soft
 limit only.  The \fBSIGXCPU\fR signal is sent to the process. If the process is
 holding or ignoring \fBSIGXCPU\fR, the behavior is scheduling class defined.
@@ -90,24 +86,20 @@ holding or ignoring \fBSIGXCPU\fR, the behavior is scheduling class defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_DATA\fR\fR
 .ad
 .RS 17n
-.rt  
 The maximum size of a process's heap in bytes.  The \fBbrk\fR(2) function will
 fail with  \fBerrno\fR set to  \fBENOMEM\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_FSIZE\fR\fR
 .ad
 .RS 17n
-.rt  
 The maximum size of a file in bytes that may be created by a process. A limit
 of  \fB0\fR will prevent the creation of a file.  The \fBSIGXFSZ\fR signal is
 sent to the process. If the process is holding or ignoring  \fBSIGXFSZ\fR,
@@ -117,12 +109,10 @@ with  \fBerrno\fR set to  \fBEFBIG\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_NOFILE\fR\fR
 .ad
 .RS 17n
-.rt  
 One more than the maximum value that the system may assign to a newly created
 descriptor. This limit constrains the number of file descriptors that a process
 may create.
@@ -130,12 +120,10 @@ may create.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_STACK\fR\fR
 .ad
 .RS 17n
-.rt  
 The maximum size of a process's stack in bytes. The system will not
 automatically grow the stack beyond this limit.
 .sp
@@ -158,12 +146,10 @@ disposition of  \fBSIGSEGV\fR will be set to  \fBSIG_DFL\fR before it is sent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_VMEM\fR\fR
 .ad
 .RS 17n
-.rt  
 The maximum size of a process's mapped address space in bytes.  If this limit
 is exceeded, the \fBbrk\fR(2) and  \fBmmap\fR(2) functions will fail with
 \fBerrno\fR set to  \fBENOMEM\fR. In addition, the automatic stack growth will
@@ -172,12 +158,10 @@ fail with the effects outlined above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRLIMIT_AS\fR\fR
 .ad
 .RS 17n
-.rt  
 This is the maximum size of a process's total available memory, in bytes.  If
 this limit is exceeded, the \fBbrk\fR(2), \fBmalloc\fR(3C), \fBmmap\fR(2) and
 \fBsbrk\fR(2) functions will fail with \fBerrno\fR set to \fBENOMEM\fR. In
@@ -197,13 +181,11 @@ implementation defined parameters:
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-LimitImplementation Defined Constant
-\fBRLIMIT_FSIZE\fR\fBFCHR_MAX\fR
-\fBRLIMIT_NOFILE\fR\fBOPEN_MAX\fR
+c c
+l l .
+Limit	Implementation Defined Constant
+\fBRLIMIT_FSIZE\fR	\fBFCHR_MAX\fR
+\fBRLIMIT_NOFILE\fR	\fBOPEN_MAX\fR
 .TE
 
 .sp
@@ -247,35 +229,29 @@ indicate the error.
 The \fBgetrlimit()\fR and \fBsetrlimit()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIrlp\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An invalid \fIresource\fR was specified; or in a \fBsetrlimit()\fR call, the
 new \fBrlim_cur\fR exceeds the new \fBrlim_max\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The limit specified to \fBsetrlimit()\fR would have raised the maximum limit
 value and {\fBPRIV_SYS_RESOURCE\fR} is not asserted in the effective set of the
 current process.
@@ -286,12 +262,10 @@ current process.
 The \fBsetrlimit()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The limit specified cannot be lowered because current usage is already higher
 than the limit.
 .RE
@@ -317,13 +291,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fRATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

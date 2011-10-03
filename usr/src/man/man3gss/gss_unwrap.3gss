@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_unwrap 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_UNWRAP 3GSS "Jan 15, 2003"
 .SH NAME
 gss_unwrap \- verify a message with attached cryptographic message
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_unwrap\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -38,45 +38,37 @@ wrapping and unwrapping of zero-length messages.
 The parameter descriptions for \fBgss_unwrap()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 25n
-.rt  
 The status code returned by the underlying mechanism.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext_handle\fR\fR
 .ad
 .RS 25n
-.rt  
 Identifies the context on which the message arrived.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput_message_buffer\fR\fR
 .ad
 .RS 25n
-.rt  
 The message to be protected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutput_message_buffer\fR\fR
 .ad
 .RS 25n
-.rt  
 The buffer to receive the unwrapped message. Storage associated with this
 buffer must be freed by the application after use with a call to
 \fBgss_release_buffer\fR(3GSS).
@@ -84,12 +76,10 @@ buffer must be freed by the application after use with a call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconf_state\fR\fR
 .ad
 .RS 25n
-.rt  
 If the value of \fIconf_state\fR is non-zero, then confidentiality and
 integrity protection were used. If the value is zero, only integrity service
 was used. Specify \fBNULL\fR if this parameter is not required.
@@ -97,12 +87,10 @@ was used. Specify \fBNULL\fR if this parameter is not required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqop_state\fR\fR
 .ad
 .RS 25n
-.rt  
 Specifies the quality of protection provided. Specify \fBNULL\fR if this
 parameter is not required.
 .RE
@@ -113,81 +101,67 @@ parameter is not required.
 \fBgss_unwrap()\fR may return the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 25n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_DEFECTIVE_TOKEN\fR\fR
 .ad
 .RS 25n
-.rt  
 The token failed consistency checks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_BAD_SIG\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fBMIC\fR was incorrect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_DUPLICATE_TOKEN\fR\fR
 .ad
 .RS 25n
-.rt  
 The token was valid, and contained a correct \fBMIC\fR for the message, but it
 had already been processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_OLD_TOKEN\fR\fR
 .ad
 .RS 25n
-.rt  
 The token was valid, and contained a correct \fBMIC\fR for the message, but it
 is too old to check for duplication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_UNSEQ_TOKEN\fR\fR
 .ad
 .RS 25n
-.rt  
 The token was valid, and contained a correct \fBMIC\fR for the message, but has
 been verified out of sequence; a later token has already been received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_GAP_TOKEN\fR\fR
 .ad
 .RS 25n
-.rt  
 The token was valid, and contained a correct \fBMIC\fR for the message, but has
 been verified out of sequence; an earlier expected token has not yet been
 received.
@@ -195,34 +169,28 @@ received.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_CONTEXT_EXPIRED\fR\fR
 .ad
 .RS 25n
-.rt  
 The context has already expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CONTEXT\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIcontext_handle\fR parameter did not identify a valid context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 25n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -236,13 +204,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

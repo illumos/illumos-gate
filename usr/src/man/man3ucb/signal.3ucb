@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH signal 3UCB "30 Oct 2007" "SunOS 5.11" "SunOS/BSD Compatibility Library Functions"
+.TH SIGNAL 3UCB "Oct 30, 2007"
 .SH NAME
 signal \- simplified software signal facilities
 .SH SYNOPSIS
@@ -75,12 +75,10 @@ returned and \fBerrno\fR is set to indicate the error.
 \fBsignal()\fR will fail and no action will take place if the following occurs:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIsig\fR is not a valid signal number, or is \fBSIGKILL\fR or \fBSIGSTOP\fR.
 .RE
 

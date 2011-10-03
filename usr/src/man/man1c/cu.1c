@@ -2,21 +2,21 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cu 1C "11 May 2001" "SunOS 5.11" "Communication Commands"
+.TH CU 1C "May 11, 2001"
 .SH NAME
 cu \- call another UNIX system
 .SH SYNOPSIS
 .LP
 .nf
-\fBcu\fR [\fB-c\fR \fIdevice\fR | \fB-l\fR \fIline\fR] [\fB-s\fR \fIspeed\fR] [\fB-b\fR \fIbits\fR] [\fB-h\fR] [\fB-n\fR] 
-     [\fB-t\fR] [\fB-d\fR] [\fB-o\fR | \fB-e\fR] [\fB-L\fR] [\fB-C\fR] [\fB-H\fR] \fI telno\fR | \fIsystemname\fR 
+\fBcu\fR [\fB-c\fR \fIdevice\fR | \fB-l\fR \fIline\fR] [\fB-s\fR \fIspeed\fR] [\fB-b\fR \fIbits\fR] [\fB-h\fR] [\fB-n\fR]
+     [\fB-t\fR] [\fB-d\fR] [\fB-o\fR | \fB-e\fR] [\fB-L\fR] [\fB-C\fR] [\fB-H\fR] \fI telno\fR | \fIsystemname\fR
      [\fIlocal-cmd\fR]
 .fi
 
@@ -37,12 +37,10 @@ play a part in selecting the medium. The remaining options are used in
 configuring the line.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbits\fR\fR
 .ad
 .RS 13n
-.rt  
 Forces \fIbits\fR to be the number of bits processed on the line. \fIbits\fR is
 either  \fB7\fR or \fB8\fR. This allows connection between systems with
 different character sizes.  By default, the character size of the line is set
@@ -52,12 +50,10 @@ is affected by \fBLC_CTYPE\fR also.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIdevice\fR\fR
 .ad
 .RS 13n
-.rt  
 Forces \fBcu\fR to use only entries in the "Type" field (the first field in the
 \fB/etc/uucp/Devices\fR file) that match the user specified \fIdevice\fR,
 usually the name of a local area network.
@@ -65,12 +61,10 @@ usually the name of a local area network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 13n
-.rt  
 Runs the \fIlocal-cmd\fR specified at the end of the command line instead of
 entering interactive mode. The \fBstdin\fR and \fBstdout\fR of the command that
 is run refer to the remote connection.
@@ -78,35 +72,29 @@ is run refer to the remote connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints diagnostic traces.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 13n
-.rt  
 Sets an EVEN data parity.  This option designates that EVEN parity is to be
 generated for data sent to the remote system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 13n
-.rt  
 Sets communication mode to half-duplex.  This option emulates local echo in
 order to support calls to other computer systems that expect terminals to be
 set to half-duplex mode.
@@ -114,12 +102,10 @@ set to half-duplex mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 13n
-.rt  
 Ignores one hangup. This allows the user to remain in \fBcu\fR while the remote
 machine disconnects and places a call back to the local machine.  This option
 should be used when connecting to systems with callback or dialback modems.
@@ -131,12 +117,10 @@ IP Services\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIline\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies a device name to use as the communication line. This can be used to
 override the search that would otherwise take place for the first available
 line having the right speed. When the \fB-l\fR option is used without the
@@ -155,12 +139,10 @@ dialer, a telephone number must be  provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 13n
-.rt  
 Goes through the login chat sequence specified in the \fB/etc/uucp/Systems\fR
 file. For more information about the chat sequence, see \fISystem
 Administration Guide: IP Services\fR
@@ -168,12 +150,10 @@ Administration Guide: IP Services\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 13n
-.rt  
 Requests user prompt for telephone number.  For added security, this option
 will prompt the user to provide the telephone number to be dialed, rather than
 taking it from the command line.
@@ -181,24 +161,20 @@ taking it from the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 13n
-.rt  
 Sets an ODD data parity.  This option designates that ODD parity is to be
 generated for data sent to the remote system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIspeed\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the transmission speed (\fB300\fR, \fB1200\fR, \fB2400\fR,
 \fB4800\fR, \fB9600\fR, \fB19200\fR, \fB38400\fR). The default value is "Any"
 speed which will depend on the order of the lines in the
@@ -207,12 +183,10 @@ speed which will depend on the order of the lines in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 13n
-.rt  
 Dials a terminal which has been set to auto answer. Appropriate mapping of
 carriage-return to carriage-return-line-feed pairs is set.
 .RE
@@ -223,12 +197,10 @@ carriage-return to carriage-return-line-feed pairs is set.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fItelno\fR\fR
 .ad
 .RS 14n
-.rt  
 When using an automatic dialler, specifies the telephone number with equal
 signs for secondary dial tone or minus signs placed appropriately for delays of
 4 seconds.
@@ -236,12 +208,10 @@ signs for secondary dial tone or minus signs placed appropriately for delays of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsystemname\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies a \fBuucp\fR system name, which can be used rather than a telephone
 number; in this case, \fBcu\fR will obtain an appropriate direct line or
 telephone number from a system file.
@@ -275,12 +245,10 @@ tell \fBcu\fR what system you wish to connect to. This parameter can be blank,
 a telephone number, a system name, or a \fBLAN\fR specific address.
 .sp
 .ne 2
-.mk
 .na
 \fBtelephone number\fR
 .ad
 .RS 20n
-.rt  
 A telephone number is a string consisting of the tone dial characters (the
 digits  \fB0\fR through \fB9\fR, \fB*\fR, and \fB#\fR) plus the special
 characters \fB=\fR and \fB\(mi\fR\&. The equal sign designates a secondary dial
@@ -289,24 +257,20 @@ tone and the minus sign creates a  \fB4\fR second delay.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsystem name\fR
 .ad
 .RS 20n
-.rt  
 A system name is the name of any computer that \fBuucp\fR can call; the
 \fBuuname\fR(1C) command prints a list of these names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBLAN address\fR
 .ad
 .RS 20n
-.rt  
 The documentation for your  \fBLAN\fR will show the form of the \fBLAN\fR
 specific address.
 .RE
@@ -354,151 +318,125 @@ with \fB~\fR have special meanings.
 The \fBtransmit\fR process interprets the following user initiated commands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~.\fR\fR
 .ad
 .RS 27n
-.rt  
 Terminates the conversation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~!\fR\fR
 .ad
 .RS 27n
-.rt  
 Escapes to an interactive shell on the local system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~!\fR\fIcmd\|.\|.\|.\fR\fR
 .ad
 .RS 27n
-.rt  
 Runs \fIcmd\fR on the local system (via \fBsh \fR\fB-c\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~$\fR\fIcmd\|.\|.\|.\fR\fR
 .ad
 .RS 27n
-.rt  
 Runs \fIcmd\fR locally and send its output to the remote system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%cd\fR\fR
 .ad
 .RS 27n
-.rt  
 Changes the directory on the local system. Note: \fB~!cd\fR will cause the
 command to be run by a sub-shell, probably not what was intended.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%take\fR \fIfrom\fR \|[\fI\|to\fR\|]\fR
 .ad
 .RS 27n
-.rt  
 Copies file \fIfrom\fR (on the remote system) to file \fIto\fR on the local
 system. If \fIto\fR is omitted, the \fIfrom\fR argument is used in both places.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%put\fR \fI\|from\fR \|[\fI\|to\fR\|]\fR
 .ad
 .RS 27n
-.rt  
 Copies file \fIfrom\fR (on local system) to file \fIto\fR on remote system. If
 \fIto\fR is omitted, the \fIfrom\fR argument is used in both places.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~~\fR\fI\|line\fR\fR
 .ad
 .RS 27n
-.rt  
 Sends the line \fB~\fR \fIline\fR to the remote system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%break\fR\fR
 .ad
 .RS 27n
-.rt  
 Transmits a  \fBBREAK\fR to the remote system (which can also be specified as
 \fB~%b\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%debug\fR\fR
 .ad
 .RS 27n
-.rt  
 Toggles the \fB-d\fR debugging option on or off (which can also be specified as
 \fB~%d\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~t\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints the values of the termio structure variables for the user's terminal
 (useful for debugging).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~l\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints the values of the termio structure variables for the remote
 communication line (useful for debugging).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%ifc\fR\fR
 .ad
 .RS 27n
-.rt  
 Toggles between DC3/DC1 input control protocol and no input control. This is
 useful when the remote system does not respond properly to the DC3 and DC1
 characters (can also be specified as \fB\(ap%nostop\fR).
@@ -506,12 +444,10 @@ characters (can also be specified as \fB\(ap%nostop\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%ofc\fR\fR
 .ad
 .RS 27n
-.rt  
 Toggles the output flow control setting.  When enabled, outgoing data may be
 flow controlled by the remote host (can also be specified as
 \fB\(ap%noostop\fR).
@@ -519,35 +455,29 @@ flow controlled by the remote host (can also be specified as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%divert\fR\fR
 .ad
 .RS 27n
-.rt  
 Allows/disallows unsolicited diversions.  That is, diversions not specified by
 \fB~%take\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%old\fR\fR
 .ad
 .RS 27n
-.rt  
 Allows/disallows old style syntax for received diversions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~%nostop\fR\fR
 .ad
 .RS 27n
-.rt  
 Same as  \fB~%ifc\fR.
 .RE
 
@@ -603,7 +533,7 @@ To dial a system whose telephone number is  \fB9\fR \fB1\fR \fB201\fR \fB555\fR
 .sp
 .in +2
 .nf
-example% \fBcu \fR\fB-s\fR\fB 1200 9=12015551234\fR 
+example% \fBcu \fR\fB-s\fR\fB 1200 9=12015551234\fR
 .fi
 .in -2
 .sp
@@ -621,7 +551,7 @@ To login to a system connected by a direct line:
 .sp
 .in +2
 .nf
-example% \fBcu \fR\fB-l\fR\fB /dev/term/b\fR 
+example% \fBcu \fR\fB-l\fR\fB /dev/term/b\fR
 .fi
 .in -2
 .sp
@@ -633,7 +563,7 @@ or
 .sp
 .in +2
 .nf
-example% \fBcu \fR\fB-l\fR\fB term/b\fR 
+example% \fBcu \fR\fB-l\fR\fB term/b\fR
 .fi
 .in -2
 .sp
@@ -647,7 +577,7 @@ To dial a system with a specific line and speed:
 .sp
 .in +2
 .nf
-example% \fBcu \fR\fB-s\fR\fB 1200 \fR\fB-l\fR\fB term/b\fR 
+example% \fBcu \fR\fB-s\fR\fB 1200 \fR\fB-l\fR\fB term/b\fR
 .fi
 .in -2
 .sp
@@ -661,7 +591,7 @@ To use a system name:
 .sp
 .in +2
 .nf
-example% \fBcu systemname\fR 
+example% \fBcu systemname\fR
 .fi
 .in -2
 .sp
@@ -678,68 +608,56 @@ that affect the execution of \fBcu\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Devices\fR\fR
 .ad
 .RS 22n
-.rt  
 device file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Sysfiles\fR\fR
 .ad
 .RS 22n
-.rt  
 system file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Systems\fR\fR
 .ad
 .RS 22n
-.rt  
 system file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/locks/*\fR\fR
 .ad
 .RS 22n
-.rt  
 lock file
 .RE
 
@@ -759,45 +677,37 @@ The \fBcu\fR utility takes the default action upon receipt of signals, with the
 exception of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR\fR
 .ad
 .RS 11n
-.rt  
 Close the connection and terminate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGINT\fR\fR
 .ad
 .RS 11n
-.rt  
 Forward to the remote system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGQUIT\fR\fR
 .ad
 .RS 11n
-.rt  
 Forward to the remote system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGUSR1\fR\fR
 .ad
 .RS 11n
-.rt  
 Terminate the \fBcu\fR process without the normal connection closing sequence.
 .RE
 

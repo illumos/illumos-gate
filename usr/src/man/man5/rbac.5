@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rbac 5 "15 Jul 2003" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH RBAC 5 "Jul 15, 2003"
 .SH NAME
 rbac, RBAC \- role-based access control
 .SH DESCRIPTION
@@ -94,7 +94,7 @@ the \fBsolaris.jobs.admin\fR authorization and a variable called
 .in +2
 .nf
 ruid = getuid();
- 
+
 if ((eflag || lflag || rflag) && argc == 1) {
         if ((pwp = getpwnam(*argv)) == NULL)
                 crabort(INVALIDUSER);
@@ -118,13 +118,13 @@ if ((eflag || lflag || rflag) && argc == 1) {
 ruid = getuid();
 if ((pwp = getpwuid(ruid)) == NULL)
         crabort(INVALIDUSER);
- 
+
 strcpy(real_login, pwp->pw_name);
- 
+
 if ((eflag || lflag || rflag) && argc == 1) {
         if ((pwp = getpwnam(*argv)) == NULL)
                 crabort(INVALIDUSER);
- 
+
         if (!chkauthattr("solaris.jobs.admin", real_login)) {
                 if (pwp->pw_uid != ruid)
                         crabort(NOTROOT);
@@ -215,15 +215,15 @@ output of the \fBauths\fR(1) utility. For example,
 .sp
 .in +2
 .nf
-for auth in `auths | tr , " "` NOTFOUND 
+for auth in `auths | tr , " "` NOTFOUND
 do
     [ "$auth" = "solaris.date" ] && break       # authorization found
 done
- 
-if [ "$auth" != "solaris.date" ] 
-then 
-    echo >&2 "$PROG: ERROR: you are not authorized to set the date" 
-    exit 1 
+
+if [ "$auth" != "solaris.date" ]
+then
+    echo >&2 "$PROG: ERROR: you are not authorized to set the date"
+    exit 1
 fi
 .fi
 .in -2

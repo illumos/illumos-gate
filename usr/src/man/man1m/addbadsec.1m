@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH addbadsec 1M "24 Feb 1998" "SunOS 5.11" "System Administration Commands"
+.TH ADDBADSEC 1M "Feb 24, 1998"
 .SH NAME
 addbadsec \- map out defective disk blocks
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ might have to be recovered from a backup.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Adds the specified blocks to the hardware or software map. If more than one
 block number is specified, the entire list should be quoted and block numbers
 should be separated by white space.
@@ -49,24 +47,20 @@ should be separated by white space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Adds the specified blocks to the hardware or software map. The bad blocks are
 listed, one per line, in the specified file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Causes \fBaddbadsec\fR to print the current software map. The output shows the
 defective block and the assigned alternate. This option cannot be used to print
 the hardware map.
@@ -78,12 +72,10 @@ the hardware map.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw_device\fR\fR
 .ad
 .RS 14n
-.rt  
 The address of the disk drive (see \fBFILES\fR).
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metadb 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METADB 1M "Mar 26, 2006"
 .SH NAME
 metadb \- create and delete replicas of the metadevice state database
 .SH SYNOPSIS
@@ -24,7 +24,7 @@ metadb \- create and delete replicas of the metadevice state database
 
 .LP
 .nf
-\fB/sbin/metadb\fR [\fB-s\fR \fIsetname\fR] \fB-a\fR [\fB-f\fR] [\fB-k\fR \fIsystem-file\fR] 
+\fB/sbin/metadb\fR [\fB-s\fR \fIsetname\fR] \fB-a\fR [\fB-f\fR] [\fB-k\fR \fIsystem-file\fR]
      [\fB-c\fR \fInumber\fR] [\fB-l\fR \fIlength\fR] \fIslice...\fR
 .fi
 
@@ -45,7 +45,7 @@ metadb \- create and delete replicas of the metadevice state database
 
 .LP
 .nf
-\fB/sbin/metadb\fR [\fB-s\fR \fIsetname\fR] \fB-p\fR [\fB-k\fR \fIsystem-file\fR] 
+\fB/sbin/metadb\fR [\fB-s\fR \fIsetname\fR] \fB-p\fR [\fB-k\fR \fIsystem-file\fR]
      [\fImddb.cf-file\fR]
 .fi
 
@@ -156,12 +156,10 @@ options are compatible on the same command line. Refer to the \fBSYNOPSIS\fR to
 see the supported use of the options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 18n
-.rt  
 Attach a new database device. The \fB/kernel/drv/md.conf\fR file is
 automatically updated with the new information and the \fB/etc/lvm/mddb.cf\fR
 file is updated as well. An alternate way to create replicas is by defining
@@ -173,24 +171,20 @@ for instructions on setting up replicas in that file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fInumber\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the number of replicas to be placed on each device. The default
 number of replicas is 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Deletes all replicas that are located on the specified \fIslice\fR. The
 \fB/kernel/drv/md.conf\fR file is automatically updated with the new
 information and the \fB/etc/lvm/mddb.cf\fR file is updated as well.
@@ -198,12 +192,10 @@ information and the \fB/etc/lvm/mddb.cf\fR file is updated as well.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fB-f\fR option is used to create the initial state database. It is also
 used to force the deletion of replicas below the minimum of one. (The \fB-a\fR
 and \fB-f\fR options should be used together only when no state databases
@@ -212,211 +204,173 @@ exist.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays a usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 18n
-.rt  
 Inquire about the status of the replicas. The output of the \fB-i\fR option
 includes characters in front of the device name that represent the status of
 the state database. Explanations of the characters are displayed following the
 replica status and are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 replica does not have an associated device ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 replica active prior to last \fBmddb\fR configuration change
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 5n
-.rt  
 replica is up to date
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 locator for this replica was read successfully
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 replica's location was in \fB/etc/lvm/mddb.cf\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 replica's location was patched in kernel
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 replica is master, this is replica selected as input
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 replica does not have device relocation information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 tagged data is associated with the replica
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBW\fR\fR
 .ad
 .RS 5n
-.rt  
 replica has device write errors
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 replica is active, commits are occurring to this
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fR
 .ad
 .RS 5n
-.rt  
 replica had problem with master blocks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 replica had problem with data blocks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR\fR
 .ad
 .RS 5n
-.rt  
 replica had format problems
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 5n
-.rt  
 replica is too small to hold current database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fR\fR
 .ad
 .RS 5n
-.rt  
 replica had device read errors
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB\fR\fR
 .ad
 .RS 5n
-.rt  
 tagged data associated with the replica is not valid
 .RE
 
@@ -424,12 +378,10 @@ tagged data associated with the replica is not valid
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIsystem-file\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the name of the kernel file where the replica information should be
 written. The default \fIsystem-file\fR is \fB/kernel/drv/md.conf\fR. This
 option is for use with the local diskset only.
@@ -437,12 +389,10 @@ option is for use with the local diskset only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlength\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the size of each replica. The default \fIlength\fR is 8192 blocks,
 which should be appropriate for most configurations. "Replica" sizes of less
 than 128 blocks are not recommended.
@@ -450,12 +400,10 @@ than 128 blocks are not recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies updating the system file (\fB/kernel/drv/md.conf\fR) with entries
 from the \fB/etc/lvm/mddb.cf\fR file. This option is normally used to update a
 newly built system before it is booted for the first time. If the system has
@@ -467,12 +415,10 @@ use with the local diskset only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsetname\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the name of the diskset on which the \fBmetadb\fR command will work.
 Using the \fB-s\fR option will cause the command to perform its administrative
 function within the specified diskset. Without this option, the command will
@@ -481,12 +427,10 @@ perform its function on local database replicas.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIslice\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the logical name of the physical slice (partition), such as
 \fB/dev/dsk/c0t0d0s3\fR.
 .RE
@@ -553,34 +497,28 @@ inoperable.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lvm/mddb.cf\fR\fR
 .ad
 .RS 23n
-.rt  
 Contains the location of each copy of the metadevice state database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/lvm/md.tab\fR\fR
 .ad
 .RS 23n
-.rt  
 Workspace file for metadevice database configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/md.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Contains database replica information for all metadevices on a system. Also
 contains Solaris Volume Manager configuration information.
 .RE
@@ -591,23 +529,19 @@ contains Solaris Volume Manager configuration information.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 successful completion
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 an error occurred
 .RE
 
@@ -619,13 +553,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

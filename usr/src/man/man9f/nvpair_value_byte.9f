@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvpair_value_byte 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NVPAIR_VALUE_BYTE 9F "Jan 16, 2006"
 .SH NAME
 nvpair_value_byte, nvpair_value_nvlist, nvpair_value_int8, nvpair_value_int16,
 nvpair_value_int32, nvpair_value_int64, nvpair_value_uint8,
@@ -17,7 +17,7 @@ name-value pair
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/nvpair.h> 
+#include <sys/nvpair.h>
 
 \fBint\fR \fBnvpair_value_boolean_value\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBboolean_t *\fR\fIval\fR);
 .fi
@@ -85,67 +85,67 @@ name-value pair
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_byte_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuchar_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_byte_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuchar_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_int8_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint8_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_int8_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint8_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_uint8_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint8_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_uint8_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint8_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_int16_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint16_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_int16_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint16_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_uint16_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint16_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_uint16_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint16_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_int32_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint32_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_int32_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint32_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_uint32_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint32_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_uint32_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint32_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_int64_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint64_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_int64_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBint64_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_uint64_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint64_t **\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_uint64_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBuint64_t **\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_string_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBchar ***\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_string_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBchar ***\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvpair_value_nvlist_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBnvlist_t ***\fR\fIval\fR, 
+\fBint\fR \fBnvpair_value_nvlist_array\fR(\fBnvpair_t *\fR\fInvpair\fR, \fBnvlist_t ***\fR\fIval\fR,
      \fBuint_t *\fR\fInelem\fR);
 .fi
 
@@ -156,34 +156,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvpair\fR\fR
 .ad
 .RS 10n
-.rt  
 Name-value pair (\fBnvpair\fR) to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInelem\fR\fR
 .ad
 .RS 10n
-.rt  
 Address to store the number of elements in value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIval\fR\fR
 .ad
 .RS 10n
-.rt  
 Address to store the value or starting address of array value.
 .RE
 
@@ -211,23 +205,19 @@ addition on nvlists created with NV_UNIQUE_NAME_TYPE and NV_UNIQUE_NAME. See
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 Success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Either one of the arguments is \fINULL\fR or type of \fInvpair\fR does not
 match the interface name.
 .RE

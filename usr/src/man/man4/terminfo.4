@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH terminfo 4 "9 Jul 1996" "SunOS 5.11" "File Formats"
+.TH TERMINFO 4 "Jul 9, 1996"
 .SH NAME
 terminfo \- terminal and printer capability database
 .SH SYNOPSIS
@@ -82,18 +82,16 @@ following suffixes where possible.
 
 .sp
 .TS
-tab();
-lw(.21i) lw(.74i) lw(2.79i) lw(1.76i) 
-lw(.21i) lw(.74i) lw(2.79i) lw(1.76i) 
-.
-SuffixMeaningExample
-\fB-w\fRWide mode (more than 80 columns)\fB5410-w\fR
-\fB-am\fRWith auto. margins (usually default)\fBvt100-am\fR
-\fB-nam\fRWithout automatic margins\fBvt100-nam\fR
-\fI-n\fRNumber of lines on the screen\fB2300-40\fR
-\fB-na\fRNo arrow keys (leave them in local)\fBc100-na\fR
--\fIn\fRpNumber of pages of memory\fBc100-4p\fR
-\fB-rv\fRReverse video\fB4415-rv\fR
+l l l l
+l l l l .
+	Suffix	Meaning	Example
+	\fB-w\fR	Wide mode (more than 80 columns)	\fB5410-w\fR
+	\fB-am\fR	With auto. margins (usually default)	\fBvt100-am\fR
+	\fB-nam\fR	Without automatic margins	\fBvt100-nam\fR
+	\fI-n\fR	Number of lines on the screen	\fB2300-40\fR
+	\fB-na\fR	No arrow keys (leave them in local)	\fBc100-na\fR
+	-\fIn\fRp	Number of pages of memory	\fBc100-4p\fR
+	\fB-rv\fR	Reverse video	\fB4415-rv\fR
 .TE
 
 .sp
@@ -150,7 +148,7 @@ ________________________________________________________________
                           Cap-   Termcap
 Variable                  name   Code     Description
 ________________________________________________________________
- 
+
 auto_left_margin          bw     bw       cub1 wraps from column 0 to
                                           last column
 auto_right_margin         am     am       Terminal has automatic margins
@@ -210,8 +208,8 @@ status_line_esc_ok        eslok  es       Escape can be used on
                                           the status line
 tilde_glitch              hz     hz       Hazeltine; can't print tilde (~)
 transparent_underline     ul     ul       Underline character overstrikes
-xon_xoff                  xon    xo       Terminal uses xon/xoff 
-                                          handshaking                                  
+xon_xoff                  xon    xo       Terminal uses xon/xoff
+                                          handshaking
 .fi
 .in -2
 .sp
@@ -224,7 +222,7 @@ ________________________________________________________________
                       Cap-    Termcap
 Variable              name    Code     Description
 ________________________________________________________________
- 
+
 bit_image_entwining   bitwin  Yo       Number of passes for each
                                        bit-map row
 bit_image_type        bitype  Yp       Type of bit image device
@@ -289,7 +287,7 @@ ________________________________________________________________
                            Cap-   Termcap
 Variable                   name   Code     Description
 ________________________________________________________________
- 
+
 acs_chars                  acsc   ac       Graphic charset pairs aAbBcC
 alt_scancode_esc           scesa  S8       Alternate escape for
                                            scancode emulation
@@ -512,9 +510,9 @@ key_f9                  kf9     k9       KEY_F(9), sent by function key f9
 
 key_f10                 kf10    k;       KEY_F(10), sent by function key
                                          f10
-key_f11                 kf11    F1       KEY_F(11), sent by function key 
+key_f11                 kf11    F1       KEY_F(11), sent by function key
                                          f11
-key_f12                 kf12    F2       KEY_F(12), sent by function key 
+key_f12                 kf12    F2       KEY_F(12), sent by function key
                                          f12
 key_f13                 kf13    F3       KEY_F(13), sent by function key
                                          f13
@@ -534,7 +532,7 @@ key_f20                 kf20    FA       KEY_F(20), sent by function key
                                          f20
 key_f21                 kf21    FB       KEY_F(21), sent by function key
                                          f21
-key_f22                 kf22    FC       KEY_F(22), sent by function key 
+key_f22                 kf22    FC       KEY_F(22), sent by function key
                                          f22
 key_f23                 kf23    FD       KEY_F(23), sent by function key
                                          f23
@@ -861,7 +859,7 @@ set_left_margin         smgl    ML       Set left margin at current line
 set_left_margin_parm    smglp   Zm       Set left (right) margin
                                          at column #1 (#2)
 set_lr_margin           smglr   ML       Sets both left and right margins
-set_page_length         slines  YZ       Set page length to #1 lines 
+set_page_length         slines  YZ       Set page length to #1 lines
                                          (use tparm) of an inch
 set_right_margin        smgr    MR       Set right margin at
                                          current column
@@ -1147,7 +1145,6 @@ the first parameter, one would use \fB%p1%{5}%\(mi\fR.
 The \fB%\fR encodings have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
@@ -1158,7 +1155,6 @@ outputs `%'
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%[[:]\fR\fIflags\fR][\fIwidth\fR[\fI\&.precision\fR]][\fBdoxXs\fR]\fR
 .ad
@@ -1169,7 +1165,6 @@ as in \fBprintf\fR, flags are \fB[\(mi+#]\fR and space
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%c\fR\fR
 .ad
@@ -1180,7 +1175,6 @@ print pop gives %c
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%p[1-9]\fR\fR
 .ad
@@ -1191,7 +1185,6 @@ push \fIi\fRth parm
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P[a-z]\fR\fR
 .ad
@@ -1202,7 +1195,6 @@ set dynamic variable [a-z] to pop
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%g[a-z]\fR\fR
 .ad
@@ -1213,7 +1205,6 @@ get dynamic variable [a-z] and push it
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P[A-Z]\fR\fR
 .ad
@@ -1224,7 +1215,6 @@ set static variable [a-z] to pop
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%g[A-Z]\fR\fR
 .ad
@@ -1235,7 +1225,6 @@ get static variable [a-z] and push it
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%'\fR\fIc\fR'\fR
 .ad
@@ -1246,7 +1235,6 @@ push char constant \fIc\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%{\fR\fInn\fR}\fR
 .ad
@@ -1257,7 +1245,6 @@ push decimal constant \fInn\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%l\fR\fR
 .ad
@@ -1268,7 +1255,6 @@ push strlen(pop)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%+ %\(mi %* %/ %m\fR\fR
 .ad
@@ -1279,7 +1265,6 @@ arithmetic (\fB%m\fR is mod):  push(pop integer2 op pop integer1)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%& %| %^\fR\fR
 .ad
@@ -1290,7 +1275,6 @@ bit operations:  push(pop integer2 op pop integer1)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%= %> %<\fR\fR
 .ad
@@ -1301,7 +1285,6 @@ logical operations:  push(pop integer2 op pop integer1)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%A %O\fR\fR
 .ad
@@ -1312,7 +1295,6 @@ logical operations:  and, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%! %~\fR\fR
 .ad
@@ -1323,7 +1305,6 @@ unary operations:  push(op pop)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%i\fR\fR
 .ad
@@ -1335,7 +1316,6 @@ parms, if more than one parm present
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR \fBexpr\fR %t \fIthenpart\fR %e \fIelsepart\fR %\fR
 .ad
@@ -1616,23 +1596,21 @@ needs the following escape sequences to turn on various modes.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-cw(1.83i) cw(1.83i) cw(1.83i) 
-.
-tparm
-parameterattributeescape sequence
+c c c
+c c c .
+tparm		
+parameter	attribute	escape sequence
 _
-none\eE[0m
-p1standout\eE[0;4;7m
-p2underline\eE[0;3m
-p3reverse\eE[0;4m
-p4 blink\eE[0;5m
-p5dim\eE[0;7m
-p6bold\eE[0;3;4m
-p7invis\eE[0;8m
-p8protectnot available
-p9altcharset^O (off) ^N (on)
+	none	\eE[0m
+p1	standout	\eE[0;4;7m
+p2	underline	\eE[0;3m
+p3	reverse	\eE[0;4m
+p4	 blink	\eE[0;5m
+p5	dim	\eE[0;7m
+p6	bold	\eE[0;3;4m
+p7	invis	\eE[0;8m
+p8	protect	not available
+p9	altcharset	^O (off) ^N (on)
 .TE
 
 .sp
@@ -1658,20 +1636,18 @@ sequences, along with their dependencies, gives the following:
 
 .sp
 .TS
-tab();
-cw(1.51i) cw(1.99i) cw(1.99i) 
-lw(1.51i) lw(1.99i) lw(1.99i) 
-.
-sequencewhen to outputterminfo translation
+c c c
+l l l .
+sequence	when to output	terminfo translation
 _
-\eE[0always\eE[0
-;3if \fBp2\fR or \fBp6\fR%?%p2%p6%|%t;3%
-;4if \fBp1\fR or \fBp3\fR or \fBp6\fR%?%p1%p3%|%p6%|%t;4%
-;5if \fBp4\fR%?%p4%t;5%
-;7if \fBp1\fR or \fBp5\fR%?%p1%p5%|%t;7%
-;8if \fBp7\fR%?%p7%t;8%
-malwaysm
-^N or ^Oif \fBp9 ^N\fR, else \fB^O\fR%?%p9%t^N%e^O%
+\eE[0	always	\eE[0
+;3	if \fBp2\fR or \fBp6\fR	%?%p2%p6%|%t;3%
+;4	if \fBp1\fR or \fBp3\fR or \fBp6\fR	%?%p1%p3%|%p6%|%t;4%
+;5	if \fBp4\fR	%?%p4%t;5%
+;7	if \fBp1\fR or \fBp5\fR	%?%p1%p5%|%t;7%
+;8	if \fBp7\fR	%?%p7%t;8%
+m	always	m
+^N or ^O	if \fBp9 ^N\fR, else \fB^O\fR	%?%p9%t^N%e^O%
 .TE
 
 .sp
@@ -1830,37 +1806,35 @@ slightly with some characters from the AT&T 4410v1 terminal.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-Glyph Namevt100+ Character
+c c
+l l .
+Glyph Name	vt100+ Character
 _
-arrow pointing right+
-arrow pointing left,
-arrow pointing down\&.
-solid square block0
-lantern symbolI
-arrow pointing up\(mi
-diamond`
-checker board (stipple)a
-degree symbolf
-plus/minusg
-board of squaresh
-lower right cornerj
-upper right cornerk
-upper left cornerl
-lower left cornerm
-plusn
-scan line 1o
-horizontal lineq
-scan line 9s
-left teet
-right teeu
-bottom teev
-top teew
-vertical linex
-bullet~
+arrow pointing right	+
+arrow pointing left	,
+arrow pointing down	\&.
+solid square block	0
+lantern symbol	I
+arrow pointing up	\(mi
+diamond	`
+checker board (stipple)	a
+degree symbol	f
+plus/minus	g
+board of squares	h
+lower right corner	j
+upper right corner	k
+upper left corner	l
+lower left corner	m
+plus	n
+scan line 1	o
+horizontal line	q
+scan line 9	s
+left tee	t
+right tee	u
+bottom tee	v
+top tee	w
+vertical line	x
+bullet	~
 .TE
 
 .sp
@@ -1873,18 +1847,16 @@ For example,
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Glyph Namevt100+ CharNew tty Char
+c c c
+l l l .
+Glyph Name	vt100+ Char	New tty Char
 _
-upper left cornerlR
-lower left cornermF
-upper right cornerkT
-lower right cornerjG
-horizontal lineq,
-vertical linex\&.
+upper left corner	l	R
+lower left corner	m	F
+upper right corner	k	T
+lower right corner	j	G
+horizontal line	q	,
+vertical line	x	\&.
 .TE
 
 .sp
@@ -1963,21 +1935,19 @@ correspondence.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-AttributeBit PositionDecimal Value
+c c c
+l l l .
+Attribute	Bit Position	Decimal Value
 _
-A_STANDOUT01
-A_UNDERLINE12
-A_REVERSE24
-A_BLINK38
-A_DIM416
-A_BOLD532
-A_INVIS664
-A_PROTECT7128
-A_ALTCHARSET8256
+A_STANDOUT	0	1
+A_UNDERLINE	1	2
+A_REVERSE	2	4
+A_BLINK	3	8
+A_DIM	4	16
+A_BOLD	5	32
+A_INVIS	6	64
+A_PROTECT	7	128
+A_ALTCHARSET	8	256
 .TE
 
 .sp
@@ -2458,7 +2428,7 @@ Entering/Exiting Reverse Modes
      rum     Restore sense of vertical motions
 
      While sense of horizontal motions reversed:
-     mc‰ub1   Move 1 step right
+     mcub1   Move 1 step right
      mcuf1   Move 1 step left
      mcub    Move N steps right
      mcuf    Move N steps left
@@ -2471,7 +2441,7 @@ Entering/Exiting Reverse Modes
      mcuu1   Move 1 step down
      mcud1   Move 1 step up
      mcuu    Move N steps down
-     mcuˆd    Move N steps up
+     mcud    Move N steps up
      cuu1    Move 1 line down
      cud1    Move 1 line up
      cuu     Move N lines down
@@ -2866,14 +2836,14 @@ Using cpi with cpix clear:
  $bold spinh '$    $bold spinh$
 
 Using cpi with cpix set:
- $bold spinh '$    $bold spinh = bold spinh ' cdot bold orhi over 
+ $bold spinh '$    $bold spinh = bold spinh ' cdot bold orhi over
                           { bold {orhi '} }$
-     
+
 Using lpi with lpix clear:
  $bold spinv '$    $bold spinv$
 
 Using lpi with lpix set:
- $bold spinv '$    $bold spinv = bold {spinv '} cdot bold orhi over 
+ $bold spinv '$    $bold spinv = bold {spinv '} cdot bold orhi over
                           { bold {orhi '}}$
 
 Using chr:
@@ -2977,7 +2947,6 @@ correct place.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/terminfo/?/*\fR\fR
 .ad
@@ -2988,7 +2957,6 @@ compiled terminal description database
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/.COREterm/?/*\fR\fR
 .ad
@@ -2999,7 +2967,6 @@ subset of compiled terminal description database
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tabset/*\fR\fR
 .ad

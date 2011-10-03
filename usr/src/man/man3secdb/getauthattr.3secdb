@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getauthattr 3SECDB "20 Feb 2009" "SunOS 5.11" "Security Attributes Database Library Functions"
+.TH GETAUTHATTR 3SECDB "Feb 20, 2009"
 .SH NAME
 getauthattr, getauthnam, free_authattr, setauthattr, endauthattr, chkauthattr
 \- get authorization entry
@@ -11,8 +11,8 @@ getauthattr, getauthnam, free_authattr, setauthattr, endauthattr, chkauthattr
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lsecdb  -lsocket  -lnsl  [ \fIlibrary\fR... ]
-#include <auth_attr.h> 
-#include <secdb.h>  
+#include <auth_attr.h>
+#include <secdb.h>
 
 \fBauthattr_t *\fR\fBgetauthattr\fR(\fBvoid\fR);
 .fi
@@ -128,17 +128,16 @@ user is assigned an authorization.
 
 .sp
 .TS
-tab() box;
-cw(2.04i) |cw(2.33i) |cw(1.12i) 
-cw(2.04i) |cw(2.33i) |cw(1.12i) 
-.
-\f(CW/etc/security/policy.conf\fR orIs user
+box;
+c | c | c
+c | c | c .
+	\f(CW/etc/security/policy.conf\fR or	Is user
 _
-\fBAuthorization name\fR\fBuser_attr\fR or \fB\fR \fBprof_attr\fR entryauthorized?
+\fBAuthorization name\fR	\fBuser_attr\fR or \fB\fR \fBprof_attr\fR entry	authorized?
 _
-solaris.printer.postscriptsolaris.printer.postscriptYes
-solaris.printer.postscriptsolaris.printer.*Yes
-solaris.printer.grantsolaris.printer.*No
+solaris.printer.postscript	solaris.printer.postscript	Yes
+solaris.printer.postscript	solaris.printer.*	Yes
+solaris.printer.grant	solaris.printer.*	No
 .TE
 
 .sp
@@ -177,56 +176,46 @@ ignore unknown key-value pairs without error.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 configuration file lookup information for the name server switch
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/user_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 extended user attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/auth_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 authorization attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/policy.conf\fR\fR
 .ad
 .RS 29n
-.rt  
 policy definitions
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/prof_attr\fR\fR
 .ad
 .RS 29n
-.rt  
 profile information
 .RE
 
@@ -238,13 +227,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

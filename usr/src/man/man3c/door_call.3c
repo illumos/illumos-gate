@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH door_call 3C "22 Mar 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH DOOR_CALL 3C "Mar 22, 2005"
 .SH NAME
 door_call \- invoke the function associated with a door descriptor
 .SH SYNOPSIS
@@ -87,81 +87,67 @@ passes a system-wide unique number associated with each door in the
 attributes associated with a door including the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_LOCAL\fR\fR
 .ad
 .RS 20n
-.rt  
 The door received was created  by this process using \fBdoor_create()\fR. See
 \fBdoor_create\fR(3C).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_PRIVATE\fR\fR
 .ad
 .RS 20n
-.rt  
 The door received has a private pool of server threads associated with the
 door.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_UNREF\fR\fR
 .ad
 .RS 20n
-.rt  
 The door received is expecting an unreferenced notification.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_UNREF_MULTI\fR\fR
 .ad
 .RS 20n
-.rt  
 Similar to \fBDOOR_UNREF\fR,  except multiple unreferenced notifications may be
 delivered for the same door.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_REFUSE_DESC\fR\fR
 .ad
 .RS 20n
-.rt  
 This door does not accept argument descriptors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_NO_CANCEL\fR\fR
 .ad
 .RS 20n
-.rt  
 This door does not cancel the server thread upon client abort.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDOOR_REVOKED\fR\fR
 .ad
 .RS 20n
-.rt  
 The door received has been revoked by the server.
 .RE
 
@@ -193,90 +179,74 @@ returned and \fBerrno\fR is set to indicate the error.
 The  \fBdoor_call()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 13n
-.rt  
 Arguments were too big for server thread stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 Server was out of available resources.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 Invalid door descriptor was passed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 13n
-.rt  
 Argument pointers pointed outside the allocated address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-.rt  
 A signal was caught in the client, the client called \fBfork\fR(2), or the
 server exited during invocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 Bad arguments were passed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 13n
-.rt  
 The client or server has too many open descriptors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIdesc_num\fR argument is larger than the door's \fBDOOR_PARAM_DESC_MAX\fR
 parameter (see \fBdoor_getparam\fR(3C)), and the door does not have the
 \fBDOOR_REFUSE_DESC\fR set.
@@ -284,12 +254,10 @@ parameter (see \fBdoor_getparam\fR(3C)), and the door does not have the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIdata_size\fR argument is larger than the door's
 \fBDOOR_PARAM_DATA_MAX\fR parameter, or smaller than the door's
 \fBDOOR_PARAM_DATA_MIN\fR parameter (see \fBdoor_getparam\fR(3C)).
@@ -297,24 +265,20 @@ The \fIdata_size\fR argument is larger than the door's
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIdesc_num\fR argument is non-zero and the door has the
 \fBDOOR_REFUSE_DESC\fR flag set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 System could not create overflow area in caller for results.
 .RE
 
@@ -326,17 +290,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architectureall
+Architecture	all
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

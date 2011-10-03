@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH freezestr 9F "17 Oct 2000" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH FREEZESTR 9F "Oct 17, 2000"
 .SH NAME
 freezestr, unfreezestr \- freeze, thaw the state of a stream
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/stream.h> 
-#include <sys/ddi.h> 
+#include <sys/stream.h>
+#include <sys/ddi.h>
 
 
 
@@ -29,12 +29,10 @@ Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIq\fR \fR
 .ad
 .RS 6n
-.rt  
 Pointer to the message queue to freeze/unfreeze.
 .RE
 

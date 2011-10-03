@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_Error2Text 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_ERROR2TEXT 9F "Jul 19, 1996"
 .SH NAME
 csx_Error2Text \- convert error return codes to text strings
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/pccard.h> 
+#include <sys/pccard.h>
 
 
 
@@ -23,12 +23,10 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIer\fR \fR
 .ad
 .RS 7n
-.rt  
 Pointer to an \fBerror2text_t\fR structure.
 .RE
 
@@ -62,23 +60,19 @@ Card Services error return code specified in the item field is not found, the
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR \fR
 .ad
 .RS 28n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 
@@ -98,7 +92,7 @@ if ((ret = csx_RegisterClient(&client_handle, &
    error2text_t error2text;
    error2text.item = ret;
    csx_Error2Text(&error2text);
-   cmn_err(CE_CONT, "RegisterClient failed %s (0x%x)", 
+   cmn_err(CE_CONT, "RegisterClient failed %s (0x%x)",
 	   error2text.text, ret);
 }
 .fi

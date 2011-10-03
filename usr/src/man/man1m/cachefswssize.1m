@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cachefswssize 1M "16 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH CACHEFSWSSIZE 1M "Sep 16, 1996"
 .SH NAME
 cachefswssize \- determine working set size for cachefs
 .SH SYNOPSIS
@@ -35,26 +35,24 @@ See \fBlargefile\fR(5) for the description of the behavior of
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fB/home/sam\fR
-\fBend size:\fR\fB10688k\fR
-\fBhigh water size:\fR\fB10704k\fR
-
-\fB/foo\fR
-\fBend size:\fR\fB128k\fR
-\fBhigh water size:\fR\fB128k\fR
-
-\fB/usr/dist\fR
-\fBend size:\fR\fB1472k\fR
-\fBhigh water size:\fR\fB1472k\fR
-
-\fBtotal for cache\fR
-\fBinitial size:\fR\fB110960k\fR
-\fBend size:\fR\fB12288k\fR
-\fBhigh water size:\fR\fB12304k\fR
+l l l
+l l l .
+\fB/home/sam\fR		
+	\fBend size:\fR	\fB10688k\fR
+	\fBhigh water size:\fR	\fB10704k\fR
+		
+\fB/foo\fR		
+	\fBend size:\fR	\fB128k\fR
+	\fBhigh water size:\fR	\fB128k\fR
+		
+\fB/usr/dist\fR		
+	\fBend size:\fR	\fB1472k\fR
+	\fBhigh water size:\fR	\fB1472k\fR
+		
+\fBtotal for cache\fR		
+	\fBinitial size:\fR	\fB110960k\fR
+	\fBend size:\fR	\fB12288k\fR
+	\fBhigh water size:\fR	\fB12304k\fR
 .TE
 
 .SH EXIT STATUS
@@ -63,23 +61,19 @@ lw(1.83i) lw(1.83i) lw(1.83i)
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 an error has occurred.
 .RE
 
@@ -91,7 +85,6 @@ an error has occurred.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproblems were encountered writing log file\fR\fR
 .ad
@@ -103,7 +96,6 @@ most common problem is running out of disk space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinvalid log\fR \fBfile\fR\fR
 .ad

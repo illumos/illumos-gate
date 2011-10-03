@@ -3,22 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_open_by_dev 9F "9 Aug 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_OPEN_BY_DEV 9F "Aug 9, 2004"
 .SH NAME
 ldi_open_by_dev, ldi_open_by_name, ldi_open_by_devid, ldi_close \- open and
 close devices
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/sunldi.h> 
+#include <sys/sunldi.h>
 
-\fBint\fR \fBldi_open_by_dev\fR(\fBdev_t *\fR\fIdevp\fR, \fBint\fR \fIotyp\fR, \fBint\fR \fIflag\fR, \fBcred_t  *\fR\fIcr\fR, 
+\fBint\fR \fBldi_open_by_dev\fR(\fBdev_t *\fR\fIdevp\fR, \fBint\fR \fIotyp\fR, \fBint\fR \fIflag\fR, \fBcred_t  *\fR\fIcr\fR,
      \fBldi_handle_t *\fR\fIlhp\fR, \fBldi_ident_t\fR \fIli\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBldi_open_by_name\fR(\fBchar  *\fR\fIpathname\fR, \fBint\fR \fIflag\fR, \fBcred_t *\fR\fIcr\fR, 
+\fBint\fR \fBldi_open_by_name\fR(\fBchar  *\fR\fIpathname\fR, \fBint\fR \fIflag\fR, \fBcred_t *\fR\fIcr\fR,
      \fBldi_handle_t *\fR\fIlhp\fR, \fBldi_ident_t\fR \fIli\fR);
 .fi
 
@@ -36,121 +36,99 @@ close devices
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlh\fR\fR
 .ad
 .RS 14n
-.rt  
 Layered handle
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlhp\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to a layered handle that is returned upon a successful open.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIli\fR\fR
 .ad
 .RS 14n
-.rt  
 LDI identifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcr\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the credential structure used to open a device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to a device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 14n
-.rt  
 Pathname to a device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevid\fR\fR
 .ad
 .RS 14n
-.rt  
 Device ID.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_name\fR\fR
 .ad
 .RS 14n
-.rt  
 Minor device node name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIotyp\fR\fR
 .ad
 .RS 14n
-.rt  
 Flag passed to the driver indicating which interface is open. Valid settings
 are:
 .sp
 .ne 2
-.mk
 .na
 \fBOTYP_BLK\fR
 .ad
 .RS 12n
-.rt  
 Open the device block interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOTYP_CHR\fR
 .ad
 .RS 12n
-.rt  
 Open the device character interface.
 .RE
 
@@ -160,70 +138,58 @@ Only one OTYP flag can be specified. To open streams devices, specify
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 14n
-.rt  
 Bit field that instructs the driver on how to open the device. Valid settings
 are:
 .sp
 .ne 2
-.mk
 .na
 \fBFEXCL\fR
 .ad
 .RS 11n
-.rt  
 Open the device with exclusive access; fail all other attempts to open the
 device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBFNDELAY\fR
 .ad
 .RS 11n
-.rt  
 Open the device and return immediately.  Do not block the open even if
 something is wrong.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBFREAD\fR
 .ad
 .RS 11n
-.rt  
 Open the device with read-only permission. (If ORed with \fBFWRITE\fR, allow
 both read and write access).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBFWRITE\fR
 .ad
 .RS 11n
-.rt  
 Open a device with write-only permission (if ORed with \fBFREAD\fR, then allow
 both read and write access).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBFNOCTTY\fR
 .ad
 .RS 11n
-.rt  
 Open the device. If the device is a tty, do not attempt to open it as a
 session-controlling tty.
 .RE
@@ -279,34 +245,28 @@ return values are shown below. Otherwise any other error number may be returned
 by the device.
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 Invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENODEV\fR
 .ad
 .RS 10n
-.rt  
 Requested device does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENXIO\fR
 .ad
 .RS 10n
-.rt  
 Unsupported device operation or access mode.
 .RE
 
@@ -317,46 +277,38 @@ failure occurs before the device is open, possible return values are shown
 below. Otherwise any other error number may be returned by the device.
 .sp
 .ne 2
-.mk
 .na
 \fBEINVAL\fR
 .ad
 .RS 10n
-.rt  
 Invalid input parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENODEV\fR
 .ad
 .RS 10n
-.rt  
 Requested device path does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEACCES\fR
 .ad
 .RS 10n
-.rt  
 Search permission is denied on a component of the path prefix, or the file
 exists and the permissions specified by \fIcr\fR are denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBENXIO\fR
 .ad
 .RS 10n
-.rt  
 Unsupported device operation or access mode.
 .RE
 

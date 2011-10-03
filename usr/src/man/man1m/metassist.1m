@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metassist 1M "22 Feb 2005" "SunOS 5.11" "System Administration Commands"
+.TH METASSIST 1M "Feb 22, 2005"
 .SH NAME
 metassist \- automated volume creation utility to support Solaris Volume
 Manager
@@ -30,9 +30,9 @@ Manager
 
 .LP
 .nf
-\fBmetassist\fR create [\fB-v\fR \fIn\fR] [\fB-c\fR | \fB-d\fR] [\fB-f\fR] [\fB-n\fR \fIname\fR] 
-     [\fB-p\fR \fIdatapaths\fR] [\fB-r\fR \fIredundancy\fR] 
-     [\fB-a\fR \fIavailable\fR [,\fIavailable\fR,\&.\|.\|.]] 
+\fBmetassist\fR create [\fB-v\fR \fIn\fR] [\fB-c\fR | \fB-d\fR] [\fB-f\fR] [\fB-n\fR \fIname\fR]
+     [\fB-p\fR \fIdatapaths\fR] [\fB-r\fR \fIredundancy\fR]
+     [\fB-a\fR \fIavailable\fR [,\fIavailable\fR,\&.\|.\|.]]
      [\fB-u\fR \fIunavailable\fR [,\fIunavailable\fR,\&.\|.\|.]] \fB-s\fR \fIsetname\fR \fB-S\fR \fIsize\fR
 .fi
 
@@ -52,12 +52,10 @@ common Solaris Volume Manager tasks.
 The following subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBcreate\fR subcommand creates one or more Solaris Volume Manager volumes.
 You can specify this request on the command line or in a file specified on the
 command line.
@@ -109,7 +107,6 @@ The following option is mandatory if you specify a volume request or volume
 configuration in a file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIconfig_file\fR | \fIrequest_file\fR\fR
 .ad
@@ -129,12 +126,10 @@ The following options are mandatory if you specify a volume request on the
 command line:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIset\fR\fR
 .ad
 .RS 11n
-.rt  
 Specify the disk set to use when creating volumes. All the volumes and hot
 spare pools are created in this disk set. If necessary, disks are moved into
 the diskset for use in the volumes and hot spare pools. If the diskset doesn't
@@ -145,12 +140,10 @@ allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIsize\fR\fR
 .ad
 .RS 11n
-.rt  
 Specify the size of the volume to be created. The size argument consists of a
 numeric value (a decimal can be specified) followed by KB, MB, GB, or TB,
 indicating kilobytes, megabytes, gigabytes, or terabytes, respectively. Case is
@@ -162,12 +155,10 @@ ignored when interpreting this option. This option is required.
 The following options are optional command line parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIdevice1\fR\fB,\fR\fIdevice2\fR\fB,...\fR\fR
 .ad
 .RS 26n
-.rt  
 Explicitly specify the devices that can be used in the creation of this volume.
 Named devices may be controllers or disks. Only used when specifying a volume
 on the command line.
@@ -175,12 +166,10 @@ on the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 26n
-.rt  
 Output the command script that would implement the specified or generated
 volume configuration. The command script is not run, and processing stops at
 this stage.
@@ -188,12 +177,10 @@ this stage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 26n
-.rt  
 Output the volume configuration that satisfies the specified or generated
 volume request. No command script is generated or executed, and processing
 stops at this stage.
@@ -201,12 +188,10 @@ stops at this stage.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify whether the volume should support automatic component replacement after
 a fault. If this option is specified, a mirror is created and its submirrors
 are associated with a hot spare.
@@ -214,24 +199,20 @@ are associated with a hot spare.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify the name of the new volume. See \fBmetainit\fR(1M) for naming
 guidelines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify the number of required paths to the storage volume. The value of
 \fIn\fR cannot be greater than the number of different physical paths and
 logical paths to attached storage. Only used when specifying a volume on the
@@ -240,12 +221,10 @@ command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify the redundancy level (\fB0\fR-\fB4\fR) of the data. The default is
 \fB0\fR. Only used when specifying a volume on the command line. If redundancy
 is \fB0\fR, a stripe is created. If redundancy is \fB1\fR or greater, a mirror
@@ -258,12 +237,10 @@ failures.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIdevice1\fR\fB,\fR\fIdevice2\fR\fB,...\fR\fR
 .ad
 .RS 26n
-.rt  
 Explicitly specify devices to exclude in the creation of this volume. Named
 devices can be controllers or disks. You can use this option alone, or to
 exclude some of the devices listed as available with the \fB-a\fR option, Only
@@ -272,12 +249,10 @@ used when specifying a volume on the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fIvalue\fR\fR
 .ad
 .RS 26n
-.rt  
 Specify the level of verbosity. Values from \fB0\fR to \fB2\fR are available,
 with higher numbers specifying more verbose output when the command is run.
 \fB-v\fR \fB0\fR indicates silent output, except for errors or other critical
@@ -286,23 +261,19 @@ messages. The default level is \fB1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 26n
-.rt  
 Display program version information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
 .RS 26n
-.rt  
 Display help information. This option can follow a subcommand for
 subcommand-specific help.
 .RE
@@ -438,58 +409,51 @@ you can run later:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/xml/dtd/volume-request.dtd\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/xml/dtd/volume-defaults.dtd\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/xml/dtd/volume-config.dtd\fR\fR
 .ad
 .sp .6
 .RS 4n
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -500,13 +464,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Inteface StabilityStable
+Inteface Stability	Stable
 .TE
 
 .SH SEE ALSO

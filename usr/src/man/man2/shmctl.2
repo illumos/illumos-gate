@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH shmctl 2 "10 Apr 2007" "SunOS 5.11" "System Calls"
+.TH SHMCTL 2 "Apr 10, 2007"
 .SH NAME
 shmctl \- shared memory control operations
 .SH SYNOPSIS
@@ -45,12 +45,10 @@ more information.
 The following operations require the specified tokens:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPC_STAT\fR\fR
 .ad
 .RS 14n
-.rt  
 Place the current value of each member of the data structure associated with
 \fIshmid\fR into the structure pointed to by \fIbuf\fR. The contents of this
 structure are defined in \fBIntro\fR(2). {\fBREAD\fR}
@@ -58,12 +56,10 @@ structure are defined in \fBIntro\fR(2). {\fBREAD\fR}
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPC_SET\fR\fR
 .ad
 .RS 14n
-.rt  
 Set the value of the following members of the data structure associated with
 \fIshmid\fR to the corresponding value found in the structure pointed to by
 \fIbuf\fR:
@@ -83,12 +79,10 @@ or an effective user \fBID\fR equal to the value of \fBshm_perm.cuid\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPC_RMID\fR\fR
 .ad
 .RS 14n
-.rt  
 Remove the shared memory identifier specified by \fIshmid\fR from the system.
 The segment referenced by the identifier will be destroyed when all processes
 with the segment attached have either detached the segment or exited. If the
@@ -101,24 +95,20 @@ has appropriate privileges or an effective user ID equal to the value of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHM_LOCK\fR\fR
 .ad
 .RS 14n
-.rt  
 Lock the shared memory segment specified by \fIshmid\fR in memory. This command
 can be executed only by a process that has appropriate privileges.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHM_UNLOCK\fR\fR
 .ad
 .RS 14n
-.rt  
 Unlock the shared memory segment specified by \fIshmid\fR. This command can be
 executed only by a process that has appropriate privileges.
 .RE
@@ -138,35 +128,29 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBshmctl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is equal to \fBIPC_STAT\fR and \fB{READ}\fR operation
 permission is denied to the calling process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIbuf\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIshmid\fR argument is not a valid shared memory identifier; or the
 \fIcmd\fR argument is not a valid command or is \fBIPC_SET\fR and
 \fBshm_perm.uid\fR or \fBshm_perm.gid\fR is not valid.
@@ -174,12 +158,10 @@ The \fIshmid\fR argument is not a valid shared memory identifier; or the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is equal to \fBSHM_LOCK\fR and there is not enough
 memory, or the operation would exceed a limit or resource control on locked
 memory.
@@ -187,24 +169,20 @@ memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBIPC_STAT\fR and \fIuid\fR or \fIgid\fR is too
 large to be stored in the structure pointed to by \fIbuf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is equal to \fBIPC_RMID\fR or \fBIPC_SET\fR, the
 effective user ID of the calling process is not equal to the value of
 \fBshm_perm.cuid\fR or \fBshm_perm.uid\fR in the data structure associated with
@@ -224,13 +202,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

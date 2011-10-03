@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH talk 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.TH TALK 1 "Nov 6, 2000"
 .SH NAME
 talk \- talk to another user
 .SH SYNOPSIS
@@ -129,12 +129,10 @@ may report an error describing the terminal-related deficiency.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 12n
-.rt  
 The recipient of the \fBtalk\fR session. One form of \fIaddress\fR is the
 \fIusername\fR, as returned by the \fBwho\fR(1) utility. If you wish to talk to
 someone on your own machine, then \fIusername\fR is just the person's login
@@ -146,7 +144,7 @@ of the following forms:
 \fIhost\fR\fB!\fR\fIuser\fR
 \fIhost\fR\fB\&.\fR\fIuser\fR
 \fIhost\fR\fB:\fR\fIuser\fR
-\fIuser\fR\fB@\fR\fIhost\fR 
+\fIuser\fR\fB@\fR\fIhost\fR
 .fi
 .in -2
 .sp
@@ -156,12 +154,10 @@ although \fIuser\fR\fB@\fR\fIhost\fR is perhaps preferred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIterminal\fR\fR
 .ad
 .RS 12n
-.rt  
 If the recipient is logged in more than once, \fIterminal\fR can be used to
 indicate the appropriate terminal name. If \fIterminal\fR is not specified, the
 \fBtalk\fR message will be displayed on one or more accessible terminals in use
@@ -177,12 +173,10 @@ that affect the execution of \fBtalk\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERM\fR\fR
 .ad
 .RS 8n
-.rt  
 Determine the name of the invoker's terminal type.  If this variable is unset
 or null, an unspecified terminal type will be used.
 .RE
@@ -193,23 +187,19 @@ or null, an unspecified terminal type will be used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred, or \fBtalk\fR was invoked on a terminal incapable of
 supporting it.
 .RE
@@ -217,23 +207,19 @@ supporting it.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 18n
-.rt  
 host name database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 user and accounting information for \fBtalk\fR
 .RE
 
@@ -245,13 +231,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

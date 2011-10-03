@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nohup 1 "19 Jun 2006" "SunOS 5.11" "User Commands"
+.TH NOHUP 1 "Jun 19, 2006"
 .SH NAME
 nohup \- run a command immune to hangups
 .SH SYNOPSIS
@@ -53,24 +53,20 @@ cause them to be killed. All stopped, running, and background jobs ignores
 \fBSIGHUP\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/nohup\fR\fR
 .ad
 .RS 27n
-.rt  
 Processes run by \fB/usr/bin/nohup\fR are immune to \fBSIGHUP\fR (hangup) and
 \fBSIGQUIT\fR (quit) signals.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/nohup\fR \fB-p\fR [\fB-Fa\fR]\fR
 .ad
 .RS 27n
-.rt  
 Processes specified by \fBID\fR are made immune to \fBSIGHUP\fR and
 \fBSIGQUIT\fR, and all output to the controlling terminal is redirected to
 \fBnohup.out\fR. If \fB-F\fR is specified, \fBnohup\fR forces control of each
@@ -81,12 +77,10 @@ for either signal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/nohup\fR \fB-g\fR [\fB-Fa\fR]\fR
 .ad
 .RS 27n
-.rt  
 Every process in the same process group as the processes specified by \fBID\fR
 are made immune to \fBSIGHUP\fR and \fBSIGQUIT\fR, and all output to the
 controlling terminal is redirected to \fBnohup.out\fR. If \fB-F\fR is
@@ -97,12 +91,10 @@ specified, \fBnohup\fR changes the signal disposition of \fBSIGHUP\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/xpg4/bin/nohup\fR\fR
 .ad
 .RS 27n
-.rt  
 Processes run by \fB/usr/xpg4/bin/nohup\fR are immune to \fBSIGHUP\fR.
 .sp
 The \fBnohup\fR utility does not arrange to make processes immune to a
@@ -123,47 +115,39 @@ redirected. The priority of the process run by \fBnohup\fR is not altered.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Always changes the signal disposition of target processes. This option is valid
 only when specified with \fB-p\fR or \fB-g\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Force. Grabs the target processes even if another process has control. This
 option is valid only when specified with \fB-p\fR or \fB-g.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 6n
-.rt  
 Operates on a list of process groups. This option is not valid with \fB-p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Operates on a list of processes. This option is not valid with \fB-g\fR.
 .RE
 
@@ -173,34 +157,28 @@ Operates on a list of processes. This option is not valid with \fB-g\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 12n
-.rt  
 A decimal process \fBID\fR to be manipulated by \fBnohup\fR \fB-p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpgid\fR\fR
 .ad
 .RS 12n
-.rt  
 A decimal process group \fBID\fR to be manipulated by \fBnohup\fR \fB-g\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of a command that is to be invoked. If the \fIcommand\fR operand names
 any of the special \fBshell_builtins\fR(1) utilities, the results are
 undefined.
@@ -208,12 +186,10 @@ undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR\fR
 .ad
 .RS 12n
-.rt  
 Any string to be supplied as an argument when invoking the \fIcommand\fR
 operand.
 .RE
@@ -295,12 +271,10 @@ that affect the execution of \fBnohup\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBPATH\fR, \fBNLSPATH\fR, and \fBPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
 .RS 8n
-.rt  
 Determine the path name of the user's home directory: if the output file
 \fBnohup.out\fR cannot be created in the current directory, the \fBnohup\fR
 command uses the directory named by \fBHOME\fR to create the file.
@@ -312,23 +286,19 @@ command uses the directory named by \fBHOME\fR to create the file.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIcommand\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 7n
-.rt  
 An error occurred in \fBnohup\fR, or \fIcommand\fR could not be found
 .RE
 
@@ -339,24 +309,20 @@ operand.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnohup.out\fR\fR
 .ad
 .RS 19n
-.rt  
 The output file of the \fBnohup\fR execution if standard output is a terminal
 and if the current directory is writable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/nohup.out\fR\fR
 .ad
 .RS 19n
-.rt  
 The output file of the \fBnohup\fR execution if standard output is a terminal
 and if the current directory is not writable.
 .RE
@@ -370,13 +336,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/nohup"
@@ -384,15 +349,14 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

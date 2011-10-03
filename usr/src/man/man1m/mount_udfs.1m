@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_udfs 1M "12 May 2008" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_UDFS 1M "May 12, 2008"
 .SH NAME
 mount_udfs \- mount a udfs file system
 .SH SYNOPSIS
 .LP
 .nf
-\fBmount\fR \fB-F\fR udfs [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] 
+\fBmount\fR \fB-F\fR udfs [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
      [\fB-O\fR] \fIspecial\fR \fImount_point\fR
 .fi
 
@@ -54,7 +54,6 @@ See \fBmount\fR(1M) for the list of supported \fIgeneric_options\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
@@ -64,7 +63,6 @@ Specify \fBudfs\fR file system specific options in a comma-separated list with
 no intervening spaces. The following \fIspecific_options\fR are available:
 .sp
 .ne 2
-.mk
 .na
 \fBm\fR
 .ad
@@ -75,7 +73,6 @@ Mount the file system without making an entry in \fB/etc/mnttab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBremount\fR
 .ad
@@ -92,7 +89,6 @@ fails if the file system is not currently mounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
@@ -107,7 +103,6 @@ producing the error \f(CWdevice busy\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -118,7 +113,6 @@ Table of mounted file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
@@ -136,7 +130,6 @@ List of default parameters for each file system
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fBnot super user\fR
 .ad
@@ -147,7 +140,6 @@ The command is run by a non-root user. Run as root.
 
 .sp
 .ne 2
-.mk
 .na
 \fBno such device\fR
 .ad
@@ -158,7 +150,6 @@ The device name specified does not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fBnot a directory\fR
 .ad
@@ -169,7 +160,6 @@ The specified mount point is not a directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBis not an udfs file system\fR
 .ad
@@ -181,7 +171,6 @@ system module is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fBis already mounted\fR
 .ad
@@ -192,7 +181,6 @@ The specified device is already in use.
 
 .sp
 .ne 2
-.mk
 .na
 \fBnot a block device\fR
 .ad
@@ -203,7 +191,6 @@ The device specified is not a block device. Use block device to mount.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrite-protected\fR
 .ad
@@ -214,7 +201,6 @@ The device is read-only.
 
 .sp
 .ne 2
-.mk
 .na
 \fBis corrupted. needs checking\fR
 .ad

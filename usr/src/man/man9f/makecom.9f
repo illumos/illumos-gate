@@ -3,16 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH makecom 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH MAKECOM 9F "Jan 16, 2006"
 .SH NAME
 makecom, makecom_g0, makecom_g0_s, makecom_g1, makecom_g5 \- make a packet for
 SCSI commands
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/scsi/scsi.h> 
+#include <sys/scsi/scsi.h>
 
-\fBvoid\fR \fBmakecom_g0\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR, 
+\fBvoid\fR \fBmakecom_g0\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR,
      \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIaddr\fR, \fBint\fR \fIcnt\fR);
 .fi
 
@@ -24,13 +24,13 @@ SCSI commands
 
 .LP
 .nf
-\fBvoid\fR \fBmakecom_g1\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR, 
+\fBvoid\fR \fBmakecom_g1\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR,
      \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIaddr\fR, \fBint\fR \fIcnt\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBmakecom_g5\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR, 
+\fBvoid\fR \fBmakecom_g5\fR(\fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct scsi_device *\fR\fIdevp\fR,
      \fBint\fR \fIflag\fR, \fBint\fR \fIcmd\fR, \fBint\fR \fIaddr\fR, \fBint\fR \fIcnt\fR);
 .fi
 
@@ -41,67 +41,55 @@ These interfaces are obsolete. \fBscsi_setup_cdb\fR(9F) should be used instead.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to an allocated \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to the target's \fBscsi_device\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 10n
-.rt  
 Flags for the \fBpkt_flags\fR member.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd\fR\fR
 .ad
 .RS 10n
-.rt  
 First byte of a group 0 or 1 or 5 \fBSCSI\fR \fBCDB\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR\fR
 .ad
 .RS 10n
-.rt  
 Pointer to the location of the data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcnt\fR\fR
 .ad
 .RS 10n
-.rt  
 Data transfer length in units defined by the SCSI device type. For sequential
 devices \fIcnt\fR is the number of bytes. For block devices, \fIcnt\fR is the
 number of blocks.
@@ -109,12 +97,10 @@ number of blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfixbit\fR\fR
 .ad
 .RS 10n
-.rt  
 Fixed bit in sequential access device commands.
 .RE
 
@@ -158,13 +144,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelObsolete
+Stability Level	Obsolete
 .TE
 
 .SH SEE ALSO

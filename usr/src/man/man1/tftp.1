@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tftp 1 "7 May 2007" "SunOS 5.11" "User Commands"
+.TH TFTP 1 "May 7, 2007"
 .SH NAME
 tftp \- trivial file transfer program
 .SH SYNOPSIS
@@ -30,7 +30,6 @@ following commands:
 .SS "Commands"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect\fR \fIhost-name\fR [ \fIport\fR ]\fR
 .ad
@@ -46,7 +45,6 @@ part of the \fBget\fR or \fBput\fR commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmode\fR \fItransfer-mode\fR\fR
 .ad
@@ -58,7 +56,6 @@ Set the mode for transfers; \fItransfer-mode\fR may be one of \fBascii\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBput\fR \fIfilename\fR\fR
 .ad
@@ -106,7 +103,6 @@ Files may be written only if they already exist and are publicly writable. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR \fIfilename\fR\fR
 .ad
@@ -137,7 +133,6 @@ used, the last host specified becomes the default for future transfers. See the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -148,7 +143,6 @@ Exit \fBtftp\fR. An \fBEOF\fR also exits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
@@ -159,7 +153,6 @@ Toggle verbose mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace\fR\fR
 .ad
@@ -170,7 +163,6 @@ Toggle packet tracing.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -181,7 +173,6 @@ Show current status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrexmt\fR\fIretransmission-timeout\fR\fR
 .ad
@@ -192,7 +183,6 @@ Set the per-packet retransmission timeout, in seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeout\fR\fItotal-transmission-timeout\fR\fR
 .ad
@@ -203,7 +193,6 @@ Set the total transmission timeout, in seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBascii\fR\fR
 .ad
@@ -214,7 +203,6 @@ Shorthand for \fBmode ascii\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbinary\fR\fR
 .ad
@@ -225,7 +213,6 @@ Shorthand for \fBmode binary\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblksize\fR \fItransfer-blocksize\fR\fR
 .ad
@@ -237,7 +224,6 @@ value of \fB0\fR disables the negotiation of this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsrexmt\fR \fIserver-retransmission-timeout\fR\fR
 .ad
@@ -249,7 +235,6 @@ A value of 0 disables the negotiation of this option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtsize\fR\fR
 .ad
@@ -262,7 +247,6 @@ request when the \fItransfer-mode\fR is \fBascii\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB? [\fR \fIcommand-name\fR .\|.\|. ]\fR
 .ad

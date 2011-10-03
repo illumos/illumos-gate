@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright 1989 AT&T.  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sigaltstack 2 "1 Nov 2003" "SunOS 5.11" "System Calls"
+.TH SIGALTSTACK 2 "Nov 1, 2003"
 .SH NAME
 sigaltstack \- set or get signal alternate stack context
 .SH SYNOPSIS
@@ -53,12 +53,10 @@ growth and alignment.  The \fBss_flags\fR member specifies the new stack state
 and may be set to the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSS_DISABLE\fR\fR
 .ad
 .RS 14n
-.rt  
 The stack is to be disabled and \fBss_sp\fR and \fBss_size\fR are ignored. If
 \fBSS_DISABLE\fR is not set, the stack will be enabled.
 .RE
@@ -72,12 +70,10 @@ and size of that stack.  The \fBss_flags\fR member specifies the stack's state,
 and may contain the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSS_ONSTACK\fR\fR
 .ad
 .RS 14n
-.rt  
 The thread is currently executing on the alternate signal stack. Attempts to
 modify the alternate signal stack while the thread is executing on it will
 fail.
@@ -85,12 +81,10 @@ fail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSS_DISABLE\fR\fR
 .ad
 .RS 14n
-.rt  
 The alternate signal stack is currently disabled.
 .RE
 
@@ -105,46 +99,38 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBsigaltstack()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIss\fR or \fIoss\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIss\fR argument is not a null pointer, and the \fBss_flags\fR member
 pointed to by \fIss\fR contains flags other than \fBSS_DISABLE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The size of the alternate stack area is less than \fBMINSIGSTKSZ\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 An attempt was made to modify an active stack.
 .RE
 
@@ -156,15 +142,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

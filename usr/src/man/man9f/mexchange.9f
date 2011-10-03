@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mexchange 9F "9 June 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH MEXCHANGE 9F "Jun 9, 2004"
 .SH NAME
 mexchange \- Exchange one message for another
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ mexchange \- Exchange one message for another
 
 
 
-\fBmblk_t *\fR\fBmexchange\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBsize_t\fR \fIsize\fR, 
+\fBmblk_t *\fR\fBmexchange\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBsize_t\fR \fIsize\fR,
      \fBuchar_t\fR \fItype\fR, \fBint32_t\fR \fIprimtype\fR);
 .fi
 
@@ -25,57 +25,47 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwq\fR\fR
 .ad
 .RS 12n
-.rt  
 Optionally, write queue associated with the read queue to be used on failure
 (see below).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR\fR
 .ad
 .RS 12n
-.rt  
 Optionally, the message to exchange.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 12n
-.rt  
 Size of the returned message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 12n
-.rt  
 Type of the returned message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprimtype\fR\fR
 .ad
 .RS 12n
-.rt  
 Optionally, a 4 byte value to store at the beginning of the returned message.
 .RE
 

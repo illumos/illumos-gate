@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH inetd 1M "5 Jul 2007" "SunOS 5.11" "System Administration Commands"
+.TH INETD 1M "Jul 5, 2007"
 .SH NAME
 inetd \- Solaris Management Facility delegated restarter for inet services
 .SH SYNOPSIS
@@ -74,7 +74,6 @@ up of the \fBsmf\fR(5) set of states. The semantics of these states are as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuninitialized\fR\fR
 .ad
@@ -85,7 +84,6 @@ follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonline\fR\fR
 .ad
@@ -97,7 +95,6 @@ connections active.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdegraded\fR\fR
 .ad
@@ -111,7 +108,6 @@ active.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffline\fR\fR
 .ad
@@ -156,7 +152,6 @@ a listen attempt is successful or the retry limit is reached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisabled\fR\fR
 .ad
@@ -169,7 +164,6 @@ exit this state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaintenance\fR\fR
 .ad
@@ -199,7 +193,6 @@ As part of certain state transitions \fBinetd\fR will execute, if supplied, one
 of a set of methods provided by the service. The set of supported methods are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinetd_start\fR\fR
 .ad
@@ -212,7 +205,6 @@ connections, this method is not executed as part of a state transition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinetd_offline\fR\fR
 .ad
@@ -228,7 +220,6 @@ required to be implemented for a \fBwait\fR-type service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinetd_online\fR\fR
 .ad
@@ -241,7 +232,6 @@ preparation prior to a service starting to handle requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinetd_disable\fR\fR
 .ad
@@ -254,7 +244,6 @@ being terminated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinetd_refresh\fR\fR
 .ad
@@ -301,7 +290,6 @@ The basic configuration of a service is stored in a property group named
 are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbind_addr\fR\fR
 .ad
@@ -314,7 +302,6 @@ interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbind_fail_interval\fR\fR
 .ad
@@ -327,7 +314,6 @@ failure is handled the same as exceeding \fBbind_fail_max\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbind_fail_max\fR\fR
 .ad
@@ -343,7 +329,6 @@ otherwise, if not all of the protocols were bound to, the service goes to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcon_rate_offline\fR\fR
 .ad
@@ -356,7 +341,6 @@ specify that connection rate limiting is disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnection_backlog\fR\fR
 .ad
@@ -368,7 +352,6 @@ requests that can be queued at the listening endpoints for servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBendpoint_type\fR\fR
 .ad
@@ -381,7 +364,6 @@ TLI-based service. Valid socket type values are: \fBstream\fR, \fBdgram\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailrate_cnt\fR\fR
 .ad
@@ -401,7 +383,6 @@ is equivalent to the \fB-r\fR option of the previous \fBinetd\fR. The values
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfailrate_interval\fR\fR
 .ad
@@ -413,7 +394,6 @@ and \fB-1\fR specify that the failure rate limit feature is disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinherit_env\fR\fR
 .ad
@@ -428,7 +408,6 @@ are described in \fBsmf_method\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBisrpc\fR\fR
 .ad
@@ -439,7 +418,6 @@ If true, this is an RPC service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_con_rate\fR\fR
 .ad
@@ -452,7 +430,6 @@ connection rate limiting is disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmax_copies\fR\fR
 .ad
@@ -465,7 +442,6 @@ disabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBname\fR\fR
 .ad
@@ -495,7 +471,6 @@ if \fBisrpc\fR is set to \fBtrue\fR, a valid RPC program number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproto\fR\fR
 .ad
@@ -515,7 +490,6 @@ mapped ones). See "Configuring Protocols for Sockets-Based Services," below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_low_version\fR\fR
 .ad
@@ -526,7 +500,6 @@ Lowest supported RPC version. Required when \fBisrpc\fR is set to \fBtrue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrpc_high_version\fR\fR
 .ad
@@ -537,7 +510,6 @@ Highest supported RPC version. Required when \fBisrpc\fR is set to \fBtrue\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtcp_trace\fR\fR
 .ad
@@ -557,7 +529,6 @@ facility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtcp_wrappers\fR\fR
 .ad
@@ -584,7 +555,6 @@ of the standard Solaris man pages, available at \fB/usr/man\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR\fR
 .ad
@@ -724,7 +694,6 @@ IPv4 and IPv6.
 restarter, \fBsvc.startd\fR(1M).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR\fR
 .ad
@@ -744,7 +713,6 @@ is logged in \fBsyslog\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR\fR
 .ad
@@ -758,7 +726,6 @@ methods in the process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefresh\fR\fR
 .ad
@@ -809,7 +776,6 @@ No options are supported.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconfiguration-file\fR\fR
 .ad
@@ -821,7 +787,6 @@ Specifies an alternate location for the legacy service file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR|\fBstop\fR|\fBrefresh\fR\fR
 .ad
@@ -844,9 +809,9 @@ IPv4 and IPv6 and assign \fBproto\fR properties to those services.
 example# \fBsvcs -a | grep mysvc\fR
 online         15:48:29 svc:/network/mysvc:dgram4
 online         15:48:29 svc:/network/mysvc:dgram6
-online         15:51:47 svc:/network/mysvc:stream4  
-online         15:52:10 svc:/network/mysvc:stream6  
- 
+online         15:51:47 svc:/network/mysvc:stream4
+online         15:52:10 svc:/network/mysvc:stream6
+
 # \fBinetadm -M network/rpc/mysvc:dgram4 proto=udp\fR
 # \fBinetadm -M network/rpc/mysvc:dgram6 proto=udp6only\fR
 # \fBinetadm -M network/rpc/mysvc:stream4 proto=tcp\fR
@@ -867,13 +832,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

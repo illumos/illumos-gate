@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ndmpstat 1M "21 Jun 2007" "SunOS 5.11" "System Administration Commands"
+.TH NDMPSTAT 1M "Jun 21, 2007"
 .SH NAME
 ndmpstat \- show NDMP backup progress statistics
 .SH SYNOPSIS
@@ -33,7 +33,6 @@ NDMP daemon activity since the NDMP service was invoked.
 The fields in \fBndmpstat\fR output are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwthr\fR\fR
 .ad
@@ -42,7 +41,6 @@ The fields in \fBndmpstat\fR output are described as follows:
 Report the number of worker threads in each  of  the four following states:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
@@ -53,7 +51,6 @@ the number of worker threads running
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
@@ -65,7 +62,6 @@ and paging
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
@@ -76,7 +72,6 @@ the number of backup operations currently running
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
@@ -89,7 +84,6 @@ the number of restore operations currently running
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
@@ -98,7 +92,6 @@ the number of restore operations currently running
 Report on usage of filesystem.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrd\fR\fR
 .ad
@@ -109,7 +102,6 @@ the number of files being read
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwr\fR\fR
 .ad
@@ -122,7 +114,6 @@ the number of files being written
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk\fR\fR
 .ad
@@ -131,7 +122,6 @@ the number of files being written
 Report the number of disk operations per interval.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrd\fR\fR
 .ad
@@ -142,7 +132,6 @@ the number of disk blocks being read
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwr\fR\fR
 .ad
@@ -155,7 +144,6 @@ the number of disk blocks being written
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtape\fR\fR
 .ad
@@ -166,7 +154,6 @@ four tapes, labeled with a single number. The number indicates the name of the
 device under \fB/dev/rmt\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrd\fR\fR
 .ad
@@ -177,7 +164,6 @@ the number of tape blocks being read
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwr\fR\fR
 .ad
@@ -190,7 +176,6 @@ the number of tape blocks being written
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbytes\fR\fR
 .ad
@@ -200,7 +185,6 @@ Report the number of bytes transferred. This is the aggregate value of both
 tape and disk devices. The number is in kilobytes.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrd\fR\fR
 .ad
@@ -211,7 +195,6 @@ the number of kilobytes being read
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwr\fR\fR
 .ad
@@ -224,7 +207,6 @@ the number of kilobytes being written
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBperf\fR\fR
 .ad
@@ -234,7 +216,6 @@ Displays a rough estimate of performance of the backup/restore operation in
 megabytes per second.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbk\fR\fR
 .ad
@@ -245,7 +226,6 @@ backup performance
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrs\fR\fR
 .ad
@@ -258,7 +238,6 @@ restore performance
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprcnt\fR\fR
 .ad
@@ -267,7 +246,6 @@ restore performance
 Display the comparative usage of resources, in percent.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdsk\fR\fR
 .ad
@@ -278,7 +256,6 @@ disk I/O time
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtpe\fR\fR
 .ad
@@ -289,7 +266,6 @@ tape I/O time
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBotr\fR\fR
 .ad
@@ -309,23 +285,19 @@ See \fBEXAMPLES\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the number of times that the statistics display is repeated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItape\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies which tapes are to be given priority in the output. A command line is
 limited to a maximum of four tape devices. A common tape name is
 \fB/dev/rmt/\fR\fIn\fR, where \fIn\fR is an integer.
@@ -333,12 +305,10 @@ limited to a maximum of four tape devices. A common tape name is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the number of seconds over which \fBndmpstat\fR summarizes activity.
 The specified interval remains in effect till the command is terminated.
 .RE
@@ -377,13 +347,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below
+Interface Stability	See below
 .TE
 
 .sp

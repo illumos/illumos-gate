@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_vu_errmsg 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_VU_ERRMSG 9F "Jan 16, 2006"
 .SH NAME
 scsi_vu_errmsg \- display a SCSI request sense message
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ scsi_vu_errmsg \- display a SCSI request sense message
 
 
 \fBvoid\fR \fBscsi_vu_errmsg\fR(\fBstruct scsi_pkt\fR \fI*pktp\fR, \fBchar\fR \fI*drv_name\fR, \fBint severity,\fR
-     \fBint err_blkno,\fR \fBstruct scsi_key_strings\fR \fI*cmdlist\fR, 
+     \fBint err_blkno,\fR \fBstruct scsi_key_strings\fR \fI*cmdlist\fR,
      \fBstruct scsi_extended_sense\fR \fI*sensep\fR,
      \fBstruct scsi_asq_key_strings\fR \fI*asc_list\fR,
      \fBchar **decode_fru struct scsi_device\fR\fI*\fR, char \fI*\fR, int, char);
@@ -30,112 +30,92 @@ Solaris DDI specific (Solaris DDI).
 The following parameters are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the \fBscsi_device\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpktp\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to a \fBscsi_pkt\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdrv_name\fR\fR
 .ad
 .RS 14n
-.rt  
 String used by \fBscsi_log\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIseverity\fR\fR
 .ad
 .RS 14n
-.rt  
 Error severity level, maps to severity strings below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblkno\fR\fR
 .ad
 .RS 14n
-.rt  
 Requested block number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerr_blkno\fR\fR
 .ad
 .RS 14n
-.rt  
 Error block number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmdlist\fR\fR
 .ad
 .RS 14n
-.rt  
 An array of SCSI command description strings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsensep\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to a \fBscsi_extended_sense\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIasc_list\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to a array of asc and ascq message list.The list must be terminated
 with \fB-1\fR asc value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdecode_fru\fR\fR
 .ad
 .RS 14n
-.rt  
 This is a function pointer that will be called after the entire sense
 information has been decoded. The parameters will be the scsi_device structure
 to identify the device. Second argument will be a pointer to a buffer of length
@@ -174,7 +154,7 @@ below:
 .sp
 .in +2
 .nf
-     Severity Value:      String:  
+     Severity Value:      String:
      SCSI_ERR_ALL         All
      SCSI_ERR_UNKNOWN     Unknown
      SCSI_ERR_INFO        Information
@@ -209,7 +189,7 @@ For a basic SCSI disk, the following list is appropriate:
 .sp
 .in +2
 .nf
-     static struct scsi_key_strings scsi_cmds[] = {            
+     static struct scsi_key_strings scsi_cmds[] = {
              0x00, "test unit ready",
              0x01, "rezero/rewind",
              0x03, "request sense",
@@ -252,7 +232,7 @@ kernel context.
              -1, 0, NULL,
      };
 
-        
+
      scsi_vu_errmsg(devp, pkt, "sd",
                     SCSI_ERR_INFO, bp->b_blkno, err_blkno,
                     sd_cmds, rqsense, cd_list,

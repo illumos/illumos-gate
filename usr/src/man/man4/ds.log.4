@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ds.log 4 "08 Jun 2007" "SunOS 5.11" "File Formats"
+.TH DS.LOG 4 "Jun 08, 2007"
 .SH NAME
 ds.log \- Availability Suite data services log file
 .SH DESCRIPTION
@@ -28,7 +28,6 @@ Note that when the size of the log file exceeds 10 Mbytes, ds.log is renamed
 The \fBds.log\fR fields are:
 .sp
 .ne 2
-.mk
 .na
 \fBdate\fR
 .ad
@@ -41,7 +40,6 @@ event occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fBtime\fR
 .ad
@@ -52,7 +50,6 @@ The time of the event, in \fIhh:mm:ss\fR format.
 
 .sp
 .ne 2
-.mk
 .na
 \fBproduct\fR
 .ad
@@ -65,7 +62,6 @@ and a space.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmessage\fR
 .ad
@@ -100,15 +96,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(0i) |cw(5.5i) 
-lw(0i) |lw(5.5i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 _
-Interface Stability Committed
+Interface Stability 	Committed
 .TE
 
 .SH SEE ALSO

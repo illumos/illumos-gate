@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH _lwp_mutex_lock 2 "30 Jul 1992" "SunOS 5.11" "System Calls"
+.TH _LWP_MUTEX_LOCK 2 "Jul 30, 1992"
 .SH NAME
 _lwp_mutex_lock, _lwp_mutex_unlock, _lwp_mutex_trylock \- mutual exclusion
 .SH SYNOPSIS
@@ -61,23 +61,19 @@ If any of the following conditions are detected, \fB_lwp_mutex_lock()\fR,
 corresponding value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fImp\fR argument points to an invalid LWP mutex.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fImp\fR argument points to an illegal address.
 .RE
 
@@ -87,12 +83,10 @@ If any of the following conditions occur, \fB_lwp_mutex_trylock()\fR fails and
 returns the corresponding value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fImp\fR argument points to a locked mutex.
 .RE
 

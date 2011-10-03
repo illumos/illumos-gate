@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH add_allocatable 1M "20 Jul 2007" "SunOS 5.11" "System Administration Commands"
+.TH ADD_ALLOCATABLE 1M "Jul 20, 2007"
 .SH NAME
 add_allocatable \- add entries to allocation databases
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/add_allocatable\fR [\fB-f\fR] [\fB-s\fR] [\fB-d\fR] \fB-n\fR \fIname\fR \fB-t\fR \fItype\fR \fB-l\fR \fIdevice-list\fR 
+\fB/usr/sbin/add_allocatable\fR [\fB-f\fR] [\fB-s\fR] [\fB-d\fR] \fB-n\fR \fIname\fR \fB-t\fR \fItype\fR \fB-l\fR \fIdevice-list\fR
     [\fB-a\fR \fIauthorization\fR] [\fB-c\fR \fIclean\fR] [\fB-o\fR \fIkey\fR=\fIvalue\fR]
 .fi
 
@@ -36,12 +36,10 @@ their attributes, and device paths.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 20n
-.rt  
 Force an update of an already-existing entry with the specified information.
 \fBadd_allocatable\fR exits with an error if this option is not specified when
 an entry with the specified device name already exists.
@@ -49,59 +47,49 @@ an entry with the specified device name already exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 20n
-.rt  
 Turn on silent mode. \fBadd_allocatable\fR does not print any error or warning
 messages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 20n
-.rt  
 If this option is present, \fBadd_allocatable\fR updates the system-supplied
 default attributes of the device type specified with \fB-t\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR\fR
 .ad
 .RS 20n
-.rt  
 Adds or updates an entry for device that is specified by \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype\fR\fR
 .ad
 .RS 20n
-.rt  
 Adds or updates device entries that are of a type that are specified by
 \fItype\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIdevice-list\fR\fR
 .ad
 .RS 20n
-.rt  
 Adds or updates device paths to the device that is specified with \fB-n\fR.
 Multiple paths in \fIdevice-list\fR must be separated by white spaces and the
 list must be quoted.
@@ -109,12 +97,10 @@ list must be quoted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIauthorization\fR\fR
 .ad
 .RS 20n
-.rt  
 Adds or updates the authorization that is associated with either the device
 that is specified with \fB-n\fR or with devices of the type that is specified
 with \fB-t\fR. When more than one authorization is specified, the list must be
@@ -126,12 +112,10 @@ the at sign (@) and must be quoted. Default authorization is '@'.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclean\fR\fR
 .ad
 .RS 20n
-.rt  
 Specifies the \fBdevice_clean\fR(5) program \fIclean\fR to be used with the
 device that is specified with \fB-n\fR or with devices of the type that is
 specified with \fB-t\fR. The default clean program is \fB/bin/true\fR.
@@ -139,46 +123,38 @@ specified with \fB-t\fR. The default clean program is \fB/bin/true\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIkey\fR=\fIvalue\fR\fR
 .ad
 .RS 20n
-.rt  
 Accepts a string of colon-separated \fB\fIkey\fR=\fIvalue\fR\fR pairs for a
 device that is specified with \fB-n\fR or with devices of the type that is
 specified with \fB-t\fR. The following keys are currently interpreted by the
 system:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBminlabel\fR\fR
 .ad
 .RS 12n
-.rt  
 The minimum label at which the device can be used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxlabel\fR\fR
 .ad
 .RS 12n
-.rt  
 The maximum label at which the device can be used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclass\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies a logical  grouping of devices. For example, all Sun
 Ray\u\s-2TM\s+2\d devices of all device types is a logical grouping. The
 \fBclass\fR keyword has no default value.
@@ -186,12 +162,10 @@ Ray\u\s-2TM\s+2\d devices of all device types is a logical grouping. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdpy\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the display name of the X session. This keyword is used to identify
 devices that are associated with the X session. The \fBxdpy\fR keyword has no
 default value.
@@ -207,46 +181,38 @@ When successful, \fBadd_allocate\fR returns an exit status of \fB0\fR (true).
 exit codes are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Invocation syntax error
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Unknown system error
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 An entry already exists for the specified device. This error occurs only when
 the \fB-f\fR option is not specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Permission denied. User does not have DAC or MAC access record updates.
 .RE
 
@@ -258,13 +224,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.82i) |cw(2.68i) 
-lw(2.82i) |lw(2.68i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ber_decode 3LDAP "15 May 2009" "SunOS 5.11" "LDAP Library Functions"
+.TH BER_DECODE 3LDAP "May 15, 2009"
 .SH NAME
 ber_decode, ber_alloc_t, ber_free, ber_bvdup, ber_init, ber_flatten,
 ber_get_next, ber_skip_tag, ber_peek_tag, ber_scanf, ber_get_int,
@@ -179,12 +179,10 @@ which are used to direct the interpretation of the BER element.  The format
 string can contain the following characters.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 Octet string.  A char ** should be supplied.  Memory is allocated, filled with
 the contents of the octet string, null-terminated, and returned in the
 parameter.
@@ -192,12 +190,10 @@ parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 Octet string.  A char * buffer should be supplied, followed by a pointer to an
 integer initialized to the size of the buffer.  Upon return, the
 null-terminated octet string is put into the buffer, and the integer is set to
@@ -206,12 +202,10 @@ the actual size of the octet string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBO\fR\fR
 .ad
 .RS 5n
-.rt  
 Octet string.  A struct ber_val ** should be supplied, which upon return points
 to a memory allocated struct berval containing the octet string and its length.
 \fBber_bvfree()\fR can be called to free the allocated memory.
@@ -219,34 +213,28 @@ to a memory allocated struct berval containing the octet string and its length.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 Boolean.  A pointer to an integer should be supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Integer.  A pointer to an integer should be supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBB\fR\fR
 .ad
 .RS 5n
-.rt  
 Bitstring.  A char ** should be supplied which will point to the  memory
 allocated bits, followed by an unsigned long *, which will point to the length
 (in bits) of the bitstring returned.
@@ -254,24 +242,20 @@ allocated bits, followed by an unsigned long *, which will point to the length
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 5n
-.rt  
 Null.  No parameter is required.  The element is simply skipped if it is
 recognized.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 Sequence of octet strings.  A char *** should be supplied, which upon return
 points to a memory allocated null-terminated array of char *'s containing the
 octet strings.   \fINULL\fR is returned if the sequence is empty.
@@ -279,12 +263,10 @@ octet strings.   \fINULL\fR is returned if the sequence is empty.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBV\fR\fR
 .ad
 .RS 5n
-.rt  
 Sequence of octet strings with lengths. A struct berval *** should be supplied,
 which upon return points to a memory allocated, null-terminated array of struct
 berval *'s containing the octet strings and their lengths. \fINULL\fR is
@@ -294,58 +276,48 @@ the allocated memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 Skip element.  The next element is skipped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR\fR
 .ad
 .RS 5n
-.rt  
 Begin sequence.  No parameter is required.  The initial sequence tag and length
 are skipped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB}\fR\fR
 .ad
 .RS 5n
-.rt  
 End sequence.  No parameter is required and no action is taken.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fR
 .ad
 .RS 5n
-.rt  
 Begin set.  No parameter is required.  The initial set tag and length are
 skipped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB]\fR\fR
 .ad
 .RS 5n
-.rt  
 End set.  No parameter is required and no action is taken.
 .RE
 
@@ -496,13 +468,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

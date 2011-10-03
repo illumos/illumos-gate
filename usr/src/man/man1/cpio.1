@@ -10,19 +10,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cpio 1 "3 Aug 2009" "SunOS 5.11" "User Commands"
+.TH CPIO 1 "Aug 3, 2009"
 .SH NAME
 cpio \- copy file archives in and out
 .SH SYNOPSIS
 .LP
 .nf
-\fBcpio\fR \fB-i\fR [\fB-bBcdfkmPrsStuvV6@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-E\fR \fIfile\fR] 
+\fBcpio\fR \fB-i\fR [\fB-bBcdfkmPrsStuvV6@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-E\fR \fIfile\fR]
      [\fB-H\fR \fIheader\fR] [\fB-I\fR \fI\fR [\fB-M\fR \fImessage\fR]] [\fB-R\fR \fIid\fR] [\fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBcpio\fR \fB-o\fR [\fB-aABcLPvV@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-H\fR \fIheader\fR] 
+\fBcpio\fR \fB-o\fR [\fB-aABcLPvV@/\fR] [\fB-C\fR \fIbufsize\fR] [\fB-H\fR \fIheader\fR]
      [\fB-O\fR \fIfile\fR [\fB-M\fR \fImessage\fR]]
 .fi
 
@@ -107,36 +107,30 @@ proceed while you are changing the floppies. Press RETURN to cause the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 (copy in) Reads an archive from the standard input and conditionally extracts
 the files contained in it and places them into the current directory tree.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 (copy out) Reads a list of file path names from the standard input and copies
 those files to the standard output in the form of a \fBcpio\fR archive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 (pass) Reads a list of file path names from the standard input and
 conditionally copies those files into the destination directory tree.
 .RE
@@ -147,12 +141,10 @@ The following options can be appended in any sequence to the \fB-i\fR,
 \fB-o\fR, or \fB-p\fR options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-.rt  
 Resets access times of input files after they have been copied, making
 \fBcpio\fR's access invisible. Access times are not reset for linked files when
 \fBcpio\fR \fB-pla\fR is specified.
@@ -160,12 +152,10 @@ Resets access times of input files after they have been copied, making
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 14n
-.rt  
 Appends files to an archive. The \fB-A\fR option requires the \fB-O\fR option.
 Valid only with archives that are files, or that are on floppy diskettes or
 hard disk partitions. The effect on files that are linked in the existing
@@ -174,24 +164,20 @@ portion of the archive is unpredictable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 14n
-.rt  
 Reverses the order of the bytes within each word. Use only with the \fB-i\fR
 option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
 .RS 14n
-.rt  
 Blocks input/output 5120 bytes to the record. The default buffer size is 8192
 bytes when this and the \fB-C\fR options are not used. \fB-B\fR does not apply
 to the \fB-p\fR (pass) option.
@@ -199,12 +185,10 @@ to the \fB-p\fR (pass) option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 14n
-.rt  
 Reads or writes header information in \fBASCII\fR character form for
 portability. There are no \fBUID\fR or \fBGID\fR restrictions associated with
 this header format. Use this option between SVR4-based machines, or the
@@ -217,12 +201,10 @@ Solaris 2.6 Operating environment or compatible versions, use \fB-H\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIbufsize\fR\fR
 .ad
 .RS 14n
-.rt  
 Blocks input/output \fIbufsize\fR bytes to the record, where \fIbufsize\fR is
 replaced by a positive integer. The default buffer size is 8192 bytes when this
 and \fB-B\fR options are not used. \fB-C\fR does not apply to the \fB-p\fR
@@ -231,47 +213,39 @@ and \fB-B\fR options are not used. \fB-C\fR does not apply to the \fB-p\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 14n
-.rt  
 Creates directories as needed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR \fIfile\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies an input file (\fIfile\fR) that contains a list of filenames to be
 extracted from the archive (one filename per line).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 14n
-.rt  
 Copies in all files except those in \fIpattern\fRs. See OPERANDS for a
 description of \fIpattern\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR \fIheader\fR\fR
 .ad
 .RS 14n
-.rt  
 Reads or writes header information in \fIheader\fR format. Always use this
 option or the \fB-c\fR option when the origin and the destination machines are
 different types. This option is mutually exclusive with options \fB-c\fR and
@@ -280,23 +254,19 @@ different types. This option is mutually exclusive with options \fB-c\fR and
 Valid values for \fIheader\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbar\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBbar\fR head and format. Used only with the \fB-i\fR option ( read only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrc\fR | \fBCRC\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBASCII\fR header with expanded device numbers and an additional per-file
 checksum. There are no \fBUID\fR or \fBGID\fR restrictions associated with this
 header format.
@@ -304,12 +274,10 @@ header format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBodc\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBASCII\fR header with small device numbers. This is the IEEE/P1003 Data
 Interchange Standard cpio header and format. It has the widest range of
 portability of any of the header formats. It is the official format for
@@ -321,12 +289,10 @@ header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtar\fR | \fBTAR\fR\fR
 .ad
 .RS 17n
-.rt  
 \fBtar\fR header and format. This is an older \fBtar\fR header format that
 allows \fBUID\fRs and \fBGID\fRs up to 2097151 to be stored in the header. It
 is provided for the reading of legacy archives only, that is, in conjunction
@@ -339,12 +305,10 @@ must be read using \fB-H\fR \fBustar\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBustar\fR | \fBUSTAR\fR\fR
 .ad
 .RS 17n
-.rt  
 IEEE/P1003 Data Interchange Standard tar header and format. This header format
 allows \fBUID\fRs and \fBGID\fRs up to 2097151 to be stored in the header.
 .RE
@@ -357,12 +321,10 @@ file (8 Gb \(em 1 byte), the header format can be \fBtar|TAR\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIfile\fR\fR
 .ad
 .RS 14n
-.rt  
 Reads the contents of \fIfile\fR as an input archive, instead of the standard
 input. If \fIfile\fR is a character special device, and the current medium has
 been completely read, replace the medium and press RETURN to continue to the
@@ -371,12 +333,10 @@ next medium. This option is used only with the \fB-i\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 14n
-.rt  
 Attempts to skip corrupted file headers and I/O errors that might be
 encountered. If you want to copy files from a medium that is corrupted or out
 of sequence, this option lets you read only those files with good headers. For
@@ -388,12 +348,10 @@ smaller archive's trailer is encountered. Use only with the \fB-i\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 14n
-.rt  
 In pass mode, makes hard links between the source and destination whenever
 possible. If the \fB-L\fR option is also specified, the hard link is to the
 file referred to by the symbolic link. Otherwise, the hard link is to the
@@ -402,12 +360,10 @@ symbolic link itself. Use only with the \fB-p\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 14n
-.rt  
 Follows symbolic links. If a symbolic link to a directory is encountered,
 archives the directory referred to by the link, using the name of the link.
 Otherwise, archives the file referred to by the link, using the name of the
@@ -416,24 +372,20 @@ link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 14n
-.rt  
 Retains previous file modification time. This option is ineffective on
 directories that are being copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR \fImessage\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines a \fImessage\fR to use when switching media. When you use the \fB-O\fR
 or \fB-I\fR options and specify a character special device, you can use this
 option to define the message that is printed when you reach the end of the
@@ -443,12 +395,10 @@ number of the next medium needed to continue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIfile\fR\fR
 .ad
 .RS 14n
-.rt  
 Directs the output of \fBcpio\fR to \fIfile\fR, instead of the standard output.
 If \fIfile\fR is a character special device and the current medium is full,
 replace the medium and type a carriage return to continue to the next medium.
@@ -457,12 +407,10 @@ Use only with the \fB-o\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 14n
-.rt  
 Preserves \fBACL\fRs. If the option is used for output, existing \fBACL\fRs are
 written along with other attributes, except for extended attributes, to the
 standard output. \fBACL\fRs are created as special files with a special file
@@ -476,12 +424,10 @@ systems, and hence is not portable. Use \fBASCII\fR headers for portability.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 14n
-.rt  
 Interactively renames files. If the user types a carriage return alone, the
 file is skipped. If the user types a ``.'', the original pathname is retained.
 Not available with \fBcpio\fR \fB-p\fR.
@@ -489,12 +435,10 @@ Not available with \fBcpio\fR \fB-p\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIid\fR\fR
 .ad
 .RS 14n
-.rt  
 Reassigns ownership and group information for each file to user ID. (ID must be
 a valid login ID from the \fBpasswd\fR database.) This option is valid only
 when id is the invoking user or the super-user. See \fBNOTES\fR.
@@ -502,34 +446,28 @@ when id is the invoking user or the super-user. See \fBNOTES\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 14n
-.rt  
 Swaps bytes within each half word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 14n
-.rt  
 Swaps halfwords within each word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 14n
-.rt  
 Prints a table of contents of the input. If any file in the table of contents
 has extended attributes, these are also listed. No files are created. \fB-t\fR
 and \fB-V\fR are mutually exclusive.
@@ -537,24 +475,20 @@ and \fB-V\fR are mutually exclusive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 14n
-.rt  
 Copies unconditionally. Normally, an older file is not replaced a newer file
 with the same name, although an older directory updates a newer directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 14n
-.rt  
 Verbose. Prints a list of file and extended attribute names. When used with the
 \fB-t\fR option, the table of contents looks like the output of an \fBls\fR
 \fB-l\fR command (see \fBls\fR(1)).
@@ -562,36 +496,30 @@ Verbose. Prints a list of file and extended attribute names. When used with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 14n
-.rt  
 Special verbose. Prints a dot for each file read or written. Useful to assure
 the user that \fBcpio\fR is working without printing out all file names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
 .RS 14n
-.rt  
 Processes a UNIX System Sixth Edition archive format file. Use only with the
 \fB-i\fR option. This option is mutually exclusive with \fB-c\fR and \fB-H\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-@\fR\fR
 .ad
 .RS 14n
-.rt  
 Includes extended attributes in archive. By default, \fBcpio\fR does not place
 extended attributes in the archive. With this flag, \fBcpio\fR looks for
 extended attributes on the files to be placed in the archive and add them, as
@@ -605,12 +533,10 @@ explicitly extract attribute records are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-/\fR\fR
 .ad
 .RS 14n
-.rt  
 Includes extended system attributes in archive. By default, \fBcpio\fR does not
 place extended system attributes in the archive. With this flag, \fBcpio\fR
 looks for extended system attributes on the files to be placed in the archive
@@ -628,57 +554,47 @@ extract. Attempts to explicitly extract attribute records are ignored.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fR
 .ad
 .RS 13n
-.rt  
 A path name of an existing directory to be used as the target of \fBcpio\fR
 \fB-p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 13n
-.rt  
 Expressions making use of a pattern-matching notation similar to that used by
 the shell (see \fBsh\fR(1)) for filename pattern matching, and similar to
 regular expressions. The following metacharacters are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 9n
-.rt  
 Matches any string, including the empty string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 9n
-.rt  
 Matches any single character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[...]\fR\fR
 .ad
 .RS 9n
-.rt  
 Matches any one of the enclosed characters. A pair of characters separated by
 `\(mi' matches any symbol between the pair (inclusive), as defined by the
 system default collating sequence. If the first character following the opening
@@ -687,12 +603,10 @@ system default collating sequence. If the first character following the opening
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 9n
-.rt  
 The ! (exclamation point) means \fInot\fR. For example, the \fB!abc*\fR pattern
 would exclude all files that begin with \fBabc\fR.
 .RE
@@ -795,12 +709,10 @@ that affect the execution of \fBcpio\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
 \fBLC_MESSAGES\fR, \fBLC_TIME\fR, \fBTZ\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTMPDIR\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBcpio\fR creates its temporary file in \fB/var/tmp\fR by default. Otherwise,
 it uses the directory specified by \fBTMPDIR\fR.
 .RE
@@ -811,23 +723,19 @@ it uses the directory specified by \fBTMPDIR\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -839,15 +747,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
@@ -867,16 +774,14 @@ supported archive header type.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Header typeCommand line optionsMaximum path name length
-BINARY"\fB-o\fR"256
-POSIX"\fB-oH\fR odc"256
-ASCII"\fB-oc\fR"1023
-CRC"\fB-oH\fR crc"1023
-USTAR"\fB-oH\fR ustar"255
+c c c
+l l l .
+Header type	Command line options	Maximum path name length
+BINARY	"\fB-o\fR"	256
+POSIX	"\fB-oH\fR odc"	256
+ASCII	"\fB-oc\fR"	1023
+CRC	"\fB-oH\fR crc"	1023
+USTAR	"\fB-oH\fR ustar"	255
 .TE
 
 .sp

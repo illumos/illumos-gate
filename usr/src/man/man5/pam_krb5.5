@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_krb5 5 "8 Apr 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_KRB5 5 "Apr 8, 2008"
 .SH NAME
 pam_krb5 \- authentication, account, session, and password management PAM
 modules for Kerberos V5
@@ -49,7 +49,6 @@ verification to succeed in the absence of a keytab host principal entry.
 \fBpam_sm_authenticate\fR(3PAM) may be passed the following flag:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
 .ad
@@ -68,7 +67,6 @@ applications. The following flags may be set in the flags field. They are best
 described by their effect on the user's credential cache.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_ESTABLISH_CRED\fR\fR
 .ad
@@ -83,7 +81,6 @@ authentication pass was made, PAM_CRED_UNAVAIL is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DELETE_CRED\fR\fR
 .ad
@@ -97,7 +94,6 @@ The credential cache may be deleted with the \fBkdestroy\fR(1) command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_REINITIALIZE_CRED\fR\fR
 .ad
@@ -110,7 +106,6 @@ user's ticket lifetime and renewable life time values are reset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_REFRESH_CRED\fR\fR
 .ad
@@ -128,23 +123,19 @@ renewable ticket lifetime is expired.
 The following options can be passed to the Kerberos V5 authentication module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 10n
-.rt  
 Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnowarn\fR\fR
 .ad
 .RS 10n
-.rt  
 Turns off warning messages.
 .RE
 
@@ -158,23 +149,19 @@ not expired. The following options may be passed in to the Kerberos V5 account
 management module:
 .sp
 .ne 2
-.mk
 .na
 \fBdebug\fR
 .ad
 .RS 10n
-.rt  
 Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnowarn\fR
 .ad
 .RS 10n
-.rt  
 Turns off warning messages. Also, does not query KDC for impending password
 expiration information used to warn the user.
 .RE
@@ -194,7 +181,6 @@ passwords, \fBpam_sm_chauthtok()\fR, in the Key Distribution Center (\fBKDC\fR)
 database. The following flags may be passed to \fBpam_sm_chauthtok\fR(3PAM):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CHANGE_EXPIRED_AUTHTOK\fR\fR
 .ad
@@ -207,7 +193,6 @@ behaviour is to always change the user's Kerberos password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_PRELIM_CHECK\fR\fR
 .ad
@@ -218,7 +203,6 @@ This is a null function that always returns \fBPAM_IGNORE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_UPDATE_AUTHTOK\fR\fR
 .ad
@@ -233,12 +217,10 @@ not set, \fBpam_krb5\fR returns \fBPAM_SYSTEM_ERR\fR.
 The following option can be passed to the Kerberos V5 password module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 9n
-.rt  
 Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
 .RE
 
@@ -248,67 +230,55 @@ Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
 The following error codes are returned for \fBpam_sm_authenticate()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Authentication failure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_BUF_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 Memory buffer error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 20n
-.rt  
 The user is "\fBroot\fR" and the root key exists in the default keytab.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 20n
-.rt  
 Successfully obtained Kerberos credentials .
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 20n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 20n
-.rt  
 An unknown Kerberos principal was requested.
 .RE
 
@@ -317,56 +287,46 @@ An unknown Kerberos principal was requested.
 The following error codes are returned for \fBpam_sm_setcred()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 18n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_BUF_ERR\fR\fR
 .ad
 .RS 18n
-.rt  
 Memory buffer error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 18n
-.rt  
 The user is "\fBroot\fR" and the root key exists in the default keytab.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 18n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 18n
-.rt  
 Successfully modified the Kerberos credential cache.
 .RE
 
@@ -375,79 +335,65 @@ Successfully modified the Kerberos credential cache.
 The following error codes are returned for \fBpam_sm_acct_mgmt()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 24n
-.rt  
 Kerberos service module \fBpam_sm_authenticate()\fR was never called, or the
 user is "\fBroot\fR" and the root key exists in the default keytab.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
 .ad
 .RS 24n
-.rt  
 Obtain new authentication token from the user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SERVICE_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Error in underlying service module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 24n
-.rt  
 Kerberos principal account is valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 24n
-.rt  
 An unknown Kerberos principal was requested.
 .RE
 
@@ -457,12 +403,10 @@ The following error code is returned for \fBpam_sm_open_session()\fR and
 \fBpam_sm_close_session()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 14n
-.rt  
 These two functions are null functions in \fBpam_krb5\fR:
 .RE
 
@@ -471,23 +415,19 @@ These two functions are null functions in \fBpam_krb5\fR:
 The following error codes are returned for \fBpam_sm_chauthtok()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_IGNORE\fR\fR
 .ad
 .RS 24n
-.rt  
 The user has not been authenticated by Kerberos service module
 \fBpam_sm_authenticate()\fR, or the user is "\fBroot\fR" and the root key
 exists in the default keytab.
@@ -495,56 +435,46 @@ exists in the default keytab.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
 .ad
 .RS 24n
-.rt  
 User's Kerberos password has expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SERVICE_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 Error in module. At least one input parameter is missing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 24n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
 .RS 24n
-.rt  
 An unknown Kerberos principal was requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 24n
-.rt  
 Successfully changed the user's Kerberos password.
 .RE
 
@@ -742,13 +672,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

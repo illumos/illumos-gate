@@ -2,7 +2,7 @@
 .\" Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" To view license terms, see http://www.opensource.org/licenses/cpl1.0.txt
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc.
-.TH ksh93 1 "11 Aug sam2009" "SunOS 5.11" "User Commands"
+.TH KSH93 1 "Aug 11, 2009"
 .SH NAME
 ksh93, rksh93 \- Korn Shell, a standard and restricted command and programming
 language
@@ -131,7 +131,6 @@ list. Unless otherwise stated, the value returned by a command is that of the
 last simple-command executed in the command.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfor\fR \fIvname\fR \fB[ in\fR \fIword\fR \fB\&... ] ;do\fR \fIlist\fR
 \fB;done\fR\fR
@@ -147,7 +146,6 @@ there are no more words in the list. See \fBParameter Expansion\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(( [\fR\fIexpr1\fR\fB] ; [\fR\fIexpr2\fR] ; [\fIexpr3\fR\fB] )) ;do\fR
 \fIlist\fR \fB;done\fR\fR
@@ -163,7 +161,6 @@ evaluated to \fB1\fR. See \fBArithmetic Evaluation\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBselect\fR \fIvname\fR [ in \fIword\fR \fB\&... ] ;do\fR \fIlist\fR
 \fB;done\fR\fR
@@ -187,7 +184,6 @@ displaying the \fBPS3\fR prompt for the next selection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcase\fR \fIword\fR \fBin [ [(]\fR \fIpattern\fR \fB[ |\fR \fIpattern\fR
 \fB] ... )\fR \fIlist\fR \fB;; ] ... esac\fR\fR
@@ -204,7 +200,6 @@ is used in place of \fB;;\fR the next subsequent list, if any, is executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif\fR \fIlist\fR \fB;then\fR \fIlist\fR \fB[ ;elif\fR \fIlist\fR
 \fB;then\fR \fIlist\fR ] \fB\&... [ ;else\fR \fIlist\fR \fB]\fR \fB;fi\fR\fR
@@ -223,7 +218,6 @@ exit status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwhile\fR \fIlist\fR \fB;do\fR \fIlist\fR \fB;done\fR\fR
 .ad
@@ -243,7 +237,6 @@ termination test.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB((\fR\fIexpression\fR\fB))\fR\fR
 .ad
@@ -257,7 +250,6 @@ described in this manual page. If the value of the arithmetic expression is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(\fR\fIlist\fR\fB;)\fR\fR
 .ad
@@ -274,7 +266,6 @@ a line or after a \fB;\fR to be recognized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[[\fR \fIexpression\fR \fB]]\fR\fR
 .ad
@@ -287,7 +278,6 @@ of \fIexpression\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfunction\fR \fIvarname\fR \fB{\fR \fIlist\fR \fB;}\fR\fR
 .ad
@@ -311,7 +301,6 @@ it. See \fBFunctions\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtime [\fR \fIpipeline\fR \fB]\fR\fR
 .ad
@@ -409,7 +398,6 @@ to the \fBtypeset\fR, \fBexport\fR, or \fBreadonly\fR special built-in
 commands. The syntax for an \fIassignment\fR is of the form:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvarname\fR\fB=\fR\fIword\fR\fR
 .ad
@@ -425,7 +413,6 @@ and \fIword\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvarname\fR\fB=(\fR\fIassignlist\fR\fB)\fR\fR
 .ad
@@ -435,7 +422,6 @@ No space is permitted between \fIvarname\fR and the \fB=\fR. An
 \fIassignlist\fR can be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIword ...\fR\fR
 .ad
@@ -446,7 +432,6 @@ Indexed array assignment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIword\fR\fB]=\fR\fIword ...\fR\fR
 .ad
@@ -458,7 +443,6 @@ indexed array instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIassignment ...\fR\fR
 .ad
@@ -475,7 +459,6 @@ elements to be defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtypeset [\fR\fIoptions\fR] \fIassignment\fR \fB\&...\fR\fR
 .ad
@@ -710,7 +693,6 @@ argument zero when the shell is invoked. The character \fB$\fR is used to
 introduce substitutable parameters.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB}\fR\fR
 .ad
@@ -732,7 +714,6 @@ is substituted, separated by the first character of the value of \fBIFS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${#\fR\fIparameter\fR\fB}\fR\fR
 .ad
@@ -745,7 +726,6 @@ substituted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${#\fR\fIvname\fR\fB[*]}\fR\fR
 .ad
@@ -760,7 +740,6 @@ The number of elements in the array \fIvname\fR is substituted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${!\fR\fIvname\fR\fB}\fR\fR
 .ad
@@ -772,7 +751,6 @@ Expands to the name of the variable referred to by \fIvname\fR. This is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${!\fR\fIvname\fR\fB[\fR\fIsubscript\fR\fB]}\fR\fR
 .ad
@@ -788,7 +766,6 @@ used in double quotes, each array subscript yields a separate argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${!\fR\fIprefix\fR\fB*}\fR\fR
 .ad
@@ -799,7 +776,6 @@ Expands to the names of the variables whose names begin with \fIprefix\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:-\fR\fIword\fR\fB}\fR\fR
 .ad
@@ -826,7 +802,6 @@ whether \fIparameter\fR is set or not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:=\fR\fIword\fR\fB}\fR\fR
 .ad
@@ -854,7 +829,6 @@ whether \fIparameter\fR is set or not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:?\fR\fIword\fR\fB}\fR\fR
 .ad
@@ -882,7 +856,6 @@ whether \fIparameter\fR is set or not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:+\fR\fIword\fR\fB}\fR\fR
 .ad
@@ -909,7 +882,6 @@ whether \fIparameter\fR is set or not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:\fR\fIoffset\fR:\fIlength\fR}\fR
 .ad
@@ -937,7 +909,6 @@ subscript for indexed arrays. The order for associative arrays is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB#\fR\fIpattern\fR\fB}\fR\fR
 .ad
@@ -959,7 +930,6 @@ to each element in turn.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB%\fR\fIpattern\fR\fB}\fR\fR
 .ad
@@ -980,7 +950,6 @@ applied to each element in turn.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB/\fR\fIpattern\fR\fB/\fR\fIstring\fR\fB}\fR\fR
 .ad
@@ -1025,56 +994,46 @@ The fourth form restricts the pattern match to the end of the \fIstring\fR.
 The following parameters are automatically set by the shell:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 19n
-.rt  
 The number of positional parameters in decimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 19n
-.rt  
 Options supplied to the shell on invocation or by the \fBset\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 19n
-.rt  
 The decimal value returned by the last executed command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 19n
-.rt  
 The process number of this shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_\fR\fR
 .ad
 .RS 19n
-.rt  
 Initially, the value of \fB_\fR is the absolute pathname of the shell or script
 being executed as passed in the environment. It is subsequently assigned the
 last argument of the previous command.
@@ -1086,36 +1045,30 @@ mail.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 19n
-.rt  
 The process number of the last background command invoked or the most recent
 job put in the background with the \fBbg\fR built-in command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.command\fR\fR
 .ad
 .RS 19n
-.rt  
 When processing a \fBDEBUG\fR trap, this variable contains the current command
 line that is about to run.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.edchar\fR\fR
 .ad
 .RS 19n
-.rt  
 This variable contains the value of the keyboard character (or sequence of
 characters if the first character is an ESC, \fBASCII 033\fR) that has been
 entered when processing a \fBKEYBD\fR trap. If the value is changed as part of
@@ -1125,24 +1078,20 @@ caused the trap. See the \fBKey Bindings\fR section of this manual page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.edcol\fR\fR
 .ad
 .RS 19n
-.rt  
 The character position of the cursor at the time of the most recent \fBKEYBD\fR
 trap.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.edmode\fR\fR
 .ad
 .RS 19n
-.rt  
 The value is set to ESC when processing a \fBKEYBD\fR trap while in \fBvi\fR
 insert mode. Otherwise, \fB\&.sh.edmode\fR is null when processing a
 \fBKEYBD\fR trap. See the \fBvi Editing Mode\fR section of this manual page.
@@ -1150,46 +1099,38 @@ insert mode. Otherwise, \fB\&.sh.edmode\fR is null when processing a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.edtext\fR\fR
 .ad
 .RS 19n
-.rt  
 The characters in the input buffer at the time of the most recent \fBKEYBD\fR
 trap. The value is null when not processing a \fBKEYBD\fR trap.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.file\fR\fR
 .ad
 .RS 19n
-.rt  
 The pathname of the file than contains the current command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.fun\fR\fR
 .ad
 .RS 19n
-.rt  
 The name of the current function that is being executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.match\fR\fR
 .ad
 .RS 19n
-.rt  
 An indexed array which stores the most recent match and sub-pattern matches
 after conditional pattern matches that match and after variables expansions
 using the operators \fB#\fR, \fB%\fR, or \fB/\fR. The \fB0\fRth element stores
@@ -1200,138 +1141,114 @@ assigned a new value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.name\fR\fR
 .ad
 .RS 19n
-.rt  
 Set to the name of the variable at the time that a discipline function is
 invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.subscript\fR\fR
 .ad
 .RS 19n
-.rt  
 Set to the name subscript of the variable at the time that a discipline
 function is invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.subshell\fR\fR
 .ad
 .RS 19n
-.rt  
 The current depth for sub-shells and command substitution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.value\fR\fR
 .ad
 .RS 19n
-.rt  
 Set to the value of the variable at the time that the set or append discipline
 function is invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.sh.version\fR\fR
 .ad
 .RS 19n
-.rt  
 Set to a value that identifies the version of this shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINENO\fR\fR
 .ad
 .RS 19n
-.rt  
 The current line number within the script or function being executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOLDPWD\fR\fR
 .ad
 .RS 19n
-.rt  
 The previous working directory set by the \fBcd\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPTARG\fR\fR
 .ad
 .RS 19n
-.rt  
 The value of the last option argument processed by the \fBgetopts\fR built-in
 command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOPTIND\fR\fR
 .ad
 .RS 19n
-.rt  
 The index of the last option argument processed by the \fBgetopts\fR built-in
 command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPID\fR\fR
 .ad
 .RS 19n
-.rt  
 The process number of the parent of the shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPWD\fR\fR
 .ad
 .RS 19n
-.rt  
 The present working directory set by the \fBcd\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRANDOM\fR\fR
 .ad
 .RS 19n
-.rt  
 Each time this variable is referenced, a random integer, uniformly distributed
 between \fB0\fR and \fB32767\fR, is generated. The sequence of random numbers
 can be initialized by assigning a numeric value to \fBRANDOM\fR.
@@ -1339,24 +1256,20 @@ can be initialized by assigning a numeric value to \fBRANDOM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREPLY\fR\fR
 .ad
 .RS 19n
-.rt  
 This variable is set by the \fBselect\fR statement and by the \fBread\fR
 built-in command when no arguments are supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSECONDS\fR\fR
 .ad
 .RS 19n
-.rt  
 Each time this variable is referenced, the number of seconds since shell
 invocation is returned. If this variable is assigned a value, then the value
 returned upon reference is the value that was assigned plus the number of
@@ -1368,35 +1281,29 @@ seconds since the assignment.
 The following variables are used by the shell:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDPATH\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the search path for the \fBcd\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLUMNS\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the width of the edit window for the shell edit modes and for printing
 select lists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDITOR\fR\fR
 .ad
 .RS 14n
-.rt  
 If the \fBVISUAL\fR variable is not set, the value of this variable is checked
 for the patterns as described with \fBVISUAL\fR and the corresponding editing
 option is turned on.
@@ -1407,12 +1314,10 @@ page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENV\fR\fR
 .ad
 .RS 14n
-.rt  
 Performs parameter expansion, command substitution, and arithmetic substitution
 on the value to generate the pathname of the script that is executed when the
 shell is invoked. This file is typically used for alias and function
@@ -1425,12 +1330,10 @@ See the \fBInvocation\fR section of this manual page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCEDIT\fR\fR
 .ad
 .RS 14n
-.rt  
 Obsolete name for the default editor name for the \fBhist\fR command.
 \fBFCEDIT\fR is not used when \fBHISTEDIT\fR is set.
 .sp
@@ -1439,24 +1342,20 @@ The shell specifies a default value to \fBFCEDIT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFIGNORE\fR\fR
 .ad
 .RS 14n
-.rt  
 A pattern that defines the set of file names that is ignored when performing
 file name matching.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFPATH\fR\fR
 .ad
 .RS 14n
-.rt  
 The search path for function definitions. The directories in this path are
 searched for a file with the same name as the function or command when a
 function with the \fB-u\fR attribute is referenced and when a command is not
@@ -1468,34 +1367,28 @@ adjacent colon (\fB:\fR) characters or a beginning or ending colon (\fB:\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTCMD\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of the current command in the history file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTEDIT\fR\fR
 .ad
 .RS 14n
-.rt  
 The name for the default editor name for the \fBhist\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTFILE\fR\fR
 .ad
 .RS 14n
-.rt  
 If this variable is set when the shell is invoked, the value is the pathname of
 the file that is used to store the command history. See the \fBCommand
 Re-entry\fR section of this manual page.
@@ -1503,12 +1396,10 @@ Re-entry\fR section of this manual page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTSIZE\fR\fR
 .ad
 .RS 14n
-.rt  
 If this variable is set when the shell is invoked, then the number of
 previously entered commands that are accessible by this shell is greater than
 or equal to this number. The default is \fB512\fR.
@@ -1516,12 +1407,10 @@ or equal to this number. The default is \fB512\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
 .RS 14n
-.rt  
 The default argument (home directory) for the \fBcd\fR command.
 .sp
 \fBHOME\fR is not set by the shell. \fBHOME\fR is set by \fBlogin\fR(1).
@@ -1529,12 +1418,10 @@ The default argument (home directory) for the \fBcd\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIFS\fR\fR
 .ad
 .RS 14n
-.rt  
 Internal field separators, normally SPACE, TAB, and NEWLINE that are used to
 separate the results of command substitution or parameter expansion and to
 separate fields with the built-in command read. The first character of the
@@ -1555,48 +1442,40 @@ The shell specifies a default value to \fBIFS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLANG\fR\fR
 .ad
 .RS 14n
-.rt  
 This variable determines the locale category for any category not specifically
 selected with a variable starting with \fBLC_\fR or \fBLANG\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_ALL\fR\fR
 .ad
 .RS 14n
-.rt  
 This variable overrides the value of the \fBLANG\fR variable and any other
 \fBLC_\fR variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_COLLATE\fR\fR
 .ad
 .RS 14n
-.rt  
 This variable determines the locale category for character collation
 information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 14n
-.rt  
 This variable determines the locale category for character handling functions.
 It determines the character classes for pattern matching. See the \fBFile Name
 Generation\fR section of this manual page.
@@ -1604,23 +1483,19 @@ Generation\fR section of this manual page.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
 .RS 14n
-.rt  
 This variable determines the locale category for the decimal point character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLINES\fR\fR
 .ad
 .RS 14n
-.rt  
 If this variable is set, the value is used to determine the column length for
 printing select lists. Select lists prints vertically until about two-thirds of
 \fBLINES\fR lines are filled.
@@ -1628,12 +1503,10 @@ printing select lists. Select lists prints vertically until about two-thirds of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAIL\fR\fR
 .ad
 .RS 14n
-.rt  
 If this variable is set to the name of a mail file \fBand\fR the \fBMAILPATH\fR
 variable is not set, then the shell informs the user of arrival of mail in the
 specified file.
@@ -1644,12 +1517,10 @@ specified file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILCHECK\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies how often in seconds the shell checks for changes in the modification
 time of any of the files specified by the \fBMAILPATH\fR or \fBMAIL\fR
 variables. The default value is \fB600\fR seconds. When the time has elapsed
@@ -1660,12 +1531,10 @@ The shell specifies a default value to \fBMAILCHECK\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILPATH\fR\fR
 .ad
 .RS 14n
-.rt  
 A colon ( \fB:\fR ) separated list of file names. If this variable is set, then
 the shell informs the user of any modifications to the specified files that
 have occurred within the last \fBMAILCHECK\fR seconds. Each file name can be
@@ -1677,12 +1546,10 @@ message is \fByou have mail in $_\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
 .RS 14n
-.rt  
 The search path for commands. Except in \fB\&.profile\fR, users cannot change
 \fBPATH\fR if executing under \fBrksh93\fR. See the \fBExecution\fR section of
 this manual page.
@@ -1692,12 +1559,10 @@ The shell specifies a default value to \fBPATH\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS1\fR\fR
 .ad
 .RS 14n
-.rt  
 The value of this variable is expanded for parameter expansion, command
 substitution, and arithmetic substitution to define the primary prompt string
 which by default is \fB$\fR. The character \fB!\fR in the primary prompt string
@@ -1710,12 +1575,10 @@ The shell specifies a default value to \fBPS1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS2\fR\fR
 .ad
 .RS 14n
-.rt  
 Secondary prompt string, by default, \fB>\fR.
 .sp
 The shell specifies a default value to \fBPS2\fR.
@@ -1723,12 +1586,10 @@ The shell specifies a default value to \fBPS2\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS3\fR\fR
 .ad
 .RS 14n
-.rt  
 Selection prompt string used within a select loop, by default \fB#?\fR.
 .sp
 The shell specifies a default value to \fBPS3\fR.
@@ -1736,12 +1597,10 @@ The shell specifies a default value to \fBPS3\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS4\fR\fR
 .ad
 .RS 14n
-.rt  
 The value of this variable is expanded for parameter evaluation, command
 substitution, and arithmetic substitution and precedes each line of an
 execution trace. By default, \fBPS4\fR is \fB+\fR. When \fBPS4\fR is unset, the
@@ -1752,12 +1611,10 @@ The shell specifies a default value to \fBPS4\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
 .RS 14n
-.rt  
 The pathname of the shell is kept in the environment. At invocation, if the
 basename of this variable is \fBrsh\fR, \fBrksh\fR, \fBrksh93\fR, or
 \fBkrsh\fR, the shell becomes restricted.
@@ -1768,12 +1625,10 @@ basename of this variable is \fBrsh\fR, \fBrksh\fR, \fBrksh93\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIMEFORMAT\fR\fR
 .ad
 .RS 14n
-.rt  
 The value of this parameter is used as a format string specifying how the
 timing information for pipelines prefixed with the \fBtime\fR reserved word
 should be displayed. The \fB%\fR character introduces a format sequence that is
@@ -1782,7 +1637,6 @@ expanded to a time value or other information.
 The format sequences and their meanings are as follows.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
@@ -1793,7 +1647,6 @@ A literal \fB%\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%[\fIp\fR][l]R\fR\fR
 .ad
@@ -1804,7 +1657,6 @@ The elapsed time in seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%[\fIp\fR][l]U\fR\fR
 .ad
@@ -1815,7 +1667,6 @@ The number of CPU seconds spent in user mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%[\fIp\fR][l]S\fR\fR
 .ad
@@ -1826,7 +1677,6 @@ The number of CPU seconds spent in system mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P\fR\fR
 .ad
@@ -1853,12 +1703,10 @@ used. If the value is null, no timing information is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTMOUT\fR\fR
 .ad
 .RS 14n
-.rt  
 If set to a value greater than zero, \fBTMOUT\fR is the default time-out value
 for the \fBread\fR built-in command. The \fBselect\fR compound command
 terminates after \fBTMOUT\fR seconds when input is from a terminal. Otherwise,
@@ -1871,12 +1719,10 @@ The shell specifies a default value to \fBTMOUT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVISUAL\fR\fR
 .ad
 .RS 14n
-.rt  
 If the value of this variable matches the pattern \fB*[Vv][Ii]*\fR, then the
 \fBvi\fR option is turned on. See \fBSpecial Commands\fR. If the value matches
 the pattern \fB*gmacs*\fR , the \fBgmacs\fR option is turned on. If the value
@@ -1953,12 +1799,10 @@ character \fB\&.\fR itself. For other uses of pattern matching the \fB/\fR and
 \fB\&.\fR are not specially treated.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 11n
-.rt  
 Match any string, including the null string. When used for file name expansion,
 if the \fBglobstar\fR option is on, two adjacent \fB*\fRs by themselves match
 all files and zero or more directories and subdirectories. If the two adjacent
@@ -1967,23 +1811,19 @@ all files and zero or more directories and subdirectories. If the two adjacent
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 11n
-.rt  
 Matches any single character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fB\&...\fR]\fR
 .ad
 .RS 11n
-.rt  
 Match any one of the enclosed characters. A pair of characters separated by
 \fB-\fR matches any character lexically between the pair, inclusive. If the
 first character following the opening \fB[\fR is a \fB!\fR, any character not
@@ -2018,56 +1858,46 @@ be matched whereas \fB|\fR requires that only one pattern be matched. Composite
 patterns can be formed with one or more of the following sub-patterns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Optionally matches any one of the specified patterns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Matches zero or more occurrences of the specified patterns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Matches one or more occurrences of the specified patterns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR\fIn\fR\fB(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Matches \fIn\fR occurrences of the specified patterns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR\fIm\fR\fB,\fR\fIn\fR\fB(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Matches from \fIm\fR to \fIn\fR occurrences of the specified patterns. If
 \fIm\fR is omitted, \fB0\fR is used. If \fIn\fR is omitted at least \fIm\fR
 occurrences are matched.
@@ -2075,23 +1905,19 @@ occurrences are matched.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB@(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Matches exactly one of the specified patterns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!(\fR\fIpattern-list\fR\fB)\fR\fR
 .ad
 .RS 22n
-.rt  
 Matches anything except one of the specified patterns.
 .RE
 
@@ -2111,67 +1937,55 @@ character \fB\e\fR is treated specially even when inside a character class. All
 character. In addition the following escape sequences are recognized:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ed\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any character in the digit class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eD\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any character not in the digit class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\es\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any character in the space class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eS\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any character not in the space class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ew\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any character in the word class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eW\fR\fR
 .ad
 .RS 7n
-.rt  
 Matches any character not in the word class.
 .RE
 
@@ -2187,47 +2001,39 @@ ending character matches. The behavior is unspecified when the first character
 of a \fIpattern-pair\fR is alphanumeric except for the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 Causes the ending character to terminate the search for this pattern without
 finding a match.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE\fR\fR
 .ad
 .RS 5n
-.rt  
 Causes the ending character to be interpreted as an escape character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 5n
-.rt  
 Causes the ending character to be interpreted as a quote character causing all
 characters to be ignored when looking for a match.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ\fR\fR
 .ad
 .RS 5n
-.rt  
 Causes the ending character to be interpreted as a quote character causing all
 characters other than any escape character to be ignored when looking for a
 match.
@@ -2255,57 +2061,47 @@ sub-patterns. If \fIoptions\fR is present, it can consist of one or more of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 5n
-.rt  
 Enable the following options. This is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 5n
-.rt  
 Disable the following options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE\fR\fR
 .ad
 .RS 5n
-.rt  
 The remainder of the pattern uses extended regular expression syntax like the
 \fBegrep\fR(1) command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR\fR
 .ad
 .RS 5n
-.rt  
 The remainder of the pattern uses \fBfgrep\fR(1) expression syntax.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 File the longest match (greedy).
 .sp
 This is the default.
@@ -2313,35 +2109,29 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBG\fR\fR
 .ad
 .RS 5n
-.rt  
 The remainder of the pattern uses basic regular expression syntax like the
 \fBgrep\fR(1) command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Treat the match as case insensitive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBK\fR\fR
 .ad
 .RS 5n
-.rt  
 The remainder of the pattern uses shell pattern syntax.
 .sp
 This is the default.
@@ -2349,12 +2139,10 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 Left anchor the pattern.
 .sp
 This is the default for \fBK\fR style patterns.
@@ -2362,12 +2150,10 @@ This is the default for \fBK\fR style patterns.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN\fR\fR
 .ad
 .RS 5n
-.rt  
 This is ignored. However, when it is the first letter and is used with file
 name generation, and no matches occur, the file pattern expands to the empty
 string.
@@ -2375,12 +2161,10 @@ string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 Right anchor the pattern.
 .sp
 This is the default for \fBK\fR style patterns.
@@ -2399,23 +2183,19 @@ Each of the metacharacters listed in the \fBDefinitions\fR has a special
 meaning to the shell.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 File the longest match (greedy). This is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 Treat the match as case insensitive.
 .RE
 
@@ -2437,56 +2217,46 @@ the single quotes. A single quoted string preceded by an unquoted \fB$\fR is
 processed as an \fBANSI-C\fR string except for the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e0\fR\fR
 .ad
 .RS 19n
-.rt  
 Causes the remainder of the string to be ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ec\fR\fIx\fR\fR
 .ad
 .RS 19n
-.rt  
 Expands to the character CTRL-x.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eC\fR[\fB\&.\fR\fIname\fR\fB\&.\fR]\fR
 .ad
 .RS 19n
-.rt  
 Expands to the collating element \fIname\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ee\fR\fR
 .ad
 .RS 19n
-.rt  
 Equivalent to the escape character (\fBASCII\fR 033),
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eE\fR\fR
 .ad
 .RS 19n
-.rt  
 Equivalent to the escape character (\fBASCII\fR 033),
 .RE
 
@@ -2547,10 +2317,10 @@ be used within an arithmetic expression:
 .sp
 .in +2
 .nf
-abs acos acosh asin asinh atan atan2 atanh cbrt 
+abs acos acosh asin asinh atan atan2 atanh cbrt
 copysign cos cosh erf erfc exp exp2 expm1 fabs
-fdim finite floor fma fmax fmod hypot ilogb 
-int isinf isnan lgamma log log2 logb 
+fdim finite floor fma fmax fmod hypot ilogb
+int isinf isnan lgamma log log2 logb
 nearbyint nextafter nexttoward pow remainder
 rint round sin sinh sqrt tan tanh tgamma trunc
 .fi
@@ -2603,12 +2373,10 @@ Each expression can be constructed from one or more of the following unary or
 binary expressions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists.
 .sp
 This option is the same as \fB-e\fR. This option is obsolete.
@@ -2616,258 +2384,212 @@ This option is the same as \fB-e\fR. This option is obsolete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a block special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a character special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is an ordinary file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and it has its \fBsetgid\fR bit set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and its group matches the effective group id of this
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and it has its sticky bit set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIstring\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if length of \fIstring\fR is \fBnon-zero\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and the modification time is greater than the last
 access time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if option named \fIoption\fR is on.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fI?option\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if option named \fIoption\fR is a valid option name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is owned by the effective user id of this
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a \fBFIFO\fR special file or a pipe.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is readable by current process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and has size greater than zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIfildes\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if file descriptor number \fIfildes\fR is open and associated with a
 terminal device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and it has its \fBsetuid\fR bit set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is writable by current process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIfile\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile\fR exists and is executable by current process. If \fIfile\fR
 exists and is a directory, then true if the current process has permission to
 search in the directory.
@@ -2875,69 +2597,57 @@ search in the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIstring\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if length of \fIstring\fR is zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fB-ef\fR \fIfile2\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile1\fR and \fIfile2\fR exist and refer to the same file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fB-nt\fR \fIfile2\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile1\fR exists and \fIfile2\fR does not, or \fIfile1\fR is newer
 than \fIfile2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile1\fR \fB-ot\fR \fIfile2\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIfile2\fR exists and \fIfile1\fR does not, or \fIfile1\fR is older
 than \fIfile2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIstring\fR is not null.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR \fB==\fR \fIpattern\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIstring\fR matches \fIpattern\fR. Any part of \fIpattern\fR can be
 quoted to cause it to be matched as a string. With a successful match to
 \fIpattern\fR, the \fB\&.sh.match\fR array variable contains the match and
@@ -2946,23 +2656,19 @@ sub-pattern matches.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR \fB=\fR \fIpattern\fR\fR
 .ad
 .RS 21n
-.rt  
 Same as \fB==\fR, but is obsolete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR \fB!=\fR \fIpattern\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIstring\fR does not match \fIpattern\fR. When the \fIstring\fR
 matches the \fIpattern\fR the \fB\&.sh.match\fR array variable contains the
 match and sub-pattern matches.
@@ -2970,36 +2676,30 @@ match and sub-pattern matches.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR \fB=~\fR \fIere\fR\fR
 .ad
 .RS 21n
-.rt  
 True if \fIstring\fR matches the pattern \fB~(E)\fR\fIere\fR where \fIere\fR is
 an extended regular expression.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring1\fR \fB<\fR \fIstring2\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIstring1\fR comes before \fIstring2\fR based on \fBASCII\fR value of
 their characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring1\fR \fB>\fR \fIstring2\fR\fR
 .ad
 .RS 21n
-.rt  
 True, if \fIstring1\fR comes after \fIstring2\fR based on \fBASCII\fR value of
 their characters.
 .RE
@@ -3012,67 +2712,55 @@ open file whose descriptor number is \fIn\fR. The following obsolete arithmetic
 comparisons are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexp1\fR \fB-eq\fR \fIexp2\fR\fR
 .ad
 .RS 17n
-.rt  
 True, if \fIexp1\fR is equal to \fIexp2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexp1\fR \fB-ge\fR \fIexp2\fR\fR
 .ad
 .RS 17n
-.rt  
 True, if \fIexp1\fR is greater than or equal to \fIexp2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexp1\fR \fB-gt\fR \fIexp2\fR\fR
 .ad
 .RS 17n
-.rt  
 True, if \fIexp1\fR is greater than \fIexp2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexp1\fR \fB-le\fR \fIexp2\fR\fR
 .ad
 .RS 17n
-.rt  
 True, if \fIexp1\fR is less than or equal to \fIexp2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexp1\fR \fB-lt\fR \fIexp2\fR\fR
 .ad
 .RS 17n
-.rt  
 True, if \fIexp1\fR is less than \fIexp2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexp1\fR \fB-ne\fR \fIexp2\fR\fR
 .ad
 .RS 17n
-.rt  
 True, if \fIexp1\fR is not equal to \fIexp2\fR.
 .RE
 
@@ -3082,45 +2770,37 @@ A compound expression can be constructed from these primitives by using any of
 the following, listed in decreasing order of precedence:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(\fR\fIexpression\fR\fB)\fR\fR
 .ad
 .RS 30n
-.rt  
 True, if \fIexpression\fR is true. Used to group expressions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR \fIexpression\fR\fR
 .ad
 .RS 30n
-.rt  
 True, if \fIexpression\fR is false.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression1\fR \fB&&\fR \fIexpression2\fR\fR
 .ad
 .RS 30n
-.rt  
 True, if \fIexpression1\fR and \fIexpression2\fR are both true.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression1\fR \fB||\fR \fIexpression2\fR\fR
 .ad
 .RS 30n
-.rt  
 True, if either \fIexpression1\fR or \fIexpression2\fR is true.
 .RE
 
@@ -3150,23 +2830,19 @@ No intervening space is allowed between the characters of redirection
 operators.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 Use file \fIword\fR as standard input (file descriptor 0).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 Use file \fIword\fR as standard output (file descriptor 1). If the file does
 not exist then it is created. If the file exists, and the \fBnoclobber\fR
 option is on, this causes an error. Otherwise, it is truncated to zero length.
@@ -3174,23 +2850,19 @@ option is on, this causes an error. Otherwise, it is truncated to zero length.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>|\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 Same as \fB>\fR, except that it overrides the \fBnoclobber\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>>\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 Use file \fIword\fR as standard output. If the file exists, then output is
 appended to it (by first seeking to the end-of-file). Otherwise, the file is
 created.
@@ -3198,23 +2870,19 @@ created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<>\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 Open file \fIword\fR for reading and writing as standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<<\fR\fB[-]\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 The shell input is read up to a line that is the same as \fIword\fR after any
 quoting has been removed, or to an end-of-file. No parameter substitution,
 command substitution, arithmetic substitution or file name generation is
@@ -3233,12 +2901,10 @@ columns for the purposes of determining the indentation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<<<\fR\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 A short form of here document in which \fIword\fR becomes the contents of the
 here-document after any parameter expansion, command substitution, and
 arithmetic substitution occur.
@@ -3246,70 +2912,58 @@ arithmetic substitution occur.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<&\fR\fIdigit\fR\fR
 .ad
 .RS 14n
-.rt  
 The standard input is duplicated from file descriptor \fIdigit\fR, and
 similarly for the standard output using \fB>&\fR\fIdigit\fR. See \fBdup\fR(2).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<&\fR\fIdigit\fR\fB-\fR\fR
 .ad
 .RS 14n
-.rt  
 The file descriptor specified by \fIdigit\fR is moved to standard input.
 Similarly for the standard output using \fB>&\fR\fIdigit\fR\fB-\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<&-\fR\fR
 .ad
 .RS 14n
-.rt  
 The standard input is closed. Similarly for the standard output using
 \fB>&-\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<&p\fR\fR
 .ad
 .RS 14n
-.rt  
 The input from the co-process is moved to standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>&p\fR\fR
 .ad
 .RS 14n
-.rt  
 The output to the co-process is moved to standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<#((\fR\fIexpr\fR\fB))\fR\fR
 .ad
 .RS 14n
-.rt  
 Evaluate arithmetic expression \fIexpr\fR and position file descriptor 0 to the
 resulting value bytes from the start of the file. The variables \fBCUR\fR and
 \fBEOF\fR evaluate to the current offset and end-of-file offset respectively
@@ -3318,34 +2972,28 @@ when evaluating \fIexpr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>#((\fR\fIexpr\fR\fB))\fR\fR
 .ad
 .RS 14n
-.rt  
 The same as \fB<#\fR except applies to file descriptor 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<#\fR\fIpattern\fR\fR
 .ad
 .RS 14n
-.rt  
 Seek forward to the beginning of the next line containing pattern.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<##\fR\fIpattern\fR\fR
 .ad
 .RS 14n
-.rt  
 The same as \fB<#\fR, except that the portion of the file that is skipped is
 copied to standard output.
 .RE
@@ -3591,67 +3239,55 @@ There are several ways to refer to jobs in the shell. A job can be referred to
 by the process id of any process of the job or by one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The job with the specified number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Any job whose command line begins with \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Any job whose command line contains \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 12n
-.rt  
 Current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%+\fR\fR
 .ad
 .RS 12n
-.rt  
 Equivalent to \fB%%\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%-\fR\fR
 .ad
 .RS 12n
-.rt  
 Previous job.
 .RE
 
@@ -3871,168 +3507,138 @@ beginning. The RETURN or the LINE FEED key is not entered after edit commands
 except when noted.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^F\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward (right) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[C\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward (right) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-f\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward one word. The \fBemacs\fR editor's idea of a word is a
 string of characters consisting of only letters, digits and underscores.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^B\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backward (left) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[D\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backward (left) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-b\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backward one word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^A\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the beginning of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[H\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the beginning of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^E\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[Y\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the end of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^]\fR\fIchar\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward to the character \fIchar\fR on the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^]\fR\fIchar\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backwards to the character \fIchar\fR on the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^X^X\fR\fR
 .ad
 .RS 13n
-.rt  
 Interchange the cursor and the mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerase\fR\fR
 .ad
 .RS 13n
-.rt  
 Delete the previous character. The user-defined erase character is defined by
 the \fBstty\fR(1) command, and is usually \fB^H\fR or \fB#\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlnext\fR\fR
 .ad
 .RS 13n
-.rt  
 Removes the next character's editing features. The user-defined literal next
 character is defined by the \fBstty\fR(1) command, or is \fB^V\fR if not
 defined.
@@ -4040,68 +3646,56 @@ defined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^D\fR\fR
 .ad
 .RS 13n
-.rt  
 Delete the current character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-d\fR\fR
 .ad
 .RS 13n
-.rt  
 Delete the current word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^H\fR\fR
 .ad
 .RS 13n
-.rt  
 MetaBACKSPACE. Delete the previous word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-h\fR\fR
 .ad
 .RS 13n
-.rt  
 Delete the previous word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^?\fR\fR
 .ad
 .RS 13n
-.rt  
 MetaDEL. Delete the previous word. If your interrupt character is \fB^?\fR
 (DEL, the default), this command does not work.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^T\fR\fR
 .ad
 .RS 13n
-.rt  
 Transpose the current character with the previous character, and advance the
 cursor in \fBemacs\fR mode. Transpose two previous characters in \fBgmacs\fR
 mode.
@@ -4109,45 +3703,37 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^C\fR\fR
 .ad
 .RS 13n
-.rt  
 Capitalize the current character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-c\fR\fR
 .ad
 .RS 13n
-.rt  
 Capitalize the current word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-l\fR\fR
 .ad
 .RS 13n
-.rt  
 Change the current word to lower case.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^K\fR\fR
 .ad
 .RS 13n
-.rt  
 Delete from the cursor to the end of the line. If preceded by a numerical
 parameter whose value is less than the current cursor position, delete from
 specified position up to the cursor. If preceded by a numerical parameter whose
@@ -4157,34 +3743,28 @@ to specified cursor position.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^W\fR\fR
 .ad
 .RS 13n
-.rt  
 Kill from the cursor to the mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Push the region from the cursor to the mark on the stack.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkill\fR\fR
 .ad
 .RS 13n
-.rt  
 Kill the entire current line. The user-defined kill character is defined by the
 \fBstty\fR(1) command, usually a \fB^G\fR or \fB@\fR. If two kill characters
 are entered in succession, all kill characters from then on cause a line feed.
@@ -4193,101 +3773,83 @@ This is useful when using paper terminals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^Y\fR\fR
 .ad
 .RS 13n
-.rt  
 Restore the last item removed from line. Yank the item back to the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^L\fR\fR
 .ad
 .RS 13n
-.rt  
 Line feed and print the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^L\fR\fR
 .ad
 .RS 13n
-.rt  
 Clear the screen.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^@\fR\fR
 .ad
 .RS 13n
-.rt  
 Null character. Set mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\fR\fIspace\fR\fR
 .ad
 .RS 13n
-.rt  
 MetaSPACE. Set the mark.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^J\fR\fR
 .ad
 .RS 13n
-.rt  
 New line. Execute the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^M\fR\fR
 .ad
 .RS 13n
-.rt  
 Return. Execute the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOF\fR\fR
 .ad
 .RS 13n
-.rt  
 End-of-file character, normally \fB^D\fR, is processed as an \fBend-of-file\fR
 only if the current line is null.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^P\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the previous command. Each time \fB^P\fR is entered the previous command
 back in time is accessed. Moves back one line when it is not on the first line
 of a multi-line command.
@@ -4295,68 +3857,56 @@ of a multi-line command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[A\fR\fR
 .ad
 .RS 13n
-.rt  
 Equivalent to \fB^P\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-<\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the least recent (oldest) history line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM->\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the most recent (youngest) history line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^N\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the next command line. Each time \fB^N\fR is entered the next command
 line forward in time is accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[B\fR\fR
 .ad
 .RS 13n
-.rt  
 Equivalent to \fB^N\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^R\fR\fIstring\fR\fR
 .ad
 .RS 13n
-.rt  
 Reverse search history for a previous command line containing \fIstring\fR. If
 a parameter of zero is specified, the search is forward. \fIstring\fR is
 terminated by a RETURN or NEWLINE. If string is preceded by a \fB^\fR, the
@@ -4367,24 +3917,20 @@ case a parameter of zero reverses the direction of the search.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^O\fR\fR
 .ad
 .RS 13n
-.rt  
 Operate. Execute the current line and fetch the next line relative to current
 line from the history file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\fR\fIdigits\fR\fR
 .ad
 .RS 13n
-.rt  
 Escape. Define numeric parameter. The digits are taken as a parameter to the
 next command. The commands that accept a parameter are: \fB^F\fR, \fB^B\fR,
 \fBERASE\fR, \fB^C\fR, \fB^D\fR, \fB^K\fR, \fB^R\fR, \fB^P\fR, \fB^N\fR,
@@ -4394,12 +3940,10 @@ next command. The commands that accept a parameter are: \fB^F\fR, \fB^B\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\fR\fIletter\fR\fR
 .ad
 .RS 13n
-.rt  
 Soft-key. Search the alias list for an alias by the name \fIletter\fR. If an
 alias of \fIletter\fR is defined, insert its value on the input queue.
 \fIletter\fR must not be one of the metafunctions in this section.
@@ -4407,12 +3951,10 @@ alias of \fIletter\fR is defined, insert its value on the input queue.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-[\fR\fIletter\fR\fR
 .ad
 .RS 13n
-.rt  
 Soft key. Search the alias list for an alias by the name \fIletter\fR. If an
 alias of this name is defined, insert its value on the input queue. This can be
 used to program function keys on many terminals.
@@ -4420,12 +3962,10 @@ used to program function keys on many terminals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-.\fR\fR
 .ad
 .RS 13n
-.rt  
 The last word of the previous command is inserted on the line. If preceded by a
 numeric parameter, the value of this parameter determines which word to insert
 rather than the last word.
@@ -4433,46 +3973,38 @@ rather than the last word.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-_\fR\fR
 .ad
 .RS 13n
-.rt  
 Same as \fBM-.\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-*\fR\fR
 .ad
 .RS 13n
-.rt  
 Attempt filename generation on the current word. As asterisk is appended if the
 word does not match any file or contain any special pattern characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-\fRESC\fR
 .ad
 .RS 13n
-.rt  
 Command or file name completion as described in this manual page.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^I\fRTAB\fR
 .ad
 .RS 13n
-.rt  
 Attempts command or file name completion as described in this manual page. If a
 partial completion occurs, repeating this behaves as if \fBM-=\fR were entered.
 If no match is found or entered after SPACE, a TAB is inserted.
@@ -4480,12 +4012,10 @@ If no match is found or entered after SPACE, a TAB is inserted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-=\fR\fR
 .ad
 .RS 13n
-.rt  
 If not preceded by a numeric parameter, generates the list of matching commands
 or file names as described in this manual page. Otherwise, the word under the
 cursor is replaced by the item corresponding to the value of the numeric
@@ -4495,23 +4025,19 @@ is not on a word, the word is inserted instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^U\fR\fR
 .ad
 .RS 13n
-.rt  
 Multiply parameter of next command by \fB4\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\fR\fR
 .ad
 .RS 13n
-.rt  
 Escape the next character. Editing characters, the user's erase, kill and
 interrupt (normally \fB^?\fR) characters can be entered in a command line or in
 a search string if preceded by a \fB\e\fR\&. The \fB\e\fR removes the next
@@ -4520,23 +4046,19 @@ character's editing features, if any.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-^V\fR\fR
 .ad
 .RS 13n
-.rt  
 Display the version of the shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM-#\fR\fR
 .ad
 .RS 13n
-.rt  
 If the line does not begin with a \fB#\fR, a \fB#\fR is inserted at the
 beginning of the line and after each NEWLINE, and the line is entered. This
 causes a comment to be inserted in the history file. If the line begins with a
@@ -4575,48 +4097,40 @@ By default the editor is in input mode.
 The following input edit commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBERASE\fR
 .ad
 .RS 10n
-.rt  
 User defined erase character as defined by the \fBstty\fR command, usually
 \fB^H\fR or \fB#\fR. Delete previous character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^W\fR\fR
 .ad
 .RS 10n
-.rt  
 Delete the previous blank separated word. On some systems the \fBviraw\fR
 option might be required for this to work.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEOF\fR
 .ad
 .RS 10n
-.rt  
 As the first character of the line causes the shell to terminate unless the
 \fBignoreeof\fR option is set. Otherwise this character is ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlnext\fR\fR
 .ad
 .RS 10n
-.rt  
 User defined literal next character as defined by the \fBstty\fR(1) or \fB^V\fR
 if not defined. Removes the next character's editing features, if any. On some
 systems the \fBviraw\fR option might be required for this to work.
@@ -4624,23 +4138,19 @@ systems the \fBviraw\fR option might be required for this to work.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\fR\fR
 .ad
 .RS 10n
-.rt  
 Escape the next ERASE or KILL character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^I\fR TAB\fR
 .ad
 .RS 10n
-.rt  
 Attempts command or file name completion as described in this manual page and
 returns to input mode. If a partial completion occurs, repeating this behaves
 as if \fB=\fR were entered from control mode. If no match is found or entered
@@ -4656,255 +4166,209 @@ The motion edit commands move the cursor.
 The following motion edit commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]l\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward (right) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB][C\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward (right) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]w\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor forward one alphanumeric word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]W\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the beginning of the next word that follows a blank.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]e\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the end of the word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]E\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the end of the current blank delimited word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]h\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backward (left) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB][D\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backward (left) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]b\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor backward one word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]B\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the preceding blank separated word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]|\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to column \fIcount\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]f\fR\fIc\fR\fR
 .ad
 .RS 13n
-.rt  
 Find the next character \fIc\fR in the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]F\fR\fIc\fR\fR
 .ad
 .RS 13n
-.rt  
 Find the previous character \fIc\fR in the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]t\fR\fIC\fR\fR
 .ad
 .RS 13n
-.rt  
 Equivalent to \fBf\fR followed by \fBh\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]T\fR\fIc\fR\fR
 .ad
 .RS 13n
-.rt  
 Equivalent to \fBF\fR followed by \fBl\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB];\fR\fR
 .ad
 .RS 13n
-.rt  
 Repeat \fIcount\fR times the last single character find command: \fBf\fR,
 \fBF\fR, \fBt,\fR or \fBT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB],\fR\fR
 .ad
 .RS 13n
-.rt  
 Reverse the last single character find command \fIcount\fR times.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the start of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to start of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[H\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the first non-blank character in the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[Y\fR\fR
 .ad
 .RS 13n
-.rt  
 Move the cursor to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 13n
-.rt  
 Moves to balancing \fB(\fR, \fB)\fR, \fB{\fR, \fB}\fR, \fB[\fR, or \fB]\fR. If
 cursor is not on one of the characters described in this section, the remainder
 of the line is searched for the first occurrence of one of the characters
@@ -4920,24 +4384,20 @@ The search edit commands access your command history.
 The following search edit commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]k\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the previous command. Each time \fBk\fR is entered, the previous command
 back in time is accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]-\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the previous command. Each time \fBk\fR is entered, the previous command
 back in time is accessed.
 .sp
@@ -4946,12 +4406,10 @@ Equivalent to \fBk\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB][A\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the previous command. Each time \fBk\fR is entered, the previous command
 back in time is accessed.
 .sp
@@ -4960,24 +4418,20 @@ Equivalent to \fBk\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]j\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the next command. Each time \fBj\fR is entered, the next command forward
 in time is accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]+\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the next command. Each time \fBj\fR is entered, the next command forward
 in time is accessed.
 .sp
@@ -4986,12 +4440,10 @@ Equivalent to \fBj\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB][B\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch the next command. Each time \fBj\fR is entered, the next command forward
 in time is accessed.
 .sp
@@ -5000,24 +4452,20 @@ Equivalent to \fBj\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]G\fR\fR
 .ad
 .RS 13n
-.rt  
 Fetch command number \fIcount\fR. The default is the least recent history
 command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fIstring\fR\fR
 .ad
 .RS 13n
-.rt  
 Search backward through history for a previous command containing \fIstring\fR.
 \fIstring\fR is terminated by a RETURN or NEWLINE. If string is preceded by a
 \fB^\fR, the matched line must begin with \fIstring\fR. If \fIstring\fR is
@@ -5026,12 +4474,10 @@ null, the previous string is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fIstring\fR\fR
 .ad
 .RS 13n
-.rt  
 Search forward through history for a previous command containing \fIstring\fR.
 \fIstring\fR is terminated by a RETURN or NEWLINE. If string is preceded by a
 \fB^\fR, the matched line must begin with \fIstring\fR. If \fIstring\fR is
@@ -5042,24 +4488,20 @@ Same as \fI/\fR except that search is in the forward direction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 13n
-.rt  
 Search in the backwards direction for the next match of the last pattern to
 \fI/\fR or \fI?\fR commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBN\fR\fR
 .ad
 .RS 13n
-.rt  
 Search in the forward direction for next match of the last pattern to \fI/\fR
 or \fI?\fR.
 .RE
@@ -5070,29 +4512,24 @@ or \fI?\fR.
 The following commands modify the line:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 19n
-.rt  
 Enter input mode and enter text after the current character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA\fR\fR
 .ad
 .RS 19n
-.rt  
 Append text to the end of the line. Equivalent to \fB$a\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]c\fR\fImotion\fR\fR
 .ad
@@ -5101,7 +4538,6 @@ Append text to the end of the line. Equivalent to \fB$a\fR.
 \fB\fBc[\fR\fIcount\fR\fB]\fR\fImotion\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete current character through the character that \fImotion\fR would move the
 cursor to and enter input mode. If \fImotion\fR is \fBc\fR, the entire line is
 deleted and input mode entered.
@@ -5109,194 +4545,160 @@ deleted and input mode entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete the current character through the end of line and enter input mode.
 Equivalent to \fBc$\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 19n
-.rt  
 Equivalent to \fBcc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]s\fR\fR
 .ad
 .RS 19n
-.rt  
 Replace characters under the cursor in input mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD[\fR\fIcount\fR\fB]d\fR\fImotion\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete the current character through the end of line. Equivalent to d$.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd[\fR\fIcount\fR\fB]\fR\fImotion\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete current character through the character that \fImotion\fR would move to.
 If \fImotion\fR is d , the entire line is deleted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 19n
-.rt  
 Enter input mode and insert text before the current character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI\fR\fR
 .ad
 .RS 19n
-.rt  
 Insert text before the beginning of the line. Equivalent to \fB0i\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]P\fR\fR
 .ad
 .RS 19n
-.rt  
 Place the previous text modification before the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]p\fR\fR
 .ad
 .RS 19n
-.rt  
 Place the previous text modification after the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fR\fR
 .ad
 .RS 19n
-.rt  
 Enter input mode and replace characters on the screen with characters you type
 overlay fashion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]r\fR\fIc\fR\fR
 .ad
 .RS 19n
-.rt  
 Replace the \fIcount\fR characters starting at the current cursor position with
 \fIc\fR, and advance the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]x\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete current character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fIcount\fR]X\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete preceding character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fIcount\fR].\fR\fR
 .ad
 .RS 19n
-.rt  
 Repeat the previous text modification command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fIcount\fR]~\fR\fR
 .ad
 .RS 19n
-.rt  
 Invert the case of the \fIcount\fR characters starting at the current cursor
 position and advance the cursor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fIcount\fR]_\fR\fR
 .ad
 .RS 19n
-.rt  
 Causes the \fIcount\fR word of the previous command to be appended and input
 mode entered. The last word is used if \fIcount\fR is omitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 19n
-.rt  
 Causes an \fB*\fR to be appended to the current word and file name generation
 attempted. If no match is found, it rings the bell. Otherwise, the word is
 replaced by the matching pattern and input mode is entered.
@@ -5304,12 +4706,10 @@ replaced by the matching pattern and input mode is entered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\fR\fR
 .ad
 .RS 19n
-.rt  
 Command or file name completion as described in this manual page.
 .RE
 
@@ -5319,7 +4719,6 @@ Command or file name completion as described in this manual page.
 The following miscellaneous edit commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]y\fR\fImotion\fR\fR
 .ad
@@ -5328,7 +4727,6 @@ The following miscellaneous edit commands are supported:
 \fB\fBy[\fR\fIcount\fR\fB]\fR\fImotion\fR\fR
 .ad
 .RS 18n
-.rt  
 Yank the current character through the character to which \fImotion\fR would
 move the cursor. Put the yanked characters in the delete buffer. The text and
 cursor position are unchanged.
@@ -5336,57 +4734,47 @@ cursor position are unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fByy\fR\fR
 .ad
 .RS 18n
-.rt  
 Yank the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBY\fR\fR
 .ad
 .RS 18n
-.rt  
 Yank the current line from the current cursor location to the end of the line.
 Equivalent to \fBy$\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBu\fR\fR
 .ad
 .RS 18n
-.rt  
 Undo the last text modifying command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU\fR\fR
 .ad
 .RS 18n
-.rt  
 Undo all the text modifying commands performed on current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]V\fR\fR
 .ad
 .RS 18n
-.rt  
 Return the command :
 .sp
 .in +2
@@ -5401,45 +4789,37 @@ in the input buffer. If \fIcount\fR is omitted, the current line is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^L\fR\fR
 .ad
 .RS 18n
-.rt  
 Line feed and print the current line. This command only works in control mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^J\fR\fR
 .ad
 .RS 18n
-.rt  
 New line. Execute the current line, regardless of mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^M\fR\fR
 .ad
 .RS 18n
-.rt  
 Return. Execute the current line, regardless of mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 18n
-.rt  
 If the first character of the command is a \fB#\fR , delete this \fB#\fR and
 each \fB#\fR that follows a NEWLINE.
 .sp
@@ -5453,12 +4833,10 @@ history file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR\fIcount\fR\fB]=\fR\fR
 .ad
 .RS 18n
-.rt  
 If \fIcount\fR is not specified, generate the list of matching commands or file
 names as described in this manual page.
 .sp
@@ -5469,24 +4847,20 @@ not on a word, it is inserted after the current cursor location.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB@\fR\fIletter\fR\fR
 .ad
 .RS 18n
-.rt  
 Search your alias list for an alias by the name \fIletter\fR. If an alias of
 this name is defined, insert its value on the input queue for processing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^V\fR\fR
 .ad
 .RS 18n
-.rt  
 Display version of the shell.
 .RE
 
@@ -5536,7 +4910,6 @@ field splitting and file name generation are not performed.
 .RE
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ : [\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -5547,7 +4920,6 @@ The command only expands parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ .\fR \fIname\fR \fB[\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -5567,7 +4939,6 @@ last command executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB++ alias [\fR\fB-ptx\fR\fB] [\fR\fIname\fR\fB[
 =\fR\fIvalue\fR\fB]] ...\fR\fR
@@ -5592,7 +4963,6 @@ obsolete -x option has no effect. The exit status is \fBnon-zero\fR if a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbg [\fR \fIjob\fR\fB\&...]\fR\fR
 .ad
@@ -5606,7 +4976,6 @@ a description of the format of \fIjob\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ break [\fR\fIn\fR\fB]\fR\fR
 .ad
@@ -5618,7 +4987,6 @@ loop, if any. If \fIn\fR is specified, then break \fIn\fR levels.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbuiltin [\fR\fB-ds\fR \fB] [\fR\fB-f\fR \fIfile\fR\fB]
 [\fR\fIname ...\fR\fB]\fR\fR
@@ -5648,7 +5016,6 @@ argument of \fB0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR \fB[\fR\fB-LP\fR\fB] [\fR\fIarg\fR\fB]\fR\fR
 .ad
@@ -5684,7 +5051,6 @@ determines which method is used. The \fBcd\fR command cannot be executed by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcommand\fR \fB[\fR\fB-pvVx\fR\fB]\fR \fIname\fR
 \fB[\fR\fIarg ...\fR\fB]\fR\fR
@@ -5716,7 +5082,6 @@ With the \fB-v\fR option, \fBcommand\fR is equivalent to the built-in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+continue\fR \fB[\fR\fIn\fR\fB]\fR\fR
 .ad
@@ -5729,7 +5094,6 @@ Resumes the next iteration of the enclosing \fBfor\fR, \fBwhile\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisown\fR \fB[\fR\fIjob...\fR\fB]\fR\fR
 .ad
@@ -5741,7 +5105,6 @@ all active jobs if \fIjob\fR is omitted, when a login shell terminates.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR \fB[\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -5756,7 +5119,6 @@ this section should be used. See \fBecho\fR(1) for usage and description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+eval\fR \fB[\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -5768,7 +5130,6 @@ executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+exec\fR [\fB-c\fR] [\fB-a\fR \fIname ...\fR]
 \fB[\fR\fIarg ...\fR\fB]\fR\fR
@@ -5789,7 +5150,6 @@ mechanism are closed when invoking another program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+exit\fR \fB[\fR\fIn\fR\fB]\fR\fR
 .ad
@@ -5804,7 +5164,6 @@ option turned on. See \fBset\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB++export\fR \fB[\fR\fB-p\fR\fB]\fR
 \fB[\fR\fIname\fR\fB[=\fR\fIvalue\fR\fB]] ...\fR\fR
@@ -5820,7 +5179,6 @@ automatic export to the environment of subsequently-executed commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfalse\fR\fR
 .ad
@@ -5831,7 +5189,6 @@ Does nothing, and exits \fB1\fR. Used with \fBuntil\fR for infinite loops.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfg\fR \fB[\fR\fIjob ...\fR\fB]\fR\fR
 .ad
@@ -5845,7 +5202,6 @@ description of the format of \fIjob\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetconf\fR \fB[\fR\fIname\fR \fB[\fR\fIpathname\fR\fB]]\fR\fR
 .ad
@@ -5864,7 +5220,6 @@ pathname \fB/\fR is used for each of the parameters that requires
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetopts\fR \fB[\fR \fB-a\fR \fIname\fR\fB]\fR \fIoptstring\fR \fIvname\fR
 \fB[\fR\fIarg ...\fR\fB]\fR\fR
@@ -5896,7 +5251,6 @@ specified as the first option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhist\fR \fB[\fR \fB-e\fR \fIename\fR\fB]\fR\fB[\fR\fB-nlr\fR\fB]\fR
 \fB[\fR \fIfirst\fR\fB[\fR\fIlast\fR \fB] ]\fR\fR
@@ -5934,7 +5288,6 @@ the optional substitution \fIold\fR\fB=\fR\fInew\fR is performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjobs\fR \fB-lnp\fR \fB[\fR\fIjob ...\fR\fB]\fR\fR
 .ad
@@ -5949,7 +5302,6 @@ listed. See \fBJobs\fR for a description of the format of \fIjob\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkill\fR \fB[\fR\fB-s\fR \fIsigname\fR\fB]\fR \fIjob ...\fR\fR
 .ad
@@ -5982,7 +5334,6 @@ number, the signal name corresponding to the least significant 8 bits of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlet\fR \fB[\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -5996,7 +5347,6 @@ the last expression is \fBnon-zero\fR, and \fB1\fR otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+newgrp\fR \fB[\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -6007,7 +5357,6 @@ Equivalent to \fBexec\fR \fB/bin/newgrp\fR \fIarg ...\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprint\fR [\fB-Renprs\fR] \fB[\fR \fB-u\fR \fIunit\fR\fB] [\fR \fB-f\fR
 \fIformat\fR \fB] [\fR \fIarg ...\fR\fB]\fR\fR
@@ -6021,122 +5370,100 @@ described by \fBprintf\fR. In this case, any \fBe\fR, \fBn\fR, \fBr\fR, or
 specified, the following escape conventions are applied:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ea\fR\fR
 .ad
 .RS 8n
-.rt  
 Alert character (\fBASCII\fR 07)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eb\fR\fR
 .ad
 .RS 8n
-.rt  
 Backspace character (\fBASCII\fR 010)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ec\fR\fR
 .ad
 .RS 8n
-.rt  
 Causes print to end without processing more arguments and not adding a NEWLINE
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ef\fR\fR
 .ad
 .RS 8n
-.rt  
 Form-feed character (\fBASCII\fR 014)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\en\fR\fR
 .ad
 .RS 8n
-.rt  
 NEWLINE character (\fBASCII\fR 012)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\er\fR\fR
 .ad
 .RS 8n
-.rt  
 RETURN character (\fBASCII\fR 015)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\et\fR\fR
 .ad
 .RS 8n
-.rt  
 TAB character (\fBASCII\fR 011)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\ev\fR\fR
 .ad
 .RS 8n
-.rt  
 Vertical TAB character (\fBASCII\fR 013)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\eE\fR\fR
 .ad
 .RS 8n
-.rt  
 Escape character (\fBASCII\fR 033)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\e\fR\fR
 .ad
 .RS 8n
-.rt  
 Backslash character \fB\e\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e0\fR\fIx\fR\fR
 .ad
 .RS 8n
-.rt  
 Character defined by the 1, 2, or 3-digit octal string specified by \fIx\fR
 .RE
 
@@ -6153,7 +5480,6 @@ arguments to be written onto the history file instead of standard output. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprintf\fR \fIformat\fR\fB[\fR\fIarg ...\fR\fB]\fR\fR
 .ad
@@ -6193,7 +5519,6 @@ field width.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwd\fR [\fB-LP\fR]\fR
 .ad
@@ -6208,7 +5533,6 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread\fR \fB[\fR\fB-Aprs\fR\fB] [\fR\fB-d\fR \fIdelim\fR\fB] [\fR \fB-n\fR
 \fIn\fR\fB] [[\fR \fB-N\fR \fIn\fR\fB] [[\fR\fB-t\fR \fItimeout\fR\fB]
@@ -6251,7 +5575,6 @@ end-of-file is encountered or read has timed out.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB++readonly\fR \fB[\fR\fB-p\fR\fB] [\fR
 \fIvname\fR\fB[=\fR\fIvalue\fR\fB]] ...\fR\fR
@@ -6267,7 +5590,6 @@ be inserted before each one. Otherwise, the specified \fIvname\fRs are marked
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+return\fR \fB[\fR\fIn\fR\fB]\fR\fR
 .ad
@@ -6282,7 +5604,6 @@ script, then it behaves the same as exit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+set [ \(+-BCGabefhkmnoprstuvx] [\(+-o [\fR \fIoption\fR \fB] ] ... [
 \(+-A\fR \fIvname\fR\fB]\fR \fB[\fR\fIarg...\fR\fB]\fR\fR
@@ -6292,7 +5613,6 @@ script, then it behaves the same as exit.
 The \fBset\fR command supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -6303,7 +5623,6 @@ All subsequent variables that are defined are automatically exported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -6316,7 +5635,6 @@ unset first.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
@@ -6328,7 +5646,6 @@ than waiting for the next prompt.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fR
 .ad
@@ -6339,7 +5656,6 @@ Enable brace pattern field generation. This is the default behavior.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
@@ -6352,7 +5668,6 @@ file when turned on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -6364,7 +5679,6 @@ set, and exit. This mode is disabled while reading profiles.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -6375,7 +5689,6 @@ Disables file name generation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
@@ -6388,7 +5701,6 @@ by a \fB/\fR only directories and subdirectories are matched.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -6399,7 +5711,6 @@ Each command becomes a tracked alias when first encountered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
@@ -6411,7 +5722,6 @@ command, not just those that precede the command name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -6425,7 +5735,6 @@ for interactive shells.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -6437,7 +5746,6 @@ Ignored for interactive shells.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -6451,7 +5759,6 @@ settings. This option can be repeated to enable or disable multiple options.
 The following argument can be one of the following option names:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallexport\fR\fR
 .ad
@@ -6462,7 +5769,6 @@ Same as \fB-a\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbgnice\fR\fR
 .ad
@@ -6473,7 +5779,6 @@ All background jobs are run at a lower priority. This is the default mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbraceexpand\fR\fR
 .ad
@@ -6484,7 +5789,6 @@ Same as \fB-\fRB.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBemacs\fR\fR
 .ad
@@ -6495,7 +5799,6 @@ Puts you in an \fBemacs\fR style inline editor for command entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerrexit\fR\fR
 .ad
@@ -6506,7 +5809,6 @@ Same as \fB-e\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglobstar\fR\fR
 .ad
@@ -6517,7 +5819,6 @@ Same as \fB-G\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgmacs\fR\fR
 .ad
@@ -6528,7 +5829,6 @@ Puts you in a \fBgmacs\fR style inline editor for command entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignoreeof\fR\fR
 .ad
@@ -6539,7 +5839,6 @@ The shell does not exit on end-of-file. The command \fBexit\fR must be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyword\fR\fR
 .ad
@@ -6550,7 +5849,6 @@ Same as \fB-k\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmarkdirs\fR\fR
 .ad
@@ -6562,7 +5860,6 @@ appended.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmonitor\fR\fR
 .ad
@@ -6573,7 +5870,6 @@ Same as \fB-m\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmultiline\fR\fR
 .ad
@@ -6585,7 +5881,6 @@ than the width of the screen. This might not work for all terminals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoclobber\fR\fR
 .ad
@@ -6596,7 +5891,6 @@ Same as \fB-C\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoexec\fR\fR
 .ad
@@ -6607,7 +5901,6 @@ Same as \fB-n\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoglob\fR\fR
 .ad
@@ -6618,7 +5911,6 @@ Same as \fB-f\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnolog\fR\fR
 .ad
@@ -6629,7 +5921,6 @@ Do not save function definitions in the history file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotify\fR\fR
 .ad
@@ -6640,7 +5931,6 @@ Same as \fB-b\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnounset\fR\fR
 .ad
@@ -6651,7 +5941,6 @@ Same as \fB-u\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpipefail\fR\fR
 .ad
@@ -6664,7 +5953,6 @@ to fail or zero if no command has failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivileged\fR\fR
 .ad
@@ -6675,7 +5963,6 @@ Same as \fB-p\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowme\fR\fR
 .ad
@@ -6688,7 +5975,6 @@ Otherwise, the leading \fB;\fR is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrackall\fR\fR
 .ad
@@ -6699,7 +5985,6 @@ Same as \fB-h\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
@@ -6710,7 +5995,6 @@ Same as \fB-v\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvi\fR\fR
 .ad
@@ -6722,7 +6006,6 @@ escape character 033. This puts you in control mode. A return sends the line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBviraw\fR\fR
 .ad
@@ -6733,7 +6016,6 @@ Each character is processed as it is typed in \fBvi\fR mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxtrace\fR\fR
 .ad
@@ -6748,7 +6030,6 @@ If no option name is supplied, the current options settings are printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -6763,7 +6044,6 @@ be set to the real \fBuid\fR and \fBgid\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -6774,7 +6054,6 @@ Enables the restricted shell. This option cannot be unset once set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -6785,7 +6064,6 @@ Sort the positional parameters lexicographically.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -6796,7 +6074,6 @@ Obsolete. Exit after reading and executing one command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -6807,7 +6084,6 @@ Treat \fBunset\fR parameters as an error when substituting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -6818,7 +6094,6 @@ Print shell input lines as they are read.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -6829,7 +6104,6 @@ Print commands and their arguments as they are executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB--\fR\fR
 .ad
@@ -6852,7 +6126,6 @@ all variables are printed on the standard output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+shift\fR \fB[\fR\fIn\fR\fB]\fR\fR
 .ad
@@ -6866,7 +6139,6 @@ equal to \fB$#\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsleep\fR \fIseconds\fR\fR
 .ad
@@ -6878,7 +6150,6 @@ specified by \fIseconds\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+trap\fR \fB-p\fR \fB[\fR\fIaction\fR\fB]\fR
 \fB[\fR\fIsig\fR\fB] ...\fR\fR
@@ -6911,7 +6182,6 @@ a list of commands associated with each signal number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrue\fR\fR
 .ad
@@ -6922,7 +6192,6 @@ Does nothing, and exits \fB0\fR. Used with while for infinite loops.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB++typeset [\(+-AHflabnprtux ] [ \(+-EFLRZi[\fR\fIn\fR\fB] ] [\fR
 \fIvname\fR\fB[=\fR\fIvalue\fR \fB] ]\fR\fR
@@ -6947,36 +6216,30 @@ printed.
 The following list of attributes can be specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Declares \fIvname\fR to be an indexed array. This is optional unless except for
 compound variable assignments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 6n
-.rt  
 Declares \fIvname\fR to be an associative array. Sub-scripts are strings rather
 than arithmetic expressions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 The variable can hold any number of bytes of data. The data can be text or
 binary. The value is represented by the \fBbase64\fR encoding of the data. If
 \fB-Z\fR is also specified, the size in bytes of the data in the buffer is
@@ -6989,12 +6252,10 @@ the data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 6n
-.rt  
 Declares \fIvname\fR to be a double precision floating point number. If \fIn\fR
 is \fBnon-zero\fR, it defines the number of significant figures that are used
 when expanding \fIvname\fR. Otherwise, ten significant figures is used.
@@ -7002,12 +6263,10 @@ when expanding \fIvname\fR. Otherwise, ten significant figures is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 The names refer to function names rather than variable names. No assignments
 can be made and the only other valid options are \fB-t\fR, \fB-u\fR, and
 \fB-x.\fR The \fB-t\fR option turns on execution tracing for this function. The
@@ -7024,12 +6283,10 @@ The \fB-i\fR attribute cannot be specified with \fB-f\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Declares \fIvname\fR to be a double precision floating point number. If \fIn\fR
 is \fBnon-zero\fR, it defines the number of places after the decimal point that
 are used when expanding \fIvname\fR. Otherwise ten places after the decimal
@@ -7038,23 +6295,19 @@ point is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 6n
-.rt  
 This option provides UNIX to hostname file mapping on non-UNIX machines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Declares \fIvname\fR to be represented internally as integer. The right hand
 side of an assignment is evaluated as an arithmetic expression when assigning
 to an integer. If \fIn\fR is \fBnon-zero\fR, it defines the output arithmetic
@@ -7066,24 +6319,20 @@ The \fB-i\fR attribute cannot be specified along with \fB-R\fR, \fB-L\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 All uppercase characters are converted to lowercase. The uppercase option,
 \fB-u\fR, is turned off.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Left justify and remove leading blanks from \fIvalue\fR. If \fIn\fR is
 \fBnon-zero\fR, it defines the width of the field, otherwise it is determined
 by the width of the value of first assignment. When the variable is assigned
@@ -7095,12 +6344,10 @@ The \fB-i\fR attribute cannot be specified with \fB-L\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Declares \fIvname\fR to be a reference to the variable whose name is defined by
 the value of variable \fIvname\fR. This is usually used to reference a variable
 inside a function whose name has been passed as an argument.
@@ -7108,12 +6355,10 @@ inside a function whose name has been passed as an argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 6n
-.rt  
 Right justify and fill with leading blanks. If \fIn\fR is \fBnon-zero\fR, it
 defines the width of the field, otherwise it is determined by the width of the
 value of first assignment. The field is left filled with blanks or truncated
@@ -7124,48 +6369,40 @@ The \fB-i\fR attribute cannot be specified with \fB-R\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 The specified \fIvname\fRs are marked read-only and these names cannot be
 changed by subsequent assignment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Tags the variables. Tags are user definable and have no special meaning to the
 shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 All lowercase characters are converted to uppercase. The lowercase option,
 \fB-l\fR, is turned off.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 The specified \fIvname\fRs are marked for automatic export to the environment
 of subsequently-executed commands. Variables whose names contain a . cannot be
 exported.
@@ -7173,12 +6410,10 @@ exported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
 .RS 6n
-.rt  
 Right justify and fill with leading zeros if the first non-blank character is a
 digit and the \fB-L\fR option has not been set. Remove leading zeros if the
 \fB-L\fR option is also set. If \fIn\fR is \fBnon-zero\fR, it defines the width
@@ -7192,7 +6427,6 @@ The \fB-i\fR attribute cannot be specified with \fB-Z\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBulimit [\fR\fB-HSacdfmnpstv\fR\fB] [\fR \fIlimit\fR\fB]\fR\fR
 .ad
@@ -7209,57 +6443,47 @@ If no option is specified, \fB-f\fR is assumed.
 The following are the available resource limits:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Lists all of the current resource limits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of 512-byte blocks on the size of core dumps.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of Kbytes on the size of the data area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of 512-byte blocks on files that can be written by the current
 process or by child processes (files of any size can be read).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies a hard limit for the specified resource.
 .sp
 A hard limit cannot be increased once it is set.
@@ -7271,56 +6495,46 @@ this case, the soft limit is printed unless \fB-H\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of Kbytes on the size of physical memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of file descriptors plus 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of 512-byte blocks for pipe buffering.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of Kbytes on the size of the stack area.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies a soft limit for the specified resource.
 .sp
 A soft limit can be increased up to the value of the hard limit.
@@ -7332,23 +6546,19 @@ this case, the soft limit is printed unless \fB-H\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of CPU seconds to be used by each process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of Kbytes for virtual memory.
 .RE
 
@@ -7356,7 +6566,6 @@ The number of Kbytes for virtual memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBumask\fR \fB[\fR\fB-S\fR\fB]\fR\fB[\fR\fImask\fR\fB]\fR\fR
 .ad
@@ -7376,7 +6585,6 @@ See \fBumask\fR(2)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+unalias\fR \fB[\fR\fB-a\fR\fB]\fR \fIname\fR\fR
 .ad
@@ -7388,7 +6596,6 @@ list. The \fB-a\fR option causes all the aliases to be unset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+unset\fR \fB[\fR\fB-fnv\fR\fB]\fR \fIvname\fR\fR
 .ad
@@ -7407,7 +6614,6 @@ their special meaning even if they are subsequently assigned to.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR \fB[\fR\fIjob\fR\fB]\fR\fR
 .ad
@@ -7422,7 +6628,6 @@ of the format of \fIjob\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwhence\fR \fB[\fR\fB-afpv\fR\fB]\fR \fIname ...\fR\fR
 .ad
@@ -7460,12 +6665,10 @@ Commands are then read as described, and the following options are interpreted
 by the shell when it is invoked:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-c\fR option is present, then commands are read from the first
 \fIarg\fR. Any remaining arguments become positional parameters starting at
 \fB0\fR.
@@ -7473,12 +6676,10 @@ If the \fB-c\fR option is present, then commands are read from the first
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 15n
-.rt  
 A list of all double quoted strings that are preceded by a \fB$\fR is printed
 on standard output and the shell exits. This set of strings is subject to
 language translation when the locale is not C or POSIX. No commands are
@@ -7487,12 +6688,10 @@ executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-i\fR option is present or if the shell input and output are attached
 to a terminal (as told by \fBtcgetattr\fR(3C), this shell is interactive. In
 this case \fBTERM\fR is ignored (so that \fBkill 0\fR does not kill an
@@ -7502,12 +6701,10 @@ interruptible). In all cases, \fBQUIT\fR is ignored by the shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fB-R\fR \fIfilename\fR option is used to generate a cross reference
 database that can be used by a separate utility to find definitions and
 references for variables and commands.
@@ -7515,23 +6712,19 @@ references for variables and commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-r\fR option is present, the shell is a restricted shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-s\fR option is present or if no arguments remain, then commands are
 read from the standard input. Shell output, except for the output of the
 \fBSpecial Commands\fR listed, is written to file descriptor 2.
@@ -7621,7 +6814,6 @@ bytes).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
@@ -7637,7 +6829,6 @@ sub-shell is abandoned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexit status of last command executed\fR\fR
 .ad
@@ -7656,7 +6847,6 @@ See the \fBksh93 exit\fR command for additional details.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/profile\fR\fR
 .ad
@@ -7667,7 +6857,6 @@ The system initialization file, executed for login shells.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ksh.kshrc\fR\fR
 .ad
@@ -7678,7 +6867,6 @@ The system wide startup file, executed for interactive shells.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.profile\fR\fR
 .ad
@@ -7690,7 +6878,6 @@ The personal initialization file, executed for login shells after
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.kshrc\fR\fR
 .ad
@@ -7702,7 +6889,6 @@ interactive shells when \fBENV\fR is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/suid-profile\fR\fR
 .ad
@@ -7714,7 +6900,6 @@ initialization file when the real and effective user or group id do not match.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/null\fR\fR
 .ad
@@ -7735,13 +6920,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

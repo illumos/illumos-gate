@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_clr_feature 9F "Feb 9 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_CLR_FEATURE 9F "Feb 9, 2004"
 .SH NAME
 usb_clr_feature \- Clear feature of USB device, interface or endpoint
 .SH SYNOPSIS
@@ -14,11 +14,11 @@ usb_clr_feature \- Clear feature of USB device, interface or endpoint
 
 
 
-\fBint\fR \fBusb_clr_feature\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBusb_clr_feature\fR(\fBdev_info_t *\fR\fIdip\fR,
      \fBuint_t\fR \fIrequest_type\fR, \fBuint_t\fR \fIfeature\fR,
-     \fBuint_t\fR \fIwhich\fR, \fBusb_flags_t\fR \fIflags\fR, 
+     \fBuint_t\fR \fIwhich\fR, \fBusb_flags_t\fR \fIflags\fR,
      \fBvoid (\fR\fI*callback)\fR (usb_pipe_handle_t \fIpipe_handle\fR,
-     \fBusb_opaque_t\fR \fIcallback_arg\fR, \fBint\fR \fIrval\fR, \fBusb_cb_flags_t\fR \fIflags)\fR, 
+     \fBusb_opaque_t\fR \fIcallback_arg\fR, \fBint\fR \fIrval\fR, \fBusb_cb_flags_t\fR \fIflags)\fR,
      \fBusb_opaque_t\fR \fIcallback_arg\fR);
 .fi
 
@@ -29,34 +29,28 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 16n
-.rt  
 Pipe handle to device, device interface or endpoint.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequest_type\fR\fR
 .ad
 .RS 16n
-.rt  
 bmRequestType to be used.  One of the following:
 .sp
 USB_DEV_REQ_RCPT_DEV - Clear feature on device.
@@ -68,12 +62,10 @@ USB_DEV_REQ_RCPT_EP - Clear feature on endpoint.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfeature\fR\fR
 .ad
 .RS 16n
-.rt  
 Feature to be cleared. Can be any device-defined device-, interface-, or
 endpoint-specific feature, including the following which are defined in the
 \fIUSB 2.0\fR specification:
@@ -87,12 +79,10 @@ USB_DEV_TEST_MODE - Clear TEST_MODE on a device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBwhich\fR
 .ad
 .RS 9n
-.rt  
 Device, interface or endpoint on which to  clear the feature. One of:
 .br
 .in +2
@@ -110,35 +100,29 @@ Endpoint number, for endpoints.
 
 .sp
 .ne 2
-.mk
 .na
 \fBflags\fR
 .ad
 .RS 16n
-.rt  
 USB_FLAGS_SLEEP is the only flag recognized. Wait for completion and do not
 call callback.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcallback\fR
 .ad
 .RS 16n
-.rt  
 Callback handler to notify of asynchronous completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcallback_arg\fR
 .ad
 .RS 16n
-.rt  
 Second argument passed to callback handler.
 .RE
 
@@ -156,56 +140,46 @@ set.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Feature was successfully cleared.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 \fIdip\fR argument is NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 23n
-.rt  
 \fIpipe_handle\fR argument is NULL
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from interrupt context with USB_FLAGS_SLEEP flag set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 23n
-.rt  
 Clearing of feature was unsuccessful.
 .RE
 
@@ -231,7 +205,7 @@ if (usb_clr_feature(dip, pipe_handle, USB_DEV_REQ_RCPT_EP,
                ddi_driver_name(dip), ddi_get_instance(dip),
                data_endpoint_num);
    }
-                
+
 .fi
 .in -2
 
@@ -243,15 +217,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audiotest 1 "5 May 2009" "SunOS 5.11" "User Commands"
+.TH AUDIOTEST 1 "May 5, 2009"
 .SH NAME
 audiotest \- test audio device
 .SH SYNOPSIS
@@ -25,47 +25,39 @@ drift.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 Loop mode. The test is run in an infinite loop.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-2\fR\fR
 .ad
 .RS 6n
-.rt  
 Stereo (2-channel) mode. This is the default mode. Playback assumes 2 channels
 are present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-4\fR\fR
 .ad
 .RS 6n
-.rt  
 Quadraphonic mode (4-channel surround). The test assumes that four surround
 channels are present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-5\fR\fR
 .ad
 .RS 6n
-.rt  
 Surround sound mode (5.1). The test checks the left, right, surround left,
 surround right, and center channels. The low frequency effects channel is not
 tested.
@@ -73,12 +65,10 @@ tested.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-7\fR\fR
 .ad
 .RS 6n
-.rt  
 Surround sound mode (7.1). The test checks the left, right, surround left,
 surround right, back surround left, back surround right, and center channels.
 The low frequency effects channel is not tested.
@@ -87,12 +77,10 @@ The low frequency effects channel is not tested.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 7n
-.rt  
 The path the device to test, for example, \fB/dev/dsp0\fR.
 .RE
 
@@ -104,15 +92,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

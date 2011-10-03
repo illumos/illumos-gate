@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH system 4 "3 Nov 2004" "SunOS 5.11" "File Formats"
+.TH SYSTEM 4 "Nov 3, 2004"
 .SH NAME
 system \- system configuration information file
 .SH DESCRIPTION
@@ -32,33 +32,27 @@ modules require you to specify the module type by listing the module's
 namespace. The following namespaces are currently supported on all platforms:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrv\fR\fR
 .ad
 .RS 10n
-.rt  
 Modules in this namespace are device drivers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexec\fR\fR
 .ad
 .RS 10n
-.rt  
 Modules in this namespace are execution format modules. The following
 \fBexec\fR modules are currently provided:
 .sp
 .ne 2
-.mk
 .na
 \fBOnly on SPARC system:\fR
 .ad
 .RS 28n
-.rt  
 .sp
 .in +2
 .nf
@@ -71,12 +65,10 @@ aoutexec
 
 .sp
 .ne 2
-.mk
 .na
 \fBOnly on x86 system:\fR
 .ad
 .RS 28n
-.rt  
 .sp
 .in +2
 .nf
@@ -89,12 +81,10 @@ coffexec
 
 .sp
 .ne 2
-.mk
 .na
 \fBOn SPARC and IA systems:\fR
 .ad
 .RS 28n
-.rt  
 .sp
 .in +2
 .nf
@@ -111,56 +101,46 @@ javaexec
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfs\fR\fR
 .ad
 .RS 10n
-.rt  
 These modules are filesystems.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsched\fR\fR
 .ad
 .RS 10n
-.rt  
 These modules implement a process scheduling algorithm.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstrmod\fR\fR
 .ad
 .RS 10n
-.rt  
 These modules are \fBSTREAMS\fR modules.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsys\fR\fR
 .ad
 .RS 10n
-.rt  
 These modules implement loadable system-call modules.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmisc\fR\fR
 .ad
 .RS 10n
-.rt  
 These modules do not fit into any of the above categories, so are considered
 "miscellaneous" modules.
 .RE
@@ -170,34 +150,28 @@ These modules do not fit into any of the above categories, so are considered
 SPARC only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdacf\fR\fR
 .ad
 .RS 8n
-.rt  
 These modules provide rules and actions for device auto-configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtod\fR\fR
 .ad
 .RS 8n
-.rt  
 These modules provide support for the time of day hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpu\fR\fR
 .ad
 .RS 8n
-.rt  
 These modules provide \fBCPU\fR-specific kernel routines.
 .RE
 
@@ -206,7 +180,6 @@ These modules provide \fBCPU\fR-specific kernel routines.
 A description of each of the supported commands follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexclude:\fR <\fInamespace\fR>/<\fImodulename\fR>\fR
 .ad
@@ -219,7 +192,6 @@ combining every \fBexclude\fR entry in the \fBsystem\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinclude:\fR <\fInamespace\fR>/<\fImodulename\fR>\fR
 .ad
@@ -232,7 +204,6 @@ commands are cumulative.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforceload:\fR <\fInamespace\fR>/<\fImodulename\fR>\fR
 .ad
@@ -245,7 +216,6 @@ accessed. \fBforceload\fR commands are cumulative.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrootdev:\fR <\fIdevice name\fR>\fR
 .ad
@@ -257,7 +227,6 @@ device as supplied by the boot program.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrootfs:\fR <\fIroot filesystem type\fR>\fR
 .ad
@@ -268,7 +237,6 @@ Set the root filesystem type to the listed value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmoddir:\fR <\fIfirst module path\fR>[[{:, }<\fIsecond ...\fR>]...]\fR
 .ad
@@ -281,7 +249,6 @@ listed together, delimited either by blank spaces or colons.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR [\fI<module>\fR:]\fI<symbol>\fR {=, |, &} [~][-]\fI<value>\fR\fR
 .ad

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csx_MapMemPage 9F "19 Jul 1996" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH CSX_MAPMEMPAGE 9F "Jul 19, 1996"
 .SH NAME
 csx_MapMemPage \- map the memory area on a PC Card
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris \fBDDI \fRSpecific (Solaris \fBDDI) \fR
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwh\fR \fR
 .ad
 .RS 7n
-.rt  
 Window handle returned from \fBcsx_RequestWindow\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR \fR
 .ad
 .RS 7n
-.rt  
 Pointer to a \fBmap_mem_page_t\fR structure.
 .RE
 
@@ -65,24 +61,20 @@ uint32_t     Page;             /* page number */
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCardOffset\fR \fR
 .ad
 .RS 15n
-.rt  
 The absolute offset in bytes from the beginning of the \fBPC \fRCard to map
 into system memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPage\fR \fR
 .ad
 .RS 15n
-.rt  
 Used internally by Card Services; clients must set this field to \fB0\fR before
 calling this function.
 .RE
@@ -90,67 +82,55 @@ calling this function.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_SUCCESS\fR \fR
 .ad
 .RS 28n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_HANDLE\fR \fR
 .ad
 .RS 28n
-.rt  
 Client handle is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_OFFSET\fR \fR
 .ad
 .RS 28n
-.rt  
 Offset is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_BAD_PAGE\fR \fR
 .ad
 .RS 28n
-.rt  
 Page is not zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_NO_CARD\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPC \fRCard in socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCS_UNSUPPORTED_FUNCTION\fR \fR
 .ad
 .RS 28n
-.rt  
 No \fBPCMCIA \fRhardware installed.
 .RE
 

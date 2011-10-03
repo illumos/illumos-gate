@@ -3,25 +3,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_ac 1M "29 Sep 1999" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_AC 1M "Sep 29, 1999"
 .SH NAME
 cfgadm_ac \- EXX00 memory system administration
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-c\fR configure] [\fB-f\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-c\fR configure] [\fB-f\fR]
      [\fB-o\fR disable-at-boot | enable-at-boot ] ac\fI#\fR:bank\fI#\fR ...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-c\fR unconfigure] 
+\fB/usr/sbin/cfgadm\fR [\fB-c\fR unconfigure]
      [\fB-o\fR disable-at-bootp | enable-at-boot ] ac\fI#\fR:bank\fI#\fR ...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR]
      [\fB-o\fR quick | normal | extended, [max_errors=\fI#\fR] ] \fB-t\fR ac\fI#\fR:bank\fI#\fR...
 .fi
 
@@ -62,7 +62,6 @@ Refer to \fBcfgadm\fR(1M) for complete descriptions of the command options.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR configure | unconfigure\fR
 .ad
@@ -97,7 +96,6 @@ disabling the timeout.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -110,7 +108,6 @@ variable. See \fBPlatform Notes:Sun Enterprise 6x00/5x00/4x00/3x00 Systems\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -136,7 +133,7 @@ field has the following information for connected banks:
 .sp
 .in +2
 .nf
-slot# sizeMb|sizeGb [(sizeMb|sizeGb used)] base 0x### 
+slot# sizeMb|sizeGb [(sizeMb|sizeGb used)] base 0x###
       [interleaved #-way] [disabled at boot] [permanent]
 .fi
 .in -2
@@ -153,7 +150,6 @@ permanent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR disable-at-boot | enable-at-boot\fR
 .ad
@@ -169,7 +165,6 @@ in the disabled memory list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR extended | normal | quick\fR
 .ad
@@ -187,7 +182,6 @@ See \fB-t\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR max_errors=\fI#\fR\fR
 .ad
@@ -199,7 +193,6 @@ If not specified, a default of \fB32\fR is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR timeout=\fI#\fR\fR
 .ad
@@ -212,7 +205,6 @@ timeout.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -228,7 +220,6 @@ the attachment point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -240,7 +231,6 @@ to display detailed progress and results of tests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR relocate-test\fR
 .ad
@@ -259,12 +249,10 @@ purposes only.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIac#\fR:\fIbank#\fR\fR
 .ad
 .RS 13n
-.rt  
 The attachment points for memory banks are published by instances of the
 address controller (\fBac\fR) driver (\fIac#\fR). One instance of the \fBac\fR
 driver is created for each system board, but only those instances associated
@@ -276,7 +264,7 @@ bank1.
 \fBFILES\fR section.
 .sp
 The \fBac\fR driver instance numbering has no relation to the slot number for
-the 	corresponding board. The full physical attachment point identifier has the
+the corresponding board. The full physical attachment point identifier has the
 slot number incorporated into it as twice the slot number in hexadecimal
 directly following the \fBfhc@\fR part.
 .RE
@@ -284,7 +272,6 @@ directly following the \fBfhc@\fR part.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/devices/fhc@*,f8800000/ac@0,1000000:bank?\fR
 .ad
@@ -295,7 +282,6 @@ attachment points
 
 .sp
 .ne 2
-.mk
 .na
 \fB/usr/platform/sun4u/lib/cfgadm/cfgadm_ac.so.1\fR
 .ad

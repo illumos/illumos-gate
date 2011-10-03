@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prex 1 "1 Mar 2004" "SunOS 5.11" "User Commands"
+.TH PREX 1 "Mar 1, 2004"
 .SH NAME
 prex \- control tracing and manipulate probe points in a process or the kernel
 .SH SYNOPSIS
 .LP
 .nf
-\fBprex\fR [\fB-o\fR \fItrace_file_name\fR] [\fB-l\fR \fIlibraries\fR] [\fB-s\fR \fIkbytes_size\fR] \fIcmd\fR 
+\fBprex\fR [\fB-o\fR \fItrace_file_name\fR] [\fB-l\fR \fIlibraries\fR] [\fB-s\fR \fIkbytes_size\fR] \fIcmd\fR
      [\fIcmd-args\fR]...
 .fi
 
@@ -116,17 +116,15 @@ The "\fB#\fR" character implies that the rest of the line is a comment.
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-CommandResult
+c c
+l l .
+Command	Result
 _
-% \fBprex a.out\fRT{
+% \fBprex a.out\fR	T{
 Attaches \fBprex\fR to your program and starts \fBprex\fR.
 T}
-prex> \fBenable $all\fREnables all the probes.
-prex> \fBquit resume\fRT{
+prex> \fBenable $all\fR	Enables all the probes.
+prex> \fBquit resume\fR	T{
 Quits \fBprex\fR and resumes execution of program.
 T}
 .TE
@@ -181,12 +179,10 @@ Program\fR below for more information on signals and the target process.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBkernel mode\fR: \fBprex\fR is used to control probes in the Solaris kernel.
 In kernel mode, additional commands are defined, and some commands valid in
 other modes are invalid. See \fBKernel Mode\fR  below.
@@ -194,12 +190,10 @@ other modes are invalid. See \fBKernel Mode\fR  below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlibraries\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fIlibraries\fR mentioned are linked in to the target application using
 \fBLD_PRELOAD\fR (see \fBld\fR(1)). This option cannot be used when attaching
 to a running process. The argument to the \fB-l\fR option should be a
@@ -210,12 +204,10 @@ specified and where they will be found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fItrace_file_name\fR\fR
 .ad
 .RS 22n
-.rt  
 File to be used for the trace output. \fItrace_file_name\fR is assumed to be
 relative to the current working directory of \fBprex\fR (that is, the directory
 that the user was in when \fBprex\fR was started).
@@ -229,12 +221,10 @@ program. If \fBTMPDIR\fR is not set, \fB/tmp\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIkbytes_size\fR\fR
 .ad
 .RS 22n
-.rt  
 Maximum size of the output trace file in Kbytes. The default size of the trace
 \fIkbytes_size\fR is \fB4096\fR (2^10) bytes or \fB4\fR Mbytes for normal
 usage, and \fB384\fR or \fB384\fR kbytes in kernel mode. The minimum size that
@@ -269,24 +259,20 @@ The \fIattribute\fR or \fIvalue\fR (generically called "spec") can be any of
 the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIDENT\fR\fR
 .ad
 .RS 14n
-.rt  
 Any sequence of letters, digits, _\|, \e\|, ., % not beginning with a digit.
 \fBIDENT\fR implies an exact match.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQUOTED_STR\fR\fR
 .ad
 .RS 14n
-.rt  
 Usually used to escape reserved words (any commands in the command language).
 \fBQUOTED_STR\fR implies an exact match and has to be enclosed in single quotes
 (' ').
@@ -294,12 +280,10 @@ Usually used to escape reserved words (any commands in the command language).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBREGEXP\fR\fR
 .ad
 .RS 14n
-.rt  
 An \fBed\fR(1) regular expression pattern match. \fBREGEXP\fR has to be
 enclosed in slashes (/ /), A / can be included in a \fBREGEXP\fR by escaping it
 with a backslash \e\|.
@@ -782,18 +766,15 @@ arguments, \fBpfilter\fR prints the current process filter set and the state of
 the process filter mode switch:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBon\fR or \fBoff\fR\fR
 .ad
 .RS 18n
-.rt  
 set the state of the process filter mode switch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR \fIpidlist\fR\fR
 .ad
@@ -802,7 +783,6 @@ set the state of the process filter mode switch.
 \fB\fBdelete\fR \fIpidlist\fR\fR
 .ad
 .RS 18n
-.rt  
 add or delete processes from the process filter set. \fIpidlist\fR is a
 comma-separated list of one or more process ids.
 .RE
@@ -891,34 +871,28 @@ ktrace on                  # turn tracing on
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.prexrc\fR\fR
 .ad
 .RS 15n
-.rt  
 local \fBprex\fR initialization file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.prexrc\fR\fR
 .ad
 .RS 15n
-.rt  
 user's \fBprex\fR initialization file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fInnnnn\fR\fR\fR
 .ad
 .RS 15n
-.rt  
 process files
 .RE
 

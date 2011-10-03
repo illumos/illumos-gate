@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH copyresp 9S "14 Nov 1996" "SunOS 5.11" "Data Structures for Drivers"
+.TH COPYRESP 9S "Nov 14, 1996"
 .SH NAME
 copyresp \- STREAMS data structure for the M_IOCDATA message type
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/stream.h> 
+#include <sys/stream.h>
 .fi
 
 .SH INTERFACE LEVEL
@@ -30,7 +30,7 @@ cred_t   *cp_cr;       /* full credentials */
 uint_t   cp_id;        /* ioctl id (from ioc_id) */
 uint_t   cp_flag;      /* ioctl flags */
 mblk_t   *cp_private;  /* private state information */
-caddr_t  cp_rval;      /* status of request: 0 -> success; 
+caddr_t  cp_rval;      /* status of request: 0 -> success;
                        /* non-zero -> failure */
 .fi
 .in -2

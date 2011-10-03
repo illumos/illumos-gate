@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH newpad 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.TH NEWPAD 3XCURSES "Jun 5, 2002"
 .SH NAME
 newpad, pnoutrefresh, prefresh, subpad \- create or refresh a pad or subpad
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ newpad, pnoutrefresh, prefresh, subpad \- create or refresh a pad or subpad
 
 .LP
 .nf
-\fBint\fR \fBpnoutrefresh\fR(\fBWINDOW *\fR\fIpad\fR, \fBint\fR \fIpminrow\fR, \fBint\fR \fIpmincol\fR, \fBint\fR \fIsminrow\fR, 
+\fBint\fR \fBpnoutrefresh\fR(\fBWINDOW *\fR\fIpad\fR, \fBint\fR \fIpminrow\fR, \fBint\fR \fIpmincol\fR, \fBint\fR \fIsminrow\fR,
      \fBint\fR \fIsmincol\fR,\fBint\fR \fIsmaxrow\fR, \fBint\fR \fIsmaxcol\fR);
 .fi
 
@@ -39,117 +39,97 @@ newpad, pnoutrefresh, prefresh, subpad \- create or refresh a pad or subpad
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInlines\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the number of lines in the pad to be created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIncols\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the number of columns in the pad to be created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpad\fR\fR
 .ad
 .RS 11n
-.rt  
 Is a pointer to the pad to refresh.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpminrow\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the row coordinate of the upper left corner of the pad rectangle to be
 copied
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpmincol\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the column coordinate of the upper left corner of the pad rectangle to be
 copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsminrow\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the row coordinate of the upper left corner of the rectangle on the physical
 screen where pad is to be positioned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsmincol\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the column coordinate of the upper left corner of the rectangle on the
 physical screen where pad is to be positioned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsmaxrow\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the row coordinate of the lower right corner of the rectangle on the
 physical screen where the pad is to be positioned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsmaxcol\fR\fR
 .ad
 .RS 11n
-.rt  
 Is the column coordinate of the lower right corner of the rectangle on the
 physical screen where the pad is to be positioned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIorig\fR\fR
 .ad
 .RS 11n
-.rt  
 Is a pointer to the parent pad within which a sub-pad is created.
 .RE
 
@@ -214,15 +194,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

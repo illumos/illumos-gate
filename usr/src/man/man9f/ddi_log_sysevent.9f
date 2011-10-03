@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_log_sysevent 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_LOG_SYSEVENT 9F "Jan 16, 2006"
 .SH NAME
 ddi_log_sysevent \- log system event for drivers
 .SH SYNOPSIS
@@ -14,8 +14,8 @@ ddi_log_sysevent \- log system event for drivers
 
 
 
-\fBint\fR \fBddi_log_sysevent\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIvendor\fR, 
-     \fBchar *\fR\fIclass\fR, \fBchar *\fR\fIsubclass\fR, \fBnvlist_t *\fR\fIattr_list\fR, 
+\fBint\fR \fBddi_log_sysevent\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIvendor\fR,
+     \fBchar *\fR\fIclass\fR, \fBchar *\fR\fIsubclass\fR, \fBnvlist_t *\fR\fIattr_list\fR,
      \fBsysevent_id_t *\fR\fIeidp\fR, \fBint\fR \fIsleep_flag\fR);
 .fi
 
@@ -26,23 +26,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to the \fBdev_info\fR node for this driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvendor\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to a string defining the vendor. Third-party drivers should use their
 company's stock symbol (or similarly enduring identifier). Sun-supplied drivers
 should use \fBDDI_VENDOR_SUNW\fR.
@@ -50,46 +46,38 @@ should use \fBDDI_VENDOR_SUNW\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclass\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to a string defining the event class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsubclass\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to a string defining the event subclass.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattr_list\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to an \fBnvlist_t\fR, listing the name-value attributes associated
 with the event or NULL if there are no such attributes for this event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIeidp\fR\fR
 .ad
 .RS 14n
-.rt  
 The address of a \fBsysevent_id_t\fR structure in which the event's sequence
 number and timestamp are returned if the event is successfully queued. May be
 NULL if this information is not of interest. See below for the definition of
@@ -98,12 +86,10 @@ NULL if this information is not of interest. See below for the definition of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsleep_flag\fR\fR
 .ad
 .RS 14n
-.rt  
 Indicates how a caller wants to handle the possibility of resources not being
 available. If \fIsleep_flag\fR is \fBDDI_NOSLEEP\fR, the caller does not care
 if the allocation fails or the queue is full and can handle a failure
@@ -152,47 +138,39 @@ The structure members of \fBsysevent_id_t\fR are:
 The \fBddi_log_sysevent()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 18n
-.rt  
 The event has been queued for delivery successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ENOMEM\fR\fR
 .ad
 .RS 18n
-.rt  
 There is not enough memory to queue the system event at this time.
 \fBDDI_ENOMEM\fR cannot be returned when \fIsleep_flag\fR is \fBDDI_SLEEP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_EBUSY\fR\fR
 .ad
 .RS 18n
-.rt  
 The system event queue is full at this time. \fBDDI_EBUSY\fR cannot be returned
 when \fIsleep_flag\fR is \fBDDI_SLEEP\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ETRANSPORT\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fBsyseventd\fR daemon is not responding and events cannot be queued or
 delivered at this time. \fBDDI_ETRANSPORT\fR can be returned even when
 \fIsleep_flag\fR is \fBDDI_SLEEP\fR.
@@ -200,12 +178,10 @@ delivered at this time. \fBDDI_ETRANSPORT\fR can be returned even when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_ECONTEXT\fR\fR
 .ad
 .RS 18n
-.rt  
 \fIsleep_flag\fR is DDI_SLEEP and the driver is running in interrupt context.
 .RE
 

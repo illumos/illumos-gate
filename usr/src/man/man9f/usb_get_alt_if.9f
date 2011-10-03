@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_get_alt_if 9F "29 Dec 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_GET_ALT_IF 9F "Dec 29, 2006"
 .SH NAME
 usb_get_alt_if, usb_set_alt_if, usb_get_if_number, usb_owns_device \- Get and
 set alternate interface values
@@ -20,10 +20,10 @@ set alternate interface values
 
 .LP
 .nf
-\fBint\fR \fBusb_set_alt_if\fR(\fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIinterface_number\fR, 
-     \fBuint_t\fR \fIalternate_number\fR, \fBusb_flags_t\fR \fIflags\fR, 
+\fBint\fR \fBusb_set_alt_if\fR(\fBdev_info_t *\fR\fIdip\fR, \fBuint_t\fR \fIinterface_number\fR,
+     \fBuint_t\fR \fIalternate_number\fR, \fBusb_flags_t\fR \fIflags\fR,
      \fBvoid (*\fR\fIcallback\fR)(usb_pipe_handle_t \fIpipe_handle\fR,
-     \fBusb_opaque_t\fR \fIcallback_arg\fR, \fBint\fR \fIrval\fR, \fBusb_cb_flags_t\fR \fIflags\fR), 
+     \fBusb_opaque_t\fR \fIcallback_arg\fR, \fBint\fR \fIrval\fR, \fBusb_cb_flags_t\fR \fIflags\fR),
      \fBusb_opaque_t\fR \fIcallback_arg\fR);
 .fi
 
@@ -51,45 +51,37 @@ Solaris DDI specific (Solaris DDI)
 For \fBusb_get_alt_if()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 20n
-.rt  
 Pointer to device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterface_number\fR\fR
 .ad
 .RS 20n
-.rt  
 Interface of the desired alternate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIalternate_number\fR\fR
 .ad
 .RS 20n
-.rt  
 Address where current alternate setting is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 20n
-.rt  
 No flags are recognized. Reserved for future expansion.
 .RE
 
@@ -98,68 +90,56 @@ No flags are recognized. Reserved for future expansion.
 For \fBusb_set_alt_if()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 20n
-.rt  
 Pointer to device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterface_number\fR\fR
 .ad
 .RS 20n
-.rt  
 Interface of the desired alternate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIalternate_number\fR\fR
 .ad
 .RS 20n
-.rt  
 Alternate interface number to be set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 20n
-.rt  
 Only USB_FLAGS_SLEEP is recognized. Wait for completion and do not call
 callback.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 20n
-.rt  
 Callback handler to notify of asynchronous completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback_arg\fR\fR
 .ad
 .RS 20n
-.rt  
 Second argument passed to callback handler.
 .RE
 
@@ -168,12 +148,10 @@ Second argument passed to callback handler.
 For \fBusb_get_if_number()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to device's \fBdev_info\fR structure.
 .RE
 
@@ -182,12 +160,10 @@ Pointer to device's \fBdev_info\fR structure.
 For \fBusb_owns_device()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to device's \fBdev_info\fR structure.
 .RE
 
@@ -233,7 +209,6 @@ callback handler when completed.
 arguments:
 .sp
 .ne 2
-.mk
 .na
 \fBusb_pipe_handle_t pipe_handle\fR
 .ad
@@ -244,7 +219,6 @@ Handle of the default control pipe used to perform the request.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusb_opaque_t callback_arg\fR
 .ad
@@ -255,7 +229,6 @@ Callback_arg specified to \fBusb_set_alt_if()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBint rval\fR
 .ad
@@ -266,7 +239,6 @@ Request status.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusb_cb_flags_t callback_flags:\fR
 .ad
@@ -297,45 +269,37 @@ particular interface.
 For \fBusb_get_alt_if()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Interface's alternate setting was successfully obtained.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 Pointer to alternate_number and/or dip are NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from interrupt context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 23n
-.rt  
 The interface number is invalid.
 .sp
 An access error occurred.
@@ -346,67 +310,55 @@ An access error occurred.
 For \fBusb_set_alt_if()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Alternate interface was successfully set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 dip is NULL. USB_FLAGS_SLEEP is clear and callback is NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PERM\fR
 .ad
 .RS 23n
-.rt  
 dip does not own the interface to be set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from interrupt context with USB_FLAGS_SLEEP specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 23n
-.rt  
 Pipe handle is NULL, invalid, or refers to a pipe that is closing or closed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 23n
-.rt  
 The interface number and/or alternate setting are invalid.
 .sp
 Pipes were open.
@@ -434,23 +386,19 @@ interface number: otherwise.
 For \fBusb_owns_device()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBB_TRUE\fR
 .ad
 .RS 11n
-.rt  
 Driver of the dip argument owns the entire device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBB_FALSE\fR
 .ad
 .RS 11n
-.rt  
 Driver of the dip argument owns only the current interface.
 .RE
 
@@ -494,15 +442,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

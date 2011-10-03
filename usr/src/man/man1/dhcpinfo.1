@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright (c) 1992-1996 Competitive Automation, Inc. 
+.\"  Copyright (c) 1992-1996 Competitive Automation, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcpinfo 1 "15 May 2009" "SunOS 5.11" "User Commands"
+.TH DHCPINFO 1 "May 15, 2009"
 .SH NAME
 dhcpinfo \- display values of parameters received through DHCP
 .SH SYNOPSIS
@@ -57,29 +57,27 @@ their formats are listed below:
 
 .sp
 .TS
-tab();
-cw(1.4i) cw(2.1i) cw(2i) 
-lw(1.4i) lw(2.1i) lw(2i) 
-.
-Data TypeFormat\fBdhcp_inittab\fR(4) type
-Unsigned NumberOne or more decimal digitsT{
+c c c
+l l l .
+Data Type	Format	\fBdhcp_inittab\fR(4) type
+Unsigned Number	One or more decimal digits	T{
 \fBUNUMBER8\fR, \fBUNUMBER16\fR, \fBUNUMBER32\fR, \fBUNUMBER64\fR
 T}
-Signed NumberT{
+Signed Number	T{
 One or more decimal digits, optionally preceded by a minus sign
-T}T{
+T}	T{
 \fBSNUMBER8\fR, \fBSNUMBER16\fR, \fBSNUMBER32\fR, \fBSNUMBER64\fR
 T}
-\fBIP\fR AddressDotted-decimal notation\fBIP\fR
-IPv6 AddressColon-separated notation\fBIPv6\fR
-OctetT{
+\fBIP\fR Address	Dotted-decimal notation	\fBIP\fR
+IPv6 Address	Colon-separated notation	\fBIPv6\fR
+Octet	T{
 The string \fB0x\fR followed by a two-digit hexadecimal value
-T}\fBOCTET\fR
-StringZero or more \fBASCII\fR characters\fBASCII\fR
-DUIDDHCP Unique Identifier text\fBDUID\fR
-Domain NameT{
+T}	\fBOCTET\fR
+String	Zero or more \fBASCII\fR characters	\fBASCII\fR
+DUID	DHCP Unique Identifier text	\fBDUID\fR
+Domain Name	T{
 Standard dot-separated domain name, RFC 1035 format
-T}\fBDOMAIN\fR
+T}	\fBDOMAIN\fR
 .TE
 
 .SH OPTIONS
@@ -88,24 +86,20 @@ T}\fBDOMAIN\fR
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 16n
-.rt  
 Displays the output in a canonical format. This format is identical to the
 \fBOCTET\fR format with a granularity of \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinterface\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the interface to retrieve values for \fBDHCP\fR parameters from. If
 this option is not specified, the primary interface is used.
 .sp
@@ -126,23 +120,19 @@ interface, not one of the logical interfaces created by \fBdhcpagent\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIlimit\fR\fR
 .ad
 .RS 16n
-.rt  
 Limits the list of values displayed to \fIlimit\fR lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fB4 | 6\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the DHCP version to query. Use \fB-v4\fRfor DHCPv4 and \fB-v6\fR for
 DHCPv6.
 .RE
@@ -153,12 +143,10 @@ DHCPv6.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcode\fR\fR
 .ad
 .RS 14n
-.rt  
 Numeric code for the requested \fBDHCP\fR parameter, as defined by the
 \fBDHCP\fR specification. Vendor options are specified by adding \fB256\fR to
 the actual vendor code for DHCPv4, and \fB65536\fR for DHCPv6.
@@ -166,12 +154,10 @@ the actual vendor code for DHCPv4, and \fB65536\fR for DHCPv6.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIidentifier\fR\fR
 .ad
 .RS 14n
-.rt  
 Mnemonic symbol for the requested \fBDHCP\fR parameter, as listed in
 \fBdhcp_inittab\fR(4).
 .RE
@@ -182,23 +168,19 @@ Mnemonic symbol for the requested \fBDHCP\fR parameter, as listed in
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 The operation was not successful. The \fBDHCP\fR client daemon might not be
 running, the interface might have failed to configure, or no satisfactory
 \fBDHCP\fR responses were received.
@@ -206,34 +188,28 @@ running, the interface might have failed to configure, or no satisfactory
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Bad arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 The operation timed out.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 5n
-.rt  
 System error (should never occur).
 .RE
 
@@ -245,13 +221,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

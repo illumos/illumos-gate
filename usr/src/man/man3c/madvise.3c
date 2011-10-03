@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH madvise 3C "23 Feb 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH MADVISE 3C "Feb 23, 2005"
 .SH NAME
 madvise \- provide advice to VM system
 .SH SYNOPSIS
@@ -43,12 +43,10 @@ Values for \fIadvice\fR are defined in <\fBsys/mman.h\fR> as:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_NORMAL\fR\fR
 .ad
 .RS 23n
-.rt  
 This is the default system characteristic where accessing memory within the
 address range causes the system to read data from the mapped file. The kernel
 reads all data from files into pages which are retained for a period of time as
@@ -59,12 +57,10 @@ affects system performance only if a large amount of memory is accessed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_RANDOM\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the kernel to read in a minimum amount of data from a mapped file on any
 single particular access. If  \fBMADV_NORMAL\fR is in effect when an address of
 a mapped file is accessed, the system tries to read in as much data from the
@@ -74,12 +70,10 @@ locality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_SEQUENTIAL\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the system that addresses in this range are likely to be accessed only
 once, so the system will free the resources mapping the address range as
 quickly as possible.
@@ -87,12 +81,10 @@ quickly as possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_WILLNEED\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the system that a certain address range is definitely needed so the kernel
 will start reading the specified range into memory. This can benefit programs
 wanting to minimize the time needed to access memory the first time, as the
@@ -101,24 +93,20 @@ kernel would need to read in from the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_DONTNEED\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the kernel that the specified address range is no longer needed, so the
 system starts to free the resources associated with the address range.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_FREE\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the kernel that contents in the specified address range are no longer
 important and the range will be overwritten. When there is demand for memory,
 the system will free pages associated with the specified address range. In this
@@ -133,12 +121,10 @@ This value cannot be used on mappings that have underlying file objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_ACCESS_LWP\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the kernel that the next LWP to touch the specified address range will
 access it most heavily, so the kernel should try to allocate the memory and
 other resources for this range and the LWP accordingly.
@@ -146,12 +132,10 @@ other resources for this range and the LWP accordingly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_ACCESS_MANY\fR\fR
 .ad
 .RS 23n
-.rt  
 Tell the kernel that many processes and/or LWPs will access the specified
 address range randomly across the machine, so the kernel should try to allocate
 the memory and other resources for this range accordingly.
@@ -159,12 +143,10 @@ the memory and other resources for this range accordingly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV_ACCESS_DEFAULT\fR\fR
 .ad
 .RS 23n
-.rt  
 Reset the kernel's expectation for how the specified range will be accessed to
 the default.
 .RE
@@ -182,36 +164,30 @@ returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 Some or all mappings  in the  address  range [\fIaddr\fR,  \fIaddr\fR  +
 \fIlen\fR) are locked for I/O.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 10n
-.rt  
 Some or all of the addresses in the range [\fIaddr\fR, \fIaddr\fR + \fIlen\fR)
 are locked and \fBMS_SYNC\fR with the \fBMS_INVALIDATE\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 Some or all of the addresses in the specified range could not be read into
 memory from the underlying object when performing \fBMADV_WILLNEED\fR. The
 \fBmadvise()\fR function could return prior to this condition being detected,
@@ -220,12 +196,10 @@ in which case \fBerrno\fR will not be set to \fBEFAULT\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIaddr\fR argument is not a multiple of the page size as returned by
 \fBsysconf\fR(3C), the length of the specified address range is equal to 0, or
 the \fIadvice\fR argument was invalid.
@@ -233,23 +207,19 @@ the \fIadvice\fR argument was invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 Addresses in the range [\fIaddr\fR, \fIaddr\fR + \fIlen\fR) are outside the
 valid range for the address space of a process, or specify one or more pages
 that are not mapped.
@@ -257,12 +227,10 @@ that are not mapped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESTALE\fR\fR
 .ad
 .RS 10n
-.rt  
 Stale \fBNFS\fR file handle.
 .RE
 
@@ -274,15 +242,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

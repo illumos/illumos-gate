@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ipsec 7P "25 Sep 2009" "SunOS 5.11" "Protocols"
+.TH IPSEC 7P "Sep 25, 2009"
 .SH NAME
 ipsec \- Internet Protocol Security Architecture
 .SH DESCRIPTION
@@ -95,12 +95,10 @@ IPsec policy is enforced in the \fBip\fR(7P) driver. Several \fBndd\fR tunables
 for \fB/dev/ip\fR affect policy enforcement, including:
 .sp
 .ne 2
-.mk
 .na
 \fBicmp_accept_clear_messages\fR
 .ad
 .RS 30n
-.rt  
 If equal to 1 (the default), allow certain cleartext icmp messages to bypass
 policy. For ICMP echo requests ("ping"messages), protect the response like the
 request. If zero, treat icmp messages like other IP traffic.
@@ -108,34 +106,28 @@ request. If zero, treat icmp messages like other IP traffic.
 
 .sp
 .ne 2
-.mk
 .na
 \fBigmp_accept_clear_messages\fR
 .ad
 .RS 30n
-.rt  
 If 1, allow inbound cleartext IGMP messages to bypass IPsec policy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpim_accept_clear_messages\fR
 .ad
 .RS 30n
-.rt  
 If 1, allow inbound cleartext PIM messages to bypass IPsec policy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBipsec_policy_log_interval\fR
 .ad
 .RS 30n
-.rt  
 IPsec logs policy failures and errors to \fB/var/adm/messages\fR. To prevent
 syslog from being overloaded, the IPsec kernel modules limit the rate at which
 errors can be logged. You can query/set ipsec_policy_log_interval using
@@ -177,23 +169,19 @@ may not be specified. The actual request for \fBAH\fR or \fBESP\fR services can
 take one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PREF_NEVER\fR\fR
 .ad
 .RS 23n
-.rt  
 Bypass all policy. Only the superuser may request this service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PREF_REQUIRED\fR\fR
 .ad
 .RS 23n
-.rt  
 Regardless of other policy, require the use of the  IPsec  service.
 .RE
 
@@ -203,12 +191,10 @@ The following value can be logically ORed to an \fBIPSEC_PREF_REQUIRED\fR
 value:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIPSEC_PREF_UNIQUE\fR\fR
 .ad
 .RS 21n
-.rt  
 Regardless of other policy, enforce a unique \fBSA\fR for traffic originating
 from this socket.
 .RE
@@ -221,73 +207,60 @@ outside the original one. Algorithm values from <\fBnet/pfkeyv2.h\fR> are as
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_AALG_MD5HMAC\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses the MD5-HMAC (\fIRFC 2403\fR)  algorithm for authentication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_AALG_SHA1HMAC\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses the SHA1-HMAC (\fIRFC 2404)\fR algorithm for authentication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_EALG_DESCBC\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses the \fBDES\fR (\fIRFC 2405\fR) algorithm for encryption.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_EALG_3DESCBC\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses the Triple  \fBDES \fR (\fIRFC 2451\fR)   algorithm for encryption.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_EALG_BLOWFISH\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses the Blowfish (\fIRFC 2451\fR) algorithm for encryption.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_EALG_AES\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses  the  Advanced Encryption Standard  algorithm for encryption.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSADB_AALG_SHA256HMAC\fR\fR
 .ad
@@ -300,7 +273,6 @@ Uses  the  Advanced Encryption Standard  algorithm for encryption.
 \fB\fBSADB_AALG_SHA512HMAC\fR\fR
 .ad
 .RS 24n
-.rt  
 Uses the SHA2 hash algorithms with HMAC (\fIRFC 4868\fR)for authentication.
 .RE
 
@@ -313,10 +285,10 @@ An application should use either the \fBgetsockopt\fR(3SOCKET) or the
 .nf
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <net/pfkeyv2.h>   /* For SADB_*ALG_* */      
-/* .... socket setup skipped */     
-rc = setsockopt(s, IPPROTO_IP, IP_SEC_OPT,        
-   (const char *)&ipsec_req, sizeof (ipsec_req_t)); 
+#include <net/pfkeyv2.h>   /* For SADB_*ALG_* */
+/* .... socket setup skipped */
+rc = setsockopt(s, IPPROTO_IP, IP_SEC_OPT,
+   (const char *)&ipsec_req, sizeof (ipsec_req_t));
 .fi
 .in -2
 
@@ -340,13 +312,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

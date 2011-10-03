@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dlbindack 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DLBINDACK 9F "Jan 16, 2006"
 .SH NAME
 dlbindack, dlphysaddrack, dlokack, dlerrorack, dluderrorind \- DLPI device
 driver helper functions
@@ -31,13 +31,13 @@ driver helper functions
 
 .LP
 .nf
-\fBvoid\fR \fBdlphysaddrack\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBconst void *\fR\fIaddrp\fR, 
+\fBvoid\fR \fBdlphysaddrack\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBconst void *\fR\fIaddrp\fR,
      \fBt_uscalar_t\fR \fIaddrlen\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBdluderrorind\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBconst void *\fR\fIaddrp\fR, 
+\fBvoid\fR \fBdluderrorind\fR(\fBqueue_t *\fR\fIwq\fR, \fBmblk_t *\fR\fImp\fR, \fBconst void *\fR\fIaddrp\fR,
      \fBt_uscalar_t\fR \fIaddrlen\fR, \fBt_uscalar_t\fR \fIerror\fR, \fBt_uscalar_t\fR \fIunix_errno\fR);
 .fi
 
@@ -48,123 +48,101 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwq\fR\fR
 .ad
 .RS 21n
-.rt  
 Streams write queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImp\fR\fR
 .ad
 .RS 21n
-.rt  
 Pointer to the bind request message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsap\fR\fR
 .ad
 .RS 21n
-.rt  
 Service access point being requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddrp\fR\fR
 .ad
 .RS 21n
-.rt  
 Pointer to the dlpi layer source address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddrlen\fR\fR
 .ad
 .RS 21n
-.rt  
 Size of the \fBdlpi\fR layer address pointed to by \fIaddr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImaxconind\fR\fR
 .ad
 .RS 21n
-.rt  
 Maximum number of \fBDL_CONNECT_IND\fR messages allowed to be outstanding per
 stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIxidtest\fR\fR
 .ad
 .RS 21n
-.rt  
 The \fBXID\fR and \fBTEST\fR responses supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcorrect_primitive\fR\fR
 .ad
 .RS 21n
-.rt  
 Identifies the \fBDL\fR primitive completing successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerror_primitive\fR\fR
 .ad
 .RS 21n
-.rt  
 Identifies the \fBDL\fR primitive in error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerror\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBDLPI\fR error associated with the failure in the \fBDLPI\fR request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIunix_errno\fR\fR
 .ad
 .RS 21n
-.rt  
 Corresponding \fBUNIX\fR system error that can be associated with the failure
 in the \fBDLPI\fR request.
 .RE

@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ckitem 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH CKITEM 1 "Sep 14, 1992"
 .SH NAME
 ckitem, erritem, helpitem \- build a menu; prompt for and return a menu item
 .SH SYNOPSIS
 .LP
 .nf
-\fBckitem\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-uno\fR] [\fB-f\fR \fIfilename\fR] [\fB-l\fR \fIlabel\fR] 
-     [ [\fB-i\fR \fIinvis\fR] [,]...] [\fB-m\fR \fImax\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] 
-     [\fB-e\fR \fI error\fR] [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]] 
+\fBckitem\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-uno\fR] [\fB-f\fR \fIfilename\fR] [\fB-l\fR \fIlabel\fR]
+     [ [\fB-i\fR \fIinvis\fR] [,]...] [\fB-m\fR \fImax\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR]
+     [\fB-e\fR \fI error\fR] [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]]
      [\fIchoice\fR [...]]
 .fi
 
@@ -64,35 +64,29 @@ will describe the available menu choice (or choices).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI default\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the default value as \fIdefault\fR. The default is not validated and so
 does not have to meet any criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fI error\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the error message as \fI error\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fI filename\fR\fR
 .ad
 .RS 15n
-.rt  
 Define a file, \fIfilename\fR, which contains a list of menu items to be
 displayed. (The format of this file is: \fBtoken<tab>description\fR. Lines
 beginning with a pound sign (#) are designated as comments and ignored.)
@@ -100,23 +94,19 @@ beginning with a pound sign (#) are designated as comments and ignored.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fI help\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the help messages as \fI help\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI invis\fR\fR
 .ad
 .RS 15n
-.rt  
 Define invisible menu choices (those which will not be printed in the menu).
 (For example, ``all'' used as an invisible choice would mean it is a legal
 option but does not appear in the menu. Any number of invisible choices may be
@@ -126,91 +116,75 @@ or in a help message.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fI pid\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that the process \fBID\fR \fIpid\fR is to be sent a signal if the user
 chooses to abort.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fI label\fR\fR
 .ad
 .RS 15n
-.rt  
 Define a label, \fIlabel\fR, to print above the menu.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI max\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the maximum number of menu choices that the user can choose. The default
 is 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that menu items should not be displayed in alphabetical order.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that only one menu token will be returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI prompt\fR\fR
 .ad
 .RS 15n
-.rt  
 Define the prompt message as \fIprompt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that quit will not be allowed as a valid response.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI signal\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that process \fBID\fR \fIpid\fR defined with the \fB-k\fR option is to
 be sent signal \fI signal\fR when quit is chosen. If no signal is specified,
 \fBSIGTERM\fR is used.
@@ -218,23 +192,19 @@ be sent signal \fI signal\fR when quit is chosen. If no signal is specified,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that menu items should be displayed as an unnumbered list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR\fI width\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify that prompt, help and error messages will be formatted to a line length
 of \fIwidth\fR.
 .RE
@@ -245,12 +215,10 @@ of \fIwidth\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchoice\fR\fR
 .ad
 .RS 10n
-.rt  
 Define menu items. Items should be separated by white space or newline.
 .RE
 
@@ -260,46 +228,38 @@ Define menu items. Items should be separated by white space or newline.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBEOF\fR on input, or negative width on \fB-W\fR option, or inability to open
 file on \fB-f\fR option, or usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 User termination (quit).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 No choices from which to choose.
 .RE
 

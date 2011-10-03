@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pty 7D "8 Aug 1994" "SunOS 5.11" "Devices"
+.TH PTY 7D "Aug 8, 1994"
 .SH NAME
 pty \- pseudo-terminal driver
 .SH DESCRIPTION
@@ -84,36 +84,30 @@ pseudo-terminals to provide the functionality needed by applications programs
 to emulate real hardware interfaces:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSTOP\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. Output to the pseudo-terminal is suspended, as if a
 \fBSTOP\fR character had been typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCSTART\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is ignored. Output to the pseudo-terminal is restarted, as if a
 \fBSTART\fR character had been typed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBint\fR. If the value of the \fBint\fR is
 non-zero, \fIpacket\fR mode is enabled; if the value of the \fBint\fR is zero,
 packet mode is disabled. When a pseudo-terminal is in packet mode, each
@@ -124,56 +118,46 @@ information.  In the latter case, the byte is an inclusive-or of zero or more
 of the bits:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT_FLUSHREAD\fR\fR
 .ad
 .RS 22n
-.rt  
 whenever the read queue for the terminal is flushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT_FLUSHWRITE\fR\fR
 .ad
 .RS 22n
-.rt  
 whenever the write queue for the terminal is flushed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT_STOP\fR\fR
 .ad
 .RS 22n
-.rt  
 whenever output to the terminal is stopped using ^S.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT_START\fR\fR
 .ad
 .RS 22n
-.rt  
 whenever output to the terminal is restarted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT_DOSTOP\fR\fR
 .ad
 .RS 22n
-.rt  
 whenever \fBXON/XOFF\fR flow control is enabled after being disabled; it is
 considered ``enabled'' when the \fBIXON\fR flag in the \fBc_iflag\fR word is
 set, the \fBVSTOP\fR member of the \fBc_cc\fR array is ^S and the \fBVSTART\fR
@@ -182,12 +166,10 @@ member of the \fBc_cc\fR array is ^Q.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCPKT_NOSTOP\fR\fR
 .ad
 .RS 22n
-.rt  
 whenever \fBXON/XOFF\fR flow control is disabled after being enabled.
 .RE
 
@@ -195,12 +177,10 @@ whenever \fBXON/XOFF\fR flow control is disabled after being enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIOCREMOTE\fR\fR
 .ad
 .RS 14n
-.rt  
 The argument is a pointer to an \fBint\fR. If the value of the \fBint\fR is
 non-zero, \fIremote\fR mode is enabled; if the value of the \fBint\fR is zero,
 remote mode is disabled. This mode can be enabled or disabled independently of
@@ -229,8 +209,8 @@ required.
 #include <fcntl.h>
 #include <sys/termios.h>
 
-int fdm fds;  
-fdm = open("/dev/ptyp0, O_RDWR);  /* open master */ 
+int fdm fds;
+fdm = open("/dev/ptyp0, O_RDWR);  /* open master */
 fds = open("/dev/ttyp0, O_RDWR);  /* open slave */
 .fi
 .in -2
@@ -238,23 +218,19 @@ fds = open("/dev/ttyp0, O_RDWR);  /* open slave */
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/pty[p-z][0-9a-f]\fR\fR
 .ad
 .RS 25n
-.rt  
 pseudo-terminal controller devices
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/tty[p-z][0-9a-f]\fR\fR
 .ad
 .RS 25n
-.rt  
 pseudo-terminal slave devices
 .RE
 

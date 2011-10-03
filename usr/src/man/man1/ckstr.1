@@ -3,27 +3,27 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ckstr 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH CKSTR 1 "Sep 14, 1992"
 .SH NAME
 ckstr, errstr, helpstr, valstr \- display a prompt; verify and return a string
 answer
 .SH SYNOPSIS
 .LP
 .nf
-\fBckstr\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [ [\fB-r\fR \fIregexp\fR] [...]] [\fB-l\fR \fIlength\fR] 
-     [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR] 
+\fBckstr\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [ [\fB-r\fR \fIregexp\fR] [...]] [\fB-l\fR \fIlength\fR]
+     [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR]
      [\fB-k\fR \fIpid\fR [\fB- s\fR \fIsignal\fR]]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/errstr\fR [\fB-W\fR \fIwidth\fR] [\fB-e\fR \fIerror\fR] [\fB-l\fR \fIlength\fR] 
+\fB/usr/sadm/bin/errstr\fR [\fB-W\fR \fIwidth\fR] [\fB-e\fR \fIerror\fR] [\fB-l\fR \fIlength\fR]
      [ [\fB-r\fR \fIregexp\fR] [...]]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/helpstr\fR [\fB-W\fR \fIwidth\fR] [\fB-h\fR \fIhelp\fR] [\fB-l\fR \fIlength\fR] 
+\fB/usr/sadm/bin/helpstr\fR [\fB-W\fR \fIwidth\fR] [\fB-h\fR \fIhelp\fR] [\fB-l\fR \fIlength\fR]
      [ [\fB-r\fR \fIregexp\fR] [...]]
 .fi
 
@@ -70,91 +70,75 @@ standard output), and \fBvalstr\fR (which validates a response).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefault\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the default value as \fIdefault\fR. The default is not validated and so
 does not have to meet any criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIerror\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the error message as \fI error\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhelp\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the help message as \fI help\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIpid\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that process \fBID\fR \fIpid\fR is to be sent a signal if the user
 chooses to quit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlength\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the maximum length of the input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprompt\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the prompt message as \fIprompt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that \fBquit\fR will not be allowed as a valid response.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIregexp\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies a regular expression, \fI regexp\fR, against which the input should
 be validated. May include white space. If multiple expressions are defined, the
 answer need match only one of them.
@@ -162,12 +146,10 @@ answer need match only one of them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsignal\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that the process \fBID\fR \fIpid\fR defined with the \fB-k\fR option
 is to be sent signal \fIsignal\fR when quit is chosen. If no signal is
 specified, \fBSIGTERM\fR is used.
@@ -175,12 +157,10 @@ specified, \fBSIGTERM\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIwidth\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that prompt, help and error messages will be formatted to a line
 length of \fIwidth\fR.
 .RE
@@ -191,12 +171,10 @@ length of \fIwidth\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput\fR\fR
 .ad
 .RS 9n
-.rt  
 Input to be verified against format length and/or regular expression criteria.
 .RE
 
@@ -284,45 +262,37 @@ usage: valstr [\fB-l\fR length] [[\fB-r\fR regexp] [\|.\|.\|.\|]] input
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBEOF\fR on input, or negative width on  \fB-W\fR option,  or usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid regular expression.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 User termination (quit).
 .RE
 

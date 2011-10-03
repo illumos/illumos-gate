@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH soconfig 1M "29 Oct 2008" "SunOS 5.11" "System Administration Commands"
+.TH SOCONFIG 1M "Oct 29, 2008"
 .SH NAME
 soconfig \- configure transport providers for use by sockets
 .SH SYNOPSIS
@@ -35,12 +35,10 @@ during the booting sequence.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 11n
-.rt  
 Set up the \fBsoconfig\fR configuration for each driver according to the
 information stored in \fBfile\fR. A \fBsoconfig\fR file consists of lines of at
 least the first three fields listed below, separated by spaces:
@@ -58,36 +56,30 @@ An example of \fBfile\fR can be found in the \fBEXAMPLES\fR section below.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfamily\fR\fR
 .ad
 .RS 17n
-.rt  
 The protocol family as listed in the \fB/usr/include/sys/socket.h\fR file,
 expressed as an integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 17n
-.rt  
 The socket type as listed in the \fB/usr/include/sys/socket.h\fR file,
 expressed as an integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprotocol\fR\fR
 .ad
 .RS 17n
-.rt  
 The protocol number as specified in the family-specific \fBinclude\fR file,
 expressed as an integer. For example, for \fBAF_INET\fR this number is
 specified in \fB/usr/include/netinet/in.h\fR. An unspecified protocol number is
@@ -96,12 +88,10 @@ denoted with the value zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodule\fR | \fIpath\fR\fR
 .ad
 .RS 17n
-.rt  
 The module name or path name of a device that corresponds to the transport
 provider, such as \fBtcp\fR or \fB/dev/tcp\fR. Modules must reside in
 \fBkernel/socketmod\fR. A device name must begin with \fB/dev\fR. If this
@@ -165,12 +155,10 @@ begin with a hash mark (\fB#\fR):
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/sock2path\fR\fR
 .ad
 .RS 18n
-.rt  
 File containing mappings from sockets to transport providers.
 .RE
 

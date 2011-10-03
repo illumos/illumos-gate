@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH on 1 "8 Oct 2003" "SunOS 5.11" "User Commands"
+.TH ON 1 "Oct 8, 2003"
 .SH NAME
 on \- execute a command on a remote system with the local environment
 .SH SYNOPSIS
@@ -32,23 +32,19 @@ the corresponding files for the \fBon\fR command.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Debug mode. Prints out some messages as work is being done.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Interactive mode. Uses remote echoing and special character processing. This
 option is needed for programs that expect to be talking to a terminal. All
 terminal modes and window size changes are propagated.
@@ -56,12 +52,10 @@ terminal modes and window size changes are propagated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 No Input. This option causes the remote program to get EOF when it reads from
 the standard input, instead of passing the standard input from the standard
 input of the \fBon\fR program. For example, \fB-n\fR is necessary when running
@@ -76,7 +70,6 @@ commands in the background with job control.
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunknown host\fR\fR
 .ad
@@ -87,7 +80,6 @@ Host name not found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcannot connect to server\fR\fR
 .ad
@@ -98,7 +90,6 @@ Host down or not running the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcan't find\fR\fR
 .ad
@@ -109,7 +100,6 @@ Problem finding the working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcan't locate mount point\fR \fR
 .ad
@@ -120,7 +110,6 @@ Problem finding current file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRPC: Authentication error\fR \fR
 .ad
@@ -133,7 +122,6 @@ keylogin.  If that fails, try to set your publickey with chkey.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBon \fIserver\fR: RPC: can't encode arguments\fR\fR
 .ad

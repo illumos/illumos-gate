@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH halt 1M "2 Nov 2004" "SunOS 5.11" "System Administration Commands"
+.TH HALT 1M "Nov 2, 2004"
 .SH NAME
 halt, poweroff \- stop the processor
 .SH SYNOPSIS
@@ -35,70 +35,58 @@ login accounting file \fB/var/adm/wtmpx\fR. These actions are inhibited if the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Force a system crash dump before rebooting. See \fBdumpadm\fR(1M) for
 information on configuring system crash dumps.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Suppress sending a message to the system log daemon, \fBsyslogd\fR(1M), about
 who executed \fBhalt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Prevent the \fBsync\fR(1M) before stopping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 6n
-.rt  
 Quick halt. No graceful shutdown is attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 6n
-.rt  
 Halt the system, even from a dialup terminal.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 History of user access and administration information.
 .RE
 

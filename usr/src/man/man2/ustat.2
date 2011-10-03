@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ustat 2 "23 Jul 2001" "SunOS 5.11" "System Calls"
+.TH USTAT 2 "Jul 23, 2001"
 .SH NAME
 ustat \- get file system statistics
 .SH SYNOPSIS
@@ -48,70 +48,58 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBustat()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECOMM\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIdev\fR argument is on a remote machine and the link to that machine is
 no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIbuf\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-.rt  
 A signal was caught during the execution of the \fBustat()\fR function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIdev\fR argument is not the device number of a device containing a
 mounted file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIdev\fR argument refers to a device on a remote machine and the link  to
 that machine is no longer active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 One of the values returned cannot be represented in the structure pointed to by
 \fIbuf\fR.
 .RE

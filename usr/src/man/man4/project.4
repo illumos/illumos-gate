@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH project 4 "9 May 2005" "SunOS 5.11" "File Formats"
+.TH PROJECT 4 "May 9, 2005"
 .SH NAME
 project \- project file
 .SH DESCRIPTION
@@ -30,12 +30,10 @@ the system, of the form:
 where the fields are defined as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprojname\fR\fR
 .ad
 .RS 14n
-.rt  
 The name of the project. The name must be a string that consists of
 alphanumeric characters, underline (_) characters, hyphens (-), and periods
 (.). The period, which is reserved for projects with special meaning to the
@@ -45,12 +43,10 @@ operating system, can be used only in the names of default projects for users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprojid\fR\fR
 .ad
 .RS 14n
-.rt  
 The project's unique numerical \fBID\fR (\fBPROJID\fR) within the system. The
 maximum value of the \fIprojid\fR field is \fBMAXPROJID\fR. Project IDs below
 100 are reserved  for the use of the operating system.
@@ -58,23 +54,19 @@ maximum value of the \fIprojid\fR field is \fBMAXPROJID\fR. Project IDs below
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomment\fR\fR
 .ad
 .RS 14n
-.rt  
 The project's description.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuser-list\fR\fR
 .ad
 .RS 14n
-.rt  
 A comma-separated list of users allowed in the project. With the exception of
 the special projects referred to below, an empty field indicates no users are
 allowed. See note about the use of wildcards below.
@@ -82,12 +74,10 @@ allowed. See note about the use of wildcards below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup-list\fR\fR
 .ad
 .RS 14n
-.rt  
 A comma-separated list of groups of users allowed in the project. With the
 exception of the special projects referred to below, an empty field indicates
 no groups are allowed. See note about the use of wildcards below.
@@ -95,12 +85,10 @@ no groups are allowed. See note about the use of wildcards below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIattributes\fR\fR
 .ad
 .RS 14n
-.rt  
 A semicolon-separated list of name value pairs. Each pair has the following
 format:
 .sp

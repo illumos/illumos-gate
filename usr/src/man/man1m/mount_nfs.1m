@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_nfs 1M "26 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_NFS 1M "Jul 26, 2009"
 .SH NAME
 mount_nfs \- mount remote NFS resources
 .SH SYNOPSIS
@@ -54,7 +54,6 @@ interpreted as the separator between the host name and path, for example,
 \fB[1080::8:800:200C:417A]:tmp/file\fR. See \fBinet\fR(7P) and \fBinet6\fR(7P).
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhost\fR:\fIpathname\fR\fR
 .ad
@@ -68,7 +67,6 @@ necessarily slash-separated, though on most servers, this is the case.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInfs\fR://\fIhost\fR[:\fIport\fR]/\fIpathname\fR\fR
 .ad
@@ -82,7 +80,6 @@ for a more detailed discussion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhost\fR:\fIpathname\fR
 \fInfs\fR://\fIhost\fR[:\fIport\fR]/\fIpathname\fR\fR
@@ -102,7 +99,6 @@ SYSTEMS\fR for a more detailed discussion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostlist\fR \fIpathname\fR\fR
 .ad
@@ -129,7 +125,6 @@ See \fBmount\fR(1M) for the list of supported \fIgeneric_options\fR. See
 \fBshare_nfs\fR(1M) for a description of server options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
@@ -139,7 +134,6 @@ Set file system specific options according to a comma-separated list with no
 intervening spaces.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacdirmax=\fR\fIn\fR\fR
 .ad
@@ -151,7 +145,6 @@ The default value is \fB60\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacdirmin=\fR\fIn\fR\fR
 .ad
@@ -163,7 +156,6 @@ default value is \fB30\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacregmax=\fR\fIn\fR\fR
 .ad
@@ -175,7 +167,6 @@ modification. The default value is \fB60\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBacregmin=\fR\fIn\fR\fR
 .ad
@@ -187,7 +178,6 @@ The default value is \fB3\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBactimeo=\fR\fIn\fR\fR
 .ad
@@ -204,7 +194,6 @@ description of how \fBacdirmax\fR, \fBacdirmin\fR, \fBacregmax\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbg\fR | \fBfg\fR\fR
 .ad
@@ -216,7 +205,6 @@ default is \fBfg\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforcedirectio\fR | \fBnoforcedirectio\fR\fR
 .ad
@@ -233,7 +221,6 @@ The default behavior is \fBnoforcedirectio\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgrpid\fR\fR
 .ad
@@ -252,7 +239,6 @@ is unconditionally inherited from that of the parent directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhard\fR | \fBsoft\fR\fR
 .ad
@@ -265,7 +251,6 @@ NFSv4 clients do not support soft mounts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintr\fR | \fBnointr\fR\fR
 .ad
@@ -279,7 +264,6 @@ can be waiting for a remote mount.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoac\fR\fR
 .ad
@@ -292,7 +276,6 @@ is immediately written to the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnocto\fR\fR
 .ad
@@ -314,7 +297,6 @@ condition, the effect of \fB-nocto\fR can be a slight performance gain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBport=\fR\fIn\fR\fR
 .ad
@@ -328,7 +310,6 @@ then the \fBport\fR number in the option and in the \fBURL\fR must be the same.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBposix\fR\fR
 .ad
@@ -341,7 +322,6 @@ regarding POSIX.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproto=\fR\fInetid\fR | \fBrdma\fR\fR
 .ad
@@ -365,7 +345,6 @@ protocol with the \fBproto\fR option, NFS version 4 is not used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpublic\fR\fR
 .ad
@@ -379,7 +358,6 @@ under \fBNFS FILE SYSTEMS\fR for a more detailed discussion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquota\fR | \fBnoquota\fR\fR
 .ad
@@ -392,7 +370,6 @@ are still checked for operations on this file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremount\fR\fR
 .ad
@@ -405,7 +382,6 @@ only on currently mounted read-only file systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBretrans=\fR\fIn\fR\fR
 .ad
@@ -418,7 +394,6 @@ it is assumed that the transport performs retransmissions on behalf of NFS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBretry=\fR\fIn\fR\fR
 .ad
@@ -435,7 +410,6 @@ errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrsize=\fR\fIn\fR\fR
 .ad
@@ -452,7 +426,6 @@ transports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsec=\fR\fImode\fR\fR
 .ad
@@ -480,7 +453,6 @@ for the available \fImode\fR options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsecure\fR\fR
 .ad
@@ -491,7 +463,6 @@ This option has been deprecated in favor of the \fBsec=\fR\fIdh\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeo=\fR\fIn\fR\fR
 .ad
@@ -506,7 +477,6 @@ which are outside the control of NFS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvers=\fR\fINFS version number\fR\fR
 .ad
@@ -522,7 +492,6 @@ maximum, the next lowest version attempted until a matching version is found.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwsize=\fR\fIn\fR\fR
 .ad
@@ -539,7 +508,6 @@ transports.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxattr\fR | \fBnoxattr\fR\fR
 .ad
@@ -554,7 +522,6 @@ attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
@@ -569,7 +536,6 @@ producing the error "device busy."
 .SH NFS FILE SYSTEMS
 .sp
 .ne 2
-.mk
 .na
 \fBBackground versus Foreground\fR
 .ad
@@ -591,7 +557,6 @@ specified in the \fBretrans=\fR\fIn\fR option, a file system mounted with the
 
 .sp
 .ne 2
-.mk
 .na
 \fBHard versus Soft\fR
 .ad
@@ -606,7 +571,6 @@ recommended.
 
 .sp
 .ne 2
-.mk
 .na
 \fBAuthenticated requests\fR
 .ad
@@ -618,7 +582,6 @@ The server can require authenticated \fBNFS\fR requests from the client.
 
 .sp
 .ne 2
-.mk
 .na
 \fBURLs and the public option\fR
 .ad
@@ -652,7 +615,7 @@ public option      Force public file          Force public file
 default            Use MOUNT protocol.        Try public file handle
                                                with Canonical paths.
                                                Fall back to MOUNT
-                                               protocol if not 
+                                               protocol if not
                                                supported.
 .fi
 .in -2
@@ -666,7 +629,6 @@ paths.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReplicated file systems and failover\fR
 .ad
@@ -727,7 +689,7 @@ following command:
 .sp
 .in +2
 .nf
-example# mount -o acdirmax=10,actimeo=1000 server:/path /localpath 
+example# mount -o acdirmax=10,actimeo=1000 server:/path /localpath
 .fi
 .in -2
 
@@ -873,7 +835,6 @@ example# mount serv\(mix:/usr/man,serv\(miy:/var/man,nfs://serv-z/man /usr/man
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -884,7 +845,6 @@ table of mounted file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/fstypes\fR\fR
 .ad
@@ -895,7 +855,6 @@ default distributed file system type
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad

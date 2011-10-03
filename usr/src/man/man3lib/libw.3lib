@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libw 3LIB "24 Mar 2004" "SunOS 5.11" "Interface Libraries"
+.TH LIBW 3LIB "Mar 24, 2004"
 .SH NAME
 libw \- wide character library
 .SH SYNOPSIS
@@ -32,59 +32,53 @@ See \fBIntro\fR(3) for additional information on shared object interfaces.
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBfgetwc\fR\fBfgetws\fR\fBfputwc\fR
-\fBfputws\fR\fBgetwc\fR\fBgetwchar\fR
-\fBgetws\fR\fBisenglish\fR\fBisideogram\fR
-\fBisnumber\fR\fBisphonogram\fR\fBisspecial\fR
-\fBiswalnum\fR\fBiswalpha\fR\fBiswcntrl\fR
-\fBiswctype\fR\fBiswdigit\fR\fBiswgraph\fR
-\fBiswlower\fR\fBiswprint\fR\fBiswpunct\fR
-\fBiswspace\fR\fBiswupper\fR\fBiswxdigit\fR
-\fBputwc\fR\fBputwchar\fR\fBputws\fR
-\fBstrtows\fR\fBtowlower\fR\fBtowupper\fR
-\fBungetwc\fR\fBwatoll\fR\fBwcscat\fR
-\fBwcschr\fR\fBwcscmp\fR\fBwcscoll\fR
-\fBwcscpy\fR\fBwcscspn\fR\fBwcsftime\fR
-\fBwcslen\fR\fBwcsncat\fR\fBwcsncmp\fR
-\fBwcsncpy\fR\fBwcspbrk\fR\fBwcsrchr\fR
-\fBwcsspn\fR\fBwcstod\fR\fBwcstok\fR
-\fBwcstol\fR\fBwcstoul\fR\fBwcswcs\fR
-\fBwcswidth\fR\fBwcsxfrm\fR\fBwctype\fR
-\fBwcwidth\fR\fBwscasecmp\fR\fBwscat\fR
-\fBwschr\fR\fBwscmp\fR\fBwscol\fR
-\fBwscoll\fR\fBwscpy\fR\fBwscspn\fR
-\fBwsdup\fR\fBwslen\fR\fBwsncasecmp\fR
-\fBwsncat\fR\fBwsncmp\fR\fBwsncpy\fR
-\fBwspbrk\fR\fBwsprintf\fR\fBwsrchr\fR
-\fBwsscanf\fR\fBwsspn\fR\fBwstod\fR
-\fBwstok\fR\fBwstol\fR\fBwstoll\fR
-\fBwstostr\fR\fBwsxfrm\fR
+l l l
+l l l .
+\fBfgetwc\fR	\fBfgetws\fR	\fBfputwc\fR
+\fBfputws\fR	\fBgetwc\fR	\fBgetwchar\fR
+\fBgetws\fR	\fBisenglish\fR	\fBisideogram\fR
+\fBisnumber\fR	\fBisphonogram\fR	\fBisspecial\fR
+\fBiswalnum\fR	\fBiswalpha\fR	\fBiswcntrl\fR
+\fBiswctype\fR	\fBiswdigit\fR	\fBiswgraph\fR
+\fBiswlower\fR	\fBiswprint\fR	\fBiswpunct\fR
+\fBiswspace\fR	\fBiswupper\fR	\fBiswxdigit\fR
+\fBputwc\fR	\fBputwchar\fR	\fBputws\fR
+\fBstrtows\fR	\fBtowlower\fR	\fBtowupper\fR
+\fBungetwc\fR	\fBwatoll\fR	\fBwcscat\fR
+\fBwcschr\fR	\fBwcscmp\fR	\fBwcscoll\fR
+\fBwcscpy\fR	\fBwcscspn\fR	\fBwcsftime\fR
+\fBwcslen\fR	\fBwcsncat\fR	\fBwcsncmp\fR
+\fBwcsncpy\fR	\fBwcspbrk\fR	\fBwcsrchr\fR
+\fBwcsspn\fR	\fBwcstod\fR	\fBwcstok\fR
+\fBwcstol\fR	\fBwcstoul\fR	\fBwcswcs\fR
+\fBwcswidth\fR	\fBwcsxfrm\fR	\fBwctype\fR
+\fBwcwidth\fR	\fBwscasecmp\fR	\fBwscat\fR
+\fBwschr\fR	\fBwscmp\fR	\fBwscol\fR
+\fBwscoll\fR	\fBwscpy\fR	\fBwscspn\fR
+\fBwsdup\fR	\fBwslen\fR	\fBwsncasecmp\fR
+\fBwsncat\fR	\fBwsncmp\fR	\fBwsncpy\fR
+\fBwspbrk\fR	\fBwsprintf\fR	\fBwsrchr\fR
+\fBwsscanf\fR	\fBwsspn\fR	\fBwstod\fR
+\fBwstok\fR	\fBwstol\fR	\fBwstoll\fR
+\fBwstostr\fR	\fBwsxfrm\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libw.so.1\fR\fR
 .ad
 .RS 21n
-.rt  
 a filter on \fBlibc.so.1\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libw.so.1\fR\fR
 .ad
 .RS 21n
-.rt  
 a filter on \fB64/libc.so.1\fR
 .RE
 
@@ -96,13 +90,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ikeadm 1M "27 Jan 2009" "SunOS 5.11" "System Administration Commands"
+.TH IKEADM 1M "Jan 27, 2009"
 .SH NAME
 ikeadm \- manipulate Internet Key Exchange (IKE) parameters and state
 .SH SYNOPSIS
@@ -86,7 +86,6 @@ For details on how to use this command securely see .
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -99,7 +98,6 @@ otherwise unreachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -117,7 +115,6 @@ this flag is turned on.
 The following commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR\fR
 .ad
@@ -132,7 +129,6 @@ appropriate id-value pairs as described in the \fBID FORMATS\fR section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdel\fR\fR
 .ad
@@ -146,7 +142,6 @@ and preshared keys. The object to be deleted is specified as described in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdump\fR\fR
 .ad
@@ -160,7 +155,6 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflush\fR\fR
 .ad
@@ -175,7 +169,6 @@ with any new certificates added or removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR\fR
 .ad
@@ -190,7 +183,6 @@ the appropriate specification for each object type is described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR\fR
 .ad
@@ -202,7 +194,6 @@ information about that command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread\fR\fR
 .ad
@@ -214,7 +205,6 @@ preshared keys from either the default location or from the file specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR\fR
 .ad
@@ -230,7 +220,6 @@ ikeadm.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
@@ -243,7 +232,6 @@ be used to overwrite the existing configuration files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoken\fR\fR
 .ad
@@ -270,7 +258,6 @@ and invalidate access to keying material.
 .SS "Object Types"
 .sp
 .ne 2
-.mk
 .na
 \fBdebug\fR
 .ad
@@ -283,23 +270,21 @@ a bitmask, with individual bits enabling different types of information.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-DescriptionFlagNickname
+c c c
+l l l .
+Description	Flag	Nickname
 _
-Certificate management0x0001cert
-Key management0x0002key
-Operational0x0004op
-Phase 1 SA creation0x0008phase1
-Phase 2 SA creation0x0010phase2
-PF_KEY interface0x0020pfkey
-Policy management0x0040policy
-Proposal construction0x0080prop
-Door interface0x0100door
-Config file processing0x0200config
-All debug flags0x3ffall
+Certificate management	0x0001	cert
+Key management	0x0002	key
+Operational	0x0004	op
+Phase 1 SA creation	0x0008	phase1
+Phase 2 SA creation	0x0010	phase2
+PF_KEY interface	0x0020	pfkey
+Policy management	0x0040	policy
+Proposal construction	0x0080	prop
+Door interface	0x0100	door
+Config file processing	0x0200	config
+All debug flags	0x3ff	all
 .TE
 
 When specifying the debug level, either a number (decimal or hexadecimal) or a
@@ -314,7 +299,6 @@ types of information; \fBall-op\fR has the effect of turning on all debug
 
 .sp
 .ne 2
-.mk
 .na
 \fBpriv\fR
 .ad
@@ -348,7 +332,6 @@ keying material. This is also the case when viewing Phase 1 \fBSA\fRs.
 
 .sp
 .ne 2
-.mk
 .na
 \fBstats\fR
 .ad
@@ -427,7 +410,6 @@ that is loaded. See .
 
 .sp
 .ne 2
-.mk
 .na
 \fBdefaults\fR
 .ad
@@ -446,7 +428,6 @@ display the default values, not the values used to override the defaults.
 
 .sp
 .ne 2
-.mk
 .na
 \fBp1\fR
 .ad
@@ -458,7 +439,6 @@ address pair or a cookie pair; identification formats are described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrule\fR
 .ad
@@ -471,7 +451,6 @@ identified by its label; identification formats are described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpreshared\fR
 .ad
@@ -504,7 +483,6 @@ Identity pairs are made up of a local type-value pair, followed by the remote
 type-value pair. Valid types are:
 .sp
 .ne 2
-.mk
 .na
 \fBprefix\fR
 .ad
@@ -515,7 +493,6 @@ An address prefix.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfqdn\fR
 .ad
@@ -526,7 +503,6 @@ A fully-qualified domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdomain\fR
 .ad
@@ -537,7 +513,6 @@ Domain name, synonym for fqdn.
 
 .sp
 .ne 2
-.mk
 .na
 \fBuser_fqdn\fR
 .ad
@@ -548,7 +523,6 @@ User identity of the form \fIuser\fR@fqdn.
 
 .sp
 .ne 2
-.mk
 .na
 \fBmailbox\fR
 .ad
@@ -780,7 +754,7 @@ Attempted:initiator:    21   responder:      27
 Failed:   initiator:     0   responder:       0
 	         initiator fails include 0 time-out(s)
 PKCS#11 library linked in from /opt/SUNWconn/lib/libpkcs11.so
-example# 
+example#
 .fi
 .in -2
 .sp
@@ -823,23 +797,19 @@ ikeadm: PKCS#11 operation successful
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred. Writes an appropriate error message to standard error.
 .RE
 
@@ -851,13 +821,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityNot an Interface
+Interface Stability	Not an Interface
 .TE
 
 .SH SEE ALSO

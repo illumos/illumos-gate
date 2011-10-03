@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH arcmsr 7D "28 May 2011" "SunOS 5.11" "Devices"
+.TH ARCMSR 7D "May 28, 2011"
 .SH NAME
 arcmsr \- SAS and SATA HBA driver for Areca Hardware Raid devices
 .SH DESCRIPTION
@@ -55,34 +55,28 @@ hardware through the host system BIOS.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/drv/arcmsr\fR
 .ad
 .RS 28n
-.rt  
 32-bit ELF kernel module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/drv/amd64/arcmsr\fR
 .ad
 .RS 28n
-.rt  
 64-bit kernel module (x64 only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/kernel/drv/arcmsr.conf\fR
 .ad
 .RS 28n
-.rt  
 Driver configuration file (contains no user-configurable options).
 .RE
 
@@ -94,13 +88,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecturex86
+Architecture	x86
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.iked 1M "27 Jan 2009" "SunOS 5.11" "System Administration Commands"
+.TH IN.IKED 1M "Jan 27, 2009"
 .SH NAME
 in.iked \- daemon for the Internet Key Exchange (IKE)
 .SH SYNOPSIS
@@ -149,7 +149,6 @@ example# \fBsvcadm refresh ike\fR
 The following properties are defined for the \fBike\fR service:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig/admin_privilege\fR\fR
 .ad
@@ -163,7 +162,6 @@ those for the \fB-p\fR option. See the description of \fB-p\fR in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig/config_file\fR\fR
 .ad
@@ -177,7 +175,6 @@ description of \fB-f\fR in \fBOPTIONS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig/debug_level\fR\fR
 .ad
@@ -194,7 +191,6 @@ in \fBOPTIONS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig/debug_logfile\fR\fR
 .ad
@@ -220,7 +216,6 @@ files should be inspected for errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfig/ignore_errors\fR\fR
 .ad
@@ -312,23 +307,19 @@ the \fBike\fR \fBsmf\fR(5) service should be disabled first. See
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 15n
-.rt  
 Check the syntax of a configuration file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 Use debug mode. The process stays attached to the controlling terminal and
 produces large amounts of debugging output. This option is deprecated. See
 "Service Management Facility" for more details.
@@ -336,12 +327,10 @@ produces large amounts of debugging output. This option is deprecated. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Use \fIfilename\fR instead of \fB/etc/inet/ike/config\fR. See
 \fBike.config\fR(4) for the format of this file. This option is deprecated. See
 "Service Management Facility" for more details.
@@ -349,12 +338,10 @@ Use \fIfilename\fR instead of \fB/etc/inet/ike/config\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIlevel\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify privilege level (\fIlevel\fR). This option sets how much
 \fBikeadm\fR(1M) invocations can change or observe about the running
 \fBin.iked\fR.
@@ -362,34 +349,28 @@ Specify privilege level (\fIlevel\fR). This option sets how much
 Valid \fIlevels\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 5n
-.rt  
 Base level
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB1\fR
 .ad
 .RS 5n
-.rt  
 Access to preshared key info
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB2\fR
 .ad
 .RS 5n
-.rt  
 Access to keying material
 .RE
 
@@ -408,7 +389,6 @@ command to limit any corefiles produced by \fBin.iked\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ike/config\fR\fR
 .ad
@@ -419,7 +399,6 @@ Default configuration file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/secret/ike.privatekeys/*\fR\fR
 .ad
@@ -431,7 +410,6 @@ with the same filename in \fB/etc/inet/ike/publickeys/\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ike/publickeys/*\fR\fR
 .ad
@@ -443,7 +421,6 @@ private key names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ike/crls/*\fR\fR
 .ad
@@ -454,7 +431,6 @@ Public key certificate revocation lists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/secret/ike.preshared\fR\fR
 .ad

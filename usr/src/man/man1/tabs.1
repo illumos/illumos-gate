@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tabs 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH TABS 1 "Feb 1, 1995"
 .SH NAME
 tabs \- set tabs on a terminal
 .SH SYNOPSIS
@@ -36,12 +36,10 @@ The following options are supported. If a given flag occurs more than once, the
 last value given takes effect:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItype\fR \fR
 .ad
 .RS 12n
-.rt  
 \fBtabs\fR needs to know the type of terminal in order to set tabs and margins.
 \fItype\fR is a name listed in \fBterm\fR(5). If no \fB-T\fR flag is supplied,
 \fBtabs\fR uses the value of the environment variable \fBTERM\fR. If the value
@@ -52,12 +50,10 @@ provide a sequence that will work for many terminals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+m[\fR\fIn\fR\fB]\fR \fR
 .ad
 .RS 12n
-.rt  
 The margin argument may be used for some terminals. It causes all tabs to be
 moved over \fIn\fR columns by making column \fIn\fR\fB+1\fR the left margin.
 If \fB+m\fR is given without a value of \fIn\fR, the value assumed is \fB10\fR.
@@ -88,23 +84,19 @@ one code is specified, the last code option will be used.  The legal codes and
 their meanings are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,10,16,36,72\fR Assembler, IBM S/370, first format
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a2\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,10,16,40,72\fR
 .sp
 Assembler, IBM S/370, second format
@@ -112,12 +104,10 @@ Assembler, IBM S/370, second format
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,8,12,16,20,55\fR
 .sp
 COBOL, normal format
@@ -125,12 +115,10 @@ COBOL, normal format
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c2\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,6,10,14,49\fR
 .sp
 COBOL compact format (columns 1-6 omitted). Using this code, the first typed
@@ -148,12 +136,10 @@ specification as follows (see \fBfspec\fR(4)):
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c3\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,67\fR
 .sp
 COBOL compact format (columns 1-6 omitted), with more tabs than
@@ -170,12 +156,10 @@ appropriate format specification is (see \fBfspec\fR(4)):
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,7,11,15,19,23\fR
 .sp
 FORTRAN
@@ -183,12 +167,10 @@ FORTRAN
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61\fR
 .sp
 PL/I
@@ -196,12 +178,10 @@ PL/I
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,10,55\fR
 .sp
 SNOBOL
@@ -209,12 +189,10 @@ SNOBOL
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 7n
-.rt  
 \fB1,12,20,44\fR
 .sp
 UNIVAC 1100 Assembler
@@ -223,12 +201,10 @@ UNIVAC 1100 Assembler
 .SS "\fIRepetitive\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIn\fR \fR
 .ad
 .RS 7n
-.rt  
 A \fIrepetitive\fR specification requests tabs at columns 1+\fIn\fR,
 1+2*\fIn\fR, etc., where \fIn\fR is a single-digit decimal number. Of
 particular importance is the value \fB8\fR: this represents the UNIX system
@@ -244,12 +220,10 @@ See OPERANDS.
 .SS "\fIFile\fR"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIfile\fR\fR
 .ad
 .RS 9n
-.rt  
 If the name of a \fIfile\fR is given, \fBtabs\fR reads the first line of the
 file, searching for a format specification (see \fBfspec\fR(4)). If it finds
 one there, it sets the tab stops according to it, otherwise it sets them as
@@ -275,12 +249,10 @@ Tab and margin setting is performed via the standard output.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn1\fR[,\fIn2\fR,\|.\|.\|.] \fR
 .ad
 .RS 22n
-.rt  
 The \fIarbitrary\fR format consists of tab-stop values separated by commas or
 spaces. The tab-stop values must be positive decimal integers in ascending
 order. Up to 40 numbers are allowed. If any number (except the first one) is
@@ -356,12 +328,10 @@ that affect the execution of \fBtabs\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTERM\fR \fR
 .ad
 .RS 9n
-.rt  
 Determine the terminal type. If this variable is unset or null, and if the
 \fB-T\fR option is not specified, terminal type \fBansi+tabs\fR will be used.
 .RE
@@ -372,23 +342,19 @@ Determine the terminal type. If this variable is unset or null, and if the
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -400,15 +366,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

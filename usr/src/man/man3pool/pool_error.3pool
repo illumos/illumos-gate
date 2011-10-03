@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pool_error 3POOL "23 Sep 2003" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.TH POOL_ERROR 3POOL "Sep 23, 2003"
 .SH NAME
 pool_error, pool_strerror \- error interface to resource pools library
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
 
 \fBint\fR \fBpool_error\fR(\fBvoid\fR);
@@ -40,113 +40,93 @@ The \fBpool_error()\fR function returns the current pool error value for the
 calling thread from among the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_ACCESS\fR\fR
 .ad
 .RS 22n
-.rt  
 The operation could not be performed because the configuration was not opened
 with the correct opening permissions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 22n
-.rt  
 A bad parameter was supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BAD_PROP_TYPE\fR\fR
 .ad
 .RS 22n
-.rt  
 An incorrect property type was submitted or encountered during the pool
 operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_DATASTORE\fR\fR
 .ad
 .RS 22n
-.rt  
 An error occurred within permanent storage.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 22n
-.rt  
 The pool configuration presented for the operation is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_SEARCH\fR\fR
 .ad
 .RS 22n
-.rt  
 A query whose outcome set was empty was attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_NOTSUP\fR\fR
 .ad
 .RS 22n
-.rt  
 An unsupported operation was attempted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_PUTPROP\fR\fR
 .ad
 .RS 22n
-.rt  
 An attempt to write a read-only property was made.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_OK\fR\fR
 .ad
 .RS 22n
-.rt  
 The previous pool operation succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 22n
-.rt  
 An underlying system call or library function failed; \fBerrno\fR(3C) is
 preserved where possible.
 .RE
@@ -163,12 +143,10 @@ error.
 The \fBpool_strerror()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 9n
-.rt  
 The specified error value is not defined by the pools error facility.
 .RE
 
@@ -180,17 +158,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2009, Sun Microsystems, Inc. All rights reserved. 
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audiocmi 7D "17 Aug 2009" "SunOS 5.11" "Devices"
+.TH AUDIOCMI 7D "Aug 17, 2009"
 .SH NAME
 audiocmi \- C-Media 8738, 8768, and 8338 driver support
 .SH DESCRIPTION
@@ -15,7 +15,6 @@ cards.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/audiocmi\fR\fR
 .ad
@@ -26,7 +25,6 @@ cards.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/audiocmi\fR\fR
 .ad
@@ -37,7 +35,6 @@ cards.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/audiocmi\fR\fR
 .ad
@@ -48,7 +45,6 @@ cards.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/audiocmi.conf\fR\fR
 .ad
@@ -65,13 +61,12 @@ See \fBattributes\fR(5) for a descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(1.83i) |cw(3.67i) 
-lw(1.83i) |lw(3.67i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePC-based system
+Architecture	PC-based system
 .TE
 
 .SH SEE ALSO

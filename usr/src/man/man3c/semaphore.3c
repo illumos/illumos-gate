@@ -2,14 +2,14 @@
 .\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 1995 IEEE. All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH semaphore 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH SEMAPHORE 3C "Feb 5, 2008"
 .SH NAME
 semaphore, sema_init, sema_destroy, sema_wait, sema_trywait, sema_post \-
 semaphores
@@ -17,7 +17,7 @@ semaphores
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lthread  -lc [ \fIlibrary\fR... ]
-#include <synch.h> 
+#include <synch.h>
 
 \fBint\fR \fBsema_init\fR(\fBsema_t *\fR\fIsp\fR, \fBunsigned int\fR \fIcount\fR, \fBint\fR \fItype\fR,
      \fBvoid *\fR \fIarg\fR);
@@ -68,12 +68,10 @@ assign several different types of behavior to a semaphore. No current type uses
 The \fItype\fR argument may be one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSYNC_PROCESS\fR \fR
 .ad
 .RS 18n
-.rt  
 The semaphore can synchronize threads in this process and other processes.
 Initializing the semaphore should be done by only one process. A semaphore
 initialized with this type must be allocated in memory shared between
@@ -84,12 +82,10 @@ this way and not allocate it in such shared memory. \fIarg\fR is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSYNC_THREAD\fR \fR
 .ad
 .RS 18n
-.rt  
 The semaphore can synchronize  threads only in this process. The \fIarg\fR
 argument is ignored. \fBUSYNC_THREAD\fR does not support multiple mappings to
 the same logical synch object. If you need to \fBmmap()\fR a synch object to
@@ -173,23 +169,19 @@ indicates an error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-.rt  
 The \fIsp\fR argument does not refer to a valid semaphore.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR \fR
 .ad
 .RS 11n
-.rt  
 Either the \fIsp\fR or \fIarg\fR argument points to an illegal address.
 .RE
 
@@ -198,12 +190,10 @@ Either the \fIsp\fR or \fIarg\fR argument points to an illegal address.
 The \fBsema_wait()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR \fR
 .ad
 .RS 10n
-.rt  
 The wait was interrupted by a signal or \fBfork()\fR.
 .RE
 
@@ -212,12 +202,10 @@ The wait was interrupted by a signal or \fBfork()\fR.
 The \fBsema_trywait()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR \fR
 .ad
 .RS 10n
-.rt  
 The semaphore pointed to by \fIsp\fR has a 0 count.
 .RE
 
@@ -226,12 +214,10 @@ The semaphore pointed to by \fIsp\fR has a 0 count.
 The \fBsema_post()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR \fR
 .ad
 .RS 14n
-.rt  
 The semaphore value pointed to by \fIsp\fR exceeds \fBSEM_VALUE_MAX\fR.
 .RE
 
@@ -272,11 +258,11 @@ customer(int deposit_withdrawal)
                                 decrement tellers */
       }
       else
-         sema_wait(&tellers); /* wait for next teller, then 
+         sema_wait(&tellers); /* wait for next teller, then
                                 proceed, and decrement tellers */
 
       do_business(deposit_withdrawal);
-      sema_post(&tellers); /* increment tellers; this_customer's 
+      sema_post(&tellers); /* increment tellers; this_customer's
                               teller is now available */
 }
 .fi
@@ -290,13 +276,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

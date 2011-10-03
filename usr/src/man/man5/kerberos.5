@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kerberos 5 "1 Oct 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH KERBEROS 5 "Oct 1, 2008"
 .SH NAME
 kerberos \- overview of Solaris Kerberos implementation
 .SH DESCRIPTION
@@ -64,23 +64,19 @@ primary/instance@REALM
 
 .sp
 .ne 2
-.mk
 .na
 \fBprimary\fR
 .ad
 .RS 12n
-.rt  
 A user, a host, or a service.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinstance\fR
 .ad
 .RS 12n
-.rt  
 A qualification of the primary. If the primary is a host \(em indicated by the
 keyword \fBhost\fR\(em then the instance is the fully-qualified domain name of
 that host. If the primary is a user or service, then the instance is optional.
@@ -89,12 +85,10 @@ Some instances, such as \fBadmin\fR or \fBroot\fR, are privileged.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrealm\fR
 .ad
 .RS 12n
-.rt  
 The Kerberos equivalent of a domain; in fact, in most cases the realm is
 directly mapped to a \fBDNS\fR domain name. Kerberos realms are given in
 upper-case only. For examples of principal names, see the EXAMPLES.

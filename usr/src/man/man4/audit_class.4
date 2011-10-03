@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audit_class 4 "26 Jun 2008" "SunOS 5.11" "File Formats"
+.TH AUDIT_CLASS 4 "Jun 26, 2008"
 .SH NAME
 audit_class \- audit class definitions
 .SH SYNOPSIS
@@ -42,34 +42,28 @@ Each entry in the \fBaudit_class\fR file has the form:
 The fields are defined as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImask\fR\fR
 .ad
 .RS 15n
-.rt  
 class mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 15n
-.rt  
 class name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdescription\fR\fR
 .ad
 .RS 15n
-.rt  
 class description
 .RE
 
@@ -82,24 +76,20 @@ will have more than 1 bit in its mask. See Examples. Two special meta-classes
 are also pre-defined: \fBall\fR, and \fBno\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 7n
-.rt  
 Represents a conjunction of all allowed classes, and is provided as a shorthand
 method of specifying all classes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno\fR\fR
 .ad
 .RS 7n
-.rt  
 Is the invalid class, and any event mapped solely to this class will not be
 audited. Turning auditing on to the \fBall\fR meta class will not cause events
 mapped solely to the \fBno\fR class to be written to the audit trail. This
@@ -150,13 +140,11 @@ The following is an example of an \fBaudit_class\fR file:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/security/audit_class\fR\fR
 .ad
 .RS 29n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -167,13 +155,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability  See below.
+Interface Stability 	 See below.
 .TE
 
 .sp

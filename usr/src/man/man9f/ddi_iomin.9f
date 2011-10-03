@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_iomin 9F "04 Apr 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_IOMIN 9F "Apr 04, 2006"
 .SH NAME
 ddi_iomin \- find minimum alignment and transfer size for DMA
 .SH SYNOPSIS
@@ -25,23 +25,19 @@ Solaris DDI specific (Solaris DDI). This interface is obsolete.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinitial\fR\fR
 .ad
 .RS 13n
-.rt  
 The initial minimum \fBDMA\fRtransfer size in bytes. This may be zero or an
 appropriate \fBdlim_minxfer\fR value for device's \fBddi_dma_lim\fR structure
 (see \fBddi_dma_lim_sparc\fR(9S) or \fBddi_dma_lim_x86\fR(9S)). This value must
@@ -50,12 +46,10 @@ be a power of two.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstreaming\fR\fR
 .ad
 .RS 13n
-.rt  
 This argument, if non-zero, indicates that the returned value should be
 modified to account for \fIstreaming\fR mode accesses (see
 \fBddi_dma_req\fR(9S) for a discussion of streaming versus non-streaming access
@@ -87,13 +81,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

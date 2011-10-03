@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ibtl 7D "9 Oct 2004" "SunOS 5.11" "Devices"
+.TH IBTL 7D "Oct 9, 2004"
 .SH NAME
 ibtl \- Solaris InfiniBand Transport Layer
 .SH DESCRIPTION
@@ -33,34 +33,28 @@ Reliable Connected (RC) transport types only.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/ibtl\fR\fR
 .ad
 .RS 29n
-.rt  
 32-bit x86 ELF kernel misc module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/amd64/ibtl\fR\fR
 .ad
 .RS 29n
-.rt  
 64-bit x86 ELF kernel misc module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/misc/sparcv9/ibtl\fR\fR
 .ad
 .RS 29n
-.rt  
 64-bit SPARC ELF kernel module
 .RE
 
@@ -72,13 +66,12 @@ See \fBattributes\fR(5) for a description of the following attribute:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityConsolidation Private
+Interface Stability	Consolidation Private
 .TE
 
 .SH SEE ALSO

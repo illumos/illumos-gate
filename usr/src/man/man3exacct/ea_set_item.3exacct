@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ea_set_item 3EXACCT "28 Nov 2001" "SunOS 5.11" "Extended Accounting File Access Library Functions"
+.TH EA_SET_ITEM 3EXACCT "Nov 28, 2001"
 .SH NAME
 ea_set_item, ea_alloc, ea_strdup, ea_set_group, ea_match_object_catalog,
 ea_attach_to_object, ea_attach_to_group, ea_free, ea_strfree, ea_free_item,
@@ -11,7 +11,7 @@ ea_free_object \- create, destroy and manipulate exacct objects
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ] 
+\fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lexacct\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <exacct.h>
 
 \fBint\fR \fBea_set_item\fR(\fBea_object_t *\fR\fIobj\fR, \fBea_catalog_t\fR \fItag\fR, \fBvoid *\fR\fIvalue\fR,
@@ -137,24 +137,20 @@ The \fBea_set_item()\fR, \fBea_set_group()\fR, and
 \fBea_match_object_catalog()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_SYSCALL_FAIL\fR\fR
 .ad
 .RS 22n
-.rt  
 A system call invoked by the function failed. The \fBerrno\fR variable contains
 the error value set by the underlying call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXR_INVALID_OBJECT\fR\fR
 .ad
 .RS 22n
-.rt  
 The passed object is of an incorrect type, for example passing a group object
 to \fBea_set_item()\fR.
 .RE
@@ -203,15 +199,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

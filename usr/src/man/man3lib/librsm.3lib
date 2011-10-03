@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH librsm 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBRSM 3LIB "May 22, 2003"
 .SH NAME
 librsm \- remote shared memory interface library
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lrsm\fR [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lrsm\fR [ \fIlibrary\fR... ]
 #include <rsmapi.h>
 .fi
 
@@ -30,53 +30,47 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBrsm_create_localmemory_handle\fR\fBrsm_free_interconnect_topology\fR
-\fBrsm_free_localmemory_handle\fR\fBrsm_get_controller\fR
-\fBrsm_get_controller_attr\fR\fBrsm_get_interconnect_topology\fR
-\fBrsm_get_segmentid_range\fR\fBrsm_intr_signal_post\fR
-\fBrsm_intr_signal_wait\fR\fBrsm_intr_signal_wait_pollfd\fR
-\fBrsm_memseg_export_create\fR\fBrsm_memseg_export_destroy\fR
-\fBrsm_memseg_export_publish\fR\fBrsm_memseg_export_rebind\fR
-\fBrsm_memseg_export_republish\fR\fBrsm_memseg_export_unpublish\fR
-\fBrsm_memseg_get_pollfd\fR\fBrsm_memseg_import_close_barrier\fR
-\fBrsm_memseg_import_connect\fR\fBrsm_memseg_import_destroy_barrier\fR
-\fBrsm_memseg_import_disconnect\fR\fBrsm_memseg_import_get\fR
-\fBrsm_memseg_import_get16\fR\fBrsm_memseg_import_get32\fR
-\fBrsm_memseg_import_get64\fR\fBrsm_memseg_import_get8\fR
-\fBrsm_memseg_import_get_mode\fR\fBrsm_memseg_import_getv\fR
-\fBrsm_memseg_import_init_barrier\fR\fBrsm_memseg_import_map\fR
-\fBrsm_memseg_import_open_barrier\fR\fBrsm_memseg_import_order_barrier\fR
-\fBrsm_memseg_import_put\fR\fBrsm_memseg_import_put16\fR
-\fBrsm_memseg_import_put32\fR\fBrsm_memseg_import_put64\fR
-\fBrsm_memseg_import_put8\fR\fBrsm_memseg_import_putv\fR
-\fBrsm_memseg_import_set_mode\fR\fBrsm_memseg_import_unmap\fR
-\fBrsm_memseg_release_pollfd\fR\fBrsm_release_controller\fR
+l l
+l l .
+\fBrsm_create_localmemory_handle\fR	\fBrsm_free_interconnect_topology\fR
+\fBrsm_free_localmemory_handle\fR	\fBrsm_get_controller\fR
+\fBrsm_get_controller_attr\fR	\fBrsm_get_interconnect_topology\fR
+\fBrsm_get_segmentid_range\fR	\fBrsm_intr_signal_post\fR
+\fBrsm_intr_signal_wait\fR	\fBrsm_intr_signal_wait_pollfd\fR
+\fBrsm_memseg_export_create\fR	\fBrsm_memseg_export_destroy\fR
+\fBrsm_memseg_export_publish\fR	\fBrsm_memseg_export_rebind\fR
+\fBrsm_memseg_export_republish\fR	\fBrsm_memseg_export_unpublish\fR
+\fBrsm_memseg_get_pollfd\fR	\fBrsm_memseg_import_close_barrier\fR
+\fBrsm_memseg_import_connect\fR	\fBrsm_memseg_import_destroy_barrier\fR
+\fBrsm_memseg_import_disconnect\fR	\fBrsm_memseg_import_get\fR
+\fBrsm_memseg_import_get16\fR	\fBrsm_memseg_import_get32\fR
+\fBrsm_memseg_import_get64\fR	\fBrsm_memseg_import_get8\fR
+\fBrsm_memseg_import_get_mode\fR	\fBrsm_memseg_import_getv\fR
+\fBrsm_memseg_import_init_barrier\fR	\fBrsm_memseg_import_map\fR
+\fBrsm_memseg_import_open_barrier\fR	\fBrsm_memseg_import_order_barrier\fR
+\fBrsm_memseg_import_put\fR	\fBrsm_memseg_import_put16\fR
+\fBrsm_memseg_import_put32\fR	\fBrsm_memseg_import_put64\fR
+\fBrsm_memseg_import_put8\fR	\fBrsm_memseg_import_putv\fR
+\fBrsm_memseg_import_set_mode\fR	\fBrsm_memseg_import_unmap\fR
+\fBrsm_memseg_release_pollfd\fR	\fBrsm_release_controller\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/librsm.so.2\fR \fR
 .ad
 .RS 28n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/librsm.so.2\fR \fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object
 .RE
 
@@ -88,15 +82,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

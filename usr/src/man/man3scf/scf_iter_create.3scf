@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_iter_create 3SCF "4 Dec 2008" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_ITER_CREATE 3SCF "Dec 4, 2008"
 .SH NAME
 scf_iter_create, scf_iter_handle, scf_iter_destroy, scf_iter_reset,
 scf_iter_handle_scopes, scf_iter_scope_services, scf_iter_service_instances,
@@ -19,7 +19,7 @@ Configuration Facility repository
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_iter_t *\fR\fBscf_iter_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
@@ -237,34 +237,28 @@ the iterator is complete, they return 0. Otherwise, they return -1.
 The \fBscf_iter_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle argument is NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
 .RS 30n
-.rt  
 There is no memory available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The server does not have adequate resources for a new iteration.
 .RE
 
@@ -273,12 +267,10 @@ The server does not have adequate resources for a new iteration.
 The \fBscf_iter_handle()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle associated with \fIiter\fR has been destroyed.
 .RE
 
@@ -287,7 +279,6 @@ The handle associated with \fIiter\fR has been destroyed.
 The \fBscf_iter_next_value()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -308,7 +299,6 @@ The \fBscf_iter_handle_scopes()\fR, \fBscf_iter_scope_services()\fR,
 \fBscf_iter_snaplevel_pgs_typed()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -319,7 +309,6 @@ The parent has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -330,7 +319,6 @@ The parent is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -341,7 +329,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -352,7 +339,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -368,12 +354,10 @@ The \fBscf_iter_service_pgs_typed()\fR, \fBscf_iter_instance_pgs_typed()\fR,
 \fBscf_iter_snaplevel_pgs_typed()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIpgtype\fR argument is not a valid property group type.
 .RE
 
@@ -385,12 +369,10 @@ The \fBscf_iter_next_service()\fR, \fBscf_iter_next_instance()\fR,
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
 .RS 21n
-.rt  
 The parent the iterator is attached to has been deleted.
 .RE
 
@@ -402,7 +384,6 @@ The \fBscf_iter_next_scope()\fR, \fBscf_iter_next_service()\fR,
 \fBscf_iter_next_value()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
@@ -413,7 +394,6 @@ The iterator is not set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -424,7 +404,6 @@ The requested object type does not match the type the iterator is walking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -435,7 +414,6 @@ The handle is not bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_MISMATCH\fR\fR
 .ad
@@ -446,7 +424,6 @@ The \fIiter\fR and \fIparent\fR arguments are not derived from the same handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -470,12 +447,10 @@ The \fBscf_iter_scope_services()\fR, \fBscf_iter_service_instances()\fR,
 fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
 .RS 26n
-.rt  
 The server does not have the resources to complete the request.
 .RE
 
@@ -534,17 +509,17 @@ if (scf_handle_bind(handle) == -1 ||
 while ((r = scf_iter_next_service(svc_iter, svc)) > 0) {
      if (scf_service_to_fmri(svc, fmri, sz) < 0) {
           /* failure */
-     }   
+     }
      puts(fmri);
      if (scf_iter_service_instances(inst_iter, svc) < 0) {
           /* failure */
-     }   
+     }
      while ((r = scf_iter_next_instance(inst_iter, inst)) > 0) {
           if (scf_instance_to_fmri(inst, fmri, sz) < 0) {
                /* failure */
           }
           puts(fmri);
-     }   
+     }
      if (r < 0)
           break;
 }
@@ -569,15 +544,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

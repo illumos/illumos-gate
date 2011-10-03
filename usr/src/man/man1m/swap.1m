@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH swap 1M "11 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH SWAP 1M "Apr 11, 2008"
 .SH NAME
 swap \- swap administrative interface
 .SH SYNOPSIS
@@ -39,7 +39,6 @@ the system swap areas used by the memory manager.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIswapname\fR [\fIswaplow\fR] [\fIswaplen\fR]\fR
 .ad
@@ -141,7 +140,6 @@ The client can then run \fBswap\fR \fB-a\fR to add the swap space:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIswapname\fR\fR
 .ad
@@ -159,7 +157,6 @@ swap areas.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -171,7 +168,6 @@ repetitively dividing by 1024.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
@@ -182,7 +178,6 @@ Write the files sizes in units of 1024 bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -191,7 +186,6 @@ Write the files sizes in units of 1024 bytes.
 List the status of all the swap areas. The output has five columns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR\fR
 .ad
@@ -202,7 +196,6 @@ The path name for the swap area.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev\fR\fR
 .ad
@@ -214,7 +207,6 @@ zeroes otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBswaplo\fR\fR
 .ad
@@ -225,7 +217,6 @@ The \fIswaplow\fR value for the area in 512-byte blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblocks\fR\fR
 .ad
@@ -236,7 +227,6 @@ The \fIswaplen\fR value for the area in 512-byte blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfree\fR\fR
 .ad
@@ -255,7 +245,6 @@ column of the swap stats.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -264,7 +253,6 @@ column of the swap stats.
 Print summary information about total swap space usage and availability:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallocated\fR\fR
 .ad
@@ -276,7 +264,6 @@ store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreserved\fR\fR
 .ad
@@ -288,7 +275,6 @@ memory mappings for possible future use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBused\fR\fR
 .ad
@@ -299,7 +285,6 @@ The total amount of swap space in bytes that is either allocated or reserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBavailable\fR\fR
 .ad

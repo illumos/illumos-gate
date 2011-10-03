@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ct_pr_status_get_param 3CONTRACT "25 Feb 2008" "SunOS 5.11" "Contract Management Library Functions"
+.TH CT_PR_STATUS_GET_PARAM 3CONTRACT "Feb 25, 2008"
 .SH NAME
 ct_pr_status_get_param, ct_pr_status_get_fatal, ct_pr_status_get_members,
 ct_pr_status_get_contracts, ct_pr_status_get_svc_fmri,
@@ -12,7 +12,7 @@ ct_pr_status_get_svc_creator \- process contract status functions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -lcontract \fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -lcontract \fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcontract.h>
 #include <sys/contract/process.h>
 
@@ -38,7 +38,7 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -
 
 .LP
 .nf
-\fBint\fR \fBct_pr_status_get_svc_fmri\fR(\fBct_stathdl_t\fR \fIstathdl\fR, \fBchar **\fR\fIfmri\fR); 
+\fBint\fR \fBct_pr_status_get_svc_fmri\fR(\fBct_stathdl_t\fR \fIstathdl\fR, \fBchar **\fR\fIfmri\fR);
 .fi
 
 .LP
@@ -114,12 +114,10 @@ The \fBct_pr_status_get_param()\fR, \fBct_pr_status_get_fatal()\fR,
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIstathdl\fR argument is not a process contract status object.
 .RE
 
@@ -132,12 +130,10 @@ The \fBct_pr_status_get_param()\fR, \fBct_pr_status_get_fatal()\fR,
 functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested data were not available in the status object.
 .RE
 
@@ -156,13 +152,13 @@ list of processes, print them, and free the status object.
 #include <fcntl.h>
 #include <libcontract.h>
 #include <stdio.h>
- 
+
 \&...
 int fd;
 uint_t i, n;
 pid_t *procs;
 ct_stathdl_t st;
- 
+
 fd = open("/system/contract/process/1/status");
 ct_status_read(fd, &st);
 ct_pr_status_get_members(st, &procs, &n);
@@ -182,15 +178,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

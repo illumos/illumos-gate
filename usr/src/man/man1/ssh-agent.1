@@ -2,13 +2,13 @@
 .\" To view license terms, attribution, and copyright for OpenSSH, the default path is /var/sadm/pkg/SUNWsshdr/install/copyright. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the
 .\" installed location.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH ssh-agent 1 "17 Aug 2009" "SunOS 5.11" "User Commands"
+.TH SSH-AGENT 1 "Aug 17, 2009"
 .SH NAME
 ssh-agent \- authentication agent
 .SH SYNOPSIS
 .LP
 .nf
-\fBssh-agent\fR [\fB-a\fR \fIbind_address\fR] [\fB-c\fR | \fB-s\fR ] [\fB-d\fR] 
+\fBssh-agent\fR [\fB-a\fR \fIbind_address\fR] [\fB-c\fR | \fB-s\fR ] [\fB-d\fR]
      [-t \fIlife\fR] [\fIcommand\fR [\fIargs\fR]...]
 .fi
 
@@ -72,71 +72,59 @@ terminates.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIbind_address\fR\fR
 .ad
 .RS 19n
-.rt  
 Binds the agent to the unix-domain socket bind_address. The default is
 \fB/tmp/ssh-XXXXXXXX/agent.\fIpid\fR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 19n
-.rt  
 Generates C-shell commands on stdout. This is the default if \fBSHELL\fR
 indicates that it is a csh style of shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 19n
-.rt  
 Debug mode. When this option is specified, \fBssh-agent\fR does not fork.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 19n
-.rt  
 Kills the current agent (given by the \fBSSH_AGENT_PID\fR environment
 variable).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 19n
-.rt  
 Generates Bourne shell commands on stdout. This is the default if \fBSHELL\fR
 does not indicate that it is a csh style of shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIlife\fR\fR
 .ad
 .RS 19n
-.rt  
 Set a default value for the maximum lifetime (\fIlife\fR) of identities added
 to the agent. \fIlife\fR can be specified in seconds or in a time format
 specified in \fBsshd_config\fR(4). \fIlife\fR specified for an identity with
@@ -150,30 +138,25 @@ specified in \fBsshd_config\fR(4). \fIlife\fR specified for an identity with
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/ssh-XXXXXXXX/agent.\fIpid\fR\fR\fR
 .ad
@@ -192,13 +175,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

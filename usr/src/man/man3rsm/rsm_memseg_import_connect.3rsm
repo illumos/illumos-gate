@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rsm_memseg_import_connect 3RSM "8 Jun 2001" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.TH RSM_MEMSEG_IMPORT_CONNECT 3RSM "Jun 8, 2001"
 .SH NAME
 rsm_memseg_import_connect, rsm_memseg_import_disconnect \- create or break
 logical commection between import and export segments
@@ -11,7 +11,7 @@ logical commection between import and export segments
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
-#include <rsmapi.h> 
+#include <rsmapi.h>
 
 \fBint\fR \fBrsm_memseg_import_connect\fR(
      \fBrsmapi_controller_handle_t\fR \fIcontroller\fR,
@@ -43,34 +43,28 @@ request is denied. The \fIperm\fR argument is limited to the following octal
 values:
 .sp
 .ne 2
-.mk
 .na
 \fB0400\fR
 .ad
 .RS 8n
-.rt  
 read mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0200\fR
 .ad
 .RS 8n
-.rt  
 write mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0600\fR
 .ad
 .RS 8n
-.rt  
 read/write mode
 .RE
 
@@ -91,12 +85,10 @@ The \fBrsm_memseg_import_connect()\fR and \fBrsm_memseg_import_disconnect()\fR
 functions can return the following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_SEG_HNDL\fR \fR
 .ad
 .RS 24n
-.rt  
 Invalid segment handle.
 .RE
 
@@ -106,7 +98,6 @@ The  \fBrsm_memseg_import_connect()\fR function can return the following
 errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_CTLR_HNDL\fR \fR
 .ad
@@ -117,7 +108,6 @@ Invalid controller handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_CTLR_NOT_PRESENT\fR \fR
 .ad
@@ -128,7 +118,6 @@ Controller not present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_PERM_DENIED\fR \fR
 .ad
@@ -139,7 +128,6 @@ Permission denied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_INSUFFICIENT_MEM\fR \fR
 .ad
@@ -150,7 +138,6 @@ Insufficient memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_INSUFFICIENT_RESOURCES\fR \fR
 .ad
@@ -161,7 +148,6 @@ Insufficient resources.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_SEG_NOT_PUBLISHED_TO_NODE\fR \fR
 .ad
@@ -172,7 +158,6 @@ Segment not published to node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_SEG_NOT_PUBLISHED\fR \fR
 .ad
@@ -183,7 +168,6 @@ Segment not published at all.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_ADDR\fR \fR
 .ad
@@ -194,7 +178,6 @@ Bad address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_REMOTE_NODE_UNREACHABLE\fR \fR
 .ad
@@ -205,7 +188,6 @@ Remote not not reachable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_INTERRUPTED\fR \fR
 .ad
@@ -220,23 +202,19 @@ The \fBrsm_memseg_import_disconnect()\fR function can return the following
 errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_SEG_STILL_MAPPED\fR \fR
 .ad
 .RS 28n
-.rt  
 Segment still mapped, need to unmap before disconnect.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_POLLFD_IN_USE\fR \fR
 .ad
 .RS 28n
-.rt  
 Poll file descriptor in use.
 .RE
 
@@ -248,15 +226,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE \fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

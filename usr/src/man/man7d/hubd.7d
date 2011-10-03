@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hubd 7D "6 July 2006" "SunOS 5.11" "Devices"
+.TH HUBD 7D "Jul 6, 2006"
 .SH NAME
 hubd \- USB hub driver
 .SH SYNOPSIS
@@ -32,34 +32,28 @@ configuration. When the device is disconnected from the hub port, the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/hubd\fR\fR
 .ad
 .RS 28n
-.rt  
 32- bit x86 ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/hubd\fR\fR
 .ad
 .RS 28n
-.rt  
 64- bit x86 ELF kernel module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/hubd\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit SPARC ELF kernel module
 .RE
 
@@ -71,13 +65,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86, PCI-based systems
+Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
@@ -118,7 +111,6 @@ number>\fR prefix instead of \fBhub<instance number>\fR as the root hub is an
 integrated part of the host controller.
 .sp
 .ne 2
-.mk
 .na
 \fBConnecting device on port \fI<number>\fR failed.\fR
 .ad
@@ -130,7 +122,6 @@ hub. If enumeration fails, disconnect and re-connect.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUse of a USB 1.0 hub behind a high speed port may cause unexpected
 failures.\fR
@@ -145,7 +136,6 @@ Translators. Please use only USB 2.0 or USB 1.1 hubs behind high-speed ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fBConnecting a high speed device to a non-high speed hub (port x) will result
 in a loss of performance. Please connect the device to a high speed port to get
@@ -160,7 +150,6 @@ performance, reconnect without going through a USB 1.0 or 1.1 hub.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot access <device>. Please reconnect.\fR
 .ad
@@ -173,7 +162,6 @@ the original device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPort <n> overcurrent. \fR
 .ad
@@ -184,7 +172,6 @@ An overcurrent condition was detected. Please remove the device on this port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevices not identical to the previous one on this port. Please disconnect
 and reconnect.\fR
@@ -197,7 +184,6 @@ to identify the original device with a name string.
 
 .sp
 .ne 2
-.mk
 .na
 \fBHub driver supports max of \fI<n>\fR ports on hub. Hence, using the first
 \fI<number of physical ports>\fR of \fI<n>\fR ports available.\fR
@@ -211,7 +197,6 @@ out of the total \fI<number of physical ports>\fR ports are usable.
 
 .sp
 .ne 2
-.mk
 .na
 \fBHub global over current condition, please disconnect the devices connected
 to the hub to clear the condition. You may need to re-connect the hub if the
@@ -219,7 +204,7 @@ ports do not work.\fR
 .ad
 .sp .6
 .RS 4n
-An overcurrent condition was detected on the hub. This 	means that the
+An overcurrent condition was detected on the hub. This means that the
 aggregate current being drawn by the devices on the downstream ports exceeds a
 preset value. Refer to section 7.2.1.2 and 11.13 of the \fIUniversal Serial Bus
 Specification 2.0\fR. If this message continues to display, you may need to
@@ -230,7 +215,6 @@ ports.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRoot hub over current condition, please check your system to clear the
 condition as soon as possible. You may need to reboot the system if the root
@@ -259,7 +243,6 @@ the following manner:
 
 .sp
 .ne 2
-.mk
 .na
 \fBLocal power has been lost, please disconnect hub.\fR
 .ad
@@ -272,7 +255,6 @@ the external power-supply and then plug in the hub again.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLocal power has been lost, the hub could draw <x> mA power from the USB
 bus.\fR
@@ -286,7 +268,6 @@ external power-supply and then plug in the hub again.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTwo bus-powered hubs cannot be concatenated.\fR
 .ad
@@ -298,7 +279,6 @@ bus-powered hub and connect it to a self-powered hub or a root hub port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBConfiguration <n> for device <device> at port <m> exceeds power available
 for this port. Please re-insert your device into another hub port which has
@@ -311,7 +291,6 @@ The device requires more power than is available on this port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPort <\fIn\fR> in over current condition, please check the attached device
 to clear the condition. The system will try to recover the port, but if not

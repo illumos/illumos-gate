@@ -3,29 +3,29 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ikecert 1M "10 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH IKECERT 1M "Jun 10, 2009"
 .SH NAME
 ikecert \- manipulates the machine's on-filesystem public-key certificate
 databases
 .SH SYNOPSIS
 .LP
 .nf
-\fBikecert\fR certlocal 
-     [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-k\fR | \fB-l\fR | \fB-r\fR | \fB-U\fR | \fB-C\fR | \fB-L\fR] 
-     [[\fB-p\fR] \fB-T\fR \fIPKCS#11 token identifier\fR] 
+\fBikecert\fR certlocal
+     [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-k\fR | \fB-l\fR | \fB-r\fR | \fB-U\fR | \fB-C\fR | \fB-L\fR]
+     [[\fB-p\fR] \fB-T\fR \fIPKCS#11 token identifier\fR]
      [\fIoption_specific_arguments\fR]...
 .fi
 
 .LP
 .nf
-\fBikecert\fR certdb [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-l\fR | \fB-r\fR | \fB-U\fR | \fB-C\fR | \fB-L\fR] 
-     [[\fB-p\fR] \fB-T\fR \fIPKCS#11 token identifier\fR] 
+\fBikecert\fR certdb [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-l\fR | \fB-r\fR | \fB-U\fR | \fB-C\fR | \fB-L\fR]
+     [[\fB-p\fR] \fB-T\fR \fIPKCS#11 token identifier\fR]
      [\fIoption_specific_arguments\fR]...
 .fi
 
 .LP
 .nf
-\fBikecert\fR certrldb [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-l\fR | \fB-r\fR] 
+\fBikecert\fR certrldb [\fB-a\fR | \fB-e\fR | \fB-h\fR | \fB-l\fR | \fB-r\fR]
      [\fIoption_specific_arguments\fR]...
 .fi
 
@@ -86,7 +86,6 @@ specified in \fB/etc/inet/ike/config\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -94,7 +93,6 @@ The following options are supported:
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -116,7 +114,6 @@ be imported first using the \fBcertdb\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertdb\fR
 .ad
@@ -135,7 +132,6 @@ token is explicitly specified using the \fB-T\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertrldb\fR
 .ad
@@ -150,7 +146,6 @@ input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR [\fB-f\fR pkcs8] \fIslot\fR\fR
 .ad
@@ -158,7 +153,6 @@ input.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -181,7 +175,6 @@ extracted in unencrypted PKCS#8 format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR [\fB-f\fR \fIoutput-format\fR] \fBcertspec\fR\fR
 .ad
@@ -189,7 +182,6 @@ extracted in unencrypted PKCS#8 format.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertdb\fR
 .ad
@@ -204,7 +196,6 @@ first matching identity. The default output format is \fBPEM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertrldb\fR
 .ad
@@ -221,7 +212,6 @@ matches in the database is extracted. See \fBNOTES\fR, below, for details on
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-kc\fR \fB-m\fR \fIkeysize\fR \fB-t\fR \fIkeytype\fR \fB-D\fR \fIdname\fR
 \fB-A\fR \fIaltname\fR[ ... ]\fR
@@ -238,7 +228,6 @@ matches in the database is extracted. See \fBNOTES\fR, below, for details on
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -261,7 +250,6 @@ unlock the token with \fBikeadm\fR(1M) once \fBin.iked\fR(1M) is running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-ks\fR \fB-m\fR \fIkeysize\fR \fB-t\fR \fIkeytype\fR \fB-D\fR \fIdname\fR
 \fB-A\fR \fIaltname\fR[ ... ]\fR
@@ -283,7 +271,6 @@ identifier\fR]\fR
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -303,7 +290,6 @@ and the self-signed certificate will also be stored in the hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR [\fB-v\fR] [\fIslot\fR]\fR
 .ad
@@ -311,7 +297,6 @@ and the self-signed certificate will also be stored in the hardware.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -330,7 +315,6 @@ objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR [\fB-v\fR] [certspec]\fR
 .ad
@@ -338,7 +322,6 @@ objects.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertdb\fR
 .ad
@@ -356,7 +339,6 @@ listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertrldb\fR
 .ad
@@ -374,7 +356,6 @@ patterns.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIslot\fR\fR
 .ad
@@ -382,7 +363,6 @@ patterns.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -402,7 +382,6 @@ already deleted by \fBcertdb\fR \fB-r\fR, that is not a problem.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR certspec\fR
 .ad
@@ -410,7 +389,6 @@ already deleted by \fBcertdb\fR \fB-r\fR, that is not a problem.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertdb\fR
 .ad
@@ -431,7 +409,6 @@ already deleted by \fBcertlocal\fR \fB-r\fR, that is not a problem.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertrldb\fR
 .ad
@@ -445,7 +422,6 @@ with the given \fBcertspec\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR slot\fR
 .ad
@@ -453,7 +429,6 @@ with the given \fBcertspec\fR.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcertlocal\fR\fR
 .ad
@@ -468,7 +443,6 @@ database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcertdb\fR\fR
 .ad
@@ -485,7 +459,6 @@ disassociated from the IKE database.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR certspec\fR
 .ad
@@ -493,7 +466,6 @@ disassociated from the IKE database.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -511,7 +483,6 @@ this manner.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertdb\fR
 .ad
@@ -532,7 +503,6 @@ token with \fBikeadm\fR(1M) once \fBin.iked\fR(1M) is running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR pattern\fR
 .ad
@@ -540,7 +510,6 @@ token with \fBikeadm\fR(1M) once \fBin.iked\fR(1M) is running.
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fBcertlocal\fR
 .ad
@@ -555,7 +524,6 @@ created on-token with the Solaris \fBIKE\fR utilities.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcertdb\fR
 .ad
@@ -580,7 +548,6 @@ token with \fBikeadm\fR(1M) once \fBin.iked\fR(1M) is running.
 The following parameters are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBcertspec\fR
 .ad
@@ -605,7 +572,7 @@ ISSUER=<Issuer Names>
 SLOT=<Slot Number in the certificate database>
 
 Example:"ISSUER=C=US, O=SUN" IP=1.2.3.4 !DNS=example.com
-Example:"C=US,   O=CALIFORNIA" IP=5.4.2.1 DNS=example.com 
+Example:"C=US,   O=CALIFORNIA" IP=5.4.2.1 DNS=example.com
 .fi
 .in -2
 .sp
@@ -630,7 +597,6 @@ can also be issued with keyword tags.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -644,7 +610,6 @@ example below).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
@@ -658,7 +623,6 @@ unit, \fBCN\fR=common name. Valid tags are: \fBC\fR, \fBO\fR, \fBOU\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -670,7 +634,6 @@ Encoding output format. \fBpem\fR for \fBPEM Base64\fR or \fBber\fR for
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIvalidity end_time\fR\fR
 .ad
@@ -683,7 +646,6 @@ validity end time is calculated at four years from the validity start time. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -726,7 +688,6 @@ below), supports only up to 2048-bit keys for RSA and 1024-bit keys for DSA.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIvalidity start_time\fR\fR
 .ad
@@ -739,7 +700,6 @@ below, for an explanation for the validity date and time syntax.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
@@ -750,7 +710,6 @@ Key type. It can be \fBrsa-sha1\fR, \fBrsa-md5\fR, or \fBdsa-sha1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
@@ -859,7 +818,6 @@ example# \fB# ikecert certlocal -kc -m 1024 -t rsa-md5 -T vca0-keystore \e
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -870,7 +828,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
@@ -882,7 +839,6 @@ An error occurred. Writes an appropriate error message to standard error.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/secret/ike.privatekeys/*\fR\fR
 .ad
@@ -894,7 +850,6 @@ with the same filename in \fB/etc/inet/ike/publickeys/\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ike/publickeys/*\fR\fR
 .ad
@@ -906,7 +861,6 @@ private key names.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ike/crls/*\fR\fR
 .ad
@@ -917,7 +871,6 @@ Public key certificate revocation lists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/inet/ike/config\fR\fR
 .ad
@@ -934,13 +887,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
@@ -977,7 +929,6 @@ For relative dates, the syntax is as follows:
 where:
 .sp
 .ne 2
-.mk
 .na
 \fBN\fR
 .ad
@@ -988,7 +939,6 @@ represents an integer
 
 .sp
 .ne 2
-.mk
 .na
 \fBs\fR
 .ad
@@ -999,7 +949,6 @@ represents seconds
 
 .sp
 .ne 2
-.mk
 .na
 \fBm\fR
 .ad
@@ -1010,7 +959,6 @@ represents minutes
 
 .sp
 .ne 2
-.mk
 .na
 \fBh\fR
 .ad
@@ -1021,7 +969,6 @@ represents hours
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
@@ -1032,7 +979,6 @@ represents days
 
 .sp
 .ne 2
-.mk
 .na
 \fBw\fR
 .ad
@@ -1043,7 +989,6 @@ represents weeks
 
 .sp
 .ne 2
-.mk
 .na
 \fBM\fR
 .ad
@@ -1054,7 +999,6 @@ represents months
 
 .sp
 .ne 2
-.mk
 .na
 \fBy\fR
 .ad
@@ -1090,7 +1034,7 @@ day and 2 hours ago and an end date of Jan 22nd, 2007 at 12:00:00 local time.
 .in +2
 .nf
 # ikecert certlocal -ks -t rsa-sha1 -m 1024 \e
-    -D "CN=mycert, O=Sun, C=US" \e 
+    -D "CN=mycert, O=Sun, C=US" \e
     -S -1d2h -F "01/22/2007 12:00:00"
 .fi
 .in -2

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_fm_init 9F "14 May 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_FM_INIT 9F "May 14, 2007"
 .SH NAME
 ddi_fm_init, ddi_fm_fini, ddi_fm_capable \- initialize and get the FM
 capabilities for a device instance
@@ -36,34 +36,28 @@ Solaris DDI specific (Solaris DDI)
 \fBddi_fm_init()\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to the \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfm_capability\fR\fR
 .ad
 .RS 17n
-.rt  
 Fault Management capability bit mask
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIibcp\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to where the interrupt block cookie should be returned.
 .RE
 
@@ -77,60 +71,50 @@ the bitwise-inclusive-OR of the fault management capabilities, described in the
 following and supported by the driver's immediate nexus parent.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_NOT_CAPABLE\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver does not support any \fBFMA\fR features. This is the default value
 assigned to device drivers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_EREPORT_CAPABLE\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver generates \fBFMA\fR protocol error events (\fBereports\fR) upon the
 detection of an error condition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_ACCCHK_CAPABLE\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver checks for errors upon the completion of one or more access
 \fBI/O\fR transactions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_DMACHK_CAPABLE\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver checks for errors upon the completion of one or more \fBDMA\fR
 \fBI/O\fR transactions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FM_ERRCB_CAPABLE\fR\fR
 .ad
 .RS 26n
-.rt  
 The driver is capable of error handler callback registration.
 .RE
 
@@ -152,24 +136,20 @@ property in its \fBdriver.conf\fR(4) file to the values described above. The
 \fBddi_fm_init()\fR with the desired capability list.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_fm_fini()\fR\fR
 .ad
 .RS 17n
-.rt  
 This function cleans up resources allocated to support fault management for the
 \fIdip\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_fm_capable()\fR\fR
 .ad
 .RS 20n
-.rt  
 This function returns the capability bit mask currently set for the \fIdip\fR
 structure.
 .RE
@@ -187,13 +167,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

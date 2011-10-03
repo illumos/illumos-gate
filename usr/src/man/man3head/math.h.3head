@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright 1989 AT&T.  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH math.h 3HEAD "11 Aug 2004" "SunOS 5.11" "Headers"
+.TH MATH.H 3HEAD "Aug 11, 2004"
 .SH NAME
 math.h, math \- mathematical declarations
 .SH SYNOPSIS
@@ -22,23 +22,19 @@ math.h, math \- mathematical declarations
 The <\fBmath.h\fR> header includes definitions for the following types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfloat_t\fR\fR
 .ad
 .RS 12n
-.rt  
 A real-floating type at least as wide as \fBfloat\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdouble_t\fR\fR
 .ad
 .RS 12n
-.rt  
 A real-floating type at least as wide as \fBdouble\fR, and at least as wide as
 \fBfloat_t\fR.
 .RE
@@ -57,67 +53,55 @@ type \fBdouble\fR and are accurate within the precision of the \fBdouble\fR
 type.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_E\fR\fR
 .ad
 .RS 14n
-.rt  
 The base of natural logarithms (\fIe\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_LOG2E\fR\fR
 .ad
 .RS 14n
-.rt  
 The base-2 logarithm of \fIe\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_LOG10E\fR\fR
 .ad
 .RS 14n
-.rt  
 The base-10 logarithm of \fIe\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_LN2\fR\fR
 .ad
 .RS 14n
-.rt  
 The natural logarithm of 2.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_LN10\fR\fR
 .ad
 .RS 14n
-.rt  
 The natural logarithm of 10.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_PI\fR\fR
 .ad
 .RS 14n
-.rt  
 \c
 .if n pi\c
 .if t \(*p
@@ -127,12 +111,10 @@ The natural logarithm of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_PI_2\fR\fR
 .ad
 .RS 14n
-.rt  
 \c
 .if n pi\c
 .if t \(*p
@@ -142,12 +124,10 @@ The natural logarithm of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_PI_4\fR\fR
 .ad
 .RS 14n
-.rt  
 \c
 .if n pi\c
 .if t \(*p
@@ -157,12 +137,10 @@ The natural logarithm of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_1_PI\fR\fR
 .ad
 .RS 14n
-.rt  
 1/\c
 .if n pi\c
 .if t \(*p
@@ -172,12 +150,10 @@ The natural logarithm of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_2_PI\fR\fR
 .ad
 .RS 14n
-.rt  
 2/\c
 .if n pi\c
 .if t \(*p
@@ -187,12 +163,10 @@ The natural logarithm of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_2_SQRTPI\fR\fR
 .ad
 .RS 14n
-.rt  
 2 over the square root of \c
 .if n pi\c
 .if t \(*p
@@ -202,23 +176,19 @@ The natural logarithm of 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_SQRT2\fR\fR
 .ad
 .RS 14n
-.rt  
 The positive square root of 2.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM_SQRT1_2\fR\fR
 .ad
 .RS 14n
-.rt  
 The positive square root of 1/2.
 .RE
 
@@ -227,23 +197,19 @@ The positive square root of 1/2.
 The <\fBmath.h\fR> header defines the following symbolic constants:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAXFLOAT\fR\fR
 .ad
 .RS 13n
-.rt  
 The maximum value of a non-infinite single-precision floating point number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHUGE_VAL\fR\fR
 .ad
 .RS 13n
-.rt  
 A positive \fBdouble\fR expression, not necessarily representable as a float.
 Used as an error value returned by the mathematics library. \fBHUGE_VAL\fR
 evaluates to +infinity on systems supporting IEEE Std 754-1985.
@@ -251,12 +217,10 @@ evaluates to +infinity on systems supporting IEEE Std 754-1985.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHUGE_VALF\fR\fR
 .ad
 .RS 13n
-.rt  
 A positive \fBfloat\fR constant expression. Used as an error value returned by
 the mathematics library. \fBHUGE_VALF\fR evaluates to +infinity on systems
 supporting IEEE Std 754-1985.
@@ -264,12 +228,10 @@ supporting IEEE Std 754-1985.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHUGE_VALL\fR\fR
 .ad
 .RS 13n
-.rt  
 A positive \fBlong double\fR constant expression. Used as an error value
 returned by the mathematics library. \fBHUGE_VALL\fR evaluates to +infinity on
 systems supporting IEEE Std 754-1985.
@@ -277,12 +239,10 @@ systems supporting IEEE Std 754-1985.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINFINITY\fR\fR
 .ad
 .RS 13n
-.rt  
 A constant expression of type \fBfloat\fR representing positive or unsigned
 infinity, if available; else a positive constant of type \fBfloat\fR that
 overflows at translation time.
@@ -290,12 +250,10 @@ overflows at translation time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNAN\fR\fR
 .ad
 .RS 13n
-.rt  
 A constant expression of type float representing a quiet NaN. This symbolic
 constant is only defined if the implementation supports quiet NaNs for the
 \fBfloat\fR type.
@@ -399,13 +357,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH psradm 1M "25 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH PSRADM 1M "Feb 25, 2008"
 .SH NAME
 psradm \- change processor operational status
 .SH SYNOPSIS
@@ -80,34 +80,28 @@ Only users with the \fBPRIV_SYS_RES_CONFIG\fR privilege can use the
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Perform the action on all processors, or as many as possible.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Take the specified processors \fBoff-line\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Force the transition to the additional specified state. Required if one or more
 of the specified processors was in the faulted state. Set the specified
 processors to faulted, if no other transition option was specified. Forced
@@ -119,45 +113,37 @@ processor state transition.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Set the specified processors \fBno-intr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Bring the specified processors \fBon-line\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Make the specified processors spare.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Output a message giving the results of each attempted operation.
 .RE
 
@@ -167,12 +153,10 @@ Output a message giving the results of each attempted operation.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocessor_id\fR\fR
 .ad
 .RS 16n
-.rt  
 The processor \fBID\fR of the processor to be set \fBon-line\fR or
 \fBoff-line\fR, \fBspare\fR, or \fBno-intr\fR.
 .sp
@@ -258,35 +242,29 @@ processor bindings from the processes bound to them:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/wtmpx\fR\fR
 .ad
 .RS 14n
-.rt  
 Records logging processor status changes
 .RE
 
@@ -298,7 +276,6 @@ Records logging processor status changes
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsradm: processor 4: Invalid argument\fR\fR
 .ad
@@ -309,7 +286,6 @@ The specified processor does not exist in the configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsradm: processor 3: Device busy\fR\fR
 .ad
@@ -322,7 +298,6 @@ needed by the system because it provides some essential service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsradm: processor 3: Device busy\fR\fR
 .ad
@@ -335,7 +310,6 @@ system that can service interrupts needed by the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsradm: processor 3: Device busy\fR\fR
 .ad
@@ -347,7 +321,6 @@ some platform-specific resource is unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsradm: processor 0: Not owner\fR\fR
 .ad
@@ -358,7 +331,6 @@ The user does not have permission to change processor status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsradm: processor 2: Operation not supported\fR\fR
 .ad

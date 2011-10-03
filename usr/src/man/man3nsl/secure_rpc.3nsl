@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH secure_rpc 3NSL "19 Feb 2004" "SunOS 5.11" "Networking Services Library Functions"
+.TH SECURE_RPC 3NSL "Feb 19, 2004"
 .SH NAME
 secure_rpc, authdes_getucred, authdes_seccreate, getnetname, host2netname,
 key_decryptsession, key_encryptsession, key_gendes, key_setsecret,
@@ -89,34 +89,28 @@ other machines across the network.
 \fBRPC\fR supports various authentication flavors. Among them are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTH_NONE\fR\fR
 .ad
 .RS 13n
-.rt  
 No authentication (none).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTH_SYS\fR\fR
 .ad
 .RS 13n
-.rt  
 Traditional \fBUNIX-style\fR authentication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAUTH_DES\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBDES\fR encryption-based authentication.
 .RE
 
@@ -135,12 +129,10 @@ The following functions documented on this page are MT-Safe. For the MT-levels
 of other authentication styles, see relevant man pages.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdes_getucred()\fR\fR
 .ad
 .RS 26n
-.rt  
 This is the first of two functions that interface to the \fBRPC\fR secure
 authentication system \fBAUTH_DES\fR. The second is the
 \fBauthdes_seccreate()\fR function. The \fBauthdes_getucred()\fR function is
@@ -164,12 +156,10 @@ should be used to get the host name from the host netname in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauthdes_seccreate()\fR\fR
 .ad
 .RS 26n
-.rt  
 The second of two \fBAUTH_DES\fR authentication functions, the
 \fBauthdes_seccreate()\fR function is used on the client side to return an
 authentication handle that enables the use of the secure authentication system.
@@ -202,12 +192,10 @@ If \fBauthdes_seccreate()\fR fails, it returns \fINULL.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetnetname()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function returns the unique, operating system independent netname of the
 caller in the fixed-length array \fIname\fR. The function returns \fB1\fR if it
 succeeds and \fB0\fR if it fails.
@@ -215,12 +203,10 @@ succeeds and \fB0\fR if it fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhost2netname()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function converts a domain-specific hostname \fIhost\fR to an operating
 system independent netname. The function returns \fB1\fR if it succeeds and
 \fB0\fR if it fails. The \fBhost2netname()\fR function is the inverse of the
@@ -234,12 +220,10 @@ than the default domain name of the machine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_decryptsession()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function is an interface to the keyserver daemon, which is associated with
 \fBRPC's\fR secure authentication system (\fBAUTH_DES\fR authentication). User
 programs rarely need to call \fBkey_decryptsession()\fR or the associated
@@ -255,12 +239,10 @@ the calling process. The \fBkey_decryptsession()\fR function is the inverse of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_encryptsession()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function is a keyserver interface that takes a server netname
 \fIremotename\fR and a \fBDES\fR key \fIdeskey\fR, and encrypts the key using
 the public key of the the server and the secret key associated with the
@@ -274,12 +256,10 @@ returns \fB0\fR if it succeeds, \fB\(mi1\fR if it fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_gendes()\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a keyserver interface function used to ask the keyserver for a secure
 conversation key. Selecting a conversion key at random is generally not secure
 because the common ways of choosing random numbers are too easy to guess. The
@@ -289,12 +269,10 @@ fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_setsecret()\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a keyserver interface function used to set the key for the effective
 \fBUID\fR of the calling process. This function returns \fB0\fR if it succeeds,
 \fB\(mi1\fR if it fails.
@@ -302,12 +280,10 @@ This is a keyserver interface function used to set the key for the effective
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkey_secretkey_is_set()\fR\fR
 .ad
 .RS 26n
-.rt  
 This is a keyserver interface function used to determine if a key has been set
 for the effective \fBUID\fR of the calling process. If the keyserver has a key
 stored for the effective \fBUID\fR of the calling process, the
@@ -317,12 +293,10 @@ stored for the effective \fBUID\fR of the calling process, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetname2host()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function converts an operating system independent netname \fIname\fR to a
 domain-specific hostname \fIhost\fR. The \fIhostlen\fR parameter is the maximum
 size of \fIhost\fR. The \fBnetname2host()\fR function returns \fB1\fR if it
@@ -332,12 +306,10 @@ succeeds and \fB0\fR if it fails. The function is the inverse of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnetname2user()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function converts an operating system independent netname to a
 domain-specific user \fBID\fR. The \fBnetname2user()\fR function returns
 \fB1\fR if it succeeds and \fB0\fR if it fails.The function is the inverse of
@@ -353,12 +325,10 @@ entries specified by the \fIgidlist\fR parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser2netname()\fR\fR
 .ad
 .RS 26n
-.rt  
 This function converts a domain-specific username to an operating system
 independent netname. The \fBuser2netname()\fR function returns \fB1\fR if it
 succeeds and \fB0\fR if it fails. The function is the inverse of
@@ -373,13 +343,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

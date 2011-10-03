@@ -1,25 +1,25 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH m4 1 "3 Jul 2007" "SunOS 5.11" "User Commands"
+.TH M4 1 "Jul 3, 2007"
 .SH NAME
 m4 \- macro processor
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/m4\fR [\fB-e\fR] [\fB-s\fR] [\fB-B\fR \fIint\fR] [\fB-H\fR \fIint\fR] [\fB-S\fR \fIint\fR] 
+\fB/usr/bin/m4\fR [\fB-e\fR] [\fB-s\fR] [\fB-B\fR \fIint\fR] [\fB-H\fR \fIint\fR] [\fB-S\fR \fIint\fR]
      [\fB-T\fR \fIint\fR] [\fB-D\fR\fIname\fR [\fI=val\fR]] ... [\fB-U\fR \fIname\fR] ... [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/m4\fR [\fB-e\fR] [\fB-s\fR] [\fB-B\fR \fIint\fR] [\fB-H\fR \fIint\fR] [\fB-S\fR \fIint\fR] 
+\fB/usr/xpg4/bin/m4\fR [\fB-e\fR] [\fB-s\fR] [\fB-B\fR \fIint\fR] [\fB-H\fR \fIint\fR] [\fB-S\fR \fIint\fR]
      [\fB-T\fR \fIint\fR] [\fB-D\fR\fIname\fR [...\fI=val\fR]] [\fB-U\fR \fIname\fR] ... [\fIfile\fR]...
 .fi
 
@@ -73,70 +73,58 @@ rescanned.
 The options and their effects are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR\fIint\fR\fR
 .ad
 .RS 9n
-.rt  
 Changes the size of the push-back and argument collection buffers from the
 default of \fB4,096\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 9n
-.rt  
 Operates interactively. Interrupts are ignored and the output is unbuffered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fIint\fR\fR
 .ad
 .RS 9n
-.rt  
 Changes the size of the symbol table hash array from the default of \fB199\fR.
 The size should be prime.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 9n
-.rt  
 Enables line sync output for the C preprocessor (\fB#\fRline .\|.\|.\|)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fIint\fR\fR
 .ad
 .RS 9n
-.rt  
 Changes the size of the call stack from the default of \fB100\fRslots. Macros
 take three slots, and non-macro arguments take one.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fIint\fR\fR
 .ad
 .RS 9n
-.rt  
 Changes the size of the token buffer from the default of \fB512\fRbytes.
 .RE
 
@@ -146,23 +134,19 @@ To be effective, the above flags must appear before any file names and before
 any \fB-D\fR or \fB-U\fR flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fIname\fR[\fB=\fR\fBval\fR]\fR
 .ad
 .RS 17n
-.rt  
 Defines \fIname\fR to \fBval\fR or to \fINULL\fR in \fBval\fR's absence.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fIname\fR\fR
 .ad
 .RS 17n
-.rt  
 Undefines \fIname\fR.
 .RE
 
@@ -172,12 +156,10 @@ Undefines \fIname\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a text file to be processed. If no \fIfile\fR is given, or if it
 is \(mi, the standard input is read.
 .RE
@@ -190,12 +172,10 @@ macros can be redefined, but once this is done the original meaning is lost.
 Their values are \fINULL\fR unless otherwise stated.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchangequote\fR\fR
 .ad
 .RS 15n
-.rt  
 Change quote symbols to the first and second arguments. The symbols can be up
 to five characters long. \fBchangequote\fR without arguments restores the
 original values (that is, \fB`\|'\fR).
@@ -203,12 +183,10 @@ original values (that is, \fB`\|'\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchangecom\fR\fR
 .ad
 .RS 15n
-.rt  
 Change left and right comment markers from the default \fB#\fR and
 \fBNEWLINE\fR. With no arguments, the comment mechanism is effectively
 disabled. With one argument, the left marker becomes the argument and the right
@@ -218,23 +196,19 @@ Comment markers can be up to five characters long.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdecr\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the value of its argument decremented by 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefine\fR\fR
 .ad
 .RS 15n
-.rt  
 The second argument is installed as the value of the macro whose name is the
 first argument. Each occurrence of \fB$\fR\fIn\fR in the replacement text,
 where \fIn\fR is a digit, is replaced by the \fIn\fR-th argument. Argument 0 is
@@ -246,24 +220,20 @@ argument is quoted (with the current quotes).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefn\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the quoted definition of its argument(s). It is useful for renaming
 macros, especially built-ins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdivert\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBm4\fR maintains 10 output streams, numbered 0-9. The final output is the
 concatenation of the streams in numerical order. Initially stream 0 is the
 current stream. The \fBdivert\fR macro changes the current output stream to its
@@ -273,57 +243,47 @@ discarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdivnum\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the value of the current output stream.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdnl\fR\fR
 .ad
 .RS 15n
-.rt  
 Reads and discards characters up to and including the next \fBNEWLINE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdumpdef\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints current names and definitions, for the named items, or for all if no
 arguments are given.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBerrprint\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints its argument on the diagnostic output file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBifdef\fR\fR
 .ad
 .RS 15n
-.rt  
 If the first argument is defined, the value is the second argument, otherwise
 the third. If there is no third argument, the value is \fINULL\fR. The word
 \fBunix\fR is predefined.
@@ -331,12 +291,10 @@ the third. If there is no third argument, the value is \fINULL\fR. The word
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBifelse\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro has three or more arguments. If the first argument is the same
 string as the second, then the value is the third argument. If not, and if
 there are more than four arguments, the process is repeated with arguments 4,
@@ -346,117 +304,97 @@ present, \fINULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinclude\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the contents of the file named in the argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBincr\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the value of its argument incremented by 1. The value of the argument
 is calculated by interpreting an initial digit-string as a decimal number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBindex\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the position in its first argument where the second argument begins
 (zero origin), or \(mi1 if the second argument does not occur.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlen\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns the number of characters in its argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm4exit\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro causes immediate exit from \fBm4\fR. Argument 1, if given, is the
 exit code; the default is \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm4wrap\fR\fR
 .ad
 .RS 15n
-.rt  
 Argument 1 is pushed back at final \fBEOF\fR. Example:
 \fBm4wrap(`cleanup(\|)')\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaketemp\fR\fR
 .ad
 .RS 15n
-.rt  
 Fills in a string of "\fBX\fR" characters in its argument with the current
 process \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpopdef\fR\fR
 .ad
 .RS 15n
-.rt  
 Removes current definition of its argument(s), exposing the previous one, if
 any.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpushdef\fR\fR
 .ad
 .RS 15n
-.rt  
 Like \fBdefine\fR, but saves any previous definition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshift\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns all but its first argument. The other arguments are quoted and pushed
 back with commas in between. The quoting nullifies the effect of the extra scan
 that is subsequently be performed.
@@ -464,24 +402,20 @@ that is subsequently be performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsinclude\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro is identical to \fBinclude\fR, except that it says nothing if the
 file is inaccessible.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubstr\fR\fR
 .ad
 .RS 15n
-.rt  
 Returns a substring of its first argument. The second argument is a zero origin
 number selecting the first character; the third argument indicates the length
 of the substring. A missing third argument is taken to be large enough to
@@ -490,81 +424,67 @@ extend to the end of the first string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsyscmd\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro executes the command given in the first argument. No value is
 returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsysval\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro is the return code from the last call to \fBsyscmd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtranslit\fR\fR
 .ad
 .RS 15n
-.rt  
 Transliterates the characters in its first argument from the set given by the
 second argument to the set given by the third. No abbreviations are permitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtraceon\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro with no arguments, turns on tracing for all macros (including
 built-ins). Otherwise, turns on tracing for named macros.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtraceoff\fR\fR
 .ad
 .RS 15n
-.rt  
 Turns off trace globally and for any macros specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBundefine\fR\fR
 .ad
 .RS 15n
-.rt  
 Removes the definition of the macro named in its argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBundivert\fR\fR
 .ad
 .RS 15n
-.rt  
 This macro causes immediate output of text from diversions named as arguments,
 or all diversions if no argument. Text can be undiverted into another
 diversion. Undiverting discards the diverted text.
@@ -573,12 +493,10 @@ diversion. Undiverting discards the diverted text.
 .SS "/usr/bin/m4"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeval\fR\fR
 .ad
 .RS 8n
-.rt  
 Evaluates its argument as an arithmetic expression, using 32-bit signed-integer
 arithmetic. The following operators are supported: parentheses, unary -, unary
 +, !, ~, *, /, %, +, -, relationals, bitwise &, |, &&, and ||. Octal and hex
@@ -590,12 +508,10 @@ minimum number of digits in the result.
 .SS "/usr/xpg4/bin/m4"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeval\fR\fR
 .ad
 .RS 8n
-.rt  
 Evaluates its argument as an arithmetic expression,  using  32-bit
 signed-integer arithmetic. The following operators are supported: parentheses,
 unary -, unary +, !, ~, *, /, %, +, -, <<, >>, relationals, bitwise &, |, &&,
@@ -760,23 +676,19 @@ that affect the execution of \fBm4\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred
 .RE
 
@@ -794,13 +706,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

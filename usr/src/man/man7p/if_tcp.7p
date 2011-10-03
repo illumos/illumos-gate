@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH if_tcp 7P "14 Sep 2009" "SunOS 5.11" "Protocols"
+.TH IF_TCP 7P "Sep 14, 2009"
 .SH NAME
 if_tcp, if \- general properties of Internet Protocol network interfaces
 .SH DESCRIPTION
@@ -71,7 +71,7 @@ struct lifreq {
 #define lifr_addrlen   lifr_lifru1.lifru_addrlen
 #define lifr_ppa       lifr_lifru1.lifru_ppa       /* Driver's ppa */
 #define lifr_addr      lifr_lifru.lifru_addr       /* address */
-#define lifr_dstaddr   lifr_lifru.lifru_dstaddr    
+#define lifr_dstaddr   lifr_lifru.lifru_dstaddr
 #define lifr_broadaddr lifr_lifru.lifru_broadaddr  /* broadcast addr. */
 #define lifr_token     lifr_lifru.lifru_token      /* address token */
 #define lifr_subnet    lifr_lifru.lifru_subnet     /* subnet prefix */
@@ -90,79 +90,65 @@ struct lifreq {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFADDR\fR\fR
 .ad
 .RS 19n
-.rt  
 Set interface address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFADDR\fR\fR
 .ad
 .RS 19n
-.rt  
 Get interface address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFDSTADDR\fR\fR
 .ad
 .RS 19n
-.rt  
 Set point to point address for interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFDSTADDR\fR\fR
 .ad
 .RS 19n
-.rt  
 Get point to point address for interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFFLAGS\fR\fR
 .ad
 .RS 19n
-.rt  
 Set interface flags field. If the interface is marked down, any processes
 currently routing packets through the interface are notified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFFLAGS\fR\fR
 .ad
 .RS 19n
-.rt  
 Get interface flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFCONF\fR\fR
 .ad
 .RS 19n
-.rt  
 Get interface configuration list. This request takes a \fBlifconf\fR structure
 (see below) as a value-result parameter. The \fBlifc_family\fR field can  be
 set to \fBAF_UNSPEC\fR to retrieve both \fBAF_INET\fR and \fBAF_INET6\fR
@@ -180,12 +166,10 @@ are valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFNUM\fR\fR
 .ad
 .RS 19n
-.rt  
 Get number of interfaces. This request returns an integer which is the number
 of interface descriptions (\fBstruct lifreq\fR) returned by the
 \fBSIOCGLIFCONF\fR ioctl (in other words, indicates how large \fBlifc_len\fR
@@ -202,12 +186,10 @@ count.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFMTU\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the maximum transmission unit (MTU) size for interface. Place the request
 in the \fBlifru_mtu\fR field. The \fBMTU\fR can not exceed the physical
 \fBMTU\fR limitation  (which is reported in the  \fBDLPI\fR \fBDL_INFO_ACK\fR
@@ -216,238 +198,196 @@ message).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFMTU\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the maximum transmission unit size for interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFMETRIC\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the metric associated with the interface.  The metric is used by routing
 daemons such as \fBin.routed\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFMETRIC\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the metric associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFMUXID\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the \fBip\fR and \fBarp\fR \fBmuxid\fR associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFMUXID\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the \fBip\fR and \fBarp\fR \fBmuxid\fR associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFINDEX\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the interface index associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFINDEX\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the interface index associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFZONE\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the zone associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFZONE\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the zone associated with the interface. Only applies for zones that use the
 shared-IP instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCLIFADDIF\fR\fR
 .ad
 .RS 19n
-.rt  
 Add a new logical interface on a physical interface using an unused logical
 interface number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCLIFREMOVEIF\fR\fR
 .ad
 .RS 19n
-.rt  
 Remove a logical interface by specifying its \fBIP\fR address or logical
 interface name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFTOKEN\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the address token used to form IPv6 link-local addresses and for stateless
 address autoconfiguration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFTOKEN\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the address token used to form IPv6 link-local addresses and for stateless
 address autoconfiguration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFSUBNET\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the subnet prefix associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFSUBNET\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the subnet prefix associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFLNKINFO\fR\fR
 .ad
 .RS 19n
-.rt  
 Set link specific parameters for the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFLNKINFO\fR\fR
 .ad
 .RS 19n
-.rt  
 Get link specific parameters for the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCLIFDELND\fR\fR
 .ad
 .RS 19n
-.rt  
 Delete a neighbor cache entry for  IPv6.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCLIFGETND\fR\fR
 .ad
 .RS 19n
-.rt  
 Get a neighbor cache entry for  IPv6.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCLIFSETND\fR\fR
 .ad
 .RS 19n
-.rt  
 Set a neighbor cache entry for  IPv6.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSLIFUSESRC\fR\fR
 .ad
 .RS 19n
-.rt  
 Set the interface from which to choose a source address. The \fBlifr_index\fR
 field has the interface index corresponding to the interface whose address is
 to be used as the source address for packets going out on the interface whose
@@ -458,12 +398,10 @@ the \fBusesrc\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFUSESRC\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the interface index of the interface whose address is used as the source
 address for packets going out on the interface provided by \fBlifr_name\fR
 field. The value is retrieved in the \fBlifr_index\fR field. See
@@ -472,12 +410,10 @@ field. The value is retrieved in the \fBlifr_index\fR field. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGLIFSRCOF\fR\fR
 .ad
 .RS 19n
-.rt  
 Get the interface configuration list for interfaces that use an address hosted
 on the interface provided by the \fBlifs_ifindex\fR field in the \fBlifsrcof\fR
 struct (see below), as a source address. The application sets \fBlifs_maxlen\fR
@@ -494,12 +430,10 @@ how big to make the next trial. See \fBifconfig\fR(1M) for examples of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCTONLINK\fR\fR
 .ad
 .RS 19n
-.rt  
 Test if the address is directly reachable, for example, that it can be reached
 without going through a router. This request takes an \fBsioc_addrreq\fR
 structure (see below) as a value-result parameter. The \fBsa_addr\fR field
@@ -509,12 +443,10 @@ non-zero value if the address is onlink.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCTMYADDR\fR\fR
 .ad
 .RS 19n
-.rt  
 Test if the address is assigned to this node. This request takes an
 \fBsioc_addrreq\fR structure (see below) as a value-result parameter. The
 \fBsa_addr\fR field should be set to the address to test. The \fBsa_res\fR
@@ -523,12 +455,10 @@ field will contain a non-zero value if the address is assigned to this node.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCTMYSITE\fR\fR
 .ad
 .RS 19n
-.rt  
 Test if the address is part of the same site as this node. This request takes
 an \fBsioc_addrreq\fR structure (see below) as a value-result parameter. The
 \fBsa_addr\fR field should be set to the address to test. The \fBsa_res\fR
@@ -543,7 +473,7 @@ The structure used by \fBSIOCGLIFCONF\fR has the form:
 .nf
 struct lifconf {
    sa_family_t     lifc_family;
-   int             lifc_flags;       /* request specific 
+   int             lifc_flags;       /* request specific
                                      /* interfaces */
    int             lifc_len;         /* size of assoc. buffer */
    union {
@@ -592,7 +522,7 @@ The structure used by \fBSIOCGLIFSRCOF\fR has the form:
 .in +2
 .nf
  struct lifsrcof {
-     uint_t  lifs_ifindex;   /* addr on this interface */ 
+     uint_t  lifs_ifindex;   /* addr on this interface */
                              /* used as the src addr */
      size_t  lifs_maxlen;    /* size of buffer: input */
      size_t  lifs_len;       /* size of buffer: output */
@@ -601,7 +531,7 @@ The structure used by \fBSIOCGLIFSRCOF\fR has the form:
             struct  lifreq *lifsu_req;
    } lifs_lifsu;
 #define lifs_buf lifs_lifsu.lifsu_buf /* buffer addr. */
-#define lifs_req lifs_lifsu.lifsu_req /* array returned */  
+#define lifs_req lifs_lifsu.lifsu_req /* array returned */
 };
 .fi
 .in -2
@@ -640,79 +570,65 @@ struct ifreq {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFADDR\fR\fR
 .ad
 .RS 18n
-.rt  
 Set interface address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFADDR\fR\fR
 .ad
 .RS 18n
-.rt  
 Get interface address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFDSTADDR\fR\fR
 .ad
 .RS 18n
-.rt  
 Set point to point address for interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFDSTADDR\fR\fR
 .ad
 .RS 18n
-.rt  
 Get point to point address for interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFFLAGS\fR\fR
 .ad
 .RS 18n
-.rt  
 Set interface flags field. If the interface is marked down, any processes
 currently routing packets through the interface are notified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFFLAGS\fR\fR
 .ad
 .RS 18n
-.rt  
 Get interface flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFCONF\fR\fR
 .ad
 .RS 18n
-.rt  
 Get interface configuration list. This request takes an \fBifconf\fR structure
 (see below) as a value-result parameter. The \fBifc_len\fR field should be set
 to the size of the buffer pointed to by \fBifc_buf\fR. Upon success,
@@ -725,12 +641,10 @@ groups are not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFNUM\fR\fR
 .ad
 .RS 18n
-.rt  
 Get number of interfaces. This request returns an integer which is the number
 of interface descriptions (\fBstruct ifreq\fR) returned by the
 \fBSIOCGIFCONF\fR ioctl (in other words, indicates how large \fBifc_len\fR must
@@ -740,12 +654,10 @@ interfaces that comprise those IPMP groups are not.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFMTU\fR\fR
 .ad
 .RS 18n
-.rt  
 Set the maximum transmission unit (\fBMTU\fR) size for interface. Place the
 request in the \fBifr_metric\fR field. The \fBMTU\fR has to be smaller than
 physical \fBMTU\fR limitation (which is reported in the \fBDLPI\fR
@@ -754,80 +666,66 @@ physical \fBMTU\fR limitation (which is reported in the \fBDLPI\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFMTU\fR\fR
 .ad
 .RS 18n
-.rt  
 Get the maximum transmission unit size for interface. Upon success, the request
 is placed in the \fBifr_metric\fR field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFMETRIC\fR\fR
 .ad
 .RS 18n
-.rt  
 Set the metric associated with the interface.  The metric is used by routine
 daemons such as \fBin.routed\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFMETRIC\fR\fR
 .ad
 .RS 18n
-.rt  
 Get the metric associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFMUXID\fR\fR
 .ad
 .RS 18n
-.rt  
 Get the \fBip\fR and \fBarp\fR \fBmuxid\fR associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFMUXID\fR\fR
 .ad
 .RS 18n
-.rt  
 Set the \fBip\fR and \fBarp\fR \fBmuxid\fR associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFINDEX\fR\fR
 .ad
 .RS 18n
-.rt  
 Get the interface index associated with the interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFINDEX\fR\fR
 .ad
 .RS 18n
-.rt  
 Set the interface index associated with the interface.
 .RE
 
@@ -913,23 +811,19 @@ listed below (with the leading \fBIFF\fR_ prefix removed). See the
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 12n
-.rt  
 Calling process has insufficient privileges.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 12n
-.rt  
 The  \fBlifr_name\fR member of the  \fBlifreq\fR structure contains an invalid
 value.
 .sp
@@ -942,23 +836,19 @@ to an invalid value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADADDR\fR\fR
 .ad
 .RS 12n
-.rt  
 Wrong address family or malformed address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 12n
-.rt  
 For \fBSIOCSLIFMTU\fR, this error is returned when the requested \fBMTU\fR size
 is invalid. This error indicates the \fBMTU\fR size is greater than the
 \fBMTU\fR size supported by the \fBDLPI\fR provider or less than \fB68\fR (for
@@ -971,12 +861,10 @@ IPMP group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 12n
-.rt  
 For \fBSIOCLIFADDIF\fR, this error is returned if the \fBlifr_name\fR member in
 the \fBlifreq\fR structure corresponds to an interface that already has the PPA
 specified by \fBlifr_ppa\fR plumbed.

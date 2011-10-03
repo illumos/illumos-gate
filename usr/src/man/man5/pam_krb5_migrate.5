@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_krb5_migrate 5 "Jul 29 2004" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_KRB5_MIGRATE 5 "Jul 29, 2004"
 .SH NAME
 pam_krb5_migrate \- authentication PAM module for the KerberosV5 auto-migration
 of users feature
@@ -60,7 +60,6 @@ The following options can be passed to the KerberosV5 auto-migrate
 authentication module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
@@ -71,7 +70,6 @@ Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclient_service=\fR\fI<service name>\fR\fR
 .ad
@@ -85,7 +83,6 @@ or \fI<service>\fR/\fI<nodename.fqdn>\fR if this option is provided.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquiet\fR\fR
 .ad
@@ -104,7 +101,6 @@ done so.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexpire_pw\fR\fR
 .ad
@@ -193,13 +189,12 @@ See \fBattributes\fR(5) for a description of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

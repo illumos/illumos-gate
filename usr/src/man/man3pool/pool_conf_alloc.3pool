@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pool_conf_alloc 3POOL "3 Aug 2009" "SunOS 5.11" "Pool Configuration Manipulation Library Functions"
+.TH POOL_CONF_ALLOC 3POOL "Aug 3, 2009"
 .SH NAME
 pool_conf_alloc, pool_conf_close, pool_conf_commit, pool_conf_export,
 pool_conf_free, pool_conf_info, pool_conf_location, pool_conf_open,
@@ -12,7 +12,7 @@ pool_conf_validate \- manipulate resource pool configurations
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
 
 \fBpool_conf_t *\fR\fBpool_conf_alloc\fR(\fBvoid\fR);
@@ -126,46 +126,38 @@ location at which the configuration is stored. The valid flags are a bitmap of
 the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPO_RDONLY\fR\fR
 .ad
 .RS 13n
-.rt  
 Open for reading only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPO_RDWR\fR\fR
 .ad
 .RS 13n
-.rt  
 Open read-write.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPO_CREAT\fR\fR
 .ad
 .RS 13n
-.rt  
 Create a configuration at the given location if it does not exist. If it does,
 truncate it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPO_DISCO\fR\fR
 .ad
 .RS 13n
-.rt  
 Perform `discovery'. This option only makes sense when used in conjunction with
 \fBPO_CREAT\fR, and causes the returned \fBpool_conf_t\fR to contain the
 resources and components currently active on the system.
@@ -176,12 +168,10 @@ If supplied, this flag is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPO_UPDATE\fR\fR
 .ad
 .RS 13n
-.rt  
 Use when opening the dynamic state file, which is the configuration at
 \fBpool_dynamic_location\fR(3POOL), to ensure that the contents of the dynamic
 state file are updated to represent the current state of the system.
@@ -212,23 +202,19 @@ The \fBpool_conf_status()\fR function returns the status of a configuration,
 which can be one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOF_INVALID\fR\fR
 .ad
 .RS 15n
-.rt  
 The configuration is not in a suitable state for use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOF_VALID\fR\fR
 .ad
 .RS 15n
-.rt  
 The configuration is in a suitable state for use.
 .RE
 
@@ -243,47 +229,39 @@ the \fIchanged\fR value as a bitmap of possible element types.
 A change is defined for the different element classes as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOU_SYSTEM\fR\fR
 .ad
 .RS 14n
-.rt  
 A property on the system element has been created, modified, or removed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOU_POOL\fR\fR
 .ad
 .RS 14n
-.rt  
 A property on a pool element has been created, modified, or removed. A pool has
 changed a resource association.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOU_PSET\fR\fR
 .ad
 .RS 14n
-.rt  
 A property on a pset element has been created, modified, or removed. A pset's
 resource composition has changed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOU_CPU\fR\fR
 .ad
 .RS 14n
-.rt  
 A property on a CPU element has been created, modified, or removed.
 .RE
 
@@ -294,34 +272,28 @@ the given configuration. The validation can be at several (increasing) levels
 of strictness:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOV_LOOSE\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs basic internal syntax validation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOV_STRICT\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs a more thorough syntax validation and internal consistency checks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOV_RUNTIME\fR\fR
 .ad
 .RS 15n
-.rt  
 Performs an estimate of whether attempting to commit the given configuration on
 the system would succeed or fail. It is optimistic in that a successful
 validation does not guarantee a subsequent commit operation will be successful;
@@ -352,24 +324,20 @@ The \fBpool_conf_status()\fR function returns either \fBPOF_INVALID\fR or
 The \fBpool_conf_alloc()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 There is not enough memory available to allocate the configuration. Check
 \fBerrno\fR for the specific system error code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is invalid.
 .RE
 
@@ -378,23 +346,19 @@ The configuration is invalid.
 The \fBpool_conf_close()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 The configuration's permanent store cannot be closed.  Check \fBerrno\fR for
 the specific system error code.
 .RE
@@ -404,58 +368,48 @@ the specific system error code.
 The \fBpool_conf_commit()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR or the active flag
 is non-zero and the system could not be modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 The permanent store could not be updated. Check \fBerrno\fR for the specific
 system error code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is not valid for this system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_ACCESS\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration was not opened with the correct permissions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_DATASTORE\fR\fR
 .ad
 .RS 20n
-.rt  
 The update of the permanent store has failed and the contents could be
 corrupted. Check for a \fB\&.bak\fR file at the datastore location if manual
 recovery is required.
@@ -466,24 +420,20 @@ recovery is required.
 The \fBpool_conf_export()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 17n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR or the requested
 export format is not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_DATASTORE\fR\fR
 .ad
 .RS 17n
-.rt  
 The creation of the export file failed. A file might have been created at the
 specified location but the contents of the file might not be correct.
 .RE
@@ -493,36 +443,30 @@ specified location but the contents of the file might not be correct.
 The \fBpool_conf_info()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR or \fIflags\fR is
 neither 0 nor 1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 There is not enough memory available to allocate the buffer used to build the
 information string. Check \fBerrno\fR for the specific system error code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is invalid.
 .RE
 
@@ -531,12 +475,10 @@ The configuration is invalid.
 The \fBpool_conf_location()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
@@ -545,23 +487,19 @@ The supplied configuration's status is not \fBPOF_VALID\fR.
 The \fBpool_conf_open()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is already \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 There is not enough memory available to store the supplied location, or the
 pools facility is not active. Check \fBerrno\fR for the specific system error
 code.
@@ -569,12 +507,10 @@ code.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration to be opened is at \fBpool_dynamic_location\fR(3POOL) and the
 configuration is not valid for this system.
 .RE
@@ -584,23 +520,19 @@ configuration is not valid for this system.
 The \fBpool_conf_remove()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 The configuration's permanent storage could not be removed. Check \fBerrno\fR
 for the specific system error code.
 .RE
@@ -610,23 +542,19 @@ for the specific system error code.
 The \fBpool_conf_rollback()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 16n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 16n
-.rt  
 The permanent store could not be accessed. Check \fBerrno\fR for the specific
 system error code.
 .RE
@@ -636,46 +564,38 @@ system error code.
 The \fBpool_conf_update()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR or the configuration
 is not the dynamic configuration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_DATASTORE\fR\fR
 .ad
 .RS 20n
-.rt  
 The kernel snapshot cannot be correctly unpacked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration contains uncommitted transactions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_SYSTEM\fR\fR
 .ad
 .RS 20n
-.rt  
 A system error occurred during snapshot retrieval and update.
 .RE
 
@@ -684,23 +604,19 @@ A system error occurred during snapshot retrieval and update.
 The \fBpool_conf_validate()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_BADPARAM\fR\fR
 .ad
 .RS 20n
-.rt  
 The supplied configuration's status is not \fBPOF_VALID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOE_INVALID_CONF\fR\fR
 .ad
 .RS 20n
-.rt  
 The configuration is invalid.
 .RE
 
@@ -721,7 +637,7 @@ char *input_location = "/tmp/poolconf.example";
 
 if (pool_conf_open(pool_conf, input_location,
     PO_RDONLY) < 0) {
-        fprintf(stderr, "Opening pool configuration %s 
+        fprintf(stderr, "Opening pool configuration %s
                 failed\en", input_location);
 }
 .fi
@@ -735,17 +651,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

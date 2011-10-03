@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH utmpd 1M "4 Jun 2008" "SunOS 5.11" "System Administration Commands"
+.TH UTMPD 1M "Jun 4, 2008"
 .SH NAME
 utmpd \- utmpx monitoring daemon
 .SH SYNOPSIS
@@ -31,7 +31,6 @@ its table.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-debug\fR\fR
 .ad
@@ -47,7 +46,6 @@ Write debugging information to standard output.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -58,7 +56,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -70,7 +67,6 @@ An error occurred.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/utmpd\fR\fR
 .ad
@@ -80,7 +76,6 @@ You can set default values for the flags listed below. For example:
 \fBSCAN_PERIOD=600\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCAN_PERIOD\fR\fR
 .ad
@@ -92,7 +87,6 @@ see if monitored processes are still alive. The default is 300.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAX_FDS\fR\fR
 .ad
@@ -104,7 +98,6 @@ default value is 4096.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWTMPX_UPDATE_FREQ\fR\fR
 .ad
@@ -120,7 +113,6 @@ unavailable. The default is 60.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
@@ -132,7 +124,6 @@ File containing user and accounting information for commands such as
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc\fR\fR
 .ad

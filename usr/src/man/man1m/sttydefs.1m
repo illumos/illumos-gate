@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sttydefs 1M "14 Sep 1992" "SunOS 5.11" "System Administration Commands"
+.TH STTYDEFS 1M "Sep 14, 1992"
 .SH NAME
 sttydefs \- maintain line settings and hunt sequences for TTY ports
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/sttydefs\fR \fB-a\fR \fIttylabel\fR [\fB-b\fR] [\fB-f\fR \fIfinal-flags\fR] 
+\fB/usr/sbin/sttydefs\fR \fB-a\fR \fIttylabel\fR [\fB-b\fR] [\fB-f\fR \fIfinal-flags\fR]
      [\fB-i\fR \fIinitial-flags\fR] [\fB-n\fR \fInextlabel\fR]
 .fi
 
@@ -40,12 +40,10 @@ system.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIttylabel\fR\fR
 .ad
 .RS 20n
-.rt  
 Add a record to the \fBttydefs\fR file, using \fIttylabel\fR as its label. The
 following describes the effect of the \fB-b\fR, \fB-n\fR, \fB-i\fR, or \fB-f\fR
 options when used in conjunction with the \fB-a\fR option:
@@ -53,12 +51,10 @@ options when used in conjunction with the \fB-a\fR option:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 20n
-.rt  
 Enable autobaud. Autobaud allows the system to set the line speed of a given
 TTY port to the line speed of the device connected to the port without the
 user's intervention.
@@ -66,12 +62,10 @@ user's intervention.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfinal-flags\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the value to be used in the \fIfinal-flags\fR field in
 \fB/etc/ttydefs\fR. \fIfinal-flags\fR must be in a format recognized by the
 \fBstty\fR command. \fIfinal-flags\fR are the \fBtermio\fR(7I) settings used by
@@ -83,12 +77,10 @@ before invoking the service on the port. If this option is not specified,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinitial-flags\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the value to be used in the \fIinitial-flags\fR field in
 \fB/etc/ttydefs\fR. \fIinitial-flags\fR must be in a format recognized by the
 \fBstty\fR command. These flags are used by \fBttymon\fR when searching for the
@@ -99,12 +91,10 @@ not specified, \fBsttydefs\fR will set \fIinitial-flags\fR equal to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInextlabel\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify the value to be used in the \fInextlabel\fR field in
 \fB/etc/ttydefs\fR. If this option is not specified, \fBsttydefs\fR will set
 \fInextlabel\fR equal to \fIttylabel\fR.
@@ -112,12 +102,10 @@ Specify the value to be used in the \fInextlabel\fR field in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR[\fIttylabel\fR]\fR
 .ad
 .RS 20n
-.rt  
 If a \fIttylabel\fR is specified, \fBsttydefs\fR displays the record from
 \fB/etc/ttydefs\fR whose TTY label matches the specified \fIttylabel\fR. If no
 \fIttylabel\fR is specified, \fBsttydefs\fR displays the entire contents of
@@ -127,12 +115,10 @@ correct and that the entry's \fInextlabel\fR field references an existing
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIttylabel\fR\fR
 .ad
 .RS 20n
-.rt  
 Remove any record in the \fBttydefs\fR file  that has \fIttylabel\fR as its
 label.
 .RE

@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH savecore 1M "25 Sep 2004" "SunOS 5.11" "System Administration Commands"
+.TH SAVECORE 1M "Sep 25, 2004"
 .SH NAME
 savecore \- save a crash dump of the operating system
 .SH SYNOPSIS
@@ -43,12 +43,10 @@ panic, \fBsavecore\fR logs the panic string too.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 Disregard dump header valid flag. Force \fBsavecore\fR to attempt to save a
 crash dump even if the header information stored on the dump device indicates
 the dump has already been saved.
@@ -56,12 +54,10 @@ the dump has already been saved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIdumpfile\fR\fR
 .ad
 .RS 15n
-.rt  
 Attempt to save a crash dump from the specified file instead of from the
 system's current dump device. This option may be useful if the information
 stored on the dump device has been copied to an on-disk file by means of the
@@ -70,12 +66,10 @@ stored on the dump device has been copied to an on-disk file by means of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 15n
-.rt  
 Save a crash dump of the live running Solaris system, without actually
 rebooting or altering the system in any way. This option forces \fBsavecore\fR
 to save a live snapshot of the system to the dump device, and then immediately
@@ -91,12 +85,10 @@ are not fully self-consistent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
-.rt  
 Verbose. Enables verbose error messages from \fBsavecore\fR.
 .RE
 
@@ -106,12 +98,10 @@ Verbose. Enables verbose error messages from \fBsavecore\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fR
 .ad
 .RS 13n
-.rt  
 Save the crash dump files to the specified directory. If \fIdirectory\fR is not
 specified, \fBsavecore\fR saves the crash dump files to the default
 \fBsavecore\fR \fIdirectory\fR, configured by \fBdumpadm\fR(1M).
@@ -120,56 +110,46 @@ specified, \fBsavecore\fR saves the crash dump files to the default
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fB/vmcore.\fR\fIn\fR\fR
 .ad
 .RS 29n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fB/unix.\fR\fIn\fR\fR
 .ad
 .RS 29n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fB/bounds\fR\fR
 .ad
 .RS 29n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fB/minfree\fR\fR
 .ad
 .RS 29n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/crash/\&'uname \fR\fB-n\fR\fB\&'\fR\fR
 .ad
 .RS 29n
-.rt  
 default crash dump directory
 .RE
 

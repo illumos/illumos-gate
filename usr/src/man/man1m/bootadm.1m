@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bootadm 1M "25 Apr 2008" "SunOS 5.11" "System Administration Commands"
+.TH BOOTADM 1M "Apr 25, 2008"
 .SH NAME
 bootadm \- manage bootability of GRUB-enabled operating system
 .SH SYNOPSIS
@@ -64,7 +64,6 @@ to manage diskless clients of a different platform type.
 The \fBbootadm\fR command has the following subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupdate-archive\fR\fR
 .ad
@@ -76,7 +75,6 @@ platforms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-archive\fR\fR
 .ad
@@ -88,7 +86,6 @@ both SPARC and x86 platforms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset-menu\fR\fR
 .ad
@@ -101,7 +98,6 @@ change. Applies to x86 platforms only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-menu\fR\fR
 .ad
@@ -118,7 +114,6 @@ title of each entry. Applies to x86 platforms only.
 The \fBbootadm\fR command has the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -129,7 +124,6 @@ In an \fBupdate-archive\fR operation, stale files are displayed on stderr.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -141,7 +135,6 @@ updated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIplatform\fR\fR
 .ad
@@ -156,7 +149,6 @@ than the server. Platform must be one of \fBi86pc\fR, \fBsun4u\fR, or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\ \fIaltroot\fR\fR
 .ad
@@ -176,7 +168,6 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkey\fR=\fIvalue\fR\fR
 .ad
@@ -185,7 +176,6 @@ zone's file system. See \fBzones\fR(5).
 Possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault=\fR\fIentrynum\fR\fR
 .ad
@@ -197,7 +187,6 @@ operating system to boot when the timer expires.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeout=\fR\fIseconds\fR\fR
 .ad
@@ -323,7 +312,6 @@ mounted. To access the GRUB menu, mount the device and access the GRUB menu at
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -334,7 +322,6 @@ The command completed successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -351,13 +338,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

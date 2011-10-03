@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ckdate 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH CKDATE 1 "Sep 14, 1992"
 .SH NAME
 ckdate, errdate, helpdate, valdate \- prompts for and validates a date
 .SH SYNOPSIS
 .LP
 .nf
-\fBckdate\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-f\fR \fIformat\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] 
+\fBckdate\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-f\fR \fIformat\fR] [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR]
      [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR] [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]]
 .fi
 
@@ -63,122 +63,100 @@ expected format.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefault\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the default value as \fIdefault\fR. The default does not have to meet
 the format criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIerror\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the error message as \fIerror\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIformat\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies the format against which the input will be verified. Possible formats
 and their definitions are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%b\fR  =\fR
 .ad
 .RS 9n
-.rt  
 abbreviated month name (jan, feb, mar)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%B\fR  =\fR
 .ad
 .RS 9n
-.rt  
 full month name \fB%d\fR  = day of month (01 - 31)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%D\fR  =\fR
 .ad
 .RS 9n
-.rt  
 date as %m/%d/%y (the default format)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%e\fR  =\fR
 .ad
 .RS 9n
-.rt  
 day of month (1 - 31; single digits are preceded by a blank)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%h\fR  =\fR
 .ad
 .RS 9n
-.rt  
 abbreviated month name, identical to \fB%b%\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%m\fR  =\fR
 .ad
 .RS 9n
-.rt  
 month number (01 - 12)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%y\fR  =\fR
 .ad
 .RS 9n
-.rt  
 year within century (for instance, 89)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Y\fR  =\fR
 .ad
 .RS 9n
-.rt  
 year as \fBCCYY\fR (for instance, 1989)
 .RE
 
@@ -186,57 +164,47 @@ year as \fBCCYY\fR (for instance, 1989)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fI help\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the help messages as \fBhelp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fI pid\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that process \fBID\fR \fIpid\fR is to be sent a signal if the user
 chooses to abort.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI prompt\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the prompt message as \fIprompt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that quit will not be allowed as a valid response.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI signal\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that the process \fBID\fR \fIpid\fR defined with the \fB-k\fR option
 is to be sent signal \fBsignal\fR when quit is chosen.  If no signal is
 specified, \fBSIGTERM\fR is used.
@@ -244,12 +212,10 @@ specified, \fBSIGTERM\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR\fI width\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that prompt, help and error messages will be formatted to a line
 length of \fBwidth\fR.
 .RE
@@ -260,12 +226,10 @@ length of \fBwidth\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput\fR\fR
 .ad
 .RS 9n
-.rt  
 Input to be verified against format criteria.
 .RE
 
@@ -275,45 +239,37 @@ Input to be verified against format criteria.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBEOF\fR on input, or negative width on  \fB-W\fR option, or usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 User termination (quit).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Garbled format argument.
 .RE
 

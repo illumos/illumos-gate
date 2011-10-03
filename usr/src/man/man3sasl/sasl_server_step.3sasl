@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_server_step 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_SERVER_STEP 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_server_step \- perform a step in the server authentication negotiation
 .SH SYNOPSIS
@@ -26,41 +26,34 @@ The \fBsasl_server_step()\fR performs a step in the authentication negotiation.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 16n
-.rt  
 The SASL context for this connection.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclientin\fR\fR
 .ad
 .RS 16n
-.rt  
 The data given by the client. The data is decoded if the protocol encodes
 requests that are sent over the wire.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclientinlen\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of \fIclientin\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserverout\fR\fR
 .ad
@@ -69,7 +62,6 @@ The length of \fIclientin\fR.
 \fB\fIserveroutlen\fR\fR
 .ad
 .RS 16n
-.rt  
 Set by the library and sent to the client.
 .RE
 
@@ -81,23 +73,19 @@ code.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 17n
-.rt  
 The whole authentication completed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CONTINUE\fR\fR
 .ad
 .RS 17n
-.rt  
 The call to \fBsasl_server_step()\fR was successful, and at least one more step
 is needed for the authentication.
 .RE
@@ -115,15 +103,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

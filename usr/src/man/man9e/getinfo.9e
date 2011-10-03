@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getinfo 9E "16 Jan 2008" "SunOS 5.11" "Driver Entry Points"
+.TH GETINFO 9E "Jan 16, 2008"
 .SH NAME
 getinfo \- get device driver information
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ getinfo \- get device driver information
 
 
 
-\fBint prefix\fR\fBgetinfo\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_info_cmd_t\fR \fIcmd\fR, 
+\fBint prefix\fR\fBgetinfo\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_info_cmd_t\fR \fIcmd\fR,
      \fBvoid *\fR\fIarg\fR, \fBvoid **\fR\fIresultp\fR);
 .fi
 
@@ -26,46 +26,38 @@ drivers which export \fBcb_ops\fR(9S) entry points.
 .SH ARGUMENTS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 Do not use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmd\fR\fR
 .ad
 .RS 11n
-.rt  
 Command argument - valid command values are \fBDDI_INFO_DEVT2DEVINFO\fR and
 \fBDDI_INFO_DEVT2INSTANCE\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 11n
-.rt  
 Command specific argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresultp\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to where the requested information is stored.
 .RE
 
@@ -94,23 +86,19 @@ provide a \fBgetinfo()\fR entry point, and may use \fBnodev\fR(9F) in the
 \fBgetinfo()\fR should return:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 on success.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 on failure.
 .RE
 
@@ -120,7 +108,7 @@ on failure.
 .sp
 .in +2
 .nf
-/*ARGSUSED*/ 
+/*ARGSUSED*/
 static int
 rd_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, \e
 void **resultp)
@@ -128,7 +116,7 @@ void **resultp)
        /* Note that in this simple example
         * the minor number is the instance
         * number. 	 */
-         
+
      devstate_t *sp;
      int error = DDI_FAILURE;
      switch (infocmd) {

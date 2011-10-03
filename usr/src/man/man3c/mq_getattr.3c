@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mq_getattr 3C "5 Feb 2008" "SunOS 5.11" "Standard C Library Functions"
+.TH MQ_GETATTR 3C "Feb 5, 2008"
 .SH NAME
 mq_getattr \- get message queue attributes
 .SH SYNOPSIS
@@ -34,12 +34,10 @@ open message queue description as set when the message queue was opened and as
 modified by subsequent \fBmq_setattr\fR(3C) calls:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmq_flags\fR\fR
 .ad
 .RS 12n
-.rt  
 message queue flags
 .RE
 
@@ -49,34 +47,28 @@ The following attributes of the message queue are returned as set at message
 queue creation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmq_maxmsg\fR\fR
 .ad
 .RS 14n
-.rt  
 maximum number of messages
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmq_msgsize\fR\fR
 .ad
 .RS 14n
-.rt  
 maximum message size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmq_curmsgs\fR\fR
 .ad
 .RS 14n
-.rt  
 number of messages currently on the queue.
 .RE
 
@@ -92,23 +84,19 @@ the error.
 The  \fBmq_getattr()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fImqdes\fR argument is not a valid message queue descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBmq_getattr()\fR function is not supported by the system.
 .RE
 
@@ -120,17 +108,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

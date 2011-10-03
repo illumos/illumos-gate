@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ndmpadm 1M "24 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH NDMPADM 1M "Jun 24, 2009"
 .SH NAME
 ndmpadm \- administer Network Data Management Protocol activities
 .SH SYNOPSIS
@@ -27,7 +27,6 @@ along with the subcommand.
 The \fBndmpadm\fR command supports the following subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR\fR
 .ad
@@ -38,7 +37,6 @@ Disable the specified authentication password handling.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR\fR
 .ad
@@ -49,7 +47,6 @@ Enable the specified authentication password handling.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR\fR
 .ad
@@ -60,7 +57,6 @@ Get the value of an NDMP configuration property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkill-sessions\fR\fR
 .ad
@@ -71,7 +67,6 @@ Terminate an active session.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR\fR
 .ad
@@ -82,7 +77,6 @@ Set the value of an NDMP configuration property.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-devices\fR\fR
 .ad
@@ -93,7 +87,6 @@ Get a list of tape devices connected to the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow-sessions\fR\fR
 .ad
@@ -108,12 +101,10 @@ Display the details of active NDMP sessions.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-?\fR\fR
 .ad
 .RS 6n
-.rt  
 Display a list of all subcommands and options.
 .RE
 
@@ -239,7 +230,6 @@ for the \fBshow-sessions\fR subcommand is:
 The \fBshow-sessions\fR subcommand supports the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fBtape\fR,\fBscsi\fR,\fBdata\fR,\fBmover\fR\fR
 .ad
@@ -252,7 +242,6 @@ interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIID\fR\fR
 .ad
@@ -396,35 +385,29 @@ The following command disables clear text password authentication.
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred, such as the \fBndmpd\fR daemon is not running, that
 prevented \fBndmpadm\fR from contacting the demon.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 
@@ -436,13 +419,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

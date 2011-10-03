@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gateways 4 "20 May 2009" "SunOS 5.11" "File Formats"
+.TH GATEWAYS 4 "May 20, 2009"
 .SH NAME
 gateways \- configuration file for /usr/sbin/in.routed IPv4 network routing
 daemon
@@ -54,7 +54,6 @@ Host \fIhname\fR is equivalent to \fBnet \fInname\fR/32\fR.
 The parameters in the lines shown above are described as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fINname\fR or \fIHname\fR\fR
 .ad
@@ -69,7 +68,6 @@ If it is a name, then it must either be defined in \fB/etc/networks\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIMask\fR\fR
 .ad
@@ -81,7 +79,6 @@ Nname.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIGname\fR\fR
 .ad
@@ -92,7 +89,6 @@ Name or address of the gateway to which RIP responses should be forwarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIValue\fR\fR
 .ad
@@ -103,7 +99,6 @@ The hop count to the destination host or network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive\fR | \fBactive\fR | \fBexternal\fR\fR
 .ad
@@ -131,34 +126,28 @@ line with any of the keywords listed elsewhere in this document. These three
 forms are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnorip \fIifname\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 Disable all RIP processing on the specified interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoripin \fIifname\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 Disable the processing of received RIP responses on the specified interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoripout \fIifname\fR\fR\fR
 .ad
 .RS 19n
-.rt  
 Disable RIP output on the specified interface.
 .RE
 
@@ -168,7 +157,6 @@ Lines that start with neither \fBnet\fR nor \fBhost\fR must consist of one or
 more of the following parameter settings, separated by commas or blanks:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fBif=\fIifname\fR\fR\fR
 .ad
@@ -181,7 +169,6 @@ the line apply to all interfaces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsubnet=\fInname\fR[/\fImask\fR][,\fImetric\fR]\fR\fR
 .ad
@@ -195,7 +182,6 @@ full, 32-bit value, as in \fB192.0.2.0\fR instead of \fB192.0.2\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBripv1_mask=\fInname\fR/\fImask1\fR,\fImask2\fR\fR\fR
 .ad
@@ -210,7 +196,6 @@ facility. See the description of \fBripv2_out\fR, below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasswd=\fIXXX\fR[|\fIKeyID\fR[\fIstart\fR|\fIstop\fR]]\fR\fR
 .ad
@@ -235,7 +220,6 @@ only by UID 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmd5_passwd=\fR\fIXXX\fR|\fIKeyID\fR[\fIstart\fR|\fIstop\fR]\fR
 .ad
@@ -247,7 +231,6 @@ is similar to \fBpasswd\fR (described above).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_ag\fR\fR
 .ad
@@ -258,7 +241,6 @@ Turns off aggregation of subnets in RIPv1 and RIPv2 responses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_host\fR\fR
 .ad
@@ -269,7 +251,6 @@ Turns off acceptance of host routes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_super_ag\fR\fR
 .ad
@@ -280,7 +261,6 @@ Turns off aggregation of networks into supernets in RIPv2 responses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive\fR\fR
 .ad
@@ -292,7 +272,6 @@ and turns off all RIP and router discovery through the interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_rip\fR\fR
 .ad
@@ -309,7 +288,6 @@ as a client router discovery daemon, which does not advertise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_rip_mcast\fR\fR
 .ad
@@ -320,7 +298,6 @@ Causes RIPv2 packets to be broadcast instead of multicast.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_ripv1_in\fR\fR
 .ad
@@ -331,7 +308,6 @@ Causes RIPv1 received responses to be ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_ripv2_in\fR\fR
 .ad
@@ -342,7 +318,6 @@ Causes RIPv2 received responses to be ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBripv2_out\fR\fR
 .ad
@@ -354,7 +329,6 @@ possible.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBripv2\fR\fR
 .ad
@@ -366,7 +340,6 @@ disables RIPv1.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_rdisc\fR\fR
 .ad
@@ -377,7 +350,6 @@ Disables the Internet Router Discovery Protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_solicit\fR\fR
 .ad
@@ -388,7 +360,6 @@ Disables the transmission of Router Discovery Solicitations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsend_solicit\fR\fR
 .ad
@@ -401,7 +372,6 @@ messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_rdisc_adv\fR\fR
 .ad
@@ -412,7 +382,6 @@ Disables the transmission of Router Discovery Advertisements.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrdisc_adv\fR\fR
 .ad
@@ -425,7 +394,6 @@ messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbcast_rdisc\fR\fR
 .ad
@@ -437,7 +405,6 @@ multicast.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrdisc_pref=\fIN\fR\fR\fR
 .ad
@@ -450,7 +417,6 @@ less negative preferences are preferred by clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrdisc_interval=\fIN\fR\fR\fR
 .ad
@@ -462,7 +428,6 @@ transmitted to \fIN\fR seconds and their lifetime to 3*\fIN\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfake_default=\fImetric\fR\fR\fR
 .ad
@@ -474,7 +439,6 @@ the network number and netmask coming from the specified interface.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpm_rdisc\fR\fR
 .ad
@@ -489,7 +453,6 @@ serves as a \fBpoor man's router discovery\fR protocol.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrust_gateway=\fIrtr_name\fR[|\fInet1\fR/\fImask1\fR|\fInet2\fR/\fImask2\
 fR|...]\fR\fR
@@ -504,7 +467,6 @@ ignored from that router.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBredirect_ok\fR\fR
 .ad
@@ -517,7 +479,6 @@ overridden.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrip_neighbor=\fIx.x.x.x\fR\fR\fR
 .ad

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bp_copyin 9F "16 Oct 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH BP_COPYIN 9F "Oct 16, 2007"
 .SH NAME
 bp_copyin \- copy from a buf(9S) into a driver buffer
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ bp_copyin \- copy from a buf(9S) into a driver buffer
 
 
 
-\fBint\fR \fBbp_copyin\fR(\fBstruct buf *\fR\fIbp\fR, \fBvoid *\fR\fIdriverbuf\fR, \fBoffset_t\fR \fIoffset\fR, 
+\fBint\fR \fBbp_copyin\fR(\fBstruct buf *\fR\fIbp\fR, \fBvoid *\fR\fIdriverbuf\fR, \fBoffset_t\fR \fIoffset\fR,
      \fBsize_t\fR \fIsize\fR);
 .fi
 
@@ -26,45 +26,37 @@ Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the buffer header structure to copy from.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriverbuf\fR\fR
 .ad
 .RS 13n
-.rt  
 Driver buffer to copy to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 13n
-.rt  
 Offset into \fIbp\fR where to start copying.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 13n
-.rt  
 Size of copy.
 .RE
 

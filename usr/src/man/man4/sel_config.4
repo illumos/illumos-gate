@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sel_config 4 "20 Jul 2007" "SunOS 5.11" "File Formats"
+.TH SEL_CONFIG 4 "Jul 20, 2007"
 .SH NAME
 sel_config \- selection rules for copy, cut, paste, drag and drop operations
 .SH SYNOPSIS
@@ -39,34 +39,28 @@ confirmer, displays. Each entry has the form:
 source and destination windows' labels. There are three allowed values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupgradesl\fR\fR
 .ad
 .RS 20n
-.rt  
 The source window's label is less than the destination window's label.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdowngradesl\fR\fR
 .ad
 .RS 20n
-.rt  
 The source window's label is higher than the destination window's label.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisjointsl\fR\fR
 .ad
 .RS 20n
-.rt  
 The source and destination windows' labels are disjoint. Neither label
 dominates the other.
 .RE
@@ -77,24 +71,20 @@ dominates the other.
 values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 5n
-.rt  
 Use manual confirmation, that is, display the selection confirmer window. This
 is the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBy\fR\fR
 .ad
 .RS 5n
-.rt  
 Use automatic confirmation, that is, do not display the selection confirmer
 window.
 .RE
@@ -151,13 +141,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpkcs11 3LIB "4 Aug 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBPKCS11 3LIB "Aug 4, 2008"
 .SH NAME
 libpkcs11 \- PKCS#11 Cryptographic Framework library
 .SH SYNOPSIS
@@ -125,43 +125,41 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBC_CloseAllSessions\fR\fBC_CloseSession\fR
-\fBC_CopyObject\fR\fBC_CreateObject\fR
-\fBC_Decrypt\fR\fBC_DecryptDigestUpdate\fR
-\fBC_DecryptFinal\fR\fBC_DecryptInit\fR
-\fBC_DecryptUpdate\fR\fBC_DecryptVerifyUpdate\fR
-\fBC_DeriveKey\fR\fBC_DestroyObject\fR
-\fBC_Digest\fR\fBC_DigestEncryptUpdate\fR
-\fBC_DigestFinal\fR\fBC_DigestInit\fR
-\fBC_DigestKey\fR\fBC_DigestUpdate\fR
-\fBC_Encrypt\fR\fBC_EncryptFinal\fR
-\fBC_EncryptInit\fR\fBC_EncryptUpdate\fR
-\fBC_Finalize\fR\fBC_FindObjects\fR
-\fBC_FindObjectsFinal\fR\fBC_FindObjectsInit\fR
-\fBC_GenerateKey\fR\fBC_GenerateKeyPair\fR
-\fBC_GenerateRandom\fR\fBC_GetAttributeValue\fR
-\fBC_GetFunctionList\fR\fBC_GetInfo\fR
-\fBC_GetMechanismInfo\fR\fBC_GetMechanismList\fR
-\fBC_GetObjectSize\fR\fBC_GetOperationState\fR
-\fBC_GetSessionInfo\fR\fBC_GetSlotInfo\fR
-\fBC_GetSlotList\fR\fBC_GetTokenInfo\fR
-\fBC_InitPIN\fR\fBC_InitToken\fR
-\fBC_Initialize\fR\fBC_Login\fR
-\fBC_Logout\fR\fBC_OpenSession\fR
-\fBC_SeedRandom\fR\fBC_SetAttributeValue\fR
-\fBC_SetOperationState\fR\fBC_SetPIN\fR
-\fBC_Sign\fR\fBC_SignEncryptUpdate\fR
-\fBC_SignFinal\fR\fBC_SignInit\fR
-\fBC_SignRecover\fR\fBC_SignRecoverInit\fR
-\fBC_SignUpdate\fR\fBC_UnwrapKey\fR
-\fBC_Verify\fR\fBC_VerifyFinal\fR
-\fBC_VerifyInit\fR\fBC_VerifyRecover\fR
-\fBC_VerifyRecoverInit\fR\fBC_VerifyUpdate\fR
-\fBC_WaitForSlotEvent\fR\fBC_WrapKey\fR
+l l
+l l .
+\fBC_CloseAllSessions\fR	\fBC_CloseSession\fR
+\fBC_CopyObject\fR	\fBC_CreateObject\fR
+\fBC_Decrypt\fR	\fBC_DecryptDigestUpdate\fR
+\fBC_DecryptFinal\fR	\fBC_DecryptInit\fR
+\fBC_DecryptUpdate\fR	\fBC_DecryptVerifyUpdate\fR
+\fBC_DeriveKey\fR	\fBC_DestroyObject\fR
+\fBC_Digest\fR	\fBC_DigestEncryptUpdate\fR
+\fBC_DigestFinal\fR	\fBC_DigestInit\fR
+\fBC_DigestKey\fR	\fBC_DigestUpdate\fR
+\fBC_Encrypt\fR	\fBC_EncryptFinal\fR
+\fBC_EncryptInit\fR	\fBC_EncryptUpdate\fR
+\fBC_Finalize\fR	\fBC_FindObjects\fR
+\fBC_FindObjectsFinal\fR	\fBC_FindObjectsInit\fR
+\fBC_GenerateKey\fR	\fBC_GenerateKeyPair\fR
+\fBC_GenerateRandom\fR	\fBC_GetAttributeValue\fR
+\fBC_GetFunctionList\fR	\fBC_GetInfo\fR
+\fBC_GetMechanismInfo\fR	\fBC_GetMechanismList\fR
+\fBC_GetObjectSize\fR	\fBC_GetOperationState\fR
+\fBC_GetSessionInfo\fR	\fBC_GetSlotInfo\fR
+\fBC_GetSlotList\fR	\fBC_GetTokenInfo\fR
+\fBC_InitPIN\fR	\fBC_InitToken\fR
+\fBC_Initialize\fR	\fBC_Login\fR
+\fBC_Logout\fR	\fBC_OpenSession\fR
+\fBC_SeedRandom\fR	\fBC_SetAttributeValue\fR
+\fBC_SetOperationState\fR	\fBC_SetPIN\fR
+\fBC_Sign\fR	\fBC_SignEncryptUpdate\fR
+\fBC_SignFinal\fR	\fBC_SignInit\fR
+\fBC_SignRecover\fR	\fBC_SignRecoverInit\fR
+\fBC_SignUpdate\fR	\fBC_UnwrapKey\fR
+\fBC_Verify\fR	\fBC_VerifyFinal\fR
+\fBC_VerifyInit\fR	\fBC_VerifyRecover\fR
+\fBC_VerifyRecoverInit\fR	\fBC_VerifyUpdate\fR
+\fBC_WaitForSlotEvent\fR	\fBC_WrapKey\fR
 .TE
 
 .SS "SUNW Extensions"
@@ -169,32 +167,26 @@ lw(2.75i) lw(2.75i)
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-.
-\fBSUNW_C_GetMechSession\fR\fBSUNW_C_KeyToObject\fR
+l l .
+\fBSUNW_C_GetMechSession\fR	\fBSUNW_C_KeyToObject\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libpkcs11.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libpkcs11.so.1\fR\fR
 .ad
 .RS 30n
-.rt  
 64-bit shared object
 .RE
 
@@ -206,16 +198,15 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityCommitted
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Committed
 _
-MT-LevelSee below.
+MT-Level	See below.
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

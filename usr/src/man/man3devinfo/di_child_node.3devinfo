@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_child_node 3DEVINFO "1 Dec 1998" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_CHILD_NODE 3DEVINFO "Dec 1, 1998"
 .SH NAME
 di_child_node, di_parent_node, di_sibling_node, di_drv_first_node,
 di_drv_next_node \- libdevinfo node traversal functions
@@ -39,34 +39,28 @@ di_drv_next_node \- libdevinfo node traversal functions
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdrv_name\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the driver of interest.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInode\fR\fR
 .ad
 .RS 12n
-.rt  
 A  handle to any node in the snapshot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIroot\fR\fR
 .ad
 .RS 12n
-.rt  
 The handle of the root node for the snapshot returned by
 \fBdi_init\fR(3DEVINFO).
 .RE
@@ -120,34 +114,28 @@ is returned and \fIerrno\fR is set to indicate the error.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The argument is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 The requested node does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The node was not found in the snapshot, but it may exist in the kernel. This
 error may occur if the snapshot contains a partial device tree.
 .RE
@@ -160,15 +148,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sysevent_get_class_name 3SYSEVENT "24 Jul 2009" "SunOS 5.11" "System Event Library Functions"
+.TH SYSEVENT_GET_CLASS_NAME 3SYSEVENT "Jul 24, 2009"
 .SH NAME
 sysevent_get_class_name, sysevent_get_subclass_name, sysevent_get_size,
 sysevent_get_seq, sysevent_get_time \- get class name, subclass name, ID or
@@ -11,7 +11,7 @@ buffer size of event
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [\fIflag\fR\&.\|.\|.]  \fIfile\fR\&.\|.\|. \fB-lsysevent\fR [\fIlibrary\fR\&.\|.\|.] 
+\fBcc\fR [\fIflag\fR\&.\|.\|.]  \fIfile\fR\&.\|.\|. \fB-lsysevent\fR [\fIlibrary\fR\&.\|.\|.]
 #include <libsysevent.h>
 
 \fBchar *\fR\fBsysevent_get_class_name\fR(\fBsysevent_t *\fR\fIev\fR);
@@ -40,23 +40,19 @@ buffer size of event
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIev\fR\fR
 .ad
 .RS 10n
-.rt  
 handle to event
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIetimep\fR\fR
 .ad
 .RS 10n
-.rt  
 pointer to high resolution event time variable
 .RE
 
@@ -100,8 +96,8 @@ event_handler(sysevent_t *ev)
          int ev_sz;
          hrtime_t ev_time;
          uint64_t ev_seq;
-         
-         
+
+
          /* Filter on class and subclass */
          if (strcmp(EC_PRIV, sysevent_get_class_name(ev)) != 0) {
                  return;
@@ -109,7 +105,7 @@ event_handler(sysevent_t *ev)
              sysevent_get_subclass_name(ev)) != 0) {
                  return;
          }
-         
+
          /*
           * Check for replayed sysevent, time must
           * be greater than previously recorded.
@@ -121,10 +117,10 @@ event_handler(sysevent_t *ev)
              last_ev_seq)) {
                  return;
          }
-          
+
          last_ev_time = ev_time;
          last_ev_seq = ev_seq;
-          
+
          /* Store event for later processing */
          ev_sz = sysevent_get_size(ev):
          new_ev (sysevent_t *)malloc(ev_sz);
@@ -142,15 +138,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lpfilter 1M "3 Apr 1997" "SunOS 5.11" "System Administration Commands"
+.TH LPFILTER 1M "Apr 3, 1997"
 .SH NAME
 lpfilter \- administer filters used with the LP print service
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/lpfilter\fR \fB-f\fR \fIfilter-name\fR 
+\fB/usr/sbin/lpfilter\fR \fB-f\fR \fIfilter-name\fR
      {\fB-\fR | \fB-i\fR | \fB-l\fR | \fB-x\fR | \fB-F\fR \fIpathname\fR}
 .fi
 
@@ -27,12 +27,10 @@ Arguments consist of the \fB-f\fR\fIfilter-name\fR option and exactly one of
 the arguments appearing within braces (\fB{\fR\|\fB}\fR) in the SYNOPSIS.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 18n
-.rt  
 Adds or changes a filter as specified from standard input. The format of the
 input is specified below. If \fB-f\fR \fBall\fR is specified with the
 \fB\(mi\fR option, the specified change is made to all existing filters. This
@@ -41,12 +39,10 @@ is not useful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilter-name\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the  \fIfilter-name\fR of the filter to be added, changed, reset,
 deleted, or listed. The  filter name \fBall\fR is a special filter name defined
 below. The  \fB-f\fR option is required.
@@ -54,12 +50,10 @@ below. The  \fB-f\fR option is required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIpathname\fR\fR
 .ad
 .RS 18n
-.rt  
 Adds or changes a filter as specified by the contents of the file
 \fIpathname\fR. The format of the file's contents is specified below. If
 \fB\fR\fB-f\fR\fB all\fR is specified with the \fB-F\fR option, the specified
@@ -68,12 +62,10 @@ change is made to all existing filters. This is not useful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 18n
-.rt  
 Resets a filter to its default settings. Using  \fB\fR\fB-f\fR\fB all\fR with
 the  \fB-i\fR option restores  all filters for which predefined settings are
 available to their original settings.
@@ -81,24 +73,20 @@ available to their original settings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 Lists a filter description. Using \fB-f\fR \fBall\fR with the \fB-l\fR option
 produces a list of all filters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 18n
-.rt  
 Deletes a filter. Using \fB-f\fR \fBall\fR with the \fB-x\fR option results in
 all filters being deleted.
 .RE
@@ -189,19 +177,17 @@ description.
 \fBPrinters: \fR\fIprinter-list\fR
 \fBFilter type: \fR\fIfilter-type\fR
 \fBCommand: \fR\fIshell-command\fR
-\fBOptions: \fR\fItemplate-list\fR 
+\fBOptions: \fR\fItemplate-list\fR
 .fi
 .in -2
 .sp
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBInput\fR \fBtypes\fR\fR
 .ad
 .RS 17n
-.rt  
 This gives the content types that can be accepted by the filter. The default is
 \fBany\fR. The document content type must  be a member of this list for the
 initial filter in the sequence.
@@ -209,12 +195,10 @@ initial filter in the sequence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOutput\fR \fBtypes\fR\fR
 .ad
 .RS 17n
-.rt  
 This gives the content types that the filter can  produce from any of the input
 (content) types.  The default is \fBany\fR. The intersection of the output
 types of this list and the content types acceptable to the printer (from
@@ -226,12 +210,10 @@ non-null.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPrinter\fR \fBtypes\fR\fR
 .ad
 .RS 17n
-.rt  
 This gives the printer types for which this  printer can be used. The \fBLP\fR
 print service will restrict the use of  the filter to these printer types (from
 \fBlpadmin\fR \fB-T\fR). The default is \fBany\fR.
@@ -239,12 +221,10 @@ print service will restrict the use of  the filter to these printer types (from
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPrinters\fR\fR
 .ad
 .RS 17n
-.rt  
 This gives the names of the printers for which the filter can be used. The
 \fBLP\fR print service will restrict the use of the filter to just the printers
 named. The default is \fBany\fR.
@@ -252,12 +232,10 @@ named. The default is \fBany\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFilter\fR \fBtype\fR\fR
 .ad
 .RS 17n
-.rt  
 This marks the filter as a \fBslow\fR filter or a \fBfast\fR filter. Slow
 filters are generally those that take a long time to convert their input (that
 is, minutes or hours). They are run before the job is scheduled for a  printer,
@@ -272,12 +250,10 @@ program to run while connected  to the physical printer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCommand\fR\fR
 .ad
 .RS 17n
-.rt  
 This specifies which program to run to invoke the filter. The full program
 pathname as well as fixed options must  be included in the \fIshell-command\fR;
 additional options are constructed, based on the characteristics of each print
@@ -289,12 +265,10 @@ be constructed to convert data not handled by a single filter.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOptions\fR\fR
 .ad
 .RS 17n
-.rt  
 This is a comma-separated list of templates used by  the  \fBLP\fR print
 service to construct options to the filter from the  characteristics of each
 print request listed in the table later. The \fB-y\fR and  \fB- P\fR arguments
@@ -489,23 +463,19 @@ for that  filter, not for the entire pipeline.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInon-zero\fR\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

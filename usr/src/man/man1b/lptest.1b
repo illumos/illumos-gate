@@ -1,7 +1,7 @@
 '\" te
 .\"  Copyright (c) 1985 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\"  Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved.
-.TH lptest 1B "9 Sep 1996" "SunOS 5.11" "SunOS/BSD Compatibility Package Commands"
+.TH LPTEST 1B "Sep 9, 1996"
 .SH NAME
 lptest \- generate line printer ripple pattern
 .SH SYNOPSIS
@@ -25,24 +25,20 @@ This command is obsolete.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the length of the output line in characters. \fB79\fR characters is
 the default.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the number of output lines. \fB200\fR lines is the default. If
 \fIcount\fR is specified, \fIlength\fR must also be specified.
 .RE
@@ -53,23 +49,19 @@ Specifies the number of output lines. \fB200\fR lines is the default. If
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

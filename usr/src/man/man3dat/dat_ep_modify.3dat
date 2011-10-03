@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_ep_modify 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_EP_MODIFY 3DAT "Jul 16, 2004"
 .SH NAME
 dat_ep_modify \- change parameters of an Endpoint
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -24,34 +24,28 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIep_handle\fR\fR
 .ad
 .RS 17n
-.rt  
 Handle for an instance of the Endpoint.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIep_param_mask\fR\fR
 .ad
 .RS 17n
-.rt  
 Mask for Endpoint parameters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIep_param\fR\fR
 .ad
 .RS 17n
-.rt  
 Pointer to the Consumer-allocated structure that contains Consumer-requested
 Endpoint parameters.
 .RE
@@ -73,7 +67,6 @@ only when the Endpoint is in a specific state. The following list specifies
 which parameters can be modified and when they can be modified.
 .sp
 .ne 2
-.mk
 .na
 \fBInterface Adapter\fR
 .ad
@@ -87,7 +80,6 @@ changed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBEndpoint State\fR
 .ad
@@ -100,7 +92,6 @@ State of Endpoint cannot be changed by a \fBdat_ep_modify()\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLocal IA Address\fR
 .ad
@@ -113,7 +104,6 @@ Local IA Address cannot be changed by a \fBdat_ep_modify()\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLocal Port Qualifier\fR
 .ad
@@ -126,7 +116,6 @@ Local port qualifier cannot be changed by a \fBdat_ep_modify()\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRemote IA Address\fR
 .ad
@@ -139,7 +128,6 @@ Remote IA Address cannot be changed by a \fBdat_ep_modify()\fR operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRemote Port Qualifier\fR
 .ad
@@ -152,7 +140,6 @@ Remote port qualifier cannot be changed by a \fBdat_ep_modify()\fR operation
 
 .sp
 .ne 2
-.mk
 .na
 \fBProtection Zone\fR
 .ad
@@ -171,7 +158,6 @@ Protection Zone fail with a \fBDAT_PROTECTION_VIOLATION\fR return.
 
 .sp
 .ne 2
-.mk
 .na
 \fBIn DTO Event Dispatcher\fR
 .ad
@@ -187,7 +173,6 @@ Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBOut DTO Event Dispatcher\fR
 .ad
@@ -203,7 +188,6 @@ accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBConnection Event Dispatcher\fR
 .ad
@@ -219,7 +203,6 @@ Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBService Type\fR
 .ad
@@ -234,7 +217,6 @@ Active side or accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum Message Size\fR
 .ad
@@ -249,7 +231,6 @@ for an Active side or accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum RDMA Size\fR
 .ad
@@ -264,7 +245,6 @@ an Active side or accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBQuality of Service\fR
 .ad
@@ -279,7 +259,6 @@ or accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRecv Completion Flags\fR
 .ad
@@ -302,7 +281,6 @@ posting of any Recvs.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRequest Completion Flags\fR
 .ad
@@ -323,7 +301,6 @@ Active side or accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum Recv DTO\fR
 .ad
@@ -340,7 +317,6 @@ or accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum Request DTO\fR
 .ad
@@ -358,7 +334,6 @@ for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum Recv IOV\fR
 .ad
@@ -375,7 +350,6 @@ accepting a Connection Request for a Passive side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum Request IOV\fR
 .ad
@@ -393,7 +367,6 @@ side.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum outstanding RDMA Read as target\fR
 .ad
@@ -407,7 +380,6 @@ Maximum number of outstanding RDMA Reads for which the Endpoint is the target.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMaximum outstanding RDMA Read as originator\fR
 .ad
@@ -422,7 +394,6 @@ originator.
 
 .sp
 .ne 2
-.mk
 .na
 \fBNum transport-specific attributes\fR
 .ad
@@ -435,7 +406,6 @@ Number of transport-specific attributes to be modified.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTransport-specific endpoint attributes\fR
 .ad
@@ -451,7 +421,6 @@ transport-specific Endpoint attributes is the quiescent state
 
 .sp
 .ne 2
-.mk
 .na
 \fBNum provider-specific attributes\fR
 .ad
@@ -464,7 +433,6 @@ Can be modified when in Quiescent (unconnected) state.
 
 .sp
 .ne 2
-.mk
 .na
 \fBProvider-specific endpoint attributes\fR
 .ad
@@ -481,46 +449,38 @@ Provider-specific Endpoint attributes is the quiescent state
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 25n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIep_handle\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIep_param_mask\fR parameter is invalid, or one of the requested Endpoint
 parameters or attributes was invalid, not supported, or cannot be modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_STATE\fR\fR
 .ad
 .RS 25n
-.rt  
 Parameter in an invalid state. The Endpoint was not in the state that allows
 one of the parameters or attributes to be modified.
 .RE
@@ -533,15 +493,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

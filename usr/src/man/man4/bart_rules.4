@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH bart_rules 4 "9 Sep 2003" "SunOS 5.11" "File Formats"
+.TH BART_RULES 4 "Sep 9, 2003"
 .SH NAME
 bart_rules \- bart rules file
 .SH DESCRIPTION
@@ -58,12 +58,10 @@ arguments.
 There are three types of blocks:
 .sp
 .ne 2
-.mk
 .na
 \fBGlobal Block\fR
 .ad
 .RS 16n
-.rt  
 The first block in the file. The block is considered ``global'' if it specifies
 \fBCHECK\fR and \fBIGNORE\fR statements, but no previous subtree statement. A
 global block pertains to all subsequent blocks.
@@ -71,12 +69,10 @@ global block pertains to all subsequent blocks.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLocal block\fR
 .ad
 .RS 16n
-.rt  
 A block that specifies \fBCHECK\fR and \fBIGNORE\fR statements as well as a
 subtree directive. The rules in this block pertain to files and directories
 found in the specified subtree.
@@ -84,12 +80,10 @@ found in the specified subtree.
 
 .sp
 .ne 2
-.mk
 .na
 \fBHeir block\fR
 .ad
 .RS 16n
-.rt  
 A block that contains a null \fBCHECK\fR statement, no arguments. This block
 inherits the global \fBCHECK\fR statements and \fBIGNORE\fR statements.
 .RE
@@ -136,12 +130,10 @@ which they are read, overriding global settings.
 There are two types of pattern matching statements
 .sp
 .ne 2
-.mk
 .na
 \fBAND\fR
 .ad
 .RS 7n
-.rt  
 For a given subtree directive, all pattern matching statements are logically
 ANDed with the subtree. Patterns have the following syntax:
 .RS +4
@@ -181,12 +173,10 @@ CHECK  all
 
 .sp
 .ne 2
-.mk
 .na
 \fBOR\fR
 .ad
 .RS 7n
-.rt  
 Group multiple subtree directives together. Such subtree directives are
 logically ORed together.
 .sp
@@ -233,35 +223,29 @@ which attributes to track or ignore. Each attribute has an associated keyword.
 The attribute keywords are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBacl\fR
 .ad
 .RS 12n
-.rt  
 ACL attributes for the file. For a file with ACL attributes, this field
 contains the output from \fBacltotext()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBall\fR
 .ad
 .RS 12n
-.rt  
 All attributes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcontents\fR
 .ad
 .RS 12n
-.rt  
 Checksum value of the file. This attribute is only specified for regular files.
 If you turn off context checking or if checksums cannot be computed, the value
 of this field is \fB-\fR.
@@ -269,113 +253,93 @@ of this field is \fB-\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBdest\fR
 .ad
 .RS 12n
-.rt  
 Destination of a symbolic link.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdevnode\fR
 .ad
 .RS 12n
-.rt  
 Value of the device node. This attribute is for character device files and
 block device files only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdirmtime\fR
 .ad
 .RS 12n
-.rt  
 Modification time in seconds since 00:00:00 UTC, January 1, 1970 for
 directories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgid\fR
 .ad
 .RS 12n
-.rt  
 Numerical group ID of the owner of this entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlnmtime\fR
 .ad
 .RS 12n
-.rt  
 Creation time for links.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmode\fR
 .ad
 .RS 12n
-.rt  
 Octal number that represents the permissions of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmtime\fR
 .ad
 .RS 12n
-.rt  
 Modification time in seconds since 00:00:00 UTC, January 1, 1970 for files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsize\fR
 .ad
 .RS 12n
-.rt  
 File size in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtype\fR
 .ad
 .RS 12n
-.rt  
 Type of file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuid\fR
 .ad
 .RS 12n
-.rt  
 Numerical user ID of the owner of this entry.
 .RE
 

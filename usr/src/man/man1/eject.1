@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH eject 1 "8 Sep 2009" "SunOS 5.11" "User Commands"
+.TH EJECT 1 "Sep 8, 2009"
 .SH NAME
 eject \- eject media such as CD-ROM and floppy from drive
 .SH SYNOPSIS
@@ -52,56 +52,46 @@ drives have this capability.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the name of the default device to be ejected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Force the device to eject even if it is busy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Display paths and nicknames of ejectable devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 6n
-.rt  
 Query to see if the media is present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Issues the drive a CD-ROM tray close command.
 .sp
 Not all devices support this command.
@@ -113,24 +103,20 @@ Not all devices support this command.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies which device to \fBeject\fR, by the name it appears in the directory
 \fB/dev\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInickname\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies which device to \fBeject\fR, by its nickname as known to this
 command.
 .sp
@@ -173,81 +159,67 @@ example> \fBeject floppy0\fR
 The following exit codes are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 The operation was successful or, with the \fB-q\fR option, the media \fIis\fR
 in the drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 The operation was unsuccessful or, with the \fB-q\fR option, the media is
 \fInot\fR in the drive.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid options were specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 An \fBioctl()\fR request failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 5n
-.rt  
 Manually ejectable media is now okay to remove.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/diskette0\fR\fR
 .ad
 .RS 18n
-.rt  
 default diskette file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sr0\fR\fR
 .ad
 .RS 18n
-.rt  
 default \fBCD-ROM\fR file (deprecated)
 .RE
 

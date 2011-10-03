@@ -2,14 +2,14 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fcntl 2 "17 Jan 2007" "SunOS 5.11" "System Calls"
+.TH FCNTL 2 "Jan 17, 2007"
 .SH NAME
 fcntl \- file control
 .SH SYNOPSIS
@@ -37,12 +37,10 @@ specifies the operation to be performed by \fBfcntl()\fR.
 The values for \fIcmd\fR are defined in <\fBfcntl.h\fR> and include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_DUPFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Return a new file descriptor which is the lowest numbered available (that is,
 not already open) file descriptor greater than or equal to the third argument,
 \fIarg\fR, taken as an integer of type \fBint\fR. The new file descriptor
@@ -54,12 +52,10 @@ descriptor is cleared to keep the file open across calls to one of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_DUP2FD\fR\fR
 .ad
 .RS 15n
-.rt  
 Similar to \fBF_DUPFD\fR, but always returns \fIarg\fR. \fBF_DUP2FD\fR closes
 \fIarg\fR if it is open and not equal to \fIfildes.\fR \fBF_DUP2FD\fR is
 equivalent to \fBdup2\fR(\fIfildes\fR, \fIarg\fR).
@@ -67,12 +63,10 @@ equivalent to \fBdup2\fR(\fIfildes\fR, \fIarg\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_FREESP\fR\fR
 .ad
 .RS 15n
-.rt  
 Free storage space associated with a section of the ordinary file \fIfildes\fR.
 The section is specified by a variable of data type \fBstruct flock\fR pointed
 to by \fIarg\fR. The data type \fBstruct flock\fR is defined in the
@@ -84,24 +78,20 @@ freed only at the end of a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_FREESP64\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fBF_FREESP\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_ALLOCSP\fR\fR
 .ad
 .RS 15n
-.rt  
 Allocate space for a section of the ordinary file \fIfildes\fR. The section is
 specified by a variable of data type \fBstruct flock\fR pointed to by
 \fIarg\fR. The data type \fBstruct flock\fR is defined in the <\fBfcntl.h\fR>
@@ -110,24 +100,20 @@ header (see \fBfcntl.h\fR(3HEAD) and is described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_ALLOCSP64\fR\fR
 .ad
 .RS 15n
-.rt  
 Equivalent to \fBF_ALLOCSP\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the file descriptor flags defined in <\fBfcntl.h\fR> that are associated
 with the file descriptor \fIfildes\fR. File descriptor flags are associated
 with a single file descriptor and do not affect other file descriptors that
@@ -136,12 +122,10 @@ refer to the same file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETFL\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the file status flags and file access modes, defined in <\fBfcntl.h\fR>,
 for the file descriptor specified by \fIfildes\fR. The file access modes can be
 extracted from the return value using the mask \fBO_ACCMODE\fR, which is
@@ -152,12 +136,10 @@ file descriptions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETOWN\fR\fR
 .ad
 .RS 15n
-.rt  
 If \fIfildes\fR refers to a socket, get the process or process group \fBID\fR
 specified to receive \fBSIGURG\fR signals when out-of-band data is available.
 Positive values indicate a process ID; negative values, other than \(mi1,
@@ -167,12 +149,10 @@ results are unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETXFL\fR\fR
 .ad
 .RS 15n
-.rt  
 Get the file status flags, file access modes, and file creation and assignment
 flags, defined in <\fBfcntl.h\fR>, for the file descriptor specified by
 \fIfildes\fR. The file access modes can be extracted from the return value
@@ -184,12 +164,10 @@ file descriptions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETFD\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the file descriptor flags defined in <\fBfcntl.h\fR>, that are associated
 with \fIfildes\fR, to the third argument, \fIarg\fR, taken as type \fBint\fR.
 If the \fBFD_CLOEXEC\fR flag in the third argument is 0, the file will remain
@@ -199,12 +177,10 @@ successful execution of one of the \fBexec()\fR functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETFL\fR\fR
 .ad
 .RS 15n
-.rt  
 Set the file status flags, defined in <\fBfcntl.h\fR>, for the file descriptor
 specified by \fIfildes\fR from the corresponding bits in the \fIarg\fR
 argument, taken as type \fBint\fR. Bits corresponding to the file access mode
@@ -215,12 +191,10 @@ application, the result is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETOWN\fR\fR
 .ad
 .RS 15n
-.rt  
 If \fIfildes\fR refers to a socket, set the process or process group \fBID\fR
 specified to receive \fBSIGURG\fR signals when out-of-band data is available,
 using the value of the third argument, \fIarg\fR, taken as type \fBint\fR.
@@ -235,12 +209,10 @@ The following commands are available for advisory record locking. Record
 locking is supported for regular files, and may be supported for other files.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETLK\fR\fR
 .ad
 .RS 14n
-.rt  
 Get the first lock which blocks the lock description pointed to by the third
 argument, \fIarg\fR, taken as a pointer to type \fBstruct flock\fR, defined in
 <\fBfcntl.h\fR>. The information retrieved overwrites the information passed to
@@ -251,24 +223,20 @@ except for the lock type which will be set to \fBF_UNLCK\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETLK64\fR\fR
 .ad
 .RS 14n
-.rt  
 Equivalent to \fBF_GETLK\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLK\fR\fR
 .ad
 .RS 14n
-.rt  
 Set or clear a file segment lock according to the lock description pointed to
 by the third argument, \fIarg\fR, taken as a pointer to type \fBstruct
 flock\fR, defined in <\fBfcntl.h\fR>. \fBF_SETLK\fR is used to establish shared
@@ -281,24 +249,20 @@ return value of \fB\(mi1\fR\&.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLK64\fR\fR
 .ad
 .RS 14n
-.rt  
 Equivalent to \fBF_SETLK\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLKW\fR\fR
 .ad
 .RS 14n
-.rt  
 This command is the same as \fBF_SETLK\fR except that if a shared or exclusive
 lock is blocked by other locks, the process will wait until the request can be
 satisfied. If a signal that is to be caught is received while \fBfcntl()\fR is
@@ -309,12 +273,10 @@ set to \fBEINTR\fR, and the lock operation will not be done.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLKW64\fR\fR
 .ad
 .RS 14n
-.rt  
 Equivalent to \fBF_SETLKW\fR, but takes a \fBstruct flock64\fR argument rather
 than a \fBstruct flock\fR argument.
 .RE
@@ -338,13 +300,13 @@ The \fBflock\fR structure contains at least the following elements:
 .sp
 .in +2
 .nf
-short   l_type;       /* lock operation type */ 
-short   l_whence;     /* lock base indicator */ 
-off_t   l_start;      /* starting offset from base */ 
+short   l_type;       /* lock operation type */
+short   l_whence;     /* lock base indicator */
+off_t   l_start;      /* starting offset from base */
 off_t   l_len;        /* lock length; l_len == 0 means
-                         until end of file */ 
-int     l_sysid;      /* system ID running process holding lock */ 
-pid_t   l_pid;        /* process ID of process holding lock */ 
+                         until end of file */
+int     l_sysid;      /* system ID running process holding lock */
+pid_t   l_pid;        /* process ID of process holding lock */
 .fi
 .in -2
 
@@ -413,24 +375,20 @@ share reservation is placed on an entire file to allow cooperating processes to
 control access to the file.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SHARE\fR\fR
 .ad
 .RS 13n
-.rt  
 Sets a share reservation on a file with the specified access mode and
 designates which types of access to deny.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_UNSHARE\fR\fR
 .ad
 .RS 13n
-.rt  
 Remove an existing share reservation.
 .RE
 
@@ -472,34 +430,28 @@ An \fBF_UNSHARE\fR request releases the reservation with the specified
 Valid \fBf_access\fR values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RDACC\fR\fR
 .ad
 .RS 11n
-.rt  
 Set a file share reservation for read-only access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_WRACC\fR\fR
 .ad
 .RS 11n
-.rt  
 Set a file share reservation for write-only access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RWACC\fR\fR
 .ad
 .RS 11n
-.rt  
 Set a file share reservation for read and write access.
 .RE
 
@@ -508,56 +460,46 @@ Set a file share reservation for read and write access.
 Valid \fBf_deny\fR values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_COMPAT\fR\fR
 .ad
 .RS 12n
-.rt  
 Set a file share reservation to compatibility mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RDDNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Set a file share reservation to deny read access to other processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_WRDNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Set a file share reservation to deny write access to other processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_RWDNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Set a file share reservation to deny read and write access to other processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_NODNY\fR\fR
 .ad
 .RS 12n
-.rt  
 Do not deny read or write access to any other process.
 .RE
 
@@ -567,192 +509,158 @@ Do not deny read or write access to any other process.
 Upon successful completion, the value returned depends on \fIcmd\fR as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_DUPFD\fR\fR
 .ad
 .RS 14n
-.rt  
 A new file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_FREESP\fR\fR
 .ad
 .RS 14n
-.rt  
 Value of \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETFD\fR\fR
 .ad
 .RS 14n
-.rt  
 Value of flags defined in \fB<fcntl.h>\fR\&. The return value will not be
 negative.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETFL\fR\fR
 .ad
 .RS 14n
-.rt  
 Value of file status flags and access modes. The return value will not be
 negative.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETLK\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETLK64\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETOWN\fR\fR
 .ad
 .RS 14n
-.rt  
 Value of the socket owner process or process group; this will not be
 \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_GETXFL\fR\fR
 .ad
 .RS 14n
-.rt  
 Value of file status flags, access modes, and creation and assignment flags.
 The return value will not be negative.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETFD\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETFL\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLK\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLK64\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLKW\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETLKW64\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SETOWN\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_SHARE\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF_UNSHARE\fR\fR
 .ad
 .RS 14n
-.rt  
 Value other than \fB\(mi1\fR\&.
 .RE
 
@@ -766,12 +674,10 @@ error.
 The \fBfcntl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBF_SETLK\fR or \fBF_SETLK64\fR, the type of lock
 \fB(l_type)\fR is a shared (\fBF_RDLCK\fR) or exclusive (\fBF_WRLCK\fR) lock,
 and the segment of a file to be locked is already exclusive-locked by another
@@ -791,12 +697,10 @@ existing \fBf_deny\fR share reservation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIfildes\fR argument is not a valid open file descriptor; or the \fIcmd\fR
 argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
 \fBF_SETLKW64\fR, the type of lock, \fBl_type\fR, is a shared lock
@@ -821,12 +725,10 @@ reading.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBF_GETLK\fR, \fBF_GETLK64\fR, \fBF_SETLK\fR,
 \fBF_SETLK64\fR, \fBF_SETLKW\fR, \fBF_SETLKW64\fR, or \fBF_FREESP\fR and the
 \fIarg\fR argument points to an illegal address.
@@ -837,24 +739,20 @@ to an illegal address.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBF_SETLKW\fR or \fBF_SETLKW64\fR and the function
 was interrupted by a signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is invalid or not supported by the file system; or the
 \fIcmd\fR argument is \fBF_DUPFD\fR and \fIarg\fR is negative or greater than
 or equal to \fBOPEN_MAX\fR; or the \fIcmd\fR argument is \fBF_GETLK\fR,
@@ -868,23 +766,19 @@ The \fIcmd\fR argument is \fBF_UNSHARE\fR and a reservation with this
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 13n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBF_DUPFD\fR and either \fBOPEN_MAX\fR file
 descriptors are currently open in the calling process, or no file descriptors
 greater than or equal to \fIarg\fR are available.
@@ -892,12 +786,10 @@ greater than or equal to \fIarg\fR are available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLCK\fR\fR
 .ad
 .RS 13n
-.rt  
 The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
 \fBF_SETLKW64\fR and satisfying the lock or unlock request would result in the
 number of locked regions in the system exceeding a system-imposed limit.
@@ -905,12 +797,10 @@ number of locked regions in the system exceeding a system-imposed limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOLINK\fR\fR
 .ad
 .RS 13n
-.rt  
 Either the \fIfildes\fR argument is on a remote machine and the link to that
 machine is no longer active; or the \fIcmd\fR argument is \fBF_FREESP\fR, the
 file is on a remote machine, and the link to that machine is no longer active.
@@ -918,12 +808,10 @@ file is on a remote machine, and the link to that machine is no longer active.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 One of the values to be returned cannot be represented correctly.
 .sp
 The \fIcmd\fR argument is \fBF_GETLK\fR, \fBF_SETLK\fR, or \fBF_SETLKW\fR and
@@ -942,12 +830,10 @@ type \fBoff64_t\fR.
 The \fBfcntl()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is \fBF_SETLK\fR, \fBF_SETLK64\fR, \fBF_SETLKW\fR, or
 \fBF_SETLKW64\fR, and the file is currently being mapped to virtual memory
 using \fBmmap\fR(2).
@@ -955,12 +841,10 @@ using \fBmmap\fR(2).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDEADLK\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is \fBF_SETLKW\fR or \fBF_SETLKW64\fR, the lock is
 blocked by some lock from another process and putting the calling process to
 sleep, waiting for that lock to become free would cause a deadlock.
@@ -978,15 +862,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelAsync-Signal Safe
+MT-Level	Async-Signal Safe
 .TE
 
 .SH SEE ALSO

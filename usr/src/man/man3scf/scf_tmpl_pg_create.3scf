@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scf_tmpl_pg_create 3SCF "28 Oct 2008" "SunOS 5.11" "Service Configuration Facility Library Functions"
+.TH SCF_TMPL_PG_CREATE 3SCF "Oct 28, 2008"
 .SH NAME
 scf_tmpl_pg_create, scf_tmpl_pg_reset, scf_tmpl_pg_destroy,
 scf_tmpl_get_by_pg_name, scf_tmpl_get_by_pg, scf_tmpl_iter_pgs \- template
@@ -11,7 +11,7 @@ property group functions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
 \fBscf_pg_tmpl_t *\fR\fBscf_tmpl_pg_create\fR(\fBscf_handle_t *\fR\fIhandle\fR);
@@ -138,7 +138,6 @@ The \fBscf_tmpl_get_by_pg()\fR, \fBscf_tmpl_get_by_pg_name()\fR, and
 \fBscf_tmpl_iter_pgs()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
@@ -150,7 +149,6 @@ for the operation denied access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_CONNECTION_BROKEN\fR\fR
 .ad
@@ -161,7 +159,6 @@ The connection to the repository was lost.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_DELETED\fR\fR
 .ad
@@ -172,7 +169,6 @@ The instance or its template property group has been deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_HANDLE_DESTROYED\fR\fR
 .ad
@@ -183,7 +179,6 @@ The handle passed in has been destroyed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INTERNAL\fR\fR
 .ad
@@ -194,7 +189,6 @@ An internal error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
@@ -206,7 +200,6 @@ or \fIpg\fR is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
@@ -217,7 +210,6 @@ There is not enough memory to populate the \fBscf_pg_tmpl_t\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_RESOURCES\fR\fR
 .ad
@@ -228,7 +220,6 @@ The server does not have adequate resources to complete the request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_BOUND\fR\fR
 .ad
@@ -239,7 +230,6 @@ The handle is not currently bound.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_FOUND\fR\fR
 .ad
@@ -251,7 +241,6 @@ not exist.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_PERMISSION_DENIED\fR\fR
 .ad
@@ -265,12 +254,10 @@ The template could not be read due to access restrictions.
 The \fBscf_tmpl_get_by_pg()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NOT_SET\fR\fR
 .ad
 .RS 21n
-.rt  
 The property group specified by \fIpg\fR is not set.
 .RE
 
@@ -279,23 +266,19 @@ The property group specified by \fIpg\fR is not set.
 The \fBscf_tmpl_pg_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_INVALID_ARGUMENT\fR\fR
 .ad
 .RS 30n
-.rt  
 The handle argument is \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCF_ERROR_NO_MEMORY\fR\fR
 .ad
 .RS 30n
-.rt  
 There is no memory available.
 .RE
 
@@ -307,15 +290,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

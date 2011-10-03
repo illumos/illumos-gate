@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldap_error 3LDAP "11 Nov 2008" "SunOS 5.11" "LDAP Library Functions"
+.TH LDAP_ERROR 3LDAP "Nov 11, 2008"
 .SH NAME
 ldap_error, ldap_err2string, ldap_perror, ldap_result2error \- LDAP protocol
 error handling functions
@@ -63,7 +63,6 @@ be called to print an indication of the error to standard error.
 The possible values for an LDAP error code are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_SUCCESS\fR\fR
 .ad
@@ -74,7 +73,6 @@ The request was successful.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OPERATIONS_ERROR\fR\fR
 .ad
@@ -85,7 +83,6 @@ An operations error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_PROTOCOL_ERROR\fR\fR
 .ad
@@ -96,7 +93,6 @@ A protocol violation was detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_TIMELIMIT_EXCEEDED\fR\fR
 .ad
@@ -107,7 +103,6 @@ An LDAP time limit was exceeded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_SIZELIMIT_EXCEEDED\fR\fR
 .ad
@@ -118,7 +113,6 @@ An LDAP size limit was exceeded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_COMPARE_FALSE\fR\fR
 .ad
@@ -129,7 +123,6 @@ A compare operation returned false.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_COMPARE_TRUE\fR\fR
 .ad
@@ -140,7 +133,6 @@ A compare operation returned true.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_STRONG_AUTH_NOT_SUPPORTED\fR\fR
 .ad
@@ -151,7 +143,6 @@ The LDAP server does not support strong authentication.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_STRONG_AUTH_REQUIRED\fR\fR
 .ad
@@ -162,7 +153,6 @@ Strong authentication is required for the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_PARTIAL_RESULTS\fR\fR
 .ad
@@ -173,7 +163,6 @@ Only partial results are returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NO_SUCH_ATTRIBUTE\fR\fR
 .ad
@@ -184,7 +173,6 @@ The attribute type specified does not exist in the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_UNDEFINED_TYPE\fR\fR
 .ad
@@ -195,7 +183,6 @@ The attribute type specified is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_INAPPROPRIATE_MATCHING\fR\fR
 .ad
@@ -206,7 +193,6 @@ The filter type is not supported for the specified attribute.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_CONSTRAINT_VIOLATION\fR\fR
 .ad
@@ -218,7 +204,6 @@ An attribute value specified violates some constraint. For example, a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_TYPE_OR_VALUE_EXISTS\fR\fR
 .ad
@@ -229,7 +214,6 @@ An attribute type or attribute value specified already exists in the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_INVALID_SYNTAX\fR\fR
 .ad
@@ -240,7 +224,6 @@ An invalid attribute value was specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NO_SUCH_OBJECT\fR\fR
 .ad
@@ -251,7 +234,6 @@ The specified object does not exist in the directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_ALIAS_PROBLEM\fR\fR
 .ad
@@ -262,7 +244,6 @@ An alias in the directory points to a nonexistent entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_INVALID_DN_SYNTAX\fR\fR
 .ad
@@ -273,7 +254,6 @@ A syntactically invalid DN was specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_IS_LEAF\fR\fR
 .ad
@@ -284,7 +264,6 @@ The object specified is a leaf.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_ALIAS_DEREF_PROBLEM\fR\fR
 .ad
@@ -295,7 +274,6 @@ A problem was encountered when dereferencing an alias.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_INAPPROPRIATE_AUTH\fR\fR
 .ad
@@ -308,7 +286,6 @@ Inappropriate authentication was specified. For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_INVALID_CREDENTIALS\fR\fR
 .ad
@@ -319,7 +296,6 @@ Invalid credentials were presented, for example, the wrong password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_INSUFFICIENT_ACCESS\fR\fR
 .ad
@@ -330,7 +306,6 @@ The user has insufficient access to perform the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_BUSY\fR\fR
 .ad
@@ -341,7 +316,6 @@ The DSA is busy.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_UNAVAILABLE\fR\fR
 .ad
@@ -352,7 +326,6 @@ The DSA is unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_UNWILLING_TO_PERFORM\fR\fR
 .ad
@@ -363,7 +336,6 @@ The DSA is unwilling to perform the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_LOOP_DETECT\fR\fR
 .ad
@@ -374,7 +346,6 @@ A loop was detected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NAMING_VIOLATION\fR\fR
 .ad
@@ -385,7 +356,6 @@ A naming violation occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OBJECT_CLASS_VIOLATION\fR\fR
 .ad
@@ -397,7 +367,6 @@ missing from the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NOT_ALLOWED_ON_NONLEAF\fR\fR
 .ad
@@ -408,7 +377,6 @@ The operation is not allowed on a nonleaf object.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NOT_ALLOWED_ON_RDN\fR\fR
 .ad
@@ -419,7 +387,6 @@ The operation is not allowed on an RDN.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_ALREADY_EXISTS\fR\fR
 .ad
@@ -430,7 +397,6 @@ The entry already exists.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NO_OBJECT_CLASS_MODS\fR\fR
 .ad
@@ -441,7 +407,6 @@ Object class modifications are not allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_OTHER\fR\fR
 .ad
@@ -452,7 +417,6 @@ An unknown error occurred.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_SERVER_DOWN\fR\fR
 .ad
@@ -463,7 +427,6 @@ The LDAP library cannot contact the LDAP server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_LOCAL_ERROR\fR\fR
 .ad
@@ -477,7 +440,6 @@ server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_ENCODING_ERROR\fR\fR
 .ad
@@ -488,7 +450,6 @@ An error was encountered encoding parameters to send to the LDAP server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_DECODING_ERROR\fR\fR
 .ad
@@ -499,7 +460,6 @@ An error was encountered decoding a result from the LDAP server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_TIMEOUT\fR\fR
 .ad
@@ -510,7 +470,6 @@ A time limit was exceeded while waiting for a result.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_AUTH_UNKNOWN\fR\fR
 .ad
@@ -521,7 +480,6 @@ The authentication method specified to \fBldap_bind\fR(3LDAP) is not known.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_FILTER_ERROR\fR\fR
 .ad
@@ -533,7 +491,6 @@ unbalanced parentheses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_PARAM_ERROR\fR\fR
 .ad
@@ -545,7 +502,6 @@ An LDAP function was called with a bad parameter, for example, a \fINULL\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NO_MEMORY\fR\fR
 .ad
@@ -557,7 +513,6 @@ A memory allocation call failed in an LDAP library function, for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_CONNECT_ERROR\fR\fR
 .ad
@@ -569,7 +524,6 @@ establish a connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NOT_SUPPORTED\fR\fR
 .ad
@@ -581,7 +535,6 @@ client requests some LDAPv3 functionality.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_CONTROL_NOT_FOUND\fR\fR
 .ad
@@ -593,7 +546,6 @@ sent by the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_NO_RESULTS_RETURNED\fR\fR
 .ad
@@ -604,7 +556,6 @@ The LDAP server sent no results.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_MORE_RESULTS_TO_RETURN\fR\fR
 .ad
@@ -615,7 +566,6 @@ More results are chained in the message chain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_CLIENT_LOOP\fR\fR
 .ad
@@ -626,7 +576,6 @@ A loop has been detected, for example, when following referrals.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLDAP_REFERRAL_LIMIT_EXCEEDED\fR\fR
 .ad
@@ -644,13 +593,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

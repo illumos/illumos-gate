@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH umem_debug 3MALLOC "26 July 2002" "SunOS 5.11" "Memory Allocation Library Functions"
+.TH UMEM_DEBUG 3MALLOC "Jul 26, 2002"
 .SH NAME
 umem_debug \- debugging features of the umem library
 .SH SYNOPSIS
@@ -28,22 +28,18 @@ internal buffer that is readable with the \fB::umem_status\fR \fBmdb\fR(1)
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_DEBUG\fR\fR
 .ad
 .RS 16n
-.rt  
 This variable contains a list of comma-separated options.  Unrecognized options
 are ignored. Possible options include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaudit\fR[=\fIframes\fR]\fR
 .ad
 .RS 20n
-.rt  
 This option enables the recording of auditing information, including thread ID,
 high-resolution time stamp, and stack trace for the last action (allocation or
 free) on every allocation.  If transaction logging (see \fBUMEM_LOGGING\fR) is
@@ -61,12 +57,10 @@ This option also enables the \fBguards\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontents\fR[=\fIcount\fR]\fR
 .ad
 .RS 20n
-.rt  
 If auditing and contents logging (see \fBUMEM_LOGGING\fR) are enabled, the
 first \fIcount\fR bytes of each buffer are logged when they are freed.  If a
 buffer is shorter than \fIcount\fR bytes, it is logged in its entirety.
@@ -77,23 +71,19 @@ is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 20n
-.rt  
 This option is equivalent to \fBaudit\fR,\fBcontents\fR,\fBguards\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBguards\fR\fR
 .ad
 .RS 20n
-.rt  
 This option enables filling allocated and freed buffers with special patterns
 to help detect the use of uninitialized data and previously freed buffers. It
 also enables an 8-byte redzone after each buffer that contains
@@ -115,12 +105,10 @@ for details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
 .RS 20n
-.rt  
 The library writes error descriptions to standard error before aborting. These
 messages are not localized.
 .RE
@@ -129,34 +117,28 @@ messages are not localized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_LOGGING\fR\fR
 .ad
 .RS 16n
-.rt  
 To be enabled, this variable should be set to a comma-separated list of
 in-memory logs. The logs available are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtransaction\fR[=\fIsize\fR]\fR
 .ad
 .RS 22n
-.rt  
 If the \fBaudit\fR debugging option is set (see \fBUMEM_DEBUG\fR), the audit
 structures from previous transactions are entered into this log.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontents\fR[=\fIsize\fR]\fR
 .ad
 .RS 22n
-.rt  
 If the \fBaudit\fR debugging option is set, the contents of objects are
 recorded in this log as they are freed.
 .sp
@@ -166,12 +148,10 @@ are saved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfail\fR[=\fIsize\fR]\fR
 .ad
 .RS 22n
-.rt  
 Records are entered into this log for every failed allocation.
 .RE
 
@@ -195,15 +175,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

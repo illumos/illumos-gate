@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sleep 1 "20 Nov 2007" "SunOS 5.11" "User Commands"
+.TH SLEEP 1 "Nov 20, 2007"
 .SH NAME
 sleep \- suspend execution for an interval
 .SH SYNOPSIS
@@ -42,12 +42,10 @@ The following operands are supported for \fB/usr/bin/sleep\fR and \fBksh93\fR's
 \fBsleep\fR built-in command:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIseconds\fR\fR
 .ad
 .RS 11n
-.rt  
 A non-negative floating-point number specifying the number of seconds for which
 to suspend execution. The floating-point number may be specified in all formats
 required by C99/XPG6, including constants such as "Inf" or "infinite".
@@ -59,12 +57,10 @@ required by C99/XPG6, including constants such as "Inf" or "infinite".
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime\fR\fR
 .ad
 .RS 8n
-.rt  
 Specify \fItime\fR in seconds as a floating point number. The actual
 granularity depends on the underlying system, normally around 1 millisecond.
 .RE
@@ -149,24 +145,20 @@ that affect the execution of \fBsleep\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The execution was successfully suspended for at least \fItime\fR seconds, or a
 \fBSIGALRM\fR signal was received (see NOTES).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error has occurred.
 .RE
 
@@ -179,15 +171,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -195,13 +186,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

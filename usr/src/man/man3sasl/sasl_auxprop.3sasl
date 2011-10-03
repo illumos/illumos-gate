@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_auxprop 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_AUXPROP 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_auxprop, prop_new, prop_dup, prop_request, prop_get, prop_getnames,
 prop_clear, prop_erase, prop_dispose, prop_format, prop_set, prop_setvals \-
@@ -157,46 +157,38 @@ The \fBprop_setvals()\fR function is used only by \fBauxprop\fR plug-ins.
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn\fR\fR
 .ad
 .RS 12n
-.rt  
 The \fBsasl_conn_t\fR for which the request is being made
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIctx\fR\fR
 .ad
 .RS 12n
-.rt  
 The property context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIestimate\fR\fR
 .ad
 .RS 12n
-.rt  
 The estimate of the total storage needed for requests and responses. The
 library default is implied by a value of \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInames\fR\fR
 .ad
 .RS 12n
-.rt  
 The null-terminated array of property names. \fInames\fR must persist until the
 requests are cleared or the context is disposed of with a call to
 \fBprop_dispose()\fR.
@@ -204,12 +196,10 @@ requests are cleared or the context is disposed of with a call to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the property.
 .sp
 For \fBprop_set()\fR, \fIname\fR is the named of the property to receive the
@@ -219,114 +209,94 @@ last call to either \fBprop_set()\fR or \fBprop_setvals()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutbuf\fR\fR
 .ad
 .RS 12n
-.rt  
 The caller-allocated buffer of length \fIoutmax\fR that the resulting string,
 including the \fINULL\fR terminator, will be placed in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutlen\fR\fR
 .ad
 .RS 12n
-.rt  
 If non-\fINULL\fR, contains the length of the resulting sting, excluding the
 \fINULL\fR terminator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoutmax\fR\fR
 .ad
 .RS 12n
-.rt  
 The maximum length of the output buffer, including the \fINULL\fR terminator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrequests\fR\fR
 .ad
 .RS 12n
-.rt  
 The request list for a given context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsep\fR\fR
 .ad
 .RS 12n
-.rt  
 The separator to use for the string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIseplen\fR\fR
 .ad
 .RS 12n
-.rt  
 The length of the separator. The the values is less than 0, then \fBstrlen\fR
 will be used as \fIsep\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvallen\fR\fR
 .ad
 .RS 12n
-.rt  
 The length of the property.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvals\fR\fR
 .ad
 .RS 12n
-.rt  
 The value string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 12n
-.rt  
 A value for the property of length \fIvallen\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalues\fR\fR
 .ad
 .RS 12n
-.rt  
 A null-terminated array of values to be added to the property.
 .RE
 
@@ -345,15 +315,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

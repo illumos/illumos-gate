@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uconv_u16tou32 3C "18 Sep 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH UCONV_U16TOU32 3C "Sep 18, 2007"
 .SH NAME
 uconv_u16tou32, uconv_u16tou8, uconv_u32tou16, uconv_u32tou8, uconv_u8tou16,
 uconv_u8tou32 \- Unicode encoding conversion functions
@@ -51,23 +51,19 @@ uconv_u8tou32 \- Unicode encoding conversion functions
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutf16str\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBUTF-16\fR character string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutf16len\fR\fR
 .ad
 .RS 12n
-.rt  
 As an input parameter, the number of 16-bit unsigned integers in \fIutf16str\fR
 as \fBUTF-16\fR characters to be converted or saved.
 .sp
@@ -77,23 +73,19 @@ As an output parameter, the number of 16-bit unsigned integers in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutf32str\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBUTF-32\fR character string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutf32len\fR\fR
 .ad
 .RS 12n
-.rt  
 As an input parameter, the number of 32-bit unsigned integers in \fIutf32str\fR
 as \fBUTF-32\fR characters to be converted or saved.
 .sp
@@ -103,23 +95,19 @@ As an output parameter, the number of 32-bit unsigned integers in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutf8str\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a \fBUTF-8\fR character string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIutf8len\fR\fR
 .ad
 .RS 12n
-.rt  
 As an input parameter, the number of bytes in \fIutf8str\fR as \fBUTF-8\fR
 characters to be converted or saved.
 .sp
@@ -129,17 +117,14 @@ during conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 12n
-.rt  
 The possible conversion options that are constructed by a bitwise-inclusive-OR
 of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_IN_BIG_ENDIAN\fR\fR
 .ad
@@ -150,7 +135,6 @@ The input parameter is in big endian byte ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_OUT_BIG_ENDIAN\fR\fR
 .ad
@@ -161,7 +145,6 @@ The output parameter should be in big endian byte ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_IN_SYSTEM_ENDIAN\fR\fR
 .ad
@@ -172,7 +155,6 @@ The input parameter is in the default byte ordering of the current system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_OUT_SYSTEM_ENDIAN\fR\fR
 .ad
@@ -184,7 +166,6 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_IN_LITTLE_ENDIAN\fR\fR
 .ad
@@ -195,7 +176,6 @@ The input parameter is in little endian byte ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_OUT_LITTLE_ENDIAN\fR\fR
 .ad
@@ -206,7 +186,6 @@ The output parameter should be in little endian byte ordering.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_IGNORE_NULL\fR\fR
 .ad
@@ -217,7 +196,6 @@ The null or \fBU+0000\fR character should not stop the conversion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_IN_ACCEPT_BOM\fR\fR
 .ad
@@ -229,7 +207,6 @@ character of the input parameter, interpret it as the \fBBOM\fR character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCONV_OUT_EMIT_BOM\fR\fR
 .ad
@@ -330,48 +307,40 @@ Upon successful conversion, the functions return \fB0\fR. Upon failure, the
 functions return one of the following \fBerrno\fR values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 The conversion detected an illegal or out of bound character value in the input
 parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE2BIG\fR\fR
 .ad
 .RS 10n
-.rt  
 The conversion cannot finish because the size specified in the output parameter
 is too small.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The conversion stops due to an incomplete character at the end of the input
 string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 Conflicting byte-ordering option \fIflag\fR values are detected.
 .RE
 
@@ -396,7 +365,7 @@ int ret;
 \&.
 \&.
 u16len = u8len = MAXNAMELEN;
-ret = uconv_u16tou8(u16s, &u16len, u8s, &u8len, 
+ret = uconv_u16tou8(u16s, &u16len, u8s, &u8len,
     UCONV_IN_LITTLE_ENDIAN);
 if (ret != 0) {
      /* Conversion error occurred. */
@@ -432,7 +401,7 @@ size_t u32len, u16len;
 \&.
 \&.
 u32len = u16len = 100;
-ret = uconv_u32tou16(u32s, &u32len, u16s, &u16len, 
+ret = uconv_u32tou16(u32s, &u32len, u16s, &u16len,
     UCONV_IN_BIG_ENDIAN | UCONV_OUT_LITTLE_ENDIAN);
 if (ret == 0) {
      return (0);
@@ -441,7 +410,7 @@ if (ret == 0) {
      uint16_t u16s2[201];
 
      u16len = 200;
-     ret = uconv_u32tou16(u32s, &u32len, u16s2, &u16len, 
+     ret = uconv_u32tou16(u32s, &u32len, u16s2, &u16len,
         UCONV_IN_BIG_ENDIAN | UCONV_OUT_LITTLE_ENDIAN);
      if (ret == 0)
           return (0);
@@ -478,7 +447,7 @@ int ret;
 \&.
 \&.
 u8len = u16len = MAXNAMELEN;
-ret = uconv_u8tou16(u8s, &u8len, u16s, &u16len, 
+ret = uconv_u8tou16(u8s, &u8len, u16s, &u16len,
     UCONV_IN_LITTLE_ENDIAN | UCONV_EMIT_BOM);
 if (ret != 0) {
      /* Conversion error occurred. */
@@ -498,15 +467,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

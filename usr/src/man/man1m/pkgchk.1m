@@ -3,21 +3,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgchk 1M "30 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH PKGCHK 1M "Oct 30, 2007"
 .SH NAME
 pkgchk \- check package installation accuracy
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkgchk\fR [\fB-l\fR | \fB-acfnqvx\fR] [\fB-i\fR \fIfile\fR | -] 
-     [\fB-p\fR \fIpath\fR... | \fB-P\fR \fIpartial-path\fR...] [\fB-R\fR \fIroot_path\fR] 
+\fBpkgchk\fR [\fB-l\fR | \fB-acfnqvx\fR] [\fB-i\fR \fIfile\fR | -]
+     [\fB-p\fR \fIpath\fR... | \fB-P\fR \fIpartial-path\fR...] [\fB-R\fR \fIroot_path\fR]
      [ [\fB-m\fR \fIpkgmap\fR [\fB-e\fR \fIenvfile\fR]] | pkginst... | \fB-Y\fR \fIcategory\fR,\fIcategory\fR\&.\|.\|.]
 .fi
 
 .LP
 .nf
-\fBpkgchk\fR \fB-d\fR \fIdevice\fR [\fB-l\fR | \fB-fv\fR] [\fB-i\fR \fIfile\fR | -] [\fB-M\fR] [\fB-p\fR \fIpath\fR]... 
-     [\fB-V\fR \fIfs_file\fR] 
+\fBpkgchk\fR \fB-d\fR \fIdevice\fR [\fB-l\fR | \fB-fv\fR] [\fB-i\fR \fIfile\fR | -] [\fB-M\fR] [\fB-p\fR \fIpath\fR]...
+     [\fB-V\fR \fIfs_file\fR]
      [pkginst... | \fB-Y\fR \fIcategory\fR[,\fIcategory\fR\&.\|.\|.]]
 .fi
 
@@ -45,7 +45,6 @@ attributes cannot be checked for spooled packages.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -57,7 +56,6 @@ check both.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
@@ -69,7 +67,6 @@ check both.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-d\fR \fIdevice\fR\fR
 .ad
@@ -82,7 +79,6 @@ directory path name or the identifiers for tape, floppy disk, or removable disk
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-e\fR \fIenvfile\fR\fR
 .ad
@@ -94,7 +90,6 @@ resolve parameters noted in the specified \fBpkgmap\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -112,7 +107,6 @@ set in the mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-i\fR \fIfile\fR | \fB-\fR\fR
 .ad
@@ -126,7 +120,6 @@ not checked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
@@ -139,7 +132,6 @@ options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fBpkgmap\fR\fR
 .ad
@@ -150,7 +142,6 @@ Check the package against the package map file, \fBpkgmap\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -164,7 +155,6 @@ and earlier releases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -176,7 +166,6 @@ post-installation checking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-p\fR \fIpath\fR\fR
 .ad
@@ -192,7 +181,6 @@ option, described above. See EXAMPLES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-P\fR \fIpartial-path\fR\fR
 .ad
@@ -208,7 +196,6 @@ about paths that contain commas in the description of \fB-p\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
@@ -219,7 +206,6 @@ Quiet mode. Do not give messages about missing files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot_path\fR\fR
 .ad
@@ -243,7 +229,6 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -254,7 +239,6 @@ Verbose mode. Files are listed as processed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIfs_file\fR\fR
 .ad
@@ -267,7 +251,6 @@ file is non-existent or unreliable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -279,7 +262,6 @@ installation software database or the indicated \fBpkgmap\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fIcategory\fR\fR
 .ad
@@ -292,7 +274,6 @@ installed or spooled package's \fBpkginfo\fR(4) file.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
@@ -309,7 +290,6 @@ quotes (\fB\&'\fR) or preceded by a backslash (\e);
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpartial-path\fR\fR
 .ad
@@ -390,7 +370,7 @@ Expected mode: 0755
 Expected owner: root
 Expected group: bin
 Referenced by the following packages:
-        SUNWcar        
+        SUNWcar
 Current status: installed
 .fi
 .in -2
@@ -399,7 +379,6 @@ Current status: installed
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -410,7 +389,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad

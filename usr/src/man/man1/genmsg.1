@@ -3,15 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH genmsg 1 "14 May 2004" "SunOS 5.11" "User Commands"
+.TH GENMSG 1 "May 14, 2004"
 .SH NAME
 genmsg \- generate a message source file by extracting messages from source
 files
 .SH SYNOPSIS
 .LP
 .nf
-\fBgenmsg\fR [\fB-abdfrntx\fR] [\fB-c\fR \fImessage-tag\fR] [\fB-g\fR \fIproject-file\fR] 
-     [\fB-l\fR \fIproject-file\fR] [\fB-m\fR \fIprefix\fR] [\fB-M\fR \fIsuffix\fR] 
+\fBgenmsg\fR [\fB-abdfrntx\fR] [\fB-c\fR \fImessage-tag\fR] [\fB-g\fR \fIproject-file\fR]
+     [\fB-l\fR \fIproject-file\fR] [\fB-m\fR \fIprefix\fR] [\fB-M\fR \fIsuffix\fR]
      [\fB-o\fR \fImessage-file\fR] [\fB-p\fR \fIpreprocessor\fR] [\fB-s\fR \fIset-tags\fR] \fI file\fR...
 .fi
 
@@ -32,15 +32,14 @@ argument for its output file.
 
 .sp
 .TS
-tab() box;
-lw(3.58i) |lw(1.92i) 
-lw(3.58i) |lw(1.92i) 
-.
-\fICommand\fR\fIOutput File\fR
+box;
+l | l
+l | l .
+\fICommand\fR	\fIOutput File\fR
 _
-\fBgenmsg prog.c\fRprog.c.msg
-\fBgensmg main.c util.c tool.c\fRmain.c.msg
-\fBgenmsg -o prog.msg mail.c util.c\fRprog.msg
+\fBgenmsg prog.c\fR	prog.c.msg
+\fBgensmg main.c util.c tool.c\fR	main.c.msg
+\fBgenmsg -o prog.msg mail.c util.c\fR	prog.msg
 .TE
 
 .sp
@@ -61,12 +60,10 @@ maximum message numbers. Each line in a project file is composed of a set
 number and its maximum message number:
 .sp
 .ne 2
-.mk
 .na
 \fB\fISet_number\fR\fR
 .ad
 .RS 14n
-.rt  
 \fIMaximum_message_number\fR
 .RE
 
@@ -100,12 +97,10 @@ check the appearance of your window program's initial size and position.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 19n
-.rt  
 Append the output into the message file \fImessage-file\fR that is specified by
 the \fB-o\fR option. If two different messages that have the same set and
 message number are found, the message in the specified message file is kept and
@@ -114,36 +109,30 @@ the other message in the input file is discarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 19n
-.rt  
 Place the extracted comment after the corresponding message in the output file.
 This option changes the placement behavior of the \fB-s\fR or \fB-c\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI message-tag\fR\fR
 .ad
 .RS 19n
-.rt  
 Extract message comments having \fImessage-tag\fR inside them from the input
 files and write them with a '\fB$\fR' prefix as a comment in the output file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 19n
-.rt  
 Include an original text of a message as a comment to be preserved along with
 its translations. With this option, the translator can see the original
 messages even after they are replaced with their translations.
@@ -151,12 +140,10 @@ messages even after they are replaced with their translations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 19n
-.rt  
 Overwrite the input files and the project file when used with the \fB-l\fR or
 \fB-r\fR option. With the \fB-r\fR option, \fBgenmsg\fR overwrites only the
 input files.
@@ -164,24 +151,20 @@ input files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fI project-file\fR\fR
 .ad
 .RS 19n
-.rt  
 Generate \fIproject-file\fR that has a list of set numbers and their maximum
 message numbers in the input files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fI project-file\fR\fR
 .ad
 .RS 19n
-.rt  
 Replace message numbers with the calculated numbers based upon
 \fIproject-file\fR if the message numbers are \fB-1\fR in the input files, and
 then generate copies of the input files with the new message numbers and a copy
@@ -192,57 +175,47 @@ in the input file as a base number and generates \fIproject-file\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI prefix\fR\fR
 .ad
 .RS 19n
-.rt  
 Fill in the message with \fIprefix\fR. This option is useful for testing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fI suffix\fR\fR
 .ad
 .RS 19n
-.rt  
 Fill in the message with \fIsuffix\fR. This option is useful for testing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 19n
-.rt  
 Add comment lines to the output file indicating the file name and line number
 in the input files where each extracted string is encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fI message-file\fR\fR
 .ad
 .RS 19n
-.rt  
 Write the output to \fImessage-file\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fI preprocessor\fR\fR
 .ad
 .RS 19n
-.rt  
 Invoke \fIpreprocessor\fR to preprocess macros and define statements for the
 \fBcatgets\fR(3C) calls. \fBgenmsg\fR first invokes the option argument as a
 preprocesser and then starts the normal process against the output from the
@@ -251,24 +224,20 @@ preprocessor. \fBgenmsg\fR initiates this process for all the input files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 19n
-.rt  
 Replace message numbers with \fB-1\fR. This is the reverse operation of the
 \fB-l\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI set-tag\fR\fR
 .ad
 .RS 19n
-.rt  
 Extract set number comments having \fIset-tag\fR inside them from the input
 files and write them with a '\fB$\fR' prefix as a comment in the output file.
 If multiple comments are specified for one set number, the first one is
@@ -277,24 +246,20 @@ extracted and the rest of them are discarded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 19n
-.rt  
 Generate a message that is three times as long as the original message. This
 option is useful for testing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 19n
-.rt  
 Suppress warning messages about message and set number range checks and
 conflicts.
 .RE
@@ -302,12 +267,10 @@ conflicts.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 An input source file.
 .RE
 
@@ -351,34 +314,28 @@ the following files:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest.c.msg\fR\fR
 .ad
 .RS 14n
-.rt  
 Message file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproj.new\fR\fR
 .ad
 .RS 14n
-.rt  
 Updated project file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest.c.new\fR\fR
 .ad
 .RS 14n
-.rt  
 New source file
 .RE
 
@@ -570,23 +527,19 @@ that affect the execution of \fBgenmsg\fR: \fBLC_MESSAGES\fR and \fBNLSPATH\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -603,7 +556,7 @@ call. For example:
 .sp
 .in +2
 .nf
-   
+
 const int set_num = 1;
 extern int msg_num(const char *);
 const char *msg = "Hello";

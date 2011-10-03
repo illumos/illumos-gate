@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ftpaccess 4 "10 Sep 2003" "SunOS 5.11" "File Formats"
+.TH FTPACCESS 4 "Sep 10, 2003"
 .SH NAME
 ftpaccess \- FTP Server configuration file
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ The \fBftpaccess\fR file is used to configure the operation of the FTP Server.
 The following access capabilities are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBautogroup\fR \fIgroupname\fR \fIclass\fR \fIclass\fR...\fR
 .ad
@@ -36,7 +35,6 @@ users. \fIgroupname\fR is a valid group returned by \fBgetgrnam\fR(3C).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclass\fR \fIclass\fR \fItypelist\fR \fIaddrglob\fR\fIaddrglob\fR...\fR
 .ad
@@ -64,7 +62,7 @@ example,
 .sp
 .in +2
 .nf
-class rmtuser real !*.example.com 
+class rmtuser real !*.example.com
 .fi
 .in -2
 
@@ -75,7 +73,6 @@ OR'ed with other tests on the line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny\fR \fIaddrglob\fR [\fImessage_file\fR]\fR
 .ad
@@ -89,7 +86,6 @@ contain magic cookies. See \fBmessage\fR for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBguestgroup\fR \fIgroupname\fR \fIgroupname\fR...\fR
 .ad
@@ -139,8 +135,8 @@ a guest.
 .sp
 .in +2
 .nf
-guestuser *    
-realgroup admin 
+guestuser *
+realgroup admin
 .fi
 .in -2
 
@@ -150,7 +146,6 @@ of users in the \fBadmin\fR group, who are granted real user access.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnice\fR \fInice-delta\fR \fIclass\fR\fR
 .ad
@@ -167,7 +162,6 @@ only for those users who do not belong to any class for which a class-specific
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefumask\fR \fIumask\fR \fIclass\fR\fR
 .ad
@@ -181,7 +175,6 @@ mode of files created may be specified by using the \fBupload\fR directive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtcpwindow\fR \fIsize\fR class\fR
 .ad
@@ -195,7 +188,6 @@ do not set it.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBipcos\fR control|data \fIvalue\fR [\fItypelist\fR]\fR
 .ad
@@ -221,7 +213,6 @@ appears, it must be followed by a class name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeepalive\fR \fByes\fR|\fBno\fR\fR
 .ad
@@ -234,7 +225,6 @@ then use the system default (usually off). You probably want to set this.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimeout accept\fR \fIseconds\fR\fR
 .ad
@@ -263,24 +253,20 @@ then use the system default (usually off). You probably want to set this.
 Set various timeout conditions.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaccept\fR\fR
 .ad
 .RS 11n
-.rt  
 How long the FTP Server will wait for an incoming (PASV) data connection. The
 default is 120 seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconnect\fR\fR
 .ad
 .RS 11n
-.rt  
 How long the FTP Server will wait attempting to establish an outgoing (PORT)
 data connection. This effects the actual connection attempt. The daemon makes
 several attempts, sleeping between each attempt, before giving up. The default
@@ -289,12 +275,10 @@ is 120 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdata\fR\fR
 .ad
 .RS 11n
-.rt  
 How long the FTP Server will wait for some activity on the data connection. You
 should keep this long because the remote client may have a slow link, and there
 can be quite a bit of data queued for the client. The default is 1200 seconds.
@@ -302,12 +286,10 @@ can be quite a bit of data queued for the client. The default is 1200 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBidle\fR\fR
 .ad
 .RS 11n
-.rt  
 How long the FTP Server will wait for the next command. The default is 900
 seconds. The default can also be overridden by using the t option at the
 command-line. This access clause overrides both.
@@ -315,12 +297,10 @@ command-line. This access clause overrides both.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaxidle\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBSITE IDLE\fR command allows the remote client to establish a higher
 value for the idle timeout. The \fBmaxidle\fR clause sets the upper limit that
 the client may request. The default can also be overridden by using the T
@@ -330,12 +310,10 @@ option at the command-line. This access clause overrides both. The default is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRFC931\fR\fR
 .ad
 .RS 11n
-.rt  
 The maximum time the FTP server allows for the entire \fBRFC931\fR (AUTH/ident)
 conversation. Setting this to zero (0) disables the server's use of this
 protocol. The information obtained by means of \fBRFC931\fR is recorded in the
@@ -347,7 +325,6 @@ seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile-limit\fR \fIraw\fR \fIin\fR|\fIout\fR|\fItotal\fR \fIcount\fR
 \fIclass\fR\fR
@@ -363,7 +340,6 @@ traffic rather than just data files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdata-limit\fR [\fIraw\fR] \fIin\fR|\fIout\fR|\fItotal\fR \fIcount\fR
 [\fIclass\fR]\fR
@@ -381,7 +357,6 @@ files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlimit-time\fR \fI*\fR|\fIanonymous\fR|\fIguest\fR \fIminutes\fR\fR
 .ad
@@ -393,7 +368,6 @@ users are never limited.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBguestserver\fR [\fIhostname\fR...]\fR
 .ad
@@ -408,7 +382,6 @@ named machines. If access is denied, the user will be asked to use the first
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlimit\fR \fIclass\fR \fIn\fR \fItimes\fR [\fImessage_file\fR]\fR
 .ad
@@ -439,7 +412,6 @@ See \fBmessage\fR for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoretrieve\fR [\fBabsolute\fR|\fBrelative\fR]\fR
 .ad
@@ -463,7 +435,7 @@ glob. For example,
 .sp
 .in +2
 .nf
-noretrieve /etc /home/*/.htaccess 
+noretrieve /etc /home/*/.htaccess
 .fi
 .in -2
 
@@ -479,7 +451,6 @@ retrieved only if the current user is a member of one of the given classes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBallow-retrieve\fR [\fBabsolute\fR|\fBrelative\fR]\fR
 .ad
@@ -494,7 +465,6 @@ Allows retrieval of files which would otherwise be denied by noretrieve.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBloginfails\fR \fInumber\fR\fR
 .ad
@@ -506,7 +476,6 @@ terminate the FTP connection. The default value for \fInumber\fR is 5.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivate\fR \fByes\fR | \fBno\fR\fR
 .ad
@@ -533,7 +502,6 @@ Servers.
 The following informational capabilities are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgreeting\fR \fBfull\fR|\fBbrief\fR|\fBterse\fR\fR
 .ad
@@ -555,7 +523,6 @@ can be any string. Whitespace (spaces and tabs) is converted to a single space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbanner\fR \fIpath\fR\fR
 .ad
@@ -573,7 +540,6 @@ multi-line responses, which is how the banner is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBemail\fR \fIname\fR\fR
 .ad
@@ -586,7 +552,6 @@ message files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhostname\fR \fIsome.host.name\fR\fR
 .ad
@@ -600,7 +565,6 @@ the default host name for the local machine is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmessage\fR \fIpath\fR [\fIwhen\fR [\fIclass\fR...]]\fR
 .ad
@@ -620,111 +584,91 @@ to members of a particular class. More than one class may be specified.
 replace the cookie with a specified text string:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%T\fR\fR
 .ad
 .RS 6n
-.rt  
 Local time. For example, \fBThu Nov 15 17:12:42 1990\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%F\fR\fR
 .ad
 .RS 6n
-.rt  
 Free space in partition of CWD, in Kbytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%C\fR\fR
 .ad
 .RS 6n
-.rt  
 Current working directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%E\fR\fR
 .ad
 .RS 6n
-.rt  
 The email address for the FTP Server administrator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%R\fR\fR
 .ad
 .RS 6n
-.rt  
 Remote host name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%L\fR\fR
 .ad
 .RS 6n
-.rt  
 Local host name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%U\fR\fR
 .ad
 .RS 6n
-.rt  
 Username given at login time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%u\fR\fR
 .ad
 .RS 6n
-.rt  
 Username as defined by means of \fIRFC 931\fR authentication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%M\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum allowed number of users in this class.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%N\fR\fR
 .ad
 .RS 6n
-.rt  
 Current number of users in this class.
 .RE
 
@@ -732,89 +676,73 @@ The following quota magic cookies are also supported but not always set (see
 the \fBquota-info\fR capability):
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%B\fR\fR
 .ad
 .RS 6n
-.rt  
 absolute limit on disk blocks allocated
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%b\fR\fR
 .ad
 .RS 6n
-.rt  
 preferred limit on disk blocks
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Q\fR\fR
 .ad
 .RS 6n
-.rt  
 current block count
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%I\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum number of allocated inodes (+1)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%i\fR\fR
 .ad
 .RS 6n
-.rt  
 preferred inode limit
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%q\fR\fR
 .ad
 .RS 6n
-.rt  
 current number of allocated inodes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%H\fR\fR
 .ad
 .RS 6n
-.rt  
 time limit for excessive disk use
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%h\fR\fR
 .ad
 .RS 6n
-.rt  
 time limit for excessive files
 .RE
 
@@ -825,7 +753,6 @@ relative to the base of the anonymous or guest FTP directory tree.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquota-info\fR \fIuid-range\fR [\fIuid-range\fR...] \fR
 .ad
@@ -841,7 +768,6 @@ sign(\fB%\fR) before a number. An asterisk means "all users."
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreadme\fR \fIpathglob\fR [\fIwhen\fR [\fIclass\fR...]]\fR
 .ad
@@ -868,7 +794,6 @@ to members of a particular class. You can specify more than one class.
 The following logging capabilities are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog commands\fR \fItypelist\fR\fR
 .ad
@@ -881,7 +806,6 @@ a comma-separated list of any of the keywords \fBanonymous\fR, \fBguest\fR, and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog transfers\fR \fItypelist\fR \fIdirections\fR\fR
 .ad
@@ -896,7 +820,6 @@ transfers to be logged for files sent to and from the server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog security\fR \fItypelist\fR\fR
 .ad
@@ -908,7 +831,6 @@ for example, \fBnoretrieve\fR and \fB\&.notar\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog syslog\fR\fR
 .ad
@@ -926,7 +848,6 @@ both the system log file and the \fBxferlog\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxferlog\fR format \fIformatstring\fR\fR
 .ad
@@ -940,133 +861,109 @@ The following transfer-specific magic cookies are recognized only immediately
 after a transfer has been completed:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xt\fR\fR
 .ad
 .RS 7n
-.rt  
 transfer-time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xn\fR\fR
 .ad
 .RS 7n
-.rt  
 bytes-transferred
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%XP\fR\fR
 .ad
 .RS 7n
-.rt  
 filename
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xp\fR\fR
 .ad
 .RS 7n
-.rt  
 chroot-filename
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xy\fR\fR
 .ad
 .RS 7n
-.rt  
 transfer-type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xf\fR\fR
 .ad
 .RS 7n
-.rt  
 special-action-flag
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xd\fR\fR
 .ad
 .RS 7n
-.rt  
 direction
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xm\fR\fR
 .ad
 .RS 7n
-.rt  
 access-mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xa\fR\fR
 .ad
 .RS 7n
-.rt  
 authentication-method
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xc\fR\fR
 .ad
 .RS 7n
-.rt  
 completion-status
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xs\fR\fR
 .ad
 .RS 7n
-.rt  
 file-size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%Xr\fR\fR
 .ad
 .RS 7n
-.rt  
 restart-offset
 .RE
 
@@ -1088,7 +985,6 @@ xferlog format %T %Xt %R %Xn %XP %Xy %Xf %Xd %Xm %U ftp %Xa %u %Xc
 The following miscellaneous capabilities are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalias\fR\fI string\fR \fIdir\fR\fR
 .ad
@@ -1102,7 +998,6 @@ command "\fBcd rfc:\fR". Aliases only apply to the \fBcd\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcdpath\fR \fIdir\fR\fR
 .ad
@@ -1114,7 +1009,7 @@ used when changing directories. For example:
 .in +2
 .nf
 cdpath /pub/packages
-cdpath /.aliases 
+cdpath /.aliases
 .fi
 .in -2
 .sp
@@ -1155,7 +1050,6 @@ links to all of the areas you wish to make available to users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcompress\fR \fByes\fR|\fBno\fR \fIclassglob\fR [\fIclassglob\fR...]\fR
 .ad
@@ -1172,7 +1066,6 @@ See \fBftpconversions\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshutdown\fR \fIpath\fR\fR
 .ad
@@ -1188,68 +1081,57 @@ The format of the file specified by \fIpath\fR is:
 .sp
 .in +2
 .nf
-\fIyear\fR \fImonth\fR \fIday\fR \fIhour\fR \fIminute\fR \fIdeny_offset\fR \fIdisc_offset\fR \fItext\fR 
+\fIyear\fR \fImonth\fR \fIday\fR \fIhour\fR \fIminute\fR \fIdeny_offset\fR \fIdisc_offset\fR \fItext\fR
 .fi
 .in -2
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIyear\fR\fR
 .ad
 .RS 15n
-.rt  
 A value of 1970 or greater.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImonth\fR\fR
 .ad
 .RS 15n
-.rt  
 A value of 0 to 11.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIday\fR\fR
 .ad
 .RS 15n
-.rt  
 A value of 1 to 31.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhour\fR\fR
 .ad
 .RS 15n
-.rt  
 A value of 0 to 23.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminute\fR\fR
 .ad
 .RS 15n
-.rt  
 A value of 0 to 59.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdeny_offset\fR\fR
 .ad
@@ -1258,51 +1140,42 @@ A value of 0 to 59.
 \fB\fIdisc_offset\fR\fR
 .ad
 .RS 15n
-.rt  
 The offsets in HHMM format that new connections will be denied and existing
 connections will be disconnected before the shutdown time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItext\fR \fR
 .ad
 .RS 15n
-.rt  
 Follows the normal rules for any \fImessage\fR. The following additional magic
 cookies are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%s\fR\fR
 .ad
 .RS 6n
-.rt  
 The time at which the system is going to shut down.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%r\fR\fR
 .ad
 .RS 6n
-.rt  
 The time at which new connections will be denied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%d\fR\fR
 .ad
 .RS 6n
-.rt  
 The time at which current connections will be dropped.
 .RE
 
@@ -1315,7 +1188,6 @@ the external program \fBftpshut\fR(1M) to automate generation of this file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdaemonaddress\fR \fIaddress\fR\fR
 .ad
@@ -1328,7 +1200,6 @@ the FTP Server is run in standalone mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvirtual\fR \fIaddress\fR \fBroot\fR|\fBbanner\fR|\fBlogfile\fR
 \fIpath\fR\fR
@@ -1350,7 +1221,6 @@ the hostname will not be matched.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBroot\fR|\fBlogfile\fR \fIpath\fR\fR
 .ad
@@ -1372,7 +1242,6 @@ virtual hosts's \fBftpaccess\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvirtual\fR \fIaddress\fR \fBhostname\fR|\fBemail\fR \fIstring\fR\fR
 .ad
@@ -1385,7 +1254,6 @@ address used in message files and on the HELP command, to the given
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvirtual\fR \fIaddress\fR \fBallow\fR \fIusername\fR
 [\fIusername\fR...]\fR
@@ -1407,7 +1275,6 @@ clause.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvirtual\fR \fIaddress\fR \fBprivate\fR\fR
 .ad
@@ -1420,7 +1287,6 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvirtual\fR \fIaddress\fR \fBpasswd\fR \fIfile\fR\fR
 .ad
@@ -1431,7 +1297,6 @@ Use a different \fBpasswd\fR file for the virtual host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvirtual\fR \fIaddress\fR \fBshadow\fR \fIfile\fR\fR
 .ad
@@ -1442,7 +1307,6 @@ Use a different \fBshadow\fR file for the virtual host.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultserver\fR \fBdeny\fR \fIusername\fR [\fIusername\fR...]\fR
 .ad
@@ -1461,7 +1325,6 @@ Specific real and guest users can then be allowed access by using
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefaultserver\fR \fBprivate\fR\fR
 .ad
@@ -1477,7 +1340,6 @@ to which FTP Servers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive\fR \fBaddress\fR \fIexternalip\fR \fIcidr\fR\fR
 .ad
@@ -1505,7 +1367,6 @@ specified to handle complex, or multi-gatewayed, networks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpassive\fR \fBports\fR \fIcidr\fR \fImin\fR \fImax\fR\fR
 .ad
@@ -1531,7 +1392,6 @@ FTP server do the port selection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasv-allow\fR \fIclass\fR [\fIaddrglob\fR...]\fR
 .ad
@@ -1558,7 +1418,6 @@ connection.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlslong\fR\fI command\fR [\fIoptions\fR...] \fR
 .ad
@@ -1580,7 +1439,6 @@ Use \fBlslong\fR, \fBlsshort\fR, or \fBlsplain\fR only if absolutely necessary.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmailserver\fR \fIhostname\fR\fR
 .ad
@@ -1596,7 +1454,6 @@ is only meaningful if anyone is to be notified of anonymous uploads. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBincmail\fR \fIemailaddress\fR\fR
 .ad
@@ -1626,7 +1483,6 @@ have their own notifications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmailfrom\fR \fIemailaddress\fR\fR
 .ad
@@ -1649,7 +1505,6 @@ you should ensure the \fBmailfrom\fR address is deliverable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsendbuf\fR \fIsize\fR [\fItypelist\fR]\fR
 .ad
@@ -1665,7 +1520,6 @@ effect on ASCII transfers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrhostlookup\fR yes|no [\fIaddrglob\fR ...]\fR
 .ad
@@ -1683,7 +1537,6 @@ Only IP addresses, not names, are matched in \fIaddrglob\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflush-wait\fR yes|no [\fItypelist\fR]\fR
 .ad
@@ -1707,7 +1560,6 @@ for broken client behavior.
 The following permission capabilities are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchmod\fR \fByes\fR|\fBno\fR \fItypelist\fR\fR
 .ad
@@ -1741,7 +1593,6 @@ appears, it must be followed by a classname. If any \fBclass=\fR appears, the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpasswd-check\fR \fBnone\fR|\fBtrivial\fR|\fBrfc822\fR
 [\fBenforce\fR|\fBwarn\fR]\fR
@@ -1752,56 +1603,46 @@ Define the level and enforcement of password checking done by the FTP Server
 for anonymous FTP.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnone\fR\fR
 .ad
 .RS 11n
-.rt  
 No password checking is performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrivial\fR\fR
 .ad
 .RS 11n
-.rt  
 The password must contain an '@'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrfc822\fR\fR
 .ad
 .RS 11n
-.rt  
 The password must be \fIRFC 822\fR compliant.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwarn\fR\fR
 .ad
 .RS 11n
-.rt  
 Warn, but permit the login.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenforce\fR\fR
 .ad
 .RS 11n
-.rt  
 Notify and deny the login.
 .RE
 
@@ -1809,7 +1650,6 @@ Notify and deny the login.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny-email\fR \fIcase-insensitive-emailaddress\fR\fR
 .ad
@@ -1826,7 +1666,6 @@ you can have as many \fBdeny-email\fR addresses as you like.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath-filter\fR \fItypelist\fR \fImessage\fR \fIallowed_regexp\fR \fR
 .ad
@@ -1855,7 +1694,6 @@ If the filename is invalid, \fB/etc/pathmsg\fR will be displayed to the user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBupload\fR [\fBabsolute\fR|\fBrelative\fR]
 [\fBclass=\fR\fIclassname\fR]... [\fB-\fR] \fR
@@ -1916,7 +1754,6 @@ are modified by the current umask setting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBthroughput\fR \fIroot-dir\fR \fIsubdir-glob\fR \fIfile-glob-list\fR \fR
 .ad
@@ -1959,7 +1796,6 @@ only applies to users who have a home directory of \fIroot-dir\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBanonymous-root\fR \fIroot-dir\fR [\fIclass\fR...]\fR
 .ad
@@ -1992,7 +1828,6 @@ home directory in \fB/home/localftp/etc/passwd\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBguest-root\fR \fIroot-dir\fR [\fIuid-range\fR...]\fR
 .ad
@@ -2036,7 +1871,6 @@ other clause matches.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeny-uid\fR \fIuid-range\fR [\fIuid-range\fR...]\fR
 .ad
@@ -2083,7 +1917,6 @@ A "\fB*\fR" matches all UIDs or GIDs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestricted-uid\fR \fIuid-range\fR [\fIuid-range\fR...]\fR
 .ad
@@ -2129,7 +1962,6 @@ configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsite-exec-max-lines\fR \fInumber\fR [\fIclass\fR...]\fR
 .ad
@@ -2157,7 +1989,6 @@ sets a limit of 25 lines for all other users.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdns refuse_mismatch\fR \fIfilename\fR [\fBoverride\fR]\fR
 .ad
@@ -2172,7 +2003,6 @@ connection after complaining.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdns refuse_no_reverse\fR \fIfilename\fR [\fBoverride\fR]\fR
 .ad
@@ -2187,7 +2017,6 @@ connection after complaining.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdns resolveroptions\fR [\fBoptions\fR]\fR
 .ad
@@ -2215,13 +2044,11 @@ ignored.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB \fB/etc/ftpd/ftpaccess\fR\fR
 .ad
 .RS 24n
-.rt  
- 
+
 .RE
 
 .SH ATTRIBUTES
@@ -2232,13 +2059,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityExternal
+Interface Stability	External
 .TE
 
 .SH SEE ALSO

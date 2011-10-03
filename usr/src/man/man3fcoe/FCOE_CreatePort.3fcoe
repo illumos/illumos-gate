@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FCOE_CreatePort 3FCOE "1 Apr 2009" "SunOS 5.11" "FCoE Port Management Library Functions"
+.TH FCOE_CREATEPORT 3FCOE "Apr 1, 2009"
 .SH NAME
 FCOE_CreatePort \- create an FCoE port
 .SH SYNOPSIS
@@ -20,34 +20,28 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lfcoe [ \fIlibrary\fR... ]
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImacLinkName\fR\fR
 .ad
 .RS 15n
-.rt  
 The name of the MAC link on which to create the FCoE port.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIportType\fR\fR
 .ad
 .RS 15n
-.rt  
 This parameter should always be \fBFCOE_PORTTYPE_TARGET\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpwwn\fR\fR
 .ad
 .RS 15n
-.rt  
 The Port WorldWideName to be used for the FCoE port. Fill the structure with
 zeros to let the \fBfcoe\fR driver generate a valid Port WWN from the MAC
 address of the underlying NIC hardware.
@@ -55,12 +49,10 @@ address of the underlying NIC hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInwwn\fR\fR
 .ad
 .RS 15n
-.rt  
 The Node WorldWideName to be used for the FCoE port. Fill the structure with
 zeros to let the \fBfcoe\fR driver generate a valid Node WWN from the MAC
 address of the underlying NIC hardware.
@@ -68,12 +60,10 @@ address of the underlying NIC hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpromiscuous\fR\fR
 .ad
 .RS 15n
-.rt  
 A non-zero value to enable promiscuous mode on the underlying NIC hardware. A
 value of 0 indicates use of the multiple unicast address feature of the
 underlying NIC hardware.
@@ -90,7 +80,6 @@ MAC link.
 The following values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_BUSY\fR\fR
 .ad
@@ -101,7 +90,6 @@ The \fBfcoe\fR driver is busy and cannot complete the operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_ALREADY\fR\fR
 .ad
@@ -112,7 +100,6 @@ An existing FCoE port was found over the specified MAC link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_OPEN_DEV\fR\fR
 .ad
@@ -123,7 +110,6 @@ Failed to open \fBfcoe\fR device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_WWN_SAME\fR\fR
 .ad
@@ -134,7 +120,6 @@ The specified Port WWN is same as the specified Node WWN.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_MAC_LEN\fR\fR
 .ad
@@ -145,7 +130,6 @@ MAC link name exceeds the maximum length.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_PWWN_CONFLICTED\fR\fR
 .ad
@@ -156,7 +140,6 @@ The specified Port WWN is already in use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_NWWN_CONFLICTED\fR\fR
 .ad
@@ -167,7 +150,6 @@ The specified Node WWN is already in use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_NEED_JUMBO_FRAME\fR\fR
 .ad
@@ -178,7 +160,6 @@ The MTU size of the specified MAC link needs to be increased to 2500 or above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_OPEN_MAC\fR\fR
 .ad
@@ -189,7 +170,6 @@ Failed to open the specified MAC link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_ERROR_CREATE_PORT\fR\fR
 .ad
@@ -200,7 +180,6 @@ Failed to create FCoE port on the specified MAC link.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFCOE_STATUS_OK\fR\fR
 .ad
@@ -217,15 +196,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

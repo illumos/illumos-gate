@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH exstr 1 "5 Jul 1990" "SunOS 5.11" "User Commands"
+.TH EXSTR 1 "Jul 5, 1990"
 .SH NAME
 exstr \- extract strings from source files
 .SH SYNOPSIS
@@ -70,18 +70,15 @@ the message retrieval function.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fR
 .ad
 .RS 7n
-.rt  
 Extract a list of strings from the named C-language source files, with
 positional information. This list is produced on standard output in the
 following format:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile:line:position:msgfile:msgnum:string\fR \fR
 .ad
@@ -92,7 +89,6 @@ following format:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
@@ -103,7 +99,6 @@ the name of a C-language source file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIline\fR \fR
 .ad
@@ -114,7 +109,6 @@ line number in the file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIposition\fR \fR
 .ad
@@ -125,7 +119,6 @@ character position in the line
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgfile\fR \fR
 .ad
@@ -136,7 +129,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgnum\fR \fR
 .ad
@@ -147,7 +139,6 @@ null
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstring\fR \fR
 .ad
@@ -160,12 +151,10 @@ Normally you would redirect this output into a file. Then you would edit this
 file to add the values you want to use for \fImsgfile\fR and \fImsgnum\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgfile\fR \fR
 .ad
 .RS 12n
-.rt  
 the file that contains the text strings that will replace \fIstring\fR. A file
 with this name must be created and installed in the appropriate place by the
 \fBmkmsgs\fR(1) utility.
@@ -173,12 +162,10 @@ with this name must be created and installed in the appropriate place by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgnum\fR \fR
 .ad
 .RS 12n
-.rt  
 the sequence number of the string in \fImsgfile\fR.
 .RE
 
@@ -188,24 +175,20 @@ The next step is to use \fBexstr\fR \fB-r\fR to replace \fIstring\fRs in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fR
 .ad
 .RS 7n
-.rt  
 Replace strings in a C-language source file with function calls to the message
 retrieval function \fBgettxt\fR().
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fR
 .ad
 .RS 7n
-.rt  
 This option is used together with the \fB-r\fR option. If the message retrieval
 fails when \fBgettxt\fR() is invoked at run-time, then the extracted string is
 printed. You would use the capability provided by \fBexstr\fR on an application
@@ -381,7 +364,6 @@ main()
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES/* \fR\fR
 .ad

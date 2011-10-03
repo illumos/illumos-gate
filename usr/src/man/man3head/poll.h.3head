@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poll.h 3HEAD "9 Sep 2004" "SunOS 5.11" "Headers"
+.TH POLL.H 3HEAD "Sep 9, 2004"
 .SH NAME
 poll.h, poll \- definitions for the \fBpoll()\fR function
 .SH SYNOPSIS
@@ -23,34 +23,28 @@ The <\fBpoll.h\fR> header defines the \fBpollfd\fR structure, which includes
 the following members:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBint fd\fR\fR
 .ad
 .RS 17n
-.rt  
 the following descriptor being polled
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshort events\fR\fR
 .ad
 .RS 17n
-.rt  
 the input event flags (see below)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshort revents\fR\fR
 .ad
 .RS 17n
-.rt  
 the output event flags (see below)
 .RE
 
@@ -59,12 +53,10 @@ the output event flags (see below)
 The <\fBpoll.h\fR> header defines the following type through \fBtypedef\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnfds_t\fR\fR
 .ad
 .RS 10n
-.rt  
 an unsigned integer type used for the number of file descriptors
 .RE
 
@@ -82,111 +74,91 @@ OR'ed together to form the \fBevents\fR or \fBrevents\fR members  in the
 \fBpollfd\fR structure:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLIN\fR\fR
 .ad
 .RS 14n
-.rt  
 Data other than high-priority data can be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLRDNORM\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data can be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLRDBAND\fR\fR
 .ad
 .RS 14n
-.rt  
 Priority data can be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLPRI\fR\fR
 .ad
 .RS 14n
-.rt  
 High priority data can be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLOUT\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data can be written without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLWRNORM\fR\fR
 .ad
 .RS 14n
-.rt  
 Equivalent to \fBPOLLOUT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLWRBAND\fR\fR
 .ad
 .RS 14n
-.rt  
 Priority data can be written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLERR\fR\fR
 .ad
 .RS 14n
-.rt  
 An error has occurred (\fBrevents\fR only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLHUP\fR\fR
 .ad
 .RS 14n
-.rt  
 Device has been disconnected (\fBrevents\fR only).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLNVAL\fR\fR
 .ad
 .RS 14n
-.rt  
 Invalid \fBfd\fR member (\fBrevents\fR only).
 .RE
 
@@ -202,13 +174,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

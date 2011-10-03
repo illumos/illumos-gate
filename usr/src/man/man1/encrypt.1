@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright 2008, Sun Microsystems, Inc. All Rights Reserved 
+.\" Copyright 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH encrypt 1 "17 Dec 2008" "SunOS 5.11" "User Commands"
+.TH ENCRYPT 1 "Dec 17, 2008"
 .SH NAME
 encrypt, decrypt \- encrypt or decrypt files
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ encrypt, decrypt \- encrypt or decrypt files
 
 .LP
 .nf
-\fB/usr/bin/encrypt\fR \fB-a\fR \fIalgorithm\fR [\fB-v\fR] 
+\fB/usr/bin/encrypt\fR \fB-a\fR \fIalgorithm\fR [\fB-v\fR]
      [\fB-k\fR \fIkey_file\fR | \fB-K\fR \fIkey_label\fR [\fB-T\fR \fItoken_spec\fR]]
      [\fB-i\fR \fIinput_file\fR] [\fB-o\fR \fIoutput_file\fR]
 .fi
@@ -26,7 +26,7 @@ encrypt, decrypt \- encrypt or decrypt files
 
 .LP
 .nf
-\fB/usr/bin/decrypt\fR \fB-a\fR \fIalgorithm\fR [\fB-v\fR] 
+\fB/usr/bin/decrypt\fR \fB-a\fR \fIalgorithm\fR [\fB-v\fR]
      [\fB-k\fR \fIkey_file\fR | \fB-K\fR \fIkey_label\fR [\fB-T\fR \fItoken_spec\fR]]
      [\fB-i\fR \fIinput_file\fR] [\fB-o\fR \fIoutput_file\fR]
 .fi
@@ -84,35 +84,29 @@ Cipher text data.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIalgorithm\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the name of the algorithm to use during the encryption or decryption
 process. See USAGE, \fBAlgorithms\fR for details.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinput_file\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the input file. Default is stdin if \fIinput_file\fR is not specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIkey_file\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the file containing the key value for the encryption algorithm. Each
 algorithm has specific key material requirements, as stated in the PKCS#11
 specification. If \fB-k\fR is not specified, \fBencrypt\fR prompts for key
@@ -126,23 +120,19 @@ For information on generating a key file, see the \fBgenkey\fR subcommand in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR \fIkey_label\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the label of a symmetric token key in a PKCS#11 token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 Display the list of algorithms available on the system. This list can change
 depending on the configuration of the cryptographic framework. The keysizes are
 displayed in bits.
@@ -150,12 +140,10 @@ displayed in bits.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutput_file\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify output file. Default is stdout if \fIoutput_file\fR is not specified.
 If stdout is used without redirecting to a file, the terminal window can appear
 to hang because the raw encrypted or decrypted data has disrupted the terminal
@@ -164,12 +152,10 @@ emulation, much like viewing a binary file can do at times.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItoken_spec\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify a PKCS#11 token other than the default soft token object store when the
 \fB-K\fR is specified.
 .sp
@@ -194,12 +180,10 @@ token label and the manufacturer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Display verbose information. See \fBVerbose\fR.
 .RE
 
@@ -354,23 +338,19 @@ example$ encrypt -a des -K mydeskey \e
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -382,13 +362,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

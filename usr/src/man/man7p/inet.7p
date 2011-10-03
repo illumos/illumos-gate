@@ -1,10 +1,10 @@
 '\" te
-.\"  Copyright 1989 AT&T  
+.\"  Copyright 1989 AT&T
 .\" Copyright (C) 2000, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH inet 7P "3 Aug 2000" "SunOS 5.11" "Protocols"
+.TH INET 7P "Aug 3, 2000"
 .SH NAME
 inet \- Internet protocol family
 .SH SYNOPSIS
@@ -64,12 +64,10 @@ entry. Subnet addressing is enabled and examined by the following
 command.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCSIFNETMASK\fR\fR
 .ad
 .RS 18n
-.rt  
 Set interface network mask. The network mask defines the network part of the
 address; if it contains more of the address than the address type would
 indicate, then subnets are in use.
@@ -77,12 +75,10 @@ indicate, then subnets are in use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIOCGIFNETMASK\fR\fR
 .ad
 .RS 18n
-.rt  
 Get interface network mask.
 .RE
 

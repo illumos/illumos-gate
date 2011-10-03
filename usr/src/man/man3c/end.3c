@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH end 3C "31 Mar 2006" "SunOS 5.11" "Standard C Library Functions"
+.TH END 3C "Mar 31, 2006"
 .SH NAME
 end, _end, etext, _etext, edata, _edata \- last locations in program
 .SH SYNOPSIS
@@ -30,36 +30,30 @@ These names refer neither to routines nor to locations with interesting
 contents; only their addresses are meaningful.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_etext\fR\fR
 .ad
 .RS 10n
-.rt  
 The address of \fB_etext\fR is the first location after the last read-only
 loadable segment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_edata\fR\fR
 .ad
 .RS 10n
-.rt  
 The address of \fB_edata\fR is the first location after the last read-write
 loadable segment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_end\fR\fR
 .ad
 .RS 10n
-.rt  
 If the address of \fB_edata\fR is greater than the address of \fB_etext\fR, the
 address of _end is same as the address of \fB_edata\fR.
 .sp

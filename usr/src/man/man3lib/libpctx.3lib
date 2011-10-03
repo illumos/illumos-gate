@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libpctx 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBPCTX 3LIB "May 22, 2003"
 .SH NAME
 libpctx \- process context library
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpctx\fR [ \fIlibrary\fR... ] 
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpctx\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
@@ -34,35 +34,29 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBpctx_capture\fR\fBpctx_create\fR
-\fBpctx_release\fR\fBpctx_run\fR
-\fBpctx_set_events\fR
+l l
+l l .
+\fBpctx_capture\fR	\fBpctx_create\fR
+\fBpctx_release\fR	\fBpctx_run\fR
+\fBpctx_set_events\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libpctx.so.1\fR \fR
 .ad
 .RS 29n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libpctx.so.1\fR \fR
 .ad
 .RS 29n
-.rt  
 64-bit shared object
 .RE
 
@@ -74,13 +68,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

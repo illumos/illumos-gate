@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kill 1 "11 Aug 2009" "SunOS 5.11" "User Commands"
+.TH KILL 1 "Aug 11, 2009"
 .SH NAME
 kill \- terminate or signal processes
 .SH SYNOPSIS
@@ -69,12 +69,10 @@ See NOTES for descriptions of the shell built-in versions of \fBkill\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 (The letter ell.) Writes all values of \fIsignal_name\fR supported by the
 implementation, if no operand is specified. If an \fIexit_status\fR operand is
 specified and it is a value of the \fB?\fR shell special parameter and
@@ -87,12 +85,10 @@ to that signal is written. Otherwise, the results are unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsignal_name\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the signal to send, using one of the symbolic names defined in the
 \fB<signal.h>\fR description. Values of \fIsignal_name\fR is recognized in a
 case-independent fashion, without the \fBSIG\fR prefix. In addition, the
@@ -102,25 +98,21 @@ corresponding signal is sent instead of \fBSIGTERM\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIsignal_name\fR\fR
 .ad
 .RS 18n
-.rt  
 Equivalent to \fB-s\fR \fIsignal_name\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIsignal_number\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies a non-negative decimal integer, \fIsignal_number\fR, representing the
-signal to be used instead of \fBSIGTERM\fR, as the \fIsig\fR argument in 	the
+signal to be used instead of \fBSIGTERM\fR, as the \fIsig\fR argument in the
 effective call to \fBkill\fR(2).
 .RE
 
@@ -130,12 +122,10 @@ effective call to \fBkill\fR(2).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 15n
-.rt  
 One of the following:
 .RS +4
 .TP
@@ -160,12 +150,10 @@ supporting the job control option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexit_status\fR\fR
 .ad
 .RS 15n
-.rt  
 A decimal integer specifying a signal number or the exit status of a process
 terminated by a signal.
 .RE
@@ -279,24 +267,20 @@ that affect the execution of \fBkill\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 At least one matching process was found for each \fIpid\fR operand, and the
 specified signal was successfully processed for at least one matching process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -309,17 +293,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -327,15 +310,14 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
@@ -391,12 +373,10 @@ or \fBHUP\fR (hangup), then the job or process is sent a \fBCONT\fR (continue)
 signal as well.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Lists the signal names that can be sent.
 .RE
 
@@ -446,62 +426,51 @@ terminates the processes unless the signal is being caught or ignored.
 Specify \fIjob\fR as one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The process id of \fIjob\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The process group id of \fIjob\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The job number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 The job whose name begins with \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 The job whose name contains \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%+\fR\fR
 .ad
@@ -510,18 +479,15 @@ The job whose name contains \fIstring\fR.
 \fB\fB%%\fR\fR
 .ad
 .RS 12n
-.rt  
 The current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%-\fR\fR
 .ad
 .RS 12n
-.rt  
 The previous job.
 .RE
 
@@ -539,111 +505,91 @@ corresponding signal number is written to standard output. If a number is
 specified the corresponding signal name is written to standard output.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 14n
-.rt  
 List signal names or signal numbers rather than sending signals as described
 above. The \fB-n\fR and \fB-s\fR options cannot be specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIsignum\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify a signal number to send. Signal numbers are not portable across
 platforms, except for the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 No signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBHUP\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBINT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBQUIT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBABRT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB9\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBKILL\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB14\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBALRM\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB15\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBTERM\fR
 .RE
 
@@ -651,12 +597,10 @@ No signal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsigname\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify a signal name to send. The signal names are derived from their names in
 \fB<signal.h>\fR without the \fBSIG\fR prefix and are case insensitive.
 \fBkill\fR \fB-l\fR generates the list of signals on the current platform.
@@ -667,24 +611,20 @@ Specify a signal name to send. The signal names are derived from their names in
 \fBkill\fR in \fBksh93\fR exits with one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 At least one matching process was found for each job operand, and the specified
 signal was successfully sent to at least one matching process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount_ufs 1M "22 Jun 2009" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT_UFS 1M "Jun 22, 2009"
 .SH NAME
 mount_ufs \- mount ufs file systems
 .SH SYNOPSIS
@@ -54,7 +54,6 @@ See \fBmount\fR(1M) for the list of supported \fIgeneric_options\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
@@ -66,7 +65,6 @@ printed and the invalid options are ignored. The following options are
 available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdfratime\fR | \fBnodfratime\fR\fR
 .ad
@@ -84,7 +82,6 @@ the disk is accessed - even if the file is not modified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforcedirectio\fR | \fBnoforcedirectio\fR\fR
 .ad
@@ -102,7 +99,6 @@ The default behavior is \fBnoforcedirectio\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglobal\fR | \fBnoglobal\fR\fR
 .ad
@@ -116,7 +112,6 @@ globally visible. The default behavior is \fBnoglobal\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBintr\fR | \fBnointr\fR\fR
 .ad
@@ -128,7 +123,6 @@ an operation on a locked file system. The default is \fBintr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlargefiles\fR | \fBnolargefiles\fR\fR
 .ad
@@ -156,7 +150,6 @@ unsuccessful mount attempt indicates the presence of at least one large file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogging\fR | \fBnologging\fR\fR
 .ad
@@ -210,7 +203,6 @@ log is totally flushed when the file system is unmounted or as a result of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
@@ -221,7 +213,6 @@ Mount the file system without making an entry in \fB/etc/mnttab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoatime\fR\fR
 .ad
@@ -243,7 +234,6 @@ The POSIX standard requires that access times be marked on files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnosec\fR\fR
 .ad
@@ -257,7 +247,6 @@ on ACLs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonerror\fR = \fIaction\fR\fR
 .ad
@@ -272,7 +261,6 @@ forcibly unmounted, respectively. The default is \fBpanic\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquota\fR\fR
 .ad
@@ -283,7 +271,6 @@ Quotas are turned on for the file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremount\fR\fR
 .ad
@@ -295,7 +282,6 @@ set with \fBremount\fR revert to their default values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrq\fR\fR
 .ad
@@ -308,7 +294,6 @@ Read-write with quotas turned on. Equivalent to \fBrw, quota\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxattr\fR | \fBnoxattr\fR\fR
 .ad
@@ -321,7 +306,6 @@ attributes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
@@ -357,7 +341,6 @@ In the preceding commands, the \fB-F\fR \fBufs\fR option is not necessary.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -368,7 +351,6 @@ table of mounted file systems
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH drv_getparm 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DRV_GETPARM 9F "Jan 16, 2006"
 .SH NAME
 drv_getparm \- retrieve kernel state information
 .SH SYNOPSIS
@@ -24,23 +24,19 @@ Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIparm\fR\fR
 .ad
 .RS 8n
-.rt  
 The kernel parameter to be obtained. Possible values are:
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLBOLT\fR\fR
 .ad
 .RS 10n
-.rt  
 Read the value of \fBlbolt\fR. \fBlbolt\fR is a \fBclock_t\fR that is
 unconditionally incremented by one at each clock tick. No special treatment is
 applied when this value overflows the maximum value of the signed integral type
@@ -54,12 +50,10 @@ is used in this way inside the system kernel for timing purposes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPGRP\fR\fR
 .ad
 .RS 10n
-.rt  
 Read the process group identification number. This number determines which
 processes should receive a \fBHANGUP\fR or \fBBREAK\fR signal when detected by
 a driver.
@@ -67,67 +61,55 @@ a driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUPROCP\fR\fR
 .ad
 .RS 10n
-.rt  
 Read the process table token value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPID\fR\fR
 .ad
 .RS 10n
-.rt  
 Read process identification number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPSID\fR\fR
 .ad
 .RS 10n
-.rt  
 Read process session identification number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIME\fR\fR
 .ad
 .RS 10n
-.rt  
 Read time in seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUCRED\fR\fR
 .ad
 .RS 10n
-.rt  
 Return a pointer to the caller's credential structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue_p\fR\fR
 .ad
 .RS 11n
-.rt  
 A pointer to the data space in which the value of the parameter is to be
 copied.
 .RE

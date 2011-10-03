@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH priv_policy 9F "3 Apr 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PRIV_POLICY 9F "Apr 3, 2009"
 .SH NAME
 priv_policy, priv_policy_only, priv_policy_choice \- check, report, and audit
 privileges
@@ -35,34 +35,28 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcr\fR\fR
 .ad
 .RS 8n
-.rt  
 The credential to be checked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpriv\fR\fR
 .ad
 .RS 8n
-.rt  
 The integer value of the privilege to test.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 8n
-.rt  
 All zone privileges flag. Set to \fBB_FALSE\fR for most tests or \fBB_TRUE\fR
 if the operation requires the caller to have all available privileges in the
 zone.
@@ -70,23 +64,19 @@ zone.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerr\fR\fR
 .ad
 .RS 8n
-.rt  
 The error code to return.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsg\fR\fR
 .ad
 .RS 8n
-.rt  
 String that is added to the privilege debugging message if one is generated.
 NULL if no additional information is needed. Because the function name is
 included in the output, NULL is usually the best value to pass as a parameter.
@@ -127,12 +117,10 @@ on failure both return 0.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 This might be caused by any of the following:
 .RS +4
 .TP
@@ -156,23 +144,19 @@ The \fIpriv\fR parameter contains invalid characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 16n
-.rt  
 There is no room to allocate another privilege.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 An attempt was made to allocate a privilege that was longer than
 \fB{PRIVNAME_MAX}\fR characters.
 .RE
@@ -189,13 +173,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

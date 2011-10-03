@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsa2usb 7D "28 Jul 2008" "SunOS 5.11" "Devices"
+.TH SCSA2USB 7D "Jul 28, 2008"
 .SH NAME
 scsa2usb \- SCSI to USB bridge driver
 .SH SYNOPSIS
@@ -175,7 +175,6 @@ The device special files for the USB mass storage device are created like those
 for a \fBSCSI\fR disk or SCSI tape. Refer to \fBsd\fR(7D) or \fBst\fR(7D).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/dsk/c\fIn\fRt\fIn\fRd\fIn\fRs\fIn\fR\fR\fR
 .ad
@@ -186,7 +185,6 @@ Block files for disks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rdsk/c\fIn\fRt\fIn\fRd\fIn\fRs\fIn\fR\fR\fR
 .ad
@@ -197,7 +195,6 @@ Raw files for disks.
 
 .sp
 .ne 2
-.mk
 .na
 \fB/dev/usb/*/*/*\fR
 .ad
@@ -208,7 +205,6 @@ ugen(7D) nodes
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/rmt/[0- 127][l,m,h,u,c][b][n]\fR\fR
 .ad
@@ -219,7 +215,6 @@ Raw files for tapes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/vol/dev/aliases/zip0\fR\fR
 .ad
@@ -230,7 +225,6 @@ Symbolic link to the character device for the media in Zip drive 0
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/vol/dev/aliases/jaz0\fR\fR
 .ad
@@ -241,7 +235,6 @@ Symbolic link to the character device for the media in Jaz drive 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/vol/dev/aliases/rmdisk0\fR\fR
 .ad
@@ -253,7 +246,6 @@ is a generic removable media device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/scsa2usb\fR\fR
 .ad
@@ -264,7 +256,6 @@ is a generic removable media device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/scsa2usb\fR\fR
 .ad
@@ -275,7 +266,6 @@ is a generic removable media device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/scsa2usb\fR\fR
 .ad
@@ -286,7 +276,6 @@ is a generic removable media device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/scsa2usb.conf\fR\fR
 .ad
@@ -303,13 +292,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86, PCI-based systems
+Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
@@ -377,7 +365,6 @@ Warning: <device path> (scsa2usb<instance number>): Error Message...
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot access <device>. Please reconnect.\fR
 .ad
@@ -389,7 +376,6 @@ Please reconnect the device.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice is not identical to the previous one on this port. Please disconnect
 and reconnect.\fR
@@ -403,7 +389,6 @@ mass-storage device back into that port.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReinserted device is accessible again.\fR
 .ad
@@ -415,7 +400,6 @@ re-inserted to the same slot and is available for access.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPlease disconnect and reconnect this device.\fR
 .ad
@@ -438,7 +422,6 @@ the following manner:
 
 .sp
 .ne 2
-.mk
 .na
 \fBInvalid <record> in scsa2usb.conf file entry.\fR
 .ad
@@ -449,7 +432,6 @@ An unrecognized record was specified in the \fBscsa2usb.conf\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPkt submitted with 0 timeout which may cause indefinite hangs.\fR
 .ad
@@ -460,7 +442,6 @@ An application submitted a request but did not specify a timeout.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSyncing not supported.\fR
 .ad
@@ -471,7 +452,6 @@ Syncing after a panic is not supported. The filesystem may be corrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBscsa2usb.conf override: <record>.\fR
 .ad

@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gencat 1 "1 Feb 1995" "SunOS 5.11" "User Commands"
+.TH GENCAT 1 "Feb 1, 1995"
 .SH NAME
 gencat \- generate a formatted message catalog
 .SH SYNOPSIS
@@ -37,12 +37,10 @@ space or tab character. Any other \fBASCII\fR spaces or tabs are considered as
 part of the subsequent field.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$set\fR \fIn comment\fR \fR
 .ad
 .RS 22n
-.rt  
 Where \fIn\fR specifies the set identifier of the following messages until the
 next \fB$set\fR, \fB$delset\fR, or end-of-file appears. \fIn\fR must be a
 number in the range (\fB1\fR-{\fBNL_SETMAX\fR}). Set identifiers within a
@@ -54,12 +52,10 @@ a message text source file, all messages are located in the default message set
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$delset\fR \fIn comment\fR \fR
 .ad
 .RS 22n
-.rt  
 Deletes message set \fIn\fR from an existing message catalog. Any string
 following the set number is treated as a comment. (\fBNote:\fR if  \fIn\fR is
 not a valid set it is ignored.)
@@ -67,24 +63,20 @@ not a valid set it is ignored.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fIcomment\fR \fR
 .ad
 .RS 22n
-.rt  
 A line beginning with a dollar symbol  \fB$\fR followed by an \fBASCII\fR space
 or tab character is treated as a comment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIm\fR \fImessage-text\fR \fR
 .ad
 .RS 22n
-.rt  
 The \fIm\fR denotes the message identifier, a number in the range
 (\fB1\fR-{\fBNL_MSGMAX\fR}).  The \fImessage-text\fR is stored in the message
 catalog with the set identifier specified by the last \fB$set\fR directive, and
@@ -99,12 +91,10 @@ be contiguous.  The length of \fImessage-text\fR must be in the range
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$quote\fR \fIc\fR \fR
 .ad
 .RS 22n
-.rt  
 This line specifies an optional quote character \fIc\fR, which can be used to
 surround \fImessage-text\fR so that trailing spaces or null (empty) messages
 are visible in a message source line.  By default, or if an empty \fB$quote\fR
@@ -122,19 +112,18 @@ the following table:
 
 .sp
 .TS
-tab() box;
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-DescriptionSymbolSequence
-newlineNL(LF)\en
-horizontal tabHT\et
-vertical tabVT\ev
-backspaceBS\eb
-carriage returnCR\er
-form feedFF \ef
-backslash\e\e\e
-bit patternddd\eddd
+box;
+l l l
+l l l .
+Description	Symbol	Sequence
+newline	NL(LF)	\en
+horizontal tab	HT	\et
+vertical tab	VT	\ev
+backspace	BS	\eb
+carriage return	CR	\er
+form feed	FF 	\ef
+backslash	\e	\e\e
+bit pattern	ddd	\eddd
 .TE
 
 .sp
@@ -172,24 +161,20 @@ which is equivalent to:
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcatfile\fR \fR
 .ad
 .RS 12n
-.rt  
 A path name of the formatted message catalog. If \(mi is specified, standard
 output is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImsgfile\fR \fR
 .ad
 .RS 12n
-.rt  
 A path name of a message text source file. If \(mi is specified for an instance
 of \fImsgfile\fR, standard input is used. The format of message text source
 files is defined in \fBMessage Text Source File Format\fR.
@@ -207,23 +192,19 @@ that affect the execution of \fBgencat\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -235,15 +216,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIenabled
+CSI	enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

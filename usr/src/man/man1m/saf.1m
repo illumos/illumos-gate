@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH saf 1M "30 Jul1998" "SunOS 5.11" "System Administration Commands"
+.TH SAF 1M "Jul 30, 1998"
 .SH NAME
 saf \- Service Access Facility
 .SH DESCRIPTION
@@ -51,12 +51,10 @@ design of the port monitor itself. Port monitors have two main functions:
 managing ports and monitoring ports for indications of activity.
 .sp
 .ne 2
-.mk
 .na
 \fBPort Management\fR
 .ad
 .RS 23n
-.rt  
 The first function of a port monitor is to manage a port. The actual details of
 how a port is managed are defined by the person who defines the port monitor. A
 port monitor is not restricted to handling a single port; it may handle
@@ -69,12 +67,10 @@ when the service terminates, outputting a prompt, etc.
 
 .sp
 .ne 2
-.mk
 .na
 \fBActivity Monitoring\fR
 .ad
 .RS 23n
-.rt  
 The second function of a port monitor is to monitor the port or ports for which
 it is responsible for indications of activity. Two types of activity may be
 detected.
@@ -98,7 +94,6 @@ more than one port.
 This section briefly describes other port monitor functions.
 .sp
 .ne 2
-.mk
 .na
 \fBRestricting Access to the System\fR
 .ad
@@ -122,7 +117,6 @@ invocations of the port monitor.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCreating \fButmpx\fR Entries\fR
 .ad
@@ -138,7 +132,6 @@ DEAD_PROCESS.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPort Monitor Process IDs and Lock Files\fR
 .ad
@@ -150,7 +143,6 @@ When a port monitor starts, it writes its process id into a file named
 
 .sp
 .ne 2
-.mk
 .na
 \fBChanging the Service Environment: Running\fR
 .ad
@@ -168,7 +160,6 @@ monitor.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTerminating a Port Monitor\fR
 .ad
@@ -209,7 +200,6 @@ invocation of the port monitor may be started.
 This section briefly covers the files used by the \fBSAF.\fR
 .sp
 .ne 2
-.mk
 .na
 \fBThe Port Monitor Administrative File\fR
 .ad
@@ -228,7 +218,6 @@ functions.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPer-Service Configuration Files\fR
 .ad
@@ -241,7 +230,6 @@ correspond to the service tags in the \fB_pmtab\fR file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrivate Port Monitor Files\fR
 .ad
@@ -280,12 +268,10 @@ port monitor (\fBsac\fR messages), and from a port monitor to the \fBSAC\fR
 form of C structures.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsac\fR Messages\fR
 .ad
 .RS 16n
-.rt  
 The format of messages from the \fBSAC\fR is defined by the structure
 \fBsacmsg\fR:
 .sp
@@ -309,45 +295,37 @@ message is indicated by setting the \fBsc_type\fR field of the \fBsacmsg\fR
 structure to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBSC_STATUS\|\fR
 .ad
 .RS 15n
-.rt  
 status request
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSC_ENABLE\|\fR
 .ad
 .RS 15n
-.rt  
 enable message
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSC_DISABLE\fR
 .ad
 .RS 15n
-.rt  
 disable message
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSC_READDB\|\fR
 .ad
 .RS 15n
-.rt  
 message indicating that the port monitor's _pmtab file should be read
 .RE
 
@@ -382,23 +360,19 @@ message is indicated by setting the \fBpm_type\fR field of the \fBpmmsg\fR
 structure to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fBPM_STATUS\fR
 .ad
 .RS 14n
-.rt  
 state information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPM_UNKNOWN\fR
 .ad
 .RS 14n
-.rt  
 negative acknowledgment
 .RE
 
@@ -409,45 +383,37 @@ tag and the \fBpm_state\fR field is set to the port monitor's current state.
 Valid states are:
 .sp
 .ne 2
-.mk
 .na
 \fBPM_STARTING\fR
 .ad
 .RS 15n
-.rt  
 starting
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPM_ENABLED\fR
 .ad
 .RS 15n
-.rt  
 enabled
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPM_DISABLED\fR
 .ad
 .RS 15n
-.rt  
 disabled
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPM_STOPPING\fR
 .ad
 .RS 15n
-.rt  
 stopping
 .RE
 
@@ -512,12 +478,10 @@ entries should be made using the administrative command \fBsacadm\fR(1M) with a
 file contains the following information.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPMTAG\fR\fR
 .ad
 .RS 11n
-.rt  
 A unique tag that identifies a particular port monitor. The system
 administrator is responsible for naming a port monitor. This tag is then used
 by the \fBSAC\fR to identify the port  monitor for all administrative purposes.
@@ -526,12 +490,10 @@ by the \fBSAC\fR to identify the port  monitor for all administrative purposes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPMTYPE\fR\fR
 .ad
 .RS 11n
-.rt  
 The type of the port monitor. In addition to its unique tag, each port monitor
 has a type designator. The type designator identifies a group of port monitors
 that are different invocations of the same entity. ttymon and listen are
@@ -544,32 +506,26 @@ up to 14 alphanumeric characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLGS\fR\fR
 .ad
 .RS 11n
-.rt  
 The flags that are currently defined are:
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 5n
-.rt  
 When started, do not enable the port monitor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBx\fR
 .ad
 .RS 5n
-.rt  
 Do not start the port monitor.
 .RE
 
@@ -579,12 +535,10 @@ is started and enabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRCNT\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of times a port monitor may fail before being placed in a failed
 state. Once a port monitor enters the failed state, the \fBSAC\fR will not try
 to restart it. If a count is not specified when the entry is created, this
@@ -594,12 +548,10 @@ to be restarted when it fails.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMMAND\fR\fR
 .ad
 .RS 11n
-.rt  
 A string representing the command that will start the port monitor. The first
 component of the string, the command itself, must be a full path name.
 .RE
@@ -652,58 +604,48 @@ requires both a port monitor tag and a service tag to identify it uniquely.
 entries are defined as:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFLGS\fR\fR
 .ad
 .RS 14n
-.rt  
 Flags with the following meanings may currently be included in this field:
 .sp
 .ne 2
-.mk
 .na
 \fBx\fR
 .ad
 .RS 5n
-.rt  
 Do not enable this port. By default the port is enabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBu\fR
 .ad
 .RS 5n
-.rt  
-Create a utmpx entry for this service. By 	default no utmpx entry is created
-for the 	service.
+Create a utmpx entry for this service. By default no utmpx entry is created
+for the service.
 .RE
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBID\fR\fR
 .ad
 .RS 14n
-.rt  
 The identity under which the service is to be started. The identity has the
 form of a login name as it appears in \fB/etc/passwd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPMSPECIFIC\fR\fR
 .ad
 .RS 14n
-.rt  
 Examples of port monitor information are addresses, the name of a process to
 execute, or the name of a STREAMS-based pipe to pass a connection through. This
 information will vary to meet the needs of each different type of port monitor.
@@ -711,12 +653,10 @@ information will vary to meet the needs of each different type of port monitor.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMMENT\fR\fR
 .ad
 .RS 14n
-.rt  
 A comment associated with the service entry. Port monitors may ignore the
 \fIu\fR flag if creating a utmpx entry for the service is not appropriate to
 the manner in which the service is to be invoked. Some services may not start
@@ -759,7 +699,6 @@ The interface between a port monitor and a service is determined solely by the
 service. Two mechanisms for invoking a service are presented here as examples.
 .sp
 .ne 2
-.mk
 .na
 \fBNew Service Invocations\fR
 .ad
@@ -776,7 +715,6 @@ is done by calling the library routine \fBdoconfig\fR(3NSL).
 
 .sp
 .ne 2
-.mk
 .na
 \fBStanding Service Invocations\fR
 .ad
@@ -795,12 +733,10 @@ section summarizes these requirements. In addition to the port monitor itself,
 an administrative command must be supplied.
 .sp
 .ne 2
-.mk
 .na
 \fBInitial Environment\fR
 .ad
 .RS 23n
-.rt  
 When a port monitor is started, it expects an initial execution environment in
 which:
 .RS +4
@@ -858,22 +794,18 @@ The port monitor is running with user id 0 (root)
 
 .sp
 .ne 2
-.mk
 .na
 \fBImportant Files\fR
 .ad
 .RS 23n
-.rt  
 Relative to its current directory, the following key files exist for a port
 monitor.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_config\fR\fR
 .ad
 .RS 17n
-.rt  
 The port monitor's configuration script. The port monitor configuration script
 is run by the SAC. The \fBSAC\fR is started by \fBinit\fR(1M) as a result of an
 entry in \fB/etc/inittab\fR that calls \fBsac\fR(1M).
@@ -881,58 +813,48 @@ entry in \fB/etc/inittab\fR that calls \fBsac\fR(1M).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_pid\fR\fR
 .ad
 .RS 17n
-.rt  
 The file into which the port monitor writes its process id.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_pmtab\fR\fR
 .ad
 .RS 17n
-.rt  
 The port monitor's administrative file. This file contains information about
 the ports and services for which the port monitor is responsible.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB_pmpipe\fR\fR
 .ad
 .RS 17n
-.rt  
 The\fB FIFO\fR through which the port monitor will receive messages from the
 \fBSAC.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvctag\fR\fR
 .ad
 .RS 17n
-.rt  
 The per-service configuration script for the service with the tag \fIsvctag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&../_sacpipe\fR\fR
 .ad
 .RS 17n
-.rt  
 The \fBFIFO\fR through which the port monitor will send messages to
 \fBsac\fR(1M).
 .RE
@@ -1037,7 +959,6 @@ per-service configuration script.
 
 .sp
 .ne 2
-.mk
 .na
 \fBThe Per-System Configuration File\fR
 .ad
@@ -1054,7 +975,6 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPer-Port Monitor Configuration Files\fR
 .ad
@@ -1075,7 +995,6 @@ configuration script.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPer-Service Configuration Files\fR
 .ad
@@ -1101,7 +1020,6 @@ keywords are defined: \fBassign\fR, \fBpush\fR, \fBpop\fR, \fBrunwait\fR, and
 in a command script may exceed 1024 characters.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBassign\fR \fIvariable\fR=\fIvalue\fR\fR
 .ad
@@ -1118,7 +1036,6 @@ invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpush\fR \fImodule1\fR[,\fImodule2, module3\fR, . . .]\fR
 .ad
@@ -1134,7 +1051,6 @@ have already been pushed will be popped.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpop\fR [\fImodule\fR]\fR
 .ad
@@ -1151,7 +1067,6 @@ above the topmost driver are affected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrunwait\fR \fBcommand\fR\fR
 .ad
@@ -1167,7 +1082,6 @@ status.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrun\fR \fBcommand\fR\fR
 .ad
@@ -1470,116 +1384,96 @@ struct sacmsg {
 This section gives a description of the \fBSAF\fR files and directories.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/_sysconfig\fR\fR
 .ad
 .RS 28n
-.rt  
 The per-system configuration script.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/_sactab\fR\fR
 .ad
 .RS 28n
-.rt  
 The \fBSAC's\fR administrative file. Contains information about the port
 monitors for which the SAC is responsible.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fR
 .ad
 .RS 28n
-.rt  
 The home directory for port monitor \fIpmtag\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_config\fR\fR
 .ad
 .RS 28n
-.rt  
 The per-port monitor configuration script for port monitor pmtag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_pmtab\fR\fR
 .ad
 .RS 28n
-.rt  
 Port monitor pmtag's administrative file. Contains information about the
 services for which \fIpmtag\fR is responsible.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fB/\fR\fIsvctag\fR\fR
 .ad
 .RS 28n
-.rt  
 The file in which the per-service configuration script for service \fIsvctag\fR
 (available through port monitor  \fBpmtag\fR) is placed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_pid\fR\fR
 .ad
 .RS 28n
-.rt  
 The file in which a port monitor writes its process id in the current directory
 and places an advisory lock on the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/saf/\fR \fBpmtag\fR \fB/_pmpipe\fR\fR
 .ad
 .RS 28n
-.rt  
 The file in which the port monitor receives messages from the \fBSAC\fR and
 \fB\&../_sacpipe\fR and sends return messages to the \fBSAC.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/saf/_log\fR\fR
 .ad
 .RS 28n
-.rt  
 The \fBSAC's\fR log file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/saf/\fR\fIpmtag\fR\fR
 .ad
 .RS 28n
-.rt  
 The directory for files created by port monitor \fIpmtag,\fR for example its
 log file.
 .RE
@@ -1590,23 +1484,19 @@ log file.
 The following administrative commands relate to \fBSAF.\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsacadm\fR(1M)\fR
 .ad
 .RS 14n
-.rt  
 port monitor administrative command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmadm\fR(1M)\fR
 .ad
 .RS 14n
-.rt  
 service administration command
 .RE
 

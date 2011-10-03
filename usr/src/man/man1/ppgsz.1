@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ppgsz 1 "23 Jan 2003" "SunOS 5.11" "User Commands"
+.TH PPGSZ 1 "Jan 23, 2003"
 .SH NAME
 ppgsz \- set preferred page size for stack, heap, and/or other anonymous
 segments
@@ -26,12 +26,10 @@ process(es) while changing the page size. See \fBmemcntl\fR(2).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 22n
-.rt  
 Force. Sets the preferred page size options(s) for target process(es) even if
 controlled by other process(es). Caution should be exercised when using the
 \fB-F\fR flag. See \fBproc\fR(1).
@@ -39,21 +37,17 @@ controlled by other process(es). Caution should be exercised when using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR[,\fIoption\fR]\fR
 .ad
 .RS 22n
-.rt  
 The \fIoption\fRs are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBheap\fR=\fIsize\fR\fR
 .ad
 .RS 14n
-.rt  
 This option specifies the preferred page size for the heap of the target
 process(es). \fBheap\fR is defined to be the bss (uninitialized data) and the
 brk area that immediately follows the bss (see \fBbrk\fR(2)). The preferred
@@ -63,12 +57,10 @@ allocated in the future. See NOTES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstack\fR=\fIsize\fR\fR
 .ad
 .RS 14n
-.rt  
 This option specifies the preferred page size for the stack of the target
 process(es). The preferred stack page size is set for the existing stack and
 newly allocated parts of the stack as it expands.
@@ -76,12 +68,10 @@ newly allocated parts of the stack as it expands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBanon\fR=\fIsize\fR\fR
 .ad
 .RS 14n
-.rt  
 This option specifies the preferred page size for all existing
 \fBMAP_PRIVATE\fR anonymous segments of the target process(es),  other than
 \fBheap\fR and \fBstack\fR, which are large enough to fit at least one aligned
@@ -111,12 +101,10 @@ Terabytes, respectively. \fB4194304\fR, \fB0x400000\fR, \fB4096K\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpid\fR\fR
 .ad
 .RS 22n
-.rt  
 Sets the preferred page size option(s) for the target process(es) in the
 process-id (\fIpid\fR) list following the \fB-p\fR option. The pid list can
 also consist of names in the \fB/proc\fR directory. Only the process owner or
@@ -174,70 +162,58 @@ exit status of \fBppgsz\fR will be the exit status of \fIcmd\fR. Otherwise,
 \fBppgsz\fR will exit with one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successfully set preferred page size(s) for processes in the pid list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB125\fR\fR
 .ad
 .RS 7n
-.rt  
-An error occurred in \fBppgsz\fR. Errors include: invalid argument, 	invalid
+An error occurred in \fBppgsz\fR. Errors include: invalid argument, invalid
 page size(s) specified, and failure to set preferred page size(s) for one or
 more processes in the pid list or \fIcmd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIcmd\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 7n
-.rt  
 \fIcmd\fR could not be found.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/*\fR \fR
 .ad
 .RS 29n
-.rt  
 Process files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/ld/map.bssalign\fR \fR
 .ad
 .RS 29n
-.rt  
 A template link-editor \fBmapfile\fR for aligning bss (see NOTES).
 .RE
 
@@ -249,13 +225,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

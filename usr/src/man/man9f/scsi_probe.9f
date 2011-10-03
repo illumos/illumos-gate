@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH scsi_probe 9F "26 Feb 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH SCSI_PROBE 9F "Feb 26, 2002"
 .SH NAME
 scsi_probe \- utility for probing a scsi device
 .SH SYNOPSIS
@@ -23,23 +23,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevp\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBscsi_device\fR(9S) structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwaitfunc\fR \fR
 .ad
 .RS 13n
-.rt  
 \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR
 .RE
 
@@ -70,24 +66,20 @@ If the target is a non-CCS device, \fBSCSIPROBE_NONCCS\fR will be returned.
 are not available; the valid values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR \fR
 .ad
 .RS 15n
-.rt  
 Do not wait for resources. Return \fBSCSIPROBE_NOMEM\fR or
 \fBSCSIPROBE_FAILURE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR \fR
 .ad
 .RS 15n
-.rt  
 Wait indefinitely for resources.
 .RE
 
@@ -97,78 +89,64 @@ Wait indefinitely for resources.
 \fBscsi_probe()\fR returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_BUSY\fR \fR
 .ad
 .RS 23n
-.rt  
 Device exists but is currently busy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_EXISTS\fR \fR
 .ad
 .RS 23n
-.rt  
 Device exists and inquiry data is valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_FAILURE\fR \fR
 .ad
 .RS 23n
-.rt  
 Polled command failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_NOMEM\fR \fR
 .ad
 .RS 23n
-.rt  
 No space available for structures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_NOMEM_CB\fR \fR
 .ad
 .RS 23n
-.rt  
 No space available for structures but callback request has been queued.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_NONCCS\fR \fR
 .ad
 .RS 23n
-.rt  
 Device exists but inquiry data is not valid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSIPROBE_NORESP\fR \fR
 .ad
 .RS 23n
-.rt  
 Device does not respond to an INQUIRY.
 .RE
 

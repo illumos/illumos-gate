@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvlist_add_boolean 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NVLIST_ADD_BOOLEAN 9F "Jan 16, 2006"
 .SH NAME
 nvlist_add_boolean, nvlist_add_boolean_value, nvlist_add_byte, nvlist_add_int8,
 nvlist_add_uint8, nvlist_add_int16, nvlist_add_uint16, nvlist_add_int32,
@@ -24,7 +24,7 @@ functions
 
 .LP
 .nf
-\fBint\fR \fBnvlist_add_boolean_value\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+\fBint\fR \fBnvlist_add_boolean_value\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
       \fBboolean_t\fR \fIval\fR);
 .fi
 
@@ -90,7 +90,7 @@ functions
 
 .LP
 .nf
-\fBint\fR \fBnvlist_add_boolean_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+\fBint\fR \fBnvlist_add_boolean_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
      \fBboolean_t *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
 .fi
 
@@ -108,7 +108,7 @@ functions
 
 .LP
 .nf
-\fBint\fR \fBnvlist_add_uint8_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+\fBint\fR \fBnvlist_add_uint8_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
      \fBuint8_t *\fR\fIval\fR uint_t nelem);
 .fi
 
@@ -150,13 +150,13 @@ functions
 
 .LP
 .nf
-\fBint\fR \fBnvlist_add_string_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+\fBint\fR \fBnvlist_add_string_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
      \fBconst *char *\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBnvlist_add_nvlist_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR, 
+\fBint\fR \fBnvlist_add_nvlist_array\fR(\fBnvlist_t *\fR\fInvl\fR, \fBconst char *\fR\fIname\fR,
      \fBnvlist_t **\fR\fIval\fR, \fBuint_t\fR \fInelem\fR);
 .fi
 
@@ -167,56 +167,46 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvl\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fBnvlist_t\fR to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvp\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fBnvpair_t\fR (name-value pair) to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 9n
-.rt  
 Name of the name-value pair (\fBnvpair\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInelem\fR\fR
 .ad
 .RS 9n
-.rt  
 Number of elements in value (that is, array size).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIval\fR\fR
 .ad
 .RS 9n
-.rt  
 Value or starting address of the array value.
 .RE
 
@@ -254,34 +244,28 @@ The \fBnvlist_add_boolean()\fR function is deprecated and the
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 success
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 invalid argument
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 insufficient memory
 .RE
 

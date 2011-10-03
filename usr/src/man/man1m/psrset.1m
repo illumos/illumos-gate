@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH psrset 1M "25 Feb 2008" "SunOS 5.11" "System Administration Commands"
+.TH PSRSET 1M "Feb 25, 2008"
 .SH NAME
 psrset \- creation and management of processor sets
 .SH SYNOPSIS
@@ -95,12 +95,10 @@ configuration through the resource pools facility.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Assign the specified processors to the specified processor set. With the
 additional \fB-F\fR option, all LWPs bound to the specified processors will be
 unbound prior to changing processor sets.
@@ -111,12 +109,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Bind all or a subset of the \fBLWP\fRs of the specified processes to the
 specified processor set.
 .sp
@@ -134,12 +130,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Create a new processor set and displays the new processor set \fBID\fR. With
 the additional \fB-F\fR option, all LWPs bound to the specified processors will
 be unbound prior to assigning them to the processor set being created.
@@ -170,12 +164,10 @@ replaced with more appropriate strings corresponding to the locale.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove the specified processor set, releasing all processors and processes
 associated with it.
 .sp
@@ -185,12 +177,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Execute a command (with optional arguments) in the specified processor set.
 .sp
 The command process and any child processes are executed only by processors in
@@ -202,12 +192,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Disables interrupts for all processors within the specified processor set. See
 \fBpsradm\fR(1M).
 .sp
@@ -221,12 +209,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Forces the specified processor set operation by unbinding all threads bound to
 the specified processor. Only the \fB-a\fR or the \fB-r\fR option can be used
 in combination with this option. Administrators are encouraged to use the
@@ -236,12 +222,10 @@ by such operation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Display a list of processors assigned to each named processor set. If no
 argument is given, a list of all processor sets and the processors assigned to
 them is displayed. This is also the default operation if the \fBpsrset\fR
@@ -250,12 +234,10 @@ command is not given an option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Enable interrupts for all processors within the specified processor set. See
 \fBpsradm\fR(1M).
 .sp
@@ -265,12 +247,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the processor set assignments for the specified list of processors. If
 no argument is given, the processor set assignments for all processors in the
 system is given.
@@ -278,12 +258,10 @@ system is given.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the processor set bindings of the specified processes or of all
 processes. If a process is composed of multiple \fBLWP\fRs which have different
 bindings and the LWPs are not explicitly specified, the bindings of only one of
@@ -294,24 +272,20 @@ selected using "-" and "," delimiters. See EXAMPLES.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the LWPs bound to the specified list of processor sets, or all LWPs
 with processor set bindings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove a list of processors from their current processor sets. Processors that
 are removed return to the general pool of processors.
 .sp
@@ -324,12 +298,10 @@ privilege.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove the processor set bindings of a subset or all the \fBLWP\fRs of the
 specified processes, allowing them to be executed on any on-line processor if
 they are not bound to individual processors through \fBpbind\fR.
@@ -344,12 +316,10 @@ the target processes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 6n
-.rt  
 Removes the bindings of all LWPs bound to the specified list of processor sets,
 or to any processor set if no argument is specified.
 .RE
@@ -360,23 +330,19 @@ or to any processor set if no argument is specified.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify \fIpid\fR as a process \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlwpid\fR\fR
 .ad
 .RS 20n
-.rt  
 The set of LWP\fBID\fRs of the specified process to be controlled or queried.
 The syntax for selecting LWP \fBID\fRs is as follows:
 .sp
@@ -392,12 +358,10 @@ The syntax for selecting LWP \fBID\fRs is as follows:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocessor_id\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify \fIprocessor_id\fR as an individual processor number (for example,
 \fB3\fR), multiple processor numbers separated by spaces (for example, \fB1 2
 3\fR), or a range of processor numbers (for example, \fB1-4\fR). It is also
@@ -407,12 +371,10 @@ possible to combine ranges and (individual or multiple) \fIprocessor_id\fRs
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprocessor_set_id\fR\fR
 .ad
 .RS 20n
-.rt  
 Specify \fIprocessor_set_id\fR as a processor set \fBID\fR.
 .RE
 
@@ -422,23 +384,19 @@ Specify \fIprocessor_set_id\fR as a processor set \fBID\fR.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-0\fR
 .ad
 .RS 9n
-.rt  
 An error occurred.
 .RE
 
@@ -450,13 +408,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Stability LevelStable
+Stability Level	Stable
 .TE
 
 .SH SEE ALSO
@@ -575,7 +532,7 @@ The following output indicates that the pools facility is active.
 .nf
 psrset: cannot assign processor 7: Operation not supported
 psrset: cannot bind pid 31: Operation not supported
-psrset: cannot bind pid 31: Operation not supported 
+psrset: cannot bind pid 31: Operation not supported
 psrset: could not create processor set: Operation not supported
 psrset: could not remove processor set 1: Operation not supported
 psrset: cannot exec in processor set 1: Operation not supported

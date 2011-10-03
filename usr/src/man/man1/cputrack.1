@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cputrack 1 "19 Apr 2004" "SunOS 5.11" "User Commands"
+.TH CPUTRACK 1 "Apr 19, 2004"
 .SH NAME
 cputrack \- monitor process and LWP behavior using CPU performance counters
 .SH SYNOPSIS
 .LP
 .nf
-\fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... [\fB-efntvD\fR] 
+\fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... [\fB-efntvD\fR]
      [\fB-N\fR \fIcount\fR] [\fB-o\fR \fIpathname\fR] [\fB-T\fR \fIinterval\fR] \fIcommand\fR [\fIargs\fR]
 .fi
 
 .LP
 .nf
-\fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... \fB-p\fR \fIpid\fR [\fB-efntvD\fR] 
+\fBcputrack\fR \fB-c\fR \fIeventspec\fR [\fB-c\fR \fIeventspec\fR]... \fB-p\fR \fIpid\fR [\fB-efntvD\fR]
      [\fB-N\fR \fIcount\fR] [\fB-o\fR \fIpathname\fR] [\fB-T\fR \fIinterval\fR]
 .fi
 
@@ -48,12 +48,10 @@ executables cannot be tracked.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIeventspec\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies a set of events for the \fBCPU\fR performance counters to monitor.
 The syntax of these event specifications is:
 .sp
@@ -85,117 +83,97 @@ between the different event settings on each sample.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 16n
-.rt  
 Enables debug mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 16n
-.rt  
 Follows all \fBexec\fR(2), or \fBexecve\fR(2) system calls.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 16n
-.rt  
 Follows all children created by \fBfork\fR(2), \fBfork1\fR(2), or
 \fBvfork\fR(2) system calls.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 16n
-.rt  
 Prints an extended help message on how to use the utility, how to program the
 processor-dependent counters, and where to look for more detailed information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 16n
-.rt  
 Omits all header output (useful if \fBcputrack\fR is the beginning of a
 pipeline).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIcount\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the maximum number of \fBCPU\fR performance counter samples to take
 before exiting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutfile\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies file to be used for the \fBcputrack\fR output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpid\fR\fR
 .ad
 .RS 16n
-.rt  
 Interprets the argument as the process \fBID\fR of an existing process to which
 process counter context should be attached and monitored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 16n
-.rt  
 Prints an additional column of processor cycle counts, if available on the
 current architecture.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIinterval\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the interval between \fBCPU\fR performance counter samples in
 seconds. Very small intervals may cause some samples to be skipped. See
 WARNINGS.
@@ -203,12 +181,10 @@ WARNINGS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 16n
-.rt  
 Enables more verbose output.
 .RE
 
@@ -293,7 +269,7 @@ command.
 .in +2
 .nf
 example% \fBcputrack -c pic0=Cycle_cnt,pic1=Instr_cnt sleep 10\fR
-   
+
 
   time lwp      event      pic0      pic1
  1.007   1       tick    765308    219233
@@ -303,7 +279,7 @@ example% \fBcputrack -c pic0=Cycle_cnt,pic1=Instr_cnt sleep 10\fR
  8.007   1       tick         0         0
 10.007   1       tick         0         0
 10.017   1       exit    844703    228058
-  
+
 .fi
 .in -2
 .sp
@@ -322,28 +298,28 @@ where there are no ambiguities.
 .in +2
 .nf
 example% \fBcputrack -fev -c EC_ref,EC_hit /bin/ulimit -c\fR
-   
+
 
 time    pid lwp      event      pic0      pic1
-0.007 101142   1   init_lwp    805286     20023 
+0.007 101142   1   init_lwp    805286     20023
 0.023 101142   1       fork                     # 101143
-0.026 101143   1   init_lwp   1015382     24461 
-0.029 101143   1   fini_lwp   1025546     25074 
-0.029 101143   1       exec   1025546     25074 
+0.026 101143   1   init_lwp   1015382     24461
+0.029 101143   1   fini_lwp   1025546     25074
+0.029 101143   1       exec   1025546     25074
 0.000 101143   1       exec                     \e
-                                      # '/usr/bin/sh /usr/bin/basename\e 
+                                      # '/usr/bin/sh /usr/bin/basename\e
                                          /bin/ulimit'
-0.039 101143   1   init_lwp   1025546     25074 
-0.050 101143   1   fini_lwp   1140482     27806 
-0.050 101143   1       exec   1140482     27806 
+0.039 101143   1   init_lwp   1025546     25074
+0.050 101143   1   fini_lwp   1140482     27806
+0.050 101143   1       exec   1140482     27806
 0.000 101143   1       exec                     # '/usr/bin/expr \e
    //bin/ulimit : \(.*[^/]\)/*$ : .*/\(..*\) : \(.*\)$ | //bin/ulimi'
-0.059 101143   1   init_lwp   1140482     27806 
-0.075 101143   1   fini_lwp   1237647     30207 
-0.075 101143   1       exit   1237647     30207 
+0.059 101143   1   init_lwp   1140482     27806
+0.075 101143   1   fini_lwp   1237647     30207
+0.075 101143   1       exit   1237647     30207
 unlimited
-0.081 101142   1   fini_lwp    953383     23814 
-0.081 101142   1       exit    953383     23814 
+0.081 101142   1   fini_lwp    953383     23814
+0.081 101142   1       exit    953383     23814
 .fi
 .in -2
 .sp
@@ -360,7 +336,7 @@ in the kernel to print the date on a Pentium III machine:
 .in +2
 .nf
 example% \fBcputrack -c inst_retired,inst_retired,nouser1,sys1 date\fR
-   
+
 
    time lwp      event      pic0      pic1
 Fri Aug 20 20:03:08 PDT 1999
@@ -380,7 +356,7 @@ on a Pentium 4 machine:
 .in +2
 .nf
 example% \fBcputrack -c ITLB_reference,emask=1 date\fR
-   
+
 
     time lwp      event      pic0
       Fri Aug 20 20:03:08 PDT 1999
@@ -425,12 +401,11 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

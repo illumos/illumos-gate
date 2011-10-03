@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsdb_udfs 1M "11 Jun 1999" "SunOS 5.11" "System Administration Commands"
+.TH FSDB_UDFS 1M "Jun 11, 1999"
 .SH NAME
 fsdb_udfs \- udfs file system debugger
 .SH SYNOPSIS
@@ -44,55 +44,45 @@ Wherever possible, \fBadb\fR-like syntax has been adopted to promote the use of
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_option\fR\fR
 .ad
 .RS 22n
-.rt  
 Specify \fBudfs\fR file system specific options in a comma-separated list with
 no intervening spaces. The following specific options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBo\fR
 .ad
 .RS 12n
-.rt  
 Override some error conditions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBp=\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Set prompt to \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBw\fR
 .ad
 .RS 12n
-.rt  
 Open for write.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB?\fR
 .ad
 .RS 12n
-.rt  
 Display usage.
 .RE
 
@@ -155,7 +145,7 @@ example,
 .sp
 .in +2
 .nf
- > 2:inode 
+ > 2:inode
 .fi
 .in -2
 .sp
@@ -173,7 +163,7 @@ So, if
 .sp
 .in +2
 .nf
-> 2000,400/X 
+> 2000,400/X
 .fi
 .in -2
 .sp
@@ -189,7 +179,7 @@ and the use of RETURN would be:
 .sp
 .in +2
 .nf
-> 2:ino; 0:dir?d 
+> 2:ino; 0:dir?d
 .fi
 .in -2
 .sp
@@ -200,7 +190,7 @@ or
 .sp
 .in +2
 .nf
-> 2:ino; 0:db:block?d 
+> 2:ino; 0:db:block?d
 .fi
 .in -2
 .sp
@@ -238,24 +228,20 @@ is again synonymous.
 The following symbols are recognized by \fBfsdb\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBRETURN\fR
 .ad
 .RS 13n
-.rt  
 Update the value of dot by the current value of \fItype\fR and \fIdisplay\fR
 using the current value of \fIcount\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fI#\fR\fR
 .ad
 .RS 13n
-.rt  
 Update the value of dot by specifying a numeric expression. Specify numeric
 expressions using addition, subtraction, mulitiplication, and division
 operators ( \fB+\fR, \fB-\fR, \fB*\fR, and \fB%\fR). Numeric expressions are
@@ -265,12 +251,10 @@ value of dot is updated.
 
 .sp
 .ne 2
-.mk
 .na
 \fB, \fIcount\fR\fR
 .ad
 .RS 13n
-.rt  
 Update the count indicator. The global value of \fIcount\fR is updated to
 \fIcount\fR. The value of \fIcount\fR remains until a new command is run. A
 \fIcount\fR specifier of \fB*\fR attempts to show a blocks's worth of
@@ -279,47 +263,39 @@ information. The default for \fIcount\fR is \fB1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB? \fI f\fR\fR
 .ad
 .RS 13n
-.rt  
 Display in structured style with format specifier \fBf\fR. See \fBFormatted
 Output\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB/ \fIf\fR\fR
 .ad
 .RS 13n
-.rt  
 Display in unstructured style with format specifier \fBf\fR. See \fBFormatted
 Output\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.\fR
 .ad
 .RS 13n
-.rt  
 Display the value of dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB+\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 Increment the value of dot by the expression \fIe\fR. The amount actually
 incremented is dependent on the size of type: \fBdot = dot + \fR\fIe \fR\fB*
 \fR\fBsizeof\fR (\fItype\fR) The default for \fIe\fR is \fB1\fR.
@@ -327,23 +303,19 @@ incremented is dependent on the size of type: \fBdot = dot + \fR\fIe \fR\fB*
 
 .sp
 .ne 2
-.mk
 .na
 \fB\(mi\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 Decrement the value of dot by the expression \fIe \fR. See \fB+\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB*\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 Multiply the value of dot by the expression \fIe\fR. Multiplication and
 division don't use \fItype\fR. In the above calculation of dot, consider the
 \fBsizeof\fR (\fItype\fR) to be \fB1\fR.
@@ -351,47 +323,39 @@ division don't use \fItype\fR. In the above calculation of dot, consider the
 
 .sp
 .ne 2
-.mk
 .na
 \fB%\fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 Divide the value of dot by the expression \fIe\fR. See \fB*\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB< \fIname\fR\fR
 .ad
 .RS 13n
-.rt  
 Restore an address saved in register \fIname\fR. \fIname\fR must be a single
 letter or digit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB> \fIname\fR\fR
 .ad
 .RS 13n
-.rt  
 Save an address in register \fIname\fR. \fIname\fR must be a single letter or
 digit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB= \fIf\fR\fR
 .ad
 .RS 13n
-.rt  
 Display indicator. If \fIf\fR is a legitimate format specifier (see
 \fBFormatted Output\fR), then the value of dot is displayed using format
 specifier \fIf\fR. Otherwise, assignment is assumed. See \fB= [s] [e]\fR.
@@ -399,12 +363,10 @@ specifier \fIf\fR. Otherwise, assignment is assumed. See \fB= [s] [e]\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB= [\fIs\fR] [\fIe\fR]\fR
 .ad
 .RS 13n
-.rt  
 Change the value of dot using an assignment indicator. The address pointed to
 by dot has its contents changed to the value of the expression \fIe\fR or to
 the \fBASCII\fR representation of the quoted (\fB"\fR) string \fIs\fR. This can
@@ -413,24 +375,20 @@ be useful for changing directory names or \fBASCII\fR file information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB=+ \fIe\fR\fR
 .ad
 .RS 13n
-.rt  
 Change the value of dot using an incremental assignment. The address pointed to
 by dot has its contents incremented by expression \fIe\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB=- e\fR
 .ad
 .RS 13n
-.rt  
 Change the value of dot using a decremental assignment. Decrement the contents
 of the address pointed to by dot by expression \fIe\fR.
 .RE
@@ -454,7 +412,6 @@ also supported.
 The following commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBbase[=\fIb\fR]\fR
 .ad
@@ -469,7 +426,6 @@ the base. The default for base is hexadecimal.
 
 .sp
 .ne 2
-.mk
 .na
 \fBblock\fR
 .ad
@@ -480,7 +436,6 @@ Convert the value of dot to a block address.
 
 .sp
 .ne 2
-.mk
 .na
 \fBcd [\fIdir\fR]\fR
 .ad
@@ -493,7 +448,6 @@ directories to inode 2, root (\fB/\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fBdirectory\fR
 .ad
@@ -505,7 +459,6 @@ slot offset in that directory, and dot now points to this entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfile\fR
 .ad
@@ -517,7 +470,6 @@ The value of dot is updated to the first byte of  this block.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfind \fIdir\fR [\fB-name\fR \fIn\fR] | [\fB-inum\fR\fI i\fR]\fR
 .ad
@@ -531,7 +483,6 @@ be used at one time. The find \fB-print\fR is not necessary or accepted.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfill=\fIp\fR\fR
 .ad
@@ -543,7 +494,6 @@ and count.
 
 .sp
 .ne 2
-.mk
 .na
 \fBinode\fR
 .ad
@@ -557,7 +507,6 @@ the current inode and that inode is displayed in inode format.
 
 .sp
 .ne 2
-.mk
 .na
 \fBls [ \fB-R\fR ] [\fB-l\fR ] \fIpat1\fR \fIpat2\fR...\fR
 .ad
@@ -572,7 +521,6 @@ and the name; use the inode command with \fB?i\fR to get more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fBoverride\fR
 .ad
@@ -584,7 +532,6 @@ override is toggled to \fBon\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBprompt "\fIp\fR"\fR
 .ad
@@ -595,7 +542,6 @@ Change the \fBfsdb\fR prompt to \fIp\fR. \fIp\fR must be enclosed in quotes.
 
 .sp
 .ne 2
-.mk
 .na
 \fBpwd\fR
 .ad
@@ -606,7 +552,6 @@ Display the current working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fBquit\fR
 .ad
@@ -617,7 +562,6 @@ Quit \fBfsdb\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBtag\fR
 .ad
@@ -629,7 +573,6 @@ according to the tag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB!\fR
 .ad
@@ -664,111 +607,91 @@ address of the link count field.
 The following inode commands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBat\fR
 .ad
 .RS 8n
-.rt  
 Access time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbs\fR
 .ad
 .RS 8n
-.rt  
 Block size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBct\fR
 .ad
 .RS 8n
-.rt  
 Creation time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgid\fR
 .ad
 .RS 8n
-.rt  
 Group id
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBln\fR
 .ad
 .RS 8n
-.rt  
 Link number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmt\fR
 .ad
 .RS 8n
-.rt  
 Modification time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmd\fR
 .ad
 .RS 8n
-.rt  
 Mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmaj\fR
 .ad
 .RS 8n
-.rt  
 Major device number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmin\fR
 .ad
 .RS 8n
-.rt  
 Minor device number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnm\fR
 .ad
 .RS 8n
-.rt  
 This command actually operates on the directory name field. Once      poised at
 the desired directory entry (using the \fBdirectory\fR command), this command
 allows you to change or display the directory name. For example,
@@ -788,34 +711,28 @@ string is truncated to fit and a warning message is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBsz\fR
 .ad
 .RS 8n
-.rt  
 File size
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuid\fR
 .ad
 .RS 8n
-.rt  
 User \fBID\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuniq\fR
 .ad
 .RS 8n
-.rt  
 Unique \fBID\fR
 .RE
 
@@ -835,23 +752,19 @@ Format specifiers are preceded by the slash (\fB/\fR) or question mark
 The following format specifiers are preceded by the \fB?\fR character:
 .sp
 .ne 2
-.mk
 .na
 \fBi\fR
 .ad
 .RS 5n
-.rt  
 Display as inodes in the current base.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 5n
-.rt  
 Display as directories in the current base.
 .RE
 
@@ -860,56 +773,46 @@ Display as directories in the current base.
 The following format specifiers are preceded by the \fB/\fR character:
 .sp
 .ne 2
-.mk
 .na
 \fBb\fR
 .ad
 .RS 9n
-.rt  
 Display as bytes in the current base.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBc\fR
 .ad
 .RS 9n
-.rt  
 Display as characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBo | O\fR
 .ad
 .RS 9n
-.rt  
 Display as octal shorts or longs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd | D\fR
 .ad
 .RS 9n
-.rt  
 Display as decimal shorts or longs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBx | X\fR
 .ad
 .RS 9n
-.rt  
 Display as hexadecimal shorts or longs.
 .RE
 
@@ -939,7 +842,7 @@ becomes the current inode.
 .sp
 .in +2
 .nf
-> 386:ino?i 
+> 386:ino?i
 .fi
 .in -2
 .sp
@@ -1072,7 +975,7 @@ The following command changes the \fIname\fR field in the directory slot to
 .sp
 .in +2
 .nf
- > 7:dir:nm="name" 
+ > 7:dir:nm="name"
 .fi
 .in -2
 .sp
@@ -1095,7 +998,7 @@ type.
 .sp
 .in +2
 .nf
-> 2050=0xffff 
+> 2050=0xffff
 .fi
 .in -2
 .sp

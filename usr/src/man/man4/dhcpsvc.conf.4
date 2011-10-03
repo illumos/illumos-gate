@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcpsvc.conf 4 "26 Jun 2003" "SunOS 5.11" "File Formats"
+.TH DHCPSVC.CONF 4 "Jun 26, 2003"
 .SH NAME
 dhcpsvc.conf \- file containing service configuration parameters for the DHCP
 service
@@ -38,12 +38,10 @@ equals (\fB=\fR) sign followed by the parameter value, of the form:
 The following \fIKeyword\fR and \fIValue\fR parameters are supported:
 .sp
 .ne 2
-.mk
 .na
 \fBBOOTP_COMPAT\fR
 .ad
 .RS 28n
-.rt  
 String. \fBautomatic\fR or \fBmanual\fR. Enables support of \fBBOOTP\fR
 clients. Default is no \fBBOOTP\fR. Value selects \fBBOOTP\fR address
 allocation method. \fBautomatic\fR to support all BOOTP clients, \fBmanual\fR
@@ -53,24 +51,20 @@ parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCACHE_TIMEOUT\fR
 .ad
 .RS 28n
-.rt  
 Integer. Number of seconds the server caches data from data store. Used to
 improve performance. Default is 10 seconds. \fBserver\fR mode only parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCONVER\fR
 .ad
 .RS 28n
-.rt  
 Integer. Container version. Used by DHCP administrative tools to identify which
 version of the public module is being used to administer the data store.
 \fBCONVER\fR should \fBnot\fR be changed manually.
@@ -78,12 +72,10 @@ version of the public module is being used to administer the data store.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDAEMON_ENABLED\fR
 .ad
 .RS 28n
-.rt  
 \fBTRUE\fR/\fBFALSE\fR. If \fBTRUE\fR, the DHCP daemon can be run. If
 \fBFALSE\fR, DHCP daemon process exits immediately if the daemon is started.
 Default is \fBTRUE\fR. Generic parameter.
@@ -91,12 +83,10 @@ Default is \fBTRUE\fR. Generic parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fBHOSTS_DOMAIN\fR
 .ad
 .RS 28n
-.rt  
 String. Defines name service domain that DHCP administration tools use when
 managing the hosts table. Valid only when \fBHOSTS_RESOURCE\fR is set to
 \fBnisplus\fR or \fBdns\fR.
@@ -104,12 +94,10 @@ managing the hosts table. Valid only when \fBHOSTS_RESOURCE\fR is set to
 
 .sp
 .ne 2
-.mk
 .na
 \fBHOSTS_RESOURCE\fR
 .ad
 .RS 28n
-.rt  
 String. Defines what name service resource should be used by the DHCP
 administration tools when managing the hosts table. Current valid values are
 \fBfiles\fR, \fBnisplus\fR, and \fBdns\fR.
@@ -117,60 +105,50 @@ administration tools when managing the hosts table. Current valid values are
 
 .sp
 .ne 2
-.mk
 .na
 \fBICMP_VERIFY\fR
 .ad
 .RS 28n
-.rt  
 \fBTRUE\fR/\fBFALSE\fR. Toggles \fBICMP\fR echo verification of IP addresses.
 Default is \fBTRUE\fR. \fBserver\fR mode only parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBINTERFACES\fR
 .ad
 .RS 28n
-.rt  
 String. Comma-separated list of interface names to listen to. Generic
 parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBLOGGING_FACILITY\fR
 .ad
 .RS 28n
-.rt  
 Integer. Local facility number (\fB0\fR-\fB7\fR inclusive) to log \fBDHCP\fR
 events to. Default is not to log transactions. Generic parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOFFER_CACHE_TIMEOUT\fR
 .ad
 .RS 28n
-.rt  
 Integer. Number of seconds before \fBOFFER\fR cache timeouts occur. Default is
 \fB10\fR seconds. \fBserver\fR mode only parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBOWNER_IP\fR
 .ad
 .RS 28n
-.rt  
 String. List of supplemental ownership addresses  that will be used by the DHCP
 server in determining the \fBdhcp_network\fR records that are under its
 management. Addresses are in the dotted Internet form of an IPv4 address.
@@ -182,72 +160,60 @@ be advisable.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPATH\fR
 .ad
 .RS 28n
-.rt  
 Path to DHCP data tables within the data store specified by the RESOURCE
 parameter. The value of the \fBPATH\fR keyword is specific to the RESOURCE.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRELAY_DESTINATIONS\fR
 .ad
 .RS 28n
-.rt  
 String. Comma-separated list of host names and/or \fBIP\fR addresses of relay
 destinations. \fBrelay\fR mode only parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRELAY_HOPS \fR
 .ad
 .RS 28n
-.rt  
 Integer. Max number of \fBBOOTP\fR relay hops before packet is dropped. Default
 is \fB4\fR. Generic parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRESCAN_INTERVAL\fR
 .ad
 .RS 28n
-.rt  
 Integer. Number of minutes between automatic \fBdhcptab\fR rescans. Default is
 not to do rescans. \fBserver\fR mode only parameter.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRESOURCE\fR
 .ad
 .RS 28n
-.rt  
 Data store resource used. Use this parameter to name the public module. See the
 \fBPATH\fR keyword in \fBdhcp_modules\fR(5).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBRESOURCE_CONFIG\fR
 .ad
 .RS 28n
-.rt  
 String. The private layer provides for module-specific configuration
 information through the use of the \fBRESOURCE_CONFIG\fR keyword. See
 \fBdhcp_modules\fR(5).
@@ -257,7 +223,7 @@ specifying an optional service provider layer API function:
 .sp
 .in +2
 .nf
-int configure(const char *configp); 
+int configure(const char *configp);
 .fi
 .in -2
 
@@ -271,23 +237,19 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRUN_MODE\fR
 .ad
 .RS 28n
-.rt  
 \fBserver\fR or \fBrelay\fR. Selects daemon run mode. Default is \fBserver\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSECONDARY_SERVER_TIMEOUT\fR
 .ad
 .RS 28n
-.rt  
 Integer. The number of seconds a secondary server waits for a primary server to
 respond before responding itself. Default is \fB20\fR seconds. This is a server
 mode only parameter.
@@ -295,12 +257,10 @@ mode only parameter.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUPDATE_TIMEOUT\fR
 .ad
 .RS 28n
-.rt  
 Integer. Number of seconds to wait for a response from the DNS server before
 timing out. If this parameter is present, the DHCP daemon updates DNS on behalf
 of DHCP clients, and waits the number of seconds specified for a response
@@ -311,12 +271,10 @@ is not present, the DHCP daemon does not update DNS for DHCP clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fBVERBOSE\fR
 .ad
 .RS 28n
-.rt  
 \fBTRUE\fR/\fBFALSE\fR. Toggles verbose mode, determining amount of status and
 error messages reported by the daemon. Default is \fBFALSE\fR. Set to
 \fBTRUE\fR only for debugging. Generic parameter.

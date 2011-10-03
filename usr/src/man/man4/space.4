@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH space 4 "7 Feb 1997" "SunOS 5.11" "File Formats"
+.TH SPACE 4 "Feb 7, 1997"
 .SH NAME
 space \- disk space requirement file
 .SH DESCRIPTION
@@ -26,12 +26,10 @@ The generic format of a line in this file is:
 Definitions for the fields are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify a directory name which may or may not be the mount  point for a
 filesystem. Names that do not begin with a slash  ('\fB/\fR') indicate
 relocatable directories.
@@ -39,24 +37,20 @@ relocatable directories.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIblocks\fR\fR
 .ad
 .RS 12n
-.rt  
 Define the number of disk blocks required for installation of the files and
 directory entries contained in the pathname (using a 512-byte block size).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinodes\fR\fR
 .ad
 .RS 12n
-.rt  
 Define the number of inodes required for installation of the files and
 directory entries contained in the pathname.
 .RE

@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setsockopt 3XNET "21 Jan 2007" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH SETSOCKOPT 3XNET "Jan 21, 2007"
 .SH NAME
 setsockopt \- set the socket options
 .SH SYNOPSIS
@@ -47,12 +47,10 @@ to the appropriate protocol module for interpretations. The
 as follow
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_DEBUG\fR\fR
 .ad
 .RS 17n
-.rt  
 Turns on recording of debugging information.  This option enables or disables
 debugging in the underlying protocol modules.  This option takes an \fBint\fR
 value. This is a boolean option.
@@ -60,24 +58,20 @@ value. This is a boolean option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_BROADCAST\fR\fR
 .ad
 .RS 17n
-.rt  
 Permits sending of broadcast messages, if this is supported by the protocol.
 This option takes an \fBint\fR value. This is a boolean option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_REUSEADDR\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies that the rules used in validating addresses supplied to
 \fBbind\fR(3XNET) should allow reuse of local addresses, if this is supported
 by the protocol. This option takes an \fBint\fR value. This is a boolean
@@ -86,12 +80,10 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_KEEPALIVE\fR\fR
 .ad
 .RS 17n
-.rt  
 Keeps connections active by enabling the periodic transmission of messages, if
 this is supported by the protocol.  This option takes an \fBint\fR value.
 .sp
@@ -104,12 +96,10 @@ This is a boolean option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_LINGER\fR\fR
 .ad
 .RS 17n
-.rt  
 Lingers on a \fBclose\fR(2) if data is present.  This option controls the
 action taken when unsent messages queue on a socket and \fBclose\fR(2) is
 performed.  If \fBSO_LINGER\fR is set, the system blocks the process during
@@ -123,46 +113,38 @@ interval.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_OOBINLINE\fR\fR
 .ad
 .RS 17n
-.rt  
 Leaves received out-of-band data (data marked urgent) in line. This option
 takes an \fBint\fR value. This is a boolean option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_SNDBUF\fR\fR
 .ad
 .RS 17n
-.rt  
 Sets send buffer size.  This option takes an \fBint\fR value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_RCVBUF\fR\fR
 .ad
 .RS 17n
-.rt  
 Sets receive buffer size. This option takes an \fBint\fR value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_DONTROUTE\fR\fR
 .ad
 .RS 17n
-.rt  
 Requests that outgoing messages bypass the standard routing facilities. The
 destination must be on a directly-connected network, and messages are directed
 to the appropriate network interface according to the destination address. The
@@ -172,12 +154,10 @@ takes an \fBint\fR value. This is a boolean option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_MAC_EXEMPT\fR\fR
 .ad
 .RS 17n
-.rt  
 Sets the mandatory access control on the socket. A socket that has this option
 enabled can communicate with an unlabeled peer if the socket is in the global
 zone or has a label that dominates the default label of the peer. Otherwise,
@@ -188,12 +168,10 @@ when the system is configured with Trusted Extensions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSO_ALLZONES\fR\fR
 .ad
 .RS 17n
-.rt  
 Bypasses zone boundaries (privileged). This option stores an \fBint\fR value.
 This is a boolean option.
 .sp
@@ -245,81 +223,67 @@ Upon successful completion, \fBsetsockopt()\fR returns \fB0\fR. Otherwise,
 The \fBsetsockopt()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIsocket\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDOM\fR\fR
 .ad
 .RS 15n
-.rt  
 The send and receive timeout values are too big to fit into the timeout fields
 in the socket structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIoption_value\fR parameter can not be accessed or written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 15n
-.rt  
 The specified option is invalid at the specified socket level or the socket has
 been shut down.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISCONN\fR\fR
 .ad
 .RS 15n
-.rt  
 The socket is already connected, and a  specified option can not be set while
 the socket is connected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOPROTOOPT\fR\fR
 .ad
 .RS 15n
-.rt  
 The option is not supported by the protocol.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fIsocket\fR argument does not refer to a socket.
 .RE
 
@@ -328,34 +292,28 @@ The \fIsocket\fR argument does not refer to a socket.
 The \fBsetsockopt()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 There was insufficient memory available for the operation to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 Insufficient resources are available in the system to complete the call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 11n
-.rt  
 There were insufficient STREAMS resources available for the operation to
 complete.
 .RE
@@ -368,15 +326,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

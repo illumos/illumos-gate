@@ -1,13 +1,13 @@
 '\" te
-.\"  Copyright 1994, The X/Open Company Ltd., All Rights Reserved. Portions Copyright 1989 AT&T. Portions Copyright (c) 1998, Sun Microsystems, Inc. , All Rights Reserved 
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\"  Copyright 1994, The X/Open Company Ltd., All Rights Reserved. Portions Copyright 1989 AT&T. Portions Copyright (c) 1998, Sun Microsystems, Inc. , All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH t_alloc 3NSL "7 May 1998" "SunOS 5.11" "Networking Services Library Functions"
+.TH T_ALLOC 3NSL "May 7, 1998"
 .SH NAME
 t_alloc \- allocate a library structure
 .SH SYNOPSIS
@@ -71,48 +71,40 @@ buffers to allocate, where the argument is the bitwise-or of any of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_ADDR\fR \fR
 .ad
 .RS 12n
-.rt  
 The \fIaddr\fR field of the \fBt_bind\fR, \fBt_call\fR, \fBt_unitdata\fR or
 \fBt_uderr\fR structures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_OPT\fR \fR
 .ad
 .RS 12n
-.rt  
 The \fIopt\fR field of the \fBt_optmgmt\fR, \fBt_call\fR, \fBt_unitdata\fR or
 \fBt_uderr\fR structures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_UDATA\fR \fR
 .ad
 .RS 12n
-.rt  
 The \fIudata\fR field of the \fBt_call\fR, \fBt_discon\fR or \fBt_unitdata\fR
 structures.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT_ALL\fR \fR
 .ad
 .RS 12n
-.rt  
 All relevant fields of the given structure. Fields which are not supported by
 the transport provider specified by \fIfd\fR will not be allocated.
 .RE
@@ -162,24 +154,20 @@ ALL - apart from \fBT_UNINIT\fR
 On failure, \fBt_errno\fR is set to one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 \fBstruct_type\fR is other than  \fBT_INFO\fR and the specified file descriptor
 does not refer to a transport endpoint.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNOSTRUCTYPE\fR\fR
 .ad
 .RS 16n
-.rt  
 Unsupported \fIstruct_type\fR requested. This can include a request for a
 structure type which is inconsistent with the transport provider type
 specified, that is, connection-mode or connectionless-mode.
@@ -187,12 +175,10 @@ specified, that is, connection-mode or connectionless-mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTPROTO\fR\fR
 .ad
 .RS 16n
-.rt  
 This error indicates that a communication problem has been detected between XTI
 and the transport provider for which there is no other suitable XTI error
 \fB(t_errno)\fR.
@@ -200,12 +186,10 @@ and the transport provider for which there is no other suitable XTI error
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTSYSERR\fR\fR
 .ad
 .RS 16n
-.rt  
 A system error has occurred during execution of this function.
 .RE
 
@@ -230,23 +214,19 @@ The \fBt_errno\fR values that can be set by the \fBXTI\fR interface and cannot
 be set by the \fBTLI\fR interface are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTPROTO\fR \fR
 .ad
 .RS 17n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNOSTRUCTYPE\fR \fR
 .ad
 .RS 17n
-.rt  
 
 .RE
 
@@ -284,13 +264,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

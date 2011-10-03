@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cachefsstat 1M "9 Oct 2003" "SunOS 5.11" "System Administration Commands"
+.TH CACHEFSSTAT 1M "Oct 9, 2003"
 .SH NAME
 cachefsstat \- Cache File System statistics
 .SH SYNOPSIS
@@ -31,7 +31,7 @@ The statistical information has the following format:
 .nf
 <\fIcache hit rate\fR>
 <\fIconsistency checks\fR>
-<\fImodifies\fR> 
+<\fImodifies\fR>
 .fi
 .in -2
 .sp
@@ -41,36 +41,30 @@ The statistical information has the following format:
 where:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhit rate\fR\fR
 .ad
 .RS 22n
-.rt  
 The percentage of cache hits over the total number of attempts, followed by the
 actual numbers of hits and misses.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconsistency checks\fR\fR
 .ad
 .RS 22n
-.rt  
 The number of consistency checks performed, followed by the number that passed,
 and the number that failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodifies\fR\fR
 .ad
 .RS 22n
-.rt  
 The number of modify operations, including writes, creates, etc.
 .RE
 
@@ -80,12 +74,10 @@ The number of modify operations, including writes, creates, etc.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 6n
-.rt  
 Zero (reinitialize) statistics. Execute \fBcachefsstat\fR \fB-z\fR before
 executing \fBcachefsstat\fR again to gather statistics on the cache
 performance. This option can only be use by the superuser. The statistics
@@ -124,23 +116,19 @@ garbage collection:           0
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 

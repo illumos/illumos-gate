@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH inet6 7P "3 Oct 2002" "SunOS 5.11" "Protocols"
+.TH INET6 7P "Oct 3, 2002"
 .SH NAME
 inet6 \- Internet protocol family for Internet Protocol version 6
 .SH SYNOPSIS
@@ -102,7 +102,7 @@ The next 24 bits are the Next-Level Aggregation (\fBNLA\fR) identifier.
 .TP
 .ie t \(bu
 .el o
-The next 16 bits are the Site-Level Aggregation (\fBSLA\fR) 	identifier.
+The next 16 bits are the Site-Level Aggregation (\fBSLA\fR) identifier.
 .RE
 .RS +4
 .TP
@@ -176,7 +176,7 @@ in_port_t        sin6_port;
 uint32_t         sin6_flowinfo;
 struct in6_addr  sin6_addr;
 uint32_t         sin6_scope_id;
-uint32_t         __sin6_src_id; 
+uint32_t         __sin6_src_id;
 .fi
 .in -2
 
@@ -266,23 +266,19 @@ As the selection rules indicate, the candidate addresses are SA and SB and the
 destination is D.
 .sp
 .ne 2
-.mk
 .na
 \fBPrefer the same address\fR
 .ad
 .RS 30n
-.rt  
 If SA == D, prefer SA.  If SB == D, prefer SB.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrefer appropriate scope\fR
 .ad
 .RS 30n
-.rt  
 Here, Scope(X) is the scope of X according to the IPv6 Addressing Architecture.
 .sp
 If Scope(SA) < Scope(SB): If Scope(SA) < Scope(D), then prefer SB and otherwise
@@ -294,48 +290,40 @@ prefer SB.
 
 .sp
 .ne 2
-.mk
 .na
 \fBAvoid deprecated addresses\fR
 .ad
 .RS 30n
-.rt  
 If one of the addresses is deprecated (IFF_DEPRECATED) and the other is not,
 prefer the one that isn't deprecated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrefer preferred addresses\fR
 .ad
 .RS 30n
-.rt  
 If one of the addresses is preferred (IFF_PREFERRED) and the other is not,
 prefer the one that is preferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrefer outgoing interface\fR
 .ad
 .RS 30n
-.rt  
 If one of the addresses is assigned to the interface that will be used to send
 packets to D and the other is not, then prefer the former.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrefer matching label\fR
 .ad
 .RS 30n
-.rt  
 This rule uses labels which are obtained through the IPv6 default address
 selection policy table. See \fBipaddrsel\fR(1M) for a description of the
 default contents of the table and how the table is configured.
@@ -347,12 +335,10 @@ If Label(SB) == Label(D) and Label(SA) != Label(D), then prefer SB.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrefer public addresses\fR
 .ad
 .RS 30n
-.rt  
 This rule prefers public addresses over temporary addresses, as defined in
 \fIRFC 3041\fR. Temporary addresses are disabled by default and may be enabled
 by appropriate settings in \fBndpd.conf\fR(4).
@@ -366,7 +352,6 @@ more information about IPv6 socket options.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUse longest matching prefix.\fR
 .ad

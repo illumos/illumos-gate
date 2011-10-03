@@ -1,16 +1,16 @@
 '\" te
 .\"  Copyright 1989 AT&T
-.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved 
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rlogin 1 "23 Dec 2008" "SunOS 5.11" "User Commands"
+.TH RLOGIN 1 "Dec 23, 2008"
 .SH NAME
 rlogin \- remote login
 .SH SYNOPSIS
 .LP
 .nf
-\fBrlogin\fR [\fB-8EL\fR] [\fB-e\fIc\fR\fR ] [\fB-A\fR] [\fB-K\fR] [\fB-x\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR] 
+\fBrlogin\fR [\fB-8EL\fR] [\fB-e\fIc\fR\fR ] [\fB-A\fR] [\fB-K\fR] [\fB-x\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR]
      [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIhostname\fR
 .fi
 
@@ -60,35 +60,29 @@ handled properly.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-8\fR\fR
 .ad
 .RS 15n
-.rt  
 Passes eight-bit data across the net instead of seven-bit data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Forces the remote machine to ask for a password by sending a null local
 username.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 15n
-.rt  
 Explicitly enables Kerberos authentication and trusts the \fB\&.k5login\fR file
 for access-control. If the authorization check by \fBin.rlogind\fR(1M) on the
 server-side succeeds and if the \fB\&.k5login\fR file permits access, the user
@@ -97,35 +91,29 @@ is allowed to login without supplying a password.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fIc\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a different escape character, \fIc\fR, for the line used to
 disconnect from the remote host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-E\fR\fR
 .ad
 .RS 15n
-.rt  
 Stops any character from being recognized as an escape character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Forwards a copy of the local credentials (Kerberos Ticket Granting Ticket) to
 the remote system. This is a non-forwardable ticket granting ticket. You must
 forward a ticket granting ticket if you need to authenticate yourself to other
@@ -137,12 +125,10 @@ directory. This option is mutually exclusive with the \fB-F\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 15n
-.rt  
 Forwards a forwardable copy of the local credentials (Kerberos Ticket Granting
 Ticket) to the remote system. The \fB-F\fR option provides a superset of the
 functionality offered by the \fB-f\fR option. For example, with the \fB-f\fR
@@ -155,54 +141,45 @@ This option is mutually exclusive with the \fB-f\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIrealm\fR\fR
 .ad
 .RS 15n
-.rt  
 Causes \fBrlogin\fR to obtain tickets for the remote host in \fIrealm\fR
 instead of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
 .RS 15n
-.rt  
 This option explicitly disables Kerberos authentication. It can be used to
 override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIusername\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a different \fIusername\fR for the remote login. If you do not use
 this option, the remote username used is the same as your local username.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 15n
-.rt  
 Allows the rlogin session to be run in "\fBlitout\fR" mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-PN\fR\fR
 .ad
@@ -211,7 +188,6 @@ Allows the rlogin session to be run in "\fBlitout\fR" mode.
 \fB\fB-PO\fR\fR
 .ad
 .RS 15n
-.rt  
 Explicitly requests the new (\fB-PN\fR) or old (\fB-PO\fR) version of the
 Kerberos `\fBrcmd\fR' protocol. The new protocol avoids many security problems
 prevalant in the old one and is considered much more secure, but is not
@@ -225,12 +201,10 @@ protocol is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 Turns on \fBDES\fR encryption for all data passed through the rlogin session.
 This reduces response time and increases \fBCPU\fR utilization.
 .RE
@@ -242,36 +216,30 @@ Lines that you type which start with the tilde character (\fB~\fR) are "escape
 sequences." The escape character can be changed using the \fB-e\fR option.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~.\fR\fR
 .ad
 .RS 10n
-.rt  
 Disconnects from the remote host. This is not the same as a logout, because the
 local host breaks the connection with no warning to the remote end.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~susp\fR\fR
 .ad
 .RS 10n
-.rt  
 Suspends the login session, but only if you are using a shell with Job Control.
 \fBsusp\fR is your "suspend" character, usually Control-Z. See \fBtty\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~dsusp\fR\fR
 .ad
 .RS 10n
-.rt  
 Suspends the input half of the login, but output is still able to be seen (only
 if you are using a shell with Job Control). \fBdsusp\fR is your "deferred
 suspend" character, usually Control-Y. See \fBtty\fR(1).
@@ -280,12 +248,10 @@ suspend" character, usually Control-Y. See \fBtty\fR(1).
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostname\fR\fR
 .ad
 .RS 12n
-.rt  
 The remote machine on which \fIrlogin\fR establishes the remote login session.
 .RE
 
@@ -329,89 +295,73 @@ remote user or by root.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 23n
-.rt  
 Contains information about users' accounts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/hosts/*\fR\fR
 .ad
 .RS 23n
-.rt  
 For \fIhostname\fR version of the command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts.equiv\fR\fR
 .ad
 .RS 23n
-.rt  
 List of trusted hostnames with shared user names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nologin\fR\fR
 .ad
 .RS 23n
-.rt  
 Message displayed to users attempting to login during machine shutdown.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.rhosts\fR\fR
 .ad
 .RS 23n
-.rt  
 Private list of trusted hostname/username combinations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.k5login\fR\fR
 .ad
 .RS 23n
-.rt  
 File containing Kerberos principals that are allowed access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/krb5.conf\fR\fR
 .ad
 .RS 23n
-.rt  
 Kerberos configuration file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 23n
-.rt  
 Hosts database.
 .RE
 

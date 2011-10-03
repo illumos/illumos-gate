@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH crypt_gensalt_impl 3C "10 Jun 2002" "SunOS 5.11" "Standard C Library Functions"
+.TH CRYPT_GENSALT_IMPL 3C "Jun 10, 2002"
 .SH NAME
 crypt_gensalt_impl \- generate salt for password encryption
 .SH SYNOPSIS
@@ -54,34 +54,28 @@ indicate the error.
 The \fBcrypt_gensalt_impl()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The configuration file \fBcrypt.conf\fR contains an invalid entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELIBACC\fR\fR
 .ad
 .RS 11n
-.rt  
 The required crypt shared library was not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 There is insufficient memory to perform hashing.
 .RE
 
@@ -93,15 +87,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

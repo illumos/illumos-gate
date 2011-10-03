@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH stmfadm 1M "30 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH STMFADM 1M "Jul 30, 2009"
 .SH NAME
 stmfadm \- SCSI target mode framework command line interface
 .SH SYNOPSIS
@@ -138,7 +138,6 @@ Framework (STMF) framework. The framework and this man page use the following
 terminology:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitiator\fR\fR
 .ad
@@ -150,7 +149,6 @@ unit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtarget\fR\fR
 .ad
@@ -161,7 +159,6 @@ A device responsible for receiving SCSI I/O commands for a logical unit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogical unit\fR\fR
 .ad
@@ -172,7 +169,6 @@ A device within a target responsible for executing SCSI I/O commands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogical unit number\fR\fR
 .ad
@@ -183,7 +179,6 @@ The identifier of a logical unit within a target.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitiator group\fR\fR
 .ad
@@ -196,7 +191,6 @@ member of more than one initiator group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtarget group\fR\fR
 .ad
@@ -216,7 +210,6 @@ that will be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBview\fR\fR
 .ad
@@ -262,7 +255,6 @@ to logical unit number 32 for the initiator group \fBHostA\fR.
 The \fBstmfadm\fR command supports the subcommands listed below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-view\fR [\fB-n\fR, \fB--lun\fR \fIlogical-unit-number\fR \fB-t\fR,
 \fB--target-group\fR \fIgroup-name\fR \fB-h\fR, \fB--host-group\fR
@@ -283,7 +275,6 @@ name, which can be used to reference the entry in the \fBremove-view\fR and
 \fBadd-view\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR, \fB--lun\fR \fIlogical-unit-number\fR\fR
 .ad
@@ -296,7 +287,6 @@ logical unit number will be assigned by the STMF framework.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR, \fB--target-group\fR \fIgroup-name\fR\fR
 .ad
@@ -309,7 +299,6 @@ unit will be available through all targets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR, \fB-host-group\fR \fIgroup-name\fR\fR
 .ad
@@ -324,7 +313,6 @@ will be available to all initiators that log in to the STMF framework.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-hg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR...\fR
 .ad
@@ -382,7 +370,6 @@ A host group member cannot be a member of more than one host group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-tg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR...\fR
 .ad
@@ -440,7 +427,6 @@ A target group member cannot be a member of more than one target group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-hg\fR \fIgroup-name\fR\fR
 .ad
@@ -453,7 +439,6 @@ be unique within the STMF system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-lu\fR [\fB-p\fR, \fB--lu-prop\fR
 \fIlogical-unit-property\fR=\fIval\fR \fB--s\fR, \fB--size\fR \fIsize\fR]
@@ -465,7 +450,6 @@ Create a logical unit that can be registered with STMF. For the \fB-p\fR
 option, \fIlogical-unit-property\fR can be one of the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalias\fR\fR
 .ad
@@ -477,7 +461,6 @@ default is the name of the backing store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBblk\fR\fR
 .ad
@@ -488,7 +471,6 @@ Specifies the block size for the device. The default is 512.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBguid\fR\fR
 .ad
@@ -500,7 +482,6 @@ Extended Identifier. The default is set by the STMF to a generated value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmeta\fR\fR
 .ad
@@ -512,7 +493,6 @@ the logical unit. There is no default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmgmt-url\fR\fR
 .ad
@@ -525,7 +505,6 @@ enclosed inside a single pair of quotation marks (\fB"\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoui\fR\fR
 .ad
@@ -538,7 +517,6 @@ identifier (GUID). The default is \fB00144F\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpid\fR\fR
 .ad
@@ -551,7 +529,6 @@ default is \fBCOMSTAR\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserial\fR\fR
 .ad
@@ -564,7 +541,6 @@ default value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvid\fR\fR
 .ad
@@ -577,7 +553,6 @@ default is \fBSUN\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwcd\fR\fR
 .ad
@@ -590,7 +565,6 @@ of the backing store device specified by the \fIlu-file\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwp\fR\fR
 .ad
@@ -604,67 +578,55 @@ For the \fB-s\fR option, \fIsize\fR is an integer followed by one of the
 following letters, to indicate a unit of size:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk\fR\fR
 .ad
 .RS 5n
-.rt  
 kilobyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 megabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 gigabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 terabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 petabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 exabyte
 .RE
 
@@ -683,7 +645,6 @@ logical unit metadata, preferably 64k.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate-tg\fR \fIgroup-name\fR\fR
 .ad
@@ -696,7 +657,6 @@ be unique within the STMF system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-hg\fR \fIgroup-name\fR\fR
 .ad
@@ -707,7 +667,6 @@ Delete the host group that identified by \fIgroup-name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-lu\fR \fIlu-name\fR\fR
 .ad
@@ -720,7 +679,6 @@ framework. Any existing data on the logical unit remains intact.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete-tg\fR \fIgroup-name\fR\fR
 .ad
@@ -731,7 +689,6 @@ Delete the target group that identified by \fIgroup-name\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBimport-lu\fR \fIlu-file\fR\fR
 .ad
@@ -748,7 +705,6 @@ command must be used here.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-hg\fR [\fB-v\fR,\fB--verbose\fR] [\fIhost-group-name\fR...]\fR
 .ad
@@ -762,7 +718,6 @@ is specified, all members within a host group are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-lu\fR [\fB-v\fR,\fB--verbose\fR] [\fIlu-name\fR...]\fR
 .ad
@@ -776,7 +731,6 @@ additional information about the logical unit will be displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-target\fR [\fB-v\fR,\fB--verbose\fR] [\fItarget-name\fR...]\fR
 .ad
@@ -791,7 +745,6 @@ logged-in initiators is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-tg\fR [\fB-v\fR,\fB--verbose\fR] [\fItarget-group-name\fR...]\fR
 .ad
@@ -805,7 +758,6 @@ option is specified, all members within a target group are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-view\fR \fB--l\fR, \fB--lu-name\fR \fIlu-name\fR
 [\fIentry-name\fR...]\fR
@@ -819,7 +771,6 @@ unit will be listed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmodify-lu\fR [\fB-p\fR, \fB--lu-prop\fR
 \fIlogical-unit-property\fR=\fIval\fR \fB--s\fR, \fB--size\fR \fIsize\fR,
@@ -832,7 +783,6 @@ command. For the \fB-p\fR option, \fIlogical-unit-property\fR can be one of the
 following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalias\fR\fR
 .ad
@@ -844,7 +794,6 @@ default is the name of the backing store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmgmt-url\fR\fR
 .ad
@@ -857,7 +806,6 @@ enclosed inside a single pair of quotation marks (\fB"\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwcd\fR\fR
 .ad
@@ -870,7 +818,6 @@ of the backing store device specified by the \fIlu-file\fR argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwp\fR\fR
 .ad
@@ -884,67 +831,55 @@ For the \fB-s\fR option, \fIsize\fR is an integer followed by one of the
 following letters, to indicate a unit of size:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBk\fR\fR
 .ad
 .RS 5n
-.rt  
 kilobyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 megabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 gigabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 terabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 petabyte
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 exabyte
 .RE
 
@@ -956,7 +891,6 @@ into the STMF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonline-lu\fR \fIlu-name\fR\fR
 .ad
@@ -967,7 +901,6 @@ Online a logical unit currently registered with the STMF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonline-target\fR \fItarget-name\fR\fR
 .ad
@@ -978,7 +911,6 @@ Online the specified target.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffline-lu\fR \fIlu-name\fR\fR
 .ad
@@ -989,7 +921,6 @@ Offline a logical unit currently registered with the STMF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoffline-target\fR \fItarget-name\fR\fR
 .ad
@@ -1000,7 +931,6 @@ Online the specified target.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist-state\fR\fR
 .ad
@@ -1011,7 +941,6 @@ Lists the operational and configuration state of the STMF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-hg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR\fR
 .ad
@@ -1068,7 +997,6 @@ identifiers, the commands would be:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-tg-member\fR \fB-g\fR \fIgroup-name\fR \fIgroup member\fR\fR
 .ad
@@ -1125,7 +1053,6 @@ identifiers, the commands would be:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-view\fR \fB--l\fR, \fB--lu-name\fR \fIlu-name\fR
 \fIentry-name\fR\fR
@@ -1179,10 +1106,10 @@ entries for the specified logical unit.
 .in +2
 .nf
 # \fBstmfadm list-view -l 6000AE40C5000000000046FC4FEA001C\fR
-View Entry: 0 
+View Entry: 0
     			Host group      : host-group-a
-    			Target group   : All 
-    			LUN               : 0 
+    			Target group   : All
+    			LUN               : 0
 .fi
 .in -2
 .sp
@@ -1195,13 +1122,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

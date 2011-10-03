@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_req 9S "12 Oct 2005" "SunOS 5.11" "Data Structures for Drivers"
+.TH DDI_DMA_REQ 9S "Oct 12, 2005"
 .SH NAME
 ddi_dma_req \- DMA Request structure
 .SH SYNOPSIS
@@ -26,13 +26,13 @@ driver can use it to describe forms of allocations and ways to allocate
 .sp
 .in +2
 .nf
-ddi_dma_lim_t  *dmar_limits;       /* Caller's dma engine 
+ddi_dma_lim_t  *dmar_limits;       /* Caller's dma engine
                                       constraints */
-uint_t         dmar_flags;         /* Contains info for 
+uint_t         dmar_flags;         /* Contains info for
                                       mapping routines */
 int            (*dmar_fp)(caddr_t);/* Callback function */
 caddr_t        dmar_arg;           /* Callback function's argument */
-ddi_dma_obj_t  dmar_object;        /* Descrip. of  object 
+ddi_dma_obj_t  dmar_object;        /* Descrip. of  object
                                       to be mapped */
 .fi
 .in -2
@@ -117,12 +117,10 @@ the value set in the structure member \fBdmar_arg\fR. The specified callback
 function \fBmust\fR return either:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Indicating that it attempted to allocate a \fBDMA\fR resource but failed to do
 so, again, in which case the callback function will be put back on a list to be
 called again later.
@@ -130,12 +128,10 @@ called again later.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Indicating either success at allocating \fBDMA\fR resources or that it no
 longer wants to retry.
 .RE
@@ -207,13 +203,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityObsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO

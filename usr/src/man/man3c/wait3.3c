@@ -1,6 +1,6 @@
 '\" te
 .\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.   Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
-.TH wait3 3C "4 Nov 2005" "SunOS 5.11" "Standard C Library Functions"
+.TH WAIT3 3C "Nov 4, 2005"
 .SH NAME
 wait3, wait4 \- wait for process to terminate or stop
 .SH SYNOPSIS
@@ -68,24 +68,20 @@ The \fIoptions\fR argument is constructed from the bitwise inclusive \fBOR\fR
 of zero or more of the following flags, defined in <\fBsys/wait.h\fR>:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWNOHANG\fR\fR
 .ad
 .RS 13n
-.rt  
 Execution of the calling process is not suspended if status is not immediately
 available for any child process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWUNTRACED\fR\fR
 .ad
 .RS 13n
-.rt  
 The status of any child processes that are stopped, and whose status has not
 yet been reported since they stopped, are also reported to the requesting
 process.
@@ -142,46 +138,38 @@ The \fBwait3()\fR and \fBwait4()\fR functions will fail and return immediately
 if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHILD\fR\fR
 .ad
 .RS 10n
-.rt  
 The calling process has no existing unwaited-for child processes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIstatusp\fR or \fIrusage\fR arguments point to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 The function was interrupted by a signal. The value of the location pointed to
 by \fIstatusp\fR is undefined.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of \fIoptions\fR is not valid.
 .RE
 
@@ -190,12 +178,10 @@ The value of \fIoptions\fR is not valid.
 The \fBwait4()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECHILD\fR\fR
 .ad
 .RS 10n
-.rt  
 The process specified by \fIpid\fR does not exist or is not a child of the
 calling process.
 .RE
@@ -214,13 +200,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dfmounts_nfs 1M "6 Nov 2000" "SunOS 5.11" "System Administration Commands"
+.TH DFMOUNTS_NFS 1M "Nov 6, 2000"
 .SH NAME
 dfmounts_nfs \- display mounted NFS resource information
 .SH SYNOPSIS
@@ -40,79 +40,65 @@ whitespace-separated fields.  For each resource, the fields are:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIresource\fR\fR
 .ad
 .RS 12n
-.rt  
 Does not apply to  \fBNFS.\fR Printed as a hyphen (-).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the system from which the resource was mounted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the pathname that must be given to the \fBshare\fR(1M) command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclients\fR\fR
 .ad
 .RS 12n
-.rt  
 Is a comma-separated list of systems that have mounted the resource.
 .RE
 
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fBnfs\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the \fBnfs\fR-FSType.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 10n
-.rt  
 Suppress header line in output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIserver\fR\fR
 .ad
 .RS 10n
-.rt  
 Displays information about the resources mounted from each server, where
 \fIserver\fR can be any system on the network.  If no server is specified, the
 \fIserver\fR is assumed to be the local system.
@@ -121,12 +107,10 @@ Displays information about the resources mounted from each server, where
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/dfs/fstypes\fR\fR
 .ad
 .RS 20n
-.rt  
 
 .RE
 

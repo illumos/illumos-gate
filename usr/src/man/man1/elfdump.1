@@ -11,7 +11,7 @@
 .\"  If applicable, add the following below this CDDL HEADER, with the fields
 .\" enclosed by brackets "[]" replaced with your own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH elfdump 1 "3 Apr 2009" "SunOS 5.11" "User Commands"
+.TH ELFDUMP 1 "Apr 3, 2009"
 .SH NAME
 elfdump \- dumps selected parts of an object file
 .SH SYNOPSIS
@@ -50,7 +50,7 @@ Category                        Option       ELF Section Type
 Dynamic                         -d           SHT_DYNAMIC
 Global Offset Table (GOT)       -G           Special. See below.
 Group                           -g           SHT_GROUP
-Hardware/Software 
+Hardware/Software
      Capabilities               -H           SHT_SUNW_cap
 Hash Table                      -h           SHT_HASH
 Interpreter                     -i           Special, see below.
@@ -98,112 +98,92 @@ and Libraries Guide\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps section header information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 18n
-.rt  
 Demangles C++ symbol names.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.dynamic\fR section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the \fBELF\fR header.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.group\fR section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.got\fR section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.hash\fR section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.SUNW_cap\fR hardware and software capabilities
 section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.interp\fR section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR  \fIindex-expr\fR\fR
 .ad
 .RS 18n
-.rt  
 Qualifies the sections or program headers to examine with a specific index or
 index range. For example, the third section header in a file can be displayed
 using:
@@ -245,45 +225,37 @@ See Matching Options for additional information about the matching options
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 18n
-.rt  
 Calculates the \fBELF\fR checksum. See \fBgelf_checksum\fR(3ELF).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 18n
-.rt  
 Displays long section names without truncation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.SUNW_move\fR section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of \fB\&.note\fR sections. By default, \fBelfdump\fR
 displays this data without interpretation in hexadecimal form. Core files are
 an exception. A subset of the core file notes described in \fBcore\fR(4) are
@@ -295,12 +267,10 @@ and NT_ZONENAME.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIname\fR\fR
 .ad
 .RS 18n
-.rt  
 Qualifies the sections or program headers to examine with a specific name. For
 example, in a file that contains more than one symbol table, the
 \fB\&.dynsym\fR symbol table can be displayed by itself using:
@@ -330,12 +300,10 @@ See Matching Options for additional information about the matching options
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fIosabi\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the Operating System ABI to apply when interpreting the object.
 \fIosabi\fR can be the name or value of any of the \fBELFOSABI_\fR constants
 found in \fB/usr/include/sys/elf.h\fR. For convenience, the \fBELFOSABI_\fR
@@ -355,12 +323,10 @@ object that specifies the generic ELF ABI is assumed to conform to the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the program headers. Individual program headers can be specified using
 the matching options (\fB-I\fR, \fB-N\fR, \fB-T\fR). See Matching Options for
 additional information.
@@ -371,12 +337,10 @@ options can be used in a given \fBelfdump\fR invocation
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 18n
-.rt  
 Generate and use alternative section header information based on the
 information from the program headers, ignoring any section header information
 contained in the file. If the file has no section headers a warning message is
@@ -390,23 +354,19 @@ headers allows files with altered section headers to be examined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.rel\fR[\fBa\fR] relocation sections.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.SUNW_ldynsym\fR, \fB\&.dynsym\fR, and
 \fB\&.symtab\fR symbol table sections. For archives, the archive symbol table
 is also dumped. Individual sections can be specified with the matching options
@@ -425,12 +385,10 @@ See Matching Options  for additional information about the matching options
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.SUNW_ldynsym\fR and \fB\&.dynsym\fR symbol
 table sections sorted in the order given by the \fB\&.SUNW_dynsymsort\fR and
 \fB\&.SUNW_dyntlssort\fR symbol sort sections. Thread Local Storage (TLS)
@@ -440,12 +398,10 @@ not referenced by the sort sections are not displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItype\fR\fR
 .ad
 .RS 18n
-.rt  
 Qualifies the sections or program headers to examine with a specific type. For
 example, in a file that contains more than one symbol table, the
 \fB\&.dynsym\fR symbol table can be displayed by itself using:
@@ -498,35 +454,29 @@ See Matching Options for additional information about the matching options
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of sections used for stack frame unwinding and exception
 processing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.SUNW\fR\fI_version\fR version sections.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIfile\fR\fR
 .ad
 .RS 18n
-.rt  
 Writes the contents of sections which are specified with the matching options
 (\fB-I\fR, \fB-N\fR, \fB-T\fR) to the named file. For example, extracting the
 \fB\&.text\fR section of a file can be carried out with:
@@ -547,12 +497,10 @@ options can be used in a given \fBelfdump\fR invocation
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 18n
-.rt  
 Dumps the contents of the \fB\&.SUNW_syminfo\fR section.
 .RE
 
@@ -562,12 +510,10 @@ Dumps the contents of the \fB\&.SUNW_syminfo\fR section.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the specified object file.
 .RE
 
@@ -618,12 +564,10 @@ specifying each item.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBliblddbg.so\fR\fR
 .ad
 .RS 15n
-.rt  
 linker debugging library
 .RE
 
@@ -635,13 +579,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

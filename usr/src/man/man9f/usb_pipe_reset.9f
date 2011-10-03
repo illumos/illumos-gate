@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_pipe_reset 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_PIPE_RESET 9F "Jan 5, 2004"
 .SH NAME
 usb_pipe_reset \- Abort queued requests from a USB pipe and reset the pipe
 .SH SYNOPSIS
@@ -25,57 +25,47 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 16n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipe_handle\fR\fR
 .ad
 .RS 16n
-.rt  
 Handle of the pipe to reset. Cannot be the handle to the default control pipe.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusb_flags\fR\fR
 .ad
 .RS 16n
-.rt  
 USB_FLAGS_SLEEP is the only flag recognized. Wait for completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 16n
-.rt  
 Function called on completion if the USB_FLAGS_SLEEP flag is not specified. If
 NULL, no notification of completion is provided.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback_arg\fR\fR
 .ad
 .RS 16n
-.rt  
 Second argument to callback function.
 .RE
 
@@ -128,7 +118,6 @@ specified callback is called upon completion.
 \fIcallback\fR is the callback handler. It takes the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fBusb_pipe_handle_t cb_pipe_handle\fR
 .ad
@@ -139,7 +128,6 @@ Handle of the pipe to reset.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusb_opaque_t callback_arg\fR
 .ad
@@ -150,7 +138,6 @@ Callback_arg specified to \fBusb_pipe_reset()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBint rval\fR
 .ad
@@ -161,7 +148,6 @@ Return value of the reset call.
 
 .sp
 .ne 2
-.mk
 .na
 \fBusb_cb_flags_t callback_flags\fR
 .ad
@@ -181,68 +167,56 @@ Status is returned to the caller via the callback handler's rval argument.
 Possible callback hander rval argument values are:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Pipe successfully reset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PIPE\fR
 .ad
 .RS 23n
-.rt  
 \fIpipe_handle\fR specifies a pipe which is closed or closing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 \fIdip\fR or \fIpipe_handle\fR arguments are \fBNULL\fR. USB_FLAGS_SLEEP is
 clear and callback is NULL.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from interrupt context with the USB_FLAGS_SLEEP flag set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_PERM\fR
 .ad
 .RS 23n
-.rt  
 \fIpipe_handle\fR specifies the default control pipe.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 23n
-.rt  
 Asynchronous resources are unavailable. In this case, USB_CB_ASYNC_REQ_FAILED
 is passed in as the \fIcallback_flags\fR arg to the callback hander.
 .RE
@@ -284,14 +258,14 @@ void post_reset_handler(
     usb_pipe_handle_t, usb_opaque_t, int, usb_cb_flags_t);
 
 /*
- * Do an asynchronous reset on bulk_pipe. 
+ * Do an asynchronous reset on bulk_pipe.
  * Execute post_reset_handler when done.
  */
 usb_pipe_reset(dip, bulk_pipe, 0, post_reset_handler, arg);
 
 /* Do a synchronous reset on bulk_pipe. */
 usb_pipe_reset(dip, bulk_pipe, USB_FLAGS_SLEEP, NULL, NULL);
-            
+
 .fi
 .in -2
 
@@ -303,15 +277,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH volcopy_ufs 1M "15 Apr 2003" "SunOS 5.11" "System Administration Commands"
+.TH VOLCOPY_UFS 1M "Apr 15, 2003"
 .SH NAME
 volcopy_ufs \- make an image copy of a ufs file system
 .SH SYNOPSIS
@@ -23,12 +23,10 @@ blocksize matched to the device.
 The following option is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgeneric_options\fR\fR
 .ad
 .RS 19n
-.rt  
 options supported by the generic  \fBvolcopy\fR command. See
 \fBvolcopy\fR(1M).
 .RE
@@ -39,48 +37,40 @@ options supported by the generic  \fBvolcopy\fR command. See
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfsname\fR\fR
 .ad
 .RS 27n
-.rt  
 represents the mount point (for example, \fBroot\fR, \fBu1\fR, etc.) of the
 file system being copied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrcdevice\fR or \fIdestdevice\fR\fR
 .ad
 .RS 27n
-.rt  
 the disk partition specified using the raw device (for example,
 \fB/dev/rdsk/cld0s8\fR, \fB/dev/rdsk/cld1s8\fR, etc.).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsrcdevice\fR and \fIvolname1\fR\fR
 .ad
 .RS 27n
-.rt  
 the device and physical volume from which the copy of the file system is being
 extracted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestdevice\fR and \fIvolname2\fR\fR
 .ad
 .RS 27n
-.rt  
 the target device and physical volume.
 .RE
 
@@ -95,35 +85,29 @@ existing volume name.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful file system copy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error has occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/filesave.log\fR\fR
 .ad
 .RS 25n
-.rt  
 a record of file systems/volumes copied
 .RE
 

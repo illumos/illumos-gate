@@ -1,6 +1,6 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.   Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.TH adjtime 2 "20 Jan 2003" "SunOS 5.11" "System Calls"
+.TH ADJTIME 2 "Jan 20, 2003"
 .SH NAME
 adjtime \- correct the time to allow synchronization of the system clock
 .SH SYNOPSIS
@@ -57,12 +57,10 @@ returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 The \fBadjtime()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIdelta\fR or \fIolddelta\fR argument points outside the process's
 allocated address space, or \fIolddelta\fR points to a region of the process's
 allocated address space that is not writable.
@@ -70,24 +68,20 @@ allocated address space that is not writable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBtv_usec\fR member of \fIdelta\fR is not within valid range (\(mi1000000
 to 1000000).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The {\fBPRIV_SYS_TIME\fR} privilege is not asserted in the effective set of the
 calling process.
 .RE
@@ -97,12 +91,10 @@ calling process.
 Additionally, the \fBadjtime()\fR function will fail for 32-bit interfaces if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The size of the \fBtv_sec\fR member of the \fBtimeval\fR structure pointed to
 by \fIolddelta\fR is too small to contain the correct number of seconds.
 .RE

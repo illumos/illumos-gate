@@ -2,14 +2,14 @@
 .\" To view license terms, attribution, and copyright for OpenSSH, the default path is /var/sadm/pkg/SUNWsshdr/install/copyright. If the Solaris operating environment has been installed anywhere other than the default, modify the specified path to access
 .\" the file at the installed location.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH sftp 1 "8 Nov 2007" "SunOS 5.11" "User Commands"
+.TH SFTP 1 "Nov 8, 2007"
 .SH NAME
 sftp \- secure file transfer program
 .SH SYNOPSIS
 .LP
 .nf
-\fBsftp\fR [\fB-1Cv\fR] [\fB-B\fR \fIbuffer_size\fR] [\fB-b\fR \fIbatchfile\fR] [\fB-F\fR \fIssh_config\fR] 
-      [\fB-o\fR \fIssh_option\fR] [\fB-P\fR \fIsftp_server_path\fR] [\fB-R\fR \fInum_requests\fR] 
+\fBsftp\fR [\fB-1Cv\fR] [\fB-B\fR \fIbuffer_size\fR] [\fB-b\fR \fIbatchfile\fR] [\fB-F\fR \fIssh_config\fR]
+      [\fB-o\fR \fIssh_option\fR] [\fB-P\fR \fIsftp_server_path\fR] [\fB-R\fR \fInum_requests\fR]
       [\fB-S\fR \fIprogram\fR] [\fB-s\fR \fIsubsystem\fR | \fIsftp_server\fR] \fIhost\fR
 .fi
 
@@ -58,12 +58,10 @@ specified \fBsftp\fR tries to log in as the specified user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbatchfile\fR\fR
 .ad
 .RS 30n
-.rt  
 Batch mode reads a series of commands from an input \fIbatchfile\fR instead of
 \fBstdin\fR. Since it lacks user interaction, it should be used in conjunction
 with non-interactive authentication. A batchfile of \fB-\fR can be used to
@@ -77,12 +75,10 @@ suppressed on a command by command basis by prefixing the command with a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-B\fR \fIbuffer_size\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies the size of the buffer that \fBsftp\fR uses when transferring files.
 Larger buffers require fewer round trips at the cost of higher memory
 consumption. The default is 32768 bytes.
@@ -90,46 +86,38 @@ consumption. The default is 32768 bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 30n
-.rt  
 Enables compression, using the \fB-C\fR flag in \fBssh\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIssh_config\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies an alternative per-user configuration file for \fBssh\fR. This option
 is directly passed to \fBssh\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIssh_option\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies an option to be directly passed to \fBssh\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIsftp_server path\fR\fR
 .ad
 .RS 30n
-.rt  
 Executes the specified path as an \fIsftp-server\fR and uses a pipe, rather
 than an \fBssh\fR connection, to communicate with it. This option can be useful
 in debugging the \fBsftp\fR client and server. The \fB-P\fR and \fB-S\fR
@@ -138,12 +126,10 @@ options are mutually exclusive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fInum_requests\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies how many requests can be outstanding at any one time. Increasing this
 can slightly improve file transfer speed but increases memory usage. The
 default is 16 outstanding requests.
@@ -151,12 +137,10 @@ default is 16 outstanding requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsubsystem\fR | \fIsftp_server\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies the \fBSSH2\fR subsystem or the path for an \fBsftp\fR server on the
 remote host. A path is useful for using \fBsftp\fR over protocol version 1, or
 when the remote \fBsshd\fR does not have an \fBsftp\fR subsystem configured.
@@ -164,12 +148,10 @@ when the remote \fBsshd\fR does not have an \fBsftp\fR subsystem configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fIssh_program\fR \fIpath\fR\fR
 .ad
 .RS 30n
-.rt  
 Uses the specified program instead of \fBssh\fR(1) to connect to the \fBsftp\fR
 server. The \fB-P\fR and \fB-S\fR options are mutually exclusive. The program
 must understand \fBssh\fR(1) options.
@@ -177,23 +159,19 @@ must understand \fBssh\fR(1) options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 30n
-.rt  
 Raises logging level. This option is also passed to \fBssh\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 30n
-.rt  
 Specifies the use of protocol version 1.
 .RE
 
@@ -203,12 +181,10 @@ Specifies the use of protocol version 1.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhostname\fR | \fIuser@hostname\fR\fR
 .ad
 .RS 28n
-.rt  
 The name of the host to which \fBsftp\fR connects and logs into.
 .RE
 
@@ -220,7 +196,6 @@ those of \fBftp\fR(1). Commands are case insensitive and path names can be
 enclosed in quotes if they contain spaces.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbye\fR\fR
 .ad
@@ -231,7 +206,6 @@ Quits \fBsftp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR \fIpath\fR\fR
 .ad
@@ -242,7 +216,6 @@ Changes remote directory to \fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchgrp\fR \fIgrp path\fR\fR
 .ad
@@ -254,7 +227,6 @@ Changes group of file \fIpath\fR to \fIgrp\fR. \fIgrp\fR must be a numeric
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchmod\fR \fImode path\fR\fR
 .ad
@@ -265,7 +237,6 @@ Changes permissions of file \fIpath\fR to \fImode\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchown\fR \fIown path\fR\fR
 .ad
@@ -277,7 +248,6 @@ Changes owner of file \fIpath\fR to \fIown\fR. \fIown\fR must be a numeric
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexit\fR\fR
 .ad
@@ -288,7 +258,6 @@ Quits \fBsftp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR [\fIflags\fR] \fIremote-path\fR [\fIlocal-path\fR]\fR
 .ad
@@ -302,7 +271,6 @@ permission and access time are copied too.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhelp\fR\fR
 .ad
@@ -315,7 +283,6 @@ Identical to the \fB?\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlcd\fR \fIpath\fR\fR
 .ad
@@ -326,7 +293,6 @@ Changes local directory to \fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlls\fR [\fIls-options\fR [\fIpath\fR]]\fR
 .ad
@@ -338,7 +304,6 @@ Displays local directory listing of either \fIpath\fR or current directory if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlmkdir\fR \fIpath\fR\fR
 .ad
@@ -349,7 +314,6 @@ Creates local directory specified by \fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBln\fR \fIoldpath\fR \fInewpath\fR\fR
 .ad
@@ -360,7 +324,6 @@ Creates a link from \fIoldpath\fR to \fInewpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlpwd\fR\fR
 .ad
@@ -371,7 +334,6 @@ Prints local working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBls\fR [\fB-1aflnrSt\fR] [\fIpath\fR]\fR
 .ad
@@ -383,89 +345,73 @@ Displays remote directory listing of either \fIpath\fR or current directory if
 The \fBls\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Lists files beginning with a dot (\fB\&.\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Does not sort the listing. The default sort order is lexicographical.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays additional details including permissions and ownership information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Produces a long listing with user and group information presented numerically.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Reverses the sort order of the listing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 6n
-.rt  
 Sorts the listing by file size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Sorts the listing by last modification time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 Produces single column output.
 .RE
 
@@ -473,7 +419,6 @@ Produces single column output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlumask\fR \fIumask\fR\fR
 .ad
@@ -484,7 +429,6 @@ Sets local \fBumask\fR to \fIumask\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkdir\fR \fIpath\fR\fR
 .ad
@@ -495,7 +439,6 @@ Creates remote directory specified by \fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBput\fR [\fIflags\fR] \fIlocal-path\fR [\fIlocal-path\fR]\fR
 .ad
@@ -509,7 +452,6 @@ access time are copied too.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwd\fR\fR
 .ad
@@ -520,7 +462,6 @@ Displays remote working directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBquit\fR\fR
 .ad
@@ -531,7 +472,6 @@ Quits \fBsftp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrename\fR \fIoldpath newpath\fR\fR
 .ad
@@ -542,7 +482,6 @@ Renames remote file from \fIoldpath\fR to \fInewpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrm\fR \fIpath\fR\fR
 .ad
@@ -553,7 +492,6 @@ Deletes remote file specified by \fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrmdir\fR \fIpath\fR\fR
 .ad
@@ -564,7 +502,6 @@ Removes remote directory specified by \fIpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsymlink\fR \fIoldpath\fR \fInewpath\fR\fR
 .ad
@@ -575,7 +512,6 @@ Creates a symbolic link from \fIoldpath\fR to \fInewpath\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBversion\fR\fR
 .ad
@@ -586,7 +522,6 @@ Displays the \fBsftp\fR protocol version.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR [\fIcomment\fR]\fR
 .ad
@@ -597,7 +532,6 @@ Include a comment. This is useful in batch files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR [\fIcommand\fR]\fR
 .ad
@@ -610,7 +544,6 @@ If \fIcommand\fR is specified, executes \fIcommand\fR in the local shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
@@ -627,23 +560,19 @@ Identical to the \fBhelp\fR command.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -655,13 +584,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

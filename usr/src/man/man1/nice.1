@@ -1,25 +1,25 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nice 1 "23 Jan 2004" "SunOS 5.11" "User Commands"
+.TH NICE 1 "Jan 23, 2004"
 .SH NAME
 nice \- invoke a command with an altered scheduling priority
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/nice\fR [\fB-\fIincrement\fR\fR | \fB-n\fR \fIincrement\fR] \fIcommand\fR 
+\fB/usr/bin/nice\fR [\fB-\fIincrement\fR\fR | \fB-n\fR \fIincrement\fR] \fIcommand\fR
      [\fIargument\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/nice\fR [\fB-\fIincrement\fR\fR | \fB-n\fR \fIincrement\fR] \fIcommand\fR 
+\fB/usr/xpg4/bin/nice\fR [\fB-\fIincrement\fR\fR | \fB-n\fR \fIincrement\fR] \fIcommand\fR
      [\fIargument\fR]...
 .fi
 
@@ -59,12 +59,10 @@ the utility versions.  See \fBcsh\fR(1) for description.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIincrement\fR | \fB-n\fR \fIincrement\fR\fR
 .ad
 .RS 29n
-.rt  
 \fIincrement\fR is a positive or negative decimal integer that has the same
 effect on the execution of the utility as if the utility had called the
 \fBnice()\fR function with the numeric value of the \fIincrement\fR
@@ -83,12 +81,10 @@ an unprivileged user is ignored.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of a command that is to be invoked. If \fIcommand\fR names any of the
 special built-in utilities (see \fBshell_builtins\fR(1)), the results are
 undefined.
@@ -96,12 +92,10 @@ undefined.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIargument\fR\fR
 .ad
 .RS 12n
-.rt  
 Any string to be supplied as an argument when invoking \fIcommand\fR.
 .RE
 
@@ -119,34 +113,28 @@ status of \fIcommand\fR. Otherwise, \fBnice\fR will exit with one of the
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1-125\fR\fR
 .ad
 .RS 9n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB126\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIcommand\fR was found but could not be invoked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB127\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIcommand\fR could not be found.
 .RE
 
@@ -159,13 +147,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/nice"
@@ -173,15 +160,14 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

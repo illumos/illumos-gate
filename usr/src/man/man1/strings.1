@@ -1,19 +1,19 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH strings 1 "13 Apr 2007" "SunOS 5.11" "User Commands"
+.TH STRINGS 1 "Apr 13, 2007"
 .SH NAME
 strings \- find printable strings in an object or binary file
 .SH SYNOPSIS
 .LP
 .nf
-\fBstrings\fR [\fB-a\fR | \fB-\fR] 
+\fBstrings\fR [\fB-a\fR | \fB-\fR]
      [\fB-t\fR \fIformat\fR | \fB-o\fR] [\fB-n\fR \fInumber\fR | \fB-number\fR]  [\fB-N\fR \fIname\fR]  [\fIfile\fR]...
 .fi
 
@@ -44,35 +44,29 @@ be inspected with the \fB-N\fR option.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR | \fB\(mi\fR\fR
 .ad
 .RS 23n
-.rt  
 Look everywhere in the file for strings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInumber\fR \fB|\fR \fB-\fR\fInumber\fR\fR
 .ad
 .RS 23n
-.rt  
 Use a \fInumber\fR as the minimum string length rather than the default, which
 is \fB4\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIname\fR\fR
 .ad
 .RS 23n
-.rt  
 Look only in ELF section name. See \fBelfdump\fR(1). Multiple \fB-N\fR options
 can be specified to inspect multiple sections.
 .sp
@@ -82,56 +76,46 @@ ignored .
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 23n
-.rt  
 Equivalent to \fB\fR\fB-t\fR \fBd\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fBformat\fR\fR
 .ad
 .RS 23n
-.rt  
 Write each string preceded by its byte offset from the start of the file. The
 format is dependent on the single character used as the \fIformat\fR
 option-argument:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 The offset is written in decimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 The offset is written in octal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 The offset is written in hexadecimal.
 .RE
 
@@ -143,12 +127,10 @@ The offset is written in hexadecimal.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIfile\fR\fR\fR
 .ad
 .RS 8n
-.rt  
 A path name of a regular file to be used as input. If no \fIfile\fR operand is
 specified, the \fBstrings\fR utility reads from the standard input.
 .RE
@@ -165,23 +147,19 @@ that affect the execution of \fBstrings\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -193,15 +171,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

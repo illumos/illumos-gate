@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_dma_mem_alloc 9F "05 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_DMA_MEM_ALLOC 9F "Jun 05, 2006"
 .SH NAME
 ddi_dma_mem_alloc \- allocate memory for DMA transfer
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
-#include <sys/sunddi.h> 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBddi_dma_mem_alloc\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBsize_t\fR \fIlength\fR, 
-     \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR, \fBuint_t\fR \fIflags\fR, 
+\fBint\fR \fBddi_dma_mem_alloc\fR(\fBddi_dma_handle_t\fR \fIhandle\fR, \fBsize_t\fR \fIlength\fR,
+     \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR, \fBuint_t\fR \fIflags\fR,
      \fBint (*\fR\fIwaitfp\fR) (caddr_t), \fBcaddr_t\fR \fIarg\fR, \fBcaddr_t *\fR\fIkaddrp\fR,
      \fBsize_t *\fR\fIreal_length\fR, \fBddi_acc_handle_t *\fR\fIhandlep\fR);
 .fi
@@ -27,35 +27,29 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandle\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fBDMA\fR handle previously allocated by a call to
 \fBddi_dma_alloc_handle\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 15n
-.rt  
 The length in bytes of the desired allocation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaccattrp\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to a \fBddi_device_acc_attr()\fR structure of the device. See
 \fBddi_device_acc_attr\fR(9S). The value in \fBdevacc_attr_dataorder\fR is
 ignored in the current release. The value in \fBdevacc_attr_endian_flags\fR is
@@ -64,46 +58,38 @@ meaningful on the SPARC architecture only.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 Used to determine the data transfer mode and/or the cache attribute.
 .sp
 Possible values of the data transfer are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_STREAMING\fR\fR
 .ad
 .RS 22n
-.rt  
 Sequential, unidirectional, block-sized, and block-aligned transfers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_DMA_CONSISTENT\fR\fR
 .ad
 .RS 22n
-.rt  
 Nonsequential transfers of small objects.
 .RE
 
 Possible values of the cache attribute are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOMEM_DATA_CACHED\fR\fR
 .ad
 .RS 28n
-.rt  
 The CPU can cache the data it fetches and push it to memory at a later time.
 This is the default attribute that is used if no cache attributes are
 specified.
@@ -111,12 +97,10 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOMEM_DATA_UC_WR_COMBINE\fR\fR
 .ad
 .RS 28n
-.rt  
 The CPU never caches the data, but writes can occur out of order or can be
 combined. Reordering is implied.
 .sp
@@ -126,12 +110,10 @@ If \fBIOMEM_DATA_UC_WR_COMBINE\fR is specified but not supported,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOMEM_DATA_UNCACHED\fR\fR
 .ad
 .RS 28n
-.rt  
 The CPU never caches data, but has uncacheable access to memory. Strict
 ordering is implied.
 .RE
@@ -143,12 +125,10 @@ meaningful. Others lead to a failure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwaitfp\fR\fR
 .ad
 .RS 15n
-.rt  
 The address of a function to call back later if resources are not available
 now. The callback function indicates how a caller wants to handle the
 possibility of resources not being available. If callback is set to
@@ -174,35 +154,29 @@ critical resources, data structures, queues, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 15n
-.rt  
 Argument to be passed to the callback function, if such a function is
 specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkaddrp\fR\fR
 .ad
 .RS 15n
-.rt  
 On successful return, \fIkaddrp\fR points to the allocated memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreal_length\fR\fR
 .ad
 .RS 15n
-.rt  
 The amount of memory, in bytes, allocated. Alignment and padding requirements
 may require \fBddi_dma_mem_alloc()\fR to allocate more memory than requested in
 \fIlength\fR.
@@ -210,12 +184,10 @@ may require \fBddi_dma_mem_alloc()\fR to allocate more memory than requested in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhandlep\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to a data access handle.
 .RE
 
@@ -271,23 +243,19 @@ device after a \fBDMA\fR transfer, explicit synchronization steps using
 The \fBddi_dma_mem_alloc()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Memory successfully allocated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Memory allocation failed.
 .RE
 

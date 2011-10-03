@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH in.tftpd 1M "5 Nov 2008" "SunOS 5.11" "System Administration Commands"
+.TH IN.TFTPD 1M "Nov 5, 2008"
 .SH NAME
 in.tftpd, tftpd \- Internet Trivial File Transfer Protocol server
 .SH SYNOPSIS
@@ -39,35 +39,29 @@ group. However, nothing checks this assumption or enforces this restriction.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 Debug. When specified it sets the \fBSO_DEBUG\fR socket option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 Secure. When specified, the directory change to \fIhomedir\fR must succeed. The
 daemon also changes its root directory to \fIhomedir\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fIrexmtval\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the value of the retransmission timeout in seconds. This also affects
 the maximum session timeout in that the latter is set to five times the
 retransmission timeout value.

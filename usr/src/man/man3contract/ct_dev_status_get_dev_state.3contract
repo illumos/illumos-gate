@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ct_dev_status_get_dev_state 3CONTRACT "9 Aug 2007" "SunOS 5.11" "Contract Management Library Functions"
+.TH CT_DEV_STATUS_GET_DEV_STATE 3CONTRACT "Aug 9, 2007"
 .SH NAME
 ct_dev_status_get_dev_state, ct_dev_status_get_aset, ct_dev_status_get_minor,
 ct_dev_status_get_noneg \- read contract status information from a status
@@ -40,35 +40,29 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIasetp\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to a \fBuint_t\fR variable for receiving the acceptable state set
 (such as A-set) for the contract
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 11n
-.rt  
 a buffer for receiving the \fBdevfs\fR path of a minor in a contract
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuflenp\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to a variable of type \fBsize_t\fR for passing the size of the buffer
 \fIbuf\fR. If the buffer is too small (< \fBPATH_MAX\fR), the minimum size of
 the buffer needed (\fBPATH_MAX\fR) is passed back to the caller with this
@@ -77,35 +71,29 @@ argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInonegp\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to a \fBuint_t\fR variable for receiving the setting of the "noneg"
 term
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstathdl\fR\fR
 .ad
 .RS 11n
-.rt  
 a status object returned by \fBct_status_read\fR(3CONTRACT)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstatep\fR\fR
 .ad
 .RS 11n
-.rt  
 a pointer to a \fBuint_t\fR variable for receiving the current state of the
 device which is the subject of the contract
 .RE
@@ -126,34 +114,28 @@ the device which is the subject of the contract. This can be one of the
 following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCT_DEV_EV_ONLINE\fR\fR
 .ad
 .RS 22n
-.rt  
 The device is online and functioning normally.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCT_DEV_EV_DEGRADED\fR\fR
 .ad
 .RS 22n
-.rt  
 The device is online but degraded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCT_DEV_EV_OFFLINE\fR\fR
 .ad
 .RS 22n
-.rt  
 The device is offline and not configured.
 .RE
 
@@ -185,12 +167,10 @@ non-zero error value.
 The \fBct_dev_status_get_minor()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
 The buffer size is too small to hold the result.
 .RE
 
@@ -201,23 +181,19 @@ The \fBct_dev_status_get_dev_state()\fR, \fBct_dev_status_get_aset()\fR,
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 An invalid argument was specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 The requested data is not present in the status object.
 .RE
 
@@ -229,15 +205,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

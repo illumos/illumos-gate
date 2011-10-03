@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH u8_strcmp 3C "12 Sep 2007" "SunOS 5.11" "Standard C Library Functions"
+.TH U8_STRCMP 3C "Sep 12, 2007"
 .SH NAME
 u8_strcmp \- UTF-8 string comparison function
 .SH SYNOPSIS
@@ -18,23 +18,19 @@ u8_strcmp \- UTF-8 string comparison function
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIs1\fR, \fIs2\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointers to null-terminated UTF-8 strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 13n
-.rt  
 The maximum number of bytes to be compared.  If 0, the comparison is performed
 until either or both of the strings are examined to the string terminating null
 byte.
@@ -42,17 +38,14 @@ byte.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 13n
-.rt  
 The possible comparison options constructed by a bit-wise-inclusive-OR of the
 following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_CS\fR\fR
 .ad
@@ -63,7 +56,6 @@ Perform case-sensitive string comparison. This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_CI_UPPER\fR\fR
 .ad
@@ -75,7 +67,6 @@ converted results of \fIs1\fR and \fIs2\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_CI_LOWER\fR\fR
 .ad
@@ -87,7 +78,6 @@ converted results of \fIs1\fR and \fIs2\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_NFD\fR\fR
 .ad
@@ -99,7 +89,6 @@ using Unicode Normalization Form D.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_NFC\fR\fR
 .ad
@@ -111,7 +100,6 @@ using Unicode Normalization Form C.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_NFKD\fR\fR
 .ad
@@ -123,7 +111,6 @@ using Unicode Normalization Form KD.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_STRCMP_NFKC\fR\fR
 .ad
@@ -139,17 +126,14 @@ Normalization option is allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIversion\fR\fR
 .ad
 .RS 13n
-.rt  
 The version of Unicode data that should be used during comparison. The
 following values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_UNICODE_320\fR\fR
 .ad
@@ -160,7 +144,6 @@ Use Unicode 3.2.0 data during comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_UNICODE_500\fR\fR
 .ad
@@ -171,7 +154,6 @@ Use Unicode 5.0.0 data during comparison.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBU8_UNICODE_LATEST\fR\fR
 .ad
@@ -184,55 +166,45 @@ Use the latest Unicode version data available, which is Unicode 5.0.0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIerrnum\fR\fR
 .ad
 .RS 13n
-.rt  
 A non-zero value indicates that an error has occurred during comparison. The
 following values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified option values are conflicting and cannot be supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 There was an illegal character at \fIs1\fR, \fIs2\fR, or both.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 There was an incomplete character at \fIs1\fR, \fIs2\fR, or both.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified Unicode version value is not supported.
 .RE
 
@@ -357,15 +329,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

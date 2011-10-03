@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nscd.conf 4 "21 Aug 2006" "SunOS 5.11" "File Formats"
+.TH NSCD.CONF 4 "Aug 21, 2006"
 .SH NAME
 nscd.conf \- name service cache daemon configuration
 .SH SYNOPSIS
@@ -33,7 +33,6 @@ not interpreted by \fBnscd\fR.
 The \fIattribute\fR field supports the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcheck-files\fR \fIcachename value\fR\fR
 .ad
@@ -48,7 +47,6 @@ particularly over \fBNFS\fR. \fIvalue\fR may be either \fByes\fR or \fBno\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug-level\fR \fIvalue\fR\fR
 .ad
@@ -63,7 +61,6 @@ rely on its format.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable-cache\fR \fIcachename value\fR\fR
 .ad
@@ -75,7 +72,6 @@ Enables or disables the specified cache. \fIvalue\fR may be either \fByes\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable-per-user-lookup\fR \fIvalue\fR\fR
 .ad
@@ -90,7 +86,6 @@ this attribute can be either \fByes\fR or \fBno\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeep-hot-count\fR \fIcachename value\fR\fR
 .ad
@@ -104,7 +99,6 @@ during the day.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogfile\fR \fIdebug-file-name\fR\fR
 .ad
@@ -116,7 +110,6 @@ Specifies name of the file to which debug info should be written. Use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmaximum-per-user-nscd\fR \fIvalue\fR\fR
 .ad
@@ -128,7 +121,6 @@ by the main \fBnscd\fR daemon. The value is an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnegative-time-to-live\fR \fIcachename value\fR\fR
 .ad
@@ -143,7 +135,6 @@ problems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBper-user-nscd-time-to-live\fR \fIvalue\fR\fR
 .ad
@@ -156,7 +147,6 @@ number of seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpositive-time-to-live\fR \fIcachename value\fR\fR
 .ad
@@ -172,7 +162,6 @@ implications.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsuggested-size\fR \fIcachename value\fR\fR
 .ad
@@ -196,15 +185,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-AvailibilitySUNWcsu
+Availibility	SUNWcsu
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

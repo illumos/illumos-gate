@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libmenu 3LIB "22 May 2003" "SunOS 5.11" "Interface Libraries"
+.TH LIBMENU 3LIB "May 22, 2003"
 .SH NAME
 libmenu \- menus library
 .SH SYNOPSIS
@@ -26,62 +26,56 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBcurrent_item\fR\fBfree_item\fR
-\fBfree_menu\fR\fBitem_count\fR
-\fBitem_description\fR\fBitem_index\fR
-\fBitem_init\fR\fBitem_name\fR
-\fBitem_opts\fR\fBitem_opts_off\fR
-\fBitem_opts_on\fR\fBitem_term\fR
-\fBitem_userptr\fR\fBitem_value\fR
-\fBitem_visible\fR\fBmenu_back\fR
-\fBmenu_driver\fR\fBmenu_fore\fR
-\fBmenu_format\fR\fBmenu_grey\fR
-\fBmenu_init\fR\fBmenu_items\fR
-\fBmenu_mark\fR\fBmenu_opts\fR
-\fBmenu_opts_off\fR\fBmenu_opts_on\fR
-\fBmenu_pad\fR\fBmenu_pattern\fR
-\fBmenu_sub\fR\fBmenu_term\fR
-\fBmenu_userptr\fR\fBmenu_win\fR
-\fBnew_item\fR\fBnew_menu\fR
-\fBpos_menu_cursor\fR\fBpost_menu\fR
-\fBscale_menu\fR\fBset_current_item\fR
-\fBset_item_init\fR\fBset_item_opts\fR
-\fBset_item_term\fR\fBset_item_userptr\fR
-\fBset_item_value\fR\fBset_menu_back\fR
-\fBset_menu_fore\fR\fBset_menu_format\fR
-\fBset_menu_grey\fR\fBset_menu_init\fR
-\fBset_menu_items\fR\fBset_menu_mark\fR
-\fBset_menu_opts\fR\fBset_menu_pad\fR
-\fBset_menu_pattern\fR\fBset_menu_sub\fR
-\fBset_menu_term\fR\fBset_menu_userptr\fR
-\fBset_menu_win\fR\fBset_top_row\fR
-\fBtop_row\fR\fBunpost_menu\fR
+l l
+l l .
+\fBcurrent_item\fR	\fBfree_item\fR
+\fBfree_menu\fR	\fBitem_count\fR
+\fBitem_description\fR	\fBitem_index\fR
+\fBitem_init\fR	\fBitem_name\fR
+\fBitem_opts\fR	\fBitem_opts_off\fR
+\fBitem_opts_on\fR	\fBitem_term\fR
+\fBitem_userptr\fR	\fBitem_value\fR
+\fBitem_visible\fR	\fBmenu_back\fR
+\fBmenu_driver\fR	\fBmenu_fore\fR
+\fBmenu_format\fR	\fBmenu_grey\fR
+\fBmenu_init\fR	\fBmenu_items\fR
+\fBmenu_mark\fR	\fBmenu_opts\fR
+\fBmenu_opts_off\fR	\fBmenu_opts_on\fR
+\fBmenu_pad\fR	\fBmenu_pattern\fR
+\fBmenu_sub\fR	\fBmenu_term\fR
+\fBmenu_userptr\fR	\fBmenu_win\fR
+\fBnew_item\fR	\fBnew_menu\fR
+\fBpos_menu_cursor\fR	\fBpost_menu\fR
+\fBscale_menu\fR	\fBset_current_item\fR
+\fBset_item_init\fR	\fBset_item_opts\fR
+\fBset_item_term\fR	\fBset_item_userptr\fR
+\fBset_item_value\fR	\fBset_menu_back\fR
+\fBset_menu_fore\fR	\fBset_menu_format\fR
+\fBset_menu_grey\fR	\fBset_menu_init\fR
+\fBset_menu_items\fR	\fBset_menu_mark\fR
+\fBset_menu_opts\fR	\fBset_menu_pad\fR
+\fBset_menu_pattern\fR	\fBset_menu_sub\fR
+\fBset_menu_term\fR	\fBset_menu_userptr\fR
+\fBset_menu_win\fR	\fBset_top_row\fR
+\fBtop_row\fR	\fBunpost_menu\fR
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/libmenu.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/64/libmenu.so.1\fR\fR
 .ad
 .RS 28n
-.rt  
 64-bit shared object
 .RE
 
@@ -93,13 +87,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

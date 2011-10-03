@@ -3,20 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkgrm 1M "30 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH PKGRM 1M "Oct 30, 2007"
 .SH NAME
 pkgrm \- remove a package from the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkgrm\fR [\fB-nv\fR] [\fB-a\fR \fIadmin\fR] [ [\fB-A\fR | \fB-M\fR] \fB-R\fR \fIroot_path\fR] 
-     [\fB-V\fR \fIfs_file\fR] 
+\fBpkgrm\fR [\fB-nv\fR] [\fB-a\fR \fIadmin\fR] [ [\fB-A\fR | \fB-M\fR] \fB-R\fR \fIroot_path\fR]
+     [\fB-V\fR \fIfs_file\fR]
      [pkginst... | \fB-Y\fR \fIcategory\fR[,\fIcategory\fR\&.\|.\|.]]
 .fi
 
 .LP
 .nf
-\fBpkgrm\fR \fB-s\fR \fIspool\fR 
+\fBpkgrm\fR \fB-s\fR \fIspool\fR
      [pkginst... | \fB-Y\fR \fIcategory\fR[,\fIcategory\fR\&.\|.\|.]]
 .fi
 
@@ -54,7 +54,6 @@ variable is set.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIadmin\fR\fR
 .ad
@@ -69,7 +68,6 @@ current working directory, \fBpkgrm\fR looks in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
@@ -82,7 +80,6 @@ from the client's file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
@@ -96,7 +93,6 @@ and earlier releases.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -113,7 +109,6 @@ used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot_path\fR\fR
 .ad
@@ -135,7 +130,6 @@ zone's file system. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIspool\fR\fR
 .ad
@@ -147,7 +141,6 @@ directory for spooled packages is \fB/var/sadm/pkg\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -160,7 +153,6 @@ procedural and non-procedural scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIfs_file\fR\fR
 .ad
@@ -173,7 +165,6 @@ non-existent or unreliable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Y\fR \fIcategory\fR\fR
 .ad
@@ -191,7 +182,6 @@ option.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkginst\fR\fR
 .ad
@@ -232,7 +222,6 @@ option, above.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -243,7 +232,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -254,7 +242,6 @@ Fatal error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -265,7 +252,6 @@ Warning.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
@@ -276,7 +262,6 @@ Interruption.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
@@ -287,7 +272,6 @@ Administration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB10\fR\fR
 .ad
@@ -298,7 +282,6 @@ Reboot after removal of all packages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB20\fR\fR
 .ad

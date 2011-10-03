@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved 
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH qlc 7D "21 Feb 2005" "SunOS 5.11" "Devices"
+.TH QLC 7D "Feb 21, 2005"
 .SH NAME
 qlc \- ISP2200, ISP2300, and SP212 Family Fibre Channel host bus adapter
 driver.
@@ -31,45 +31,37 @@ with conflicting hard addresses are not accessible.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/qlc\fR\fR
 .ad
 .RS 27n
-.rt  
 32-bit ELF kernel module (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/qlc\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit ELF kernel module (x86)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/qlc\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit ELF kernel module (SPARC)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/qlc.conf\fR\fR
 .ad
 .RS 27n
-.rt  
  Driver configuration file
 .RE
 
@@ -81,13 +73,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO

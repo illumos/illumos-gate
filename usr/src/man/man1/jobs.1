@@ -1,16 +1,16 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH jobs 1 "2 Nov 2007" "SunOS 5.11" "User Commands"
+.TH JOBS 1 "Nov 2, 2007"
 .SH NAME
 jobs, fg, bg, stop, notify \- control process execution
 .SH SYNOPSIS
@@ -128,34 +128,28 @@ omitted, all jobs that are stopped or running in the background is reported.
 The following options modify or enhance the output of \fBjobs\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports the process group \fBID\fR and working directory of the jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports only the process group \fBID\fR of the jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Replaces any \fIjob_id\fR found in \fIcommand\fR or \fIarguments\fR with the
 corresponding process group \fBID\fR, and then executes \fIcommand\fR passing
 it \fIarguments\fR.
@@ -209,56 +203,46 @@ The acceptable syntax for a Job Identifier is of the form:
 where \fIjob_id\fR can be specified in any of the following formats:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR or \fB+\fR\fR
 .ad
 .RS 13n
-.rt  
 for the current job
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 13n
-.rt  
 for the previous job
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fI<string>\fR\fR
 .ad
 .RS 13n
-.rt  
 specify the job for which the command line uniquely contains \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 13n
-.rt  
 for job number \fIn\fR, where \fIn\fR is a job number
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpref\fR\fR
 .ad
 .RS 13n
-.rt  
 where \fIpref\fR is a unique prefix of the command name (for example, if the
 command \fBls \(mil name\fR were running in the background, it could be
 referred to as \fB%ls\fR); \fIpref\fR cannot contain blanks unless it is
@@ -285,12 +269,10 @@ The C shell built-in, \fBjobs\fR, without an argument, lists the active jobs
 under job control.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 List process \fBID\fRs, in addition to the normal information.
 .RE
 
@@ -323,34 +305,28 @@ A reference to a job begins with a `\fB%\fR'. By itself, the percent sign
 refers to the current job.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR \fB%+\fR \fB%%\fR\fR
 .ad
 .RS 12n
-.rt  
 The current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\(mi\fR\fR
 .ad
 .RS 12n
-.rt  
 The previous job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIj\fR\fR
 .ad
 .RS 12n
-.rt  
 Refer to job \fIj\fR as in: `\fBkill\fR \fB-9\fR \fB%\fR\fIj\fR'. \fIj\fR can
 be a job number, or a string that uniquely specifies the command line by which
 it was started; `\fBfg %vi\fR' might bring a stopped \fBvi\fR job to the
@@ -359,12 +335,10 @@ foreground, for instance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify the job for which the command line uniquely contains \fIstring\fR.
 .RE
 
@@ -403,12 +377,10 @@ shell execution environment.
 The following options modify or enhance the output of \fBjobs\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 (The letter ell.) Provides more information about each job listed. This
 information includes the job number, current job, process group \fBID\fR, state
 and the command that formed the job.
@@ -416,23 +388,19 @@ and the command that formed the job.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays only jobs that have stopped or exited since last notified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays only the process \fBID\fRs for the process group leaders of the
 selected jobs.
 .RE
@@ -473,69 +441,57 @@ There are several ways to refer to jobs in the shell. A job can be referred to
 by the process id of any process of the job or by one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The job with the specified number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Any job whose command line begins with \fIstring\fR; works only in the
 interactive mode when the history file is active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Any job whose command line contains \fIstring\fR; works only in the interactive
 mode when the history file is active.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 12n
-.rt  
 Current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%+\fR\fR
 .ad
 .RS 12n
-.rt  
 Equivalent to \fB%%\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\(mi\fR\fR
 .ad
 .RS 12n
-.rt  
 Previous job.
 .RE
 
@@ -593,35 +549,29 @@ job from the list of known jobs in the current shell environment.
 The following options modify or enhances the output of \fBjobs\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays process IDs after the job number in addition to the usual information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays only the jobs whose status has changed since the last prompt was
 displayed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the process group leader IDs for the specified jobs.
 .RE
 
@@ -631,62 +581,51 @@ Displays the process group leader IDs for the specified jobs.
 the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The process id of \fBjob\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The process group id of \fBjob\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fInumber\fR\fR
 .ad
 .RS 12n
-.rt  
 The job number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 The job whose name begins with \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 The job whose name contains \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%+\fR\fR
 .ad
@@ -695,18 +634,15 @@ The job whose name contains \fIstring\fR.
 \fB\fB%%\fR\fR
 .ad
 .RS 12n
-.rt  
 The current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%-\fR\fR
 .ad
 .RS 12n
-.rt  
 The previous job.
 .RE
 
@@ -741,12 +677,10 @@ lines of the form:
 where the fields are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcurrent\fR\fR
 .ad
 .RS 14n
-.rt  
 The character \fB+\fR identifies the job that would be used as a default for
 the \fBfg\fR or \fBbg\fR commands. This job can also be specified using the
 \fIjob_id\fR \fB%+\fR or \fB%%\fR \fB\&.\fR The character \fB\(mi\fR identifies
@@ -760,12 +694,10 @@ least two suspended jobs, then the previous job is also a suspended job.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIjob-number\fR\fR
 .ad
 .RS 14n
-.rt  
 A number that can be used to identify the process group to the \fBwait\fR,
 \fBfg\fR, \fBbg,\fR and \fBkill\fR utilities. Using these utilities, the job
 can be identified by prefixing the job number with \fB%\fR.
@@ -773,99 +705,81 @@ can be identified by prefixing the job number with \fB%\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstate\fR\fR
 .ad
 .RS 14n
-.rt  
 One of the following strings in the POSIX Locale:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRunning\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job has not been suspended by a signal and has not exited.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDone\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job completed and returned exit status zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDone\fR(\fIcode\fR)\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job completed normally and that it exited with the specified
 \fBnon-zero\fR exit status, \fIcode\fR, expressed as a decimal number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStopped\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job was stopped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStopped(SIGTSTP)\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job was suspended by the \fBSIGTSTP\fR signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStopped(SIGSTOP)\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job was suspended by the \fBSIGSTOP\fR signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStopped(SIGTTIN)\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job was suspended by the \fBSIGTTIN\fR signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBStopped(SIGTTOU)\fR\fR
 .ad
 .RS 20n
-.rt  
 Indicates that the job was suspended by the \fBSIGTTOU\fR signal.
 .RE
 
@@ -878,12 +792,10 @@ the termination.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcommand\fR\fR
 .ad
 .RS 14n
-.rt  
 The associated command that was specified to the shell.
 .RE
 
@@ -906,23 +818,19 @@ that affect the execution of \fBjobs\fR, \fBfg\fR, and \fBbg\fR: \fBLANG\fR,
 The following exit values are returned for \fBjobs\fR, \fBfg\fR, and \fBbg\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -932,23 +840,19 @@ An error occurred.
 The following exit values are returned for \fBjobs\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The information for each job is written to standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 One or more jobs does not exist.
 .RE
 
@@ -957,23 +861,19 @@ One or more jobs does not exist.
 The following exit values are returned for \fBfg\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexit status of last job\fR\fR
 .ad
 .RS 27n
-.rt  
 One or more jobs has been brought into the foreground.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR\fR
 .ad
 .RS 27n
-.rt  
 One or more jobs does not exist or has completed.
 .RE
 
@@ -982,23 +882,19 @@ One or more jobs does not exist or has completed.
 The following exit values are returned for \fBbg\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All background jobs are started.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 One more jobs does not exist or there are no background jobs.
 .RE
 
@@ -1011,15 +907,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
@@ -1027,13 +922,12 @@ StandardSee \fBstandards\fR(5).
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUncommitted
+Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO

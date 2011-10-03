@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mcs 1 "5 Oct 2007" "SunOS 5.11" "User Commands"
+.TH MCS 1 "Oct 5, 2007"
 .SH NAME
 mcs \- manipulate the comment section of an object file
 .SH SYNOPSIS
@@ -44,24 +44,20 @@ that name before performing the specified operation.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIstring\fR\fR
 .ad
 .RS 13n
-.rt  
 Appends \fIstring\fR to the comment section of the \fBELF\fR object files. If
 \fIstring\fR contains embedded blanks, it must be enclosed in quotation marks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 13n
-.rt  
 Compresses the contents of the comment section of the \fBELF\fR object files.
 All duplicate entries are removed. The ordering of the remaining entries is not
 disturbed.
@@ -69,24 +65,20 @@ disturbed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 13n
-.rt  
 Deletes the contents of the specified section from the \fBELF\fR object files.
 The section header for the comment section is also removed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR\fR
 .ad
 .RS 13n
-.rt  
 Specifies the name of the section to access if other than \fB\&.comment\fR. By
 default, \fBmcs\fR deals with the section named \fB\&.comment\fR. This option
 can be used to specify another section. \fBmcs\fR can take multiple \fB-n\fR
@@ -95,12 +87,10 @@ options to allow for specification of  multiple sections.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints the contents of the comment section on the standard output. Each section
 printed is tagged by the name of the file from which it was extracted, using
 the format \fIfile\fR\fB[\fR\fImember_name\fR\fB]:\fR for archive files and
@@ -109,23 +99,19 @@ the format \fIfile\fR\fB[\fR\fImember_name\fR\fB]:\fR for archive files and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 13n
-.rt  
 Prints on standard error the version number of \fBmcs\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 13n
-.rt  
 Replaces any \fBSHT_PROGBITS\fR sections with zeros while retaining the
 original attributes of the sections.
 .RE
@@ -191,12 +177,10 @@ removes the section named \fB\&.annotate\fR from the file \fBelf.file\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/mcs*\fR\fR
 .ad
 .RS 13n
-.rt  
 temporary files
 .RE
 
@@ -208,13 +192,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

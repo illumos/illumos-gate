@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pm_raise_power 9F "22 March 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PM_RAISE_POWER 9F "Mar 22, 2005"
 .SH NAME
 pm_raise_power, pm_lower_power \- Raise or lower power of components
 .SH SYNOPSIS
@@ -28,68 +28,56 @@ Solaris DDI specific (Solaris DDI)
 .SS "pm_raise_power"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the device's \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of the \fIcomponent\fR for which a power level change is desired
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 13n
-.rt  
 The power level to which the indicated \fIcomponent\fR will be raised
 .RE
 
 .SS "pm_lower_power"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the device's \fBdev_info\fR structure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcomponent\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of the \fIcomponent\fR for which a power level change is desired
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlevel\fR\fR
 .ad
 .RS 13n
-.rt  
 Power level to which the indicated \fIcomponent\fR will be lowered
 .RE
 
@@ -162,23 +150,19 @@ functions must be called from the same thread which entered \fBattach\fR(9E),
 The \fBpm_raise_power\fR(9F) function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 \fIComponent\fR is now at the requested power level or higher.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 \fIComponent \fRor \fIlevel\fR is out of range, or the framework was unable to
 raise the power level of the component to the requested level.
 .RE
@@ -188,24 +172,20 @@ raise the power level of the component to the requested level.
 The \fBpm_lower_power\fR(9F) function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 \fI Component \fR is now at the requested power level or lower, or automatic
 Power Management is disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 \fI Component \fR or \fIlevel\fR is out of range, or the framework was unable
 to lower the power level of the component to the requested level, or the device
 is not detaching.
@@ -269,7 +249,7 @@ xxdisk_power(dev_info *dip, int comp, int level)
        /*
         * We fail the power() entry point if the device is busy and
         * request is to lower the power level.
-        
+
 */
 
         ASSERT(mutex_owned( xsp->lock));
@@ -279,7 +259,7 @@ xxdisk_power(dev_info *dip, int comp, int level)
                         return (DDI_FAILURE);
                 }
         }
- 
+
 \&...
 
 }
@@ -298,13 +278,12 @@ See \fBattributes\fR(5) for a description of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

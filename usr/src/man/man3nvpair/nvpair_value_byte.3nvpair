@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvpair_value_byte 3NVPAIR "1 Aug 2008" "SunOS 5.11" "Name-value Pair Library Functions"
+.TH NVPAIR_VALUE_BYTE 3NVPAIR "Aug 1, 2008"
 .SH NAME
 nvpair_value_byte, nvpair_value_boolean_value, nvpair_value_int8,
 nvpair_value_uint8, nvpair_value_int16, nvpair_value_uint16,
@@ -159,34 +159,28 @@ nvpair_value_nvlist_array \- retrieve value from a name-value pair
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvpair\fR\fR
 .ad
 .RS 10n
-.rt  
 Name-value pair to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInelem\fR\fR
 .ad
 .RS 10n
-.rt  
 Address to store the number of elements in value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIval\fR\fR
 .ad
 .RS 10n
-.rt  
 Address to store the value or the starting address of the array value.
 .RE
 
@@ -221,12 +215,10 @@ These functions return 0 on success and an error value on failure.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 Either one of the arguments is \fINULL\fR or the type of \fInvpair\fR does not
 match the function name.
 .RE
@@ -239,15 +231,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.69i) |cw(2.81i) 
-lw(2.69i) |lw(2.81i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH chpoll 9E "7 May 2008" "SunOS 5.11" "Driver Entry Points"
+.TH CHPOLL 9E "May 7, 2008"
 .SH NAME
 chpoll \- poll entry point for a non-STREAMS character driver
 .SH SYNOPSIS
@@ -17,7 +17,7 @@ chpoll \- poll entry point for a non-STREAMS character driver
 
 
 
-\fBint prefix\fR\fBchpoll\fR(\fBdev_t\fR \fIdev\fR, \fBshort\fR \fIevents\fR, \fBint\fR \fIanyyet\fR, 
+\fBint prefix\fR\fBchpoll\fR(\fBdev_t\fR \fIdev\fR, \fBshort\fR \fIevents\fR, \fBint\fR \fIanyyet\fR,
      \fBshort *\fR\fIreventsp\fR, \fBstruct pollhead **\fR\fIphpp\fR);
 .fi
 
@@ -28,120 +28,98 @@ This entry point is optional. Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev\fR\fR
 .ad
 .RS 12n
-.rt  
 The device number for the device to be polled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevents\fR\fR
 .ad
 .RS 12n
-.rt  
 The events that may occur. Valid events are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLIN\fR\fR
 .ad
 .RS 14n
-.rt  
 Data other than high priority data may be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLOUT\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data may be written without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLPRI\fR\fR
 .ad
 .RS 14n
-.rt  
 High priority data may be received without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLHUP\fR\fR
 .ad
 .RS 14n
-.rt  
 A device hangup has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLERR\fR\fR
 .ad
 .RS 14n
-.rt  
 An error has occurred on the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLRDNORM\fR\fR
 .ad
 .RS 14n
-.rt  
 Normal data (priority band = 0) may be read without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLRDBAND\fR\fR
 .ad
 .RS 14n
-.rt  
 Data from a non-zero priority band may be read without blocking
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLWRNORM\fR\fR
 .ad
 .RS 14n
-.rt  
 The same as \fBPOLLOUT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPOLLWRBAND\fR\fR
 .ad
 .RS 14n
-.rt  
 Priority data (priority band > 0) may be written.
 .RE
 
@@ -149,12 +127,10 @@ Priority data (priority band > 0) may be written.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIanyyet\fR\fR
 .ad
 .RS 12n
-.rt  
 A flag that is non-zero if any other file descriptors in the \fBpollfd\fR array
 have events pending. The \fBpoll\fR(2) system call takes a pointer to an array
 of \fBpollfd\fR structures as one of its arguments. See the \fBpoll\fR(2)
@@ -163,23 +139,19 @@ reference page for more details.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreventsp\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a bitmask of the returned events satisfied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIphpp\fR\fR
 .ad
 .RS 12n
-.rt  
 A pointer to a pointer to a \fBpollhead\fR structure.
 .RE
 

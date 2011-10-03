@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH net_routeto 9F "1 May 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH NET_ROUTETO 9F "May 1, 2008"
 .SH NAME
 net_routeto \- indicate which network interface packets are sent
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ net_routeto \- indicate which network interface packets are sent
 .nf
 #include <sys/neti.h>
 
-\fBphy_if_t\fR \fBnet_routeto\fR(\fBconst\fR \fBnet_data_t\fR *\fInet\fR, \fBstruct\fR \fBsockaddr\fR *\fIaddress\fR, 
+\fBphy_if_t\fR \fBnet_routeto\fR(\fBconst\fR \fBnet_data_t\fR *\fInet\fR, \fBstruct\fR \fBsockaddr\fR *\fIaddress\fR,
      \fBstruct\fR \fBsockaddr\fR *\fInexthop\fR);
 .fi
 
@@ -22,34 +22,28 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInet\fR\fR
 .ad
 .RS 11n
-.rt  
 value returned from a successful call to \fBnet_protocol_lookup\fR(9F).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR\fR
 .ad
 .RS 11n
-.rt  
 network address to find a path out of the machine for.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInexthop\fR\fR
 .ad
 .RS 11n
-.rt  
 pointer to the \fBsockaddr\fR structure in which to store the address of the
 next hop. If this information is not required, the value \fBNULL\fR may be
 passed instead.
@@ -69,34 +63,28 @@ returned in it.
 The \fBnet_routeto()\fR function returns:
 .sp
 .ne 2
-.mk
 .na
 \fB-1\fR
 .ad
 .RS 6n
-.rt  
 The network protocol does not support this function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 6n
-.rt  
 This function cannot find a route for the address given.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
 .RS 6n
-.rt  
 Indicates which network interface can be used to reach the given address.
 .RE
 
@@ -113,13 +101,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH contents 4 "20 Dec 2007" "SunOS 5.11" "File Formats"
+.TH CONTENTS 4 "Dec 20, 2007"
 .SH NAME
 contents \- list of files and associated packages
 .SH SYNOPSIS
@@ -94,146 +94,120 @@ The following are the descriptions of the fields in both old- and new-style
 entries.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath\fR\fR
 .ad
 .RS 11n
-.rt  
 The absolute path of the node being described. For \fBftype\fR \fBs\fR
 (indicating a symbolic link) this is the indirect pointer (link) name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrpath\fR\fR
 .ad
 .RS 11n
-.rt  
 The relative path to the real file or linked-to directory name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIftype\fR\fR
 .ad
 .RS 11n
-.rt  
 A one-character field that indicates the entry type (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclass\fR\fR
 .ad
 .RS 11n
-.rt  
 The installation class to which the file belongs (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpackage\fR\fR
 .ad
 .RS 11n
-.rt  
 The package associated with this entry. For \fBftype\fR \fBd\fR (directory)
 more than one package can be present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 11n
-.rt  
 The octal mode of the file (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIowner\fR\fR
 .ad
 .RS 11n
-.rt  
 The owner of the file (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 11n
-.rt  
 The group to which the file belongs (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImajor\fR\fR
 .ad
 .RS 11n
-.rt  
 The major device number (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 11n
-.rt  
 The minor device number (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 11n
-.rt  
 The actual size of the file in bytes as reported by sum (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcksum\fR\fR
 .ad
 .RS 11n
-.rt  
 The checksum of the file contents (see \fBpkgmap\fR(4)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodtime\fR\fR
 .ad
 .RS 11n
-.rt  
 The time of last modification (see \fBpkgmap\fR(4)).
 .RE
 
@@ -245,13 +219,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO

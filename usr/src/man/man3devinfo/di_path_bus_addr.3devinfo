@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_path_bus_addr 3DEVINFO "15 May 2008" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_PATH_BUS_ADDR 3DEVINFO "May 15, 2008"
 .SH NAME
 di_path_bus_addr, di_path_client_node, di_path_instance, di_path_node_name,
 di_path_phci_node, di_path_state \- return libdevinfo path node information
@@ -44,12 +44,10 @@ di_path_phci_node, di_path_state \- return libdevinfo path node information
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpath\fR\fR
 .ad
 .RS 8n
-.rt  
 The handle to a path node in a \fBdi_init\fR(3DEVINFO) snapshot.
 .RE
 
@@ -93,7 +91,6 @@ The \fBdi_path_state()\fR function returns the state of an I/O path. This
 function may return one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PATH_STATE_ONLINE\fR\fR
 .ad
@@ -105,7 +102,6 @@ routed through this path.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PATH_STATE_OFFLINE\fR\fR
 .ad
@@ -116,7 +112,6 @@ Identifies that the \fBpath_info\fR node is in offline state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PATH_STATE_FAULT\fR\fR
 .ad
@@ -128,7 +123,6 @@ I/O operations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_PATH_STATE_STANDBY\fR\fR
 .ad
@@ -146,15 +140,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

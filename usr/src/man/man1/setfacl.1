@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setfacl 1 "19 Dec 2006" "SunOS 5.11" "User Commands"
+.TH SETFACL 1 "Dec 19, 2006"
 .SH NAME
 setfacl \- modify the Access Control List (ACL) for a file or files
 .SH SYNOPSIS
@@ -72,12 +72,10 @@ comma-separated \fBACL\fR entries.
 An \fBACL\fR entry consists of the following fields separated by colons:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIentry_type\fR\fR
 .ad
 .RS 14n
-.rt  
 Type of \fBACL\fR entry on which to set file permissions. For example,
 \fIentry_type\fR can be \fBuser\fR (the owner of a file) or \fBmask\fR (the
 \fBACL\fR mask).
@@ -85,24 +83,20 @@ Type of \fBACL\fR entry on which to set file permissions. For example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuid\fR or \fIgid\fR\fR
 .ad
 .RS 14n
-.rt  
 User name or user identification number. Or, group name or group identification
 number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIperms\fR\fR
 .ad
 .RS 14n
-.rt  
 Represents the permissions that are set on \fIentry_type\fR. \fIperms\fR can be
 indicated by the symbolic characters \fBrwx\fR or a number (the same
 permissions numbers used with the \fBchmod\fR command).
@@ -116,36 +110,34 @@ be specified for directories):
 
 .sp
 .TS
-tab();
-cw(2i) cw(3.5i) 
-lw(2i) lw(3.5i) 
-.
-\fBACL\fR EntryDescription
+c c
+l l .
+\fBACL\fR Entry	Description
 _
-u[ser]::\fIperms\fR File owner permissions.
-g[roup]::\fIperms\fR File group owner permissions.
-o[ther]:\fIperms\fR T{
+u[ser]::\fIperms\fR 	File owner permissions.
+g[roup]::\fIperms\fR 	File group owner permissions.
+o[ther]:\fIperms\fR 	T{
 Permissions for users other than the file owner or members of file group owner.
 T}
-m[ask]:\fIperms\fR T{
+m[ask]:\fIperms\fR 	T{
 The \fBACL\fR mask. The mask entry indicates the maximum permissions allowed for users (other than the owner) and for groups. The mask is a quick way to change permissions on all the users and groups.
 T}
-u[ser]:\fIuid:perms\fRT{
+u[ser]:\fIuid:perms\fR	T{
 Permissions for a specific user. For \fIuid\fR, you can specify either a user name or a numeric UID.
 T}
-g[roup]:\fIgid:perms\fRT{
+g[roup]:\fIgid:perms\fR	T{
 Permissions for a specific group. For \fIgid\fR, you can specify either a group name or a numeric GID.
 T}
-d[efault]:u[ser]::\fIperms\fR Default file owner permissions.
-d[efault]:g[roup]::\fIperms\fR Default file group owner permissions.
-d[efault]:o[ther]:\fIperms\fR T{
+d[efault]:u[ser]::\fIperms\fR 	Default file owner permissions.
+d[efault]:g[roup]::\fIperms\fR 	Default file group owner permissions.
+d[efault]:o[ther]:\fIperms\fR 	T{
 Default permissions for users other than the file owner or members of the file group owner.
 T}
-d[efault]:m[ask]:\fIperms\fR Default \fBACL\fR mask.
-d[efault]:u[ser]:\fIuid\fR:\fIperms\fRT{
+d[efault]:m[ask]:\fIperms\fR 	Default \fBACL\fR mask.
+d[efault]:u[ser]:\fIuid\fR:\fIperms\fR	T{
 Default permissions for a specific user. For \fIuid\fR, you can specify either a user name or a numeric UID.
 T}
-d[efault]:g[roup]:\fIgid\fR:\fIperms\fRT{
+d[efault]:g[roup]:\fIgid\fR:\fIperms\fR	T{
 Default permissions for a specific group. For \fIgid\fR, you can specify either a group name or a numeric GID.
 T}
 .TE
@@ -161,12 +153,10 @@ file group owner, \fBACL\fR mask, and others can not be deleted.
 The options have the following meaning:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIacl_entries\fR\fR
 .ad
 .RS 18n
-.rt  
 Deletes one or more entries from the file. The entries for the file owner, the
 file group owner, and others can not be deleted from the \fBACL\fR. Notice that
 deleting an entry does not necessarily have the same effect as removing all
@@ -175,12 +165,10 @@ permissions from the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIacl_file\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets a file's \fBACL\fR with the \fBACL\fR entries contained in the file named
 \fIacl_file\fR. The same constraints on specified entries hold as with the
 \fB-s\fR option. The entries are not required to be in any specific order in
@@ -196,12 +184,10 @@ are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fIacl_entries\fR\fR
 .ad
 .RS 18n
-.rt  
 Adds one or more new \fBACL\fR entries to the file, and/or modifies one or more
 existing \fBACL\fR entries on the file. If an entry already exists for a
 specified \fIuid\fR or \fIgid\fR, the specified permissions replace the current
@@ -213,12 +199,10 @@ other, mask, and any additional entries) the first time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 18n
-.rt  
 Recalculates the permissions for the \fBACL\fR mask entry. The permissions
 specified in the \fBACL\fR mask entry are ignored and replaced by the maximum
 permissions necessary to grant the access to all additional user, file group
@@ -229,12 +213,10 @@ unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIacl_entries\fR\fR
 .ad
 .RS 18n
-.rt  
 Sets a file's \fBACL\fR. All old \fBACL\fR entries are removed and replaced
 with the newly specified \fBACL\fR. The entries need not be in any specific
 order. They are sorted by the command before being applied to the file.
@@ -338,7 +320,7 @@ access.
 .sp
 .in +2
 .nf
-\fBsetfacl -s user:shea:rwx,user::rwx,group::rw-,mask:r--,other:--- abc\fR 
+\fBsetfacl -s user:shea:rwx,user::rwx,group::rw-,mask:r--,other:--- abc\fR
 .fi
 .in -2
 .sp
@@ -373,23 +355,19 @@ The following example sets the same \fBACL\fR on file \fBabc\fR as the file
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 15n
-.rt  
 password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 15n
-.rt  
 group file
 .RE
 

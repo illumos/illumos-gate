@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH libnvpair 3LIB "1 Aug 2008" "SunOS 5.11" "Interface Libraries"
+.TH LIBNVPAIR 3LIB "Aug 1, 2008"
 .SH NAME
 libnvpair \- name-value pair library
 .SH SYNOPSIS
@@ -23,45 +23,37 @@ pairs.
 The library defines four opaque handles:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnvpair_t\fR\fR
 .ad
 .RS 18n
-.rt  
 handle to a name-value pair
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnvlist_t\fR\fR
 .ad
 .RS 18n
-.rt  
 handle to a list of name-value pairs
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnv_alloc_t\fR\fR
 .ad
 .RS 18n
-.rt  
 handle to a pluggable allocator
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnv_alloc_ops_t\fR\fR
 .ad
 .RS 18n
-.rt  
 handle to pluggable allocator operations
 .RE
 
@@ -114,83 +106,77 @@ interfaces.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBnvlist_add_boolean\fR\fBnvlist_add_boolean_value\fR
-\fBnvlist_add_boolean_array\fR\fBnvlist_add_byte\fR
-\fBnvlist_add_byte_array\fR\fBnvlist_add_double\fR
-\fBnvlist_add_int8\fR\fBnvlist_add_int8_array\fR
-\fBnvlist_add_int16\fR\fBnvlist_add_int16_array\fR
-\fBnvlist_add_int32\fR\fBnvlist_add_int32_array\fR
-\fBnvlist_add_int64\fR\fBnvlist_add_int64_array\fR
-\fBnvlist_add_nvlist\fR\fBnvlist_add_nvlist_array\fR
-\fBnvlist_add_nvpair\fR\fBnvlist_add_string\fR
-\fBnvlist_add_string_array\fR\fBnvlist_add_uint8\fR
-\fBnvlist_add_uint8_array\fR\fBnvlist_add_uint16\fR
-\fBnvlist_add_uint16_array\fR\fBnvlist_add_uint32\fR
-\fBnvlist_add_uint32_array\fR\fBnvlist_add_uint64\fR
-\fBnvlist_add_uint64_array\fR\fBnvlist_alloc\fR
-\fBnvlist_dup\fR\fBnvlist_exists\fR
-\fBnvlist_free\fR\fBnvlist_lookup_boolean\fR
-\fBnvlist_lookup_boolean_value\fR\fBnvlist_lookup_boolean_array\fR
-\fBnvlist_lookup_byte\fR\fBnvlist_lookup_byte_array\fR
-\fBnvlist_lookup_double\fR\fBnvlist_lookup_int8\fR
-\fBnvlist_lookup_int8_array\fR\fBnvlist_lookup_int16\fR
-\fBnvlist_lookup_int16_array\fR\fBnvlist_lookup_int32\fR
-\fBnvlist_lookup_int32_array\fR\fBnvlist_lookup_int64\fR
-\fBnvlist_lookup_int64_array\fR\fBnvlist_lookup_nvlist\fR
-\fBnvlist_lookup_nvlist_array\fR\fBnvlist_lookup_nv_alloc\fR
-\fBnvlist_lookup_nvpair\fR\fBnvlist_lookup_pairs\fR
-\fBnvlist_lookup_string\fR\fBnvlist_lookup_string_array\fR
-\fBnvlist_lookup_uint8\fR\fBnvlist_lookup_uint8_array\fR
-\fBnvlist_lookup_uint16\fR\fBnvlist_lookup_uint16_array\fR
-\fBnvlist_lookup_uint32\fR\fBnvlist_lookup_uint32_array\fR
-\fBnvlist_lookup_uint64\fR\fBnvlist_lookup_uint64_array\fR
-\fBnvlist_merge\fR\fBnvlist_next_nvpair\fR
-\fBnvlist_pack\fR\fBnvlist_remove\fR
-\fBnvlist_remove_all\fR\fBnvlist_size\fR
-\fBnvlist_unpack\fR\fBnvlist_xalloc\fR
-\fBnvlist_xdup\fR\fBnvlist_xpack\fR
-\fBnvlist_xunpack\fR\fBnvpair_name\fR
-\fBnvpair_type\fR\fBnvpair_value_boolean_array\fR
-\fBnvpair_value_boolean_value\fR\fBnvpair_value_byte\fR
-\fBnvpair_value_byte_array\fR\fBnvpair_value_double\fR
-\fBnvpair_value_int8\fR\fBnvpair_value_int8_array\fR
-\fBnvpair_value_int16\fR\fBnvpair_value_int16_array\fR
-\fBnvpair_value_int32\fR\fBnvpair_value_int32_array\fR
-\fBnvpair_value_int64\fR\fBnvpair_value_int64_array\fR
-\fBnvpair_value_nvlist\fR\fBnvpair_value_nvlist_array\fR
-\fBnvpair_value_string\fR\fBnvpair_value_string_array\fR
-\fBnvpair_value_uint8\fR\fBnvpair_value_uint8_array\fR
-\fBnvpair_value_uint16\fR\fBnvpair_value_uint16_array\fR
-\fBnvpair_value_uint32\fR\fBnvpair_value_uint32_array\fR
-\fBnvpair_value_uint64\fR\fBnvpair_value_uint64_array\fR
-\fBnv_alloc_init\fR\fBnv_alloc_fini\fR
-\fBnv_alloc_reset\fR
+l l
+l l .
+\fBnvlist_add_boolean\fR	\fBnvlist_add_boolean_value\fR
+\fBnvlist_add_boolean_array\fR	\fBnvlist_add_byte\fR
+\fBnvlist_add_byte_array\fR	\fBnvlist_add_double\fR
+\fBnvlist_add_int8\fR	\fBnvlist_add_int8_array\fR
+\fBnvlist_add_int16\fR	\fBnvlist_add_int16_array\fR
+\fBnvlist_add_int32\fR	\fBnvlist_add_int32_array\fR
+\fBnvlist_add_int64\fR	\fBnvlist_add_int64_array\fR
+\fBnvlist_add_nvlist\fR	\fBnvlist_add_nvlist_array\fR
+\fBnvlist_add_nvpair\fR	\fBnvlist_add_string\fR
+\fBnvlist_add_string_array\fR	\fBnvlist_add_uint8\fR
+\fBnvlist_add_uint8_array\fR	\fBnvlist_add_uint16\fR
+\fBnvlist_add_uint16_array\fR	\fBnvlist_add_uint32\fR
+\fBnvlist_add_uint32_array\fR	\fBnvlist_add_uint64\fR
+\fBnvlist_add_uint64_array\fR	\fBnvlist_alloc\fR
+\fBnvlist_dup\fR	\fBnvlist_exists\fR
+\fBnvlist_free\fR	\fBnvlist_lookup_boolean\fR
+\fBnvlist_lookup_boolean_value\fR	\fBnvlist_lookup_boolean_array\fR
+\fBnvlist_lookup_byte\fR	\fBnvlist_lookup_byte_array\fR
+\fBnvlist_lookup_double\fR	\fBnvlist_lookup_int8\fR
+\fBnvlist_lookup_int8_array\fR	\fBnvlist_lookup_int16\fR
+\fBnvlist_lookup_int16_array\fR	\fBnvlist_lookup_int32\fR
+\fBnvlist_lookup_int32_array\fR	\fBnvlist_lookup_int64\fR
+\fBnvlist_lookup_int64_array\fR	\fBnvlist_lookup_nvlist\fR
+\fBnvlist_lookup_nvlist_array\fR	\fBnvlist_lookup_nv_alloc\fR
+\fBnvlist_lookup_nvpair\fR	\fBnvlist_lookup_pairs\fR
+\fBnvlist_lookup_string\fR	\fBnvlist_lookup_string_array\fR
+\fBnvlist_lookup_uint8\fR	\fBnvlist_lookup_uint8_array\fR
+\fBnvlist_lookup_uint16\fR	\fBnvlist_lookup_uint16_array\fR
+\fBnvlist_lookup_uint32\fR	\fBnvlist_lookup_uint32_array\fR
+\fBnvlist_lookup_uint64\fR	\fBnvlist_lookup_uint64_array\fR
+\fBnvlist_merge\fR	\fBnvlist_next_nvpair\fR
+\fBnvlist_pack\fR	\fBnvlist_remove\fR
+\fBnvlist_remove_all\fR	\fBnvlist_size\fR
+\fBnvlist_unpack\fR	\fBnvlist_xalloc\fR
+\fBnvlist_xdup\fR	\fBnvlist_xpack\fR
+\fBnvlist_xunpack\fR	\fBnvpair_name\fR
+\fBnvpair_type\fR	\fBnvpair_value_boolean_array\fR
+\fBnvpair_value_boolean_value\fR	\fBnvpair_value_byte\fR
+\fBnvpair_value_byte_array\fR	\fBnvpair_value_double\fR
+\fBnvpair_value_int8\fR	\fBnvpair_value_int8_array\fR
+\fBnvpair_value_int16\fR	\fBnvpair_value_int16_array\fR
+\fBnvpair_value_int32\fR	\fBnvpair_value_int32_array\fR
+\fBnvpair_value_int64\fR	\fBnvpair_value_int64_array\fR
+\fBnvpair_value_nvlist\fR	\fBnvpair_value_nvlist_array\fR
+\fBnvpair_value_string\fR	\fBnvpair_value_string_array\fR
+\fBnvpair_value_uint8\fR	\fBnvpair_value_uint8_array\fR
+\fBnvpair_value_uint16\fR	\fBnvpair_value_uint16_array\fR
+\fBnvpair_value_uint32\fR	\fBnvpair_value_uint32_array\fR
+\fBnvpair_value_uint64\fR	\fBnvpair_value_uint64_array\fR
+\fBnv_alloc_init\fR	\fBnv_alloc_fini\fR
+\fBnv_alloc_reset\fR	
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/libnvpair.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 shared object
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/64/libnvpair.so.1\fR\fR
 .ad
 .RS 26n
-.rt  
 64-bit shared object
 .RE
 
@@ -202,15 +188,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

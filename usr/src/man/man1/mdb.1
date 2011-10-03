@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mdb 1 "30 Nov 2005" "SunOS 5.11" "User Commands"
+.TH MDB 1 "Nov 30, 2005"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
 .LP
 .nf
-\fBmdb\fR [\fB-fkmuwyAFKMSUW\fR] [\(+-o \fIoption\fR] [\fB-p\fR \fIpid\fR] [\fB-s\fR \fIdistance\fR] 
-     [\fB-I\fR \fIpath\fR] [\fB-L\fR \fIpath\fR] [\fB-P\fR \fIprompt\fR] [\fB-R\fR \fIroot\fR] 
+\fBmdb\fR [\fB-fkmuwyAFKMSUW\fR] [\(+-o \fIoption\fR] [\fB-p\fR \fIpid\fR] [\fB-s\fR \fIdistance\fR]
+     [\fB-I\fR \fIpath\fR] [\fB-L\fR \fIpath\fR] [\fB-P\fR \fIprompt\fR] [\fB-R\fR \fIroot\fR]
      [\fB-V\fR \fIdis-version\fR] [object [core] | core | suffix]
 .fi
 
@@ -107,7 +107,7 @@ A \fImetacharacter\fR is one of the following characters:
 .sp
 .in +2
 .nf
-[   ]   |   !   /   \e   ?   =   >   $   :   ;   
+[   ]   |   !   /   \e   ?   =   >   $   :   ;
             \fINEWLINE\fR   \fISPACE\fR   \fITAB\fR
 .fi
 .in -2
@@ -169,7 +169,6 @@ described under \fBArithmetic Expansion\fR below.
 A \fIcommand\fR is one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpipeline\fR [\fB!\fR \fIword\fR .\|.\|.] [ \fB;\fR ]\fR
 .ad
@@ -185,7 +184,6 @@ details, refer to \fBShell Escapes\fR below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression\fR \fI pipeline\fR [\fB!\fR \fIword\fR .\|.\|.] [ \fB;\fR ]\fR
 .ad
@@ -198,7 +196,6 @@ execution of the pipeline, the value of dot (the variable denoted by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression\fR\fB ,\fR \fIexpression\fR \fIpipeline \fR [\fB!\fR
 \fIword\fR .\|.\|.] [ \fB;\fR ]\fR
@@ -214,7 +211,6 @@ The repeat count only applies to the first dcmd in the pipeline.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB,\fR \fIexpression\fR \fIpipeline\fR [\fB!\fR \fIword\fR .\|.\|.] [
 \fB;\fR ]\fR
@@ -227,7 +223,6 @@ the pipeline is repeated according to the value of the expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression\fR [\fB!\fR \fIword\fR .\|.\|.] [ \fB;\fR ]\fR
 .ad
@@ -240,7 +235,6 @@ and arguments are executed using the new value of dot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIexpression\fR\fB,\fR \fIexpression\fR  [\fB!\fR \fI word\fR .\|.\|.] [
 \fB;\fR ]\fR
@@ -255,7 +249,6 @@ the second expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB,\fR \fIexpression \fR  [\fB!\fR \fIword\fR .\|.\|.] [ \fB;\fR ]\fR
 .ad
@@ -268,7 +261,6 @@ value of the count expression.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR \fIword\fR .\|.\|. [ \fB;\fR ]\fR
 .ad
@@ -298,12 +290,10 @@ and is replaced by the value of the expression.
 Expressions can contain any of the following special words:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinteger\fR\fR
 .ad
 .RS 22n
-.rt  
 The specified integer value. Integer values can be prefixed with \fB0i\fR or
 \fB0I\fR to indicate binary values, \fB0o\fR or \fB0O\fR to indicate octal
 values, \fB0t\fR or \fB0T\fR to indicate decimal values, and \fB0x\fR or
@@ -312,24 +302,20 @@ values, \fB0t\fR or \fB0T\fR to indicate decimal values, and \fB0x\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB0[tT][0-9]+.[0-9]+\fR
 .ad
 .RS 22n
-.rt  
 The specified decimal floating point value, converted to its \fBIEEE\fR
 double-precision floating point representation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&'\fIcccccccc\fR'\fR
 .ad
 .RS 22n
-.rt  
 The integer value computed by converting each character to a byte equal to its
 \fBASCII\fR value. Up to eight characters can be specified in a character
 constant. Characters are packed into the integer in reverse order
@@ -338,78 +324,64 @@ constant. Characters are packed into the integer in reverse order
 
 .sp
 .ne 2
-.mk
 .na
 \fB<\fIidentifier\fR\fR
 .ad
 .RS 22n
-.rt  
 The value of the variable named by \fIidentifier\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIidentifier\fR\fR
 .ad
 .RS 22n
-.rt  
 The value of the symbol named by \fIidentifier\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB(\fIexpression\fR)\fR
 .ad
 .RS 22n
-.rt  
 The value of \fIexpression\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.\fR
 .ad
 .RS 22n
-.rt  
 The value of dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB&\fR
 .ad
 .RS 22n
-.rt  
 The most recent value of dot used to execute a dcmd.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB+\fR
 .ad
 .RS 22n
-.rt  
 The value of dot incremented by the current increment.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^\fR
 .ad
 .RS 22n
-.rt  
 The value of dot decremented by the current increment.
 .RE
 
@@ -424,57 +396,47 @@ Unary operators are right associative and have higher precedence than binary
 operators. The unary operators are:
 .sp
 .ne 2
-.mk
 .na
 \fB#\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 Logical negation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB~\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 Bitwise complement.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB-\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 Integer negation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of a pointer-sized quantity at the object file location corresponding
 to virtual address \fIexpression\fR in the target's virtual address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%/[csil]/\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of a char, short, int, or long-sized quantity at the object file
 location corresponding to virtual address \fIexpression\fR in the target's
 virtual address space.
@@ -482,12 +444,10 @@ virtual address space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%/[1248]/\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of a one, two, four, or eight-byte quantity at the object file
 location corresponding to virtual address \fIexpression\fR in the target's
 virtual address space.
@@ -495,36 +455,30 @@ virtual address space.
 
 .sp
 .ne 2
-.mk
 .na
 \fB*\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of a pointer-sized quantity at virtual address \fIexpression\fR in
 the target's virtual address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB*/[csil]/\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of a char, short, int, or long-sized quantity at virtual address
 \fIexpression\fR in the target's virtual address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB*/[1248]/\fIexpression\fR\fR
 .ad
 .RS 23n
-.rt  
 The value of a one, two, four, or eight-byte quantity at virtual address
 \fIexpression\fR in the target's virtual address space.
 .RE
@@ -536,133 +490,109 @@ operators. The binary operators, in order of precedence from highest to lowest,
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 6n
-.rt  
 Integer multiplication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 6n
-.rt  
 Integer division.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 6n
-.rt  
 Left-hand side rounded up to next multiple of right-hand side.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 6n
-.rt  
 Integer addition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 6n
-.rt  
 Integer subtraction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<<\fR\fR
 .ad
 .RS 6n
-.rt  
 Bitwise shift left.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>>\fR\fR
 .ad
 .RS 6n
-.rt  
 Bitwise shift right.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB==\fR\fR
 .ad
 .RS 6n
-.rt  
 Logical equality.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!=\fR\fR
 .ad
 .RS 6n
-.rt  
 Logical inequality.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&\fR\fR
 .ad
 .RS 6n
-.rt  
 Bitwise AND.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR^\fR
 .ad
 .RS 6n
-.rt  
 Bitwise exclusive OR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB|\fR\fR
 .ad
 .RS 6n
-.rt  
 Bitwise inclusive OR.
 .RE
 
@@ -705,103 +635,85 @@ tagged (user-defined indicator).
 The following variables are defined as persistent:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 10n
-.rt  
 The most recent value printed using the \fB/\fR, \fB\e\fR, \fB?\fR, or \fB=\fR
 dcmd.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB9\fR
 .ad
 .RS 10n
-.rt  
 The most recent count used with the \fB$<\fR dcmd.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBb\fR
 .ad
 .RS 10n
-.rt  
 The virtual address of the base of the data section.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBd\fR
 .ad
 .RS 10n
-.rt  
 The size of the data section in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBe\fR
 .ad
 .RS 10n
-.rt  
 The virtual address of the entry point.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBm\fR
 .ad
 .RS 10n
-.rt  
 The initial bytes (magic number) of the target's primary object file, or zero
 if no object file has been read yet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBt\fR
 .ad
 .RS 10n
-.rt  
 The size of the text section in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhits\fR
 .ad
 .RS 10n
-.rt  
 The count of the number of times the matched software event specifier has been
 matched. See \fBEvent Callbacks\fR, below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBthread\fR
 .ad
 .RS 10n
-.rt  
 The thread identifier of the current representative thread. The value of the
 identifier depends on the threading model used by the current target. See
 \fBThread Support\fR, below.
@@ -943,34 +855,28 @@ For example, if dmods \fBm1\fR and \fBm2\fR each provide a dcmd \fBd\fR, and
 \fBm1\fR is loaded prior to \fBm2\fR, then:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::d\fR\fR
 .ad
 .RS 10n
-.rt  
 Executes \fBm1\fR's definition of \fBd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::m1`d\fR\fR
 .ad
 .RS 10n
-.rt  
 Executes \fBm1\fR's definition of \fBd\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::m2`d\fR\fR
 .ad
 .RS 10n
-.rt  
 Executes \fBm2'\fRs definition of \fBd\fR.
 .RE
 
@@ -1054,158 +960,130 @@ committed and executed using \fIRETURN\fR or \fINEWLINE\fR. The edit commands
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB^F\fR
 .ad
 .RS 14n
-.rt  
 Move cursor forward (right) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBM-f\fR
 .ad
 .RS 14n
-.rt  
 Move cursor forward one word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^B\fR
 .ad
 .RS 14n
-.rt  
 Move cursor backward (left) one character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBM-b\fR
 .ad
 .RS 14n
-.rt  
 Move cursor backward one word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^A\fR
 .ad
 .RS 14n
-.rt  
 Move cursor to start of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^E\fR
 .ad
 .RS 14n
-.rt  
 Move cursor to end of line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^D\fR
 .ad
 .RS 14n
-.rt  
 Delete current character, if the current line is not empty. If the current line
 is empty, \fB^D\fR denotes \fBEOF\fR and the debugger exits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBM-^H\fR
 .ad
 .RS 14n
-.rt  
 (Meta-backspace) Delete previous word.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^K\fR
 .ad
 .RS 14n
-.rt  
 Delete from the cursor to the end of the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^L\fR
 .ad
 .RS 14n
-.rt  
 Clear the screen and reprint the current line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^T\fR
 .ad
 .RS 14n
-.rt  
 Transpose current character with next character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^N\fR
 .ad
 .RS 14n
-.rt  
 Fetch the next command from the history. Each time \fB^N\fR is entered, the
 next command forward in time is retrieved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^P\fR
 .ad
 .RS 14n
-.rt  
 Fetch the previous command from the history. Each time \fB^P\fR is entered, the
 next command backward in time is retrieved.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB^R[\fIstring\fR]\fR
 .ad
 .RS 14n
-.rt  
 Search backward in the history for a previous command line containing
 \fIstring\fR. The string should be terminated by a \fIRETURN\fR or
 \fINEWLINE\fR. If \fIstring\fR is omitted, the previous history element
@@ -1219,70 +1097,58 @@ editing commands. User defined sequences can be read or modified using the
 \fBstty\fR(1) command.
 .sp
 .ne 2
-.mk
 .na
 \fBerase\fR
 .ad
 .RS 11n
-.rt  
 User defined erase character (usually \fB^H\fR or \fB^?\fR). Delete previous
 character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBintr\fR
 .ad
 .RS 11n
-.rt  
 User defined interrupt character (usually \fB^C\fR). Abort the current command
 and print a new prompt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkill\fR
 .ad
 .RS 11n
-.rt  
 User defined kill character (usually \fB^U\fR). Kill the entire current command
 line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBquit\fR
 .ad
 .RS 11n
-.rt  
 User defined quit character (usually \fB^\e\fR). Quit the debugger.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsuspend\fR
 .ad
 .RS 11n
-.rt  
 User defined suspend character (usually \fB^Z\fR). Suspend the debugger.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwerase\fR
 .ad
 .RS 11n
-.rt  
 User defined word erase character (usually \fB^W\fR). Erase the preceding word.
 .RE
 
@@ -1292,45 +1158,37 @@ On keyboards that support an extended keypad with arrow keys, \fBmdb\fR
 interprets these keystrokes as editing commands:
 .sp
 .ne 2
-.mk
 .na
 \fBup-arrow\fR
 .ad
 .RS 15n
-.rt  
 Fetch the previous command from the history (same as \fB^P\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdown-arrow\fR
 .ad
 .RS 15n
-.rt  
 Fetch the next command from the history (same as \fB^N\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBleft-arrow\fR
 .ad
 .RS 15n
-.rt  
 Move cursor backward one character (same as \fB^B\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBright-arrow\fR
 .ad
 .RS 15n
-.rt  
 Move cursor forward one character (same as \fB^F\fR).
 .RE
 
@@ -1354,57 +1212,47 @@ displays a pager prompt:
 The following key sequences are recognized by the pager:
 .sp
 .ne 2
-.mk
 .na
 \fB\fISPACE\fR\fR
 .ad
 .RS 25n
-.rt  
 Display the next screenful of output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBa, A\fR
 .ad
 .RS 25n
-.rt  
 Abort the current top-level command and return to the prompt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBc, C\fR
 .ad
 .RS 25n
-.rt  
 Continue displaying output without pausing at each screenful until the current
 top-level command is complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBn, N, \fINEWLINE\fR, \fIRETURN\fR\fR
 .ad
 .RS 25n
-.rt  
 Display the next line of output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBq, Q, ^C, ^\e\fR
 .ad
 .RS 25n
-.rt  
 Quit (abort) the current dcmd only.
 .RE
 
@@ -1426,48 +1274,40 @@ sign (\fB$[ ]\fR). A string argument must be enclosed in double-quotes (\fB"
 The formatting dcmds are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/\fR\fR
 .ad
 .RS 6n
-.rt  
 Display data from the target's virtual address space starting at the virtual
 address specified by dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e\fR\fR
 .ad
 .RS 6n
-.rt  
 Display data from the target's physical address space starting at the physical
 address specified by dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 6n
-.rt  
 Display data from the target's primary object file starting at the object file
 location corresponding to the virtual address specified by dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the value of dot itself in each of the specified data formats. The
 \fB=\fR dcmd is therefore useful for converting between bases and performing
 arithmetic.
@@ -1494,69 +1334,67 @@ table of format characters can be displayed from within \fBmdb\fR using the
 
 .sp
 .TS
-tab();
-lw(.69i) lw(4.81i) 
-lw(.69i) lw(4.81i) 
-.
-\fB+\fRT{
+l l
+l l .
+\fB+\fR	T{
 increment dot by the count (variable size)
 T}
-\fB-\fRT{
+\fB-\fR	T{
 decrement dot by the count (variable size)
 T}
-Bhexadecimal int (1 byte)
-CT{
+B	hexadecimal int (1 byte)
+C	T{
 character using C character notation (1 byte)
 T}
-Ddecimal signed int (4 bytes)
-Edecimal unsigned long long (8 bytes)
-Fdouble (8 bytes)
-Goctal unsigned long long (8 bytes)
-Hswap bytes and shorts (4 bytes)
-IT{
+D	decimal signed int (4 bytes)
+E	decimal unsigned long long (8 bytes)
+F	double (8 bytes)
+G	octal unsigned long long (8 bytes)
+H	swap bytes and shorts (4 bytes)
+I	T{
 address and disassembled instruction (variable size)
 T}
-Jhexadecimal long long (8 bytes)
-Khexadecimal uintptr_t (4 or 8 bytes)
-Nnewline
-Ooctal unsigned int (4 bytes)
-Psymbol (4 or 8 bytes)
-Qoctal signed int (4 bytes)
-Rbinary int (8 bytes)
-ST{
+J	hexadecimal long long (8 bytes)
+K	hexadecimal uintptr_t (4 or 8 bytes)
+N	newline
+O	octal unsigned int (4 bytes)
+P	symbol (4 or 8 bytes)
+Q	octal signed int (4 bytes)
+R	binary int (8 bytes)
+S	T{
 string using C string notation (variable size)
 T}
-Thorizontal tab
-Udecimal unsigned int (4 bytes)
-Vdecimal unsigned int (1 byte)
-Wdefault radix unsigned int (4 bytes)
-Xhexadecimal int (4 bytes)
-Ydecoded time32_t (4 bytes)
-Zhexadecimal long long (8 bytes)
-^T{
+T	horizontal tab
+U	decimal unsigned int (4 bytes)
+V	decimal unsigned int (1 byte)
+W	default radix unsigned int (4 bytes)
+X	hexadecimal int (4 bytes)
+Y	decoded time32_t (4 bytes)
+Z	hexadecimal long long (8 bytes)
+^	T{
 decrement dot by increment * count (variable size)
 T}
-adot as symbol+offset
-boctal unsigned int (1 byte)
-ccharacter (1 byte)
-ddecimal signed short (2 bytes)
-edecimal signed long long (8 bytes)
-ffloat (4 bytes)
-goctal signed long long (8 bytes)
-hswap bytes (2 bytes)
-idisassembled instruction (variable size)
-nnewline
-ooctal unsigned short (2 bytes)
-psymbol (4 or 8 bytes)
-qoctal signed short (2 bytes)
-rwhitespace
-sraw string (variable size)
-thorizontal tab
-udecimal unsigned short (2 bytes)
-vdecimal signed int (1 byte)
-wdefault radix unsigned short (2 bytes)
-xhexadecimal short (2 bytes)
-ydecoded time64_t (8 bytes)
+a	dot as symbol+offset
+b	octal unsigned int (1 byte)
+c	character (1 byte)
+d	decimal signed short (2 bytes)
+e	decimal signed long long (8 bytes)
+f	float (4 bytes)
+g	octal signed long long (8 bytes)
+h	swap bytes (2 bytes)
+i	disassembled instruction (variable size)
+n	newline
+o	octal unsigned short (2 bytes)
+p	symbol (4 or 8 bytes)
+q	octal signed short (2 bytes)
+r	whitespace
+s	raw string (variable size)
+t	horizontal tab
+u	decimal unsigned short (2 bytes)
+v	decimal signed int (1 byte)
+w	default radix unsigned short (2 bytes)
+x	hexadecimal short (2 bytes)
+y	decoded time64_t (8 bytes)
 .TE
 
 .sp
@@ -1571,48 +1409,40 @@ enclosed in square brackets preceded by a dollar sign (\fB$[ ]\fR).
 The write modifiers are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 Write the lowest byte of the value of each expression to the target beginning
 at the location specified by dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 Write the lowest two bytes of the value of each expression to the target
 beginning at the location specified by dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBW\fR\fR
 .ad
 .RS 5n
-.rt  
 Write the lowest 4 bytes of the value of each expression to the target
 beginning at the location specified by dot.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBZ\fR\fR
 .ad
 .RS 5n
-.rt  
 Write the complete 8 bytes of the value of each expression to the target
 beginning at the location specified by dot.
 .RE
@@ -1638,13 +1468,11 @@ The search modifiers are:
 
 .sp
 .TS
-tab();
-lw(.69i) lw(4.81i) 
-lw(.69i) lw(4.81i) 
-.
-lSearch for the specified 2-byte value.
-LSearch for the specified 4-byte value.
-MSearch for the specified 8-byte value.
+l l
+l l .
+l	Search for the specified 2-byte value.
+L	Search for the specified 4-byte value.
+M	Search for the specified 8-byte value.
 .TE
 
 .sp
@@ -1778,7 +1606,6 @@ shown in alphabetical order. If a \fB$\fR or \fB:\fR form has a
 form. The built-in dcmds are:
 .sp
 .ne 2
-.mk
 .na
 \fB> \fIvariable-name\fR\fR
 .ad
@@ -1794,45 +1621,37 @@ character surrounded by \fB/ /\fR, then the value is modified as part of the
 assignment. The modifier characters are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 unsigned char quantity (1-byte)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 unsigned short quantity (2-byte)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 unsigned int quantity (4-byte)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 unsigned long quantity (4-byte in 32-bit, 8-byte in 64-bit)
 .RE
 
@@ -1845,7 +1664,6 @@ syntax should be used instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$<\fR \fImacro-name\fR\fR
 .ad
@@ -1860,7 +1678,6 @@ file is closed and replaced with the new file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$<<\fR \fImacro-name\fR\fR
 .ad
@@ -1872,7 +1689,6 @@ do not close the current open macro file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$?\fR\fR
 .ad
@@ -1885,7 +1701,6 @@ representative thread.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB$C\fR [ \fIcount\fR ]\fR
 .ad
@@ -1901,7 +1716,6 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIbase\fR ] \fB$d\fR\fR
 .ad
@@ -1915,7 +1729,6 @@ the current radix is printed in base 10 (decimal). The default radix is base 16
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$e\fR\fR
 .ad
@@ -1930,7 +1743,6 @@ tables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$P\fR \fIprompt-string\fR\fR
 .ad
@@ -1943,7 +1755,6 @@ is '\fB>\fR '. The prompt can also be set using \fB::set\fR \fB-P\fR or the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdistance\fR \fB$s\fR\fR
 .ad
@@ -1958,7 +1769,6 @@ specified, the current setting is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$v\fR\fR
 .ad
@@ -1970,7 +1780,6 @@ dcmd provides other options for listing variables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwidth\fR \fB$w\fR\fR
 .ad
@@ -1983,7 +1792,6 @@ resize events.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$W\fR\fR
 .ad
@@ -1996,7 +1804,6 @@ Re-open the target for writing, as if \fBmdb\fR had been executed with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIpid\fR ] \fB::attach \fR [ \fIcore\fR | \fIpid\fR ]\fR
 .ad
@@ -2017,7 +1824,6 @@ as expressions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fIaddress\fR] \fB::bp\fR [\fB-/\fR\fB-dDesT\fR] [\fB-c\fR \fIcmd\fR]
 [\fB-n\fR \fIcount\fR] \fIsym\fR ...\fR
@@ -2054,7 +1860,6 @@ this string contains meta-characters, it must be quoted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::cat\fR \fIfilename\fR ...\fR
 .ad
@@ -2069,7 +1874,6 @@ addresses stored in an external file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::cont\fR [ \fISIG\fR ]\fR
 .ad
@@ -2095,7 +1899,6 @@ running, \fB::cont\fR starts a new program running as if by \fB::run\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR \fB::context\fR\fR
 .ad
@@ -2127,7 +1930,6 @@ by executing \fB0::context\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::dcmds\fR\fR
 .ad
@@ -2138,7 +1940,6 @@ List the available dcmds and print a brief description for each one.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::delete\fR [ \fIid\fR | \fBall\fR ]\fR
 .ad
@@ -2159,7 +1960,6 @@ flag). The \fB::events\fR dcmd displays the current list of event specifiers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::dis\fR [ \fB-fw\fR ] [ \fB-n\fR \fIcount\fR ] [
 \fIaddress\fR ]\fR
@@ -2182,7 +1982,6 @@ the \fB-n\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::disasms\fR\fR
 .ad
@@ -2195,7 +1994,6 @@ mode to any of the modes listed using the \fB::dismode\fR dcmd.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::dismode\fR [ \fImode\fR ]\fR
 .ad
@@ -2213,7 +2011,6 @@ displayed using the \fB::disasms\fR dcmd.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::dmods\fR [ \fB-l\fR ] [ \fImodule-name\fR ]\fR
 .ad
@@ -2227,7 +2024,6 @@ additional argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::dump\fR [ \fB-eqrstu\fR ] [ \fB-f\fR|\fB-p\fR ]\fR
 .ad
@@ -2244,24 +2040,20 @@ a number of iterations. The \fB::dump\fR dcmd also recognizes the following
 options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 17n
-.rt  
 Adjusts for endian-ness. The \fB-e\fR option assumes 4-byte words. The \fB-g\fR
 option can be used to change the default word size.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 17n
-.rt  
 Reads data from the object file location corresponding to the given virtual
 address instead of from the target's virtual address space. The \fB-f\fR option
 is enabled by default if the debugger is not currently attached to a live
@@ -2270,93 +2062,77 @@ process, core file, or crash dump.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIbytes\fR\fR
 .ad
 .RS 17n
-.rt  
 Displays bytes in groups of \fIbytes\fR. The default group size is 4 bytes. The
 group size must be a power of two that divides the line width.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 17n
-.rt  
 Interprets \fIaddress\fR as a physical address location in the target's address
 space instead of a virtual address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 17n
-.rt  
 Does not print an ASCII decoding of the data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 17n
-.rt  
 Numbers lines relative to the start address instead of with the explicit
 address of each line. This option implies the \fB-u\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 17n
-.rt  
 Elides repeated lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 17n
-.rt  
 Only reads from and displays the contents of the specified addresses, instead
 of reading and printing entire lines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 17n
-.rt  
 Unaligns output instead of aligning the output at a paragraph boundary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fIparagraphs\fR\fR
 .ad
 .RS 17n
-.rt  
 Displays paragraphs at 16-byte paragraphs per line. The default number of
 \fIparagraphs\fR is one. The maximum value accepted for \fB-w\fR is \fB16\fR.
 .RE
@@ -2365,7 +2141,6 @@ Displays paragraphs at 16-byte paragraphs per line. The default number of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::echo\fR [ \fIstring\fR | \fIvalue\fR ...]\fR
 .ad
@@ -2378,7 +2153,6 @@ and printed in the default base.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::eval\fR \fIcommand\fR\fR
 .ad
@@ -2390,7 +2164,6 @@ metacharacters or whitespace, it should be enclosed in double or single quotes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::events\fR [ \fB-av\fR ]\fR
 .ad
@@ -2412,13 +2185,13 @@ any specifier inactivity, are shown. Here is some sample output:
 > ::events
    ID S TA HT LM Description                      Action
 ----- - -- -- -- -------------------------------- ------
-[ 1 ] - T   1  0 stop on SIGINT                   -                    
-[ 2 ] - T   0  0 stop on SIGQUIT                  -                    
-[ 3 ] - T   0  0 stop on SIGILL                   -                    
+[ 1 ] - T   1  0 stop on SIGINT                   -
+[ 2 ] - T   0  0 stop on SIGQUIT                  -
+[ 3 ] - T   0  0 stop on SIGILL                   -
  ...
-[ 11] - T   0  0 stop on SIGXCPU                  -                    
-[ 12] - T   0  0 stop on SIGXFSZ                  -                    
-[ 13] -     2  0 stop at libc`printf              ::echo printf        
+[ 11] - T   0  0 stop on SIGXCPU                  -
+[ 12] - T   0  0 stop on SIGXFSZ                  -
+[ 13] -     2  0 stop at libc`printf              ::echo printf
 >
 .fi
 .in -2
@@ -2428,12 +2201,10 @@ The following table explains the meaning of each column. A summary of this
 information is available using \fB::help\fR \fBevents\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBID\fR\fR
 .ad
 .RS 15n
-.rt  
 The event specifier identifier. The identifier is shown in square brackets \fB[
 ]\fR if the specifier is enabled, in parentheses \fB( )\fR if the specifier is
 disabled, or in angle brackets \fB< >\fR if the target program is currently
@@ -2442,21 +2213,17 @@ stopped on an event that matches the given specifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 15n
-.rt  
 The event specifier state. The state is one of the following symbols:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is idle. When no target program is running, all specifiers
 are idle. When the target program is running, a specifier can be idle if it
 cannot be evaluated (for example, a deferred breakpoint in a shared object that
@@ -2465,24 +2232,20 @@ is not yet loaded).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is active. When the target is continued, events of this
 type is detected by the debugger.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is armed. This state means that the target is currently
 running with instrumentation for this type of event. This state is only visible
 if the debugger is attached to a running program with the \fB-o\fR \fBnostop\fR
@@ -2491,12 +2254,10 @@ option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier was not armed due to an operating system error. The
 \fB::events\fR \fB-v\fR option can be used to display more information about
 the reason the instrumentation failed.
@@ -2506,34 +2267,28 @@ the reason the instrumentation failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTA\fR\fR
 .ad
 .RS 15n
-.rt  
 The Temporary, Sticky, and Automatic event specifier properties. One or more of
 the following symbols can be shown:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is temporary, and is deleted the next time the target
 stops, regardless of whether it is matched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBT\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is sticky, and is not be deleted by \fB::delete\fR
 \fBall\fR or \fB:z\fR. The specifier can be deleted by explicitly specifying
 its id number to \fB::delete\fR.
@@ -2541,36 +2296,30 @@ its id number to \fB::delete\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is automatically disabled when the hit count is equal to
 the hit limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 5n
-.rt  
 The event specifier is automatically deleted when the hit count is equal to the
 hit limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 The target automatically stops when the hit count is equal to the hit limit.
 .RE
 
@@ -2578,12 +2327,10 @@ The target automatically stops when the hit count is equal to the hit limit.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHT\fR\fR
 .ad
 .RS 15n
-.rt  
 The current hit count. This column displays the number of times the
 corresponding software event has occurred in the target since the creation of
 this event specifier.
@@ -2591,12 +2338,10 @@ this event specifier.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLM\fR\fR
 .ad
 .RS 15n
-.rt  
 The current hit limit. This column displays the limit on the hit count at which
 the auto-disable, auto-delete, or auto-stop behavior takes effect. These
 behaviors can be configured using the \fB::evset\fR dcmd, described below.
@@ -2604,24 +2349,20 @@ behaviors can be configured using the \fB::evset\fR dcmd, described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDescription\fR\fR
 .ad
 .RS 15n
-.rt  
 A description of the type of software event that is matched by the given
 specifier.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAction\fR\fR
 .ad
 .RS 15n
-.rt  
 The callback string to execute when the corresponding software event occurs.
 This callback is executed as if it had been typed at the command prompt.
 .RE
@@ -2630,7 +2371,6 @@ This callback is executed as if it had been typed at the command prompt.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fIid\fR] \fB::evset\fR [\fB-/\fR\fB-dDestT\fR] [\fB-c\fR \fIcmd\fR]
 [\fB-n\fR \fIcount\fR] \fIid\fR ...\fR
@@ -2644,12 +2384,10 @@ interpreted as a list of decimal integers, unless an explicit radix is
 specified. The \fB::evset\fR dcmd recognizes the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Disables the event specifier when the hit count reaches the hit limit. If the
 \fB-d\fR form of the option is given, this behavior is disabled. Once an event
 specifier is disabled, the debugger removes any corresponding instrumentation
@@ -2660,12 +2398,10 @@ is disabled immediately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 6n
-.rt  
 Deletes the event specifier when the hit count reaches the hit limit. If the
 \fB-D\fR form of the option is given, this behavior is disabled. The \fB-D\fR
 option takes precedence over the \fB-d\fR option. The hit limit can be
@@ -2674,24 +2410,20 @@ configured using the \fB-n\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Enables the event specifier. If the \fB-e\fR form of the option is given, the
 specifier is disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Stops the target program when the hit count reaches the hit limit. If the
 \fB-s\fR form of the option is given, this behavior is disabled. The \fB-s\fR
 behavior tells the debugger to act as if the \fB::cont\fR were issued following
@@ -2702,12 +2434,10 @@ option takes precedence over both the \fB-D\fR option and the \fB-d\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Marks the event specifier as temporary. Temporary specifiers are automatically
 deleted the next time the target stops, regardless of whether it stopped as the
 result of a software event corresponding to the given specifier. If the
@@ -2717,12 +2447,10 @@ result of a software event corresponding to the given specifier. If the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 6n
-.rt  
 Marks the event specifier as sticky. Sticky specifiers are not deleted by
 \fB::delete\fR \fBall\fR or \fB:z.\fR They can be deleted by specifying the
 corresponding specifier \fBID\fR as an explicit argument to \fB::delete\fR. If
@@ -2732,12 +2460,10 @@ default set of event specifiers are all initially marked sticky.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Executes the specified \fIcmd\fR string each time the corresponding software
 event occurs in the target program. The current callback string can be
 displayed using \fB::events\fR.
@@ -2745,12 +2471,10 @@ displayed using \fB::events\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the current value of the hit limit to \fIcount\fR. If no hit limit is
 currently set and the \fB-n\fR option does not accompany \fB-s\fR or D, the hit
 limit is set to one.
@@ -2761,7 +2485,6 @@ A summary of this information is available using \fB::help\fR \fBevset\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::files\fR\fR
 .ad
@@ -2777,7 +2500,6 @@ in the various target symbol tables).
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fIflt\fR] \fB::fltbp\fR [\fB-/\fR\fB-dDestT\fR] [\fB-c\fR \fIcmd\fR]
 [\fB-n\fR \fIcount\fR] \fIflt\fR ...\fR
@@ -2793,7 +2515,6 @@ meaning as they do for the \fB::evset\fR dcmd.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fB\fIthread\fR\fR ] \fB::fpregs\fR\fR
 .ad
@@ -2811,7 +2532,6 @@ thread expression should be one of the thread identifiers described under
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::formats\fR\fR
 .ad
@@ -2824,7 +2544,6 @@ under \fBFormatting dcmds\fR, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::grep\fR \fIcommand\fR\fR
 .ad
@@ -2838,7 +2557,6 @@ pipelines to filter a list of addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::help\fR [ \fIdcmd-name\fR ]\fR
 .ad
@@ -2851,7 +2569,6 @@ prints a usage summary for that dcmd.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsignal\fR \fB:i\fR\fR
 .ad
@@ -2867,7 +2584,6 @@ of the set of signals that cause a process to dump core by default (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$i\fR\fR
 .ad
@@ -2880,7 +2596,6 @@ obtained using the \fB::events\fR dcmd.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::kill\fR\fR
 .ad
@@ -2897,7 +2612,6 @@ using \fB::run\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$l\fR\fR
 .ad
@@ -2909,7 +2623,6 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$L\fR\fR
 .ad
@@ -2921,7 +2634,6 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::list\fR \fItype\fR \fImember\fR [ \fIvariable-name\fR
 ]\fR
@@ -2947,7 +2659,6 @@ Information\fR, below for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::load\fR [ \fB-s\fR ] \fImodule-name\fR\fR
 .ad
@@ -2963,7 +2674,6 @@ issue any error messages if the module is not found or could not be loaded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::log\fR [ \fB-d\fR | [ \fB-e\fR ] \fIfilename\fR ]\fR
 .ad
@@ -2985,7 +2695,6 @@ appends any new log output to the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::map\fR \fIcommand\fR\fR
 .ad
@@ -3000,7 +2709,6 @@ addresses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::mappings\fR [ \fIname\fR ]\fR
 .ad
@@ -3019,7 +2727,6 @@ mapping matching that description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::next\fR [ \fISIG\fR ]\fR
 .ad
@@ -3038,7 +2745,6 @@ new program running as if by \fB::run\fR and stop at the first instruction.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::nm\fR [ \fB-DPdghnopuvx\fR ] [ \fB-t\fR \fItypes\fR
 ]\fR
@@ -3056,89 +2762,73 @@ specified, only the symbol table for this load object is displayed. The
 \fB::nm\fR dcmd also recognizes the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints \fB\&.dynsym\fR (dynamic symbol table) instead of \fB\&.symtab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints the private symbol table instead of \fB\&.symtab\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints value and size fields in decimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints only global symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 27n
-.rt  
 Suppresses the header line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 27n
-.rt  
 Sorts symbols by name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints value and size fields in octal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints symbols as a series of \fB::nmadd\fR commands. This option can be used
 with \fB-P\fR to produce a macro file that can be subsequently read into the
 debugger with \fB$<\fR.
@@ -3146,132 +2836,108 @@ debugger with \fB$<\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints only undefined symbols.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 27n
-.rt  
 Sorts symbols by value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 27n
-.rt  
 Prints value and size fields in hexadecimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype\fR[,\fItype\fR ... ]\fR
 .ad
 .RS 27n
-.rt  
 Prints only symbols of the specified type(s). The valid \fItype\fR argument
 strings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoty\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_NOTYPE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobjt\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_OBJECT\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfunc\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_FUNC\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsect\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_SECTION\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_FILE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcomm\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_COMMON\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtls\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_TLS\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBregi\fR\fR
 .ad
 .RS 8n
-.rt  
 \fISTT_SPARC_REGISTER\fR
 .RE
 
@@ -3279,121 +2945,99 @@ strings are:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIformat\fR[,\fIformat\fR ... ]\fR
 .ad
 .RS 27n
-.rt  
 Prints only the specified symbol information. The valid \fIformat\fR argument
 strings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBndx\fR\fR
 .ad
 .RS 9n
-.rt  
 symbol table index
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBval\fR\fR
 .ad
 .RS 9n
-.rt  
 symbol value
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsize\fR\fR
 .ad
 .RS 9n
-.rt  
 size in bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR\fR
 .ad
 .RS 9n
-.rt  
 symbol type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbind\fR\fR
 .ad
 .RS 9n
-.rt  
 binding
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoth\fR\fR
 .ad
 .RS 9n
-.rt  
 other
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshndx\fR\fR
 .ad
 .RS 9n
-.rt  
 section index
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBname\fR\fR
 .ad
 .RS 9n
-.rt  
 symbol name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctype\fR\fR
 .ad
 .RS 9n
-.rt  
 C type for symbol (if known)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobj\fR\fR
 .ad
 .RS 9n
-.rt  
 object which defines symbol
 .RE
 
@@ -3403,7 +3047,6 @@ object which defines symbol
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR \fB::nmadd\fR [ \fB-fo\fR ] [ \fB-e\fR \fIend\fR ] [ \fB-s\fR
 \fIsize\fR ] \fIname \fR\fR
@@ -3416,45 +3059,37 @@ the target's symbol table, as described under \fBSymbol Name Resolution\fR
 above. The \fB::nmadd\fR dcmd also recognizes the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the size of the symbol to \fIend\fR - \fIvalue\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the type of the symbol to \fBSTT_FUNC\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the type of the symbol to \fBSTT_OBJECT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the size of the symbol to \fIsize\fR.
 .RE
 
@@ -3462,7 +3097,6 @@ Sets the size of the symbol to \fIsize\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::nmdel\fR \fIname\fR\fR
 .ad
@@ -3473,7 +3107,6 @@ Delete the specified symbol \fIname\fR from the private symbol table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::objects\fR [ \fB-v\fR ]\fR
 .ad
@@ -3489,7 +3122,6 @@ the output for the \fB-v\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::offsetof\fR \fItype member\fR\fR
 .ad
@@ -3508,7 +3140,6 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR \fB::print\fR [ \fB-aCdiLptx\fR ] [ \fB-c\fR \fIlim\fR ]\fR
 .ad
@@ -3563,7 +3194,6 @@ addresses shown are byte offsets starting at zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::quit\fR\fR
 .ad
@@ -3578,7 +3208,6 @@ Quit the debugger.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIthread\fR ] \fB::regs\fR\fR
 .ad
@@ -3596,7 +3225,6 @@ described under \fBThread Support\fR, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::release\fR [ \fB-a\fR ]\fR
 .ad
@@ -3618,7 +3246,6 @@ dcmds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::run\fR [ \fIargs\fR . . . ]\fR
 .ad
@@ -3636,7 +3263,6 @@ examining a live running program, it first detaches from this program as if by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::set\fR [ \fB-wF\fR ] [ \fB-/\fR\fB-o\fR \fIoption\fR ] [ \fB-s\fR
 \fIdistance\fR ] [ \fB-I\fR \fIpath\fR ]\fR
@@ -3652,24 +3278,20 @@ current set of debugger properties is displayed. The \fB::set\fR dcmd
 recognizes the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 6n
-.rt  
 Forcibly takes over the next user process that \fB::attach\fR is applied to, as
 if \fBmdb\fR had been executed with the \fB-F\fR option on the command line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the default path for locating macro files. The path argument can contain
 any of the special tokens described for the \fB-I\fR command-line option under
 OPTIONS.
@@ -3677,12 +3299,10 @@ OPTIONS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the default path for locating debugger modules. The path argument can
 contain any of the special tokens described for the \fB-I\fR command-line
 option under OPTIONS.
@@ -3690,12 +3310,10 @@ option under OPTIONS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Enables the specified debugger option. If the \fB-o\fR form is used, the option
 is disabled. The option strings are described along with the \fB-o\fR
 command-line option under OPTIONS.
@@ -3703,23 +3321,19 @@ command-line option under OPTIONS.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the command prompt to the specified prompt string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the symbol matching distance to the specified distance. Refer to the
 description of the \fB-s\fR command-line option under OPTIONS for more
 information.
@@ -3727,12 +3341,10 @@ information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 6n
-.rt  
 Re-opens the target for writing, as if \fBmdb\fR had been executed with the
 \fB-w\fR option on the command line.
 .RE
@@ -3741,7 +3353,6 @@ Re-opens the target for writing, as if \fBmdb\fR had been executed with the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::showrev\fR [ \fB-pv\fR ]\fR
 .ad
@@ -3759,7 +3370,6 @@ version of "\fBUnknown\fR" in the output for the \fB-v\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[\fIsignal\fR] \fB::sigbp\fR [\fB-/\fR\fB-dDestT\fR] [\fB-c\fR \fIcmd\fR]
 [\fB-n\fR \fIcount\fR] \fISIG\fR ...\fR
@@ -3782,7 +3392,6 @@ signals that cause the process to dump core by default (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::sizeof\fR \fItype\fR \fR
 .ad
@@ -3799,7 +3408,6 @@ Information\fR, below for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::stack \fR [ \fIcount\fR ]\fR
 .ad
@@ -3818,7 +3426,6 @@ arguments are displayed for each stack frame in the output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::status\fR\fR
 .ad
@@ -3829,7 +3436,6 @@ Print a summary of information related to the current target.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::step\fR [ \fBover\fR | \fBout\fR ] [ \fISIG\fR ]\fR
 .ad
@@ -3858,7 +3464,6 @@ program running as if by \fB::run\fR and stop at the first instruction. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIsyscall\fR ] \fB::sysbp\fR [ \fB-/\fR\fB-dDestT\fR ] [ \fB-io\fR ] [
 \fB-c\fR \fIcmd\fR ]\fR
@@ -3881,7 +3486,6 @@ specified, the event specifiers trigger on exit out from the kernel. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIthread\fR \fB::tls\fR \fIsymbol\fR\fR
 .ad
@@ -3896,7 +3500,6 @@ described under \fBSymbol Name Resolution\fR, above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::typeset\fR [ \fB-/\fR\fB-t\fR] \fIvariable-name\fR . . .\fR
 .ad
@@ -3911,7 +3514,6 @@ specified, the list of variables and their values is printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::unload\fR \fImodule-name\fR\fR
 .ad
@@ -3924,7 +3526,6 @@ Unload the specified dmod. The list of active dmods can be printed using the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::unset\fR \fIvariable-name\fR . . .\fR
 .ad
@@ -3937,7 +3538,6 @@ unset by the user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::vars\fR [ \fB-npt\fR] \fR
 .ad
@@ -3954,7 +3554,6 @@ Variables can be tagged using the \fB-t\fR option of the \fB::typeset\fR dcmd.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::version\fR\fR
 .ad
@@ -3965,7 +3564,6 @@ Print the debugger version number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddress\fR \fB::vtop\fR [\fB-a\fR \fIas\fR]\fR
 .ad
@@ -3986,7 +3584,6 @@ kernel pages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB[ \fIaddress\fR ] \fB::walk\fR \fIwalker-name\fR [ \fIvariable-name\fR ]\fR
 .ad
@@ -4009,7 +3606,6 @@ specified variable is assigned the value returned at each step of the walk when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::walkers\fR\fR
 .ad
@@ -4020,7 +3616,6 @@ List the available walkers and print a brief description for each one.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::whence\fR [ \fB-v\fR ] \fIname\fR . . .\fR
 .ad
@@ -4040,7 +3635,6 @@ and walker in order of precedence.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR [ ,\fIlen\fR ]\fB::wp\fR  [ \fB-/\fR\fB-dDestT\fR ] [ \fB-rwx\fR
 ] [ \fB-c\fR \fIcmd\fR ]\fR
@@ -4080,7 +3674,6 @@ contains meta-characters, it must be quoted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB::xdata\fR\fR
 .ad
@@ -4095,7 +3688,6 @@ information, refer to the \fISolaris Modular Debugger Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:z\fR\fR
 .ad
@@ -4111,12 +3703,10 @@ specifiers can also be deleted using \fB::delete\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 15n
-.rt  
 Disables automatic loading of \fBmdb\fR modules. By default, \fBmdb\fR attempts
 to load debugger modules corresponding to the active shared libraries in a user
 process or core file, or to the loaded kernel modules in the live operating
@@ -4125,12 +3715,10 @@ system or an operating system crash dump.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Forces raw file debugging mode. By default, \fBmdb\fR attempts to infer whether
 the object and core file operands refer to a user executable and core dump or
 to a pair of operating system crash dump files. If the file type cannot be
@@ -4141,12 +3729,10 @@ files to examine.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 15n
-.rt  
 Forcibly takes over the specified user process, if necessary. By default,
 \fBmdb\fR refuses to attach to a user process that is already under the control
 of another debugging tool, such as \fBtruss\fR(1). With the \fB-F\fR option,
@@ -4157,12 +3743,10 @@ process.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR \fIpath\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets default path for locating macro files. Macro files are read using the
 \fB$<\fR or \fB$<<\fR dcmds. The path is a sequence of directory names
 delimited by colon (\fB:\fR) characters. The \fB-I\fR \fBinclude\fR path and
@@ -4170,48 +3754,40 @@ delimited by colon (\fB:\fR) characters. The \fB-I\fR \fBinclude\fR path and
 tokens:
 .sp
 .ne 2
-.mk
 .na
 \fB%i\fR
 .ad
 .RS 6n
-.rt  
 Expands to the current instruction set architecture (\fBISA\fR) name
 ('sparc', 'sparcv9', or 'i386').
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%o\fR
 .ad
 .RS 6n
-.rt  
 Expands to the old value of the path being modified. This is useful for
 appending or prepending directories to an existing path.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%p\fR
 .ad
 .RS 6n
-.rt  
 Expands to the current platform string (either \fBuname\fR \fB-i\fR or the
 platform string stored in the process core file or crash dump).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB%r\fR
 .ad
 .RS 6n
-.rt  
 Expands to the pathname of the root directory. An alternate root directory can
 be specified using the \fB-R\fR option. If no \fB-R\fR option is present, the
 root directory is derived dynamically from the path to the \fBmdb\fR executable
@@ -4222,12 +3798,10 @@ be derived as \fB/net/hostname\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB%t\fR
 .ad
 .RS 6n
-.rt  
 Expands to the name of the current target. This is either be the literal
 string '\fBproc\fR' (a user process or user process core file), '\fBkvm\fR' (a kernel
 crash dump or the live operating system), or '\fBraw\fR' (a raw file).
@@ -4255,12 +3829,10 @@ The default include path for 64-bit \fBmdb\fR is:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 15n
-.rt  
 Forces kernel debugging mode. By default, \fBmdb\fR attempts to infer whether
 the object and core file operands refer to a user executable and core dump, or
 to a pair of operating system crash dump files. The \fB-k\fR option forces
@@ -4273,12 +3845,10 @@ Write access requires ALL privileges.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-K\fR\fR
 .ad
 .RS 15n
-.rt  
 Load \fBkmdb\fR, stop the live running operating system kernel, and proceed to
 the \fBkmdb\fR debugger prompt. This option should only be used on the system
 console, as the subsequent \fBkmdb\fR prompt appears on the system console.
@@ -4286,12 +3856,10 @@ console, as the subsequent \fBkmdb\fR prompt appears on the system console.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR \fIpath\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets default path for locating debugger modules. Modules are loaded
 automatically on startup or using the \fB::load\fR dcmd. The path is a sequence
 of directory names delimited by colon (\fB:\fR) characters. The \fB-L\fR
@@ -4300,12 +3868,10 @@ library path can also contain any of the tokens shown for \fB-I\fR above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 15n
-.rt  
 Disables demand-loading of kernel module symbols. By default, \fBmdb\fR
 processes the list of loaded kernel modules and performs demand loading of
 per-module symbol tables. If the \fB-m\fR option is specified, \fBmdb\fR does
@@ -4316,12 +3882,10 @@ are not loaded on startup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 15n
-.rt  
 Preloads all kernel module symbols. By default, \fBmdb\fR performs
 demand-loading for kernel module symbols: the complete symbol table for a
 module is read when an address is that module's text or data section is
@@ -4331,35 +3895,29 @@ of all kernel modules during startup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoption\fR\fR
 .ad
 .RS 15n
-.rt  
 Enables the specified debugger option. If the \fB-o\fR form of the option is
 used, the specified \fIoption\fR is disabled. Unless noted below, each option
 is off by default. \fBmdb\fR recognizes the following \fIoption\fR arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadb\fR\fR
 .ad
 .RS 25n
-.rt  
 Enables stricter \fBadb\fR(1) compatibility. The prompt is set to the empty
 string and many \fBmdb\fR features, such as the output pager, is disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarray_mem_limit=\fR\fIlimit\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the default limit on the number of array members that \fB::print\fR
 displays. If \fIlimit\fR is the special token \fBnone\fR, all array members are
 displayed by default.
@@ -4367,12 +3925,10 @@ displayed by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBarray_str_limit=\fR\fIlimit\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the default limit on the number of characters that \fB::print\fR attempts
 to display as an ASCII string when printing a char array. If \fIlimit\fR is the
 special token \fBnone\fR, the entire char array is displayed as a string by
@@ -4381,22 +3937,18 @@ default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfollow_exec_mode=\fR\fImode\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the debugger behavior for following an \fBexec\fR(2) system call. The
 \fImode\fR should be one of the following named constants:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBask\fR\fR
 .ad
 .RS 10n
-.rt  
 If stdout is a terminal device, the debugger stops after the \fBexec\fR(2)
 system call has returned and then prompts the user to decide whether to follow
 the exec or stop. If stdout is not a terminal device, the \fBask\fR mode
@@ -4405,12 +3957,10 @@ defaults to \fBstop\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfollow\fR\fR
 .ad
 .RS 10n
-.rt  
 The debugger follows the exec by automatically continuing the target process
 and resetting all of its mappings and symbol tables based on the new
 executable. The \fBfollow\fR behavior is discussed in more detail under NOTES,
@@ -4419,12 +3969,10 @@ executable. The \fBfollow\fR behavior is discussed in more detail under NOTES,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR\fR
 .ad
 .RS 10n
-.rt  
 The debugger stops following return from the exec system call. The \fBstop\fR
 behavior is discussed in more detail under NOTES, \fBInteraction with Exec\fR,
 below.
@@ -4434,23 +3982,19 @@ below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfollow_fork_mode=\fR\fImode\fR\fR
 .ad
 .RS 25n
-.rt  
 Sets the debugger behavior for following a \fBfork\fR(2), \fBfork1\fR(2), or
 \fBvfork\fR(2) system call. The \fImode\fR should be one of the following named
 constants:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBask\fR\fR
 .ad
 .RS 10n
-.rt  
 If stdout is a terminal device, the debugger stops after the \fBfork\fR(2)
 system call has returned and then prompts the user to decide whether to follow
 the parent or child. If stdout is not a terminal device, the \fBask\fR mode
@@ -4459,24 +4003,20 @@ defaults to \fBparent\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBparent\fR\fR
 .ad
 .RS 10n
-.rt  
 The debugger follows the parent process, and detaches from the child process
 and sets it running.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchild\fR\fR
 .ad
 .RS 10n
-.rt  
 The debugger follows the child process, and detaches from the parent process
 and sets it running.
 .RE
@@ -4485,24 +4025,20 @@ and sets it running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignoreeof\fR\fR
 .ad
 .RS 25n
-.rt  
 The debugger does not exit when an \fBEOF\fR sequence (\fB^D\fR) is entered at
 the terminal. The \fB::quit\fR dcmd must be used to quit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnostop\fR\fR
 .ad
 .RS 25n
-.rt  
 Does not stop a user process when attaching to it when the \fB-p\fR option is
 specified or when the \fB::attach\fR or \fB:A\fR dcmds are applied. The
 \fBnostop\fR behavior is described in more detail under NOTES, \fBProcess
@@ -4511,23 +4047,19 @@ Attach and Release\fR, below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpager\fR\fR
 .ad
 .RS 25n
-.rt  
 Enables the output pager (default).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrepeatlast\fR\fR
 .ad
 .RS 25n
-.rt  
 If a \fINEWLINE\fR is entered as the complete command at the terminal,
 \fBmdb\fR repeats the previous command with the current value of dot. This
 option is implied by \fB-o\fR \fBadb\fR.
@@ -4535,12 +4067,10 @@ option is implied by \fB-o\fR \fBadb\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshowlmid\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBmdb\fR provides support for symbol naming and identification in user
 applications that make use of link maps other than \fILM_ID_BASE\fR and
 \fILM_ID_LDSO\fR, as described in \fBSymbol Name Resolution\fR, above. Symbols
@@ -4558,35 +4088,29 @@ link-map \fBID\fRs according to the value of \fBshowlmid\fR above, including
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpid\fR\fR
 .ad
 .RS 15n
-.rt  
 Attaches to and stops the specified process-id. \fBmdb\fR uses the
 \fB/proc/\fIpid\fR/object/a.out\fR file as the executable file pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIprompt\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets the command prompt. The default prompt is '\fB>\fR '.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets root directory for pathname expansion. By default, the root directory is
 derived from the pathname of the \fBmdb\fR executable itself. The root
 directory is substituted in place of the \fB%r\fR token during pathname
@@ -4595,12 +4119,10 @@ expansion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIdistance\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets the symbol matching distance for address-to-symbol-name conversions to the
 specified \fIdistance\fR. By default, \fBmdb\fR sets the distance to zero,
 which enables a smart-matching mode. Each \fBELF\fR symbol table entry includes
@@ -4613,12 +4135,10 @@ absolute distance and the symbol size is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 15n
-.rt  
 Suppresses processing of the user's \fB~/.mdbrc\fR file. By default, \fBmdb\fR
 reads and processes the macro file \fB\&.mdbrc\fR if one is present in the
 user's home directory, as defined by $\fBHOME\fR. If the \fB-S\fR option is
@@ -4627,12 +4147,10 @@ present, this file is not read.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 15n
-.rt  
 Forces user debugging mode. By default, \fBmdb\fR attempts to infer whether the
 object and core file operands refer to a user executable and core dump, or to a
 pair of operating system crash dump files. The \fB-u\fR option forces \fBmdb\fR
@@ -4641,12 +4159,10 @@ to assume these files are not operating system crash dump files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR\fR
 .ad
 .RS 15n
-.rt  
 Unload \fBkmdb\fR if it is loaded. You should unload \fBkmdb\fR when it is not
 in use to release the memory used by the kernel debugger back to the free
 memory available to the operating system.
@@ -4654,12 +4170,10 @@ memory available to the operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR \fIversion\fR\fR
 .ad
 .RS 15n
-.rt  
 Sets disassembler version. By default, \fBmdb\fR attempts to infer the
 appropriate disassembler version for the debug target. The disassembler can be
 set explicitly using the \fB-V\fR option. The \fB::disasms\fR dcmd lists the
@@ -4668,23 +4182,19 @@ available disassembler versions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 15n
-.rt  
 Opens the specified object and core files for writing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR\fR
 .ad
 .RS 15n
-.rt  
 Permit access to memory addresses that are mapped to I/O devices. By default,
 \fBmdb\fR does not allow such access because many devices do not provide
 hardware protection against invalid software manipulations. Use this option
@@ -4693,12 +4203,10 @@ only when debugging device drivers and with caution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 15n
-.rt  
 Sends explicit terminal initialization sequences for tty mode. Some terminals,
 such as \fBcmdtool\fR(1), require explicit initialization sequences to switch
 into a tty mode. Without this initialization sequence, terminal features such
@@ -4711,12 +4219,10 @@ as standout mode can not be available to \fBmdb\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIobject\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies an \fBELF\fR format object file to examine. \fBmdb\fR provides the
 ability to examine and edit \fBELF\fR format executables (\fBET_EXEC\fR),
 \fBELF\fR dynamic library files (\fBET_DYN\fR), \fBELF\fR relocatable object
@@ -4725,12 +4231,10 @@ files (\fBET_REL\fR), and operating system unix.X symbol table files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcore\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies an \fBELF\fR process core file (\fBET_CORE\fR), or an operating
 system crash dump vmcore.X file. If an \fBELF\fR core file operand is provided
 without a corresponding object file, \fBmdb\fR attempts to infer the name of
@@ -4741,12 +4245,10 @@ information can be unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsuffix\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the numerical suffix representing a pair of operating system crash
 dump files. For example, if the suffix is '\fB3\fR', \fBmdb\fR infers that it
 should examine the files '\fBunix.3\fR' and '\fBvmcore.3\fR'. The string of
@@ -4767,58 +4269,48 @@ which are files greater than or equal to 2 Gbytes (2^31 bytes).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Debugger completed execution successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHISTSIZE\fR\fR
 .ad
 .RS 12n
-.rt  
 This variable is used to determine the maximum length of the command history
 list. If this variable is not present, the default length is \fB128\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
 .RS 12n
-.rt  
 This variable is used to determine the pathname of the user's home directory,
 where a \fB\&.mdbrc\fR file can reside. If this variable is not present, no
 \fB\&.mdbrc\fR processing occurs.
@@ -4826,12 +4318,10 @@ where a \fB\&.mdbrc\fR file can reside. If this variable is not present, no
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
 .RS 12n
-.rt  
 This variable is used to determine the pathname of the shell used to process
 shell escapes requested using the \fB!\fR meta-character. If this variable is
 not present, \fB/bin/sh\fR is used.
@@ -4840,7 +4330,6 @@ not present, \fB/bin/sh\fR is used.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.mdbrc\fR\fR
 .ad
@@ -4853,7 +4342,6 @@ auto-loading is performed or any commands have been read from standard input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kmem\fR\fR
 .ad
@@ -4865,7 +4353,6 @@ core file when examining the live operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/ksyms\fR\fR
 .ad
@@ -4877,7 +4364,6 @@ when examining the live operating system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fIpid\fR/*\fR\fR
 .ad
@@ -4889,7 +4375,6 @@ processes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/adb\fR\fR
 .ad
@@ -4907,7 +4392,6 @@ machine as if by \fBuname\fR \fB-i\fR (see \fBuname\fR(1)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/mdb\fR\fR
 .ad
@@ -4931,13 +4415,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

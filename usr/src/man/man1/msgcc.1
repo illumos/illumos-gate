@@ -2,7 +2,7 @@
 .\" Copyright (c) 2000-2007 AT&T Knowledge Ventures
 .\" To view license terms, see http://www.opensource.org/licenses/cpl1.0.txt
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc.
-.TH msgcc 1 "9 Oct 2007" "SunOS 5.11" "User Commands"
+.TH MSGCC 1 "Oct 9, 2007"
 .SH NAME
 msgcc \- C language message catalog compiler
 .SH SYNOPSIS
@@ -34,56 +34,46 @@ pre-existing \fB-o\fR file.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcc-options\fR\fR
 .ad
 .RS 14n
-.rt  
 Specify \fBcc\fR style options and arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M-\fR\fIoption\fR\fR
 .ad
 .RS 14n
-.rt  
 Set a \fBmsgcc\fR option.
 .sp
 Specify option as one of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkmsgs\fR\fR
 .ad
 .RS 18n
-.rt  
 The \fB-o\fR file is assumed to be in \fBmkmsgs\fR(1) format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnew\fR\fR
 .ad
 .RS 18n
-.rt  
 Create a new \fB-o\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpreserve\fR\fR
 .ad
 .RS 18n
-.rt  
 Messages in the \fB-o\fR file that are not in new \fB\&.msg\fR file arguments
 are preserved. The default is to either reuse the message numbers with new
 message text that is similar to the old or to delete the message text, leaving
@@ -92,23 +82,19 @@ an unused message number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset=\fR\fInumber\fR\fR
 .ad
 .RS 18n
-.rt  
 Set the message set number to \fInumber\fR. The default is \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsimilar=\fR\fInumber\fR\fR
 .ad
 .RS 18n
-.rt  
 The message text similarity message threshold. The similarity measure between
 old and new message text is:
 .sp
@@ -128,12 +114,10 @@ turns off message replacement, but unused old messages are still deleted. Use
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
 .RS 18n
-.rt  
 Trace similar message replacements on the standard error.
 .RE
 
@@ -145,35 +129,29 @@ Trace similar message replacements on the standard error.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies the name of the file on which \fBmsgcc\fR operates.
 .RE
 
 .SH EXIT STATUS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -206,7 +184,7 @@ int main(int ac, char *av[])
         return( EXIT_SUCCESS );
 }
 
-example% msgcc -o xxx -D__STDC__ -D__i386 hello.c 
+example% msgcc -o xxx -D__STDC__ -D__i386 hello.c
 
 example% cat hello.mso
 str "hello world"
@@ -233,13 +211,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityVolatile
+Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO

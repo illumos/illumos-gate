@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kstat 9S "4 Apr 1994" "SunOS 5.11" "Data Structures for Drivers"
+.TH KSTAT 9S "Apr 4, 1994"
 .SH NAME
 kstat \- kernel statistics structure
 .SH SYNOPSIS
@@ -39,12 +39,12 @@ before calling \fBkstat_install\fR(9F) to actually export the \fBkstat\fR.
 .in +2
 .nf
 void      *ks_data;             /* kstat type-specif. data */
-ulong_t   ks_ndata;             /* # of type-specif. data 
+ulong_t   ks_ndata;             /* # of type-specif. data
                                      records */
-ulong_t   ks_data_size;         /* total size of kstat data 
+ulong_t   ks_data_size;         /* total size of kstat data
                                    section */
 int       (*ks_update)(struct kstat *, int);
-void      *ks_private;          /* arbitrary provider-private 
+void      *ks_private;          /* arbitrary provider-private
                                    data */
 void      *ks_lock;             /* protects kstat's data */
 .fi
@@ -56,12 +56,10 @@ The members of the \fBkstat\fR structure available to examine or set by a
 driver are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_data\fR \fR
 .ad
 .RS 17n
-.rt  
 Points to the data portion of the \fBkstat\fR. Either allocated by
 \fBkstat_create\fR(9F) for the drivers use, or by the driver if it is using
 virtual \fBkstat\fRs.
@@ -69,36 +67,30 @@ virtual \fBkstat\fRs.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_ndata\fR \fR
 .ad
 .RS 17n
-.rt  
 The number of data records in this \fBkstat\fR. Set by the \fBks_update\fR(9E)
 routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_data_size\fR \fR
 .ad
 .RS 17n
-.rt  
 The amount of data pointed to by \fBks_data\fR. Set by the \fBks_update\fR(9E)
 routine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_update\fR \fR
 .ad
 .RS 17n
-.rt  
 Pointer to a routine that dynamically updates \fBkstat\fR. This is useful for
 drivers where the underlying device keeps cheap hardware statistics, but where
 extraction is expensive. Instead of constantly keeping the \fBkstat\fR data
@@ -109,23 +101,19 @@ feature, set the \fBks_update\fR field before calling \fBkstat_install\fR(9F).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_private\fR \fR
 .ad
 .RS 17n
-.rt  
 Is a private field for the driver's use. Often used in \fBks_update\fR(9E).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBks_lock\fR \fR
 .ad
 .RS 17n
-.rt  
 Is a pointer to a mutex that protects this \fBkstat\fR. \fBkstat\fR data
 sections are optionally protected by the per-\fBkstat\fR \fBks_lock\fR. If
 \fBks_lock\fR is non-\fINULL\fR, \fBkstat\fR clients (such as \fB/dev/kstat\fR)

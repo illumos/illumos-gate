@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_store_cred 3GSS "30 Jun 2005" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_STORE_CRED 3GSS "Jun 30, 2005"
 .SH NAME
 gss_store_cred \- store a credential in the current credential store
 .SH SYNOPSIS
@@ -25,35 +25,29 @@ gss_store_cred \- store a credential in the current credential store
 The parameter descriptions for \fBgss_store_cred()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput_cred\fR\fR
 .ad
 .RS 21n
-.rt  
 The credential to be stored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_usage\fR\fR
 .ad
 .RS 21n
-.rt  
 This parameter specifies whether to store an initiator, an acceptor, or both
 usage components of a credential.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdesired_mech\fR\fR
 .ad
 .RS 21n
-.rt  
 The mechanism-specific component of a credential to be stored. If
 \fBGSS_C_NULL_OID\fR is specified, the \fBgss_store_cred()\fR function attempts
 to store all the elements of the given \fIinput_cred_handle\fR.
@@ -65,12 +59,10 @@ element.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoverwrite_cred\fR\fR
 .ad
 .RS 21n
-.rt  
 A boolean that indicates whether to overwrite existing credentials in the
 current store for the same principal as that of the \fIinput_cred_handle\fR. A
 non-zero value indicates that credentials are overwritten. A zero value
@@ -79,12 +71,10 @@ indicates that credentials are not overwritten.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdefault_cred\fR\fR
 .ad
 .RS 21n
-.rt  
 A boolean that indicates whether to set the principal name of the
 \fIinput_cred_handle\fR parameter as the default of the current credential
 store. A non-zero value indicates that the principal name is set as the
@@ -96,36 +86,30 @@ gss_store_cred(3GSS).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIelements_stored\fR\fR
 .ad
 .RS 21n
-.rt  
 The set of mechanism \fBOID\fRs for which \fIinput_cred_handle\fR elements have
 been stored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcred_usage_stored\fR\fR
 .ad
 .RS 21n
-.rt  
 The stored \fIinput_cred_handle\fR usage elements: initiator, acceptor, or
 both.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 21n
-.rt  
 Minor status code that is specific to one of the following: the mechanism
 identified by the \fIdesired_mech_element\fR parameter, or the element of a
 single mechanism in the \fIinput_cred_handle\fR. In all other cases,
@@ -164,7 +148,6 @@ changing the effective UID before storing a delegated credential.
 The \fBgss_store_cred()\fR can return the following status codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
@@ -175,7 +158,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_CREDENTIALS_EXPIRED\fR\fR
 .ad
@@ -186,7 +168,6 @@ The credentials could not be stored because they have expired.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_CALL_INACCESSIBLE_READ\fR\fR
 .ad
@@ -197,7 +178,6 @@ No input credentials were given.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_UNAVAILABLE\fR\fR
 .ad
@@ -208,7 +188,6 @@ The credential store is unavailable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_DUPLICATE_ELEMENT\fR\fR
 .ad
@@ -221,7 +200,6 @@ conflicts with a credential in the current credential store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
@@ -240,15 +218,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

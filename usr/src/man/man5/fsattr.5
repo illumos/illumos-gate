@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fsattr 5 "10 Oct 2007" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH FSATTR 5 "Oct 10, 2007"
 .SH NAME
 fsattr \- extended file attributes
 .SH DESCRIPTION
@@ -44,12 +44,10 @@ The following list details the operations that are rejected in the current
 implementation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlink\fR\fR
 .ad
 .RS 25n
-.rt  
 Any attempt to create links between attribute and non-attribute space is
 rejected to prevent security-related or otherwise sensitive attributes from
 being exposed, and therefore manipulable, as regular files.
@@ -57,12 +55,10 @@ being exposed, and therefore manipulable, as regular files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrename\fR\fR
 .ad
 .RS 25n
-.rt  
 Any attempt to rename between attribute and non-attribute space is rejected to
 prevent an already linked file from being renamed and thereby circumventing the
 \fBlink\fR restriction above.
@@ -70,12 +66,10 @@ prevent an already linked file from being renamed and thereby circumventing the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmkdir\fR, \fBsymlink\fR, \fBmknod\fR\fR
 .ad
 .RS 25n
-.rt  
 Any attempt to create a "non-regular" file in attribute space is rejected to
 reduce the functionality, and therefore exposure and risk, of the initial
 implementation.
@@ -111,12 +105,10 @@ The following utilities accommodate extended attributes (see the individual
 manual pages for details):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcp\fR\fR
 .ad
 .RS 8n
-.rt  
 By default, \fBcp\fR ignores attributes and copies only file data.  This is
 intended to maintain the semantics implied by \fBcp\fR currently, where
 attributes (such as owner and mode) are not copied unless the \fB-p\fR option
@@ -126,12 +118,10 @@ all attributes along with the file data.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpio\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fB-@\fR option informs \fBcpio\fR to archive attributes, but by default
 \fBcpio\fR ignores extended attributes. See \fBExtended Archive Formats\fR
 below for a description of the new archive records.
@@ -139,24 +129,20 @@ below for a description of the new archive records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdu\fR\fR
 .ad
 .RS 8n
-.rt  
 File sizes computed include the space allocated for any extended attributes
 present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfind\fR\fR
 .ad
 .RS 8n
-.rt  
 By default, \fBfind\fR ignores attributes.  The \fB-xattr\fR expression
 provides support for searches involving attribute space. It returns true if
 extended attributes are present on the current file.
@@ -164,12 +150,10 @@ extended attributes are present on the current file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfsck\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBfsck\fR utility manages extended attribute data on the disk. A file
 system with extended attributes can be mounted on versions of Solaris that are
 not attribute-aware (versions prior to Solaris 9), but the attributes will not
@@ -183,24 +167,20 @@ before using it in an attribute-aware environment.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfsdb\fR\fR
 .ad
 .RS 8n
-.rt  
 This \fBfsdb\fR utility is able to find the inode for the "hidden" extended
 attribute directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBls\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBls\fR \fB-@\fR command displays an "@" following the mode information
 when extended attributes are present.  More precisely, the output line for a
 given file contains an "@" character following the mode characters if the
@@ -211,12 +191,10 @@ output format as the \fB-l\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmv\fR\fR
 .ad
 .RS 8n
-.rt  
 When a file is moved, all attributes are carried along with the file rename.
 When a file is moved across a file system boundary, the copy command invoked is
 similar to the \fBcp\fR \fB-p\fR variant described above and extended
@@ -226,12 +204,10 @@ the move operation fails and the source file is not removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpax\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fB-@\fR option informs \fBpax\fR to archive attributes, but by default
 \fBpax\fR ignores extended attributes.  The \fBpax\fR(1) utility is a generic
 replacement for both \fBtar\fR(1) and \fBcpio\fR(1) and is able to produce
@@ -241,12 +217,10 @@ for a description of the new archive records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtar\fR\fR
 .ad
 .RS 8n
-.rt  
 In the default case, \fBtar\fR does not attempt to place attributes in the
 archive.  If the \fB-@\fR option is specified, however, \fBtar\fR traverses
 into the attribute space of all files being placed in the archive and attempts
@@ -679,27 +653,25 @@ table.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Field NameLength (in Octets)Description
-Name100File name string
-Mode812 file mode bits
-Uid8User ID of file owner
-Gid8Group ID of file owner
-Size12Size of file
-Mtime12File modification time
-Chksum8File contents checksum
-Typeflag1File type flag
-Linkname100Link target name if file linked
-Magic6"ustar"
-Version2"00"
-Uname32User name of file owner
-Gname32Group name of file owner
-Devmajor8Major device ID if special file
-Devminor8Minor device ID if special file
-Prefix155Path prefix string for file
+c c c
+l l l .
+Field Name	Length (in Octets)	Description
+Name	100	File name string
+Mode	8	12 file mode bits
+Uid	8	User ID of file owner
+Gid	8	Group ID of file owner
+Size	12	Size of file
+Mtime	12	File modification time
+Chksum	8	File contents checksum
+Typeflag	1	File type flag
+Linkname	100	Link target name if file linked
+Magic	6	"ustar"
+Version	2	"00"
+Uname	32	User name of file owner
+Gname	32	Group name of file owner
+Devmajor	8	Major device ID if special file
+Devminor	8	Minor device ID if special file
+Prefix	155	Path prefix string for file
 .TE
 
 .sp
@@ -727,24 +699,22 @@ are arranged as described in the following table.
 
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-\fBField Name\fRLength (in Octets)Description
-\fBc_magic\fR670707
-\fBc_dev\fR6First half of unique file ID
-\fBc_ino\fR6Second half of unique file ID
-\fBc_mode\fR6File mode bits
-\fBc_uid\fR6User ID of file owner
-\fBc_gid\fR6Group ID of file owner
-\fBc_nlink\fR6Number of links referencing file
-\fBc_rdev\fR6Information for special files
-\fBc_mtime\fR11Modification time of file
-\fBc_namesize\fR6Length of file pathname
-\fBc_filesize\fR11Length of file content
-\fBc_name\fR\fBc_namesize\fRFile pathname
-\fBc_filedata\fR\fBc_filesize\fRFile content
+c c c
+l l l .
+\fBField Name\fR	Length (in Octets)	Description
+\fBc_magic\fR	6	70707
+\fBc_dev\fR	6	First half of unique file ID
+\fBc_ino\fR	6	Second half of unique file ID
+\fBc_mode\fR	6	File mode bits
+\fBc_uid\fR	6	User ID of file owner
+\fBc_gid\fR	6	Group ID of file owner
+\fBc_nlink\fR	6	Number of links referencing file
+\fBc_rdev\fR	6	Information for special files
+\fBc_mtime\fR	11	Modification time of file
+\fBc_namesize\fR	6	Length of file pathname
+\fBc_filesize\fR	11	Length of file content
+\fBc_name\fR	\fBc_namesize\fR	File pathname
+\fBc_filedata\fR	\fBc_filesize\fR	File content
 .TE
 
 .sp
@@ -779,17 +749,15 @@ following table describes the format of this data file.
 
 .sp
 .TS
-tab();
-cw(1.7i) cw(1.76i) cw(2.04i) 
-lw(1.7i) lw(1.76i) lw(2.04i) 
-.
-Field NameLength (in Octets)Description
-\fBh_version\fR7Name file version
-\fBh_size\fR10Length of data file
-\fBh_component_len\fR10Total length of all path segments
-\fBh_link_comp_len\fR10Total length of all link segments
-\fBpath\fR\fBh_component_len\fRComplex path
-\fBlink_path\fR\fBh_link_comp_len\fRComplex link path
+c c c
+l l l .
+Field Name	Length (in Octets)	Description
+\fBh_version\fR	7	Name file version
+\fBh_size\fR	10	Length of data file
+\fBh_component_len\fR	10	Total length of all path segments
+\fBh_link_comp_len\fR	10	Total length of all link segments
+\fBpath\fR	\fBh_component_len\fR	Complex path
+\fBlink_path\fR	\fBh_link_comp_len\fR	Complex link path
 .TE
 
 .sp
@@ -805,15 +773,13 @@ name space. The following table describes the format of each segment.
 
 .sp
 .TS
-tab();
-cw(1.57i) cw(1.74i) cw(2.19i) 
-lw(1.57i) lw(1.74i) lw(2.19i) 
-.
-Field NameLength (in Octets)Description
+c c c
+l l l .
+Field Name	Length (in Octets)	Description
 _
-\fBh_namesz\fR7Length of segment path
-\fBh_typeflag\fR1Actual file type of attribute file
-\fBh_names\fR\fBh_namesz\fRParent path + segment path
+\fBh_namesz\fR	7	Length of segment path
+\fBh_typeflag\fR	1	Actual file type of attribute file
+\fBh_names\fR	\fBh_namesz\fR	Parent path + segment path
 .TE
 
 .sp

@@ -1,10 +1,10 @@
 '\" te
 .\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH prototype 4 "3 May 2008" "SunOS 5.11" "File Formats"
+.TH PROTOTYPE 4 "May 3, 2008"
 .SH NAME
 prototype \- package information file
 .SH DESCRIPTION
@@ -21,12 +21,10 @@ separated by white space. Comment lines begin with a ``\fB#\fR'' and are
 ignored. The fields are described below and must appear in the order shown.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpart\fR\fR
 .ad
 .RS 12n
-.rt  
 An optional field designating the part number in which the object resides. A
 part is a collection of files and is the atomic unit by which a package is
 processed. A developer can choose criteria for grouping files into a part (for
@@ -35,132 +33,108 @@ example, based on class). If this field is not used, part 1 is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIftype\fR\fR
 .ad
 .RS 12n
-.rt  
 A one-character field that indicates the file type. Valid values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 block special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 character special device
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 5n
-.rt  
 directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 a file to be edited upon installation or removal (can be shared by several
 packages)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 5n
-.rt  
 a standard executable or data file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBi\fR\fR
 .ad
 .RS 5n
-.rt  
 installation script or information file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBl\fR\fR
 .ad
 .RS 5n
-.rt  
 linked file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 named pipe
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 symbolic link
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBv\fR\fR
 .ad
 .RS 5n
-.rt  
 volatile file (one whose contents are expected to change, like a log file)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 an exclusive directory accessible only by this package
 .RE
 
@@ -168,12 +142,10 @@ an exclusive directory accessible only by this package
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIclass\fR\fR
 .ad
 .RS 12n
-.rt  
 The installation class to which the file belongs. This name can be no longer
 than 64 characters. The field is not specified for installation scripts.
 (\fBadmin\fR and all classes beginning with capital letters are reserved class
@@ -182,12 +154,10 @@ names.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpathname\fR\fR
 .ad
 .RS 12n
-.rt  
 The pathname where the file resides on the target machine, for example,
 \fB/usr/bin/mail\fR or \fBbin/ras/proc\fR. Relative pathnames (those that do
 not begin with a slash) indicate that the file is relocatable. The form
@@ -216,36 +186,30 @@ variable is not known at build time, it is bound at install time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImajor\fR\fR
 .ad
 .RS 12n
-.rt  
 The major device number. The field is only specified for block or character
 special devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 12n
-.rt  
 The minor device number. The field is only specified for block or character
 special devices.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImode\fR\fR
 .ad
 .RS 12n
-.rt  
 The octal mode of the file (for example, 0664). A question mark (\fB?\fR)
 indicates that the mode is left unchanged, implying that the file already
 exists on the target machine. This field is not used for linked files or
@@ -262,12 +226,10 @@ time, it is bound at install time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIowner\fR\fR
 .ad
 .RS 12n
-.rt  
 The owner of the file (for example, \fBbin\fR or \fBroot\fR). The field is
 limited to 14 characters in length. A question mark (\fB?\fR) indicates that
 the owner is left unchanged, implying that the file already exists on the
@@ -285,12 +247,10 @@ time, it is bound at install time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 12n
-.rt  
 The group to which the file belongs (for example, \fBbin\fR or \fBsys\fR). The
 field is limited to 14 characters in length. A question mark (\fB?\fR)
 indicates that the group is left unchanged, implying that the file already
@@ -314,12 +274,10 @@ directories, to locate objects on a host machine, and to set permanent
 defaults. The following commands are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsearch\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a list of directories (separated by white space) to search for when
 looking for file contents on the host machine. The base name of the \fIpath\fR
 field is appended to each directory in the ordered list until the file is
@@ -328,24 +286,20 @@ located. Searches are not recursive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinclude\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a pathname which points to another prototype file to include. Note
 that \fBsearch\fR requests do not span \fBinclude\fR files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a list of attributes (mode, owner, and group) to be used by default
 if attribute information is not provided for prototype entries which require
 the information. The defaults do not apply to entries in \fBinclude\fR
@@ -354,12 +308,10 @@ prototype files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIparam\fR\fB=\fR\fIvalue\fR\fR
 .ad
 .RS 15n
-.rt  
 Places the indicated parameter in the current environment. Spans to subsequent
 included prototype files.
 .RE

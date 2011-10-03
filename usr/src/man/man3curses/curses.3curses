@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH curses 3CURSES "23 Oct 2001" "SunOS 5.11" "Curses Library Functions"
+.TH CURSES 3CURSES "Oct 23, 2001"
 .SH NAME
 curses \- CRT screen handling and optimization package
 .SH SYNOPSIS
@@ -215,3609 +215,2953 @@ The following table lists each \fBcurses\fR routine and the name of the manual
 page on which it is described.
 .sp
 .ne 2
-.mk
 .na
 \fBcurses Routine Name\fR
 .ad
 .RS 23n
-.rt  
 Manual Page Name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaddwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBadjcurspos\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_alecompat\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBattroff\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBattron\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBattrset\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbaudrate\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbeep\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_beep\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbkgd\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_bkgd\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbkgdset\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_bkgd\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBborder\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_border\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBbox\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_border\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcan_change_color\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcbreak\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBclear\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBclearok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBclrtobot\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBclrtoeol\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcolor_content\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcopywin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_overlay\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcurs_set\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdef_prog_mode\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdef_shell_mode\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdel_curterm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelay_output\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_delch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdeleteln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_deleteln\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelscreen\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_initscr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdelwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBderwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdoupdate\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_refresh\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdupwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBecho\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBechochar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBechowchar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBendwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_initscr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBerase\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBerasechar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfilter\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBflash\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_beep\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBflushinp\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetbegyx\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getyx\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetmaxyx\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getyx\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetparyx\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getyx\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetsyx\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBgetyx\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getyx\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhalfdelay\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhas_colors\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhas_ic\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhas_il\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBidcok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBidlok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBimmedok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinit_color\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinit_pair\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinitscr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_initscr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsdelln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_deleteln\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsertln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_deleteln\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinsstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinswch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinswstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBintrflush\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBinwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBis_linetouched\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_touch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBis_wintouched\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_touch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBisendwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_initscr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkeyname\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkeypad\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBkillchar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBleaveok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlongname\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmeta\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmove\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_move\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmovenextch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_alecompat\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmoveprevch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_alecompat\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvaddwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvcur\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvdelch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_delch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvderwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvgetch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvgetnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvgetstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvgetwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvgetwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinsch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinsnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinsnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinsstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinswch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinswstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvinwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvprintw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_printw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvscanw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scanw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwaddwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwdelch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_delch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwgetch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwgetnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwgetstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwgetwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwgetwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinsch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinsnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinsstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinswch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinswstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwinwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwprintw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_printw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmvwscanw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scanw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnapms\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnewpad\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_pad\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnewterm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_initscr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnewwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnl\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnocbreak\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnodelay\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnoecho\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnonl\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnoqiflush\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnoraw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnotimeout\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBoverlay\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_overlay\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBoverwrite\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_overlay\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpair_content\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpechochar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_pad\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpechowchar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_pad\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBpnoutrefresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_pad\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBprefresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_pad\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBprintw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_printw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBputp\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBputwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBqiflush\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBraw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBredrawwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_refresh\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrefresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_refresh\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBreset_prog_mode\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBreset_shell_mode\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBresetty\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBrestartterm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBripoffline\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsavetty\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscanw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scanw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscr_dump\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scr_dump\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscr_init\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scr_dump\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscr_restore\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scr_dump\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscr_set\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scr_dump\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscroll\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scroll\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBscrollok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBset_curterm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBset_term\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_initscr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetscrreg\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetsyx\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_kernel\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetterm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsetupterm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_attroff\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_attron\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_attrset\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_clear\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_init\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_label\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_noutrefresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_refresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_restore\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_set\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBslk_touch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_slk\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsrcl\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scroll\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstandend\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstandout\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBstart_color\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_color\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsubpad\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_pad\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsubwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsyncok\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtermattrs\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtermname\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termattrs\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtgetent\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termcap\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtgetflag\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termcap\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtgetnum\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termcap\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtgetstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termcap\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtgoto\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_termcap\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtigetflag\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtigetnum\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtigetstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtimeout\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtouchline\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_touch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtouchwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_touch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtparm\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtputs\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtypeahead\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBunctrl\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBungetch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBungetwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuntouchwin\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_touch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBuse_env\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_util\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvidattr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvidputs\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_terminfo\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvwprintw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_printw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBvwscanw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scanw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwaddwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwadjcurspos\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_alecompat\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwattroff\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwattron\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwattrset\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwbkgd\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_bkgd\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwbkgdset\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_bkgd\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwborder\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_border\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwclear\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwclrtobot\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwclrtoeol\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwcursyncup\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwdelch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_delch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwdeleteln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_deleteln\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwechochar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwechowchar\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_addwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwerase\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_clear\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwgetch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwgetnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwgetnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwgetstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwgetwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwgetwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_getwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwhline\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_border\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinsch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinsdelln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_deleteln\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinsertln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_deleteln\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinsnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinsnwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinsstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_insstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_instr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinswch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinswstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inswstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinwch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinwchnstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinwchstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwchstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwinwstr\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inwstr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwmove\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_move\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwmovenextch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_alecompat\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwmoveprevch\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_alecompat\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwnoutrefresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_refresh\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwprintw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_printw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwredrawln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_refresh\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwrefresh\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_refresh\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwscanw\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scanw\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwscrl\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_scroll\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwsetscrreg\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_outopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwstandend\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwstandout\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_attr\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwsyncdown\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwsyncup\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_window\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwtimeout\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_inopts\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwtouchln\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_touch\fR(3CURSES)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwvline\fR
 .ad
 .RS 23n
-.rt  
 \fBcurs_border\fR(3CURSES)
 .RE
 
@@ -3845,13 +3189,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

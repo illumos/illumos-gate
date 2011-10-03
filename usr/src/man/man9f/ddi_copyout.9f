@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_copyout 9F "19 Apr 2000" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_COPYOUT 9F "Apr 19, 2000"
 .SH NAME
 ddi_copyout \- copy data from a driver
 .SH SYNOPSIS
@@ -25,45 +25,37 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdriverbuf\fR\fR
 .ad
 .RS 13n
-.rt  
 Source address in the driver from which the data is transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 13n
-.rt  
 Destination address to which the data is transferred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcn\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of bytes to copy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 13n
-.rt  
 Set of flag bits that provide address space information about \fIbuf\fR.
 .RE
 
@@ -145,47 +137,47 @@ specified argument contains an invalid address, an error code is returned.
  4     short    recv_char;  /* receive character from device */
  5     short    xmit_char;  /* transmit character to device  */
  6  };
- 
+
  7  struct device_state {
  8     volatile struct device *regsp;   /* pointer to device registers */
  9     kmutex_t reg_mutex;              /* protect device registers */
        . . .
 10  };
- 
+
 11  static void *statep; /* for soft state routines */
- 
+
 12  xxioctl(dev_t dev, int cmd, int arg, int mode,
 13      cred_t *cred_p, int *rval_p)
 14  {
 15      struct device_state *sp;
 16      volatile struct device *rp;
 17      struct device reg_buf;     /* temporary buffer for registers */
-18      int instance;  
- 
+18      int instance;
+
 19      instance = getminor(dev);
 20      sp = ddi_get_soft_state(statep, instance);
 21      if (sp == NULL)
 22          return (ENXIO);
 23      rp = sp->regsp;
         . . .
-24      switch (cmd)  {  
- 
-25      case XX_GETREGS:   /* copy registers to arg */   
-26            mutex_enter(&sp->reg_mutex); 
-27            /*  
+24      switch (cmd)  {
+
+25      case XX_GETREGS:   /* copy registers to arg */
+26            mutex_enter(&sp->reg_mutex);
+27            /*
 28             * Copy data from device registers to
 29             * temporary device register buffer
 30             * e.g. reg_buf.control = rp->control;
-31             */ 
-32            mutex_exit(&sp->reg_mutex); 
+31             */
+32            mutex_exit(&sp->reg_mutex);
 33            if (ddi_copyout(&reg_buf, arg,
-34                sizeof (struct device), mode) != 0) {    
+34                sizeof (struct device), mode) != 0) {
 35                    return (EFAULT);
-36            }  
- 
+36            }
+
 37            break;
 38      }
-39  }   
+39  }
 .fi
 .in -2
 

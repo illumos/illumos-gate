@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smf_method 5 "20 May 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH SMF_METHOD 5 "May 20, 2009"
 .SH NAME
 smf_method \- service management framework conventions for methods
 .SH DESCRIPTION
@@ -49,7 +49,6 @@ The restarter provides four environment variables to the method that determine
 the context in which the method is invoked.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSMF_FMRI\fR\fR
 .ad
@@ -61,7 +60,6 @@ which the method is invoked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSMF_METHOD\fR\fR
 .ad
@@ -72,7 +70,6 @@ The full name of the method being invoked, such as \fBstart\fR or \fBstop\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSMF_RESTARTER\fR\fR
 .ad
@@ -83,7 +80,6 @@ The service FMRI of the restarter that invokes the method
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSMF_ZONENAME\fR\fR
 .ad
@@ -113,35 +109,29 @@ A method is defined minimally by three properties in a propertygroup of type
 These properties are:
 .sp
 .ne 2
-.mk
 .na
 \fBexec (\fIastring\fR)\fR
 .ad
 .RS 27n
-.rt  
 Method executable string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtimeout_seconds (\fIcount\fR)\fR
 .ad
 .RS 27n
-.rt  
 Number of seconds before method times out. See the \fBTimeouts\fR section for
 more detail.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBtype (\fIastring\fR)\fR
 .ad
 .RS 27n
-.rt  
 Method type. Currently always set to \fBmethod\fR.
 .RE
 
@@ -159,7 +149,6 @@ restarter for inet services, \fBinetd\fR(1M), does not support the following
 method expansions.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
@@ -170,7 +159,6 @@ method expansions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%r\fR\fR
 .ad
@@ -181,7 +169,6 @@ Name of the restarter, such as \fBsvc.startd\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%m\fR\fR
 .ad
@@ -192,7 +179,6 @@ The full name of the method being invoked, such as \fBstart\fR or \fBstop\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%s\fR\fR
 .ad
@@ -203,7 +189,6 @@ Name of the service
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%i\fR\fR
 .ad
@@ -214,7 +199,6 @@ Name of the instance
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB%f\fR\fR
 .ad
@@ -225,7 +209,6 @@ FMRI of the instance
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%{prop[:,]}\fR\fR
 .ad
@@ -252,7 +235,6 @@ An invalid expansion constitutes method failure.
 Two explicit tokens can be used in the place of method commands.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:kill [-signal]\fR\fR
 .ad
@@ -265,7 +247,6 @@ should be used to replace common \fBpkill\fR invocations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:true\fR\fR
 .ad
@@ -289,26 +270,24 @@ shell support file.
 
 .sp
 .TS
-tab();
-lw(1.74i) lw(.9i) lw(2.86i) 
-lw(1.74i) lw(.9i) lw(2.86i) 
-.
-\fBSMF_EXIT_OK\fR\fB0\fRT{
+l l l
+l l l .
+\fBSMF_EXIT_OK\fR	\fB0\fR	T{
 Method exited, performing its operation successfully.
 T}
-\fBSMF_EXIT_ERR_FATAL\fR\fB95\fRT{
+\fBSMF_EXIT_ERR_FATAL\fR	\fB95\fR	T{
 Method failed fatally and is unrecoverable without administrative intervention.
 T}
-\fBSMF_EXIT_ERR_CONFIG\fR\fB96\fRT{
+\fBSMF_EXIT_ERR_CONFIG\fR	\fB96\fR	T{
 Unrecoverable configuration error. A common condition that returns this exit status is the absence of required configuration files for an enabled service instance.
 T}
-\fBSMF_EXIT_ERR_NOSMF\fR\fB99\fRT{
+\fBSMF_EXIT_ERR_NOSMF\fR	\fB99\fR	T{
 Method has been mistakenly invoked outside the \fBsmf\fR(5) facility. Services that depend on \fBsmf\fR(5) capabilities should exit with this status value.
 T}
-\fBSMF_EXIT_ERR_PERM\fR\fB100\fRT{
+\fBSMF_EXIT_ERR_PERM\fR	\fB100\fR	T{
 Method requires a form of permission such as file access, privilege, authorization, or other credential that is not available when invoked.
 T}
-\fBSMF_EXIT_ERR_OTHER\fR\fBnon-zero\fRT{
+\fBSMF_EXIT_ERR_OTHER\fR	\fBnon-zero\fR	T{
 Any non-zero exit status from a method is treated as an unknown error. A series of unknown errors can be diagnosed as a fault by the restarter or on behalf of the restarter.
 T}
 .TE
@@ -384,7 +363,6 @@ limit potential security compromises.
 A method context can contain the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuse_profile\fR\fR
 .ad
@@ -397,7 +375,6 @@ properties.
 
 .sp
 .ne 2
-.mk
 .na
 \fBenvironment\fR
 .ad
@@ -409,7 +386,6 @@ of a number of \fBNAME=value\fR strings.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprofile\fR\fR
 .ad
@@ -421,7 +397,6 @@ method executable, identifies an entry in \fBexec_attr\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR\fR
 .ad
@@ -432,7 +407,6 @@ The user ID in numeric or text form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup\fR\fR
 .ad
@@ -443,7 +417,6 @@ The group ID in numeric or text form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsupp_groups\fR\fR
 .ad
@@ -455,7 +428,6 @@ numeric or text form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprivileges\fR\fR
 .ad
@@ -467,7 +439,6 @@ An optional string specifying the privilege set as defined in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlimit_privileges\fR\fR
 .ad
@@ -479,7 +450,6 @@ An optional string specifying the limit privilege set as defined in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBworking_directory\fR\fR
 .ad
@@ -492,7 +462,6 @@ launch the method. If the property is unset, \fB:home\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcorefile_pattern\fR\fR
 .ad
@@ -505,7 +474,6 @@ property overrides local customizations to the global core pattern.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject\fR\fR
 .ad
@@ -518,7 +486,6 @@ whose \fBuid\fR is used to launch the method.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBresource_pool\fR\fR
 .ad
@@ -546,7 +513,6 @@ model restarters also use the following conventions when invoking executables
 as methods:
 .sp
 .ne 2
-.mk
 .na
 \fBArgument array\fR
 .ad
@@ -558,7 +524,6 @@ The arguments in \fBargv[]\fR are set consistently with the result \fB/bin/sh
 
 .sp
 .ne 2
-.mk
 .na
 \fBFile descriptors\fR
 .ad
@@ -571,7 +536,6 @@ File descriptor \fB0\fR is \fB/dev/null\fR. File descriptors \fB1\fR and
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/lib/svc/share/smf_include.sh\fR\fR
 .ad
@@ -582,7 +546,6 @@ Definitions of exit status values.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/include/libscf.h\fR\fR
 .ad

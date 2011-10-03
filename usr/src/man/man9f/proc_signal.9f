@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH proc_signal 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH PROC_SIGNAL 9F "Jan 16, 2006"
 .SH NAME
 proc_signal, proc_ref, proc_unref \- send a signal to a process
 .SH SYNOPSIS
@@ -36,23 +36,19 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpref\fR\fR
 .ad
 .RS 8n
-.rt  
 A handle for the process to be signalled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsig\fR\fR
 .ad
 .RS 8n
-.rt  
 Signal number to be sent to the process.
 .RE
 
@@ -69,78 +65,64 @@ referenced process. The following set of signals may be sent to a process from
 a driver:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR\fR
 .ad
 .RS 12n
-.rt  
 The device has been disconnected.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGINT\fR\fR
 .ad
 .RS 12n
-.rt  
 The interrupt character has been received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGQUIT\fR\fR
 .ad
 .RS 12n
-.rt  
 The quit character has been received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGPOLL\fR\fR
 .ad
 .RS 12n
-.rt  
 A pollable event has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGKILL\fR\fR
 .ad
 .RS 12n
-.rt  
 Kill the process (cannot be caught or ignored).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGWINCH\fR\fR
 .ad
 .RS 12n
-.rt  
 Window size change.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGURG\fR\fR
 .ad
 .RS 12n
-.rt  
 Urgent data are available.
 .RE
 
@@ -162,12 +144,10 @@ there is exactly one corresponding call to \fBproc_unref()\fR.
 The \fBproc_ref()\fR returns the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpref\fR\fR
 .ad
 .RS 8n
-.rt  
 An opaque handle used to refer to the current process.
 .RE
 
@@ -176,23 +156,19 @@ An opaque handle used to refer to the current process.
 The \fBproc_signal()\fR returns the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 The process existed before the signal was sent.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 The process no longer exists; no signal was sent.
 .RE
 

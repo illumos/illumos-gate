@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH di_devlink_init 3DEVINFO "21 Jul 2008" "SunOS 5.11" "Device Information Library Functions"
+.TH DI_DEVLINK_INIT 3DEVINFO "Jul 21, 2008"
 .SH NAME
 di_devlink_init, di_devlink_fini \- create and destroy a snapshot of devlinks
 .SH SYNOPSIS
@@ -24,21 +24,17 @@ di_devlink_init, di_devlink_fini \- create and destroy a snapshot of devlinks
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 The following values are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDI_MAKE_LINK\fR\fR
 .ad
 .RS 16n
-.rt  
 Synchronize with devlink management before taking the snapshot. The name
 argument determines which devlink management activities must complete before
 taking a devlink snapshot. Appropriate privileges are required to use this
@@ -49,12 +45,10 @@ flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 9n
-.rt  
 If flags is \fBDI_MAKE_LINK\fR, \fIname\fR determines which devlink management
 activity must complete prior to snapshot.
 .RS +4
@@ -92,12 +86,10 @@ complete.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhdlp\fR\fR
 .ad
 .RS 9n
-.rt  
 The handle to the snapshot obtained by calling \fBdi_devlink_init()\fR.
 .RE
 
@@ -131,12 +123,10 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBdi_devlink_init()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One or more arguments is invalid.
 .RE
 
@@ -145,12 +135,10 @@ One or more arguments is invalid.
 The \fBdi_devlink_init()\fR function with \fBDI_MAKE_LINK\fR can also fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 9n
-.rt  
 The user does no have appropriate privileges.
 .RE
 
@@ -167,15 +155,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

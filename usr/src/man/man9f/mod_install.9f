@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mod_install 9F "8 Jul 2008" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH MOD_INSTALL 9F "Jul 8, 2008"
 .SH NAME
 mod_install, mod_remove, mod_info, mod_modname \- add, remove or query a
 loadable module
@@ -24,7 +24,7 @@ loadable module
 
 .LP
 .nf
-\fBint\fR \fBmod_info\fR(\fBstruct modlinkage *\fR\fImodlinkage\fR, 
+\fBint\fR \fBmod_info\fR(\fBstruct modlinkage *\fR\fImodlinkage\fR,
      \fBstruct modinfo *\fR\fImodinfo\fR);
 .fi
 
@@ -40,24 +40,20 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodlinkage\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the loadable module's \fBmodlinkage\fR structure which describes
 what type(s) of module elements are included in this loadable module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodinfo\fR\fR
 .ad
 .RS 14n
-.rt  
 Pointer to the \fBmodinfo\fR structure passed to \fB_info\fR(9E).
 .RE
 

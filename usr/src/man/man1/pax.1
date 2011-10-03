@@ -1,39 +1,39 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pax 1 "16 Jul 2008" "SunOS 5.11" "User Commands"
+.TH PAX 1 "Jul 16, 2008"
 .SH NAME
 pax \- portable archive interchange
 .SH SYNOPSIS
 .LP
 .nf
-\fBpax\fR [\fB-cdnv\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... 
+\fBpax\fR [\fB-cdnv\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]...
      [\fB-s\fR \fIreplstr\fR]... [\fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBpax\fR \fB-r\fR [\fB-cdiknuv@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... 
+\fBpax\fR \fB-r\fR [\fB-cdiknuv@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]...
      [\fB-p\fR \fIstring\fR]... [\fB-s\fR \fIreplstr\fR]... [\fIpattern\fR]...
 .fi
 
 .LP
 .nf
-\fBpax\fR \fB-w\fR [\fB-dituvX@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-b\fR \fIblocksize\fR] [\fB-a\fR] 
-     [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... [\fB-s\fR \fIreplstr\fR]... 
+\fBpax\fR \fB-w\fR [\fB-dituvX@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-b\fR \fIblocksize\fR] [\fB-a\fR]
+     [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]... [\fB-s\fR \fIreplstr\fR]...
      [\fB-x\fR \fIformat\fR] [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fBpax\fR \fB-r\fR \fB-w\fR [\fB-diklntuvX@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-o\fR \fIoptions\fR]... 
+\fBpax\fR \fB-r\fR \fB-w\fR [\fB-diklntuvX@/\fR] [\fB-H\fR | \fB-L\fR] [\fB-o\fR \fIoptions\fR]...
      [\fB-p\fR \fIstring\fR]... [\fB-s\fR \fIreplstr\fR]... [\fIfile\fR]... \fIdirectory\fR
 .fi
 
@@ -52,12 +52,10 @@ four modes of operation: \fBlist\fR, \fBread\fR, \fBwrite\fR, and \fBcopy\fR
 modes, corresponding respectively to the four forms shown in the SYNOPSIS.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
 .RS 9n
-.rt  
 In \fBlist\fR mode, that is, when neither \fB-r\fR nor \fB-w\fR are specified,
 \fBpax\fR writes the names of the members of the archive file read from the
 standard input, with path names matching the specified patterns, to standard
@@ -68,12 +66,10 @@ that file is listed as well.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread\fR\fR
 .ad
 .RS 9n
-.rt  
 In \fBread\fR mode, that is, when \fB-r\fR is specified, but \fB-w\fR is not,
 \fBpax\fR extracts the members of the archive file read from the standard
 input, with path names matching the specified patterns. If an extracted file is
@@ -91,12 +87,10 @@ files are discussed under the \fB-p\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
 .RS 9n
-.rt  
 In \fBwrite\fR mode, that is, when \fB-w\fR is specified, but \fB-r\fR is not,
 \fBpax\fR writes the contents of the \fIfile\fR operands to the standard output
 in an archive format. If no \fIfile\fR operands are specified, a list of files
@@ -106,12 +100,10 @@ directory includes all of the files in the file hierarchy rooted at the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcopy\fR\fR
 .ad
 .RS 9n
-.rt  
 In \fBcopy\fR mode, that is, when both \fB-r\fR and \fB-w\fR are specified,
 \fBpax\fR copies the \fIfile\fR operands to the destination directory.
 .sp
@@ -181,24 +173,20 @@ diagnostic message to standard error and terminates.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 16n
-.rt  
 Appends files to the end of the archive. This option does not work for some
 archive devices, such as 1/4-inch streaming tapes and 8mm tapes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIblocksize\fR\fR
 .ad
 .RS 16n
-.rt  
 Blocks the output at a positive decimal integer number of bytes per write to
 the archive file. Devices and archive formats can impose restrictions on
 blocking. Blocking is automatically determined on input. Portable applications
@@ -209,24 +197,20 @@ option below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 16n
-.rt  
 Matches all file or archive members except those specified by the \fIpattern\fR
 or \fIfile\fR operands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 16n
-.rt  
 Causes files of type directory being copied or archived or archive members of
 type directory being extracted or listed to match only the file or archive
 member itself and not the file hierarchy rooted at the file.
@@ -234,12 +218,10 @@ member itself and not the file hierarchy rooted at the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIarchive\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the path name of the input or output archive, overriding the default
 standard input (in \fBlist\fR or \fBread\fR modes) or standard output
 (\fBwrite\fR mode).
@@ -247,12 +229,10 @@ standard input (in \fBlist\fR or \fBread\fR modes) or standard output
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 16n
-.rt  
 If a symbolic link referencing a file of type directory is specified on the
 command line, \fBpax\fR archives the file hierarchy rooted in the file
 referenced by the link, using the name of the link as the root of the file
@@ -264,12 +244,10 @@ link. The default behavior is to archive the symbolic link itself.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 16n
-.rt  
 Interactively renames files or archive members. For each archive member
 matching a \fIpattern\fR operand or file matching a \fIfile\fR operand, a
 prompt is written to the file \fB/dev/tty\fR. The prompt contains the name of
@@ -287,23 +265,19 @@ extraction are unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 16n
-.rt  
 Prevents the overwriting of existing files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 16n
-.rt  
 Links files. In \fBcopy\fR mode, hard links are made between the source and
 destination file hierarchies whenever possible. If specified in conjunction
 with \fB-H\fR or \fB-L\fR, when a symbolic link is encountered, the hard link
@@ -316,12 +290,10 @@ the destination.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 16n
-.rt  
 If a symbolic link referencing a file of type directory is specified on the
 command line or encountered during the traversal of a file hierarchy, \fBpax\fR
 archives the file hierarchy rooted in the file referenced by the link, using
@@ -335,12 +307,10 @@ symbolic link itself.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 16n
-.rt  
 Selects the first archive member that matches each \fIpattern\fR operand. No
 more than one archive member is matched for each pattern, although members of
 type directory still match the file hierarchy rooted at that file.
@@ -348,12 +318,10 @@ type directory still match the file hierarchy rooted at that file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoptions\fR\fR
 .ad
 .RS 16n
-.rt  
 Provides information to the implementation to modify the algorithm for
 extracting or writing files. The value of options consists of one or more
 comma-separated keywords of the form:
@@ -387,7 +355,6 @@ following keyword values of \fIoptions\fR are supported for the file formats as
 indicated:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete=\fR\fIpattern\fR\fR
 .ad
@@ -416,7 +383,6 @@ omitted from extended header records that \fBpax\fR produces.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexthdr.name=\fR\fIstring\fR\fR
 .ad
@@ -428,47 +394,39 @@ blocks for the extended header. The name is the contents of \fIstring\fR, after
 the following character substitutions have been made:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%d\fR\fR
 .ad
 .RS 6n
-.rt  
 The directory name of the file, equivalent to the result of the \fIdirname\fR
 utility on the translated path name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%f\fR\fR
 .ad
 .RS 6n
-.rt  
 The filename of the file, equivalent to the result of the \fIbasename\fR
 utility on the translated path name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%p\fR\fR
 .ad
 .RS 6n
-.rt  
 The process ID of the \fBpax\fR process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 6n
-.rt  
 A '%' character.
 .RE
 
@@ -488,7 +446,6 @@ following default value:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglobexthdr.name=\fR\fIstring\fR\fR
 .ad
@@ -503,35 +460,29 @@ global extended header records. The name is the contents of \fIstring\fR, after
 the following character substitutions have been made:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%n\fR\fR
 .ad
 .RS 6n
-.rt  
 An integer that represents the sequence number of the global extended header
 record in the archive, starting at \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%p\fR\fR
 .ad
 .RS 6n
-.rt  
 The process ID of the \fBpax\fR process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 6n
-.rt  
 A '%' character.
 .RE
 
@@ -553,7 +504,6 @@ variable. If \fBTMPDIR\fR is not set, \fBpax\fR uses \fB/tmp\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinvalid=\fR\fIaction\fR\fR
 .ad
@@ -593,12 +543,10 @@ The following mutually-exclusive values of the \fIaction\fR argument are
 supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbypass\fR\fR
 .ad
 .RS 10n
-.rt  
 In \fBread\fR or \fBcopy\fR mode, \fBpax\fR bypasses the file, causing no
 change to the destination hierarchy. In \fBlist\fR mode, \fBpax\fR writes all
 requested valid values for the file, but its method for writing invalid values
@@ -607,12 +555,10 @@ is unspecified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrename\fR\fR
 .ad
 .RS 10n
-.rt  
 In \fBread\fR or \fBcopy\fR mode, \fBpax\fR acts as if the \fB-i\fR option were
 in effect for each file with invalid filename or link name values, allowing the
 user to provide a replacement name interactively. In \fBlist\fR mode, \fBpax\fR
@@ -621,12 +567,10 @@ behaves identically to the \fBbypass\fR action.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUTF-8\fR\fR
 .ad
 .RS 10n
-.rt  
 \fBpax\fR uses the actual \fBUTF-8\fR encoding for the name when it is used in
 \fBread\fR, \fBcopy\fR, or \fBlist\fR mode and a filename, link name, owner
 name, or any other field in an extended header record cannot be translated from
@@ -636,12 +580,10 @@ the implementation.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR\fR
 .ad
 .RS 10n
-.rt  
 In \fBread\fR or \fBcopy\fR mode, \fBpax\fR writes the file, translating the
 name, regardless of whether this can overwrite an existing file with a valid
 name. In \fBlist\fR mode, \fBpax\fR behaves identically to the \fBbypass\fR
@@ -657,7 +599,6 @@ suppressed if the \fB-k\fR option is also specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlinkdata\fR\fR
 .ad
@@ -671,7 +612,6 @@ written to the archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlistopt=\fR\fIformat\fR\fR
 .ad
@@ -690,7 +630,6 @@ order.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimes\fR\fR
 .ad
@@ -706,12 +645,10 @@ any of the keywords and values, including implementation extensions, can be
 used in \fB-o\fR option-arguments, in either of two modes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyword=\fR\fIvalue\fR\fR
 .ad
 .RS 18n
-.rt  
 When used in \fBwrite\fR or \fBcopy\fR mode, these keyword/value pairs are
 included at the beginning of the archive as \fBtypeflag g\fR global extended
 header records. When used in \fBread\fR or \fBlist\fR mode, these keyword/value
@@ -721,12 +658,10 @@ g\fR global extended header records.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyword:=\fR\fIvalue\fR\fR
 .ad
 .RS 18n
-.rt  
 When used in \fBwrite\fR or \fBcopy\fR mode, these keyword/value pairs are
 included as records at the beginning of a \fBtypeflag x\fR extended header for
 each file. This is equivalent to the equal-sign form except that it creates no
@@ -752,12 +687,10 @@ the group name is forced to a new value for all files read from the archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIstring\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies one or more file characteristic options (privileges). The
 \fIstring\fR option-argument must be a string specifying file characteristics
 to be retained or discarded on extraction. The string consists of the
@@ -767,57 +700,47 @@ multiple \fB-p\fR options can be specified. The meaning of the specification
 characters is as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 Does not preserve file access times.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 5n
-.rt  
 Preserves the user \fBID\fR, group \fBID\fR, file mode bits, access time, and
 modification time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 Does not preserve file modification times.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 5n
-.rt  
 Preserves the user \fBID\fR and group \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 Preserves the file mode bits.
 .RE
 
@@ -846,23 +769,19 @@ preserved.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 16n
-.rt  
 Reads an archive file from standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIreplstr\fR\fR
 .ad
 .RS 16n
-.rt  
 Modifies file or archive member names named by \fIpattern\fR or \fIfile\fR
 operands according to the substitution expression \fIreplstr\fR, which is based
 on the \fBed\fR(1) \fBs\fR (substitution) utility, using the regular expression
@@ -893,12 +812,10 @@ ignored when reading and writing archives.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 16n
-.rt  
 When reading files from the file system, and if the user has the permissions
 required by \fButime()\fR to do so, sets the access time of each file read to
 the access time that it had before being read by \fBpax\fR.
@@ -906,34 +823,28 @@ the access time that it had before being read by \fBpax\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 16n
-.rt  
 Ignores files that are older (having a less recent file modification time) than
 a pre-existing file or archive member with the same name.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread\fR mode\fR
 .ad
 .RS 14n
-.rt  
 An archive member with the same name as a file in the file system is extracted
 if the archive member is newer than the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwrite\fR mode\fR
 .ad
 .RS 14n
-.rt  
 An archive file member with the same name as a file in the file system is
 superseded if the file is newer than the archive member. If option \fB-a\fR is
 also specified, this is accomplished by appending to the archive. Otherwise, it
@@ -943,12 +854,10 @@ archive or by appending to the archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcopy\fR mode\fR
 .ad
 .RS 14n
-.rt  
 The file in the destination hierarchy is replaced by the file in the source
 hierarchy or by a link to the file in the source hierarchy if the file in the
 source hierarchy is newer.
@@ -958,12 +867,10 @@ source hierarchy is newer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 16n
-.rt  
 In \fBlist\fR mode, produces a verbose table of contents (see \fBStandard
 Output\fR). Otherwise, writes archive member path names and extended attributes
 to standard error (see \fBStandard Error\fR).
@@ -971,33 +878,27 @@ to standard error (see \fBStandard Error\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
 .RS 16n
-.rt  
 Writes files to the standard output in the specified archive format.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIformat\fR\fR
 .ad
 .RS 16n
-.rt  
 Specifies the output archive format. The \fBpax\fR utility recognizes the
 following formats:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpio\fR\fR
 .ad
 .RS 10n
-.rt  
 The extended \fBcpio\fR(1) interchange format. See IEEE Std 1003.1-2001. The
 default \fIblocksize\fR for this format for character special archive files is
 \fB5120\fR. Implementations support all \fIblocksize\fR values less than or
@@ -1011,12 +912,10 @@ greater than this value are archived with the \fBUID\fR and \fBGID\fR of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpax\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBpax\fR interchange format. See IEEE Std 1003.1-2001. The default
 \fIblocksize\fR for this format for character special archive files is
 \fB5120\fR. Implementations support all \fIblocksize\fR values less than or
@@ -1031,12 +930,10 @@ greater than \fB100\fR characters.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBustar\fR\fR
 .ad
 .RS 10n
-.rt  
 The extended \fBtar\fR(1) interchange format. See the IEEE 1003.1(1990)
 specifications. The default \fIblocksize\fR for this format for character
 special archive files is \fB10240\fR. Implementations support all
@@ -1051,12 +948,10 @@ greater than this value are archived with the \fBUID\fR and \fBGID\fR of
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxustar\fR\fR
 .ad
 .RS 10n
-.rt  
 Similar to \fBustar\fR. Also allows archiving and extracting files whose size
 is greater than 8GB; whose \fBUID\fR, \fBGID\fR, \fIdevmajor\fR, or
 \fIdevminor\fR values are greater than \fB2097151\fR; whose path (including
@@ -1075,12 +970,10 @@ In \fBcopy\fR mode, if no \fB-x\fR format is specified, \fBpax\fR behaves as if
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR\fR
 .ad
 .RS 16n
-.rt  
 When traversing the file hierarchy specified by a path name, \fBpax\fR does not
 descend into directories that have a different device ID (\fBst_dev\fR, see
 \fBstat\fR(2)).
@@ -1088,12 +981,10 @@ descend into directories that have a different device ID (\fBst_dev\fR, see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-@\fR\fR
 .ad
 .RS 16n
-.rt  
 Includes extended attributes in the archive. \fBpax\fR does not place extended
 attributes in the archive by default.
 .sp
@@ -1109,12 +1000,10 @@ Attempts to explicitly extract attribute records are ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-/\fR\fR
 .ad
 .RS 16n
-.rt  
 Includes extended system attributes in the archive. \fBpax\fR does not place
 extended system attributes in the archive by default.
 .sp
@@ -1310,34 +1199,28 @@ Otherwise, the \fB%L\fR conversion specification is the equivalent of \fB%F\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdirectory\fR\fR
 .ad
 .RS 13n
-.rt  
 The destination directory path name for \fBcopy\fR mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 13n
-.rt  
 A path name of a file to be copied or archived.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 13n
-.rt  
 A pattern matching one or more path names of archive members. A pattern must
 conform to the pattern matching notation found on the \fBfnmatch\fR(5) manual
 page. The default, if no \fIpattern\fR is specified, is to select all members
@@ -1503,12 +1386,10 @@ high-performance files. Although it can seem complex, there are really two
 modes that are most commonly used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fBe\fR\fR
 .ad
 .RS 8n
-.rt  
 Preserve everything. This would be used by the historical superuser, someone
 with all the appropriate privileges, to preserve all aspects of the files as
 they are recorded in the archive. The \fBe\fR flag is the sum of \fBo\fR and
@@ -1517,12 +1398,10 @@ they are recorded in the archive. The \fBe\fR flag is the sum of \fBo\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fBp\fR\fR
 .ad
 .RS 8n
-.rt  
 Preserve the file mode bits. This would be used by the user with regular
 privileges who wished to preserve aspects of the file other than the ownership.
 The file times are preserved by default, but two other flags are offered to
@@ -1701,12 +1580,10 @@ that affect the execution of \fBpax\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_COLLATE\fR\fR
 .ad
 .RS 14n
-.rt  
 Determine the locale for the behaviour of ranges, equivalence classes, and
 multi-character collating elements used in the pattern matching expressions for
 the \fIpattern\fR operand, the basic regular expression for the \fB-s\fR
@@ -1716,12 +1593,10 @@ locale keyword in the \fBLC_MESSAGES\fR category.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTMPDIR\fR\fR
 .ad
 .RS 14n
-.rt  
 Determine the path name that provides part of the default global extended
 header record file, as described for the \fB-o\fR \fBglobexthdr=\fR keyword as
 described in the OPTIONS section.
@@ -1729,12 +1604,10 @@ described in the OPTIONS section.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTZ\fR\fR
 .ad
 .RS 14n
-.rt  
 Determine the timezone used to calculate date and time strings when the
 \fB-v\fR option is specified. If \fBTZ\fR is unset or null, an unspecified
 default timezone is used.
@@ -1746,23 +1619,19 @@ default timezone is used.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 All files were processed successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -1810,21 +1679,19 @@ has no need for extended attributes.
 
 .sp
 .TS
-tab();
-cw(2.67i) cw(2.83i) 
-lw(2.67i) lw(2.83i) 
-.
-DescriptionBlock
-Global Extended Headerustar Header [\fItypeflag\fR=g]
-Global Extended Header Data
-File 1: Extended Header is includedustar Header [\fItypeflag\fR=x]
-Extended Header Data
-[\fItypeflag\fR=0]
-ustar Header Data for File 1
-File 2: No Extended Header is includedustar Header [\fItypeflag\fR=0]
-Data for File2
-End of Archive IndicatorBlock of binary zeros
-Block of binary zeros
+c c
+l l .
+Description	Block
+Global Extended Header	ustar Header [\fItypeflag\fR=g]
+	Global Extended Header Data
+File 1: Extended Header is included	ustar Header [\fItypeflag\fR=x]
+	Extended Header Data
+	[\fItypeflag\fR=0]
+	ustar Header Data for File 1
+File 2: No Extended Header is included	ustar Header [\fItypeflag\fR=0]
+	Data for File2
+End of Archive Indicator	Block of binary zeros
+	Block of binary zeros
 .TE
 
 .SS "\fBpax\fR Header Block"
@@ -1835,12 +1702,10 @@ described in \fBustar Interchange Format\fR except that two additional
 \fItypeflag\fR values are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 5n
-.rt  
 Represents global extended header records for the following files in the
 archive. The format of these extended header records are as described in \fBpax
 Extended Header\fR. Each value affects all subsequent files that do not
@@ -1853,12 +1718,10 @@ archive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 Represents extended header records for the following file in the archive (which
 has its own \fBustar\fR header block). The format of these extended header
 records is as described in \fBpax Extended Header\fR.
@@ -1930,12 +1793,10 @@ mode, \fBpax\fR behaves as if an archive had been created with applicable
 extended header records and then extracted.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBatime\fR\fR
 .ad
 .RS 16n
-.rt  
 The file access time for the specified files, equivalent to the value of the
 \fBst_atime\fR member of the stat structure for a file, as described by the
 \fBstat\fR(2) function. The access time (\fBatime\fR) is restored if the
@@ -1945,12 +1806,10 @@ process has the appropriate privilege required to do so. The format of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcharset\fR\fR
 .ad
 .RS 16n
-.rt  
 The name of the character set used to encode the data in the specified files.
 The entries in the following table are defined to refer to known standards;
 additional names can be agreed on between the originator and recipient.
@@ -1958,28 +1817,26 @@ additional names can be agreed on between the originator and recipient.
 
 .sp
 .TS
-tab();
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fIvalue\fRFormal Standard
-ISO-IR 646 1990ISO/IEC646:1990
-ISO-IR 8859 1 1998ISO/IEC8859-1:1998
-ISO-IR 8859 2 1999ISO/IEC 8859-2:1999
-ISO-IR 8859 3 1999ISO/IEC 8859-3:1999
-ISO-IR 8859 4 1999ISO/IEC8859-4:1998
-ISO-IR 8859 5 1999ISO/IEC8859-5-1999
-ISO-IR 8859 6 1999ISO/IEC8859-6-1999
-ISO-IR 8859 7 1987ISO/IEC8859-7:1987
-ISO-IR 8859 8 1999ISO/IEC8859-8:1999
-ISO-IR 8859 9 1999ISO/IEC8859-9:1999
-ISO-IR 8859 10 1998ISO/IEC8859-10:1999
-ISO-IR 8859 13 1998ISO/IEC8859-13:1998
-ISO-IR 8859 14 1998ISO/IEC8859-14:1998
-ISO-IR 8859 15 1999ISO/IEC8859-15:1999
-ISO-IR 10646 2000ISO/IEC 10646:2000
-ISO-IR 10646 2000 UTF-8ISO/IEC 10646,UTF-8 encoding
-BINARYNone
+l l
+l l .
+\fIvalue\fR	Formal Standard
+ISO-IR 646 1990	ISO/IEC646:1990
+ISO-IR 8859 1 1998	ISO/IEC8859-1:1998
+ISO-IR 8859 2 1999	ISO/IEC 8859-2:1999
+ISO-IR 8859 3 1999	ISO/IEC 8859-3:1999
+ISO-IR 8859 4 1999	ISO/IEC8859-4:1998
+ISO-IR 8859 5 1999	ISO/IEC8859-5-1999
+ISO-IR 8859 6 1999	ISO/IEC8859-6-1999
+ISO-IR 8859 7 1987	ISO/IEC8859-7:1987
+ISO-IR 8859 8 1999	ISO/IEC8859-8:1999
+ISO-IR 8859 9 1999	ISO/IEC8859-9:1999
+ISO-IR 8859 10 1998	ISO/IEC8859-10:1999
+ISO-IR 8859 13 1998	ISO/IEC8859-13:1998
+ISO-IR 8859 14 1998	ISO/IEC8859-14:1998
+ISO-IR 8859 15 1999	ISO/IEC8859-15:1999
+ISO-IR 10646 2000	ISO/IEC 10646:2000
+ISO-IR 10646 2000 UTF-8	ISO/IEC 10646,UTF-8 encoding
+BINARY	None
 .TE
 
 The encoding is included in an extended header for information only; when
@@ -1992,24 +1849,20 @@ header record for a file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcomment\fR\fR
 .ad
 .RS 16n
-.rt  
 A series of characters used as a comment. All characters in the \fIvalue\fR
 field are ignored by \fBpax\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgid\fR\fR
 .ad
 .RS 16n
-.rt  
 The group ID of the group that owns the file, expressed as a decimal number
 using digits from the \fIISO/IEC 646: 1991 standard\fR. This record overrides
 the \fBgid\fR field in the specified header blocks. When used in write or copy
@@ -2019,12 +1872,10 @@ group ID is greater than 2097151 (octal \fB7777777\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgname\fR\fR
 .ad
 .RS 16n
-.rt  
 The group of the files, formatted as a group name in the group database. This
 record overrides the \fBgid\fR and \fIgname\fR fields in the specified header
 blocks, and any \fBgid\fR extended header record. When used in read, copy, or
@@ -2039,12 +1890,10 @@ represented entirely with the letters and digits of the portable character set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlinkpath\fR\fR
 .ad
 .RS 16n
-.rt  
 The pathname of a link being created to another file, of any type, previously
 archived. This record overrides the \fIlinkname\fR field in the specified
 \fBustar\fR header blocks. The specified \fBustar\fR header block determines
@@ -2060,12 +1909,10 @@ portable character set other than \fBNULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImtime\fR\fR
 .ad
 .RS 16n
-.rt  
 The pathname of a link being created to another file, of any type, previously
 archived. This record overrides the \fIlinkname\fR field in the specified
 \fBustar\fR header blocks. The specified \fBustar\fR header block determines
@@ -2081,12 +1928,10 @@ members of the portable character set other than \fBNULL\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR\fR
 .ad
 .RS 16n
-.rt  
 The pathname of the specified files. This record overrides the name and
 \fIprefix\fR fields in the specified header blocks. \fBpax\fR translates the
 pathname of the file from the UTF-8 encoding to the character set appropriate
@@ -2098,36 +1943,30 @@ represented entirely with the members of the portable character set other than
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrealtime.\fR\fIany\fR\fR
 .ad
 .RS 16n
-.rt  
 The keywords prefixed by \fBrealtime\fR are reserved for future
 standardization.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsecurity.\fR\fIany\fR\fR
 .ad
 .RS 16n
-.rt  
 The keywords prefixed by \fBsecurity\fR are reserved for future
 standardization.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 16n
-.rt  
 The size of the file in octets, expressed as a decimal number using digits from
 the \fIISO/IEC 646: 1991 standard\fR. This record overrides the \fIsize\fR
 field in the specified header blocks. When used in write or copy mode,
@@ -2137,12 +1976,10 @@ field in the specified header blocks. When used in write or copy mode,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuid\fR\fR
 .ad
 .RS 16n
-.rt  
 The user \fBID\fR of the file owner, expressed as a decimal number using digits
 from the I\fISO/IEC 646:1991\fR standard. This record overrides the \fBuid\fR
 field in the following header block(s). When used in write or copy mode,
@@ -2152,12 +1989,10 @@ ID is greater than \fB2097151 (octal 7777777)\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuname\fR\fR
 .ad
 .RS 16n
-.rt  
 The owner of the specified files, formatted as a user name in the user
 database. This record overrides the \fIuid\fR and \fIuname\fR fields in the
 specified header blocks, and any \fIuid\fR extended header record. When used in
@@ -2280,27 +2115,25 @@ lengths and offsets are in decimal.
 \fBTable 1 \fR\fBustar\fR Header Block
 .sp
 .TS
-tab();
-cw(1.83i) cw(1.83i) cw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Field NameOctet OffsetLength (in Octets)
-\fIname\fR\fB0\fR100
-\fImode\fR1008
-\fIuid\fR1088
-\fIgid\fR1168
-\fIsize\fR12412
-\fImtime\fR13612
-\fIchksum\fR1488
-\fItypeflag\fR1561
-\fIlinkname\fR157100
-\fImagic\fR2576
-\fIversion\fR2632
-\fIuname\fR26532
-\fIgname\fR29732
-\fIdevmajor\fR3298
-\fIdevminor\fR3378
-\fIprefix\fR345155
+c c c
+l l l .
+Field Name	Octet Offset	Length (in Octets)
+\fIname\fR	\fB0\fR	100
+\fImode\fR	100	8
+\fIuid\fR	108	8
+\fIgid\fR	116	8
+\fIsize\fR	124	12
+\fImtime\fR	136	12
+\fIchksum\fR	148	8
+\fItypeflag\fR	156	1
+\fIlinkname\fR	157	100
+\fImagic\fR	257	6
+\fIversion\fR	263	2
+\fIuname\fR	265	32
+\fIgname\fR	297	32
+\fIdevmajor\fR	329	8
+\fIdevminor\fR	337	8
+\fIprefix\fR	345	155
 .TE
 
 .sp
@@ -2376,27 +2209,25 @@ representation. The encoded bits represent the following values in the
 
 .sp
 .TS
-tab();
-lw(.57i) lw(1.64i) lw(3.29i) 
-lw(.57i) lw(1.64i) lw(3.29i) 
-.
-Bit ValueIEE Std 1003.1-2001 BitDescription
-04000S_ISUIDSet UID on execution
-02000S_ISGIDSet GID on exectution
-01000\fIreserved\fRReserved for future standardization
-00400S_IRUSRRead permission for file owner class
-00200S_IWUSRWrite permission for file owner class
-00100S_IXUSRT{
+l l l
+l l l .
+Bit Value	IEE Std 1003.1-2001 Bit	Description
+04000	S_ISUID	Set UID on execution
+02000	S_ISGID	Set GID on exectution
+01000	\fIreserved\fR	Reserved for future standardization
+00400	S_IRUSR	Read permission for file owner class
+00200	S_IWUSR	Write permission for file owner class
+00100	S_IXUSR	T{
 Execute/search permission for file owner class
 T}
-00040S_IRGRPRead permission for file group class
-00020S_IWGRPWrite permission for file group class
-00010S_IXGRPT{
+00040	S_IRGRP	Read permission for file group class
+00020	S_IWGRP	Write permission for file group class
+00010	S_IXGRP	T{
 Execute/search permission for file group class
 T}
-00004S_IROTHRead permission for file other class
-00002S_IWOTHWrite permission for file other class
-00001S_IXOTHT{
+00004	S_IROTH	Read permission for file other class
+00002	S_IWOTH	Write permission for file other class
+00001	S_IXOTH	T{
 Execute/search permission for file other class
 T}
 .TE
@@ -2453,12 +2284,10 @@ that the conversion took place. All of the \fItypeflag\fR fields are coded in
 the \fIISO/IEC 646: 1991\fR standard IRV:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 17n
-.rt  
 Represents a regular file. For backward compatibility, a \fItypeflag\fR value
 of binary zero ('\e0') should be recognized as meaning a regular file when
 extracting files from the archive. Archives written with this version of the
@@ -2468,12 +2297,10 @@ archive file format create regular files with a \fItypeflag\fR value of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 17n
-.rt  
 Represents a file linked to another file, of any type, previously archived.
 Such files are identified by each file having the same device and file serial
 number. The linked-to name is specified in the \fIlinkname\fR field with a
@@ -2482,24 +2309,20 @@ number. The linked-to name is specified in the \fIlinkname\fR field with a
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 17n
-.rt  
 Represents a symbolic link. The contents of the symbolic link are stored in the
 \fIlinkname\fR field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3,4\fR\fR
 .ad
 .RS 17n
-.rt  
 Represents character special files and block special files respectively. In
 this case the \fIdevmajor\fR and \fIdevminor\fR fields contain information
 defining the device, the format of which is unspecified by volume \fIIEEE Std
@@ -2509,12 +2332,10 @@ local specification or can ignore the entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB5\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies a directory or subdirectory. On systems where disk allocation is
 performed on a directory basis, the \fIsize\fR field contain the maximum number
 of octets (which can be rounded to the nearest disk block allocation unit) that
@@ -2525,24 +2346,20 @@ Systems that do not support limiting in this manner should ignore the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB6\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies a FIFO special file. The archiving of a FIFO file archives the
 existence of this file and not its contents.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB7\fR\fR
 .ad
 .RS 17n
-.rt  
 Reserved to represent a file to which an implementation has associated some
 high- performance attribute. Implementations without such extensions should
 treat this file as a regular file (type 0).
@@ -2550,12 +2367,10 @@ treat this file as a regular file (type 0).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA-Z\fR\fR
 .ad
 .RS 17n
-.rt  
 The letters \fBA\fR through \fBZ\fR inclusive are reserved for custom
 implementations. All other values are reserved for future versions of \fIIEEE
 Std 1003.1-200x\fR.
@@ -2563,12 +2378,10 @@ Std 1003.1-200x\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUN.devmajor\fR\fR
 .ad
 .RS 17n
-.rt  
 A Solaris extension to \fBpax\fR extended header keywords. Specifies the major
 device number of the file.
 .sp
@@ -2580,12 +2393,10 @@ fit in 8 octets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUN.devminor\fR\fR
 .ad
 .RS 17n
-.rt  
 A Solaris extension to \fBpax\fR extended header keywords. Specifies the minor
 device number of the file.
 .sp
@@ -2597,12 +2408,10 @@ fit in 8 octets.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSUN.holesdata\fR\fR
 .ad
 .RS 17n
-.rt  
 A Solaris extension to \fBpax\fR extended header keywords. Specifies the data
 and hole pairs for a sparse file.
 .sp
@@ -2644,12 +2453,10 @@ bytes 24576 to 32768 is restored as data, and so forth.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBX\fR\fR
 .ad
 .RS 17n
-.rt  
 A Solaris custom \fBtypeflag\fR implementation which specifies an \fBxustar\fR
 format (see \fB-x format\fR) extended header. The \fBtypeflag 'x'\fR extended
 header is treated as a \fBustar typeflag 'x'\fR extended header.
@@ -2657,12 +2464,10 @@ header is treated as a \fBustar typeflag 'x'\fR extended header.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBE\fR\fR
 .ad
 .RS 17n
-.rt  
 A Solaris custom \fBtypeflag\fR implementation which specifies an extended
 attributes header. See \fBfsattr\fR(5).
 .RE
@@ -2704,46 +2509,40 @@ additional details.
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Header Field NameLength (in Octets)Interpreted as
-\fIc_magic\fR6Octal number
-\fIc_dev\fR6Octal number
-\fIc_ino\fR6Octal number
-\fIc_mode\fR6Octal number
-\fIc_uid\fR6Octal number
-\fIc_gid\fR6Octal number
-\fIc_nlink\fR6Octal number
-\fIc_rdev\fR6Octal number
-\fIc_mtime\fR11Octal number
-\fIc_namesize\fR6Octal number
-\fIc_filesize\fR11Octal number
+l l l
+l l l .
+Header Field Name	Length (in Octets)	Interpreted as
+\fIc_magic\fR	6	Octal number
+\fIc_dev\fR	6	Octal number
+\fIc_ino\fR	6	Octal number
+\fIc_mode\fR	6	Octal number
+\fIc_uid\fR	6	Octal number
+\fIc_gid\fR	6	Octal number
+\fIc_nlink\fR	6	Octal number
+\fIc_rdev\fR	6	Octal number
+\fIc_mtime\fR	11	Octal number
+\fIc_namesize\fR	6	Octal number
+\fIc_filesize\fR	11	Octal number
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Filename Field NameLengthInterpreted as
-\fIc_name\fR\fIc_namesize\fRPathname string
+l l l
+l l l .
+Filename Field Name	Length	Interpreted as
+\fIc_name\fR	\fIc_namesize\fR	Pathname string
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-Filename Field NameLengthInterpreted as
-\fIc_filedata\fR\fIc_filesize\fRData
+l l l
+l l l .
+Filename Field Name	Length	Interpreted as
+\fIc_filedata\fR	\fIc_filesize\fR	Data
 .TE
 
 .SS "\fBcpio\fR Header"
@@ -2758,24 +2557,20 @@ is written to the most-significant digit of the stream of octets first. The
 fields are interpreted as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_magic\fR\fR
 .ad
 .RS 15n
-.rt  
 Identifies the archive as being a transportable archive by containing the
 identifying value \fB"070707"\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_dev,c_ino\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains values that uniquely identify the file within the archive (that is, no
 files contain the same pair of \fIc_dev\fR and \fIc_ino\fR values unless they
 are links to the same file). The values are determined in an unspecified
@@ -2784,12 +2579,10 @@ manner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_mode\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains the file type and access permissions as defined in the following
 table.
 .sp
@@ -2802,76 +2595,66 @@ intended to be transported to other systems.
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-File Permissions NameValueIndicates
-\fBC_IRUSR\fR\fB000400\fRby owner
-\fBC_IWUSR\fR\fB000200\fRby owner
-\fBC_IXUSR\fR\fB000100\fRby owner
-\fBC_IRGRP\fR\fB000040\fRby group
-\fBCW_IWFGP\fR\fB000020\fRby group
-\fBCW_IXGRP\fR\fB000010\fRby group
-\fBCW_IROTH\fR\fB000004\fRby others
-\fBCW_IWOTH\fR\fB000002\fRby others
-\fBCW_IXOTH\fR\fB000001\fRby others
-\fBCW_ISUID\fR\fB004000\fRSet \fBuid\fR
-\fBW_ISGID\fR\fB002000\fRSet \fBgid\fR
-\fBW_ISVTX\fR\fB001000\fRReserved
+l l l
+l l l .
+File Permissions Name	Value	Indicates
+\fBC_IRUSR\fR	\fB000400\fR	by owner
+\fBC_IWUSR\fR	\fB000200\fR	by owner
+\fBC_IXUSR\fR	\fB000100\fR	by owner
+\fBC_IRGRP\fR	\fB000040\fR	by group
+\fBCW_IWFGP\fR	\fB000020\fR	by group
+\fBCW_IXGRP\fR	\fB000010\fR	by group
+\fBCW_IROTH\fR	\fB000004\fR	by others
+\fBCW_IWOTH\fR	\fB000002\fR	by others
+\fBCW_IXOTH\fR	\fB000001\fR	by others
+\fBCW_ISUID\fR	\fB004000\fR	Set \fBuid\fR
+\fBW_ISGID\fR	\fB002000\fR	Set \fBgid\fR
+\fBW_ISVTX\fR	\fB001000\fR	Reserved
 .TE
 
 .sp
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-File Type NameValueIndicates
-\fBC_ISDIR\fR\fB040000\fRDirectory
-\fBC_ISFIFO\fR\fB010000\fRFIFO
-\fBC_ISREG\fR\fB0100000\fRRegular file
-\fBC_ISLNK\fR\fB0120000\fRSymbolic link
-\fBC_ISBLK\fR\fB060000\fRBlock special file
-\fBC_ISCHR\fR\fB020000\fRCharacter special file
-\fBC_ISSOCK\fR\fB0140000\fRSocket
-\fBC_ISCTG\fR\fB0110000\fRReserved
+l l l
+l l l .
+File Type Name	Value	Indicates
+\fBC_ISDIR\fR	\fB040000\fR	Directory
+\fBC_ISFIFO\fR	\fB010000\fR	FIFO
+\fBC_ISREG\fR	\fB0100000\fR	Regular file
+\fBC_ISLNK\fR	\fB0120000\fR	Symbolic link
+\fBC_ISBLK\fR	\fB060000\fR	Block special file
+\fBC_ISCHR\fR	\fB020000\fR	Character special file
+\fBC_ISSOCK\fR	\fB0140000\fR	Socket
+\fBC_ISCTG\fR	\fB0110000\fR	Reserved
 .TE
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_uid\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains the user ID of the owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_gid\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains the group ID of the group
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_nlink\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains a number greater than or equal to the number of links in the archive
 referencing the file. If the \fB-a\fR option is used to append to a \fBcpio\fR
 archive, \fBpax\fR does need not to account for the files in the existing part
@@ -2883,47 +2666,39 @@ existing part of the archive if additional files with the same \fIc_dev\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_rdev\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains implementation-defined information for character or block special
 files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_mtime\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains the latest time of modification of the file at the time the archive
 was created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_namesize\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains the length of the pathname, including the terminating NULL character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIc_filesize\fR\fR
 .ad
 .RS 15n
-.rt  
 Contains the length of the file in octets. This is the length of the data
 section following the header structure.
 .RE
@@ -2999,15 +2774,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

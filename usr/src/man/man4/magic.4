@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH magic 4 "6 Feb 2004" "SunOS 5.11" "File Formats"
+.TH MAGIC 4 "Feb 6, 2004"
 .SH NAME
 magic \- file command's magic number file
 .SH SYNOPSIS
@@ -30,121 +30,99 @@ message is printed. The line consists of the following fields (separated by
 tabs): \fIoffset\fR \fItype\fR \fIvalue\fR \fImessage\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoffset\fR\fR
 .ad
 .RS 11n
-.rt  
 A number specifying the offset, in bytes, into the file of the data which is to
 be tested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 11n
-.rt  
 The type of the data to be tested. The possible values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbyte, d1, dC\fR\fR
 .ad
 .RS 24n
-.rt  
 A one-byte signed value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshort, d2, dS\fR\fR
 .ad
 .RS 24n
-.rt  
 A 2-byte signed value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlong, d4, dI, dL, d\fR\fR
 .ad
 .RS 24n
-.rt  
 A 4-byte signed value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBllong, d8\fR\fR
 .ad
 .RS 24n
-.rt  
 An 8-byte signed value
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBubyte, u1, uC\fR\fR
 .ad
 .RS 24n
-.rt  
 A one-byte unsigned value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBushort, u2, uS\fR\fR
 .ad
 .RS 24n
-.rt  
 A 2-byte unsigned value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBulong, u4, uI, uL, u\fR\fR
 .ad
 .RS 24n
-.rt  
 A 4-byte unsigned value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBullong, u8\fR\fR
 .ad
 .RS 24n
-.rt  
 An 8-byte unsigned value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstring, s\fR\fR
 .ad
 .RS 24n
-.rt  
 A string of bytes.
 .RE
 
@@ -157,12 +135,10 @@ the value is AND'ed with the \fInumber\fR before any comparisons are done. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 11n
-.rt  
 The value to be compared with the value from the file. If the type is numeric,
 this value is specified in \fBC\fR form. If it is a string, it is specified as
 a \fBC\fR string with the usual escapes permitted (for instance, \en for
@@ -172,68 +148,56 @@ NEWLINE).
 be performed, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\fR\fR
 .ad
 .RS 5n
-.rt  
 The value from the file must equal the specified value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fR
 .ad
 .RS 5n
-.rt  
 The value from the file must be less than the specified value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fR
 .ad
 .RS 5n
-.rt  
 The value from the file must be greater than the specified value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&\fR\fR
 .ad
 .RS 5n
-.rt  
 All the bits in the specified value must be set in the value from the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 5n
-.rt  
 At least one of the bits in the specified value must not be set in the value
 from the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 5n
-.rt  
 Any value will match.
 .RE
 
@@ -250,24 +214,20 @@ the specified byte string. If the value is a string, it can contain the
 following sequences:
 .sp
 .ne 2
-.mk
 .na
 \fB\e\fIcharacter\fR\fR
 .ad
 .RS 15n
-.rt  
 The backslash-escape sequences \fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR,
 \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR\&.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\e\fIoctal\fR\fR
 .ad
 .RS 15n
-.rt  
 Octal sequences that can be used to represent characters with specific coded
 values. An octal sequence consists of a backslash followed by the longest
 sequence of one, two, or three octal-digit characters (01234567).
@@ -277,12 +237,10 @@ sequence of one, two, or three octal-digit characters (01234567).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImessage\fR\fR
 .ad
 .RS 11n
-.rt  
 The message to be printed if the comparison succeeds. If the string contains a
 \fBprintf\fR(3C) format specification, the value from the file (with any
 specified masking performed) is printed using the message as the format string.
@@ -300,12 +258,10 @@ printed if the tests succeed. The next line which does not begin with a
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/magic\fR\fR
 .ad
 .RS 14n
-.rt  
 
 .RE
 

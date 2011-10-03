@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH xstr 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH XSTR 1 "Sep 14, 1992"
 .SH NAME
 xstr \- extract strings from C programs to implement shared strings
 .SH SYNOPSIS
@@ -101,35 +101,29 @@ thus \fBmake\fR(1S) can avoid remaking \fBxs.o\fR unless truly necessary.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mic \fR\fIfilename\fR\fR
 .ad
 .RS 18n
-.rt  
 Take C source text from \fIfilename\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Verbose: display a progress report indicating where new or duplicate strings
 were found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mil \fR\fIarray\fR\fR
 .ad
 .RS 18n
-.rt  
 Specify the named  \fIarray\fR in program references to abstracted strings.
 The default array name is \fBxstr\fR.
 .RE
@@ -137,45 +131,37 @@ The default array name is \fBxstr\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstrings\fR\fR
 .ad
 .RS 12n
-.rt  
 data base of strings
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx.c\fR\fR
 .ad
 .RS 12n
-.rt  
 massaged C source
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxs.c\fR\fR
 .ad
 .RS 12n
-.rt  
 C source for definition of array "xstr*(rq
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/xs*\fR\fR
 .ad
 .RS 12n
-.rt  
 temp file when \fBxstr \fR\fIfilename\fR doesn't touch \fBstrings\fR
 .RE
 

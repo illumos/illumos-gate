@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_sm 3PAM "16 Mar 2005" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_SM 3PAM "Mar 16, 2005"
 .SH NAME
 pam_sm \- PAM Service Module APIs
 .SH SYNOPSIS
@@ -156,24 +156,20 @@ before or after some other module in the stack.
 By convention, the modules should support the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
 .RS 10n
-.rt  
 Syslog debugging information at \fBLOG_DEBUG\fR level. Be careful as to not log
 any sensitive information such as passwords.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnowarn\fR\fR
 .ad
 .RS 10n
-.rt  
 Turn off warning messages such as "password is about to expire."
 .RE
 
@@ -209,15 +205,14 @@ See \fBattributes\fR(5) for description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uadmin 2 "25 Mar 2009" "SunOS 5.11" "System Calls"
+.TH UADMIN 2 "Mar 25, 2009"
 .SH NAME
 uadmin \- administrative control
 .SH SYNOPSIS
@@ -28,68 +28,56 @@ initialized to \fINULL\fR if not used.
 As specified by \fIcmd\fR, the following commands are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SHUTDOWN\fR\fR
 .ad
 .RS 14n
-.rt  
 The system is shut down. All user processes are killed, the buffer cache is
 flushed, and the root file system is unmounted. The action to be taken after
 the system has been shut down is specified by \fIfcn\fR. The functions are
 generic; the hardware capabilities vary on  specific machines.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_HALT\fR\fR
 .ad
 .RS 17n
-.rt  
 Halt the processor(s).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_POWEROFF\fR\fR
 .ad
 .RS 17n
-.rt  
 Halt the processor(s) and turn off the power.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_BOOT\fR\fR
 .ad
 .RS 17n
-.rt  
 Reboot the system, using the kernel file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_IBOOT\fR\fR
 .ad
 .RS 17n
-.rt  
 Interactive reboot; user is prompted for bootable program name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_FASTREBOOT\fR\fR
 .ad
 .RS 17n
-.rt  
 Bypass BIOS and boot loader
 .RE
 
@@ -97,24 +85,20 @@ Bypass BIOS and boot loader
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_REBOOT\fR\fR
 .ad
 .RS 14n
-.rt  
 The system stops immediately without any further processing. The action to be
 taken next is specified by \fIfcn\fR as above.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_DUMP\fR\fR
 .ad
 .RS 14n
-.rt  
 The system is forced to panic immediately without any further processing and a
 crash dump is written to the dump device (see \fBdumpadm\fR(1M)).  The action
 to be taken next is specified by \fIfcn\fR, as above.
@@ -122,29 +106,24 @@ to be taken next is specified by \fIfcn\fR, as above.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_REMOUNT\fR\fR
 .ad
 .RS 14n
-.rt  
 The root file system is mounted again after having been fixed. This should be
 used only during the startup process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_FREEZE\fR\fR
 .ad
 .RS 14n
-.rt  
 Suspend the whole system.  The system state is preserved in the state file. The
 following subcommands, specified by \fIfcn\fR, are available.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_SUSPEND_TO_DISK\fR\fR
 .ad
@@ -156,7 +135,6 @@ state S4.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_CHECK_SUSPEND_TO_DISK\fR\fR
 .ad
@@ -169,7 +147,6 @@ on your system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_SUSPEND_TO_RAM\fR\fR
 .ad
@@ -180,7 +157,6 @@ Save the system state to memory This subcommand is equivalent to ACPI state S3.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_CHECK_SUSPEND_TO_RAM\fR\fR
 .ad
@@ -195,7 +171,6 @@ The following subcommands, specified by \fIfcn\fR, are obsolete and might be
 removed in a subsequent release:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_COMPRESS\fR\fR
 .ad
@@ -208,7 +183,6 @@ instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_CHECK\fR\fR
 .ad
@@ -222,7 +196,6 @@ your system. This subcommand has been replaced by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBAD_FORCE\fR\fR
 .ad
@@ -241,45 +214,37 @@ undefined behavior.
 Upon successful completion, the value returned depends on \fIcmd\fR as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_SHUTDOWN\fR\fR
 .ad
 .RS 14n
-.rt  
 Never returns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_REBOOT\fR\fR
 .ad
 .RS 14n
-.rt  
 Never returns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_FREEZE\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB0\fR upon resume.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBA_REMOUNT\fR\fR
 .ad
 .RS 14n
-.rt  
 \fB0\fR.
 .RE
 
@@ -293,80 +258,66 @@ error.
 The \fBuadmin()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 11n
-.rt  
 Suspend is already in progress.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIcmd\fR argument is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 Suspend/resume ran out of physical memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 11n
-.rt  
 Suspend/resume could not allocate enough space on the root file system to store
 system information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 Suspend/resume is not supported on this platform or the command specified by
 \fIcmd\fR is not allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENXIO\fR\fR
 .ad
 .RS 11n
-.rt  
 Unable to successfully suspend system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 11n
-.rt  
 The {\fBPRIV_SYS_CONFIG\fR} privilege is not asserted in the effective set of
 the calling process.
 .RE
@@ -379,13 +330,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

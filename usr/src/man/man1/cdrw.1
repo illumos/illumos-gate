@@ -1,9 +1,9 @@
 '\" te
-.\" Copyright (c) 2008, Sun Microsystems, Inc. All rights reserved. 
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cdrw 1 "10 Jul 2008" "SunOS 5.11" "User Commands"
+.TH CDRW 1 "Jul 10, 2008"
 .SH NAME
 cdrw \- CD read and write
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ cdrw \- CD read and write
 
 .LP
 .nf
-\fBcdrw\fR \fB-a\fR [\fB-vSCO\fR] [\fB-d\fR \fIdevice\fR] [\fB-p\fR \fIspeed\fR] [\fB-T\fR \fIaudio-type\fR] \fIaudio-file1\fR 
+\fBcdrw\fR \fB-a\fR [\fB-vSCO\fR] [\fB-d\fR \fIdevice\fR] [\fB-p\fR \fIspeed\fR] [\fB-T\fR \fIaudio-type\fR] \fIaudio-file1\fR
      [\fIaudio-file2\fR]...
 .fi
 
@@ -25,7 +25,7 @@ cdrw \- CD read and write
 
 .LP
 .nf
-\fBcdrw\fR \fB-c\fR [\fB-vSC\fR] [\fB-d\fR \fIdevice\fR] [\fB-p\fR \fIspeed\fR] [\fB-m\fR \fItmp-dir\fR] 
+\fBcdrw\fR \fB-c\fR [\fB-vSC\fR] [\fB-d\fR \fIdevice\fR] [\fB-p\fR \fIspeed\fR] [\fB-m\fR \fItmp-dir\fR]
      [\fB-s\fR \fIsrc-device\fR]
 .fi
 
@@ -107,46 +107,38 @@ can be specified with this option. All of the audio files should be in a
 supported audio format. Currently approved formats are:
 .sp
 .ne 2
-.mk
 .na
 \fBsun\fR
 .ad
 .RS 7n
-.rt  
 Sun .au files with data in Red Book CDDA form
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBwav\fR
 .ad
 .RS 7n
-.rt  
 RIFF (.wav) files with data in Red Book CDDA form
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBcda\fR
 .ad
 .RS 7n
-.rt  
 \&.cda files having raw CD audio data (that is, 16 bit PCM stereo at 44.1 KHz
 sample rate in little-endian byte order)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBaur\fR
 .ad
 .RS 7n
-.rt  
 \&.aur files having raw CD data in big-endian byte order
 .RE
 
@@ -184,34 +176,28 @@ Users have to erase the CD-RW media before it can be rewritten. With the
 \fB-b\fR option, the following flavors of erasing are currently supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsession\fR\fR
 .ad
 .RS 11n
-.rt  
 Erases the last session.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfast\fR\fR
 .ad
 .RS 11n
-.rt  
 Minimally erases the media.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 11n
-.rt  
 Erases the entire media.
 .RE
 
@@ -256,12 +242,10 @@ information.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Creates an audio disk. At least one \fIaudio-file\fR name must be specified. A
 CD can not have more than 99 audio tracks, so no more than 99 audio files can
 be specified.
@@ -269,12 +253,10 @@ be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Blanks CD-RW or DVD-RW media. The type of erasing must be specified by the
 \fBall\fR, \fBfast\fR, or \fBsession\fR argument. DVD+RW media does not support
 blanking, but can be rewritten without the need for blanking.
@@ -282,12 +264,10 @@ blanking, but can be rewritten without the need for blanking.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Copies a CD. If no other argument is specified, the default CD writing device
 is assumed to be the source device as well. In this case, the copy operation
 reads the source media into a temporary directory and prompts you to place a
@@ -296,12 +276,10 @@ blank media into the drive for the copy operation to proceed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 6n
-.rt  
 This option is obsolete.
 .sp
 This option used to cause\fBcdrw\fR to query the drive to determine media
@@ -310,34 +288,28 @@ capacity.  This is now the default behavior.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the CD or DVD writing device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Help. Prints usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the image file for creating data CDs or DVDs. The file size should be
 less than what can be written on the media. Also, consider having the file
 locally available instead of having the file on an NFS-mounted file system. The
@@ -347,23 +319,19 @@ interruptions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Lists all the CD or DVD writers available on the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 6n
-.rt  
 Closes the disk. If the media was left in an open state after the last write
 operation, it is closed to prevent any further writing. This operation can only
 be done on re-writable CD-RW media.
@@ -371,12 +339,10 @@ be done on re-writable CD-RW media.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 6n
-.rt  
 Uses an alternate temporary directory instead of the default temporary
 directory for storing track data while copying a CD or DVD. An alternate
 temporary directory might be required because the amount of data on a CD can be
@@ -387,12 +353,10 @@ not have that much space available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-M\fR\fR
 .ad
 .RS 6n
-.rt  
 Reports media status. \fBcdrw\fR reports if the media is blank or not, its
 table of contents, the last session's start address, and the next writable
 address if the disk is open. DVD+RW does not support erasing and always has
@@ -401,24 +365,20 @@ some content on the media.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
 .RS 6n
-.rt  
 Keeps the disk open. \fBcdrw\fR closes the session, but it keeps the disk open
 so that another session can be added later on to create a multisession disk.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets the CD writing speed. For example, \fB-p\fR \fB4\fR sets the speed to 4X.
 If this option is not specified, \fBcdrw\fR uses the default speed of the CD
 writer. If this option is specified, \fBcdrw\fR tries to set the drive write
@@ -428,23 +388,19 @@ by the drive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Specifies the source device for copying a CD or DVD.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 6n
-.rt  
 Simulation mode. In this mode, \fBcdrw\fR operates with the drive laser turned
 off, so nothing is written to the media. Use this option to verify if the
 system can provide data at a rate good enough for CD writing.
@@ -456,12 +412,10 @@ others do not support simulation mode (\fB-S\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 6n
-.rt  
 Audio format to use for extracting audio files or for reading audio files for
 audio CD creation. The \fIaudio-type\fR can be \fBsun\fR, \fBwav\fR, \fBcda\fR,
 or \fBaur\fR.
@@ -469,23 +423,19 @@ or \fBaur\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Verbose mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Extracts audio data from an audio track.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lgrpinfo 1 "11 Sep 2006" "SunOS 5.11" "User Commands"
+.TH LGRPINFO 1 "Sep 11, 2006"
 .SH NAME
 lgrpinfo \- display information about locality groups
 .SH SYNOPSIS
@@ -91,12 +91,10 @@ lgrpinfo -c -e -l -m -r -t all
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 12n
-.rt  
 Print topology, CPU, memory, load and latency information.
 .sp
 This option is a shorthand for
@@ -114,12 +112,10 @@ option is not included.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 12n
-.rt  
 Print CPU information.
 .sp
 This is the default.
@@ -127,12 +123,10 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 12n
-.rt  
 Replace each lgroup in the list with its children.
 .sp
 This option cannot be used with the \fB-P\fR or the \fB-T\fR option. When no
@@ -142,12 +136,10 @@ default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 12n
-.rt  
 Print lgroup load average. The lgroup load averages are only displayed for leaf
 lgroups.
 .sp
@@ -156,12 +148,10 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR\fR
 .ad
 .RS 12n
-.rt  
 Print OS view of lgroup hierarchy.
 .sp
 By default, the caller's view of the lgroup hierarchy is displayed which only
@@ -172,23 +162,19 @@ and the caller's view.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 12n
-.rt  
 Print short help message and exit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-I\fR\fR
 .ad
 .RS 12n
-.rt  
 Print matching IDs only.
 .sp
 This option is intended for scripts and can be used with \fB-c\fR, \fB-G\fR,
@@ -202,12 +188,10 @@ displayed, which, by default is all lgroups.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 12n
-.rt  
 Print information about lgroup latencies.
 .sp
 The latency value specified for each lgroup is defined by the operating system
@@ -218,24 +202,20 @@ latency between hardware devices and might not be applicable across platforms.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 12n
-.rt  
 Print the lgroup latency table. The lgroup latency table displays the relative
 latency from each lgroup to each of the other lgroups including itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 12n
-.rt  
 Print memory information.
 .sp
 Memory sizes are scaled to the unit of measure that yields an integer from
@@ -249,12 +229,10 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 12n
-.rt  
 Replace each lgroup in the list with its parents.
 .sp
 This option cannot be used with the \fB-C\fR or \fB-T\fR option. When no
@@ -264,12 +242,10 @@ which, by default is all lgroups.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 12n
-.rt  
 Print information about lgroup resources.
 .sp
 The resources are represented by a set of lgroups in which each member lgroup
@@ -279,12 +255,10 @@ only information about resources of the intermediate lgroups is displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 12n
-.rt  
 Print information about lgroup topology.
 .sp
 This is the default.
@@ -292,12 +266,10 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fR
 .ad
 .RS 12n
-.rt  
 Print the lgroup topology of a system graphically as a tree. This option can
 only be used with the \fB-a\fR, \fB-c\fR, \fB-e\fR, \fB-G\fR,
 \fB-l\fR,\fB-L\fR, \fB-m\fR, \fB-r\fR, and \fB-u\fR options. It only prints
@@ -308,12 +280,10 @@ is printed for the \fBroot\fR lgroup unless it is the only lgroup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIunits\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify memory units. Units should be b, k, m, g, t, p, or e for bytes,
 kilobytes, megabytes, gigabytes, terabytes, petabytes, or exabytes
 respectively. The fractional part of the number is only displayed for values
@@ -327,22 +297,18 @@ less than 10. This behavior is similiar to using the \fB-h\fR option of
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlgrp\fR\fR
 .ad
 .RS 8n
-.rt  
 lgroups can be specified on the command line as lgroup ID, by using one of the
 following keywords:
 .sp
 .ne 2
-.mk
 .na
 \fBall\fR
 .ad
 .RS 16n
-.rt  
 All lgroups.
 .sp
 This is the default.
@@ -350,36 +316,30 @@ This is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fBintermediate\fR
 .ad
 .RS 16n
-.rt  
 All intermediate lgroups. An intermediate lgroup is an lgroup that has a parent
 and children.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBleaves\fR
 .ad
 .RS 16n
-.rt  
 All leaf lgroups. A leaf lgroup is an lgroup that has no children in the lgroup
 hierarchy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBroot\fR
 .ad
 .RS 16n
-.rt  
 Root lgroup. Root lgroup contains all the resources in the domain within the
 largest latency and has no parent lgroup.
 .RE
@@ -549,45 +509,37 @@ The following example prints information about lgroup latencies:
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Unable to get lgroup information from the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 All lgroups specified are invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid syntax.
 .RE
 
@@ -599,13 +551,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

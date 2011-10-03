@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mount 1M "29 May 2008" "SunOS 5.11" "System Administration Commands"
+.TH MOUNT 1M "May 29, 2008"
 .SH NAME
 mount, umount \- mount or unmount file systems and remote resources
 .SH SYNOPSIS
@@ -14,19 +14,19 @@ mount, umount \- mount or unmount file systems and remote resources
 
 .LP
 .nf
-\fBmount\fR [\fB-F\fR \fIFSType\fR] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] 
+\fBmount\fR [\fB-F\fR \fIFSType\fR] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
      [\fB-O\fR] \fIspecial\fR | \fImount_point\fR
 .fi
 
 .LP
 .nf
-\fBmount\fR [\fB-F\fR \fIFSType\fR] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] 
+\fBmount\fR [\fB-F\fR \fIFSType\fR] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
      [\fB-O\fR] \fIspecial\fR \fImount_point\fR
 .fi
 
 .LP
 .nf
-\fBmount\fR \fB-a\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fIcurrent_options\fR] 
+\fBmount\fR \fB-a\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fIcurrent_options\fR]
      [\fB-o\fR \fIspecific_options\fR] [\fImount_point\fR]...
 .fi
 
@@ -91,7 +91,6 @@ can use \fBmount\fR to list mounted file systems and resources.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIFSType\fR\fR
 .ad
@@ -104,7 +103,6 @@ specified or must be determinable from \fB/etc/vfstab\fR, or by consulting
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR [ \fImount_points\fR. . . ]\fR
 .ad
@@ -125,7 +123,6 @@ required file systems: \fB/\fR, \fB/usr\fR, \fB/var\fR, \fB/var/adm\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -141,7 +138,6 @@ unmounted will get an error (\fBEIO\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -153,7 +149,6 @@ the only option specified. See \fBBUGS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -165,7 +160,6 @@ option specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -179,7 +173,6 @@ should be used to verify and validate the command line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgeneric_options\fR\fR
 .ad
@@ -189,7 +182,6 @@ Options that are commonly supported by most \fIFSType\fR-specific command
 modules. The following options are available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -200,7 +192,6 @@ Mount the file system without making an entry in \fB/etc/mnttab\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR\fR
 .ad
@@ -213,7 +204,6 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
@@ -229,7 +219,6 @@ ignored.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevices | nodevices\fR\fR
 .ad
@@ -244,7 +233,6 @@ equivalent to that of \fBnosuid\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexec | noexec\fR\fR
 .ad
@@ -257,7 +245,6 @@ default is \fBexec\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBloop\fR\fR
 .ad
@@ -268,7 +255,6 @@ Ignored for compatibility.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnbmand | nonbmand\fR\fR
 .ad
@@ -309,7 +295,6 @@ option. See \fB-g\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBro | rw\fR\fR
 .ad
@@ -320,7 +305,6 @@ Specify read-only or read-write. The default is \fBrw\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetuid | nosetuid\fR\fR
 .ad
@@ -343,7 +327,6 @@ programs to the server or create devices that could open security holes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsuid | nosuid\fR\fR
 .ad
@@ -367,7 +350,6 @@ holes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR\fR
 .ad
@@ -381,7 +363,6 @@ producing the error "device busy".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -417,7 +398,6 @@ bytes).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
@@ -428,7 +408,6 @@ Table of mounted file systems.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/fs\fR\fR
 .ad
@@ -438,7 +417,6 @@ Default local file system type. Default values can be set for the following
 flags in \fB/etc/default/fs\fR. For example: \fBLOCAL=ufs\fR
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCAL:\fR\fR
 .ad
@@ -451,7 +429,6 @@ The default partition for a command if no \fIFSType\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad

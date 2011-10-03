@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fmtmsg.h 3HEAD "10 Sep 2004" "SunOS 5.11" "Headers"
+.TH FMTMSG.H 3HEAD "Sep 10, 2004"
 .SH NAME
 fmtmsg.h, fmtmsg \- message display structures
 .SH SYNOPSIS
@@ -23,166 +23,136 @@ The <\fBfmtmsg.h\fR> header defines the following macros, which expand to
 constant integer expressions:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_HARD\fR\fR
 .ad
 .RS 14n
-.rt  
 Source of the condition is hardware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_SOFT\fR\fR
 .ad
 .RS 14n
-.rt  
 Source of the condition is software.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_FIRM\fR\fR
 .ad
 .RS 14n
-.rt  
 Source of the condition is firmware.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_APPL\fR\fR
 .ad
 .RS 14n
-.rt  
 Condition detected by application.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_UTIL\fR\fR
 .ad
 .RS 14n
-.rt  
 Condition detected by utility.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_OPSYS\fR\fR
 .ad
 .RS 14n
-.rt  
 Condition detected by operating system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_RECOVER\fR\fR
 .ad
 .RS 14n
-.rt  
 Recoverable error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NRECOV\fR\fR
 .ad
 .RS 14n
-.rt  
 Non-recoverable error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_HALT\fR\fR
 .ad
 .RS 14n
-.rt  
 Error causing application to halt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_ERROR\fR\fR
 .ad
 .RS 14n
-.rt  
 Application has encountered a non-fatal fault.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_WARNING\fR\fR
 .ad
 .RS 14n
-.rt  
 Application has detected unusual non-error condition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_INFO\fR\fR
 .ad
 .RS 14n
-.rt  
 Informative message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOSEV\fR\fR
 .ad
 .RS 14n
-.rt  
 No severity level provided for the message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_PRINT\fR\fR
 .ad
 .RS 14n
-.rt  
 Display message on standard error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_CONSOLE\fR\fR
 .ad
 .RS 14n
-.rt  
 Display message on system console.
 .RE
 
@@ -196,17 +166,15 @@ type indicated in the Type column:
 
 .sp
 .TS
-tab();
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-lw(1.38i) lw(1.38i) lw(1.38i) lw(1.38i) 
-.
-ArgumentTypeNull-ValueIdentifier
-\fIlabel\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLLBL\fR
-\fIseverity\fR\fBint\fR\fB0\fR\fBMM_NULLSEV\fR
-\fIclass\fR\fBlong\fR\fB0L\fR\fBMM_NULLMC\fR
-\fItext\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLTXT\fR
-\fIaction\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLACT\fR
-\fItag\fR\fBchar*\fR\fB(char*) NULL\fR\fBMM_NULLTAG\fR
+l l l l
+l l l l .
+Argument	Type	Null-Value	Identifier
+\fIlabel\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLLBL\fR
+\fIseverity\fR	\fBint\fR	\fB0\fR	\fBMM_NULLSEV\fR
+\fIclass\fR	\fBlong\fR	\fB0L\fR	\fBMM_NULLMC\fR
+\fItext\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLTXT\fR
+\fIaction\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLACT\fR
+\fItag\fR	\fBchar*\fR	\fB(char*) NULL\fR	\fBMM_NULLTAG\fR
 .TE
 
 .sp
@@ -215,46 +183,38 @@ The <\fBfmtmsg.h\fR> header also defines the following macros for use as return
 values for \fBfmtmsg()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_OK\fR\fR
 .ad
 .RS 12n
-.rt  
 The function succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOTOK\fR\fR
 .ad
 .RS 12n
-.rt  
 The function failed completely.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOMSG\fR\fR
 .ad
 .RS 12n
-.rt  
 The function was unable to generate a message on standard error, but otherwise
 succeeded.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOCON\fR\fR
 .ad
 .RS 12n
-.rt  
 The function was unable to generate a console message, but otherwise succeeded.
 .RE
 
@@ -266,13 +226,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

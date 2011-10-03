@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mkfs_udfs 1M "17 Nov 2000" "SunOS 5.11" "System Administration Commands"
+.TH MKFS_UDFS 1M "Nov 17, 2000"
 .SH NAME
 mkfs_udfs \- construct a udfs file system
 .SH SYNOPSIS
 .LP
 .nf
-\fBmkfs\fR \fB-F udfs\fR [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] \fIraw_device_file\fR 
+\fBmkfs\fR \fB-F udfs\fR [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] \fIraw_device_file\fR
      [\fIsize\fR]
 .fi
 
@@ -28,12 +28,10 @@ See \fBmkfs\fR(1M) for the list of supported \fIgeneric_options\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIspecific_options\fR\fR
 .ad
 .RS 23n
-.rt  
 Specify a \fBudfs\fR-specific option. Specify \fBudfs\fR file system specific
 options in a comma-separated list with no intervening spaces. If invalid
 options are specified, a warning message is printed and the invalid options are
@@ -42,23 +40,19 @@ ignored.
 The following \fIspecific_options\fR are available:
 .sp
 .ne 2
-.mk
 .na
 \fBN\fR
 .ad
 .RS 16n
-.rt  
 Print the file system parameters without actually creating the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlabel=\fIstring\fR\fR
 .ad
 .RS 16n
-.rt  
 Specify the label to be written into the volume header structures. Specify
 \fIstring\fR as the name of the label. If \fIstring\fR is not specified, a
 default \fIstring\fR is generated in the form of \fB*NoLabel*\fR.
@@ -72,23 +66,19 @@ default \fIstring\fR is generated in the form of \fB*NoLabel*\fR.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw_device_file\fR\fR
 .ad
 .RS 19n
-.rt  
  Specify the disk partition on which to write.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 19n
-.rt  
 Specify the number of 512-byte blocks in the file system.
 .RE
 
@@ -157,7 +147,7 @@ Sector size given is not in the valid range.
 .in +2
 .nf
 Volume integrity sequence descriptors too long
-File set descriptor too long. 
+File set descriptor too long.
 .fi
 .in -2
 .sp

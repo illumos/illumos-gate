@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH addseverity 3C "29 Dec 1996" "SunOS 5.11" "Standard C Library Functions"
+.TH ADDSEVERITY 3C "Dec 29, 1996"
 .SH NAME
 addseverity \- build a list of severity levels for an application for use with
 fmtmsg
@@ -39,60 +39,50 @@ If \fBaddseverity()\fR is called with a negative number or an integer value of
 Identifiers for the standard levels of severity are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_HALT\fR\fR
 .ad
 .RS 14n
-.rt  
 Indicates that the application has encountered a severe fault and is halting.
 Produces the print string \fBHALT\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_ERROR\fR\fR
 .ad
 .RS 14n
-.rt  
 Indicates that the application has detected a fault. Produces the print string
 \fBERROR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_WARNING\fR\fR
 .ad
 .RS 14n
-.rt  
 Indicates a condition that is out of the ordinary, that might be a problem, and
 should be watched. Produces the print string \fBWARNING\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_INFO\fR\fR
 .ad
 .RS 14n
-.rt  
 Provides information about a condition that is not in error. Produces the print
 string \fBINFO\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMM_NOSEV\fR\fR
 .ad
 .RS 14n
-.rt  
 Indicates that no severity level is supplied for the message.
 .RE
 
@@ -151,13 +141,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

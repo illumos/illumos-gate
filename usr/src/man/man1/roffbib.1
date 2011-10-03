@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH roffbib 1 "14 Sep 1992" "SunOS 5.11" "User Commands"
+.TH ROFFBIB 1 "Sep 14, 1992"
 .SH NAME
 roffbib \- format and print a bibliographic database
 .SH SYNOPSIS
 .LP
 .nf
-\fBroffbib\fR [\fB-e\fR] [\fB-h\fR] [\fB-m\fR \fIfilename\fR] [\fB-n\fR\fIp\fR] [\fB-o\fR\fIlist\fR] [\fB-Q\fR] [\fB-r\fR\fIaN\fR] 
+\fBroffbib\fR [\fB-e\fR] [\fB-h\fR] [\fB-m\fR \fIfilename\fR] [\fB-n\fR\fIp\fR] [\fB-o\fR\fIlist\fR] [\fB-Q\fR] [\fB-r\fR\fIaN\fR]
      [\fB-s\fR\fIN\fR] [\fB-T\fR\fIterm\fR] [\fB-V\fR] [\fB-x\fR] [\fIfilename\fR] ...
 .fi
 
@@ -29,23 +29,19 @@ in conjunction with \fBsortbib\fR(1):
 and \fB-q\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 Produce equally-spaced words in adjusted lines using full terminal resolution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 15n
-.rt  
 Use output tabs during horizontal spacing to speed output and reduce output
 character count. \fBTAB\fR settings are assumed to be every 8 nominal character
 widths.
@@ -53,12 +49,10 @@ widths.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fI filename\fR\fR
 .ad
 .RS 15n
-.rt  
 Prepend the macro file \fB/usr/share/lib/tmac/tmac.name\fR to the input files.
 There should be a space between the \fB-m\fR and the macro filename. This set
 of macros will replace the ones defined in \fB/usr/share/lib/tmac/tmac.bib\fR.
@@ -66,23 +60,19 @@ of macros will replace the ones defined in \fB/usr/share/lib/tmac/tmac.bib\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fIp\fR\fR
 .ad
 .RS 15n
-.rt  
 Number first generated page \fIp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fIlist\fR\fR
 .ad
 .RS 15n
-.rt  
 Print only page numbers that appear in the comma-separated \fIlist\fR of
 numbers and ranges. A range \fIN\fR\fB\(mi\fR\fIM\fR means pages \fIN\fR
 through \fIM\fR; an initial \fB-\fR\fIN\fR means from the beginning to page
@@ -91,23 +81,19 @@ through \fIM\fR; an initial \fB-\fR\fIN\fR means from the beginning to page
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 15n
-.rt  
 Queue output for the phototypesetter.  Page offset is set to 1 inch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fIaN\fR\fR
 .ad
 .RS 15n
-.rt  
 Set register \fIa\fR (one-character) to \fIN\fR. The command-line argument
 \fB-rN1\fR will number the references starting at 1.
 .sp
@@ -122,46 +108,38 @@ not zero).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fIN\fR\fR
 .ad
 .RS 15n
-.rt  
 Halt prior to every \fIN\fR pages for paper loading or changing (default
 \fIN\fR\|=1). To resume, enter \fBNEWLINE\fR or \fBRETURN.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR\fIterm\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify \fIterm\fR as the terminal type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 15n
-.rt  
 Send output to the Versatec.  Page offset is set to 1 inch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 If abstracts or comments are entered following the \fB%X\fR field key,
 \fBroffbib\fR will format them into paragraphs for an annotated bibliography.
 Several \fB%X\fR fields may be given if several annotation paragraphs are
@@ -171,7 +149,6 @@ desired.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/tmac.bib\fR\fR
 .ad

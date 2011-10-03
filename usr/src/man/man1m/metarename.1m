@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH metarename 1M "26 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH METARENAME 1M "Mar 26, 2006"
 .SH NAME
 metarename \- rename metadevice or switch layered metadevice names
 .SH SYNOPSIS
@@ -77,34 +77,28 @@ Only metadevices can be switched, not slices.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Force the switching of trans metadevice members.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 15n
-.rt  
 Display a help message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIsetname\fR\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the name of the diskset on which \fBmetarename\fR will work. Using
 the \fB-s\fR option will cause the command to perform its administrative
 function within the specified diskset. Without this option, the command will
@@ -113,34 +107,28 @@ perform its function on the local metadevices.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 15n
-.rt  
 Exchange the metadevice names \fImetadevice1\fR and \fImetadevice2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImetadevice1\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the metadevice to be renamed or switched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImetadevice2\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the target metadevice name for the rename or switch operation.
 .RE
 
@@ -250,23 +238,19 @@ trans metadevice \fBd2\fR and the logging device \fBd5\fR. \fBd10\fR must be
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -278,13 +262,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

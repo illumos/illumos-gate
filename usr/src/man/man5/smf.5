@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smf 5 "6 Jul 2009" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH SMF 5 "Jul 6, 2009"
 .SH NAME
 smf \- service management facility
 .SH DESCRIPTION
@@ -68,36 +68,30 @@ transitioned to the online state.
 Whether a dependency is satisfied is determined by its \fBgrouping\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequire_all\fR\fR
 .ad
 .RS 16n
-.rt  
 Satisfied when all cited services are running (online or degraded), or when all
 indicated files are present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrequire_any\fR\fR
 .ad
 .RS 16n
-.rt  
 Satisfied when one of the cited services is running (online or degraded), or
 when at least one of the indicated files is present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBoptional_all\fR\fR
 .ad
 .RS 16n
-.rt  
 Satisfied if the cited services are running (online or degraded) or do not run
 without administrative action (disabled, maintenance, not present, or offline
 waiting for dependencies which do not start without administrative action).
@@ -105,12 +99,10 @@ waiting for dependencies which do not start without administrative action).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexclude_all\fR\fR
 .ad
 .RS 16n
-.rt  
 Satisfied when all of the cited services are disabled, in the maintenance
 state, or when cited services or files are not present.
 .RE
@@ -190,12 +182,10 @@ dependencies, the results of the execution of its methods, and its potential
 contracts events. The following states are defined:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUNINITIALIZED\fR\fR
 .ad
 .RS 17n
-.rt  
 This is the initial state for all service instances. Instances are moved to
 maintenance, offline, or a disabled state upon evaluation by
 \fBsvc.startd\fR(1M) or the appropriate restarter.
@@ -203,12 +193,10 @@ maintenance, offline, or a disabled state upon evaluation by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOFFLINE\fR\fR
 .ad
 .RS 17n
-.rt  
 The instance is enabled, but not yet running or available to run. If restarter
 execution of the service start method or the equivalent method is successful,
 the instance moves to the online state. Failures might lead to a degraded or
@@ -217,12 +205,10 @@ maintenance state. Administrative action can lead to the uninitialized state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBONLINE\fR\fR
 .ad
 .RS 17n
-.rt  
 The instance is enabled and running or is available to run. The specific nature
 of the online state is application-model specific and is defined by the
 restarter responsible for the service instance. Online is the expected
@@ -234,12 +220,10 @@ or degraded states.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDEGRADED\fR\fR
 .ad
 .RS 17n
-.rt  
 The instance is enabled and running or available to run. The instance, however,
 is functioning at a limited capacity in comparison to normal operation.
 Failures of the instance can lead to the maintenance state. Failures of
@@ -249,12 +233,10 @@ Restoration of capacity should result in a transition to the online state.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAINTENANCE\fR\fR
 .ad
 .RS 17n
-.rt  
 The instance is enabled, but not able to run. Administrative action (through
 \fBsvcadm clear\fR) is required to move the instance out of the maintenance
 state. The maintenance state might be a temporarily reached state if an
@@ -263,12 +245,10 @@ administrative operation is underway.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDISABLED\fR\fR
 .ad
 .RS 17n
-.rt  
 The instance is disabled. Enabling the service results in a transition to the
 offline state and eventually to the online state with all dependencies
 satisfied.
@@ -276,12 +256,10 @@ satisfied.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLEGACY-RUN\fR\fR
 .ad
 .RS 17n
-.rt  
 This state represents a legacy instance that is not managed by the service
 management facility. Instances in this state have been started at some point,
 but might or might not be running. Instances can only be observed using the
@@ -322,12 +300,10 @@ The \fBgeneral\fR property group applies to all service instances. It includes
 the following properties:
 .sp
 .ne 2
-.mk
 .na
 \fBenabled (boolean)\fR
 .ad
 .RS 21n
-.rt  
 Specifies whether the instance is enabled. If this property is not present on
 an instance, SMF does not tell the instance's restarter about the existence of
 the restarter.
@@ -335,12 +311,10 @@ the restarter.
 
 .sp
 .ne 2
-.mk
 .na
 \fBrestarter (fmri)\fR
 .ad
 .RS 21n
-.rt  
 The restarter for this service. See the Restarters section for more
 information. If this property is unset, the default system restarter is used.
 .RE
@@ -354,24 +328,20 @@ for administrative inspection and rollback. The following set of snapshot types
 might be available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinitial\fR\fR
 .ad
 .RS 15n
-.rt  
 Initial configuration of the instance created by the administrator or produced
 during package installation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlast_import\fR\fR
 .ad
 .RS 15n
-.rt  
 Configuration as prescribed by the manifest of the service that is taken during
 \fBsvccfg\fR(1M) import operation. This snapshot provides a baseline for
 determining property customization.
@@ -379,35 +349,29 @@ determining property customization.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprevious\fR\fR
 .ad
 .RS 15n
-.rt  
 Current configuration captured when an administrative undo operation is
 performed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrunning\fR\fR
 .ad
 .RS 15n
-.rt  
 The running configuration of the instance.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR\fR
 .ad
 .RS 15n
-.rt  
 Configuration captured during a successful transition to the online state.
 .RE
 
@@ -442,24 +406,20 @@ files, known as service bundles, are portable and suitable for backup purposes.
 Service bundles are classified as one of the following types:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmanifests\fR\fR
 .ad
 .RS 13n
-.rt  
 Files that contain the complete set of properties associated with a specific
 set of services or service instances.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprofiles\fR\fR
 .ad
 .RS 13n
-.rt  
 Files that contain a set of service instances and values for the enabled
 property (type \fBboolean\fR in the general property group) on each instance.
 .sp
@@ -493,34 +453,28 @@ Startup programs in the \fB/etc/rc?.d\fR directories are executed as part of
 the corresponding run-level milestone:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rcS.d\fR\fR
 .ad
 .RS 14n
-.rt  
 milestone/single-user:default
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rc2.d\fR\fR
 .ad
 .RS 14n
-.rt  
 milestone/multi-user:default
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rc3.d\fR\fR
 .ad
 .RS 14n
-.rt  
 milestone/multi-user-server:default
 .RE
 

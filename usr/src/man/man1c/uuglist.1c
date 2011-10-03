@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uuglist 1C "14 Sep 1992" "SunOS 5.11" "Communication Commands"
+.TH UUGLIST 1C "Sep 14, 1992"
 .SH NAME
 uuglist \- print the list of service grades that are available on this UNIX
 system
@@ -22,12 +22,10 @@ system to use with the \fB-g\fR option of \fBuucp\fR(1C) and \fBuux\fR(1C).
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 List the names of the service grades that the user is allowed to use with the
 \fB-g\fR option of  the \fBuucp\fR and \fBuux\fR commands.
 .RE
@@ -35,12 +33,10 @@ List the names of the service grades that the user is allowed to use with the
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Grades\fR\fR
 .ad
 .RS 20n
-.rt  
 contains the list of service grades
 .RE
 

@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sasl_errors 3SASL "14 Oct 2003" "SunOS 5.11" "Simple Authentication Security Layer Library Functions"
+.TH SASL_ERRORS 3SASL "Oct 14, 2003"
 .SH NAME
 sasl_errors \- SASL error codes
 .SH SYNOPSIS
@@ -24,323 +24,265 @@ upon the context of the call from which it is returned.
 .SS "Common Result Codes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_OK\fR\fR
 .ad
 .RS 17n
-.rt  
 The call was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_CONTINUE\fR\fR
 .ad
 .RS 17n
-.rt  
 Another step is required for authentication.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_FAILURE\fR\fR
 .ad
 .RS 17n
-.rt  
 Generic failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOMEM\fR\fR
 .ad
 .RS 17n
-.rt  
 Memory shortage failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BUFOVER\fR\fR
 .ad
 .RS 17n
-.rt  
 Overflowed buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOMECH\fR\fR
 .ad
 .RS 17n
-.rt  
 The mechanism was not supported, or no mechanisms matched the requirements.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BADPROT\fR\fR
 .ad
 .RS 17n
-.rt  
 The protocol was bad, invalid or cancelled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOT DONE\fR\fR
 .ad
 .RS 17n
-.rt  
 Cannot request information. Not applicable until later in the exchange.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BADPARAM\fR\fR
 .ad
 .RS 17n
-.rt  
 An invalid parameter was supplied.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_TRYAGAIN\fR\fR
 .ad
 .RS 17n
-.rt  
 Transient failure, for example, a weak key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BADMAC\fR\fR
 .ad
 .RS 17n
-.rt  
 Integrity check failed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOTINIT\fR\fR
 .ad
 .RS 17n
-.rt  
 SASL library not initialized.
 .RE
 
 .SS "Client Only Result Codes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_INTERACT\fR\fR
 .ad
 .RS 18n
-.rt  
 Needs user interaction.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BADSERV\fR\fR
 .ad
 .RS 18n
-.rt  
 Server failed mutual authentication step.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_WRONGMECH\fR\fR
 .ad
 .RS 18n
-.rt  
 Mechanism does not support the requested feature.
 .RE
 
 .SS "Server Only Result Codes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BADAUTH\fR\fR
 .ad
 .RS 17n
-.rt  
 Authentication failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOAUTHZ\fR\fR
 .ad
 .RS 17n
-.rt  
 Authorization failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_TOOWEAK\fR\fR
 .ad
 .RS 17n
-.rt  
 The mechanism is too weak for this user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_ENCRYPT\fR\fR
 .ad
 .RS 17n
-.rt  
 Encryption is needed to use this mechanism.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_TRANS\fR\fR
 .ad
 .RS 17n
-.rt  
 One time use of a plaintext password will enable requested mechanism for user.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_EXPIRED\fR\fR
 .ad
 .RS 17n
-.rt  
 The passphrase expired and must be reset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_DISABLED\fR\fR
 .ad
 .RS 17n
-.rt  
 Account disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOUSER\fR\fR
 .ad
 .RS 17n
-.rt  
 User not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_BADVERS\fR\fR
 .ad
 .RS 17n
-.rt  
 Version mismatch with plug-in.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOVERIFY\fR\fR
 .ad
 .RS 17n
-.rt  
 The user exists, but there is no verifier for the user.
 .RE
 
 .SS "Password Setting Result Codes"
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_PWLOCK\fR\fR
 .ad
 .RS 19n
-.rt  
 Passphrase locked.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOCHANGE\fR\fR
 .ad
 .RS 19n
-.rt  
 The requested change was not needed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_WEAKPASS\fR\fR
 .ad
 .RS 19n
-.rt  
 The passphrase is too weak for security policy.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSASL_NOUSERPASS\fR\fR
 .ad
 .RS 19n
-.rt  
 User supplied passwords are not permitted.
 .RE
 
@@ -352,15 +294,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

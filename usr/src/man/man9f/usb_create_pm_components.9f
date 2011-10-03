@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_create_pm_components 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_CREATE_PM_COMPONENTS 9F "Jan 5, 2004"
 .SH NAME
 usb_create_pm_components \- Create power management components for USB devices
 .SH SYNOPSIS
@@ -23,68 +23,56 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpwrstates\fR\fR
 .ad
 .RS 13n
-.rt  
 Address into which a mask which lists power states capable by device is
 returned. This is a bitmask containing zero or more of the following values:
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_PWRMASK_D0\fR
 .ad
 .RS 22n
-.rt  
 Corresponds to USB_DEV_OS_PWR_3 or full power.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_PWRMASK_D1\fR
 .ad
 .RS 22n
-.rt  
 Corresponds to USB_DEV_OS_PWR_2.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_PWRMASK_D2\fR
 .ad
 .RS 22n
-.rt  
 Corresponds to USB_DEV_OS_PWR_1.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_DEV_PWRMASK_D3\fR
 .ad
 .RS 22n
-.rt  
 Corresponds to USB_DEV_OS_PWR_0 or no power.
 .RE
 
@@ -105,23 +93,19 @@ powered-down.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 15n
-.rt  
 Power management facilities in device are recognized by system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 15n
-.rt  
 An error occurred.
 .RE
 
@@ -139,7 +123,7 @@ May be called from user or kernel context.
     if (usb_create_pm_components(dip, pwrstates) == USB_SUCCESS) {
             usb_handle_remote_wakeup(dip,USB_REMOTE_WAKEUP_ENABLE);
     }
-            
+
 .fi
 .in -2
 
@@ -151,15 +135,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

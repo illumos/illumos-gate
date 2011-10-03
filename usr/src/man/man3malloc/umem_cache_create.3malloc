@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH umem_cache_create 3MALLOC "24 Mar 2008" "SunOS 5.11" "Memory Allocation Library Functions"
+.TH UMEM_CACHE_CREATE 3MALLOC "Mar 24, 2008"
 .SH NAME
 umem_cache_create, umem_cache_destroy, umem_cache_alloc, umem_cache_free \-
 allocation cache manipulation
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.\|.\fR ] 
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.\|.\fR ]
 #include <umem.h>
 
 \fBumem_cache_t *\fR\fBumem_cache_create\fR(\fBchar *\fR\fIdebug_name\fR, \fBsize_t\fR \fIbufsize\fR,
@@ -59,34 +59,28 @@ The \fBumem_cache_create()\fR function creates a cache of objects and takes as
 arguments the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdebug_name\fR\fR
 .ad
 .RS 17n
-.rt  
 A human-readable name for debugging purposes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbufsize\fR\fR
 .ad
 .RS 17n
-.rt  
 The size, in bytes, of the buffers in this cache.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIalign\fR\fR
 .ad
 .RS 17n
-.rt  
 The minimum alignment required for buffers in this cache. This parameter must
 be a power of 2. If 0, it is replaced with the minimum required alignment for
 the current architecture.
@@ -94,67 +88,55 @@ the current architecture.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconstructor\fR\fR
 .ad
 .RS 17n
-.rt  
 The callback to construct an object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestructor\fR\fR
 .ad
 .RS 17n
-.rt  
 The callback to destroy an object.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIreclaim\fR\fR
 .ad
 .RS 17n
-.rt  
 The callback to reclaim objects.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback_data\fR\fR
 .ad
 .RS 17n
-.rt  
 An opaque pointer passed to the callbacks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsource\fR\fR
 .ad
 .RS 17n
-.rt  
 This parameter must be \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcflags\fR\fR
 .ad
 .RS 17n
-.rt  
 This parameter must be either 0 or \fBUMC_NODEBUG\fR. If \fBUMC_NODEBUG\fR, all
 debugging features are disabled for this cache. See \fBumem_debug\fR(3MALLOC).
 .RE
@@ -208,23 +190,19 @@ has any outstanding allocations, the behavior is undefined.
 The \fBumem_cache_alloc()\fR function takes as arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcache\fR\fR
 .ad
 .RS 9n
-.rt  
 a cache pointer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 9n
-.rt  
 flags that determine the behavior if \fBumem_cache_alloc()\fR is unable to
 fulfill the allocation request
 .RE
@@ -261,24 +239,20 @@ behavior:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_DEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBumem_cache_alloc()\fR function returns \fINULL\fR if the allocation
 fails.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_NOFAIL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fBumem_cache_alloc()\fR function cannot return \fINULL\fR. A callback is
 used to determine what action occurs. See \fBumem_alloc\fR(3MALLOC) for more
 information.
@@ -293,23 +267,19 @@ information.
 The \fBumem_cache_free()\fR function takes as arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcache\fR\fR
 .ad
 .RS 9n
-.rt  
 a cache pointer
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuf\fR\fR
 .ad
 .RS 9n
-.rt  
 a pointer previously returned from \fBumem_cache_alloc()\fR. This argument must
 not be \fINULL\fR.
 .RE
@@ -341,23 +311,19 @@ Upon failure, the \fBumem_cache_create()\fR function returns a null pointer.
 The \fBumem_cache_create()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 There is not enough memory available to allocate the cache data structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIdebug_name\fR argument is \fINULL\fR, the \fIalign\fR argument is not a
 power of two or is larger than the system pagesize, or the \fIbufsize\fR
 argument is 0.
@@ -365,12 +331,10 @@ argument is 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBlibumem\fR library could not be initialized, or the \fIbufsize\fR
 argument is too large and its use would cause integer overflow to occur.
 .RE
@@ -415,12 +379,12 @@ umem_cache_free(my_obj_cache, cur);
 #define _REENTRANT
 #include <synch.h>
 #include <umem.h>
- 
+
 typedef struct my_obj {
           mutex_t my_mutex;
           long my_data;
 } my_obj_t;
- 
+
 /*
  * my_objs can only be freed when my_mutex is unlocked.
  */
@@ -428,22 +392,22 @@ int
 my_obj_constructor(void *buf, void *ignored, int flags)
 {
           my_obj_t *myobj = buf;
- 
+
           (void) mutex_init(&my_obj->my_mutex, USYNC_THREAD, NULL);
- 
+
           return (0);
 }
- 
+
 void
 my_obj_destructor(void *buf, void *ignored)
 {
           my_obj_t *myobj = buf;
- 
+
           (void) mutex_destroy(&my_obj->my_mutex);
 }
- 
+
 umem_cache_t *my_obj_cache;
- 
+
 \&...
 my_obj_cache = umem_cache_create("my_obj", sizeof (my_obj_t),
     0, my_obj_constructor, my_obj_destructor, NULL, NULL,
@@ -532,54 +496,54 @@ typedef struct my_obj {
           char *my_buffer;
           size_t my_size;
 } my_obj_t;
- 
+
 /*
  * my_size and the my_buffer pointer should never be changed
  */
- 
+
 int
 my_obj_constructor(void *buf, void *arg, int flags)
 {
           size_t sz = (size_t)arg;
- 
+
           my_obj_t *myobj = buf;
- 
+
           if ((myobj->my_buffer = umem_alloc(sz, flags)) == NULL)
                 return (1);
- 
+
           my_size = sz;
- 
+
           return (0);
 }
- 
+
 void
 my_obj_destructor(void *buf, void *arg)
 {
           size_t sz = (size_t)arg;
- 
+
           my_obj_t *myobj = buf;
- 
+
           assert(sz == buf->my_size);
           umem_free(myobj->my_buffer, sz);
 }
- 
+
 \&...
 umem_cache_t *my_obj_4k_cache;
 umem_cache_t *my_obj_8k_cache;
 \&...
 my_obj_cache_4k = umem_cache_create("my_obj_4k", sizeof (my_obj_t),
-         0, my_obj_constructor, my_obj_destructor, NULL, 
+         0, my_obj_constructor, my_obj_destructor, NULL,
          (void *)4096, NULL, 0);
- 
+
 my_obj_cache_8k = umem_cache_create("my_obj_8k", sizeof (my_obj_t),
-         0, my_obj_constructor, my_obj_destructor, NULL, 
+         0, my_obj_constructor, my_obj_destructor, NULL,
          (void *)8192, NULL, 0);
 \&...
 my_obj_t *my_obj_4k = umem_cache_alloc(my_obj_4k_cache,
          UMEM_DEFAULT);
 my_obj_t *my_obj_8k = umem_cache_alloc(my_obj_8k_cache,
          UMEM_DEFAULT);
-/* no assumptions should be made about the contents 
+/* no assumptions should be made about the contents
 of the buffers */
 \&...
 /* make sure to return them to the correct cache */
@@ -601,15 +565,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

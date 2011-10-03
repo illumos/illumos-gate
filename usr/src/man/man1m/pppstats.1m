@@ -3,13 +3,13 @@
 .\" Redistribution and use in source and binary forms are permitted provided that the above copyright notice and this paragraph are duplicated in all such forms and that any documentation, advertising materials, and other materials related to such distribution and use acknowledge that the software was developed by the University of California, Berkeley.  The name of the University may not be used to endorse or promote products derived from this software without specific prior written permission.  THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
 .\" WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.TH pppstats 1M "4 May 2001" "SunOS 5.11" "System Administration Commands"
+.TH PPPSTATS 1M "May 4, 2001"
 .SH NAME
 pppstats \- print PPP statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBpppstats\fR [\fB-a\fR] [\fB-v\fR] [\fB-r\fR] [\fB-z\fR] [\fB-c\fR \fI<count>\fR] [\fB-w\fR \fI<secs>\fR] 
+\fBpppstats\fR [\fB-a\fR] [\fB-v\fR] [\fB-r\fR] [\fB-z\fR] [\fB-c\fR \fI<count>\fR] [\fB-w\fR \fI<secs>\fR]
      [\fIinterface\fR]
 .fi
 
@@ -27,12 +27,10 @@ properties and volume of packets received and transmitted by the interface.
 The \fBpppstats\fR options are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fR
 .ad
 .RS 13n
-.rt  
 Display absolute values rather than deltas. With this option, all reports show
 statistics for the time elapsed since the link was initiated. Without this
 option, the second and subsequent reports show statistics for the time since
@@ -41,12 +39,10 @@ the last report.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fB\fIcount\fR\fR \fR
 .ad
 .RS 13n
-.rt  
 Repeat the display \fIcount\fR times. If this option is not specified, the
 default repeat count is 1 if the \fB-w\fR option is not specified, otherwise
 infinity.
@@ -54,48 +50,40 @@ infinity.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fR
 .ad
 .RS 13n
-.rt  
 Display additional statistics summarizing the compression ratio achieved by the
 packet compression algorithm in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fR
 .ad
 .RS 13n
-.rt  
 Display additional statistics relating to the performance of the Van Jacobson
 TCP header compression algorithm.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR \fB\fIwait\fR\fR \fR
 .ad
 .RS 13n
-.rt  
 Pause  \fIwait\fR seconds between each display. If this option is not
 specified, the default interval is five seconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fR
 .ad
 .RS 13n
-.rt  
 Instead of the standard display, show statistics indicating the performance of
 the packet compression algorithm in use.
 .RE
@@ -107,69 +95,57 @@ The following fields are printed on the input side when the \fB-z\fR option is
 not used:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIN\fR \fR
 .ad
 .RS 11n
-.rt  
 Total number of bytes received by this interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPACK\fR \fR
 .ad
 .RS 11n
-.rt  
 Total number of packets received by this interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJCOMP\fR \fR
 .ad
 .RS 11n
-.rt  
 Number of header-compressed TCP packets received by this interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJUNC\fR \fR
 .ad
 .RS 11n
-.rt  
 Number of header-uncompressed TCP packets received by this interface. Not
 reported when the \fB-r\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJERR\fR \fR
 .ad
 .RS 11n
-.rt  
 Number of corrupted or bogus header-compressed TCP packets received by this
 interface. Not reported when the \fB-r\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJTOSS\fR \fR
 .ad
 .RS 11n
-.rt  
 Number of VJ header-compressed TCP packets dropped on reception by this
 interface because of preceding errors. Only reported when the \fB-v\fR option
 is specified.
@@ -177,24 +153,20 @@ is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNON-VJ\fR \fR
 .ad
 .RS 11n
-.rt  
 Total number of non-TCP packets received by this interface. Only reported when
 the \fB-v\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRATIO\fR \fR
 .ad
 .RS 11n
-.rt  
 Compression ratio achieved for received packets by the packet compression
 scheme in use, defined as the uncompressed size divided by the compressed size.
 Only reported when the \fB-r\fR option is specified.
@@ -202,12 +174,10 @@ Only reported when the \fB-r\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUBYTE\fR \fR
 .ad
 .RS 11n
-.rt  
 Total number of bytes received, after decompression of compressed packets. Only
 reported when the \fB-r\fR option is specified.
 .RE
@@ -217,94 +187,78 @@ reported when the \fB-r\fR option is specified.
 The following fields are printed on the output side:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOUT\fR\fR
 .ad
 .RS 10n
-.rt  
 Total number of bytes transmitted from this interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPACK\fR\fR
 .ad
 .RS 10n
-.rt  
 Total number of packets transmitted from this interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJCOMP\fR\fR
 .ad
 .RS 10n
-.rt  
 Number of TCP packets transmitted from this interface with VJ-compressed TCP
 headers.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJUNC\fR\fR
 .ad
 .RS 10n
-.rt  
 Number of TCP packets transmitted from this interface with VJ-uncompressed TCP
 headers. Not reported when the \fB-r\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNON-VJ\fR\fR
 .ad
 .RS 10n
-.rt  
 Total number of non-TCP packets transmitted from this interface. Not reported
 when the \fB-r\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJSRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 Number of searches for the cached header entry for a VJ header compressed TCP
 packet. Only reported when the \fB-v\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVJMISS\fR\fR
 .ad
 .RS 10n
-.rt  
 Number of failed searches for the cached header entry for a VJ header
 compressed TCP packet. Only reported when the \fB-v\fR option is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRATIO\fR\fR
 .ad
 .RS 10n
-.rt  
 Compression ratio achieved for transmitted packets by the packet compression
 scheme in use, defined as the size before compression divided by the compressed
 size. Only reported when the \fB-r\fR option is specified.
@@ -312,12 +266,10 @@ size. Only reported when the \fB-r\fR option is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUBYTE\fR\fR
 .ad
 .RS 10n
-.rt  
 Total number of bytes to be transmitted before packet compression is applied.
 Only reported when the \fB-r\fR option is specified.
 .RE
@@ -330,57 +282,47 @@ compression is not in use, these fields display zeroes. The fields displayed on
 the input side are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMPRESSED BYTE\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of bytes of compressed packets received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMPRESSED PACK\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of compressed packets received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINCOMPRESSIBLE BYTE\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of bytes of incompressible packets (that is, those which were
 transmitted in uncompressed form) received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINCOMPRESSIBLE PACK\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of incompressible packets received.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMP RATIO\fR\fR
 .ad
 .RS 23n
-.rt  
 Recent compression ratio for incoming packets, defined as the uncompressed size
 divided by the compressed size (including both compressible and incompressible
 packets).
@@ -391,57 +333,47 @@ packets).
 The fields displayed on the output side are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMPRESSED BYTE\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of bytes of compressed packets transmitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMPRESSED PACK\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of compressed packets transmitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINCOMPRESSIBLE BYTE\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of bytes of incompressible packets received; that is, those that were
 transmitted by the peer in uncompressed form.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBINCOMPRESSIBLE PACK\fR\fR
 .ad
 .RS 23n
-.rt  
 Number of incompressible packets transmitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOMP RATIO\fR\fR
 .ad
 .RS 23n
-.rt  
 Recent compression ratio for outgoing packets.
 .RE
 
@@ -453,13 +385,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mknod 1M "16 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH MKNOD 1M "Sep 16, 1996"
 .SH NAME
 mknod \- make a special file
 .SH SYNOPSIS
@@ -32,34 +32,28 @@ mknod \- make a special file
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 Create a block-type special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 5n
-.rt  
 Create a character-type special file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 5n
-.rt  
 Create a FIFO (named pipe).
 .RE
 
@@ -69,23 +63,19 @@ Create a FIFO (named pipe).
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fImajor\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fImajor\fR device number.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor\fR\fR
 .ad
 .RS 9n
-.rt  
 The \fIminor\fR device number; can be either decimal or octal. The assignment
 of major device numbers is specific to each system. You must be the super-user
 to use this form of the command.
@@ -93,12 +83,10 @@ to use this form of the command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 9n
-.rt  
 A special file to be created.
 .RE
 

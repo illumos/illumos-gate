@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH conv_lpd 1M "9 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH CONV_LPD 1M "Sep 9, 1996"
 .SH NAME
 conv_lpd \- convert LPD configuration
 .SH SYNOPSIS
@@ -28,12 +28,10 @@ is in  \fBprinters.conf\fR format, it converts it to a \fBprintcap\fR file. If
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-c\fR\fB printers \fR|\fB \fR\fB-c\fR\fB printcap\fR\fR
 .ad
 .RS 29n
-.rt  
 Specifies the type of output file produced by the conversion. \fB-c\fR
 \fBprinters\fR converts to a \fBprinters.conf\fR file.  \fB-c\fR \fBprintcap\fR
 converts to a \fBprintcap\fR file. \fB-c\fR \fBprinters\fR is the default.
@@ -41,12 +39,10 @@ converts to a \fBprintcap\fR file. \fB-c\fR \fBprinters\fR is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 29n
-.rt  
 Preserves the namelist during the conversion.
 .RE
 
@@ -56,12 +52,10 @@ Preserves the namelist during the conversion.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 The file to be converted.
 .RE
 
@@ -120,46 +114,38 @@ file and preserves the namelist.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printers.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 System printer configuration database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/printcap\fR\fR
 .ad
 .RS 22n
-.rt  
 SunOS 4.\fIx\fR printer capability database.
 .RE
 

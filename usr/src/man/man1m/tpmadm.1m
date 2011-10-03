@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tpmadm 1M "7 Jul 2009" "SunOS 5.11" "System Administration Commands"
+.TH TPMADM 1M "Jul 7, 2009"
 .SH NAME
 tpmadm \- administer Trusted Platform Module
 .SH SYNOPSIS
@@ -83,7 +83,6 @@ The following subcommands are used in the form:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
@@ -96,7 +95,6 @@ and the usage of TPM resources such as communication sessions and loaded keys.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinit\fR\fR
 .ad
@@ -111,7 +109,6 @@ it can be re-initialized.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauth\fR\fR
 .ad
@@ -122,7 +119,6 @@ Change the owner authorization password for the TPM.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear\fR \fBlock\fR\fR
 .ad
@@ -137,7 +133,6 @@ count of failed attempts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclear\fR \fBowner\fR\fR
 .ad
@@ -152,7 +147,6 @@ TPM must be re-initialized using the \fBtpmadm init\fR command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkeyinfo\fR [\fIuuid\fR]\fR
 .ad
@@ -166,7 +160,6 @@ displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdeletekey\fR \fIuuid\fR\fR
 .ad
@@ -183,7 +176,6 @@ After completing the requested operation, \fBtpmadm\fR exits with one of the
 following status values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -194,7 +186,6 @@ Successful termination.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
@@ -205,7 +196,6 @@ Failure. The requested operation could not be completed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
@@ -222,13 +212,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

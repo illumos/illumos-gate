@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH audit_syslog 5 "25 Sep 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH AUDIT_SYSLOG 5 "Sep 25, 2008"
 .SH NAME
 audit_syslog \- realtime conversion of Solaris audit data to syslog messages
 .SH SYNOPSIS
@@ -60,80 +60,66 @@ field is additional data, described below. This data is omitted if it is not
 contained in the source audit record.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBok\fR or \fBfailed\fR\fR
 .ad
 .RS 21n
-.rt  
 Comes from the return or exit token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsession \fI<#>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<#>\fR is the session ID from the subject token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBby \fI<name>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<name>\fR is the audit ID from the subject token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBas \fI<name>\fR:\fI<group>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<name>\fR is the effective user ID and \fI<group>\fR is the effective group
 ID from the subject token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBin\fR \fI<zone name>\fR\fR
 .ad
 .RS 21n
-.rt  
 The zone name. This field is generated only if the \fBzonename\fR audit policy
 is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfrom \fI<terminal>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<terminal>\fR is the text machine address from the subject token.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBobj \fI<path>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<path>\fR is the path from the path token The path can be truncated from the
 left if necessary to fit it on the line. Truncation is indicated by leading
 ellipsis (\fB\&...\fR).
@@ -141,23 +127,19 @@ ellipsis (\fB\&...\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproc_uid \fI<owner>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<owner>\fR is the effective user ID of the process owner.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproc_auid \fI<owner>\fR\fR\fR
 .ad
 .RS 21n
-.rt  
 \fI<owner>\fR is the audit ID of the process owner.
 .RE
 
@@ -243,15 +225,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe
+MT Level	MT-Safe
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ticlts 7D "3 Jul 1990" "SunOS 5.11" "Devices"
+.TH TICLTS 7D "Jul 3, 1990"
 .SH NAME
 ticlts, ticots, ticotsord \- loopback transport providers
 .SH SYNOPSIS
@@ -43,45 +43,37 @@ service of type \fBT_CLTS\fR. Its default address size is
 \fBt_rcvuderr\fR(3NSL)):
 .sp
 .ne 2
-.mk
 .na
 \fBTCL_BADADDR\fR
 .ad
 .RS 20n
-.rt  
 bad address specification
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCL_BADOPT\fR
 .ad
 .RS 20n
-.rt  
 bad option specification
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCL_NOPEER\fR
 .ad
 .RS 20n
-.rt  
 bound
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCL_PEERBADSTATE\fR
 .ad
 .RS 20n
-.rt  
 peer in wrong state
 .RE
 
@@ -93,56 +85,46 @@ peer in wrong state
 (see  \fBt_rcvdis\fR(3NSL)):
 .sp
 .ne 2
-.mk
 .na
 \fBTCO_NOPEER\fR
 .ad
 .RS 25n
-.rt  
 no listener on destination address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCO_PEERNOROOMONQ\fR
 .ad
 .RS 25n
-.rt  
 peer has no room on connect queue
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCO_PEERBADSTATE\fR
 .ad
 .RS 25n
-.rt  
 peer in wrong state
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCO_PEERINITIATED\fR
 .ad
 .RS 25n
-.rt  
 peer-initiated disconnect
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCO_PROVIDERINITIATED\fR
 .ad
 .RS 25n
-.rt  
 provider-initiated disconnect
 .RE
 
@@ -154,56 +136,46 @@ Its default address size is \fBTCOO_DEFAULTADDRSZ\fR. \fBticotsord\fR prints
 the following disconnect messages (see \fBt_rcvdis\fR(3NSL)):
 .sp
 .ne 2
-.mk
 .na
 \fBTCOO_NOPEER\fR
 .ad
 .RS 26n
-.rt  
 no listener on destination address
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCOO_PEERNOROOMONQ\fR
 .ad
 .RS 26n
-.rt  
 peer has no room on connect queue
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCOO_PEERBADSTATE\fR
 .ad
 .RS 26n
-.rt  
 peer in wrong state
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCOO_PEERINITIATED\fR
 .ad
 .RS 26n
-.rt  
 provider-initiated disconnect
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBTCOO_PROVIDERINITIATED\fR
 .ad
 .RS 26n
-.rt  
 peer-initiated disconnect
 .RE
 

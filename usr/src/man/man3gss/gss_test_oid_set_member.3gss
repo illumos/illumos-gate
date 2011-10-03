@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_test_oid_set_member 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_TEST_OID_SET_MEMBER 3GSS "Jan 15, 2003"
 .SH NAME
 gss_test_oid_set_member \- interrogate an object identifier set
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_test_oid_set_member\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -31,45 +31,37 @@ also work with user-generated sets.
 The parameter descriptions for \fBgss_test_oid_set_member()\fR follow:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 16n
-.rt  
 A mechanism-specific status code
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImember\fR\fR
 .ad
 .RS 16n
-.rt  
 An object identifier whose presence is to be tested
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIset\fR\fR
 .ad
 .RS 16n
-.rt  
 An object identifier set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpresent\fR\fR
 .ad
 .RS 16n
-.rt  
 The value of \fIpresent\fR is non-zero if the specified \fBOID\fR is a member
 of the set; if not, the value of \fIpresent\fR is zero.
 .RE
@@ -81,23 +73,19 @@ The \fBgss_test_oid_set_member()\fR function may return the following status
 codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 18n
-.rt  
 Successful completion
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 18n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -111,13 +99,12 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

@@ -2,14 +2,14 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH getgrnam 3C "5 Apr 2004" "SunOS 5.11" "Standard C Library Functions"
+.TH GETGRNAM 3C "Apr 5, 2004"
 .SH NAME
 getgrnam, getgrnam_r, getgrent, getgrent_r, getgrgid, getgrgid_r, setgrent,
 endgrent, fgetgrent, fgetgrent_r \- group database entry functions
@@ -181,7 +181,7 @@ struct group {
     char *gr_name;          /* the name of the group */
     char *gr_passwd;        /* the encrypted group password */
     gid_t gr_gid;           /* the numerical group ID */
-    char **gr_mem;          /* vector of pointers to member 
+    char **gr_mem;          /* vector of pointers to member
                                names */
 };
 .fi
@@ -227,23 +227,19 @@ The \fBgetgrent_r()\fR, \fBfgetgrent()\fR, and \fBfgetgrent_r()\fR functions
 will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
 the data to be referenced by the resulting \fBgroup\fR structure.
 .RE
@@ -253,24 +249,20 @@ the data to be referenced by the resulting \fBgroup\fR structure.
 The \fBgetgrent_r()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 The maximum allowable number of files is currently open in the system.
 .RE
 
@@ -280,46 +272,38 @@ The \fBgetgrnam()\fR, \fBgetgrnam_r()\fR, \fBgetgrgid()\fR, \fBgetgrgid_r()\fR,
 and \fBgetgrent()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-.rt  
 A signal was caught during the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An I/O error has occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 There are {\fBOPEN_MAX\fR} file descriptors currently open in the calling
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 10n
-.rt  
 The maximum allowable number of files is currently open in the system.
 .RE
 
@@ -328,12 +312,10 @@ The maximum allowable number of files is currently open in the system.
 The \fBgetgrnam_r()\fR and \fBgetgrgid_r()\fR functions may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBERANGE\fR\fR
 .ad
 .RS 10n
-.rt  
 Insufficient storage was supplied by \fIbuffer\fR and \fIbufsize\fR to contain
 the data to be referenced by the resulting \fBgroup\fR structure.
 .RE
@@ -346,15 +328,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 _
-MT-LevelSee \fBReentrant Interfaces\fR in \fBDESCRIPTION\fR.
+MT-Level	See \fBReentrant Interfaces\fR in \fBDESCRIPTION\fR.
 .TE
 
 .sp

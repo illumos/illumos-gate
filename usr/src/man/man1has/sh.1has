@@ -2,14 +2,14 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sh "1has" "3 Apr 2008" "SunOS 5.11" "User Commands"
+.TH SH 1HAS "Apr 3, 2008"
 .SH NAME
 sh, jsh \- standard and job control shell and command interpreter
 .SH SYNOPSIS
@@ -95,7 +95,6 @@ Unless otherwise stated, the value returned by a command is that of the last
 \fIsimple-command\fR executed in the command.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfor\fR \fIname\fR [ \fBin\fR \fIword\fR .\|.\|. ] \fBdo\fR \fIlist\fR
 \fBdone\fR\fR
@@ -112,7 +111,6 @@ the list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcase\fR \fIword\fR \fBin\fR [ \fIpattern\fR [ | \fIpattern\fR ] \fB)\fR
 \fIlist\fR \fB;\|;\fR ] .\|.\|.  \fBesac\fR\fR
@@ -140,12 +138,10 @@ the \fIlist\fR following \fBelif\fR is executed and, if its value is zero, the
 \fIlist\fR is executed, then the \fBif\fR command returns a zero exit status.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwhile\fR \fIlist\fR \fBdo\fR \fIlist\fR \fBdone\fR\fR
 .ad
 .RS 27n
-.rt  
 A \fBwhile\fR command repeatedly executes the \fBwhile\fR \fIlist\fR and, if
 the exit status of the last command in the list is zero, executes the \fBdo\fR
 \fIlist\fR; otherwise the loop terminates. If no commands in the \fBdo\fR
@@ -156,35 +152,29 @@ termination test.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(\fR\fIlist\fR\fB)\fR\fR
 .ad
 .RS 27n
-.rt  
 Execute \fIlist\fR in a sub-shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR \fIlist\fR\fB;}\fR\fR
 .ad
 .RS 27n
-.rt  
 \fIlist\fR is executed in the current (that is, parent) shell. The \fB{\fR must
 be followed by a space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR \fB(\|) {\fR \fIlist\fR\fB;}\fR\fR
 .ad
 .RS 27n
-.rt  
 Define a function which is referenced by \fIname\fR. The body of the function
 is the \fIlist\fR of commands between \fB{\fR and \fB}\fR. The \fB{\fR must be
 followed by a space. Execution of functions is described below (see
@@ -246,12 +236,10 @@ Pattern-matching is not performed on \fIvalue\fR. There cannot be a function
 and a variable with the same \fIname\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB}\fR\fR
 .ad
 .RS 25n
-.rt  
 The value, if any, of the parameter is substituted. The braces are required
 only when \fIparameter\fR is followed by a letter, digit, or underscore that is
 not to be interpreted as part of its name. If \fIparameter\fR is \fB*\fR or
@@ -262,12 +250,10 @@ shell is invoked.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:\(mi\fR\fIword\fR\fB}\fR\fR
 .ad
 .RS 25n
-.rt  
 Use Default Values. If \fIparameter\fR is unset or null, the expansion of
 \fIword\fR is substituted; otherwise, the value of \fIparameter\fR is
 substituted.
@@ -275,12 +261,10 @@ substituted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:=\fR\fIword\fR\fB}\fR\fR
 .ad
 .RS 25n
-.rt  
 Assign Default Values. If \fIparameter\fR is unset or null, the expansion of
 \fIword\fR is assigned to \fIparameter\fR. In all cases, the final value of
 \fIparameter\fR is substituted. Only variables, not positional parameters or
@@ -289,12 +273,10 @@ special parameters, can be assigned in this way.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:?\fR\fIword\fR\fB}\fR\fR
 .ad
 .RS 25n
-.rt  
 If \fIparameter\fR is set and is non-null, substitute its value; otherwise,
 print \fIword\fR and exit from the shell. If \fIword\fR is omitted, the message
 "parameter null or not set" is printed.
@@ -302,12 +284,10 @@ print \fIword\fR and exit from the shell. If \fIword\fR is omitted, the message
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${\fR\fIparameter\fR\fB:+\fR\fIword\fR\fB}\fR\fR
 .ad
 .RS 25n
-.rt  
 If \fIparameter\fR is set and is non-null, substitute \fIword\fR; otherwise
 substitute nothing.
 .RE
@@ -334,56 +314,46 @@ checks whether \fIparameter\fR is set or not.
 The following parameters are automatically set by the shell.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 8n
-.rt  
 The number of positional parameters in decimal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 8n
-.rt  
 Flags supplied to the shell on invocation or by the \fBset\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 8n
-.rt  
 The decimal value returned by the last synchronously executed command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 8n
-.rt  
 The process number of this shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 8n
-.rt  
 The process number of the last background command invoked.
 .RE
 
@@ -393,12 +363,10 @@ The following parameters are used by the shell. The parameters in this section
 are also referred to as environment variables.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBHOME\fR\fR
 .ad
 .RS 13n
-.rt  
 The default argument (home directory) for the \fBcd\fR command, set to the
 user's login directory by \fBlogin\fR(1) from the password file (see
 \fBpasswd\fR(4)).
@@ -406,34 +374,28 @@ user's login directory by \fBlogin\fR(1) from the password file (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPATH\fR\fR
 .ad
 .RS 13n
-.rt  
 The search path for commands (see \fBExecution\fR section below).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDPATH\fR\fR
 .ad
 .RS 13n
-.rt  
 The search path for the \fBcd\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAIL\fR\fR
 .ad
 .RS 13n
-.rt  
 If this parameter is set to the name of a mail file \fIand\fR the
 \fBMAILPATH\fR  parameter is not set, the shell informs the user of the arrival
 of mail in the specified file.
@@ -441,12 +403,10 @@ of mail in the specified file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILCHECK\fR\fR
 .ad
 .RS 13n
-.rt  
 This parameter specifies how often (in seconds) the shell checks for the
 arrival of mail in the files specified by the \fBMAILPATH\fR or \fBMAIL\fR
 parameters. The default value is \fB600\fR seconds (10 minutes). If set to 0,
@@ -455,12 +415,10 @@ the shell checks before each prompt.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMAILPATH\fR\fR
 .ad
 .RS 13n
-.rt  
 A colon-separated list of file names. If this parameter is set, the shell
 informs the user of the arrival of mail in any of the specified files. Each
 file name can be followed by % and a message that is e printed when the
@@ -469,58 +427,48 @@ modification time changes. The default message is, \fByou have mail\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS1\fR\fR
 .ad
 .RS 13n
-.rt  
 Primary prompt string, by default " $ \|".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPS2\fR\fR
 .ad
 .RS 13n
-.rt  
 Secondary prompt string, by default " > \|".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIFS\fR\fR
 .ad
 .RS 13n
-.rt  
 Internal field separators, normally \fBspace\fR, \fBtab\fR, and \fBnewline\fR
 (see \fBBlank Interpretation\fR section).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHACCT\fR\fR
 .ad
 .RS 13n
-.rt  
 If this parameter is set to the name of a file writable by the user, the shell
 writes an accounting record in the file for each shell procedure executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSHELL\fR\fR
 .ad
 .RS 13n
-.rt  
 When the shell is invoked, it scans the environment (see \fBEnvironment\fR
 section below) for this name.
 .RE
@@ -552,58 +500,48 @@ passed on as arguments to the invoked command. \fBNote:\fR Parameter and
 command substitution occurs before \fIword\fR or \fIdigit\fR is used.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fIword\fR\fR
 .ad
 .RS 16n
-.rt  
 Use file \fIword\fR as standard input (file descriptor 0).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR\fIword\fR\fR
 .ad
 .RS 16n
-.rt  
 Use file \fIword\fR as standard output (file descriptor 1). If the file does
 not exist, it is created; otherwise, it is truncated to zero length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>>\fR\fIword\fR\fR
 .ad
 .RS 16n
-.rt  
 Use file \fIword\fR as standard output. If the file exists, output is appended
 to it by first seeking to the \fBEOF\fR. Otherwise, the file is created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\|>\fR\fIword\fR\fR
 .ad
 .RS 16n
-.rt  
 Open file \fIword\fR for reading and writing as standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<<\fR[\fB\(mi\fR]\fIword\fR\fR
 .ad
 .RS 16n
-.rt  
 After parameter and command substitution is done on \fIword\fR, the shell input
 is read up to the first line that literally matches the resulting \fIword\fR,
 or to an \fBEOF\fR. If, however, the hyphen (\fB\(mi\fR) is appended to
@@ -650,24 +588,20 @@ The resulting document becomes the standard input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<&\fR\fIdigit\fR\fR
 .ad
 .RS 16n
-.rt  
 Use the file associated with file descriptor \fIdigit\fR as standard input.
 Similarly for the standard output using \fB>&\fR\fIdigit\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<&\(mi\fR\fR
 .ad
 .RS 16n
-.rt  
 The standard input is closed. Similarly for the standard output using
 \fB>&\(mi\fR.
 .RE
@@ -735,34 +669,28 @@ found that matches the pattern, the word is left unchanged. The character
 well as the character \fB/\fR itself, must be matched explicitly.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 13n
-.rt  
 Matches any string, including the null string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fR
 .ad
 .RS 13n
-.rt  
 Matches any single character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR.\|.\|.\fB]\fR\fR
 .ad
 .RS 13n
-.rt  
 Matches any one of the enclosed characters. A pair of characters separated by
 \fB\(mi\fR matches any character lexically between the pair, inclusive. If the
 first character following the opening \fB[\fR is a \fB!\fR, any character not
@@ -946,7 +874,6 @@ is the default output location. When Job Control is enabled, additional
 Control\fR section below).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR\fR
 .ad
@@ -957,7 +884,6 @@ No effect; the command does nothing. A zero exit code is returned.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\&.\|\fR \fIfilename\fR\fR
 .ad
@@ -970,7 +896,6 @@ specified by \fBPATH\fR is used to find the directory containing
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbg\fR [\fB%\fR\fIjobid .\|.\|.\fR]\fR
 .ad
@@ -984,7 +909,6 @@ background. If \fB%\fR\fIjobid\fR is omitted the current job is assumed. (See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbreak\fR [ \fIn\fR ]\fR
 .ad
@@ -996,7 +920,6 @@ specified, break \fIn\fR levels.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR [ \fIargument\fR ]\fR
 .ad
@@ -1015,7 +938,6 @@ each directory in the path is searched for \fIargument\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchdir\fR [ \fIdir\fR ]\fR
 .ad
@@ -1031,7 +953,6 @@ by that value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontinue\fR [ \fIn\fR ]\fR
 .ad
@@ -1043,7 +964,6 @@ Resume the next iteration of the enclosing \fBfor\fR or \fBwhile\fR loop. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR [ \fIarguments\fR .\|.\|. ]\fR
 .ad
@@ -1056,7 +976,6 @@ description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeval\fR [ \fIargument\fR .\|.\|. ]\fR
 .ad
@@ -1068,7 +987,6 @@ executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexec\fR [ \fIargument\fR .\|.\|. ]\fR
 .ad
@@ -1081,7 +999,6 @@ other arguments are given, cause the shell input/output to be modified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexit\fR [ \fIn\fR ]\fR
 .ad
@@ -1094,7 +1011,6 @@ executed (an \fBEOF\fR also causes the shell to exit.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexport\fR [ \fIname\fR .\|.\|. ]\fR
 .ad
@@ -1110,7 +1026,6 @@ are \fBnot\fR exported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfg\fR [\fB%\fR\fIjobid .\|.\|.\fR]\fR
 .ad
@@ -1125,7 +1040,6 @@ foreground. If \fB%\fR\fIjobid\fR is omitted, the current job is assumed. (See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgetopts\fR\fR
 .ad
@@ -1138,7 +1052,6 @@ This command parses positional parameters and checks for legal options. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhash\fR [ \fB-r\fR ] [ \fIname\fR .\|.\|. ]\fR
 .ad
@@ -1159,7 +1072,6 @@ done.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjobs\fR [\fB\fR\fB-p\fR\fB|\fR\fB-l\fR] [\fB%\fR\fIjobid ...\fR]\fR
 .ad
@@ -1176,7 +1088,6 @@ background are reported. (See \fBJob Control\fR section below for more detail.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkill\fR [ \fB-\fR\fIsig\fR ] \fB%\fR\fIjob\fR .\|.\|.\fR
 .ad
@@ -1200,7 +1111,6 @@ second form, \fBkill\fR \fB-l\fR, the signal numbers and names are listed. (See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogin\fR [ \fIargument\fR .\|.\|. ]\fR
 .ad
@@ -1212,7 +1122,6 @@ Equivalent to `\fBexec\fR \fBlogin\fR \fIargument\fR.\|.\|.\|.' See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnewgrp\fR [ \fIargument\fR ]\fR
 .ad
@@ -1224,7 +1133,6 @@ usage and description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpwd\fR\fR
 .ad
@@ -1236,7 +1144,6 @@ description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBread\fR \fIname\fR .\|.\|.\fR
 .ad
@@ -1255,7 +1162,6 @@ code is \fB0\fR, unless an \fBEOF\fR is encountered.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreadonly\fR [ \fIname\fR .\|.\|. ]\fR
 .ad
@@ -1268,7 +1174,6 @@ given, a list of all \fBreadonly\fR names is printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBreturn\fR [ \fIn\fR ]\fR
 .ad
@@ -1280,7 +1185,6 @@ Causes a function to exit with the return value specified by \fIn\fR. If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR [ \fB-aefhkntuvx\fR [ \fIargument\fR .\|.\|. ] ]\fR
 .ad
@@ -1288,124 +1192,102 @@ Causes a function to exit with the return value specified by \fIn\fR. If
 .RS 4n
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Mark variables which are modified or created for export.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Exit immediately if a command exits with a non-zero exit status.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Disable file name generation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Locate and remember function commands as functions are defined (function
 commands are normally located when the function is executed).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR\fR
 .ad
 .RS 6n
-.rt  
 All keyword arguments are placed in the environment for a command, not just
 those that precede the command name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Read commands but do not execute them.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Exit after reading and executing one command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
 .RS 6n
-.rt  
 Treat unset variables as an error when substituting.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Print shell input lines as they are read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Print commands and their arguments as they are executed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 6n
-.rt  
 Do not change any of the flags; useful in setting \fB$1\fR to \fB\(mi\fR\&.
 .RE
 
@@ -1418,7 +1300,6 @@ given, the values of all names are printed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshift\fR [ \fIn\fR ]\fR
 .ad
@@ -1430,7 +1311,6 @@ The positional parameters from \fB$\fR\fIn\fR\fB+1\fR .\|.\|. are renamed
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fIpid .\|.\|.\fR\fR
 .ad
@@ -1441,7 +1321,6 @@ Halt execution of the process number \fIpid\fR. (see \fBps\fR(1)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsuspend\fR\fR
 .ad
@@ -1452,7 +1331,6 @@ Stops the execution of the current shell (but not if it is the login shell).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtest\fR\fR
 .ad
@@ -1463,7 +1341,6 @@ Evaluate conditional expressions. See \fBtest\fR(1) for usage and description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtimes\fR\fR
 .ad
@@ -1474,7 +1351,6 @@ Print the accumulated user and system times for processes run from the shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrap\fR [ \fIargument\fR \fIn\fR [ \fIn2\fR .\|.\|. ]]\fR
 .ad
@@ -1495,7 +1371,6 @@ no arguments prints a list of commands associated with each signal number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtype\fR [ \fIname\fR .\|.\|. ]\fR
 .ad
@@ -1507,7 +1382,6 @@ name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBulimit\fR [ [\fB-HS\fR] [\fB-a\fR | \fB-cdfnstv\fR] ]\fR
 .ad
@@ -1540,78 +1414,64 @@ The following options specify the resource whose limits are to be printed or
 set. If no option is specified, the file size limit is printed or set.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum core file size (in 512-byte blocks)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum size of data segment or heap (in kbytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum file size (in 512-byte blocks)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum file descriptor plus 1
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum size of stack segment (in kbytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum CPU time (in seconds)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 maximum size of virtual memory (in kbytes)
 .RE
 
@@ -1633,7 +1493,6 @@ Megabytes, type the following:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBumask\fR [ \fInnn\fR ]\fR
 .ad
@@ -1645,7 +1504,6 @@ The user file-creation mask is set to \fInnn\fR (see \fBumask\fR(1)). If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunset\fR [ \fIname\fR .\|.\|. ]\fR
 .ad
@@ -1658,7 +1516,6 @@ cannot be unset.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR [ \fIn\fR ]\fR
 .ad
@@ -1683,23 +1540,19 @@ commands, and the remaining arguments are passed as positional parameters to
 that command file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI\| string\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-c\fR flag is present commands are read from \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-i\fR flag is present or if the shell input and output are attached
 to a terminal, this shell is \fBinteractive\fR. In this case, TERMINATE is
 ignored (so that \fBkill 0\fR does not kill an interactive shell) and INTERRUPT
@@ -1709,36 +1562,30 @@ is ignored by the shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-p\fR flag is present, the shell does not set the effective user and
 group IDs to the real user and group IDs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-r\fR flag is present the shell is a restricted shell (see
 \fBrsh\fR(1M)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
-.rt  
 If the \fB-s\fR flag is present or if no arguments remain, commands are read
 from the standard input. Any remaining arguments specify the positional
 parameters. Shell output (except for \fBSpecial Commands\fR) is written to file
@@ -1798,56 +1645,46 @@ The acceptable syntax for a Job Identifier is of the form:
 where \fIjobid\fR can be specified in any of the following formats:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR or \fB+\fR\fR
 .ad
 .RS 13n
-.rt  
 For the current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR\fR
 .ad
 .RS 13n
-.rt  
 For the previous job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB?\fR\fI<string>\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify the job for which the command line uniquely contains \fIstring\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 13n
-.rt  
 For job number \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpref\fR\fR
 .ad
 .RS 13n
-.rt  
 Where \fIpref\fR is a unique prefix of the command name. For example, if the
 command \fBls\fR \fB-l\fR \fIname\fR were running in the background, it could
 be referred to as \fB%ls\fR. \fIpref\fR cannot contain blanks unless it is
@@ -1860,7 +1697,6 @@ When Job Control is enabled, the following commands are added to the user's
 environment to manipulate jobs:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbg\fR [\fB%\fR\fIjobid .\|.\|.\fR]\fR
 .ad
@@ -1872,7 +1708,6 @@ is omitted the current job is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfg\fR [\fB%\fR\fIjobid .\|.\|.\fR]\fR
 .ad
@@ -1885,7 +1720,6 @@ the current job is assumed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjobs\fR [\fB-p\fR|\fB-l\fR] [\fB%\fR\fIjobid .\|.\|.\fR]\fR
 .ad
@@ -1901,34 +1735,28 @@ background is reported. The following options modify/enhance the output of
 \fBjobs\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Report the process group ID and working directory of the jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Report only the process group ID of the jobs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Replace any \fIjobid\fR found in \fIcommand\fR or \fIarguments\fR with the
 corresponding process group ID, and then execute \fIcommand\fR passing it
 \fIarguments\fR.
@@ -1938,7 +1766,6 @@ corresponding process group ID, and then execute \fIcommand\fR passing it
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkill\fR [ \fB-signal\fR ] \fB%\fR\fIjobid\fR\fR
 .ad
@@ -1950,7 +1777,6 @@ command for processes identified with a \fIjobid\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fB%\fR\fIjobid .\|.\|.\fR\fR
 .ad
@@ -1961,7 +1787,6 @@ Stops the execution of a background job(s).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsuspend\fR\fR
 .ad
@@ -1972,7 +1797,6 @@ Stops the execution of the current shell (but not if it is the login shell).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR [\fB%\fR\fIjobid .\|.\|.\fR]\fR
 .ad
@@ -2030,13 +1854,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/sh"
@@ -2044,13 +1867,12 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

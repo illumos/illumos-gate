@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mkfs_pcfs 1M "1 Dec 2003" "SunOS 5.11" "System Administration Commands"
+.TH MKFS_PCFS 1M "Dec 1, 2003"
 .SH NAME
 mkfs_pcfs \- construct a FAT file system
 .SH SYNOPSIS
@@ -54,35 +54,29 @@ See \fBmkfs\fR(1M) for the list of supported generic options.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIFSType_specific_options\fR\fR
 .ad
 .RS 30n
-.rt  
 Specify \fBpcfs\fR file system-specific options in a comma-separated list with
 no intervening spaces. If invalid options are specified, a warning message is
 printed and the invalid options are ignored.
 .sp
 .ne 2
-.mk
 .na
 \fBb=\fIlabel\fR\fR
 .ad
 .RS 14n
-.rt  
 Label the media with volume label. The volume label is restricted to 11
 uppercase characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBB=\fIfilename\fR\fR
 .ad
 .RS 14n
-.rt  
 Install \fIfilename\fR as the boot loader in the file system's boot sector. If
 you don't specify a boot loader, an \fBMS-DOS\fR boot loader is installed. The
 \fBMS-DOS\fR boot loader requires specific \fBMS-DOS\fR system files to make
@@ -91,36 +85,30 @@ the diskette bootable. See \fBNOTES\fR for more information.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfat=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 The size of a \fBFAT\fR entry. Currently, 12, 16, and 32 are valid values. The
 default is 12 for diskettes, 16 for larger media.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBh\fR
 .ad
 .RS 14n
-.rt  
 Mark the first file installed as a hidden file. The \fB-i\fR option must also
 be specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBhidden=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 Set the number of hidden sectors to \fIn\fR. This is the number of sectors on
 the physical disk preceding the start of the volume (which is the boot sector
 itself). This defaults to 0 for diskettes or a computed valued (based on the
@@ -130,12 +118,10 @@ fdisk table) for disks. This option may be used only in conjunction with the
 
 .sp
 .ne 2
-.mk
 .na
 \fBi=\fIfilename\fR\fR
 .ad
 .RS 14n
-.rt  
 Install \fIfilename\fR as the initial file in the new file system. The initial
 file's contents are guaranteed to occupy consecutive clusters at the start of
 the files area. When creating bootable media, a boot program should be
@@ -144,12 +130,10 @@ specified as the initial file.
 
 .sp
 .ne 2
-.mk
 .na
 \fBnofdisk\fR
 .ad
 .RS 14n
-.rt  
 Do not attempt to find an \fBfdisk\fR table on the medium. Instead rely on the
 \fBsize\fR option for determining the partition size. By default, the created
 \fBFAT\fR is 16 bits and begins at the first sector of the device. This
@@ -158,12 +142,10 @@ origination sector can be modified with the hidden option (\fB-h\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fBnsect=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of sectors per track on the disk. If not specified, the value is
 determined by using a \fBdkio\fR(7I) ioctl to get the disk geometry, or (for
 diskette) from the results of an \fBFDIOGCHAR\fR ioctl.
@@ -171,12 +153,10 @@ diskette) from the results of an \fBFDIOGCHAR\fR ioctl.
 
 .sp
 .ne 2
-.mk
 .na
 \fBntrack=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of tracks per cylinder on the disk. If not specified, the value is
 determined by using a \fBdkio\fR(7I) ioctl to get the disk geometry, or (for
 diskette) from the results of an \fBFDIOGCHAR\fR ioctl.
@@ -184,12 +164,10 @@ diskette) from the results of an \fBFDIOGCHAR\fR ioctl.
 
 .sp
 .ne 2
-.mk
 .na
 \fBN\fR
 .ad
 .RS 14n
-.rt  
 No execution mode. Print normal output, but do not actually write the file
 system to the medium. This is most useful when used in conjunction with the
 verbose option.
@@ -197,24 +175,20 @@ verbose option.
 
 .sp
 .ne 2
-.mk
 .na
 \fBr\fR
 .ad
 .RS 14n
-.rt  
 Mark the first file installed as read-only. The \fB-i\fR option must also be
 specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBreserve=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 Set the number of reserved sectors to \fIn\fR. This is the number of sectors in
 the volume, preceding the start of the first \fBFAT\fR, including the boot
 sector. The value should always be at least 1, and the default value is exactly
@@ -223,24 +197,20 @@ sector. The value should always be at least 1, and the default value is exactly
 
 .sp
 .ne 2
-.mk
 .na
 \fBs\fR
 .ad
 .RS 14n
-.rt  
 Mark the first file installed as a system file. The \fB-i\fR option must also
 be specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBsize=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 The number of sectors in the file system. If not specified, the value is
 determined from the size of the partition given in the fdisk table or (for
 diskette) by way of computation using the \fBFDIOGCHAR\fR ioctl.
@@ -248,12 +218,10 @@ diskette) by way of computation using the \fBFDIOGCHAR\fR ioctl.
 
 .sp
 .ne 2
-.mk
 .na
 \fBspc=\fIn\fR\fR
 .ad
 .RS 14n
-.rt  
 The size of the allocation unit for space within the file system, expressed as
 a number of sectors. The default value depends on the \fBFAT\fR entry size and
 the size of the file system.
@@ -261,12 +229,10 @@ the size of the file system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBv\fR
 .ad
 .RS 14n
-.rt  
 Verbose output. Describe, in detail, operations being performed.
 .RE
 
@@ -275,12 +241,10 @@ Verbose output. Describe, in detail, operations being performed.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fIraw_device_file\fR\fR
 .ad
 .RS 19n
-.rt  
 The device on which to build the \fBFAT\fR. The device name for a diskette must
 be specified as \fB/dev/rdiskette0\fR for the first diskette drive, or
 \fB/dev/rdiskette1\fR for a second diskette drive. For non-diskette media, a
@@ -366,13 +330,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStable
+Interface Stability	Stable
 .TE
 
 .SH SEE ALSO

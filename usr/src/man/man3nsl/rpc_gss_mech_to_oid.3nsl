@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rpc_gss_mech_to_oid 3NSL "5 Feb 2002" "SunOS 5.11" "Networking Services Library Functions"
+.TH RPC_GSS_MECH_TO_OID 3NSL "Feb 5, 2002"
 .SH NAME
 rpc_gss_mech_to_oid, rpc_gss_qop_to_num \- map mechanism, QOP strings to
 non-string values
 .SH SYNOPSIS
 .LP
 .nf
-#include <rpc/rpcsec_gss.h> 
+#include <rpc/rpcsec_gss.h>
 
 \fBbool_t\fR \fBrpc_gss_mech_to_oid\fR(\fBcharc\fR\fI*mech\fR, \fBrpc_gss_OIDc\fR\fI*oid\fR);
 .fi
@@ -40,36 +40,30 @@ Information on \fBRPCSEC_GSS\fR data types for parameters may be found on the
 \fBrpcsec_gss\fR(3NSL) man page.
 .sp
 .ne 2
-.mk
 .na
 \fB\fImech\fR \fR
 .ad
 .RS 9n
-.rt  
 An ASCII string representing the security mechanism in use.  Valid strings may
 be found in the \fB/etc/gss/mech\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoid\fR \fR
 .ad
 .RS 9n
-.rt  
 An object identifier of type \fBrpc_gss_OID\fR, whose elements are usable by
 kernel-level RPC routines.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIqop\fR \fR
 .ad
 .RS 9n
-.rt  
 This is an ASCII string which sets the quality of protection (QOP) for the
 session. Appropriate values for this string may be found in the file
 \fB/etc/gss/qop\fR.
@@ -77,12 +71,10 @@ session. Appropriate values for this string may be found in the file
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInum\fR \fR
 .ad
 .RS 9n
-.rt  
 The non-string value for the QOP.
 .RE
 
@@ -93,23 +85,19 @@ Both functions return TRUE if they are successful, FALSE otherwise.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gss/mech\fR \fR
 .ad
 .RS 18n
-.rt  
 File containing valid security mechanisms
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/gss/qop\fR \fR
 .ad
 .RS 18n
-.rt  
 File containing valid QOP values
 .RE
 
@@ -121,22 +109,19 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
-_
+MT-Level	MT-Safe
+.TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBrpc\fR(3NSL), \fBrpc_gss_get_error\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5) 
+\fBrpc\fR(3NSL), \fBrpc_gss_get_error\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5)
 .sp
 .LP
-\fIONC+ Developer\&'s Guide\fR 
+\fIONC+ Developer\&'s Guide\fR
 .sp
-.LP
-Linn, J. \fIRFC 2078, Generic Security Service Application Program Interface, Version 2\fR. Network Working Group. January 1997. 

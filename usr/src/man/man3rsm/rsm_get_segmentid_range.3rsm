@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rsm_get_segmentid_range 3RSM "8 May 2003" "SunOS 5.11" "Remote Shared Memory Library Functions"
+.TH RSM_GET_SEGMENTID_RANGE 3RSM "May 8, 2003"
 .SH NAME
 rsm_get_segmentid_range \- get segment ID range
 .SH SYNOPSIS
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
-#include <rsmapi.h> 
+#include <rsmapi.h>
 
 \fBint\fR \fBrsm_get_segmentid_range\fR(\fBconst char *\fR\fIappid\fR,
      \fBrsm_memseg_id_t *\fR\fIbaseid\fR, \fBuint32_t *\fR\fIlength\fR);
@@ -75,34 +75,28 @@ is returned to indicate the error.
 The \fBrsm_get_segmentid_range()\fR function can return the following errors:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_ADDR\fR \fR
 .ad
 .RS 21n
-.rt  
 The address passed is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_APPID\fR \fR
 .ad
 .RS 21n
-.rt  
 The \fIappid\fR is not defined in configuration file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRSMERR_BAD_CONF\fR \fR
 .ad
 .RS 21n
-.rt  
 The configuration file is not present or not readable, or the configuration
 file format is incorrect.
 .RE
@@ -115,15 +109,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) |lw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPE ATTRIBUTE VALUE
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE 	ATTRIBUTE VALUE
 _
-Interface StabilityUnstable
+Interface Stability	Unstable
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

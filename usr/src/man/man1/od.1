@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH od 1 "20 May 2005" "SunOS 5.11" "User Commands"
+.TH OD 1 "May 20, 2005"
 .SH NAME
 od \- octal dump
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ od \- octal dump
 
 .LP
 .nf
-\fB/usr/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-A\fR \fIaddress_base\fR] [\fB-j\fR \fIskip\fR] 
+\fB/usr/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-A\fR \fIaddress_base\fR] [\fB-j\fR \fIskip\fR]
      [\fB-N\fR \fIcount\fR] [\fB-t\fR \fItype_string\fR]... [\fB-\fR] [\fIfile\fR]...
 .fi
 
@@ -29,7 +29,7 @@ od \- octal dump
 
 .LP
 .nf
-\fB/usr/xpg4/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-A\fR \fIaddress_base\fR] 
+\fB/usr/xpg4/bin/od\fR [\fB-bcCDdFfOoSsvXx\fR] [\fB-A\fR \fIaddress_base\fR]
      [\fB-j\fR \fIskip\fR] [\fB-N\fR \fIcount\fR] [\fB-t\fR \fItype_string\fR]... [\fIfile\fR]...
 .fi
 
@@ -48,34 +48,28 @@ specified.  If no \fIfile\fR is specified, the standard input is used.  The
 the following terms are used:
 .sp
 .ne 2
-.mk
 .na
 \fBword\fR
 .ad
 .RS 20n
-.rt  
 Refers to a 16-bit unit, independent of the word size of the machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBlong word\fR
 .ad
 .RS 20n
-.rt  
 Refers to a 32-bit unit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBdouble long word\fR
 .ad
 .RS 20n
-.rt  
 Refers to a 64-bit unit.
 .RE
 
@@ -85,12 +79,10 @@ Refers to a 64-bit unit.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR \fIaddress_base\fR \fR
 .ad
 .RS 20n
-.rt  
 Specifies the input offset base. The \fIaddress_base\fR option-argument must be
 a character.  The characters \fBd\fR, \fBo\fR and \fBx\fR specify that the
 offset base will be written in decimal, octal or hexadecimal, respectively. The
@@ -105,24 +97,20 @@ offset base is displayed in octal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fR
 .ad
 .RS 20n
-.rt  
 Interprets bytes in octal.  This is equivalent to \fB-t\fR \fBo1\fR.
 .RE
 
 .SS "/usr/bin/od"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fR
 .ad
 .RS 7n
-.rt  
 Displays single-byte characters. Certain non-graphic characters appear as
 C-language escapes:
 .sp
@@ -154,12 +142,10 @@ Others appear as 3-digit octal numbers. For example:
 .SS "/usr/xpg4/bin/od"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets bytes as single-byte or multibyte characters according to the
 current setting of the \fBLC_CTYPE\fR locale category. Printable multibyte
 characters are written in the area corresponding to the first byte of the
@@ -171,12 +157,10 @@ would using the \fB-C\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets bytes as single-byte or multibyte characters according to the
 current setting of the \fBLC_CTYPE\fR locale category. Printable multibyte
 characters are written in the area corresponding to the first byte of the
@@ -202,59 +186,49 @@ byte in the character.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets words in unsigned decimal.  This is equivalent to \fB-t\fR \fBu2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets long words in unsigned decimal. This is equivalent to \fB-t\fR
 \fBu4\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets long words in floating point.  This is equivalent to \fB-t\fR
 \fBf4\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets double long words in extended precision. This is equivalent to
 \fB-t\fR \fBf8\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR \fIskip\fR \fR
 .ad
 .RS 19n
-.rt  
 Jumps over \fIskip\fR bytes from the beginning of the input. The \fBod\fR
 command will read or seek past the first \fIskip\fR bytes in the concatenated
 input files.  If the combined input is not at least \fIskip\fR bytes long, the
@@ -274,12 +248,10 @@ the base of the \fIskip\fR option-argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-N\fR \fIcount\fR \fR
 .ad
 .RS 19n
-.rt  
 Formats no more than \fIcount\fR bytes of input. By default, \fIcount\fR is
 interpreted as a decimal number.  With a leading \fB0x\fR or \fB0X\fR,
 \fIcount\fR is interpreted as a hexadecimal number; otherwise, with a leading
@@ -292,69 +264,57 @@ by the base of the \fIcount\fR option-argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets words in octal. This is equivalent to \fB-t\fR \fBo2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-O\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets long words in unsigned octal.  This is equivalent to \fB-t\fR
 \fBo4\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets words in signed decimal. This is equivalent to \fB-t\fR \fBd2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets long words in signed decimal. This is equivalent to \fB-t\fR
 \fBd4\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype_string\fR \fR
 .ad
 .RS 19n
-.rt  
 Specifies one or more output types. The \fItype_string\fR option-argument must
 be a string specifying the types to be used when writing the input data. The
 string must consist of the type specification characters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR \fR
 .ad
 .RS 6n
-.rt  
 \fINamed character\fR. Interprets bytes as named characters. Only the least
 significant seven bits of each byte will be used for this type specification.
 Bytes with the values listed in the following table will be written using the
@@ -364,8 +324,8 @@ The following are named characters in \fBod\fR:
 .sp
 .in +2
 .nf
-Value   Name  
-    
+Value   Name
+
 \000    nul
 \001    soh
 \002    stx
@@ -408,12 +368,10 @@ Value   Name
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR \fR
 .ad
 .RS 6n
-.rt  
 \fICharacter\fR. Interprets bytes as single-byte or multibyte characters
 specified by the current setting of the \fBLC_CTYPE\fR locale category.
 Printable multibyte characters are written in the area corresponding to the
@@ -430,12 +388,10 @@ The type specification characters \fBd\fR, \fBf\fR, \fBo\fR, \fBu\fR, and
 the number of bytes to be transformed by each instance of the output type.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR \fR
 .ad
 .RS 18n
-.rt  
 \fIFloating point\fR. Can be followed by an optional \fBF\fR, \fBD\fR, or
 \fBL\fR indicating that the conversion should be applied to an item of type
 \fBfloat\fR, \fBdouble\fR, or \fBlong double\fR, respectively.
@@ -443,12 +399,10 @@ the number of bytes to be transformed by each instance of the output type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR, \fBo\fR, \fBu\fR, and \fBx\fR\fR
 .ad
 .RS 18n
-.rt  
 \fISigned decimal\fR, \fIoctal\fR, \fIunsigned decimal\fR, and
 \fIhexadecimal\fR, respectively. Can be followed by an optional \fBC\fR,
 \fBS\fR, \fBI\fR, or \fBL\fR indicating that the conversion should be applied
@@ -464,12 +418,10 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR \fR
 .ad
 .RS 19n
-.rt  
 Shows all input data (verbose). Without the \fB-v\fR option, all groups of
 output lines that would be identical to the immediately preceding output line
 (except for byte offsets), will be replaced with a line containing only an
@@ -478,23 +430,19 @@ asterisk (*).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets words in hex. This is equivalent to \fB-t\fR \fBx2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR \fR
 .ad
 .RS 19n
-.rt  
 Interprets long words in hex. This is equivalent to \fB-t\fR \fBx4\fR.
 .RE
 
@@ -505,12 +453,10 @@ Interprets long words in hex. This is equivalent to \fB-t\fR \fBx4\fR.
 The following operands are supported for \fB/usr/bin/od\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR \fR
 .ad
 .RS 26n
-.rt  
 Uses the standard input in addition to any files specified.  When this operand
 is not given, the standard input is used only if no \fIfile\fR operands are
 specified.
@@ -518,12 +464,10 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 26n
-.rt  
 A path name of a file to be read. If no \fIfile\fR operands are specified, the
 standard input will be used. If there are no more than two operands, none of
 the \fB-A\fR, \fB-j\fR, \fB-N\fR, or \fB-t\fR options is specified, and
@@ -563,7 +507,6 @@ is reached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[+][0]\fR \fIoffset\fR \fB[.][b|B]\fR\fR
 .ad
@@ -580,7 +523,6 @@ is reached.
 \fB\fB[+][0x|x]\fR \fIoffset\fR\fB[B]\fR\fR
 .ad
 .RS 26n
-.rt  
 The \fIoffset_string\fR operand specifies the byte offset in the file where
 dumping is to commence.  The offset is interpreted in octal bytes by default.
 If \fIoffset\fR begins with "\fB0\fR", it is interpreted in octal. If
@@ -602,19 +544,16 @@ conversions in the same offset operand.
 The following operands are supported for \fB/usr/xpg4/bin/od\fR only:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR \fR
 .ad
 .RS 29n
-.rt  
 Same as \fB/usr/bin/od\fR, except only one of the first two conditions must be
 true.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[+] [0] \fR\fIoffset\fR \fB[.]\|[b|B]\fR\fR
 .ad
@@ -639,7 +578,6 @@ true.
 \fB\fB+x\fR\fIoffset \fR\fB[B]\fR\fR
 .ad
 .RS 29n
-.rt  
 Description of \fIoffset_string\fR is the same as for \fB/usr/bin/od\fR.
 .RE
 
@@ -655,23 +593,19 @@ that affect the execution of \fBod\fR: \fBLANG\fR, \fBLC_ALL\fR,
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 7n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR \fR
 .ad
 .RS 7n
-.rt  
 An error occurred.
 .RE
 
@@ -684,13 +618,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIenabled
+CSI	enabled
 .TE
 
 .SS "/usr/xpg4/bin/od"
@@ -698,15 +631,14 @@ CSIenabled
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIenabled
+CSI	enabled
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

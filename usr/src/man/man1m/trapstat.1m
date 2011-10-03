@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH trapstat 1M "11 May 2004" "SunOS 5.11" "System Administration Commands"
+.TH TRAPSTAT 1M "May 11, 2004"
 .SH NAME
 trapstat \- report trap statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/trapstat\fR [\fB-t\fR | \fB-T\fR | \fB-e\fR \fIentry\fR] 
-     [\fB-C\fR \fIprocessor_set_id\fR | \fB-c\fR \fIcpulist\fR] [\fB-P\fR] [\fB-a\fR] 
+\fB/usr/sbin/trapstat\fR [\fB-t\fR | \fB-T\fR | \fB-e\fR \fIentry\fR]
+     [\fB-C\fR \fIprocessor_set_id\fR | \fB-c\fR \fIcpulist\fR] [\fB-P\fR] [\fB-a\fR]
      [\fB-r\fR \fIrate\fR] [ [\fIinterval\fR [\fIcount\fR]] | \fIcommand\fR | [\fIargs\fR]]
 .fi
 
@@ -81,24 +81,20 @@ be specified.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 24n
-.rt  
 Displays the number of traps as accumulating, monotonically increasing values
 instead of per-second or per-interval rates.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIcpulist\fR \fR
 .ad
 .RS 24n
-.rt  
 Enables \fBtrapstat\fR only on the \fBCPU\fRs specified by \fIcpulist\fR.
 .sp
 \fIcpulist\fR can be a single processor \fBID\fR (for example, \fB4\fR), a
@@ -109,12 +105,10 @@ list of processor\fB ID\fRs or processor \fBID\fR ranges (for example,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR \fIprocessor_set_id\fR \fR
 .ad
 .RS 24n
-.rt  
 Enables \fBtrapstat\fR only on the \fBCPU\fRs in the processor set specified by
 \fIprocessor_set_id\fR.
 .sp
@@ -127,12 +121,10 @@ most one processor set can be specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIentrylist\fR \fR
 .ad
 .RS 24n
-.rt  
 Enables \fBtrapstat\fR only for the trap table entry or entries specified by
 \fIentrylist\fR. A trap table entry can be specified by trap number or by trap
 name (for example, the level-10 trap can be specified as \fB74\fR, \fB0x4A\fR,
@@ -149,16 +141,14 @@ Manual.\fR If the parsable option (\fB-P\fR) is specified in addition to the
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-FieldContents
-1Timestamp (nanoseconds since start)
-2CPU ID
-3Trap number (in hexadecimal)
-4Trap name
-5Trap rate per interval
+c c
+l l .
+Field	Contents
+1	Timestamp (nanoseconds since start)
+2	CPU ID
+3	Trap number (in hexadecimal)
+4	Trap name
+5	Trap rate per interval
 .TE
 
 Each field is separated with whitespace. If the format is modified, it will be
@@ -168,12 +158,10 @@ will remain unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fR
 .ad
 .RS 24n
-.rt  
 Lists trap table entries. By default, a table is displayed containing all valid
 trap numbers, their names and a brief description. The trap name is used in
 both the default output and in the \fIentrylist\fR parameter for the \fB-e\fR
@@ -183,27 +171,23 @@ argument. If the parsable option (\fB-P\fR) is specified in addition to the
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-FieldContents
-1Trap number in hexadecimal
-2Trap number in decimal
-3Trap name 
-RemainingTrap description
+c c
+l l .
+Field	Contents
+1	Trap number in hexadecimal
+2	Trap number in decimal
+3	Trap name
+Remaining	Trap description
 .TE
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fR
 .ad
 .RS 24n
-.rt  
 Generates parsable output. When run without other data gathering modifying
 options (that is, \fB-e\fR, \fB-t\fR or \fB-T\fR), \fBtrapstat\fR's the
 parsable output has the following format:
@@ -211,16 +195,14 @@ parsable output has the following format:
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-FieldContents
-1Timestamp (nanoseconds since start)
-2CPU ID
-3Trap number (in hexadecimal)
-4Trap name
-5Trap rate per interval
+c c
+l l .
+Field	Contents
+1	Timestamp (nanoseconds since start)
+2	CPU ID
+3	Trap number (in hexadecimal)
+4	Trap name
+5	Trap rate per interval
 .TE
 
 Each field is separated with whitespace. If the format is modified, it will be
@@ -230,12 +212,10 @@ will remain unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrate\fR \fR
 .ad
 .RS 24n
-.rt  
 Explicitly sets the sampling rate to be \fIrate\fR samples per second. If this
 option is specified, \fBtrapstat\fR's output changes from a traps-per-second to
 traps-per-sampling-interval.
@@ -243,12 +223,10 @@ traps-per-sampling-interval.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 24n
-.rt  
 Enables TLB statistics.
 .sp
 A table is displayed with four principal columns of data: \fIitlb-miss\fR,
@@ -266,22 +244,20 @@ format of the data is as follows:
 
 .sp
 .TS
-tab();
-cw(0i) cw(5.5i) 
-lw(0i) lw(5.5i) 
-.
-FieldContents
-1Timestamp (nanoseconds since start)
-2CPU ID
-3Mode (\fBk\fR denotes kernel, \fBu\fR denotes user)
-4I-TLB misses
-5Percentage of time in I-TLB miss handler
-6I-TSB misses
-7Percentage of time in I-TSB miss handler
-8D-TLB misses
-9Percentage of time in D-TLB miss handler
-10D-TSB misses
-11Percentage of time in D-TSB miss handler
+c c
+l l .
+Field	Contents
+1	Timestamp (nanoseconds since start)
+2	CPU ID
+3	Mode (\fBk\fR denotes kernel, \fBu\fR denotes user)
+4	I-TLB misses
+5	Percentage of time in I-TLB miss handler
+6	I-TSB misses
+7	Percentage of time in I-TSB miss handler
+8	D-TLB misses
+9	Percentage of time in D-TLB miss handler
+10	D-TSB misses
+11	Percentage of time in D-TSB miss handler
 .TE
 
 Each field is separated with whitespace. If the format is modified, it will be
@@ -291,12 +267,10 @@ fields will remain unchanged.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fR
 .ad
 .RS 24n
-.rt  
 Enables \fBTLB\fR statistics, with page size information. As with the \fB-t\fR
 option, a table is displayed with four principal columns of data:
 \fIitlb-miss\fR, \fIitsb-miss\fR, \fIdtlb-miss\fR, and \fIdtsb-miss\fR. The
@@ -315,23 +289,21 @@ addition to the \fB-T\fR option, the format of the data is as follows:
 
 .sp
 .TS
-tab();
-cw(0i) cw(5.5i) 
-lw(0i) lw(5.5i) 
-.
-FieldContents
-1Timestamp (nanoseconds since start)
-2CPU ID
-3Mode \fBk\fR denotes kernel, \fBu\fR denotes user)
-4Page size, in decimal
-5I-TLB misses
-6Percentage of time in I-TLB miss handler
-7I-TSB misses
-8Percentage of time in I-TSB miss handler
-9D-TLB misses
-10Percentage of time in D-TLB miss handler
-11D-TSB misses
-12Percentage of time in D-TSB miss handler
+c c
+l l .
+Field	Contents
+1	Timestamp (nanoseconds since start)
+2	CPU ID
+3	Mode \fBk\fR denotes kernel, \fBu\fR denotes user)
+4	Page size, in decimal
+5	I-TLB misses
+6	Percentage of time in I-TLB miss handler
+7	I-TSB misses
+8	Percentage of time in I-TSB miss handler
+9	D-TLB misses
+10	Percentage of time in D-TLB miss handler
+11	D-TSB misses
+12	Percentage of time in D-TSB miss handler
 .TE
 
 Each field is separated with whitespace. If the format is modified, it will be
@@ -611,14 +583,13 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface Stability
-    Human Readable OutputUnstable
-    Parsable OutputEvolving
+box;
+c c
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	
+    Human Readable Output	Unstable
+    Parsable Output	Evolving
 .TE
 
 .SH SEE ALSO
@@ -642,14 +613,12 @@ specifics of the hardware, the following table can be used as a rough guide:
 
 .sp
 .TS
-tab();
-cw(0i) cw(5.5i) 
-lw(0i) lw(5.5i) 
-.
-OptionApproximate probe effect
-default3-5% per trap
-\fB-e\fR3-5% per specified trap
-\fB-t\fR, \fB-T\fR T{
+c c
+l l .
+Option	Approximate probe effect
+default	3-5% per trap
+\fB-e\fR	3-5% per specified trap
+\fB-t\fR, \fB-T\fR 	T{
 40-45% per TLB miss trap hitting in the TSB, 25-30% per TLB miss trap missing in the TSB
 T}
 .TE

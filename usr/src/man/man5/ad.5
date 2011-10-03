@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ad 5 "22 Oct 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH AD 5 "Oct 22, 2008"
 .SH NAME
 ad \- Active Directory as a naming repository
 .SH DESCRIPTION
@@ -43,35 +43,29 @@ configures Kerberos v5 on the client. See \fBkclient\fR(1M).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 Configuration file for the name-service switch.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.ad\fR\fR
 .ad
 .RS 24n
-.rt  
 Sample configuration file for the name-service switch configured with ad, dns
 and files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/nss_ad.so.1\fR\fR
 .ad
 .RS 24n
-.rt  
 Name service switch module for AD.
 .RE
 

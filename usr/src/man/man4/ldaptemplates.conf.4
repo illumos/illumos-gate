@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldaptemplates.conf 4 "9 Jul 2003" "SunOS 5.11" "File Formats"
+.TH LDAPTEMPLATES.CONF 4 "Jul 9, 2003"
 .SH NAME
 ldaptemplates.conf \- configuration file for LDAP display template routines
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/opt/SUNWconn/ldap/current/ldaptemplates.conf\fR 
+\fB/etc/opt/SUNWconn/ldap/current/ldaptemplates.conf\fR
 .fi
 
 .SH DESCRIPTION
@@ -188,177 +188,145 @@ extra arguments.
 The item type token must be one of the following strings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcis\fR \fR
 .ad
 .RS 14n
-.rt  
 case-ignore string attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmls\fR \fR
 .ad
 .RS 14n
-.rt  
 multiline string attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR \fR
 .ad
 .RS 14n
-.rt  
 RFC-822 conformant mail address attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdn\fR \fR
 .ad
 .RS 14n
-.rt  
 distinguished name pointer attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbool\fR \fR
 .ad
 .RS 14n
-.rt  
 Boolean attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjpeg\fR \fR
 .ad
 .RS 14n
-.rt  
 JPEG photo attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjpegbtn\fR \fR
 .ad
 .RS 14n
-.rt  
 a button that will retrieve and show a JPEG photo attribute
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfax\fR \fR
 .ad
 .RS 14n
-.rt  
 FAX T.4 format image attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfaxbtn\fR \fR
 .ad
 .RS 14n
-.rt  
 a button that will retrieve and show a FAX photo attribute
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaudiobtn\fR \fR
 .ad
 .RS 14n
-.rt  
 audio attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtime\fR \fR
 .ad
 .RS 14n
-.rt  
 UTC time attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdate\fR \fR
 .ad
 .RS 14n
-.rt  
 UTC time attributes where only the date portion should be shown
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBurl\fR \fR
 .ad
 .RS 14n
-.rt  
 labeled Uniform Resource Locator attributes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsearchact\fR \fR
 .ad
 .RS 14n
-.rt  
 define an action that will do a directory search for other entries
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlinkact\fR \fR
 .ad
 .RS 14n
-.rt  
 define an action which is a link to another display template
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprotected\fR \fR
 .ad
 .RS 14n
-.rt  
 for an encrypted attribute, with values displayed as asterisks
 .RE
 
@@ -453,12 +421,11 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Stability LevelEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Stability Level	Evolving
 .TE
 
 .SH SEE ALSO

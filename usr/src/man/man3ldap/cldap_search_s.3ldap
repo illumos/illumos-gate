@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cldap_search_s 3LDAP "27 Jan 2002" "SunOS 5.11" "LDAP Library Functions"
+.TH CLDAP_SEARCH_S 3LDAP "Jan 27, 2002"
 .SH NAME
 cldap_search_s \- connectionless LDAP search
 .SH SYNOPSIS
@@ -45,12 +45,10 @@ members of the \fBld\fR LDAP structure, and the default values set in
 used is:
 .sp
 .ne 2
-.mk
 .na
 \fBStep 1\fR
 .ad
 .RS 10n
-.rt  
 Set the current timeout to \fBld_cldaptimeout\fR seconds, and the current LDAP
 server address to the first LDAP server found during the \fBldap_open\fR(3LDAP)
 call.
@@ -58,23 +56,19 @@ call.
 
 .sp
 .ne 2
-.mk
 .na
 \fBStep 2\fR
 .ad
 .RS 10n
-.rt  
 Send the search request to the current LDAP server address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBStep 3\fR
 .ad
 .RS 10n
-.rt  
 Set the wait timeout to the current timeout divided by the number of server
 addresses found during \fBldap_open\fR(3LDAP) or to one second, whichever is
 larger. Wait at most that long for a response; if a response is received, STOP.
@@ -83,23 +77,19 @@ Note that the wait timeout is always rounded down to the next lowest second.
 
 .sp
 .ne 2
-.mk
 .na
 \fBStep 4\fR
 .ad
 .RS 10n
-.rt  
 Repeat steps 2 and 3 for each LDAP server address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBStep 5\fR
 .ad
 .RS 10n
-.rt  
 Set the current timeout to twice its previous value and repeat Steps 2 through
 5 a maximum of \fItries\fR times.
 .RE
@@ -141,12 +131,11 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

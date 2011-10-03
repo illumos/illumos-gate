@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH csh 1 "27 Jul 2007" "SunOS 5.11" "User Commands"
+.TH CSH 1 "Jul 27, 2007"
 .SH NAME
 csh \- shell command interpreter with a C-like syntax
 .SH SYNOPSIS
@@ -68,12 +68,10 @@ known as a script.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 6n
-.rt  
 Forced a "break" from option processing. Subsequent command line arguments are
 not interpreted as C shell options. This allows the passing of options to a
 script without confusion. The shell does not run set-user-ID or set-group-ID
@@ -82,12 +80,10 @@ scripts unless this option is present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Executes the first \fIargument\fR, which must be present. Remaining arguments
 are placed in \fBargv\fR, the argument-list variable, and passed directly to
 \fBcsh\fR.
@@ -95,70 +91,58 @@ are placed in \fBargv\fR, the argument-list variable, and passed directly to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 6n
-.rt  
 Exits if a command terminates abnormally or yields a nonzero exit status.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Fast start. Reads neither the \fB\&.cshrc\fR file, nor the \fB\&.login\fR file
 (if a login shell) upon startup.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 6n
-.rt  
 Forced interactive. Prompts for command line input, even if the standard input
 does not appear to be a terminal (character-special device).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Parses (interprets), but does not execute commands. This option can be used to
 check C shell scripts for syntax errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
-.rt  
 Takes commands from the standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fR
 .ad
 .RS 6n
-.rt  
 Reads and executes a single command line. A `\fB\e\fR\&' (backslash) can be
 used to escape each newline for continuation of the command line onto
 subsequent input lines.
@@ -166,12 +150,10 @@ subsequent input lines.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Verbose. Sets the \fBverbose\fR predefined variable. Command input is echoed
 after history substitution, but before other substitutions and before
 execution.
@@ -179,35 +161,29 @@ execution.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets \fBverbose\fR before reading \fB\&.cshrc\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 6n
-.rt  
 Echo. Sets the \fBecho\fR variable. Echoes commands after all substitutions and
 just before execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-X\fR\fR
 .ad
 .RS 6n
-.rt  
 Sets \fBecho\fR before reading \fB\&.cshrc\fR.
 .RE
 
@@ -316,7 +292,6 @@ gets executed.
 An event designator is a reference to a command line entry in the history list.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
@@ -328,7 +303,6 @@ newline, \fB=\fR or \fB(\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!!\fR\fR
 .ad
@@ -340,7 +314,6 @@ previous command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fIn\fR\fR
 .ad
@@ -351,7 +324,6 @@ Refer to command line \fIn\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fB-n\fR\fR
 .ad
@@ -362,7 +334,6 @@ Refer to the current command line minus \fIn\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fIstr\fR\fR
 .ad
@@ -373,7 +344,6 @@ Refer to the most recent command starting with \fIstr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!?\fR\fIstr\fR\fB?\fR\fR
 .ad
@@ -384,7 +354,6 @@ Refer to the most recent command containing \fIstr\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!?\fR\fIstr\fR\fB?\fR \fIadditional\fR\fR
 .ad
@@ -396,7 +365,6 @@ Refer to the most recent command containing \fIstr\fR and append
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!{\fR\fIcommand\fR\fB}\fR \fIadditional\fR\fR
 .ad
@@ -408,7 +376,6 @@ Refer to the most recent command beginning with \fIcommand\fR and append
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fIprevious_word\fR\fB^\fR\fIreplacement\fR\fB^\fR\fR
 .ad
@@ -448,111 +415,91 @@ word of the previous command, while \fB!!$\fR and \fB!$\fR both refer to the
 last word in the previous command. Word designators include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB#\fR\fR
 .ad
 .RS 10n
-.rt  
 The entire command line typed so far.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 10n
-.rt  
 The first input word (command).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIn\fR'th argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 10n
-.rt  
 The first argument, that is, \fB1\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fR
 .ad
 .RS 10n
-.rt  
 The last argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fR
 .ad
 .RS 10n
-.rt  
 The word matched by the \fB?\fR\fIs\fR search.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fB\(mi\fR\fIy\fR\fR
 .ad
 .RS 10n
-.rt  
 A range of words; \fB\(mi\fR\fIy\fR abbreviates \fB0\(mi\fR\fIy\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB*\fR\fR
 .ad
 .RS 10n
-.rt  
 All the arguments, or a null value if there is just one word in the event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fB*\fR\fR
 .ad
 .RS 10n
-.rt  
 Abbreviates \fIx\fR\fB\(mi$\fR\fI\&.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fB\(mi\fR\fR
 .ad
 .RS 10n
-.rt  
 Like \fIx*\fR but omitting word \fB$\fR.
 .RE
 
@@ -563,113 +510,93 @@ After the optional word designator, you can add one of the following modifiers,
 preceded by a \fB:\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBh\fR\fR
 .ad
 .RS 10n
-.rt  
 Remove a trailing pathname component, leaving the head.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 10n
-.rt  
 Remove a trailing suffix of the form `\fB\&.\fR\fIxxx\fR', leaving the
 basename.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBe\fR\fR
 .ad
 .RS 10n
-.rt  
 Remove all but the suffix, leaving the Extension.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs/\fR\fIl\fR\fB/\fR\fIr\fR\fB/\fR\fR
 .ad
 .RS 10n
-.rt  
 Substitute \fIr\fR for \fIl\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 10n
-.rt  
 Remove all leading pathname components, leaving the tail.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&\fR\fR
 .ad
 .RS 10n
-.rt  
 Repeat the previous substitution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBg\fR\fR
 .ad
 .RS 10n
-.rt  
 Apply the change to the first occurrence of a match in each word, by prefixing
 the above (for example, \fBg&\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 10n
-.rt  
 Print the new command but do not execute it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 10n
-.rt  
 Quote the substituted words,escaping further substitutions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBx\fR\fR
 .ad
 .RS 10n
-.rt  
 Like \fBq\fR, but break into words at each space character, tab or newline.
 .RE
 
@@ -695,12 +622,10 @@ any).
 .SS "Quick Substitution"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fIl\fR\fB^\fR\fIr\fR\fB^\fR\fR
 .ad
 .RS 9n
-.rt  
 This is equivalent to the history substitution:
 .sp
 .in +2
@@ -754,23 +679,19 @@ is redirected; this word is variable, command, and filename expanded separately
 from the rest of the command.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\fR\fR
 .ad
 .RS 15n
-.rt  
 Redirect the standard input.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<\|<\fR\fI\|word\fR\fR
 .ad
 .RS 15n
-.rt  
 Read the standard input, up to a line that is identical with \fIword\fR, and
 place the resulting lines in a temporary file. Unless \fIword\fR is escaped or
 quoted, variable and command substitutions are performed on these lines. Then,
@@ -782,12 +703,10 @@ shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\fR \fB>!\fR \fB>&\fR \fB>&!\fR\fR
 .ad
 .RS 15n
-.rt  
 Redirect the standard output to a file. If the file does not exist, it is
 created. If it does exist, it is overwritten; its previous contents are lost.
 .sp
@@ -799,12 +718,10 @@ the standard error (diagnostic output) to the file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>\|>\fR \fB>\|>&\fR \fB>\|>!\fR \fB>\|>&!\fR\fR
 .ad
 .RS 27n
-.rt  
 Append the standard output. Like \fB>\fR, but places output at the end of the
 file rather than overwriting it. If \fBnoclobber\fR is set, it is an error for
 the file not to exist, unless one of the \fB!\fR forms is used. The \fB&\fR
@@ -870,7 +787,6 @@ filename substitutions.
 Except as noted below, it is an error to refer to a variable that is not set.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fIvar\fR\fR
 .ad
@@ -879,7 +795,6 @@ Except as noted below, it is an error to refer to a variable that is not set.
 \fB\fB${\fR\fIvar\fR\fB}\fR\fR
 .ad
 .RS 17n
-.rt  
 These are replaced by words from the value of \fIvar\fR, each separated by a
 space character. If \fIvar\fR is an environment variable, its value is returned
 (but `\fB:\fR' modifiers and the other forms given below are not available).
@@ -887,7 +802,6 @@ space character. If \fIvar\fR is an environment variable, its value is returned
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fIvar\fR\fB[\fR\fIindex\fR\fB]\fR\fR
 .ad
@@ -896,7 +810,6 @@ space character. If \fIvar\fR is an environment variable, its value is returned
 \fB\fB${\fR\fIvar\fR\fB[\fR\fIindex\fR\fB]}\fR\fR
 .ad
 .RS 17n
-.rt  
 These select only the indicated words from the value of \fIvar\fR. Variable
 substitution is applied to \fIindex\fR\|, which can consist of (or result in) a
 either single number, two numbers separated by a `\fB\(mi\fR\&', or an
@@ -910,7 +823,6 @@ within range).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$#\fR\fIname\fR\fR
 .ad
@@ -919,25 +831,21 @@ within range).
 \fB\fB${#\fR\fIname\fR\fB}\fR\fR
 .ad
 .RS 17n
-.rt  
 These give the number of words in the variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$0\fR\fR
 .ad
 .RS 17n
-.rt  
 This substitutes the name of the file from which command input is being read
 except for setuid shell scripts. An error occurs if the name is not known.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$\fR\fIn\fR\fR
 .ad
@@ -946,18 +854,15 @@ except for setuid shell scripts. An error occurs if the name is not known.
 \fB\fB${\fR\fIn\fR\fB}\fR\fR
 .ad
 .RS 17n
-.rt  
 Equivalent to \fB$argv[\fR\fIn\fR\fB]\fR\fI\&.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$*\fR\fR
 .ad
 .RS 17n
-.rt  
 Equivalent to \fB$argv[*]\fR.
 .RE
 
@@ -973,7 +878,6 @@ modifier per expansion.
 The following references can not be modified with \fB:\fR modifiers.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$?\fR\fIvar\fR\fR
 .ad
@@ -982,40 +886,33 @@ The following references can not be modified with \fB:\fR modifiers.
 \fB\fB${?\fR\fIvar\fR\fB}\fR\fR
 .ad
 .RS 11n
-.rt  
 Substitutes the string 1 if \fIvar\fR is set or 0 if it is not set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$?0\fR\fR
 .ad
 .RS 11n
-.rt  
 Substitutes 1 if the current input filename is known or 0 if it is not.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$$\fR\fR
 .ad
 .RS 11n
-.rt  
 Substitutes the process number of the (parent) shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$<\fR\fR
 .ad
 .RS 11n
-.rt  
 Substitutes a line from the standard input, with no further interpretation
 thereafter. It can be used to read from the keyboard in a C shell script.
 .RE
@@ -1046,34 +943,28 @@ Unquoted words containing any of the characters \fB*\fR, \fB?\fR, \fB[\fR or
 an alphabetically sorted list of filenames, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB*\fR
 .ad
 .RS 24n
-.rt  
 Match any (zero or more) characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB?\fR
 .ad
 .RS 24n
-.rt  
 Match any single character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB[\fR.\|.\|.\fB]\fR\fR
 .ad
 .RS 24n
-.rt  
 Match any single character in the enclosed list(s) or range(s). A list is a
 string of characters. A range is two characters separated by a dash
 (\fB\(mi\fR), and includes all the characters in between in the \fBASCII\fR
@@ -1082,12 +973,10 @@ collating sequence (see \fBascii\fR(5)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB{\fIstr\fR\fB,\fR \fIstr\fR\fB,\fR .\|.\|. \fB}\fR\fR
 .ad
 .RS 24n
-.rt  
 Expand to each string (or filename-matching pattern) in the comma-separated
 list. Unlike the pattern-matching expressions above, the expansion of this
 construct is not sorted. For instance, \fB{b,a}\fR expands to `\fBb\fR'
@@ -1097,12 +986,10 @@ and \fB}\fR, along with the string \fB{\|}\fR, are passed undisturbed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB~[\fIuser\fR]\fR
 .ad
 .RS 24n
-.rt  
 Your home directory, as indicated by the value of the variable \fBhome\fR, or
 that of \fIuser\fR, as indicated by the password entry for \fIuser\fR.
 .RE
@@ -1132,45 +1019,37 @@ a string, which can represent decimal numbers.
 The following C shell operators are grouped in order of precedence:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(\|\fR.\|.\|.\|\fB\|)\fR\fR
 .ad
 .RS 19n
-.rt  
 grouping
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB~\fR\fR
 .ad
 .RS 19n
-.rt  
 one's complement
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB!\fR\fR
 .ad
 .RS 19n
-.rt  
 logical negation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB* / %\fR\fR
 .ad
 .RS 19n
-.rt  
 multiplication, division, remainder. These are right associative, which can
 lead to unexpected results. Combinations should be grouped explicitly with
 parentheses.
@@ -1178,101 +1057,83 @@ parentheses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+ \(mi\fR\fR
 .ad
 .RS 19n
-.rt  
 addition, subtraction (also right associative)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB<< >>\fR\fR
 .ad
 .RS 19n
-.rt  
 bitwise shift left, bitwise shift right
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB< > <= >=\fR\fR
 .ad
 .RS 19n
-.rt  
 less than, greater than, less than or equal to, greater than or equal to
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB=\|= != =~ !~\fR\fR
 .ad
 .RS 19n
-.rt  
 equal to, not equal to, filename-substitution pattern match (described below),
 filename-substitution pattern mismatch
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&\fR\fR
 .ad
 .RS 19n
-.rt  
 bitwise AND
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB^\fR\fR
 .ad
 .RS 19n
-.rt  
 bitwise XOR (exclusive or)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB|\fR\fR
 .ad
 .RS 19n
-.rt  
 bitwise inclusive OR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB&&\fR\fR
 .ad
 .RS 19n
-.rt  
 logical AND
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB|\|\||\fR\fR
 .ad
 .RS 19n
-.rt  
 logical OR
 .RE
 
@@ -1288,90 +1149,74 @@ statements when pattern-matching between strings is all that is required.
 Also available are file inquiries:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 Return true, or 1 if the user has read access. Otherwise it returns false, or
 0.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if the user has write access.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if the user has execute permission (or search permission on a directory).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if \fIfilename\fR exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if the user owns \fIfilename\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if \fIfilename\fR is of zero length (empty).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if \fIfilename\fR is a plain file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fIfilename\fR\fR
 .ad
 .RS 15n
-.rt  
 True if \fIfilename\fR is a directory.
 .RE
 
@@ -1384,12 +1229,10 @@ false.
 An inquiry as to the success of a command is also available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB{\fR \fIcommand\fR\fB}\fR\fR
 .ad
 .RS 14n
-.rt  
 If \fIcommand\fR runs successfully, the expression evaluates to true, 1.
 Otherwise, it evaluates to false, 0. \fBNote:\fR Conversely, \fIcommand\fR
 itself typically returns 0 when it runs successfully, or some other value if it
@@ -1510,34 +1353,28 @@ A reference to a job begins with a `\fB%\fR'. By itself, the percent-sign
 refers to the current job.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR \fB%+\fR \fB%%\fR\fR
 .ad
 .RS 12n
-.rt  
 The current job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\(mi\fR\fR
 .ad
 .RS 12n
-.rt  
 The previous job.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR\fIj\fR\fR
 .ad
 .RS 12n
-.rt  
 Refer to job \fIj\fR as in: `\fBkill\fR \fB-9\fR \fB%\fR\fIj\fR'. \fIj\fR can
 be a job number, or a string that uniquely specifies the command line by which
 it was started; `\fBfg %vi\fR' might bring a stopped \fBvi\fR job to the
@@ -1546,12 +1383,10 @@ foreground, for instance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%?\fR\fIstring\fR\fR
 .ad
 .RS 12n
-.rt  
 Specify the job for which the command line uniquely contains \fIstring\fR.
 .RE
 
@@ -1577,23 +1412,19 @@ Built-in commands are executed within the C shell. If a built-in command occurs
 as any component of a pipeline except the last, it is executed in a subshell.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB:\fR\fR
 .ad
 .RS 26n
-.rt  
 Null command. This command is interpreted, but performs no action.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBalias\fR [ \fIname\fR [ \fIdef\fR ] ]\fR
 .ad
 .RS 26n
-.rt  
 Assign \fIdef\fR to the alias \fIname\fR. \fIdef\fR is a list of words that can
 contain escaped history-substitution metasyntax. \fIname\fR is not allowed to
 be \fBalias\fR or \fBunalias\fR. If \fIdef\fR is omitted, the current
@@ -1603,23 +1434,19 @@ definition for the alias \fIname\fR is displayed. If both \fIname\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbg\fR [ \fB%\fR\fIjob .\|.\|.\fR ]\fR
 .ad
 .RS 26n
-.rt  
 Run the current or specified jobs in the background.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbreak\fR\fR
 .ad
 .RS 26n
-.rt  
 Resume execution after the \fBend\fR of the nearest enclosing \fBforeach\fR or
 \fBwhile\fR loop. The remaining commands on the current line are executed. This
 allows multilevel breaks to be written as a list of \fBbreak\fR commands, all
@@ -1628,29 +1455,24 @@ on one line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbreaksw\fR\fR
 .ad
 .RS 26n
-.rt  
 Break from a \fBswitch\fR, resuming after the \fBendsw\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcase\fR \fIlabel\fR\fB:\fR\fR
 .ad
 .RS 26n
-.rt  
 A label in a \fBswitch\fR statement.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcd\fR [\fIdir\fR ]\fR
 .ad
@@ -1659,7 +1481,6 @@ A label in a \fBswitch\fR statement.
 \fB\fBchdir\fR [\fIdir\fR ]\fR
 .ad
 .RS 26n
-.rt  
 Change the shell's working directory to directory \fIdir\fR. If no argument is
 given, change to the home directory of the user. If \fIdir\fR is a relative
 pathname not found in the current directory, check for it in those directories
@@ -1670,24 +1491,20 @@ that value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcontinue\fR\fR
 .ad
 .RS 26n
-.rt  
 Continue execution of the next iteration of the nearest enclosing \fBwhile\fR
 or \fBforeach\fR loop.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault:\fR\fR
 .ad
 .RS 26n
-.rt  
 Labels the default case in a \fBswitch\fR statement. The default should come
 after all \fBcase\fR labels. Any remaining commands on the command line are
 first executed.
@@ -1695,12 +1512,10 @@ first executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdirs\fR [\fB-l\fR]\fR
 .ad
 .RS 26n
-.rt  
 Print the directory stack, most recent to the left. The first directory shown
 is the current directory. With the \fB-l\fR argument, produce an unabbreviated
 printout; use of the ~ notation is suppressed.
@@ -1708,12 +1523,10 @@ printout; use of the ~ notation is suppressed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR [\fB-n\fR] \fIlist\fR\fR
 .ad
 .RS 26n
-.rt  
 The words in \fIlist\fR are written to the shell's standard output, separated
 by space characters. The output is terminated with a newline unless the
 \fB-n\fR option is used. \fBcsh\fR, by default, invokes its built-in
@@ -1724,12 +1537,10 @@ command, regardless of the configuration of your \fBPATH\fR (see
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBeval\fR \fIargument\fR\fB\|.\|.\|.\fR\fR
 .ad
 .RS 26n
-.rt  
 Reads the arguments as input to the shell and executes the resulting
 command(s). This is usually used to execute commands generated as the result of
 command or variable substitution. See \fBtset\fR(1B) for an example of how to
@@ -1738,41 +1549,34 @@ use \fBeval\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexec\fR \fIcommand\fR\fR
 .ad
 .RS 26n
-.rt  
 Execute \fIcommand\fR in place of the current shell, which terminates.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBexit\fR [\fB(\fR\fIexpr\fR\fB)\fR]\fR
 .ad
 .RS 26n
-.rt  
 The calling shell or shell script exits, either with the value of the status
 variable or with the value specified by the expression \fIexpr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfg\fR [\fB%\fR\fIjob\fR ]\fR
 .ad
 .RS 26n
-.rt  
 Bring the current or specified \fIjob\fR into the foreground.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforeach\fR \fIvar\fR\fB(\fR\fIwordlist\fR\fB)\fR\fR
 .ad
@@ -1785,7 +1589,6 @@ Bring the current or specified \fIjob\fR into the foreground.
 \fB\fBend\fR\fR
 .ad
 .RS 26n
-.rt  
 The variable \fIvar\fR is successively set to each member of \fIwordlist\fR.
 The sequence of commands between this command and the matching \fBend\fR is
 executed for each new value of \fIvar\fR. Both \fBforeach\fR and \fBend\fR must
@@ -1800,7 +1603,6 @@ statements in the loop are executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBglob\fR \fIwordlist\fR\fR
 .ad
@@ -1813,7 +1615,6 @@ output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgoto\fR\fIlabel\fR\fR
 .ad
@@ -1829,7 +1630,6 @@ corresponding \fBend\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhashstat\fR\fR
 .ad
@@ -1845,7 +1645,6 @@ effectiveness of the \fIpath\fR variable, not the \fIcdpath\fR variable.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhistory\fR [\fB-hr\fR] [\fIn\fR]\fR
 .ad
@@ -1855,23 +1654,19 @@ Display the history list; if \fIn\fR is given, display only the \fIn\fR most
 recent events.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Reverse the order of printout to be most recent first rather than oldest first.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Display the history list without leading numbers. This is used to produce files
 suitable for sourcing using the \fB-h\fR option to \fIsource\fR.
 .RE
@@ -1880,7 +1675,6 @@ suitable for sourcing using the \fB-h\fR option to \fIsource\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif (\fR\fIexpr\fR \fB)\fR\fIcommand\fR\fR
 .ad
@@ -1896,7 +1690,6 @@ list. \fBNote:\fR I/O redirection occurs even if \fIexpr\fR is false, when
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBif (\fR\fBexpr\fR\fB) then\fR\fR
 .ad
@@ -1938,7 +1731,6 @@ an \fBelse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjobs\fR [\fB-l\fR]\fR
 .ad
@@ -1947,12 +1739,10 @@ an \fBelse\fR.
 List the active jobs under job control.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 List process \fBID\fRs, in addition to the normal information.
 .RE
 
@@ -1960,7 +1750,6 @@ List process \fBID\fRs, in addition to the normal information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkill\fR [\fIsig\fR ] [ \fIpid\fR ] [ \fB%\fR\fB\fIjob\fR ] .\|.\|.\fR\fR
 .ad
@@ -1978,12 +1767,10 @@ is \fBTERM\fR (terminate) or \fBHUP\fR (hangup), then the job or process is
 sent a \fBCONT\fR (continue) signal as well.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 List the signal names that can be sent.
 .RE
 
@@ -1991,7 +1778,6 @@ List the signal names that can be sent.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlimit\fR [\fB-h\fR] [\fIresource\fR [\fImax-use\fR ] ]\fR
 .ad
@@ -2007,12 +1793,10 @@ report stack size). The values reported are in hexadecimal, but can be
 translated into decimal numbers using the \fBbc\fR(1) command.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Use hard limits instead of the current limits. Hard limits impose a ceiling on
 the values of the current limits. Only the privileged user can raise the hard
 limits.
@@ -2021,126 +1805,104 @@ limits.
 \fIresource\fR is one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcputime\fR\fR
 .ad
 .RS 23n
-.rt  
 Maximum \fBCPU\fR seconds per process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfilesize\fR\fR
 .ad
 .RS 23n
-.rt  
 Largest single file allowed. Limited to the size of the filesystem. (See
 \fBdf\fR(1M)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdatasize\fR (heapsize)\fR
 .ad
 .RS 23n
-.rt  
 Maximum data size (including stack) for the process. This is the size of your
 virtual memory See \fBswap\fR(1M).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstacksize\fR\fR
 .ad
 .RS 23n
-.rt  
 Maximum stack size for the process. The default stack size is 2^64 bytes. You
 can use \fBlimit\fR(1) to change this default within a shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcoredumpsize\fR\fR
 .ad
 .RS 23n
-.rt  
 Maximum size of a core dump (file). This limited to the size of the filesystem.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdescriptors\fR\fR
 .ad
 .RS 23n
-.rt  
 Maximum number of file descriptors. Run \fBsysdef()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmemorysize\fR\fR
 .ad
 .RS 23n
-.rt  
 Maximum size of virtual memory.
 .RE
 
 \fImax-use\fR is a number, with an optional scaling factor, as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBh\fR\fR
 .ad
 .RS 9n
-.rt  
 Hours (for \fBcputime\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBk\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR kilobytes. This is the default for all but \fBcputime\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fBm\fR\fR
 .ad
 .RS 9n
-.rt  
 \fIn\fR megabytes or minutes (for \fBcputime\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImm\fR\fB:\fR\fIss\fR\fR
 .ad
 .RS 9n
-.rt  
 Minutes and seconds (for \fBcputime\fR).
 .RE
 
@@ -2158,7 +1920,6 @@ type the following:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogin\fR [\fIusername\fR\|| \fB-p\fR ]\fR
 .ad
@@ -2169,12 +1930,10 @@ not processed. If \fIusername\fR is omitted, \fBlogin\fR prompts for the name
 of a user.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-.rt  
 Preserve the current environment (variables).
 .RE
 
@@ -2182,7 +1941,6 @@ Preserve the current environment (variables).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogout\fR\fR
 .ad
@@ -2193,7 +1951,6 @@ Terminate a login shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnice\fR [\fB+\fR\fIn\fR \||\fB-\fR\fIn\fR ] [\fIcommand\fR ]\fR
 .ad
@@ -2210,23 +1967,19 @@ to 4. The range of process priority values is from \(mi20 to 20. Values of
 boundary, respectively.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 Increment the process priority value by \fIn\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 Decrement by \fIn\fR. This argument can be used only by the privileged user.
 .RE
 
@@ -2234,7 +1987,6 @@ Decrement by \fIn\fR. This argument can be used only by the privileged user.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnohup\fR [\fIcommand\fR ]\fR
 .ad
@@ -2249,7 +2001,6 @@ statements apply. All processes detached with \fB&\fR are effectively
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotify\fR [\fB%\fR\fIjob\fR] .\|.\|.\fR
 .ad
@@ -2261,7 +2012,6 @@ jobs changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBonintr\fR [\fB\(mi\fR| \fIlabel\fR]\fR
 .ad
@@ -2277,7 +2027,6 @@ received or a child process terminates because it was interrupted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpopd\fR [\fB+\fR\fIn\fR ]\fR
 .ad
@@ -2287,12 +2036,10 @@ Pop the directory stack and \fBcd\fR to the new top directory. The elements of
 the directory stack are numbered from 0 starting at the top.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIn\fR\fR
 .ad
 .RS 6n
-.rt  
 Discard the \fIn\fR'th entry in the stack.
 .RE
 
@@ -2300,7 +2047,6 @@ Discard the \fIn\fR'th entry in the stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpushd\fR [\fB+\fR\fIn\fR |\fIdir\fR]\fR
 .ad
@@ -2310,23 +2056,19 @@ Push a directory onto the directory stack. With no arguments, exchange the top
 two elements.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIn\fR\fR
 .ad
 .RS 7n
-.rt  
 Rotate the \fIn\fR'th entry to the top of the stack and \fBcd\fR to it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdir\fR\fR
 .ad
 .RS 7n
-.rt  
 Push the current working directory onto the stack and change to \fIdir\fR.
 .RE
 
@@ -2334,7 +2076,6 @@ Push the current working directory onto the stack and change to \fIdir\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrehash\fR\fR
 .ad
@@ -2348,7 +2089,6 @@ to account for new directories added.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrepeat\fR \fIcount command\fR\fR
 .ad
@@ -2360,7 +2100,6 @@ restrictions as with the one-line \fBif\fR statement.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR [\fIvar\fR [\fB=\fR \fIvalue\fR ] ]\fR
 .ad
@@ -2377,23 +2116,19 @@ argument alone, \fBset\fR assigns an empty (null) value to the variable
 assigns \fIvalue\fR to \fIvar\fR, where \fIvalue\fR is one of:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIword\fR\fR
 .ad
 .RS 14n
-.rt  
 A single word (or quoted string).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(\fR\fIwordlist\fR\fB)\fR\fR
 .ad
 .RS 14n
-.rt  
 A space-separated list of words enclosed in parentheses.
 .RE
 
@@ -2404,7 +2139,6 @@ word in a multiword value with \fIword\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsetenv\fR [\fIVAR\fR [\fIword\fR ] ]\fR
 .ad
@@ -2436,12 +2170,10 @@ none of the above variables is set in the environment, the "C" (U.S. style)
 locale determines how \fBcsh\fR behaves.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how \fBcsh\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBcsh\fR can display and handle text and filenames containing
 valid characters for that locale.
@@ -2449,12 +2181,10 @@ valid characters for that locale.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how diagnostic and informative messages are presented. This includes
 the language and style of the messages and the correct form of affirmative and
 negative responses. In the "C" locale, the messages are presented in the
@@ -2463,12 +2193,10 @@ default form found in the program itself (in most cases, U.S./English).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_NUMERIC\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines the value of the radix character, decimal point, (\fB\&.\fR) in the
 "C" locale) and thousand separator, empty string (\fB""\fR) in the "C" locale).
 .RE
@@ -2477,7 +2205,6 @@ Determines the value of the radix character, decimal point, (\fB\&.\fR) in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshift\fR [\fIvariable\fR ]\fR
 .ad
@@ -2490,7 +2217,6 @@ to be set or to have a null value.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsource\fR [\fB-h\fR] \fIname\fR\fR
 .ad
@@ -2501,12 +2227,10 @@ they are nested too deeply the shell can run out of file descriptors. An error
 in a sourced file at any level terminates all nested \fBsource\fR commands.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Place commands from the file \fIname\fR on the history list without executing
 them.
 .RE
@@ -2515,7 +2239,6 @@ them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fB%\fR\fIjobid .\|.\|.\fR\fR
 .ad
@@ -2526,7 +2249,6 @@ Stop the current or specified background job.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR \fIpid .\|.\|.\fR\fR
 .ad
@@ -2537,7 +2259,6 @@ Stop the specified process, \fIpid\fR. (see \fBps\fR(1)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsuspend\fR\fR
 .ad
@@ -2549,7 +2270,6 @@ Stop the shell in its tracks, much as if it had been sent a stop signal with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBswitch (\fR\fIstring\fR\fB)\fR\fR
 .ad
@@ -2601,7 +2321,6 @@ no label matches and there is no default, execution continues after the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtime\fR [\fIcommand\fR ]\fR
 .ad
@@ -2615,7 +2334,7 @@ erroneously report the value \fB0\fR for these fields.
 .sp
 .in +2
 .nf
-example %\fBtime ls\fR \fB-R\fR 
+example %\fBtime ls\fR \fB-R\fR
         9.0u 11.0s 3:32 10% 0+0k 0+0io 0pf+0w
 .fi
 .in -2
@@ -2627,7 +2346,6 @@ on the \fBtime\fR variable.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBumask\fR [\fIvalue\fR ]\fR
 .ad
@@ -2643,7 +2361,6 @@ directory search) but not write permission to the group and others.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunalias\fR \fIpattern\fR\fR
 .ad
@@ -2655,7 +2372,6 @@ are removed by `\fBunalias *\fR'.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunhash\fR\fR
 .ad
@@ -2666,7 +2382,6 @@ Disable the internal hash tables for the \fIpath\fR and \fIcdpath\fR variables.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunlimit\fR [\fB-h\fR] [\fIresource\fR ]\fR
 .ad
@@ -2677,12 +2392,10 @@ all resource limitations are removed. See the description of the \fBlimit\fR
 command for the list of resource names.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Remove corresponding hard limits. Only the privileged user can do this.
 .RE
 
@@ -2690,7 +2403,6 @@ Remove corresponding hard limits. Only the privileged user can do this.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunset\fR \fIpattern\fR\fR
 .ad
@@ -2703,7 +2415,6 @@ effects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunsetenv\fR \fIvariable\fR\fR
 .ad
@@ -2715,7 +2426,6 @@ matching is not performed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwait\fR\fR
 .ad
@@ -2726,7 +2436,6 @@ Wait for background jobs to finish (or for an interrupt) before prompting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwhile (\fR\fIexpr\fR\fB)\fR\fR
 .ad
@@ -2750,7 +2459,6 @@ the \fBend\fR command is entered and then performs the commands in the loop.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%\fR [\fIjob\fR ] [\fB&\fR]\fR
 .ad
@@ -2762,7 +2470,6 @@ continue running \fIjob\fR in the background.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB@\fR [\fIvar\fR \fB=\fR\fIexpr\fR]\fR
 .ad
@@ -2808,12 +2515,10 @@ set from \fBcwd\fR whenever the latter changes. The following shell variables
 have predefined meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargv\fR\fR
 .ad
 .RS 13n
-.rt  
 Argument list. Contains the list of command line arguments supplied to the
 current invocation of the shell. This variable determines the value of the
 positional parameters \fB$1\fR, \fB$2\fR, and so on.
@@ -2821,12 +2526,10 @@ positional parameters \fB$1\fR, \fB$2\fR, and so on.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcdpath\fR\fR
 .ad
 .RS 13n
-.rt  
 Contains a list of directories to be searched by the \fBcd\fR, \fBchdir\fR, and
 \fBpopd\fR commands, if the directory argument each accepts is not a
 subdirectory of the current directory.
@@ -2834,68 +2537,56 @@ subdirectory of the current directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcwd\fR\fR
 .ad
 .RS 13n
-.rt  
 The full pathname of the current directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBecho\fR\fR
 .ad
 .RS 13n
-.rt  
 Echo commands (after substitutions) just before execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfignore\fR\fR
 .ad
 .RS 13n
-.rt  
 A list of filename suffixes to ignore when attempting filename completion.
 Typically the single word `\fB\&.o\fR'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfilec\fR\fR
 .ad
 .RS 13n
-.rt  
 Enable filename completion, in which case the Control-d character \fBEOT\fR and
 the \fBESC\fR character have special significance when typed in at the end of a
 terminal input line:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOT\fR\fR
 .ad
 .RS 7n
-.rt  
 Print a list of all filenames that start with the preceding string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESC\fR\fR
 .ad
 .RS 7n
-.rt  
 Replace the preceding string with the longest unambiguous extension.
 .RE
 
@@ -2903,24 +2594,20 @@ Replace the preceding string with the longest unambiguous extension.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhardpaths\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, pathnames in the directory stack are resolved to contain no
 symbolic-link components.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhistchars\fR\fR
 .ad
 .RS 13n
-.rt  
 A two-character string. The first character replaces \fB!\fR as the
 history-substitution character. The second replaces the carat (\fB^\fR) for
 quick substitutions.
@@ -2928,12 +2615,10 @@ quick substitutions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhistory\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of lines saved in the history list. A very large number can use up
 all of the C shell's memory. If not set, the C shell saves only the most recent
 command.
@@ -2941,36 +2626,30 @@ command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhome\fR\fR
 .ad
 .RS 13n
-.rt  
 The user's home directory. The filename expansion of ~ refers to the value of
 this variable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBignoreeof\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, the shell ignores \fBEOF\fR from terminals. This protects against
 accidentally killing a C shell by typing a Control-d.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmail\fR\fR
 .ad
 .RS 13n
-.rt  
 A list of files where the C shell checks for mail. If the first word of the
 value is a number, it specifies a mail checking interval in seconds (default 5
 minutes).
@@ -2978,24 +2657,20 @@ minutes).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnobeep\fR\fR
 .ad
 .RS 13n
-.rt  
 Suppress the bell during command completion when asking the C shell to extend
 an ambiguous filename.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoclobber\fR\fR
 .ad
 .RS 13n
-.rt  
 Restrict output redirection so that existing files are not destroyed by
 accident. \fB>\fR redirections can only be made to new files. \fB>>\fR
 redirections can only be made to existing files.
@@ -3003,48 +2678,40 @@ redirections can only be made to existing files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnoglob\fR\fR
 .ad
 .RS 13n
-.rt  
 Inhibit filename substitution. This is most useful in shell scripts once
 filenames (if any) are obtained and no further expansion is desired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnonomatch\fR\fR
 .ad
 .RS 13n
-.rt  
 Return the filename substitution pattern, rather than an error, if the pattern
 is not matched. Malformed patterns still result in errors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnotify\fR\fR
 .ad
 .RS 13n
-.rt  
 If set, the shell notifies you immediately as jobs are completed, rather than
 waiting until just before issuing a prompt.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR\fR
 .ad
 .RS 13n
-.rt  
 The list of directories in which to search for commands. \fBpath\fR is
 initialized from the environment variable \fBPATH\fR, which the C shell updates
 whenever \fBpath\fR changes. A null word ('') specifies the current directory.
@@ -3059,12 +2726,10 @@ table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprompt\fR\fR
 .ad
 .RS 13n
-.rt  
 The string an interactive C shell prompts with. Noninteractive shells leave the
 \fBprompt\fR variable unset. Aliases and other commands in the \fB\&.cshrc\fR
 file that are only useful interactively, can be placed after the following
@@ -3076,34 +2741,28 @@ mortals, or \fIhostname\fR\fB#\fR for the privileged user.
 The setting of \fB$prompt\fR has three meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$prompt\fR not set\fR
 .ad
 .RS 25n
-.rt  
 non-interactive shell, test \fB$?prompt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$prompt\fR set but \fB== ""\fR\fR
 .ad
 .RS 25n
-.rt  
 \fB\&.cshrc\fR called by the \fBwhich\fR(1) command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$prompt\fR set and \fB!= ""\fR\fR
 .ad
 .RS 25n
-.rt  
 normal interactive shell.
 .RE
 
@@ -3111,12 +2770,10 @@ normal interactive shell.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsavehist\fR\fR
 .ad
 .RS 13n
-.rt  
 The number of lines from the history list that are saved in ~/.history when the
 user logs out. Large values for \fBsavehist\fR slow down the C shell during
 startup.
@@ -3124,12 +2781,10 @@ startup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshell\fR\fR
 .ad
 .RS 13n
-.rt  
 The file in which the C shell resides. This is used in forking shells to
 interpret files that have execute bits set, but that are not executable by the
 system.
@@ -3137,12 +2792,10 @@ system.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstatus\fR\fR
 .ad
 .RS 13n
-.rt  
 The status returned by the most recent command. If that command terminated
 abnormally, 0200 is added to the status. Built-in commands that fail return
 exit status 1; all other built-in commands set status to 0.
@@ -3150,12 +2803,10 @@ exit status 1; all other built-in commands set status to 0.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtime\fR\fR
 .ad
 .RS 13n
-.rt  
 Control automatic timing of commands. Can be supplied with one or two values.
 The first is the reporting threshold in \fBCPU\fR seconds. The second is a
 string of tags and text indicating which resources to report on. A tag is a
@@ -3163,135 +2814,111 @@ percent sign (\fB%\fR) followed by a single upper-case letter (unrecognized
 tags print as text):
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%D\fR\fR
 .ad
 .RS 6n
-.rt  
 Average amount of unshared data space used in Kilobytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%E\fR\fR
 .ad
 .RS 6n
-.rt  
 Elapsed (wallclock) time for the command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%F\fR\fR
 .ad
 .RS 6n
-.rt  
 Page faults.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%I\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of block input operations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%K\fR\fR
 .ad
 .RS 6n
-.rt  
 Average amount of unshared stack space used in Kilobytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%M\fR\fR
 .ad
 .RS 6n
-.rt  
 Maximum real memory used during execution of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%O\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of block output operations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P\fR\fR
 .ad
 .RS 6n
-.rt  
 Total CPU time \(em U (user) plus S (system) \(em as a percentage of E
 (elapsed) time.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%S\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of seconds of CPU time consumed by the kernel on behalf of the user's
 process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%U\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of seconds of \fBCPU\fR time devoted to the user's process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%W\fR\fR
 .ad
 .RS 6n
-.rt  
 Number of swaps.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%X\fR\fR
 .ad
 .RS 6n
-.rt  
 Average amount of shared memory used in Kilobytes.
 .RE
 
@@ -3302,12 +2929,10 @@ in that order.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBverbose\fR\fR
 .ad
 .RS 13n
-.rt  
 Display each command after history substitution takes place.
 .RE
 
@@ -3319,78 +2944,64 @@ encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.cshrc\fR\fR
 .ad
 .RS 15n
-.rt  
 Read at beginning of execution by each shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.login\fR\fR
 .ad
 .RS 15n
-.rt  
 Read by login shells after \fB\&.cshrc\fR at login.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.logout\fR\fR
 .ad
 .RS 15n
-.rt  
 Read by login shells at logout.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB~/.history\fR\fR
 .ad
 .RS 15n
-.rt  
 Saved history for use at next login.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/bin/sh\fR\fR
 .ad
 .RS 15n
-.rt  
 The Bourne shell, for shell scripts not starting with a `\fB#\fR'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/sh*\fR\fR
 .ad
 .RS 15n
-.rt  
 Temporary file for `\fB<<\fR\&'.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 15n
-.rt  
 Source of home directories for `~\fIname\fR'.
 .RE
 
@@ -3402,13 +3013,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 .TE
 
 .SH SEE ALSO
@@ -3423,12 +3033,10 @@ CSIEnabled
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBYou have stopped jobs.\fR\fR
 .ad
 .RS 26n
-.rt  
 You attempted to exit the C shell with stopped jobs under job control. An
 immediate second attempt to exit succeeds, terminating the stopped jobs.
 .RE

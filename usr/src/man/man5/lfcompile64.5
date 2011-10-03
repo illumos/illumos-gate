@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lfcompile64 5 "26 Jan 1998" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH LFCOMPILE64 5 "Jan 26, 1998"
 .SH NAME
 lfcompile64 \- transitional compilation environment
 .SH DESCRIPTION
@@ -73,18 +73,17 @@ Use the \fBgetconf\fR(1) command with one or more of the following arguments:
 
 .sp
 .TS
-tab() box;
-cw(1.67i) |cw(3.83i) 
-lw(1.67i) |lw(3.83i) 
-.
-\fBargument\fR\fBpurpose\fR
+box;
+c | c
+l | l .
+\fBargument\fR	\fBpurpose\fR
 _
-\fBLFS64_CFLAGS\fRT{
+\fBLFS64_CFLAGS\fR	T{
 obtain compilation flags necessary to enable the transitional compilation environment
 T}
-\fBLFS64_LDFLAGS\fRobtain link editor options
-\fBLFS64_LIBS\fRobtain link library names
-\fBLFS64_LINTFLAGS\fRobtain lint options
+\fBLFS64_LDFLAGS\fR	obtain link editor options
+\fBLFS64_LIBS\fR	obtain link library names
+\fBLFS64_LINTFLAGS\fR	obtain lint options
 .TE
 
 .SH EXAMPLES

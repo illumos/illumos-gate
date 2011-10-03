@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dsstat 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH DSSTAT 1M "Oct 2, 2007"
 .SH NAME
 dsstat \- report Sun StorageTek Availability Suite I/O statistics
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ StorageTek Availability Suite products.
 The \fBdsstat\fR supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR \fB\fImode\fR\fR\fR
 .ad
@@ -33,7 +32,6 @@ The \fBdsstat\fR supports the following options:
 Specifies the mode(s) of operation. Valid modes are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcache\fR\fR
 .ad
@@ -44,7 +42,6 @@ Cache statistics
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBii\fR\fR
 .ad
@@ -55,7 +52,6 @@ Point-in-Time Copy statistics
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsndr\fR\fR
 .ad
@@ -86,7 +82,6 @@ descriptions of these fields.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fB\fIreport-options\fR\fR\fR
 .ad
@@ -100,12 +95,10 @@ vary based on the mode(s) specified above. This option is not used for
 Valid \fIreport-options\fR for \fBii\fR mode are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 13n
-.rt  
 Master volume statistics.
 .RS +4
 .TP
@@ -137,57 +130,47 @@ For the "display-options for ii mode": \fBr\fR, \fBw\fR, \fBt\fR, \fBs\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 13n
-.rt  
 Shadow volume statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 13n
-.rt  
 Bitmap volume statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBo\fR\fR
 .ad
 .RS 13n
-.rt  
 Overflow volume statistics, if attached.
 .RE
 
 Valid \fIreport-options\fR for \fBsndr\fR mode are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 13n
-.rt  
 Bitmap volume statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBn\fR\fR
 .ad
 .RS 13n
-.rt  
 Network volume statistics.
 .RE
 
@@ -195,7 +178,6 @@ Network volume statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdisplay-options\fR\fR
 .ad
@@ -207,45 +189,37 @@ represented by a single character; multiple types can be specified.
 For \fBcache\fR mode, the valid \fIdisplay-options\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 13n
-.rt  
 Detailed read statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 13n
-.rt  
 Detailed write statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 13n
-.rt  
 Summary statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 13n
-.rt  
 Cache behavior flags.
 .RE
 
@@ -253,23 +227,19 @@ The following \fIdisplay-options\fR are available only for cache mode, they
 need to be combined with the mode options (\fB-m\fR)
 .sp
 .ne 2
-.mk
 .na
 \fB\fBd\fR\fR
 .ad
 .RS 13n
-.rt  
 Destaged data statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 13n
-.rt  
 Write cancellation statistics.
 .RE
 
@@ -278,7 +248,6 @@ The default \fIdisplay-options\fR for \fBcache\fR are \fBsf\fR.
 For \fBii\fR mode, the valid \fIdisplay-options\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
@@ -289,7 +258,6 @@ Detailed read statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
@@ -300,7 +268,6 @@ Detailed write statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
@@ -311,7 +278,6 @@ Timing statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
@@ -322,7 +288,6 @@ Summary statistics.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
@@ -333,7 +298,6 @@ Percentage of volume requiring sync.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
@@ -346,78 +310,64 @@ The default \fIdisplay-options\fR for \fBii\fR are \fBspf\fR. For \fBsndr\fR
 mode, the valid \fIdisplay-options\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 13n
-.rt  
 Detailed read statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 13n
-.rt  
 Detailed write statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 13n
-.rt  
 Timing statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 13n
-.rt  
 Summary statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBp\fR\fR
 .ad
 .RS 13n
-.rt  
 Percentage of volume requiring sync.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume type/status flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 13n
-.rt  
 Asynchronous queue statistics.
 .RE
 
@@ -425,12 +375,10 @@ The following \fIdisplay-option\fR is only available for \fBsndr\fR mode, and
 needs to be combined with the mode options (\fB-m\fR).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 13n
-.rt  
 Asynchronous queue statistics.
 .RE
 
@@ -442,12 +390,10 @@ Specifying the summary \fIdisplay-option\fR causes \fBr\fR \fBw\fR \fBt\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fB\fIvolume-sets\fR\fR\fR
 .ad
 .RS 20n
-.rt  
 Filters the output to include only the specified \fIvolume-sets\fR, where
 \fIvolume-sets\fR is a comma-delimited list of volume names. When displaying
 Remote Mirror statistics, the name specified is compared to the Remote Mirror
@@ -463,34 +409,28 @@ shadow volume to determine if they match.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 20n
-.rt  
 Output field headers at every reporting cycle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR\fR
 .ad
 .RS 20n
-.rt  
 Output field headers once, when reporting begins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR\fR
 .ad
 .RS 20n
-.rt  
 Suppress report lines that have zero values or no activity.
 .RE
 
@@ -500,7 +440,6 @@ Suppress report lines that have zero values or no activity.
 The \fBdsstat\fR command line supports the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
@@ -517,7 +456,6 @@ information at the desired time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
@@ -534,309 +472,253 @@ Unless otherwise specified, all fields are per-second averages based on the
 data collected during the specified \fIinterval\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBname\fR\fR
 .ad
 .RS 13n
-.rt  
 Name of the entity being reported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBt\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume type
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume status
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 13n
-.rt  
 Cache read behavior
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 13n
-.rt  
 Cache write behavior
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpct\fR\fR
 .ad
 .RS 13n
-.rt  
 Percentage of volume requiring sync
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrole\fR\fR
 .ad
 .RS 13n
-.rt  
 Role of the item being reported
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtps\fR\fR
 .ad
 .RS 13n
-.rt  
 Total number of reads + writes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrtps\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of reads
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwtps\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of writes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Total kilobytes read + written
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes read
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes written
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcrkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes read from cache
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdrkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes read from disk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcwkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes written to cache
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdwkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes written to disk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBckps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes transferred to or from cache
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdkps\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes transferred to or from disk
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsvt\fR\fR
 .ad
 .RS 13n
-.rt  
 Service time per operation
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhit\fR\fR
 .ad
 .RS 13n
-.rt  
 Read hits during \fIinterval\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBds/s\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes destaged from cache
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcn/s\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of write cancellations
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBq\fR\fR
 .ad
 .RS 13n
-.rt  
 Type of asynchronous queuing being used
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqi\fR\fR
 .ad
 .RS 13n
-.rt  
 Number of items currently queued
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqk\fR\fR
 .ad
 .RS 13n
-.rt  
 Kilobytes currently queued
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqhwi\fR\fR
 .ad
 .RS 13n
-.rt  
 High water mark of queued items
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBqhwk\fR\fR
 .ad
 .RS 13n
-.rt  
 High water mark of queued kilobytes
 .RE
 
@@ -848,23 +730,19 @@ The \fBname\fR field displays only the last 16 characters of the name.
 Valid cache behaviors for \fBcache\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 13n
-.rt  
 Cache reads/writes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 13n
-.rt  
 Disk reads/writes
 .RE
 
@@ -873,23 +751,19 @@ Disk reads/writes
 Valid volume types for \fBii\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBI\fR\fR
 .ad
 .RS 13n
-.rt  
 Independent shadow volume
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 13n
-.rt  
 Dependent shadow volume
 .RE
 
@@ -898,23 +772,19 @@ Dependent shadow volume
 Valid volume status for \fBii\fR is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR\fR
 .ad
 .RS 13n
-.rt  
 Copy in progress
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fR
 .ad
 .RS 13n
-.rt  
 No copy in progress
 .RE
 
@@ -923,23 +793,19 @@ No copy in progress
 Valid volume types for \fBsndr\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBP\fR\fR
 .ad
 .RS 13n
-.rt  
 This is the primary host of this volume set
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR\fR
 .ad
 .RS 13n
-.rt  
 This is the secondary host of this volume set
 .RE
 
@@ -948,111 +814,91 @@ This is the secondary host of this volume set
 Valid volume status for \fBsndr\fR is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBL\fR\fR
 .ad
 .RS 13n
-.rt  
 Changes to this volume are being logged
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQ\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume are in queuing mode
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBR\fR\fR
 .ad
 .RS 13n
-.rt  
 Replicating changes to secondary
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSY\fR\fR
 .ad
 .RS 13n
-.rt  
 Synchronization in progress. Sending data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRS\fR\fR
 .ad
 .RS 13n
-.rt  
 Reverse synchronization in progress. Receiving data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSN\fR\fR
 .ad
 .RS 13n
-.rt  
 Synchronization needed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBRN\fR\fR
 .ad
 .RS 13n
-.rt  
 Reverse synchronization needed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVF\fR\fR
 .ad
 .RS 13n
-.rt  
 Volume failed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBF\fR\fR
 .ad
 .RS 13n
-.rt  
 Bitmap failed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBQF\fR\fR
 .ad
 .RS 13n
-.rt  
 Queue failed
 .RE
 
@@ -1061,23 +907,19 @@ Queue failed
 Valid queue types for \fBsndr\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBD\fR\fR
 .ad
 .RS 13n
-.rt  
 Disk-based queuing enabled
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBM\fR\fR
 .ad
 .RS 13n
-.rt  
 Memory-based queuing enabled
 .RE
 
@@ -1086,23 +928,19 @@ Memory-based queuing enabled
 Volume roles for \fBsndr\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnet\fR\fR
 .ad
 .RS 13n
-.rt  
 Network volume statistics
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbmp\fR\fR
 .ad
 .RS 13n
-.rt  
 Bitmap volume statistics
 .RE
 
@@ -1111,45 +949,37 @@ Bitmap volume statistics
 Volume roles for \fBii\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmst\fR\fR
 .ad
 .RS 13n
-.rt  
 Master volume statistics
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshd\fR\fR
 .ad
 .RS 13n
-.rt  
 Shadow volume statistics
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbmp\fR\fR
 .ad
 .RS 13n
-.rt  
 Bitmap volume statistics
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBovr\fR\fR
 .ad
 .RS 13n
-.rt  
 Overflow volume statistics
 .RE
 
@@ -1167,13 +997,13 @@ five second intervals. Reporting is limited to the set
 .in +2
 .nf
  # dsstat -m cache -d rw -s /dev/rdsk/c1t1d0s0 5
-- read -             - write -      
-name                ckps   dkps    hit   ckps   dkps    hit 
-dev/rdsk/c1t1d0s0      0      0   0.00      0      0   0.00 
-dev/rdsk/c1t1d0s0      3   2396   0.13    983    763 100.00 
-dev/rdsk/c1t1d0s0   2399    799  75.00   2815   2686 100.00 
-dev/rdsk/c1t1d0s0   3200    800  80.00   2755   2908 100.00 
-dev/rdsk/c1t1d0s0   3999    799  83.33   2809   2868 100.00 
+- read -             - write -
+name                ckps   dkps    hit   ckps   dkps    hit
+dev/rdsk/c1t1d0s0      0      0   0.00      0      0   0.00
+dev/rdsk/c1t1d0s0      3   2396   0.13    983    763 100.00
+dev/rdsk/c1t1d0s0   2399    799  75.00   2815   2686 100.00
+dev/rdsk/c1t1d0s0   3200    800  80.00   2755   2908 100.00
+dev/rdsk/c1t1d0s0   3999    799  83.33   2809   2868 100.00
 dev/rdsk/c1t1d0s0   4800    800  85.71   2867   2931 100.00
 .fi
 .in -2
@@ -1188,16 +1018,16 @@ default output. Generate reports at two second intervals.
 .sp
 .in +2
 .nf
-# dsstat -m ii -r msb 2 
-name               t  s    pct role    kps   tps  svt 
-dev/rdsk/c0t1d0s5  I  C  96.15  mst  19921    38   22 
-dev/rdsk/c0t1d0s6               shd   9960    19   20 
-dev/rdsk/c0t1d0s7               bmp     39    77    2 
-dev/rdsk/c0t1d0s5  I  C  94.24  mst  19623    38   22 
-dev/rdsk/c0t1d0s6               shd   9939    19   20 
-dev/rdsk/c0t1d0s7               bmp     39    77    2 
-dev/rdsk/c0t1d0s5  I  C  92.34  mst  19969    39   22 
-dev/rdsk/c0t1d0s6               shd   9984    19   20 
+# dsstat -m ii -r msb 2
+name               t  s    pct role    kps   tps  svt
+dev/rdsk/c0t1d0s5  I  C  96.15  mst  19921    38   22
+dev/rdsk/c0t1d0s6               shd   9960    19   20
+dev/rdsk/c0t1d0s7               bmp     39    77    2
+dev/rdsk/c0t1d0s5  I  C  94.24  mst  19623    38   22
+dev/rdsk/c0t1d0s6               shd   9939    19   20
+dev/rdsk/c0t1d0s7               bmp     39    77    2
+dev/rdsk/c0t1d0s5  I  C  92.34  mst  19969    39   22
+dev/rdsk/c0t1d0s6               shd   9984    19   20
 dev/rdsk/c0t1d0s7               bmp     39    78    2
 .fi
 .in -2
@@ -1214,13 +1044,13 @@ reports at two second intervals. Limit reporting to the set
 .sp
 .in +2
 .nf
-# dsstat -m sndr -r n -d rwpf -s /dev/rdsk/c0t1d0s0 2 
-name               t  s    pct role   rkps  rtps   wkps  wtps 
-dev/rdsk/c0t1d0s0  P  L 100.00  sec      0     0      0     0 
-dev/rdsk/c0t1d0s0  P SY  99.90  sec      0     0    288     9 
-dev/rdsk/c0t1d0s0  P SY  97.90  sec      0     0   5296   165 
-dev/rdsk/c0t1d0s0  P SY  95.81  sec      0     0   5184   161 
-dev/rdsk/c0t1d0s0  P SY  93.81  sec      0     0   5280   164 
+# dsstat -m sndr -r n -d rwpf -s /dev/rdsk/c0t1d0s0 2
+name               t  s    pct role   rkps  rtps   wkps  wtps
+dev/rdsk/c0t1d0s0  P  L 100.00  sec      0     0      0     0
+dev/rdsk/c0t1d0s0  P SY  99.90  sec      0     0    288     9
+dev/rdsk/c0t1d0s0  P SY  97.90  sec      0     0   5296   165
+dev/rdsk/c0t1d0s0  P SY  95.81  sec      0     0   5184   161
+dev/rdsk/c0t1d0s0  P SY  93.81  sec      0     0   5280   164
 dev/rdsk/c0t1d0s0  P SY  91.71  sec      0     0   5198   162
 .fi
 .in -2
@@ -1231,56 +1061,46 @@ dev/rdsk/c0t1d0s0  P SY  91.71  sec      0     0   5198   162
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 13n
-.rt  
 Successful completion, no statistics to report.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 13n
-.rt  
 An invalid argument has been encountered.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 13n
-.rt  
 No memory is available to create \fBkstat\fR statistics.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 13n
-.rt  
 An unknown error has occurred.
 .RE
 
@@ -1292,13 +1112,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

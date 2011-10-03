@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cryptoadm 1M "1 Sep 2009" "SunOS 5.11" "System Administration Commands"
+.TH CRYPTOADM 1M "Sep 1, 2009"
 .SH NAME
 cryptoadm \- cryptographic framework administration
 .SH SYNOPSIS
 .LP
 .nf
-\fBcryptoadm\fR list [\fB-mpv\fR] [provider=\fIprovider-name\fR] 
+\fBcryptoadm\fR list [\fB-mpv\fR] [provider=\fIprovider-name\fR]
      [mechanism=\fImechanism-list\fR]
 .fi
 
@@ -32,7 +32,7 @@ cryptoadm \- cryptographic framework administration
 
 .LP
 .nf
-\fBcryptoadm\fR install provider=\fIprovider-name\fR 
+\fBcryptoadm\fR install provider=\fIprovider-name\fR
      [mechanism=\fImechanism-list\fR]
 .fi
 
@@ -149,7 +149,6 @@ The \fBcryptoadm\fR utility has the various combinations of subcommands and
 options shown below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBlist\fR\fR
 .ad
@@ -160,7 +159,6 @@ Display the list of installed providers.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBlist metaslot\fR\fR
 .ad
@@ -171,7 +169,6 @@ Display the system-wide configuration for metaslot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBlist\fR \fB-m\fR \fB[ provider=\fIprovider-name\fR |
 metaslot ]\fR\fR
@@ -187,7 +184,6 @@ with metaslot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBlist\fR \fB-p\fR \fB[ provider=\fIprovider-name\fR |
 metaslot ]\fR\fR
@@ -203,7 +199,6 @@ display the mechanism policy enforced on the metaslot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBlist\fR \fB-v\fR \fBprovider=\fIprovider-name\fR |
 metaslot\fR\fR
@@ -216,7 +211,6 @@ metaslot keyword is specified, display details about the metaslot.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -229,7 +223,6 @@ mechanisms and slots.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBdisable provider=\fIprovider-name\fR\fR\fR
 .ad
@@ -247,7 +240,6 @@ OPERANDS for a description of \fImechanism\fR, \fIprovider-feature\fR, and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fB[ mechanism=\fImechanism-list\fR ] [ auto-key-migrate
 ]\fR\fR
@@ -267,7 +259,6 @@ of \fBauto-key-migrate\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBenable provider=\fIprovider-name\fR\fR\fR
 .ad
@@ -285,7 +276,6 @@ OPERANDS for a description of \fImechanism\fR, \fIprovider-feature\fR, and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBenable metaslot [ mechanism=\fImechanism-list\fR ]
 |\fR\fR
@@ -317,7 +307,6 @@ mechanism, token, slot, \fBdefault-keystore\fR, and \fBauto-key-migrate\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBinstall provider=\fIprovider-name\fR\fR\fR
 .ad
@@ -340,7 +329,6 @@ Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBinstall provider=\fIprovider-name\fR\fR\fR
 .ad
@@ -361,7 +349,6 @@ Developer's Guide\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBuninstall provider=\fIprovider-name\fR\fR\fR
 .ad
@@ -374,7 +361,6 @@ software provider.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBunload provider=\fIprovider-name\fR\fR\fR
 .ad
@@ -385,7 +371,6 @@ Unload the kernel software module specified by \fIprovider\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBdisable fips-140\fR\fR
 .ad
@@ -396,7 +381,6 @@ Disable FIPS-140 mode in the Cryptographic Framework.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBenable fips-140\fR\fR
 .ad
@@ -420,7 +404,6 @@ cryptographic algorithm test and a software integrity test.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBlist fips-140\fR\fR
 .ad
@@ -433,7 +416,6 @@ FIPS-140 mode is \fBdisabled\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fBrefresh\fR\fR
 .ad
@@ -452,7 +434,6 @@ Private interfaces for use by \fBsmf\fR(5), these must not be used directly.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcryptoadm\fR \fB-help\fR\fR
 .ad
@@ -464,7 +445,6 @@ Display the command usage.
 .SH OPERANDS
 .sp
 .ne 2
-.mk
 .na
 \fBprovider=\fIprovider-name\fR\fR
 .ad
@@ -484,7 +464,6 @@ base name only. A \fIprovider\fR operand for a kernel hardware provider is in a
 
 .sp
 .ne 2
-.mk
 .na
 \fBmechanism=\fImechanism-list\fR\fR
 .ad
@@ -498,7 +477,6 @@ mechanisms on a provider. See the discussion of the \fBall\fR keyword, below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprovider-feature\fR\fR
 .ad
@@ -514,7 +492,6 @@ numbers from the provider.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBall\fR\fR
 .ad
@@ -526,7 +503,6 @@ subcommands to operate on all provider features.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtoken=\fR\fItoken-label\fR\fR
 .ad
@@ -540,7 +516,6 @@ from the output of the command \fBcryptoadm list\fR \fB-v\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBslot=\fR\fIslot-description\fR\fR
 .ad
@@ -555,7 +530,6 @@ the output of the command \fBcryptoadm list\fR \fB-v\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdefault-keystore\fR\fR
 .ad
@@ -568,7 +542,6 @@ default store.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBauto-key-migrate\fR\fR
 .ad
@@ -639,7 +612,7 @@ user-level providers:
 /usr/lib/security/$ISA/pkcs11_softtoken.so
 /opt/lib/libcryptoki.so.1
 /opt/SUNWconn/lib/$ISA/libpkcs11.so.1
-  
+
 kernel software providers:
     des
     aes
@@ -795,7 +768,6 @@ example# \fBcryptoadm enable metaslot token="SUNW,venus"\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
@@ -806,7 +778,6 @@ Successful completion.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
@@ -823,13 +794,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below
+Interface Stability	See below
 .TE
 
 .sp

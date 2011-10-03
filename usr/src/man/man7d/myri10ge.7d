@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add
 .\" the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH myri10ge 7D "10 Sep 2009" "SunOS 5.11" "Devices"
+.TH MYRI10GE 7D "Sep 10, 2009"
 .SH NAME
 myri10ge \- Myricom Myri10GE 10Gb PCI Express NIC Driver
 .SH SYNOPSIS
@@ -103,7 +103,6 @@ Standard\fR for more information.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/myri10ge*\fR\fR
 .ad
@@ -114,7 +113,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/myri10ge\fR\fR
 .ad
@@ -125,7 +123,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/myri10ge\fR\fR
 .ad
@@ -136,7 +133,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/myri10ge\fR\fR
 .ad
@@ -147,7 +143,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/myri10ge.conf\fR\fR
 .ad
@@ -164,15 +159,14 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureSPARC, x86
+Architecture	SPARC, x86
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

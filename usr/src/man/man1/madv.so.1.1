@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH madv.so.1 1 "15 Feb 2002" "SunOS 5.11" "User Commands"
+.TH MADV.SO.1 1 "Feb 15, 2002"
 .SH NAME
 madv.so.1 \- madv library
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/madv.so.1\fR 
+\fB/usr/lib/madv.so.1\fR
 .fi
 
 .SH DESCRIPTION
@@ -36,12 +36,10 @@ the following environment variables are read by the \fBmadv\fR shared object to
 determine to which created process(es) to apply the specified advice.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADV\fR=\fIadvice\fR \fR
 .ad
 .RS 27n
-.rt  
 \fBMADV\fR specifies the VM advice to use for all heap, shared memory, and mmap
 regions in the process address                 space. This advice is applied to
 all created processes.
@@ -76,12 +74,10 @@ access_default
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADVCFGFILE\fR=\fIconfig-file\fR\fR
 .ad
 .RS 27n
-.rt  
 \fIconfig-file\fR is a text file which contains one or more \fBmadv\fR
 configuration entries of the form:
 .sp
@@ -111,31 +107,26 @@ within the arguments to \fIexec-name\fR.
 memory region(s):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmadv\fR=\fIadvice\fR\fR
 .ad
 .RS 21n
-.rt  
 Applies to all heap, shared memory, and mmap regions in the process address
 space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBheap\fR=\fIadvice\fR\fR
 .ad
 .RS 21n
-.rt  
 The heap is defined to be the brk area (see \fBbrk\fR(2)). Applies to the
 existing heap and for any additional heap memory allocated in the future.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshm\fR=\fIadvice\fR\fR
 .ad
@@ -148,7 +139,6 @@ existing heap and for any additional heap memory allocated in the future.
 \fB\fBdism\fR=\fIadvice\fR\fR
 .ad
 .RS 21n
-.rt  
 Shared memory segments (see \fBshmat\fR(2)) attached using any flags, flag
 \fBSHM_SHARE_MMU\fR, or flag \fBSHM_PAGEABLE\fR  respectively. Options
 \fBism\fR and \fBdism\fR take precedence over option \fBshm\fR.
@@ -156,7 +146,6 @@ Shared memory segments (see \fBshmat\fR(2)) attached using any flags, flag
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmap\fR=\fIadvice\fR\fR
 .ad
@@ -173,7 +162,6 @@ Shared memory segments (see \fBshmat\fR(2)) attached using any flags, flag
 \fB\fBmapanon\fR=\fIadvice\fR\fR
 .ad
 .RS 21n
-.rt  
 Mappings established through \fBmmap\fR(2) using any flags, flag
 \fBMAP_SHARED\fR, flag \fBMAP_PRIVATE\fR, or flag \fBMAP_ANON\fR, respectively.
 Options \fBmapshared\fR, \fBmapprivate\fR, and \fBmapanon\fR take precedence
@@ -185,12 +173,10 @@ over option \fBmap\fR. Option \fBmapanon\fR takes precedence over
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMADVERRFILE\fR=\fIpathname\fR\fR
 .ad
 .RS 27n
-.rt  
 By default, error messages are logged via \fBsyslog\fR(3C) using level
 \fBLOG_ERR\fR and facility \fBLOG_USER\fR. If \fBMADVERRFILE\fR contains a
 valid \fIpathname\fR (such as \fB/dev/stderr\fR), error messages will be logged
@@ -301,12 +287,10 @@ example$ \fBcat $MADVCFGFILE\fR
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/madv.conf\fR \fR
 .ad
 .RS 19n
-.rt  
 Configuration file
 .RE
 

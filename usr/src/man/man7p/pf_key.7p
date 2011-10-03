@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pf_key 7P "6 May 2008" "SunOS 5.11" "Protocols"
+.TH PF_KEY 7P "May 6, 2008"
 .SH NAME
 pf_key \- Security association database interface
 .SH SYNOPSIS
@@ -69,7 +69,7 @@ Messages include:
 #define    SADB_FLUSH      /* Flush all SAs. */
 #define    SADB_DUMP       /* Get all SAs.  (Unreliable) */
 #define    SADB_X_PROMISC  /* Listen promiscuously */
-#define    SADB_X_INVERSE_ACQUIRE  /* Query kernel policy, 
+#define    SADB_X_INVERSE_ACQUIRE  /* Query kernel policy,
 								         get an ACQUIRE in return. */
 #define    SADB_X_UPDATEPAIR     /* Update an SA and its pair SA */
 #define    SADB_X_DELPAIR        /* Delete an SA pair. */
@@ -182,7 +182,7 @@ struct sadb_sa {
     uint32_t sadb_sa_spi;
     uint8_t sadb_sa_replay;
     uint8_t sadb_sa_state;
-    uint8_t sadb_sa_auth;         
+    uint8_t sadb_sa_auth;
     uint8_t sadb_sa_encrypt;
     uint32_t sadb_sa_flags;
 };
@@ -211,10 +211,10 @@ struct sadb_lifetime {
 struct sadb_address {
     uint16_t sadb_address_len;
     uint16_t sadb_address_exttype;    /* SRC, DST, NATT_*, INNER_* */
-    uint8_t sadb_address_proto;       /* Proto for ports... */ 
+    uint8_t sadb_address_proto;       /* Proto for ports... */
     uint8_t sadb_address_prefixlen;   /* Prefix length for INNER_*. */
     uint16_t sadb_address_reserved;   /* Padding */
-                                      /* Followed by a sockaddr 
+                                      /* Followed by a sockaddr
                                          structure.*/
 };
 .fi
@@ -229,7 +229,7 @@ struct sadb_key {
     uint16_t sadb_key_exttype;         /* AUTH, ENCRYPT */
     uint16_t sadb_key_bits;
     uint16_t sadb_key_reserved;
-        /* Followed by actual key(s) in 
+        /* Followed by actual key(s) in
          canonical (outbound proc.) order. */
 };
 .fi
@@ -261,7 +261,7 @@ struct sadb_sens {
     uint8_t sadb_sens_sens_level;
     uint8_t sadb_sens_sens_len;   /* 64-bit words */
     uint8_t sadb_sens_integ_level;
-    uint8_t sadb_sens_integ_len;  /* 64-bit words */     
+    uint8_t sadb_sens_integ_len;  /* 64-bit words */
     uint32_t sadb_sens_reserved;
                      /*
                       * followed by two uint64_t arrays
@@ -277,7 +277,7 @@ struct sadb_sens {
 .in +2
 .nf
 struct sadb_prop {
-    uint16_t sadb_prop_len;        
+    uint16_t sadb_prop_len;
     uint16_t sadb_prop_exttype;     /* PROPOSAL, X_EPROP */
     uint8_t sadb_prop_replay;
     uint8_t sadb_X_prop_ereserved;
@@ -379,7 +379,7 @@ struct sadb_x_kmc {
 .in +2
 .nf
 struct sadb_supported {
-    uint16_t sadb_supported_len;         
+    uint16_t sadb_supported_len;
     uint16_t sadb_supported_exttype;
     uint32_t sadb_supported_reserved;
 };
@@ -406,7 +406,7 @@ struct sadb_alg {
 .nf
 struct sadb_spirange {
     uint16_t sadb_spirange_len;
-    uint16_t sadb_spirange_exttype;    /* SPI_RANGE */ 
+    uint16_t sadb_spirange_exttype;    /* SPI_RANGE */
     uint32_t sadb_spirange_min
     uint32_t sadb_spirange_max;
     uint32_t sadb_spirange_reserved;
@@ -478,12 +478,10 @@ an error, an extended diagnostic may be set (see DIAGNOSTICS). Typical errors
 include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 Various message improprieties, including \fBSPI\fR ranges that are malformed,
 weak keys, and others. If EINVAL is returned, an application should look at the
 \fBsadb_x_msg_diagnostic\fR field of the sadb_msg structure. It contains one of
@@ -493,45 +491,37 @@ form SADB_X_DIAGNOSTIC_.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 Needed memory was not available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENSGSIZ\fR\fR
 .ad
 .RS 11n
-.rt  
 Message exceeds the maximum length allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBSA\fR (that is being added or created with \fBGETSPI\fR) already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBSA\fR could not be found.
 .RE
 
@@ -683,7 +673,7 @@ if appropriate.
 .sp
 .in +2
 .nf
-<base, address (SD), (address(Is,Id)), (identity(SD),) 
+<base, address (SD), (address(Is,Id)), (identity(SD),)
      (sensitivity,) proposal>
 .fi
 .in -2
@@ -697,7 +687,7 @@ combination(s) of security protocols.
 .in +2
 .nf
 <base, address (SD), (address(Is,Id)), (identity(SD),)
-                       (sensitivity,) eprop> 
+                       (sensitivity,) eprop>
 .fi
 .in -2
 
@@ -987,12 +977,11 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
-Interface StabilityEvolving
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

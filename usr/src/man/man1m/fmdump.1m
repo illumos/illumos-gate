@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fmdump 1M "14 Apr 2009" "SunOS 5.11" "System Administration Commands"
+.TH FMDUMP 1M "Apr 14, 2009"
 .SH NAME
 fmdump \- fault management log viewer
 .SH SYNOPSIS
 .LP
 .nf
-\fBfmdump\fR [\fB-efmvV\fR] [\fB-c\fR \fIclass\fR] [\fB-R\fR \fIdir\fR] [\fB-t\fR \fItime\fR] [\fB-T\fR \fItime\fR] 
+\fBfmdump\fR [\fB-efmvV\fR] [\fB-c\fR \fIclass\fR] [\fB-R\fR \fIdir\fR] [\fB-t\fR \fItime\fR] [\fB-T\fR \fItime\fR]
      [\fB-u\fR \fIuid\fR] [\fB-n\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR]] [\fIfile\fR]
 .fi
 
@@ -28,24 +28,20 @@ The Fault Manager maintains two sets of log files for use by administrators and
 service personnel:
 .sp
 .ne 2
-.mk
 .na
 \fBerror log\fR
 .ad
 .RS 13n
-.rt  
 A log which records error telemetry, the symptoms of problems detected by the
 system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfault log\fR
 .ad
 .RS 13n
-.rt  
 A log which records fault diagnosis information, the problems believed to
 explain these symptoms.
 .RE
@@ -133,7 +129,6 @@ or after 02Dec03).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIclass\fR\fR
 .ad
@@ -148,7 +143,6 @@ http://www.sun.com/msg/.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -166,7 +160,6 @@ relied upon for the development of scripts and other tools. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -180,7 +173,6 @@ terminated at any time by sending an interrupt (\fBControl-C\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
@@ -192,7 +184,6 @@ log.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR]\fR
 .ad
@@ -218,7 +209,6 @@ value can be octal, hex, or decimal.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIdir\fR\fR
 .ad
@@ -230,7 +220,6 @@ instead of the default root (\fB/\fR).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItime\fR\fR
 .ad
@@ -240,7 +229,6 @@ Select events that occurred at or after the specified time. The time can be
 specified using any of the following forms:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fImm\fR/\fIdd\fR/\fIyy hh\fR:\fImm\fR:\fIss\fR\fR\fR
 .ad
@@ -253,7 +241,6 @@ that the shell interprets the two strings as a single argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fImm\fR/\fIdd\fR/\fIyy hh\fR:\fImm\fR\fR\fR
 .ad
@@ -266,7 +253,6 @@ interprets the two strings as a single argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fImm\fR/\fIdd\fR/\fIyy\fR\fR\fR
 .ad
@@ -277,7 +263,6 @@ interprets the two strings as a single argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIddMonyy hh\fR:\fImm\fR:\fIss\fR\fR\fR
 .ad
@@ -290,7 +275,6 @@ that the shell interprets the two strings as a single argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIddMonyy hh\fR:\fImm\fR\fR\fR
 .ad
@@ -303,7 +287,6 @@ that the shell interprets the two strings as a single argument.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIMon\fR \fIdd\fR \fIhh\fR:\fImm\fR:\fIss\fR\fR\fR
 .ad
@@ -314,7 +297,6 @@ Month, day, hour in 24-hour format, minute, and second of the current year.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIyyyy\fR-\fImm\fR-\fIdd\fR [T \fIhh\fR:\fImm\fR[:\fIss\fR]]\fR\fR
 .ad
@@ -326,7 +308,6 @@ second, or hour, minute, and second, can be optionally omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIddMonyy\fR\fR
 .ad
@@ -337,7 +318,6 @@ second, or hour, minute, and second, can be optionally omitted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIhh\fR:\fImm\fR:\fIss\fR\fR\fR
 .ad
@@ -348,7 +328,6 @@ Hour in 24-hour format, minute, and second of the current day.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIhh\fR:\fImm\fR\fR\fR
 .ad
@@ -359,7 +338,6 @@ Hour in 24-hour format and minute of the current day.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIT\fR\fBns\fR | \fIT\fR\fBnsec\fR\fR
 .ad
@@ -370,7 +348,6 @@ Hour in 24-hour format and minute of the current day.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIT\fRus |\fIT\fRusec\fR\fR
 .ad
@@ -381,7 +358,6 @@ Hour in 24-hour format and minute of the current day.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIT\fR\fBms\fR | \fIT\fR\fBmsec\fR\fR
 .ad
@@ -392,7 +368,6 @@ T milliseconds ago where T is an integer value specified in base 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIT\fRs | \fIT\fRsec\fR\fR
 .ad
@@ -403,7 +378,6 @@ T seconds ago where \fIT\fR is an integer value specified in base 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIT\fRm |\fIT\fRmin\fR\fR
 .ad
@@ -414,7 +388,6 @@ T seconds ago where \fIT\fR is an integer value specified in base 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIT\fRh |\fIT\fRhour\fR\fR
 .ad
@@ -425,7 +398,6 @@ T seconds ago where \fIT\fR is an integer value specified in base 10.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIT\fRd |\fIT\fRday\fR\fR
 .ad
@@ -441,7 +413,6 @@ time.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItime\fR\fR
 .ad
@@ -453,7 +424,6 @@ specified using any of the time formats described for the \fB-t\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuuid\fR\fR
 .ad
@@ -471,7 +441,6 @@ that are cross-referenced by the specified diagnosis are displayed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -483,7 +452,6 @@ common members of the selected events.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
@@ -501,12 +469,10 @@ corresponding errors that were associated with the diagnosis.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile\fR\fR
 .ad
 .RS 8n
-.rt  
 Specifies an alternate log file to display instead of the system fault log. The
 \fBfmdump\fR utility determines the type of the specified log automatically and
 produces appropriate output for the selected log.
@@ -589,46 +555,38 @@ nvlist version: 0
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion. All records in the log file were examined successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred. This prevented any log file data from being examined,
 such as failure to open the specified file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command-line options were specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 The log file was opened successfully, but one or more log file records were not
 displayed, either due to an I/O error or because the records themselves were
 malformed. \fBfmdump\fR issues a warning message for each record that could not
@@ -638,34 +596,28 @@ be displayed, and then continues on and attempts to display other records.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/fm/fmd\fR\fR
 .ad
 .RS 22n
-.rt  
 Fault management log directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/fm/fmd/errlog\fR\fR
 .ad
 .RS 22n
-.rt  
 Fault management error log
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/fm/fmd/fltlog\fR\fR
 .ad
 .RS 22n
-.rt  
 Fault management fault log
 .RE
 
@@ -677,13 +629,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH nvlist_remove 3NVPAIR "2 Feb 2004" "SunOS 5.11" "Name-value Pair Library Functions"
+.TH NVLIST_REMOVE 3NVPAIR "Feb 2, 2004"
 .SH NAME
 nvlist_remove, nvlist_remove_all \- remove name-value pairs
 .SH SYNOPSIS
@@ -24,34 +24,28 @@ nvlist_remove, nvlist_remove_all \- remove name-value pairs
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fInvl\fR\fR
 .ad
 .RS 8n
-.rt  
 The \fBnvlist_t\fR to be processed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 8n
-.rt  
 Name of the name-value pair to be removed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 8n
-.rt  
 Data type of the \fBnvpair\fR to be removed.
 .RE
 
@@ -79,23 +73,19 @@ These functions return 0 on success and an error value on failure.
 These functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 There is an invalid argument.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 10n
-.rt  
 No name-value pairs were found to match the criteria specified by \fIname\fR
 and \fItype\fR.
 .RE
@@ -108,15 +98,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.69i) |cw(2.81i) 
-lw(2.69i) |lw(2.81i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

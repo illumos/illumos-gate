@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pkcs11_softtoken 5 "25 Mar 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PKCS11_SOFTTOKEN 5 "Mar 25, 2008"
 .SH NAME
 pkcs11_softtoken \- Software RSA PKCS#11 softtoken
 .SH SYNOPSIS
@@ -115,13 +115,13 @@ CKM_SHA256_KEY_DERIVATION
 CKM_SHA384_KEY_DERIVATION
 CKM_SHA512_KEY_DERIVATION
 
-CKM_SSL3_PRE_MASTER_KEY_GEN 
+CKM_SSL3_PRE_MASTER_KEY_GEN
 CKM_SSL3_MASTER_KEY_DERIVE
 CKM_SSL3_KEY_AND_MAC_DERIVE
 CKM_SSL3_MASTER_KEY_DERIVE_DH
-CKM_TLS_PRE_MASTER_KEY_GEN 
-CKM_TLS_MASTER_KEY_DERIVE 
-CKM_TLS_KEY_AND_MAC_DERIVE 
+CKM_TLS_PRE_MASTER_KEY_GEN
+CKM_TLS_MASTER_KEY_DERIVE
+CKM_TLS_KEY_AND_MAC_DERIVE
 CKM_TLS_MASTER_KEY_DERIVE_DH
 .fi
 .in -2
@@ -133,35 +133,29 @@ attributes that are set to true by default as a result of object creation,
 key/key pair generation, and key derivation.
 .sp
 .ne 2
-.mk
 .na
 \fBPublic key object\fR
 .ad
 .RS 22n
-.rt  
 \fBCKA_ENCRYPT\fR, \fBCKA_VERIFY\fR, \fBCKA_VERIFY_RECOVER\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBPrivate key object\fR
 .ad
 .RS 22n
-.rt  
 \fBCKA_DECRYPT\fR, \fBCKA_SIGN\fR, \fBCKA_SIGN_RECOVER\fR,
 \fBCKA_EXTRACTABLE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSecret key object\fR
 .ad
 .RS 22n
-.rt  
 \fBCKA_ENCRYPT\fR, \fBCKA_DECRYPT\fR, \fBCKA_SIGN\fR, \fBCKA_VERIFY\fR,
 \fBCKA_EXTRACTABLE\fR
 .RE
@@ -171,12 +165,10 @@ key/key pair generation, and key derivation.
 The following certificate objects are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCKC_X_509\fR\fR
 .ad
 .RS 23n
-.rt  
 For \fBCKC_X_509\fR certificate objects, the following attributes are
 supported: \fBCKA_SUBJECT\fR, \fBCKA_VALUE\fR, \fBCKA_LABEL\fR, \fBCKA_ID\fR,
 \fBCKA_ISSUER\fR, \fBCKA_SERIAL_NUMBER\fR, and \fBCKA_CERTIFICATE_TYPE\fR.
@@ -184,12 +176,10 @@ supported: \fBCKA_SUBJECT\fR, \fBCKA_VALUE\fR, \fBCKA_LABEL\fR, \fBCKA_ID\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCKC_X_509_ATTR_CERT\fR\fR
 .ad
 .RS 23n
-.rt  
 For \fBCKC_X_509_ATTR_CERT\fR certificate objects, the following attributes are
 supported: \fBCKA_OWNER\fR, \fBCKA_VALUE, CKA_LABEL\fR,
 \fBCKA_SERIAL_NUMBER\fR, \fBCKA_AC_ISSUER\fR, \fBCKA_ATTR_TYPES\fR, and
@@ -240,7 +230,6 @@ in the RSA PKCS#11 v2.20 specification. See http://www.rsasecurity.com
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fIuser_home_directory\fR/.sunw/pkcs11_softtoken\fR\fR
 .ad
@@ -251,7 +240,6 @@ user's default token object store
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB${SOFTTOKEN_DIR}/pkcs11_softtoken\fR\fR
 .ad
@@ -268,19 +256,18 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelT{
+MT-Level	T{
 MT-Safe with exceptions. See section 6.5.2 of RSA PKCS#11 v2.20.
 T}
 _
-StandardPKCS#11 v2.20
+Standard	PKCS#11 v2.20
 .TE
 
 .SH SEE ALSO

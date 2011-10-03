@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH slpd.reg 4 "17 Nov 1999" "SunOS 5.11" "File Formats"
+.TH SLPD.REG 4 "Nov 17, 1999"
 .SH NAME
 slpd.reg \- serialized registration file for the service location protocol
 daemon (slpd)
@@ -46,7 +46,7 @@ type          =  ; The service type name, see [7]
                  ; and [8] for syntax.
 slist         =  "scopes" "=" scope-list newline
 scope-list    =  scope-name / scope-name "," scope-list
-scope         =  ; See grammar of [7] for 
+scope         =  ; See grammar of [7] for
                  ; scope-name syntax.
 attr-list     =  attr-def / attr-def attr-list
 attr-def      =  ( attr / keyword ) newline
@@ -61,7 +61,7 @@ other         =  %x21-%x2f / %x3a-%x40 /
                  %x5b-%x60 / %7b-%7e
                   ; All printable, nonwhitespace US-ASCII
                   ; characters.
-newline       =  CR / ( CRLF )  
+newline       =  CR / ( CRLF )
 .fi
 .in -2
 
@@ -122,15 +122,14 @@ See \fBattributes\fR(5)  for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled
+CSI	Enabled
 _
-Interface Stability		Standard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

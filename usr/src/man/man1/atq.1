@@ -2,7 +2,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1985 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (c) 1999 Sun Microsystems, Inc., All Rights Reserved.
-.TH atq 1 "13 Aug 1999" "SunOS 5.11" "User Commands"
+.TH ATQ 1 "Aug 13, 1999"
 .SH NAME
 atq \- display the jobs queued to run at specified times
 .SH SYNOPSIS
@@ -33,36 +33,30 @@ jobs belonging to the named user are displayed.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays the queued jobs in the order they were created (that is, the time that
 the \fBat\fR command was given).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 6n
-.rt  
 Displays only the total number of jobs currently in the queue.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/cron/atjobs\fR\fR
 .ad
 .RS 26n
-.rt  
 spool area for at jobs.
 .RE
 

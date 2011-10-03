@@ -3,25 +3,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pgrep 1 "6 May 2004" "SunOS 5.11" "User Commands"
+.TH PGREP 1 "May 6, 2004"
 .SH NAME
 pgrep, pkill \- find or signal processes by name and other attributes
 .SH SYNOPSIS
 .LP
 .nf
-\fBpgrep\fR [\fB-flvx\fR] [\fB-n\fR | \fB-o\fR] [\fB-d\fR \fIdelim\fR] [\fB-P\fR \fIppidlist\fR] 
-     [\fB-g\fR \fIpgrplist\fR] [\fB-s\fR \fIsidlist\fR] [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] 
-     [\fB-G\fR \fIgidlist\fR] [\fB-J\fR \fIprojidlist\fR] [\fB-t\fR \fItermlist\fR] 
-     [\fB-T\fR \fItaskidlist\fR] [\fB-c\fR \fIctidlist\fR] [\fB-z\fR \fIzoneidlist\fR] 
+\fBpgrep\fR [\fB-flvx\fR] [\fB-n\fR | \fB-o\fR] [\fB-d\fR \fIdelim\fR] [\fB-P\fR \fIppidlist\fR]
+     [\fB-g\fR \fIpgrplist\fR] [\fB-s\fR \fIsidlist\fR] [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR]
+     [\fB-G\fR \fIgidlist\fR] [\fB-J\fR \fIprojidlist\fR] [\fB-t\fR \fItermlist\fR]
+     [\fB-T\fR \fItaskidlist\fR] [\fB-c\fR \fIctidlist\fR] [\fB-z\fR \fIzoneidlist\fR]
      [\fIpattern\fR]
 .fi
 
 .LP
 .nf
-\fBpkill\fR [\fB-\fIsignal\fR\fR] [\fB-fvx\fR] [\fB-n\fR | \fB-o\fR] [\fB-P\fR \fIppidlist\fR] 
-     [\fB-g\fR \fIpgrplist\fR] [\fB-s\fR \fIsidlist\fR] [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] 
-     [\fB-G\fR \fIgidlist\fR] [\fB-J\fR \fIprojidlist\fR] [\fB-t\fR \fItermlist\fR] 
-     [\fB-T\fR \fItaskidlist\fR] [\fB-c\fR \fIctidlist\fR] [\fB-z\fR \fIzoneidlist\fR] 
+\fBpkill\fR [\fB-\fIsignal\fR\fR] [\fB-fvx\fR] [\fB-n\fR | \fB-o\fR] [\fB-P\fR \fIppidlist\fR]
+     [\fB-g\fR \fIpgrplist\fR] [\fB-s\fR \fIsidlist\fR] [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR]
+     [\fB-G\fR \fIgidlist\fR] [\fB-J\fR \fIprojidlist\fR] [\fB-t\fR \fItermlist\fR]
+     [\fB-T\fR \fItaskidlist\fR] [\fB-c\fR \fIctidlist\fR] [\fB-z\fR \fIzoneidlist\fR]
      [\fIpattern\fR]
 .fi
 
@@ -79,23 +79,19 @@ line option to \fBpkill\fR.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIctidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose process contract ID is in the given list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdelim\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the output delimiter string to be printed between each matching
 process \fBID\fR. If no \fB-d\fR option is specified, the default is a newline
 character. The \fB-d\fR option is only valid when specified as an option to
@@ -104,12 +100,10 @@ character. The \fB-d\fR option is only valid when specified as an option to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 17n
-.rt  
 The regular expression \fIpattern\fR should be matched against the full process
 argument string (obtained from the \fBpr_psargs\fR field of the
 \fB/proc/\fInnnnn\fR/psinfo\fR file). If no \fB-f\fR option is specified, the
@@ -119,12 +113,10 @@ from the \fBpr_fname\fR field of the \fB/proc/\fInnnnn\fR/psinfo\fR file).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIpgrplist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose process group \fBID\fR is in the given list. If
 group 0 is included in the list, this is interpreted as the process group
 \fBID\fR of the \fBpgrep\fR or \fBpkill\fR process.
@@ -132,12 +124,10 @@ group 0 is included in the list, this is interpreted as the process group
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIgidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose real group \fBID\fR is in the given list. Each
 group \fBID\fR may be specified as either a group name or a numerical group
 \fBID\fR.
@@ -145,12 +135,10 @@ group \fBID\fR may be specified as either a group name or a numerical group
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-J\fR \fIprojidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose project \fBID\fR is in the given list. Each
 project \fBID\fR may be specified as either a project name or a numerical
 project \fBID\fR.
@@ -158,12 +146,10 @@ project \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 17n
-.rt  
 Long output format. Prints the process name along with the process \fBID\fR of
 each matching process. The process name is obtained from the \fBpr_psargs\fR or
 \fBpr_fname\fR field, depending on whether the \fB-f\fR option was specified
@@ -173,47 +159,39 @@ each matching process. The process name is obtained from the \fBpr_psargs\fR or
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only the newest (most recently created) process that meets all other
 specified matching criteria. Cannot be used with option \fB-o\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only the oldest (earliest created) process that meets all other
 specified matching criteria. Cannot be used with option \fB-n\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIppidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose parent process \fBID\fR is in the given list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose process session \fBID\fR is in in the given list.
 If \fBID\fR 0 is included in the list, this is interpreted as the session
 \fBID\fR of the \fBpgrep\fR or \fBpkill\fR process.
@@ -221,12 +199,10 @@ If \fBID\fR 0 is included in the list, this is interpreted as the session
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItermlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes which are associated with a terminal in the given list.
 Each terminal is specified as the suffix following "/dev/" of the terminal's
 device path name in \fB/dev\fR. For example, \fBterm/a\fR or \fBpts/0\fR.
@@ -234,12 +210,10 @@ device path name in \fB/dev\fR. For example, \fBterm/a\fR or \fBpts/0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItaskidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose task \fBID\fR is in the given list. If \fBID\fR 0
 is included in the list, this is interpreted as the task \fBID\fR of the
 \fBpgrep\fR or \fBpkill\fR process.
@@ -247,12 +221,10 @@ is included in the list, this is interpreted as the task \fBID\fR of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIeuidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose effective user \fBID\fR is in the given list. Each
 user \fBID\fR may be specified as either a login name or a numerical user
 \fBID\fR.
@@ -260,36 +232,30 @@ user \fBID\fR may be specified as either a login name or a numerical user
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fIuidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose real user \fBID\fR is in the given list. Each user
 \fBID\fR may be specified as either a login name or a numerical user \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 17n
-.rt  
 Reverses the sense of the matching. Matches all processes \fBexcept\fR those
 which meet the specified matching criteria.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 17n
-.rt  
 Considers only processes whose argument string or executable file name
 \fBexactly\fR matches the specified \fIpattern\fR to be matching processes. The
 pattern match is considered to be exact when all characters in the process
@@ -298,12 +264,10 @@ argument string or executable file name match the pattern.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzoneidlist\fR\fR
 .ad
 .RS 17n
-.rt  
 Matches only processes whose zone \fBID\fR is in the given list. Each zone
 \fBID\fR may be specified as either a zone name or a numerical zone \fBID\fR.
 This option is only useful when executed in the global zone. If the \fBpkill\fR
@@ -313,12 +277,10 @@ have asserted the \fB{PRIV_PROC_ZONE}\fR privilege (see \fBprivileges\fR(5)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-\fR\fIsignal\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the signal to send to each matched process. If no signal is
 specified, \fBSIGTERM\fR is sent by default. The value of \fIsignal\fR can be
 one of the symbolic names defined in \fBsignal.h\fR(3HEAD) without the
@@ -333,12 +295,10 @@ one of the symbolic names defined in \fBsignal.h\fR(3HEAD) without the
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpattern\fR\fR
 .ad
 .RS 11n
-.rt  
 Specifies an Extended Regular Expression (\fBERE\fR) pattern to match against
 either the executable file name or full process argument string. See
 \fBregex\fR(5) for a complete description of the \fBERE\fR syntax.
@@ -380,57 +340,47 @@ example% \fBpkill -n xterm\fR
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 One or more processes were matched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 No processes were matched.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 A fatal error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/\fInnnnn\fR/psinfo\fR\fR
 .ad
 .RS 22n
-.rt  
 Process information files
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_putenv 3PAM "1 Mar 2004" "SunOS 5.11" "PAM Library Functions"
+.TH PAM_PUTENV 3PAM "Mar 1, 2004"
 .SH NAME
 pam_putenv \- change or add a value to the PAM environment
 .SH SYNOPSIS
@@ -48,89 +48,73 @@ will be removed from the \fBPAM\fR handle.
 The \fBpam_putenv()\fR function may return one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 19n
-.rt  
 The function returned successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_OPEN_ERR\fR\fR
 .ad
 .RS 19n
-.rt  
 \fBdlopen()\fR failed when dynamically loading a service module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYMBOL_ERR\fR\fR
 .ad
 .RS 19n
-.rt  
 Symbol not found.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SERVICE_ERR\fR\fR
 .ad
 .RS 19n
-.rt  
 Error in service module.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 19n
-.rt  
 System error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_BUF_ERR\fR\fR
 .ad
 .RS 19n
-.rt  
 Memory buffer error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_CONV_ERR\fR\fR
 .ad
 .RS 19n
-.rt  
 Conversation failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_PERM_DENIED\fR\fR
 .ad
 .RS 19n
-.rt  
 Permission denied.
 .RE
 
@@ -142,15 +126,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Stable
+Interface Stability	 Stable
 _
-MT-LevelMT-Safe with exceptions
+MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

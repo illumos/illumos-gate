@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fas 7D "20 Jun 1997" "SunOS 5.11" "Devices"
+.TH FAS 7D "Jun 20, 1997"
 .SH NAME
 fas \- FAS SCSI Host Bus Adapter Driver
 .SH SYNOPSIS
@@ -212,23 +212,19 @@ Refer to \fBscsi_ifsetcap\fR(9F) and  \fBscsi_ifgetcap\fR(9F) for details.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/fas\fR\fR
 .ad
 .RS 24n
-.rt  
 \fBELF\fR Kernel Module
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/fas.conf\fR\fR
 .ad
 .RS 24n
-.rt  
 Optional configuration file
 .RE
 
@@ -240,13 +236,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.21i) |cw(3.29i) 
-lw(2.21i) |lw(3.29i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitectureT{
+Architecture	T{
 Limited to Sparc SBus-based systems with FAS366-based SCSI port and SunSWIFT SBus SCSI Host Adapter/Fast Ethernet option.
 T}
 .TE
@@ -281,7 +276,6 @@ All of these messages are preceded by "fas%d", where "%d" is the instance
 number of the  \fBfas\fR controller.
 .sp
 .ne 2
-.mk
 .na
 \fBDevice in slave-only slot\fR
 .ad
@@ -293,7 +287,6 @@ accessible; move to non-slave-only SBus slot.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDevice is using a hilevel intr\fR
 .ad
@@ -305,7 +298,6 @@ The device was configured with an interrupt level that cannot be used with this
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot alloc dma handle\fR
 .ad
@@ -316,7 +308,6 @@ Driver was unable to allocate memory for a DMA controller.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot alloc cmd area\fR
 .ad
@@ -327,7 +318,6 @@ Driver was unable to allocate memory for a command address.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot create kmem_cache\fR
 .ad
@@ -338,7 +328,6 @@ Driver was unable to allocate memory for internal data structures.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnable to map FAS366 registers\fR
 .ad
@@ -350,7 +339,6 @@ not attach to device; \fBSCSI\fR devices will be inaccessible.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot add intr\fR
 .ad
@@ -361,7 +349,6 @@ Driver could not add its interrupt service routine to the kernel.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot map dma\fR
 .ad
@@ -373,7 +360,6 @@ auto-configuration error.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot bind cmdarea\fR
 .ad
@@ -384,7 +370,6 @@ Driver was unable to bind the \fBDMA\fR handle to an address.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot create devctl minor node\fR
 .ad
@@ -395,7 +380,6 @@ Driver is unable to create a minor node for the controller.
 
 .sp
 .ne 2
-.mk
 .na
 \fBCannot attach\fR
 .ad
@@ -407,7 +391,6 @@ why attach failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDisabled TQ since disconnects are disabled\fR
 .ad
@@ -419,7 +402,6 @@ Tagged queuing was disabled because disconnects were disabled in
 
 .sp
 .ne 2
-.mk
 .na
 \fBBad clock frequency\fR
 .ad
@@ -430,7 +412,6 @@ Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSync of pkt (<address>) failed\fR
 .ad
@@ -441,7 +422,6 @@ Syncing a \fBSCSI\fR packet failed. Refer to \fBscsi_sync_pkt\fR(9F).
 
 .sp
 .ne 2
-.mk
 .na
 \fBAll tags in use!\fR
 .ad
@@ -453,7 +433,6 @@ properly support tagged queuing.
 
 .sp
 .ne 2
-.mk
 .na
 \fBGross error in FAS366 status\fR
 .ad
@@ -465,7 +444,6 @@ terminator.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSpurious interrupt\fR
 .ad
@@ -476,7 +454,6 @@ The driver received an interrupt while the hardware was not interrupting.
 
 .sp
 .ne 2
-.mk
 .na
 \fBLost state in phasemanage\fR
 .ad
@@ -487,7 +464,6 @@ The driver is confused about the state of the \fBSCSI\fR bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnrecoverable DMA \fBerror\fR \fBduring selection\fR\fR
 .ad
@@ -499,7 +475,6 @@ hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBBad sequence step (<step number>) in selection\fR
 .ad
@@ -510,7 +485,6 @@ The FAS366 hardware reported a bad sequence step. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUndetermined selection failure\fR
 .ad
@@ -521,7 +495,6 @@ The selection of a target failed unexpectedly. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (bad reselect bytes)\fR
 .ad
@@ -533,7 +506,6 @@ bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (bad identify message)\fR
 .ad
@@ -545,7 +517,6 @@ Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (not in msgin phase)\fR
 .ad
@@ -556,7 +527,6 @@ Incorrect \fBSCSI\fR bus phase after reconnection. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (unexpected bus free)\fR
 .ad
@@ -567,7 +537,6 @@ Incorrect \fBSCSI\fR bus phase after reconnection.  Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (timeout on receiving tag msg)\fR
 .ad
@@ -578,7 +547,6 @@ A reconnect failed; target failed to send tag bytes. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (botched tag)\fR
 .ad
@@ -589,7 +557,6 @@ A reconnect failed; target failed to send tag bytes. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (invalid tag)\fR
 .ad
@@ -600,7 +567,6 @@ A reconnect failed; target sent incorrect tag bytes. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (Parity error in reconnect msg's)\fR
 .ad
@@ -611,7 +577,6 @@ A reconnect failed; parity error detected.  Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n>: failed reselection (no command)\fR
 .ad
@@ -623,7 +588,6 @@ to reconnect. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnexpected bus free\fR
 .ad
@@ -634,7 +598,6 @@ Target disconnected from the bus without notice. Check for bad hardware.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n> didn't disconnect after sending <message>\fR
 .ad
@@ -646,7 +609,6 @@ The target unexpectedly did not disconnect after sending
 
 .sp
 .ne 2
-.mk
 .na
 \fBBad sequence step (0x?) in selection\fR
 .ad
@@ -658,7 +620,6 @@ misbehaving.
 
 .sp
 .ne 2
-.mk
 .na
 \fBIllegal dma boundary?\fR
 .ad
@@ -669,7 +630,6 @@ An attempt was made to cross a boundary that the driver could not handle.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnwanted data xfer direction for Target <n>\fR
 .ad
@@ -680,7 +640,6 @@ The target went into an unexpected phase.
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnrecoverable DMA error on dma <send/receive>\fR
 .ad
@@ -692,7 +651,6 @@ controller is experiencing some problems.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSCSI bus DATA IN phase parity error\fR
 .ad
@@ -703,7 +661,6 @@ The driver detected parity errors on the \fBSCSI\fR bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSCSI bus MESSAGE IN phase parity error\fR
 .ad
@@ -714,7 +671,6 @@ The driver detected parity errors on the \fBSCSI\fR bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBSCSI bus STATUS phase parity \fBerror\fR\fR
 .ad
@@ -725,7 +681,6 @@ The driver detected parity errors on the \fBSCSI\fR bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPremature end of extended message\fR
 .ad
@@ -737,7 +692,6 @@ problem.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPremature end of input message\fR
 .ad
@@ -748,7 +702,6 @@ A multibyte input message was truncated. Suspect a target firmware problem.
 
 .sp
 .ne 2
-.mk
 .na
 \fBInput message botch\fR
 .ad
@@ -759,7 +712,6 @@ The driver is confused about messages coming from the target.
 
 .sp
 .ne 2
-.mk
 .na
 \fBExtended message <n> is too long\fR
 .ad
@@ -770,7 +722,6 @@ The extended message sent by the target is longer than expected.
 
 .sp
 .ne 2
-.mk
 .na
 \fB<name> message <n> from Target <m> garbled\fR
 .ad
@@ -782,7 +733,6 @@ Target \fB<\fR\fIm\fR\fB>\fR sent message \fB<\fR\fIname\fR\fB>\fR of value
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n> rejects our message <name>\fR
 .ad
@@ -793,7 +743,6 @@ Target \fB<\fR\fIn\fR\fB>\fR rejected a message sent by the driver.
 
 .sp
 .ne 2
-.mk
 .na
 \fBRejecting message <name> from Target <n>\fR
 .ad
@@ -804,7 +753,6 @@ The driver rejected a message received from target \fB<\fR\fIn\fR\fB>.\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fBCmd transmission \fBerror\fR\fR
 .ad
@@ -815,7 +763,6 @@ The driver was unable to send out command bytes.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <n> refused message resend\fR
 .ad
@@ -826,7 +773,6 @@ The target did not accept a message resend.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMESSAGE OUT phase parity error\fR
 .ad
@@ -837,7 +783,6 @@ The driver detected parity errors on the SCSI bus.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTwo byte message <name> <value> rejected\fR
 .ad
@@ -848,7 +793,6 @@ The driver does not accept this two byte message.
 
 .sp
 .ne 2
-.mk
 .na
 \fBGross error in fas status <stat>\fR
 .ad
@@ -859,7 +803,6 @@ The \fBfas\fR chip has indicated a gross error like \fBFIFO\fR overflow.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPolled cmd failed (target busy)\fR
 .ad
@@ -871,7 +814,6 @@ commands within a reasonable time.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPolled cmd failed\fR
 .ad
@@ -882,7 +824,6 @@ A polled command failed because of timeouts or bus errors.
 
 .sp
 .ne 2
-.mk
 .na
 \fBAuto request sense failed\fR
 .ad
@@ -893,7 +834,6 @@ Driver is unable to get request sense from the target.
 
 .sp
 .ne 2
-.mk
 .na
 \fBDisconnected command timeout for Target <id>.<lun>\fR
 .ad
@@ -906,7 +846,6 @@ usually a target firmware problem. For tagged queuing targets,
 
 .sp
 .ne 2
-.mk
 .na
 \fBDisconnected tagged cmds (<n>) timeout for Target <id>.<lun>\fR
 .ad
@@ -919,7 +858,6 @@ usually a target firmware problem. For tagged queuing targets,
 
 .sp
 .ne 2
-.mk
 .na
 \fBConnected command timeout for Target <id>.<lun>\fR
 .ad
@@ -930,7 +868,6 @@ This is usually a \fBSCSI\fR bus problem. Check cables and termination.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <id>.<lun> reverting to async. mode\fR
 .ad
@@ -942,7 +879,6 @@ problem by reducing the data transfer rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <id>.<lun> reducing sync. transfer rate\fR
 .ad
@@ -954,7 +890,6 @@ problem by reducing the data transfer rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReverting to slow SCSI cable mode\fR
 .ad
@@ -966,7 +901,6 @@ problem by reducing the data transfer rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <id> reducing sync. transfer rate\fR
 .ad
@@ -978,7 +912,6 @@ problem by reducing the data transfer rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <id> reverting to async. mode\fR
 .ad
@@ -990,7 +923,6 @@ problem by reducing the data transfer rate.
 
 .sp
 .ne 2
-.mk
 .na
 \fBTarget <id> disabled wide SCSI mode\fR
 .ad
@@ -1002,7 +934,6 @@ mode of operation to avoid further problems.
 
 .sp
 .ne 2
-.mk
 .na
 \fBReset SCSI bus failed\fR
 .ad
@@ -1013,7 +944,6 @@ An attempt to reset the \fBSCSI\fR bus failed.
 
 .sp
 .ne 2
-.mk
 .na
 \fBExternal SCSI bus reset\fR
 .ad

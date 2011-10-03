@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mansun 5 "11 Jun 1992" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH MANSUN 5 "Jun 11, 1992"
 .SH NAME
 mansun \- macros to format Reference Manual pages
 .SH SYNOPSIS
@@ -45,23 +45,19 @@ processing font and size setting macros.
 These strings are predefined by \fB-mansun\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e*R\fR\fR
 .ad
 .RS 8n
-.rt  
 `\(rg', `(Reg)' in \fBnroff\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\e*S\fR\fR
 .ad
 .RS 8n
-.rt  
 Change to default type size.
 .RE
 
@@ -73,57 +69,56 @@ Change to default type size.
 
 .sp
 .TS
-tab();
-cw(1i) cw(1i) cw(1i) cw(2.5i) 
-cw(1i) cw(1i) cw(1i) cw(2.5i) 
-.
-\fIRequest\fR\fICause\fR\fIIf no\fR\fIExplanation\fR
-\fIBreak\fR\fIArgument\fR
-\fB\&.B \fR\fIt\fRno\fIt\fR=n.t.l.*Text is in bold font.
-\fB\&.BI \fR\fIt\fRno\fIt\fR=n.t.l.Join words, alternating bold and italic.
-\fB\&.BR \fR\fIt\fRno\fIt\fR=n.t.l.Join words, alternating bold and Roman.
-\fB\&.DT\fRno\&.5i 1i...Restore default tabs.
-\fB\&.HP \fR\fIi\fRyes\fIi\fR=p.i.*T{
+c c c c
+c c c c .
+\fIRequest\fR	\fICause\fR	\fIIf no\fR	\fIExplanation\fR
+	\fIBreak\fR	\fIArgument\fR	
+\fB\&.B \fR\fIt\fR	no	\fIt\fR=n.t.l.*	Text is in bold font.
+\fB\&.BI \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and italic.
+\fB\&.BR \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and Roman.
+\fB\&.DT\fR	no	\&.5i 1i...	Restore default tabs.
+\fB\&.HP \fR\fIi\fR	yes	\fIi\fR=p.i.*	T{
 Begin paragraph with hanging indent. Set prevailing indent to \fIi\fR.
 T}
-\fB\&.I \fR\fIt\fRno\fIt\fR=n.t.l.Text is italic.
-\fB\&.IB \fR\fIt\fRno\fIt\fR=n.t.l.Join words, alternating italic and bold.
-\fB\&.IP \fR\fIx i\fRyes\fIx\fR=""Same as \fB\&.TP\fR with tag \fIx\fR.
-\fB\&.IR \fR\fIt\fRno\fIt\fR=n.t.l.T{
+\fB\&.I \fR\fIt\fR	no	\fIt\fR=n.t.l.	Text is italic.
+\fB\&.IB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating italic and bold.
+\fB\&.IP \fR\fIx i\fR	yes	\fIx\fR=""	Same as \fB\&.TP\fR with tag \fIx\fR.
+\fB\&.IR \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
 Join words, alternating italic and Roman.
 T}
-\fB\&.IX \fR\fIt\fRno-Index macro, for SunSoft internal use.
-\fB\&.LP\fRyes-T{
+\fB\&.IX \fR\fIt\fR	no	-	Index macro, for SunSoft internal use.
+\fB\&.LP\fR	yes	-	T{
 Begin left-aligned paragraph. Set prevailing indent to .5i.
 T}
-\fB\&.P\fRyes-Same as \fB\&.LP\fR.
-\fB\&.PD \fR\fId\fRno\fId\fR=.4vT{
+\fB\&.P\fR	yes	-	Same as \fB\&.LP\fR.
+\fB\&.PD \fR\fId\fR	no	\fId\fR=.4v	T{
 Set vertical distance between paragraphs.
 T}
-\fB\&.PP\fRyes-Same as \fB\&.LP\fR.
-\fB\&.RE\fRyes-T{
+\fB\&.PP\fR	yes	-	Same as \fB\&.LP\fR.
+\fB\&.RE\fR	yes	-	T{
 End of relative indent. Restores prevailing indent.
 T}
-\fB\&.RB \fR\fIt\fRno\fIt\fR=n.t.l.Join words, alternating Roman and bold.
-\fB\&.RI \fR\fIt\fRno\fIt\fR=n.t.l.T{
+\fB\&.RB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating Roman and bold.
+\fB\&.RI \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
 Join words, alternating Roman and italic.
 T}
-\fB\&.RS \fR\fIi\fRyes\fIi\fR=p.i.T{
+\fB\&.RS \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
 Start relative indent, increase indent by \fIi\fR. Sets prevailing indent to .5i for nested indents.
 T}
-\fB\&.SB \fR\fIt\fRno-T{
+\fB\&.SB \fR\fIt\fR	no	-	T{
 Reduce size of text by 1 point, make text bold.
 T}
-\fB\&.SH \fR\fIt\fRyes-Section Heading.
-\fB\&.SM \fR\fIt\fRno\fIt\fR=n.t.l.Reduce size of text by 1 point.
-\fB\&.SS \fR\fIt\fRyes\fIt\fR=n.t.l.Section Subheading.
-\fB\&.TH \fR\fIn s d f m\fRyes-T{
+\fB\&.SH \fR\fIt\fR	yes	-	Section Heading.
+\fB\&.SM \fR\fIt\fR	no	\fIt\fR=n.t.l.	Reduce size of text by 1 point.
+\fB\&.SS \fR\fIt\fR	yes	\fIt\fR=n.t.l.	Section Subheading.
+\fB\&.TH \FR\FIN S "f d, m\fR"
+\fB\&.TH \fR\fIn s d f m\fR	yes	-	T{
 Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change.  If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header.  Sets prevailing indent and tabs to .5i.
 T}
-\fB\&.TP \fR\fIi\fRyes\fIi\fR=p.i.T{
+\fB\&.TP \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
 Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to \fIi\fR.
 T}
-\fB\&.TX \fR\fIt \fR\fIp\fRno-T{
+\fB\&.TX \fR\fIt \fR\fIp\fR	no	-	T{
 Resolve the title abbreviation \fIt\fR; join to punctuation mark (or text) \fIp\fR.
 T}
 .TE
@@ -146,24 +141,20 @@ preprocessor.
 A typical manual page for a command or function is laid out as follows:
 .sp
 .ne 2
-.mk
 .na
-\fB\&.TH\fI title \fR[1-8]\fR
+\fB\&.TH\fI TITLE \FR[1-8]\FR " , "
 .ad
 .RS 21n
-.rt  
 The name of the command or function, which serves as the title of the manual
 page. This is followed by the number of the section in which it appears.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH NAME\fR
 .ad
 .RS 21n
-.rt  
 The name, or list of names, by which the command is called, followed by a dash
 and then a one-line summary of the action performed. All in Roman font, this
 section contains no \fBtroff\fR(1) commands or escapes, and no macro requests.
@@ -173,20 +164,16 @@ It is used to generate the \fBwindex\fR database, which is used by the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH SYNOPSIS\fR
 .ad
 .RS 21n
-.rt  
 .sp
 .ne 2
-.mk
 .na
 \fBCommands:\fR
 .ad
 .RS 13n
-.rt  
 The syntax of the command and its arguments, as typed on the command line.
 When in boldface, a word must be typed exactly as printed.  When in italics, a
 word can be replaced with an argument that you supply. References to bold or
@@ -196,35 +183,29 @@ sentence.
 Syntactic symbols appear in Roman face:
 .sp
 .ne 2
-.mk
 .na
 \fB[ ]\fR
 .ad
 .RS 13n
-.rt  
 An argument, when surrounded by brackets is optional.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB|\fR
 .ad
 .RS 13n
-.rt  
 Arguments separated by a vertical bar are exclusive. You can supply only one
 item from such a list.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.\|.\|.\fR
 .ad
 .RS 13n
-.rt  
 Arguments followed by an ellipsis can be repeated. When an ellipsis follows a
 bracketed set, the expression within the brackets can be repeated.
 .RE
@@ -233,12 +214,10 @@ bracketed set, the expression within the brackets can be repeated.
 
 .sp
 .ne 2
-.mk
 .na
 \fBFunctions:\fR
 .ad
 .RS 14n
-.rt  
 If required, the data declaration, or \fB#include\fR directive, is shown first,
 followed by the  function declaration. Otherwise, the function declaration is
 shown.
@@ -248,12 +227,10 @@ shown.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH DESCRIPTION\fR
 .ad
 .RS 21n
-.rt  
 A narrative overview of the command or function's external behavior. This
 includes how it interacts with files or data, and how it handles the standard
 input, standard output and standard error. Internals and implementation details
@@ -272,58 +249,48 @@ describes the behavior of the command itself, not that of subcommands.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH OPTIONS\fR
 .ad
 .RS 21n
-.rt  
 The list of options along with a description of how each affects the command's
 operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH FILES\fR
 .ad
 .RS 21n
-.rt  
 A list of files associated with the command or function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH SEE ALSO\fR
 .ad
 .RS 21n
-.rt  
 A comma-separated list of related manual pages, followed by references to other
 published materials.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH DIAGNOSTICS\fR
 .ad
 .RS 21n
-.rt  
 A list of diagnostic messages and an explanation of each.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\&.SH BUGS\fR
 .ad
 .RS 21n
-.rt  
 A description of limitations, known defects, and possible problems associated
 with the command or function.
 .RE
@@ -331,23 +298,19 @@ with the command or function.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/lib/tmac/ansun\fR\fR
 .ad
 .RS 29n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/share/man/windex\fR\fR
 .ad
 .RS 29n
-.rt  
 
 .RE
 

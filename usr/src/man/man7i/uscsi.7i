@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uscsi 7I "29 May 2007" "SunOS 5.11" "Ioctl Requests"
+.TH USCSI 7I "May 29, 2007"
 .SH NAME
 uscsi \- user SCSI command interface
 .SH SYNOPSIS
@@ -64,127 +64,105 @@ void *uscsi_reserved_5;       /* Reserved for future use */
 The fields of the \fBuscsi_cmd\fR structure have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_flags\fR\fR
 .ad
 .RS 20n
-.rt  
 The \fBI/O\fR direction and other details of how to carry out the \fBSCSI\fR
 command. Possible values are described below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_status\fR\fR
 .ad
 .RS 20n
-.rt  
 The \fBSCSI\fR status byte returned by the device is returned in this field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_timeout\fR\fR
 .ad
 .RS 20n
-.rt  
 Time in seconds to allow for completion of the command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_cdb\fR\fR
 .ad
 .RS 20n
-.rt  
 A pointer to the \fBSCSI\fR CDB (command descriptor block) to be transferred to
 the device in command phase.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_bufaddr\fR\fR
 .ad
 .RS 20n
-.rt  
 The user buffer containing the data to be read from or written to the device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_buflen\fR\fR
 .ad
 .RS 20n
-.rt  
 The length of \fBuscsi_bufaddr\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_resid\fR\fR
 .ad
 .RS 20n
-.rt  
 If a data transfer terminates without transferring the entire requested amount,
 the remainder, or residue, is returned in this field.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_cdblen\fR\fR
 .ad
 .RS 20n
-.rt  
 The length of the \fBSCSI\fR CDB to be transferred to the device in command
 phase.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_rqlen\fR\fR
 .ad
 .RS 20n
-.rt  
 The length of \fBuscsi_rqbuf\fR, the application's Request Sense buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_rqstatus\fR\fR
 .ad
 .RS 20n
-.rt  
 The \fBSCSI\fR status byte returned for the Request Sense command executed
 automatically by the driver in response to a Check Condition status return.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_rqresid\fR\fR
 .ad
 .RS 20n
-.rt  
 The residue, or untransferred data length, of the Request Sense data transfer
 (the number of bytes, less than or equal to \fBuscsi_rqlen\fR, which were not
 filled with sense data).
@@ -192,24 +170,20 @@ filled with sense data).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_rqbuf\fR\fR
 .ad
 .RS 20n
-.rt  
 Points to a buffer in application address space to which the results of an
 automatic Request Sense command are written.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuscsi_reserved_5\fR\fR
 .ad
 .RS 20n
-.rt  
 Reserved for future use.
 .RE
 
@@ -240,125 +214,103 @@ USCSI_RENEGOT                 /* renegotiate wide/sync on next I/O */
 The \fBuscsi_flags\fR bits have the following interpretation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_WRITE\fR\fR
 .ad
 .RS 22n
-.rt  
 Data will be written from the initiator to the target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_SILENT\fR\fR
 .ad
 .RS 22n
-.rt  
 The driver should not print any console error messages or warnings regarding
 failures associated with this \fBSCSI\fR command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_DIAGNOSE\fR\fR
 .ad
 .RS 22n
-.rt  
 The driver should not attempt any retries or other recovery mechanisms if this
 \fBSCSI\fR command terminates abnormally in any way.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_ISOLATE\fR\fR
 .ad
 .RS 22n
-.rt  
 This \fBSCSI\fR command should not be executed with other commands.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_READ\fR\fR
 .ad
 .RS 22n
-.rt  
 Data will be read from the target to the initiator.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_ASYNC\fR\fR
 .ad
 .RS 22n
-.rt  
 Set the \fBSCSI\fR bus to asynchronous mode before running this command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_SYNC\fR\fR
 .ad
 .RS 22n
-.rt  
 Set the \fBSCSI\fR bus to synchronous mode before running this command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_RESET\fR\fR
 .ad
 .RS 22n
-.rt  
 Send a \fBSCSI\fR bus device reset message to this target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_RESET_TARGET\fR\fR
 .ad
 .RS 22n
-.rt  
 Same as USCSI_RESET. Use this flag to request TARGET RESET. (USCSI_RESET is
 maintained only for compatibility with old applications).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_RESET_LUN\fR\fR
 .ad
 .RS 22n
-.rt  
 Send a \fBSCSI\fR logical unit reset message to this target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_RESET_ALL\fR\fR
 .ad
 .RS 22n
-.rt  
 USCSI_RESET_ALL, USCSI_RESET/USCSI_RESET_TARGET and USCSI_RESET_LUN are
 mutually exclusive options and issuing them in any simultaneous combination
 will result in implementation-dependent behavior
@@ -372,12 +324,10 @@ in the uscsi_cmd are ignored. The uscsi_cdblen \fBmust\fR be set to zero.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_RQENABLE\fR\fR
 .ad
 .RS 22n
-.rt  
 Enable Request Sense extensions. If the user application is prepared to receive
 sense data, this bit must be set, the fields \fBuscsi_rqbuf\fR and
 \fBuscsi_rqbuflen\fR must be non-zero, and the \fBuscsi_rqbuf\fR must point to
@@ -386,12 +336,10 @@ memory writable by the application.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSI_RENEGOT\fR\fR
 .ad
 .RS 22n
-.rt  
 Tells USCSI to renegotiate wide mode and synchronous transfer speed before the
 transmitted SCSI command is executed. This flag in effects tells the target
 driver to pass the \fBFLAG_RENEGOTIATE_WIDE_SYNC\fR flag in the SCSI packet
@@ -407,12 +355,10 @@ information.
 The \fBioctl\fR supported by drivers providing the \fBuscsi\fR interface is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUSCSICMD\fR\fR
 .ad
 .RS 12n
-.rt  
 The argument is a pointer to a \fBuscsi_cmd\fR structure. The \fBSCSI\fR device
 addressed by that driver is selected, and given the \fBSCSI\fR command
 addressed by \fBuscsi_cdb\fR. If this command requires a data phase, the
@@ -428,45 +374,37 @@ Sense data transfer.
 .SH ERRORS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 A parameter has an incorrect, or unsupported, value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-.rt  
 An error occurred during the execution of the command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 A process without root credentials tried to execute the \fBUSCSICMD\fR ioctl.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fBuscsi_cmd\fR itself, the \fBuscsi_cdb\fR, the \fBuscsi_buf\fR, or the
 \fBuscsi_rqbuf\fR point to an invalid address.
 .RE
@@ -479,13 +417,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Committed
+Interface Stability 	Committed
 .TE
 
 .SH SEE ALSO

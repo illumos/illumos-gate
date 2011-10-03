@@ -1,10 +1,10 @@
 '\" te
 .\"  Copyright (c) 1999, Sun Microsystems, Inc.
-.\"  All Rights Reserved 
+.\"  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH idn 7d "3 Jun 1999" "SunOS 5.11" "Devices"
+.TH IDN 7D "Jun 3, 1999"
 .SH NAME
 idn \- inter-domain network device driver
 .SH SYNOPSIS
@@ -203,7 +203,6 @@ primitive is not allowed.
 The following files are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/idn \fR\fR
 .ad
@@ -214,7 +213,6 @@ IDN special character device
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/platform/SUNW,Ultra-Enterprise-10000/kernel/drv/idn.conf \fR\fR
 .ad

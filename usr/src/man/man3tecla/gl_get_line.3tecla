@@ -9,7 +9,7 @@
 .\" copyright notice(s) and this permission notice appear in all copies of
 .\" the Software and that both the above copyright notice(s) and this
 .\" permission notice appear in supporting documentation.
-.\" 
+.\"
 .\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 .\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 .\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -19,13 +19,13 @@
 .\" FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
 .\" NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 .\" WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-.\" 
+.\"
 .\" Except as contained in this notice, the name of a copyright holder
 .\" shall not be used in advertising or otherwise to promote the sale, use
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH gl_get_line 3TECLA "28 Nov 2007" "SunOS 5.11" "Interactive Command-line Input Library Functions"
+.TH GL_GET_LINE 3TECLA "Nov 28, 2007"
 .SH NAME
 gl_get_line, new_GetLine, del_GetLine, gl_customize_completion,
 gl_change_terminal, gl_configure_getline, gl_load_history, gl_save_history,
@@ -41,7 +41,7 @@ gl_read_char \- allow the user to compose an input line
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <stdio.h>
 #include <libtecla.h>
 
@@ -390,24 +390,20 @@ The following are the possible enumerated values returned by
 \fBgl_return_status()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_NEWLINE\fR\fR
 .ad
 .RS 15n
-.rt  
 The last call to \fBgl_get_line()\fR successfully returned a completed input
 line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_BLOCKED\fR\fR
 .ad
 .RS 15n
-.rt  
 The \fBgl_get_line()\fR function was in non-blocking server mode, and returned
 early to avoid blocking the process while waiting for terminal I/O. The
 \fBgl_pending_io()\fR function can be used to see what type of I/O
@@ -416,24 +412,20 @@ early to avoid blocking the process while waiting for terminal I/O. The
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_SIGNAL\fR\fR
 .ad
 .RS 15n
-.rt  
 A signal was caught by \fBgl_get_line()\fR that had an after-signal disposition
 of \fBGLS_ABORT\fR. See \fBgl_trap_signal()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_TIMEOUT\fR\fR
 .ad
 .RS 15n
-.rt  
 The inactivity timer expired while \fBgl_get_line()\fR was waiting for input,
 and the timeout callback function returned \fBGLTO_ABORT\fR. See
 \fBgl_inactivity_timeout()\fR for information about timeouts.
@@ -441,24 +433,20 @@ and the timeout callback function returned \fBGLTO_ABORT\fR. See
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_FDABORT\fR\fR
 .ad
 .RS 15n
-.rt  
 An application I/O callback returned \fBGLFD_ABORT\fR. Ssee
 \fBgl_watch_fd()\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_EOF\fR\fR
 .ad
 .RS 15n
-.rt  
 End of file reached. This can happen when input is coming from a file or a
 pipe, instead of the terminal. It also occurs if the user invokes the
 list-or-eof or del-char-or-list-or-eof actions at the start of a new line.
@@ -466,12 +454,10 @@ list-or-eof or del-char-or-list-or-eof actions at the start of a new line.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLR_ERROR\fR\fR
 .ad
 .RS 15n
-.rt  
 An unexpected error caused \fBgl_get_line()\fR to abort (consult \fBerrno\fR
 and/or \fBgl_error_message()\fR for details.
 .RE
@@ -505,154 +491,126 @@ The \fIstyle\fR argument, which specifies the formatting style, can take any of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGL_FORMAT_PROMPT\fR\fR
 .ad
 .RS 21n
-.rt  
 In this style, the formatting directives described below, when included in
 prompt strings, are interpreted as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%B\fR\fR
 .ad
 .RS 6n
-.rt  
 Display subsequent characters with a bold font.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%b\fR\fR
 .ad
 .RS 6n
-.rt  
 Stop displaying characters with the bold font.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%F\fR\fR
 .ad
 .RS 6n
-.rt  
 Make subsequent characters flash.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%f\fR\fR
 .ad
 .RS 6n
-.rt  
 Turn off flashing characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%U\fR\fR
 .ad
 .RS 6n
-.rt  
 Underline subsequent characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%u\fR\fR
 .ad
 .RS 6n
-.rt  
 Stop underlining characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%P\fR\fR
 .ad
 .RS 6n
-.rt  
 Switch to a pale (half brightness) font.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%p\fR\fR
 .ad
 .RS 6n
-.rt  
 Stop using the pale font.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%S\fR\fR
 .ad
 .RS 6n
-.rt  
 Highlight subsequent characters (also known as standout mode).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%s\fR\fR
 .ad
 .RS 6n
-.rt  
 Stop highlighting characters.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%V\fR\fR
 .ad
 .RS 6n
-.rt  
 Turn on reverse video.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%v\fR\fR
 .ad
 .RS 6n
-.rt  
 Turn off reverse video.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 6n
-.rt  
 Display a single % character.
 .RE
 
@@ -670,12 +628,10 @@ some substitute a different attribute for missing ones.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGL_LITERAL_PROMPT\fR\fR
 .ad
 .RS 21n
-.rt  
 In this style, the prompt string is printed literally. This is the default
 style.
 .RE
@@ -751,23 +707,19 @@ priority of the binding, according to whom it is being established for, and
 must be one of the following two values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGL_USER_KEY\fR\fR
 .ad
 .RS 15n
-.rt  
 The user requested this key-binding.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGL_APP_KEY\fR\fR
 .ad
 .RS 15n
-.rt  
 This is a default binding set by the application.
 .RE
 
@@ -961,34 +913,28 @@ Action functions must return one of the following values, to tell
 \fBgl_get_line()\fR how to proceed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLA_ABORT\fR\fR
 .ad
 .RS 16n
-.rt  
 Cause \fBgl_get_line()\fR to return \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLA_RETURN\fR\fR
 .ad
 .RS 16n
-.rt  
 Cause \fBgl_get_line()\fR to return the completed input line
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLA_CONTINUE\fR\fR
 .ad
 .RS 16n
-.rt  
 Resume command-line editing.
 .RE
 
@@ -1071,67 +1017,55 @@ line is displayed. This can contain arbitrary characters which are written
 verbatim, interleaved with any of the following format directives:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%D\fR\fR
 .ad
 .RS 6n
-.rt  
 The date on which the line was originally entered, formatted like 2001-11-20.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%T\fR\fR
 .ad
 .RS 6n
-.rt  
 The time of day when the line was entered, formatted like 23:59:59.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%N\fR\fR
 .ad
 .RS 6n
-.rt  
 The sequential entry number of the line in the history buffer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%G\fR\fR
 .ad
 .RS 6n
-.rt  
 The number of the history group which the line belongs to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%%\fR\fR
 .ad
 .RS 6n
-.rt  
 A literal % character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB%H\fR\fR
 .ad
 .RS 6n
-.rt  
 The history line itself.
 .RE
 
@@ -1203,23 +1137,19 @@ If successful, \fBgl_append_history()\fR returns 0. Otherwise it returns
 non-zero and sets \fBerrno\fR to one of the following values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 One of the arguments passed to \fBgl_append_history()\fR was \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified line was longer than the allocated size of the history buffer (as
 specified when \fBnew_GetLine()\fR was called), so it could not be archived.
 .RE
@@ -1365,34 +1295,28 @@ specifies what type of activity is of interest, chosen from the following
 enumerated values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLFD_READ\fR\fR
 .ad
 .RS 15n
-.rt  
 Watch for the arrival of data to be read.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLFD_WRITE\fR\fR
 .ad
 .RS 15n
-.rt  
 Watch for the ability to write to the file descriptor without blocking.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLFD_URGENT\fR\fR
 .ad
 .RS 15n
-.rt  
 Watch for the arrival of urgent out-of-band data on the file descriptor.
 .RE
 
@@ -1420,12 +1344,10 @@ The return value of the callback function should be one of the following
 values.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLFD_ABORT\fR\fR
 .ad
 .RS 17n
-.rt  
 Tell \fBgl_get_line()\fR to abort. When this happens, \fBgl_get_line()\fR
 returns \fINULL\fR, and a following call to \fBgl_return_status()\fR will
 return \fBGLR_FDABORT\fR. Note that if the application needs \fBerrno\fR always
@@ -1435,24 +1357,20 @@ callback function should set \fBerrno\fR appropriately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLFD_REFRESH\fR\fR
 .ad
 .RS 17n
-.rt  
 Redraw the input line  then continue waiting for input. Return this if your
 callback wrote to the terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLFD_CONTINUE\fR\fR
 .ad
 .RS 17n
-.rt  
 Continue to wait for input, without redrawing the line.
 .RE
 
@@ -1511,12 +1429,10 @@ following enumerators to tell \fBgl_get_line()\fR how to procede after the
 timeout has been handled by the callback.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLTO_ABORT\fR\fR
 .ad
 .RS 17n
-.rt  
 Tell \fBgl_get_line()\fR to abort. When this happens, \fBgl_get_line()\fR will
 return \fINULL\fR, and a following call to \fBgl_return_status()\fR will return
 \fBGLR_TIMEOUT\fR. Note that if the application needs \fBerrno\fR always to
@@ -1526,24 +1442,20 @@ callback function should set \fBerrno\fR appropriately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLTO_REFRESH\fR\fR
 .ad
 .RS 17n
-.rt  
 Redraw the input line, then continue waiting for input. You should return this
 value if your callback wrote to the terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLTO_CONTINUE\fR\fR
 .ad
 .RS 17n
-.rt  
 In normal blocking-I/O mode, continue to wait for input, without redrawing the
 user's input line. In non-blocking server I/O mode (see
 \fBgl_io_mode\fR(3TECLA)), \fBgl_get_line()\fR acts as though I/O blocked. This
@@ -1598,36 +1510,30 @@ application's signal handlers to handle it, then, if the process still exists,
 returns \fINULL\fR and sets \fBerrno\fR as specified below.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGINT\fR\fR
 .ad
 .RS 11n
-.rt  
 This signal is generated both by the keyboard interrupt key (usually \fB^C\fR),
 and the keyboard break key. The \fBerrno\fR value is \fBEINTR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR\fR
 .ad
 .RS 11n
-.rt  
 This signal is generated when the controlling terminal exits. The \fBerrno\fR
 value is \fBENOTTY\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGPIPE\fR\fR
 .ad
 .RS 11n
-.rt  
 This signal is generated when a program attempts to write to a pipe whose
 remote end is not being read by any process. This can happen for example if you
 have called \fBgl_change_terminal()\fR to redirect output to a pipe hidden
@@ -1636,24 +1542,20 @@ under a pseudo terminal. The \fBerrno\fR value is \fBEPIPE\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGQUIT\fR\fR
 .ad
 .RS 11n
-.rt  
 This signal is generated by the keyboard quit key (usually \fB^\\fR). The
 \fBerrno\fR value is \fBEINTR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGABRT\fR\fR
 .ad
 .RS 11n
-.rt  
 This signal is generated by the standard C, abort function. By default it both
 terminates the process and generates a core dump. The \fBerrno\fR value is
 \fBEINTR\fR.
@@ -1661,12 +1563,10 @@ terminates the process and generates a core dump. The \fBerrno\fR value is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGTERM\fR\fR
 .ad
 .RS 11n
-.rt  
 This is the default signal that the UNIX kill command sends to processes. The
 \fBerrno\fR value is \fBEINTR\fR.
 .RE
@@ -1704,23 +1604,19 @@ terminal back to raw mode, redisplays the input line, and goes back to awaiting
 terminal input from the user.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGCONT\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated when a suspended process is resumed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGPOLL\fR\fR
 .ad
 .RS 13n
-.rt  
 On SVR4 systems, this signal notifies the process of an asynchronous I/O event.
 Note that under 4.3+BSD, \fBSIGIO\fR and \fBSIGPOLL\fR are the same. On other
 systems, \fBSIGIO\fR is ignored by default, so \fBgl_get_line()\fR does not
@@ -1729,114 +1625,94 @@ trap it by default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGPWR\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated when a power failure occurs (presumably when the
 system is on a UPS).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGALRM\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated when a timer expires.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGUSR1\fR\fR
 .ad
 .RS 13n
-.rt  
 An application specific signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGUSR2\fR\fR
 .ad
 .RS 13n
-.rt  
 Another application specific signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGVTALRM\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated when a virtual timer expires. See \fBsetitimer\fR(2).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGXCPU\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated when a process exceeds its soft CPU time limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGXFSZ\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated when a process exceeds its soft file-size limit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGTSTP\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated by the terminal suspend key, which is usually
 \fB^Z\fR, or the delayed terminal suspend key, which is usually \fB^Y\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGTTIN\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated if the program attempts to read from the terminal
 while the program is running in the background.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGTTOU\fR\fR
 .ad
 .RS 13n
-.rt  
 This signal is generated if the program attempts to write to the terminal while
 the program is running in the background.
 .RE
@@ -1891,57 +1767,47 @@ The \fIflags\fR argument is a bitwise OR of zero or more of the following
 enumerators:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_RESTORE_SIG\fR\fR
 .ad
 .RS 20n
-.rt  
 Restore the caller's signal environment while handling the signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_RESTORE_TTY\fR\fR
 .ad
 .RS 20n
-.rt  
 Restore the caller's terminal settings while handling the signal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_RESTORE_LINE\fR\fR
 .ad
 .RS 20n
-.rt  
 Move the cursor to the start of the line following the input line before
 invoking the application's signal handler.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_REDRAW_LINE\fR\fR
 .ad
 .RS 20n
-.rt  
 Redraw the input line when the application's signal handler returns.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_UNBLOCK_SIG\fR\fR
 .ad
 .RS 20n
-.rt  
 Normally, if the calling program has a signal blocked (see
 \fBsigprocmask\fR(2)), \fBgl_get_line()\fR does not trap that signal. This flag
 tells \fBgl_get_line()\fR to trap the signal and unblock it for the duration of
@@ -1950,12 +1816,10 @@ the call to \fBgl_get_line()\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_DONT_FORWARD\fR\fR
 .ad
 .RS 20n
-.rt  
 If this flag is included, the signal will not be forwarded to the signal
 handler of the calling program.
 .RE
@@ -1965,23 +1829,19 @@ handler of the calling program.
 Two commonly useful flag combinations are also enumerated as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_RESTORE_ENV\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBGLS_RESTORE_SIG\fR | \fBGLS_RESTORE_TTY\fR |\fBGLS_REDRAW_LINE\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_SUSPEND_INPUT\fR\fR
 .ad
 .RS 21n
-.rt  
 \fBGLS_RESTORE_ENV\fR | \fBGLS_RESTORE_LINE\fR
 .RE
 
@@ -2035,24 +1895,20 @@ the application's signal handler returns (if  it returns), can take any one of
 the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_RETURN\fR\fR
 .ad
 .RS 16n
-.rt  
 Return the completed input line, just as though the user had pressed the return
 key.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_ABORT\fR\fR
 .ad
 .RS 16n
-.rt  
 Cause \fBgl_get_line()\fR to abort. When this happens, \fBgl_get_line()\fR
 returns \fINULL\fR, and a following call to \fBgl_return_status()\fR will
 return \fBGLR_SIGNAL\fR. Note that if the application needs \fBerrno\fR always
@@ -2062,12 +1918,10 @@ callback function should set \fBerrno\fR appropriately.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGLS_CONTINUE\fR\fR
 .ad
 .RS 16n
-.rt  
 Resume command line editing.
 .RE
 
@@ -2566,15 +2420,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

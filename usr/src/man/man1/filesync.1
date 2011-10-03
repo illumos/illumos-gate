@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH filesync 1 "6 Nov 2000" "SunOS 5.11" "User Commands"
+.TH FILESYNC 1 "Nov 6, 2000"
 .SH NAME
 filesync \- synchronize ordinary, directory or special files
 .SH SYNOPSIS
 .LP
 .nf
-\fBfilesync\fR [\fB-aehmnqvy\fR] [\fB-o\fR src | dst] 
+\fBfilesync\fR [\fB-aehmnqvy\fR] [\fB-o\fR src | dst]
      [\fB-f\fR src | dst | old | new] [\fB-r\fR \fIdirectory\fR]...
 .fi
 
@@ -203,12 +203,10 @@ baseline files from being copied.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 28n
-.rt  
 Force the checking of Access Control Lists (\fBACL\fRs )  and attempt to make
 them agree for all new and changed files. If it is not possible to set the
 \fBACL\fR for a particular file, \fBfilesync\fR stops \fBACL\fR synchronization
@@ -221,12 +219,10 @@ attempting to do so will result in numerous error messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI dest-dir\fR\fR
 .ad
 .RS 28n
-.rt  
 Specify the directory on the destination system into which \fIfilename\fR is to
 be copied. Use with the \fB-s\fR\fI source-dir\fR option and the \fIfilename\fR
 operand. See \fB-s\fR and  \fBOPERANDS\fR.
@@ -234,12 +230,10 @@ operand. See \fB-s\fR and  \fBOPERANDS\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 28n
-.rt  
 Flag all differences. It may not be possible to resolve all conflicts involving
 modes and ownership (unless \fBfilesync\fR is being run with root privileges).
 If you cannot change the ownership or protections on a file, \fBfilesync\fR
@@ -250,12 +244,10 @@ differences.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-f\fR\fB src\fR | \fBdst\fR | \fBold\fR | \fBnew\fR\fR
 .ad
 .RS 28n
-.rt  
 The \fB-f\fR option tells \fBfilesync\fR how to resolve conflicting changes. If
 a file has been changed on both systems, and an \fB-f\fR option has been
 specified, \fBfilesync\fR will retain the changes made on the favored system
@@ -274,12 +266,10 @@ if they both specify the same preference  (\fBsrc \fRand\fB dst\fR). If
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 28n
-.rt  
 Halt on error. Normally, if \fBfilesync\fR encounters a read or write error
 while copying files, it notes the error and the program continues, in an
 attempt to reconcile other files. If the \fB-h\fR option is specified,
@@ -289,12 +279,10 @@ not try to process any more files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-m\fR\fR
 .ad
 .RS 28n
-.rt  
 Ensure that both copies of the file have the same modification time. The
 modification time for newly copied files is set to the time of reconciliation
 by default. File changes are ordered by increasing modification times so that
@@ -313,12 +301,10 @@ time prior to a  \fB\&.o\fR file that was built from a prior version of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 28n
-.rt  
 Do not really make the changes. If the  \fB-n\fR option is specified,
 \fBfilesync\fR determines what changes have been made to files, and what
 reconciliations are required and displays this information on the standard
@@ -334,12 +320,10 @@ description.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\fR\fB-o\fR\fB src | dst\fR\fR
 .ad
 .RS 28n
-.rt  
 The \fB-o\fR option forces a one-way reconciliation, favoring either the source
 system (\fBsrc\fR) or destination system (\fBdst\fR).
 .sp
@@ -366,12 +350,10 @@ they both specify the same preference (\fBsrc\fR or \fBdst\fR). If \fB-o\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 28n
-.rt  
 Suppress the standard \fBfilesync\fR messages that describe each reconciliation
 action as it is performed.
 .sp
@@ -382,24 +364,20 @@ form of a UNIX shell command (for example, \fBmv\fR, \fBln\fR, \fBcp\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI directory\fR\fR
 .ad
 .RS 28n
-.rt  
 Limit the reconciliation to  \fIdirectory\fR. Specify multiple directories with
 multiple \fB-r\fR specifications.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI source-dir\fR\fR
 .ad
 .RS 28n
-.rt  
 Specify the directory on the source system from which the  \fIfilename\fR to be
 copied is located. Use with the  \fB-d\fR\fI dest-dir\fR option and the
 \fIfilename\fR operand. See the \fB-d\fR option description and
@@ -408,24 +386,20 @@ copied is located. Use with the  \fB-d\fR\fI dest-dir\fR option and the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 28n
-.rt  
 Display additional information about each file comparison as it is made on the
 standard output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 28n
-.rt  
 Bypass safety check prompts. Nomadic machines occasionally move between
 domains, and many of the files on which \fBfilesync\fR operates are expected to
 be accessed by NFS. There is a danger that someday  \fBfilesync\fR will be
@@ -445,12 +419,10 @@ confirm these prompts.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfilename\fR\fR
 .ad
 .RS 12n
-.rt  
 The name of the ordinary file, directory, symbolic link, or special file in the
 specified source directory (\fIsource-dir\fR) to be synchronized. Specify
 multiple files by separating each filename by spaces. Use the \fIfilename\fR
@@ -511,12 +483,10 @@ switches).
 .SH ENVIRONMENT VARIABLES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBFILESYNC\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the default location of the \fBfilesync\fR packing rules and baseline
 files. The default value for this variable is \fB$HOME\fR. The suffixes
 \fB\&.packingrules\fR and \fB\&.filesync-base\fR will be appended to form the
@@ -525,12 +495,10 @@ names of the packing rules and baseline files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how diagnostic and informative messages are presented. In the "C"
 locale, the messages are presented in the default form found in the program
 itself (in most cases, U.S. English).
@@ -545,124 +513,102 @@ However, if either the \fB-n\fR option was specified or any errors occurred,
 the exit status will be the logical OR of the following:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 7n
-.rt  
 No conflicts, all files up to date.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 7n
-.rt  
 Some resolvable conflicts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 7n
-.rt  
 Some conflicts requiring manual resolution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB4\fR\fR
 .ad
 .RS 7n
-.rt  
 Some specified files did not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB8\fR\fR
 .ad
 .RS 7n
-.rt  
 Insufficient permission for some files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB16\fR\fR
 .ad
 .RS 7n
-.rt  
 Errors accessing packing rules or baseline file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB32\fR\fR
 .ad
 .RS 7n
-.rt  
 Invalid arguments.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB64\fR\fR
 .ad
 .RS 7n
-.rt  
 Unable to access either or both of the specified \fBsrc\fR or \fBdst\fR
 directories.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB128\fR\fR
 .ad
 .RS 7n
-.rt  
 Miscellaneous other failures.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.packingrules\fR\fR
 .ad
 .RS 24n
-.rt  
 list of files to be kept synchronized
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.filesync-base\fR\fR
 .ad
 .RS 24n
-.rt  
 baseline summary file
 .RE
 

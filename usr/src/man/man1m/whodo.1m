@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH whodo 1M "18 Jun 2003" "SunOS 5.11" "System Administration Commands"
+.TH WHODO 1M "Jun 18, 2003"
 .SH NAME
 whodo \- who is doing what
 .SH SYNOPSIS
@@ -34,23 +34,19 @@ that user.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 6n
-.rt  
 Suppress the heading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 Produce a long form of output. The fields displayed are: the user's login name,
 the name of the tty the user is on, the time of day the user logged in (in
 \fIhours\fR\fB:\fR\fIminutes\fR), the idle time \(em that is, the time since
@@ -117,12 +113,10 @@ variables is set in the environment, the "C" (U.S. style) locale determines how
 \fBwhodo\fR behaves.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_CTYPE\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how \fBwhodo\fR handles characters. When \fBLC_CTYPE\fR is set to a
 valid value, \fBwhodo\fR can display and handle text and filenames containing
 valid characters for that locale. The \fBwhodo\fR command can display and
@@ -134,12 +128,10 @@ valid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_MESSAGES\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how diagnostic and informative messages are presented. This includes
 the language and style of the messages, and the correct form of affirmative and
 negative responses. In the "C" locale, the messages are presented in the
@@ -148,12 +140,10 @@ default form found in the program itself (in most cases, U.S. English).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLC_TIME\fR\fR
 .ad
 .RS 15n
-.rt  
 Determines how \fBwhodo\fR handles date and time formats. In the "C" locale,
 date and time handling follow the U.S. rules.
 .RE
@@ -164,57 +154,47 @@ date and time handling follow the U.S. rules.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 18n
-.rt  
 System password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/utmpx\fR\fR
 .ad
 .RS 18n
-.rt  
 User access and administration information
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/pid\fR\fR
 .ad
 .RS 18n
-.rt  
 Contains PID
 .RE
 

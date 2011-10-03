@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_get_eventcookie 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_GET_EVENTCOOKIE 9F "Aug 21, 2007"
 .SH NAME
 ldi_get_eventcookie \- retrieve NDI event service cookie
 .SH SYNOPSIS
@@ -22,34 +22,28 @@ Obsolete
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_handle_t lh\fR\fR
 .ad
 .RS 26n
-.rt  
 Layered handle.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIchar *name\fR\fR
 .ad
 .RS 26n
-.rt  
 null-terminated string containing the event name.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIddi_eventcookie_t *ecp\fR\fR
 .ad
 .RS 26n
-.rt  
 Pointer to the kernel event cookie.
 .RE
 
@@ -74,23 +68,19 @@ with \fBldi_add_event_handler\fR(9F).
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Cookie handle is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Request was not serviceable by any nexus driver in the target device's
 ancestral device tree hierarchy.
 .RE

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devreserv 1M "5 Jul 1990" "SunOS 5.11" "System Administration Commands"
+.TH DEVRESERV 1M "Jul 5, 1990"
 .SH NAME
 devreserv \- reserve devices for exclusive use
 .SH SYNOPSIS
@@ -34,24 +34,20 @@ devices that are currently reserved to that key.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice-list\fR\fR
 .ad
 .RS 15n
-.rt  
 Defines a list of devices that \fBdevreserv\fR will search to find an available
 device. The list must be formatted as a single argument to the shell.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkey\fR\fR
 .ad
 .RS 15n
-.rt  
 Designates a unique key on which the device will be reserved. The key must be a
 positive integer.
 .RE
@@ -113,70 +109,58 @@ $ devreserv $key
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Command syntax was incorrect, an invalid was option used, or an internal error
 occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Device table or device reservation table could not be opened for reading.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 Device reservation request could not be fulfilled.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/device.tab\fR\fR
 .ad
 .RS 19n
-.rt  
- 
+
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/devlkfile\fR\fR
 .ad
 .RS 19n
-.rt  
- 
+
 .RE
 
 .SH SEE ALSO

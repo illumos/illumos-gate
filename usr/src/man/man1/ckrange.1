@@ -3,26 +3,26 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ckrange 1 "4 Nov 2005" "SunOS 5.11" "User Commands"
+.TH CKRANGE 1 "Nov 4, 2005"
 .SH NAME
 ckrange, errange, helprange, valrange \- prompts for and validates an integer
 .SH SYNOPSIS
 .LP
 .nf
-\fBckrange\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-l\fR \fIlower\fR] [\fB-u\fR \fIupper\fR] [\fB-b\fR \fIbase\fR] 
-     [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR] 
+\fBckrange\fR [\fB-Q\fR] [\fB-W\fR \fIwidth\fR] [\fB-l\fR \fIlower\fR] [\fB-u\fR \fIupper\fR] [\fB-b\fR \fIbase\fR]
+     [\fB-d\fR \fIdefault\fR] [\fB-h\fR \fIhelp\fR] [\fB-e\fR \fIerror\fR] [\fB-p\fR \fIprompt\fR]
      [\fB-k\fR \fIpid\fR [\fB-s\fR \fIsignal\fR]]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/errange\fR [\fB-W\fR \fIwidth\fR] [\fB-e\fR \fIerror\fR] [\fB-l\fR \fIlower\fR] 
+\fB/usr/sadm/bin/errange\fR [\fB-W\fR \fIwidth\fR] [\fB-e\fR \fIerror\fR] [\fB-l\fR \fIlower\fR]
      [\fB-u\fR \fIupper\fR] [\fB-b\fR \fIbase\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sadm/bin/helprange\fR [\fB-W\fR \fIwidth\fR] [\fB-h\fR \fIhelp\fR] [\fB-l\fR \fIlower\fR] 
+\fB/usr/sadm/bin/helprange\fR [\fB-W\fR \fIwidth\fR] [\fB-h\fR \fIhelp\fR] [\fB-l\fR \fIlower\fR]
      [\fB-u\fR \fIupper\fR] [\fB-b\fR \fIbase\fR]
 .fi
 
@@ -74,24 +74,20 @@ options.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR \fIbase\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the base for input. Must be 2 to 36, default is 10. Base conversion
 uses \fBstrtol\fR(3C). Output is always base 10.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR \fIdefault\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the default value as \fIdefault\fR. \fIdefault\fR is converted using
 \fBstrtol\fR(3C) in the desired base. Any characters invalid in the specified
 base will terminate the \fBstrtol\fR conversion without error.
@@ -99,80 +95,66 @@ base will terminate the \fBstrtol\fR conversion without error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIerror\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the error message as \fI error\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIhelp\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the help message as \fI help\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-k\fR \fIpid\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that process \fBID\fR \fIpid\fR is to be sent a signal if the user
 chooses to quit.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR \fIlower\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the lower limit of the range as \fIlower\fR. Default is the machine's
 largest negative long.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIprompt\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the prompt message as \fIprompt\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that quit will not be allowed as a valid response.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsignal\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that the process \fBID\fR \fIpid\fR defined with the \fB-k\fR option
 is to be sent signal \fIsignal\fR when quit is chosen. If no signal is
 specified,  \fBSIGTERM\fR is used.
@@ -180,24 +162,20 @@ specified,  \fBSIGTERM\fR is used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIupper\fR\fR
 .ad
 .RS 14n
-.rt  
 Defines the upper limit of the range as \fIupper\fR. Default is the machine's
 largest positive long.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-W\fR \fIwidth\fR\fR
 .ad
 .RS 14n
-.rt  
 Specifies that prompt, help and error messages will be formatted to a line
 length of \fIwidth\fR.
 .RE
@@ -208,12 +186,10 @@ length of \fIwidth\fR.
 The following operand is supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinput\fR\fR
 .ad
 .RS 9n
-.rt  
 Input to be verified against upper and lower limits and base.
 .RE
 
@@ -309,45 +285,37 @@ usage: valrange [-l lower] [-u upper] [-b base] input
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful execution.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 \fBEOF\fR on input, or negative width on \fB-W\fR option, or usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Usage error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB3\fR\fR
 .ad
 .RS 5n
-.rt  
 User termination (quit).
 .RE
 

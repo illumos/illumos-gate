@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ssh-keyscan 1 "24 Jul 2004" "SunOS 5.11" "User Commands"
+.TH SSH-KEYSCAN 1 "Jul 24, 2004"
 .SH NAME
 ssh-keyscan \- gather public ssh host keys of a number of hosts
 .SH SYNOPSIS
 .LP
 .nf
-\fBssh-keyscan\fR [\fB-v46\fR] [\fB-p\fR \fIport\fR] [\fB-T\fR \fItimeout\fR] [\fB-t\fR \fItype\fR] 
+\fBssh-keyscan\fR [\fB-v46\fR] [\fB-p\fR \fIport\fR] [\fB-T\fR \fItimeout\fR] [\fB-t\fR \fItype\fR]
      [\fB-f\fR \fIfile\fR] [\fB-\fR] [\fIhost\fR... | \fIaddrlist\fR \fInamelist\fR] [...]
 .fi
 
@@ -71,12 +71,10 @@ Output format for \fBrsa\fR and \fBdsa\fR keys, where \fIkeytype\fR is either
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fIfilename\fR\fR
 .ad
 .RS 28n
-.rt  
 Read hosts or addrlist namelist pairs from this file, one per line. If you
 specity - instead of a filename, \fBssh-keyscan\fR reads hosts or addrlist
 namelist pairs from the standard input.
@@ -84,23 +82,19 @@ namelist pairs from the standard input.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIport\fR\fR
 .ad
 .RS 28n
-.rt  
 Port to connect to on the remote host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fItimeout\fR\fR
 .ad
 .RS 28n
-.rt  
 Set the timeout for connection attempts. If \fItimeout\fR seconds have elapsed
 since a connection was initiated to a host or since the last time anything was
 read from that host, the connection is closed and the host in question is
@@ -109,12 +103,10 @@ considered unavailable. The default is for \fItimeout\fR is 5 seconds.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fItype\fR\fR
 .ad
 .RS 28n
-.rt  
 Specify the type of the key to fetch from the scanned hosts. The possible
 values for \fItype\fR are \fBrsa1\fR for protocol version 1 and \fBrsa\fR or
 \fBdsa\fR for protocol version 2. Specify multiple values by separating them
@@ -123,34 +115,28 @@ with commas. The default is \fBrsa1\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 28n
-.rt  
 Specify verbose mode. Print debugging messages about progress.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-4\fR\fR
 .ad
 .RS 28n
-.rt  
 Force to use IPv4 addresses only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-6\fR\fR
 .ad
 .RS 28n
-.rt  
 Forces to use IPv6 addresses only.
 .RE
 
@@ -197,12 +183,10 @@ $ ssh-keyscan -t rsa,dsa -f ssh_hosts | \e
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ssh_known_hosts\fR \fR
 .ad
 .RS 25n
-.rt  
 
 .RE
 
@@ -212,24 +196,20 @@ $ ssh-keyscan -t rsa,dsa -f ssh_hosts | \e
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 No usage errors. \fBssh-keyscan\fR might or might not have succeeded or failed
 to scan one, more or all of the given hosts.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 6n
-.rt  
 Usage error.
 .RE
 
@@ -241,13 +221,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

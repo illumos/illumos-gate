@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH netid 4 "23 May 1994" "SunOS 5.11" "File Formats"
+.TH NETID 4 "May 23, 1994"
 .SH NAME
 netid \- netname database
 .SH SYNOPSIS
@@ -54,12 +54,10 @@ associates a hostname with a netname.
 The  \fBnetid\fR file field descriptions are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fInetname\fR\fR
 .ad
 .RS 12n
-.rt  
 The operating system independent network name for the user or host.
 \fInetname\fR has one of two formats.  The format used to specify a host is of
 the form:
@@ -79,36 +77,30 @@ domain name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIuid\fR\fR
 .ad
 .RS 12n
-.rt  
 The numerical id of the user (see   \fBpasswd\fR(4)). When specifying a host
 name, \fIuid\fR is always zero.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
 .RS 12n
-.rt  
 The numerical id of the group the user belongs to (see  \fBgroup\fR(4)).
 Several groups, separated by commas, may be listed for a single \fIuid\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhostname\fR\fR
 .ad
 .RS 12n
-.rt  
 The local hostname (see  \fBhosts\fR(4)).
 .RE
 
@@ -136,56 +128,46 @@ unix.candlestick@campus1.bayarea.EDU	0:candlestick
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/group\fR\fR
 .ad
 .RS 18n
-.rt  
 groups file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 18n
-.rt  
 hosts database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/netid\fR\fR
 .ad
 .RS 18n
-.rt  
 netname database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 18n
-.rt  
 password file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/publickey\fR\fR
 .ad
 .RS 18n
-.rt  
 public key database
 .RE
 

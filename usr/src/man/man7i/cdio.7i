@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cdio 7I "4 Oct 2001" "SunOS 5.11" "Ioctl Requests"
+.TH CDIO 7I "Oct 4, 2001"
 .SH NAME
 cdio \- CD-ROM control operations
 .SH SYNOPSIS
@@ -39,67 +39,55 @@ The following \fBI/O\fR controls do not have any additional data passed into or
 received from them.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMSTART\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR spins up the disc and seeks to the last address requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMSTOP\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR spins down the disc.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMPAUSE\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR pauses the current audio play operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMRESUME\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR resumes the paused audio play operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMEJECT\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR ejects the caddy with the disc.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMCLOSETRAY\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR closes the caddy with the disc.
 .RE
 
@@ -109,12 +97,10 @@ The following \fBI/O\fR controls require a pointer to the structure for that
 \fBioctl()\fR, with data being passed into the \fBioctl()\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMPLAYMSF\fR\fR
 .ad
 .RS 19n
-.rt  
 This \fBioctl()\fR command requests the drive to output the audio signals at
 the specified starting address and continue the audio play until the specified
 ending address is detected. The address is in \fBMSF\fR format. The third
@@ -149,12 +135,10 @@ time of the  last audio track.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMPLAYTRKIND\fR\fR
 .ad
 .RS 19n
-.rt  
 This \fBioctl()\fR command is similar to  \fBCDROMPLAYMSF\fR. The starting and
 ending address is in track/index format. The third argument of the
 \fBioctl()\fR call is a pointer to the type \fBstruct cdrom_ti\fR.
@@ -177,12 +161,10 @@ struct cdrom_ti {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMVOLCTRL\fR\fR
 .ad
 .RS 19n
-.rt  
 This \fBioctl()\fR command controls the audio output level. The \fBSCSI\fR
 command allows the control of up to four channels. The current implementation
 of the supported \fBCD-ROM\fR drive only uses channel 0 and channel 1. The
@@ -213,12 +195,10 @@ The following \fBI/O\fR controls take a pointer that will have data returned to
 the user program from the \fBCD-ROM\fR driver.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMREADTOCHDR\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR command returns the header of the  table of contents (TOC).
 The header consists of the starting tracking number and the ending track number
 of the disc. These two numbers are returned through a pointer of  \fBstruct
@@ -241,12 +221,10 @@ struct cdrom_tochdr {
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMREADTOCENTRY\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR command returns the information of a specified track. The
 third argument of the function call is a pointer to the type \fBstruct
 cdrom_tocentry\fR. The caller needs to supply the track number and the address
@@ -282,12 +260,10 @@ To get the information from the leadout track, the following value is
 appropriate for the \fBcdte_track\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_LEADOUT\fR\fR
 .ad
 .RS 17n
-.rt  
 Leadout track
 .RE
 
@@ -295,35 +271,29 @@ To get the information from the data track, the following value is appropriate
 for the \fBcdte_ctrl\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_DATA_TRACK\fR\fR
 .ad
 .RS 20n
-.rt  
 Data track
 .RE
 
 The following values are appropriate for the  \fBcdte_format\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_LBA\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBLBA\fR format
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_MSF\fR\fR
 .ad
 .RS 13n
-.rt  
 \fBMSF\fR format
 .RE
 
@@ -331,12 +301,10 @@ The following values are appropriate for the  \fBcdte_format\fR field:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMSUBCHNL\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR command reads the Q sub-channel data of the current block.
 The subchannel data includes track number, index number, absolute \fBCD-ROM\fR
 address, track relative  \fBCD-ROM\fR address, control data and audio status.
@@ -376,67 +344,55 @@ The following values are valid for the audio status field returned from
 \fBREAD\fR \fBSUBCHANNEL\fR command:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_AUDIO_INVALID\fR\fR
 .ad
 .RS 25n
-.rt  
 Audio status not supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_AUDIO_PLAY\fR\fR
 .ad
 .RS 25n
-.rt  
 Audio play operation in progress.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_AUDIO_PAUSED\fR\fR
 .ad
 .RS 25n
-.rt  
 Audio play operation paused.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_AUDIO_COMPLETED\fR\fR
 .ad
 .RS 25n
-.rt  
 Audio play successfully completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_AUDIO_ERROR\fR\fR
 .ad
 .RS 25n
-.rt  
 Audio play stopped due to error.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_AUDIO_NO_STATUS\fR\fR
 .ad
 .RS 25n
-.rt  
 No current audio status to return.
 .RE
 
@@ -444,12 +400,10 @@ No current audio status to return.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMREADOFFSET\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR command returns the absolute \fBCD-ROM\fR address of the
 first track in the last session of a Multi-Session \fBCD-ROM\fR. The third
 argument of the \fBioctl()\fR call is a pointer to an \fBint\fR.
@@ -457,12 +411,10 @@ argument of the \fBioctl()\fR call is a pointer to an \fBint\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMCDDA\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR command returns the \fBCD-DA\fR data or the subcode data.
 The third argument of the \fBioctl()\fR call is a pointer to the type \fBstruct
 cdrom_cdda\fR. In addition to allocating memory and supplying its address, the
@@ -494,45 +446,37 @@ To get the subcode information related to  \fBCD-DA\fR data, the following
 values are appropriate for the  \fBcdda_subcode\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_DA_NO_SUBCODE\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBCD-DA\fR data with no subcode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_DA_SUBQ\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBCD-DA\fR data with sub Q code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_DA_ALL_SUBCODE\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBCD-DA\fR data with all subcode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_DA_SUBCODE_ONLY\fR\fR
 .ad
 .RS 25n
-.rt  
 All subcode only.
 .RE
 
@@ -540,7 +484,6 @@ To allocate the memory related to  \fBCD-DA\fR and/or subcode data, the
 following values are appropriate for each data  block transferred:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCD-DA\fR data with no subcode\fR
 .ad
@@ -551,7 +494,6 @@ following values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCD-DA\fR data with sub Q code\fR
 .ad
@@ -562,7 +504,6 @@ following values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCD-DA\fR data with all subcode\fR
 .ad
@@ -573,7 +514,6 @@ following values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fBAll subcode only\fR
 .ad
@@ -586,12 +526,10 @@ following values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMCDXA\fR\fR
 .ad
 .RS 21n
-.rt  
 This \fBioctl()\fR command returns the \fBCD-ROM\fR \fBXA\fR (CD-ROM Extended
 Architecture) data according to  \fBCD-ROM\fR \fBXA\fR format. The third
 argument of the \fBioctl()\fR call is a pointer to the type \fBstruct
@@ -619,34 +557,28 @@ To get the proper  \fBCD-ROM\fR \fBXA\fR data, the following values are
 appropriate for the  \fBcdxa_format\fR field:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_XA_DATA\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBCD-ROM\fR \fBXA\fR data only
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_XA_SECTOR_DATA\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBCD-ROM\fR \fBXA\fR all sector data
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_XA_DATA_W_ERROR\fR\fR
 .ad
 .RS 25n
-.rt  
 \fBCD-ROM\fR \fBXA\fR data with error flags data
 .RE
 
@@ -654,7 +586,6 @@ To allocate the memory related to  \fBCD-ROM\fR \fBXA\fR format, the following
 values are appropriate for each data  block transferred:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCD-ROM XA\fR data only\fR
 .ad
@@ -665,7 +596,6 @@ values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCD-ROM XA\fR all sector data\fR
 .ad
@@ -676,7 +606,6 @@ values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCD-ROM XA\fR data with error flags data\fR
 .ad
@@ -689,12 +618,10 @@ values are appropriate for each data  block transferred:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMSUBCODE\fR\fR
 .ad
 .RS 21n
-.rt  
 This  \fBioctl()\fR command returns raw subcode data (subcodes P ~ W are
 described in  the "Red Book," see \fBSEE ALSO\fR) to the initiator while the
 target is  playing audio. The third argument of the  \fBioctl()\fR call is a
@@ -723,12 +650,10 @@ The next group of \fBI/O\fR controls get and set various \fBCD-ROM\fR drive
 parameters.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMGBLKMODE\fR\fR
 .ad
 .RS 18n
-.rt  
 This  \fBioctl()\fR command returns the current block size used by the
 \fBCD-ROM\fR drive.  The third argument of the \fBioctl()\fR call is a pointer
 to an integer.
@@ -736,12 +661,10 @@ to an integer.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMSBLKMODE\fR\fR
 .ad
 .RS 18n
-.rt  
 This  \fBioctl()\fR command requests the \fBCD-ROM\fR drive to change from the
 current block size to the requested block size. The third argument of the
 \fBioctl()\fR call is an integer which contains the requested block size.
@@ -755,122 +678,100 @@ device on block boundaries and in block multiples.
 To set the proper block size, the following values are appropriate:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_512\fR\fR
 .ad
 .RS 18n
-.rt  
 512 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_1024\fR\fR
 .ad
 .RS 18n
-.rt  
 1024 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2048\fR\fR
 .ad
 .RS 18n
-.rt  
 2048 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2056\fR\fR
 .ad
 .RS 18n
-.rt  
 2056 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2336\fR\fR
 .ad
 .RS 18n
-.rt  
 2336 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2340\fR\fR
 .ad
 .RS 18n
-.rt  
 2340 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2352\fR\fR
 .ad
 .RS 18n
-.rt  
 2352 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2368\fR\fR
 .ad
 .RS 18n
-.rt  
 2368 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2448\fR\fR
 .ad
 .RS 18n
-.rt  
 2448 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2646\fR\fR
 .ad
 .RS 18n
-.rt  
 2646 bytes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_BLK_2647\fR\fR
 .ad
 .RS 18n
-.rt  
 2647 bytes
 .RE
 
@@ -878,24 +779,20 @@ To set the proper block size, the following values are appropriate:
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMGDRVSPEED\fR\fR
 .ad
 .RS 18n
-.rt  
 This \fBioctl()\fR command returns the current \fBCD-ROM\fR drive speed. The
 third argument of the  \fBioctl()\fR call is a pointer to an integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROMSDRVSPEED\fR\fR
 .ad
 .RS 18n
-.rt  
 This  \fBioctl()\fR command requests the \fBCD-ROM\fR drive to change the
 current drive speed to the requested drive speed. This speed setting is only
 applicable when reading data areas. The third argument of the  \fBioctl()\fR is
@@ -905,45 +802,37 @@ To set the  \fBCD-ROM\fR drive to the proper speed, the following values are
 appropriate:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_NORMAL_SPEED\fR\fR
 .ad
 .RS 23n
-.rt  
 150k/second
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_DOUBLE_SPEED\fR\fR
 .ad
 .RS 23n
-.rt  
 300k/second
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_QUAD_SPEED\fR\fR
 .ad
 .RS 23n
-.rt  
 600k/second
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCDROM_MAXIMUM_SPEED\fR\fR
 .ad
 .RS 23n
-.rt  
 300k/second (2x drive) 600k/second (4x drive)
 .RE
 

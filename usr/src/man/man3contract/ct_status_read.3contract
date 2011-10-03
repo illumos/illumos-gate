@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ct_status_read 3CONTRACT "1 Apr 2004" "SunOS 5.11" "Contract Management Library Functions"
+.TH CT_STATUS_READ 3CONTRACT "Apr 1, 2004"
 .SH NAME
 ct_status_read, ct_status_free, ct_status_get_id, ct_status_get_zoneid,
 ct_status_get_type, ct_status_get_state, ct_status_get_holder,
@@ -13,7 +13,7 @@ ct_status_get_critical \- common contract status functions
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -lcontract \fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-D_LARGEFILE64_SOURCE\fR \fB -lcontract \fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libcontract.h>
 
 \fBint\fR \fBct_status_read\fR(\fBint\fR \fIfd\fR, \fBint\fR \fIdetail\fR, \fBct_stathdl_t *\fR\fIstathdlp\fR);
@@ -130,45 +130,37 @@ The \fBct_status_get_state()\fR function returns the state of the contract.
 Valid state values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTS_OWNED\fR\fR
 .ad
 .RS 17n
-.rt  
 a contract that is currently owned by a process
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTS_INHERITED\fR\fR
 .ad
 .RS 17n
-.rt  
 a contract that has been inherited by a regent process contract
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTS_ORPHAN\fR\fR
 .ad
 .RS 17n
-.rt  
 a contract that has no owner and has not been inherited
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCTS_DEAD\fR\fR
 .ad
 .RS 17n
-.rt  
 a contract that is no longer in effect and will be automatically removed from
 the system as soon as the last reference to it is release (for example, an open
 status file descriptor)
@@ -232,12 +224,10 @@ the data described in the DESCRIPTION.
 The \fBct_status_read()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIdetail\fR level specified is invalid.
 .RE
 
@@ -249,15 +239,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

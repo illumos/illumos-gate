@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH poolbind 1M "9 Feb 2005" "SunOS 5.11" "System Administration Commands"
+.TH POOLBIND 1M "Feb 9, 2005"
 .SH NAME
 poolbind \- bind processes, tasks, or projects or query binding of processes to
 resource pools
@@ -42,59 +42,49 @@ process is bound to.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR \fIcommand\fR [\fIarguments\fR...]\fR
 .ad
 .RS 29n
-.rt  
 Executes \fIcommand\fR, bound to the pool you specify with \fB-p\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIidtype\fR\fR
 .ad
 .RS 29n
-.rt  
 This option, together with the \fIidlist\fR arguments, specifies one or more
 processes to which the poolbind command is to apply. The interpretation of
 \fIidlist\fR depends on the value of \fIidtype\fR. The valid \fIidtype\fR
 arguments and corresponding interpretations of \fIidlist\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpid\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIidlist\fR is a list of process \fBID\fRs. Binds the specified processes to
 the specified pool. This is the default behavior if no idtype is specified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItaskid\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIidlist\fR is a list of task IDs. Bind all processes within the list of task
 IDs to the specified pool.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprojid\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIidlist\fR is a list of project \fBID\fRs. Bind all processes within the list
 of projects to the specified pool. Each project \fBID\fR can be specified as
 either a project name or a numerical project \fBID\fR. See \fBproject\fR(4).
@@ -102,12 +92,10 @@ either a project name or a numerical project \fBID\fR. See \fBproject\fR(4).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIzoneid\fR\fR
 .ad
 .RS 10n
-.rt  
 \fIidlist\fR is a list of zone \fBID\fRs. Bind all processes within the list of
 zones to the specified pool. Each zone \fBID\fR can be specified as either a
 zone name or a numerical zone \fBID\fR. See \fBzones\fR(5).
@@ -117,24 +105,20 @@ zone name or a numerical zone \fBID\fR. See \fBzones\fR(5).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIpoolname\fR\fR
 .ad
 .RS 29n
-.rt  
 Specifies the name of a pool to which the specified zone, project, tasks, or
 processes are to be bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR \fIpid\fR ...\fR
 .ad
 .RS 29n
-.rt  
 Queries the pool bindings for a given list of process \fBID\fRs. If the
 collection of resources associated with the process does not correspond to any
 currently existing pool, or if there are multiple pools with the set of
@@ -144,12 +128,10 @@ process \fBID\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Q\fR \fIpid\fR ...\fR
 .ad
 .RS 29n
-.rt  
  Queries the resource bindings for a given list of process IDs. The resource
 bindings are each reported on a separate line.
 .RE
@@ -220,34 +202,28 @@ example# /usr/sbin/poolbind \fB-Q\fR $$
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 Requested operation could not be completed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid command line options were specified.
 .RE
 
@@ -259,13 +235,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability See below.
+Interface Stability	 See below.
 .TE
 
 .sp

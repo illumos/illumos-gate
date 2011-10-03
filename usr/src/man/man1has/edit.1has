@@ -4,28 +4,28 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH edit "1has" "11 Jun 2004" "SunOS 5.11" "User Commands"
+.TH EDIT 1HAS "Jun 11, 2004"
 .SH NAME
 edit \- text editor (variant of ex for casual users)
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg4/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]] 
-     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR] 
+\fB/usr/xpg6/bin/edit\fR [\fB-|\fR \fB-s\fR] [\fB-l\fR] [\fB-L\fR] [\fB-R\fR] [\fB-r\fR [\fIfilename\fR]]
+     [\fB-t\fR \fItag\fR] [\fB-v\fR] [\fB-V\fR] [\fB-x\fR] [\fB-w\fR\fIn\fR] [\fB-C\fR]
      [+\fIcommand\fR | \fB-c\fR \fIcommand\fR] \fIfilename\fR...
 .fi
 
@@ -37,45 +37,37 @@ new or casual users who wish to use a command-oriented editor. It operates
 precisely as \fBex\fR with the following options automatically set:
 .sp
 .ne 2
-.mk
 .na
 \fBnovice\fR
 .ad
 .RS 12n
-.rt  
 \fBON\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBreport\fR
 .ad
 .RS 12n
-.rt  
 \fBON\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBshowmode\fR
 .ad
 .RS 12n
-.rt  
 \fBON\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBmagic\fR
 .ad
 .RS 12n
-.rt  
 \fBOFF\fR
 .RE
 
@@ -225,12 +217,10 @@ These options can be turned on or off using the \fBset\fR command in
 \fBex\fR(1).
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-C\fR\fR
 .ad
 .RS 26n
-.rt  
 Encryption option; same as the \fB-x\fR option, except that \fBvi\fR simulates
 the \fBC\fR command of \fBex\fR. The \fBC\fR command is like the \fBX\fR
 command of \fBex\fR, except that all text read in is assumed to have been
@@ -239,82 +229,68 @@ encrypted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 26n
-.rt  
 Set up for editing LISP programs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 26n
-.rt  
 List the name of all files saved as the result of an editor or system crash.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR\fR
 .ad
 .RS 26n
-.rt  
 \fBReadonly\fR mode; the \fBreadonly\fR flag is set, preventing accidental
 overwriting of the file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI filename\fR\fR
 .ad
 .RS 26n
-.rt  
 Edit \fIfilename\fR after an editor or system crash. (Recovers the version of
 \fIfilename\fR that was in the buffer when the crash occurred.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR\fI tag\fR \fR
 .ad
 .RS 26n
-.rt  
 Edit the file containing the \fItag\fR and position the editor at its
 definition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 26n
-.rt  
 Start up in display editing state using \fBvi\fR. You can achieve the same
 effect by simply typing the \fBvi\fR command itself.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 26n
-.rt  
 Verbose. When \fBex\fR commands are read by means of standard input, the input
 is echoed to standard error. This can be useful when processing \fBex\fR
 commands within shell scripts.
@@ -322,12 +298,10 @@ commands within shell scripts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
 .RS 26n
-.rt  
 Encryption option; when used, \fBedit\fR simulates the \fBX\fR command of
 \fBex\fR and prompts the user for a key. This key is used to encrypt and
 decrypt text using the algorithm of the \fBcrypt\fR command. The \fBX\fR
@@ -338,36 +312,30 @@ version of the key typed in for the \fB-x\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fIn\fR\fR
 .ad
 .RS 26n
-.rt  
 Set the default window size to \fIn\fR. This is useful when using the editor
 over a slow speed line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB+\fR\fIcommand\fR | \fB-c\fR\fI  command\fR\fR
 .ad
 .RS 26n
-.rt  
 Begin editing by executing the specified editor \fBcommand\fR (usually a search
 or positioning command).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB\(mi\fR | \fB-s\fR \fR
 .ad
 .RS 26n
-.rt  
 Suppress all interactive user feedback.  This is useful when processing editor
 scripts.
 .RE
@@ -384,12 +352,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
-CSIEnabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg4/bin/edit"
@@ -397,11 +365,12 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-CSIEnabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+CSI	Enabled
 .TE
 
 .SS "/usr/xpg6/bin/edit"
@@ -409,11 +378,12 @@ CSIEnabled
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-CSIEnabled
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+CSI	Enabled
 .TE
 
 .SH SEE ALSO

@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH setproject 3PROJECT "10 Apr 2007" "SunOS 5.11" "Project Database Access Library Functions"
+.TH SETPROJECT 3PROJECT "Apr 10, 2007"
 .SH NAME
 setproject \- associate a user process with a project
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lproject\fR [ \fIlibrary \&.\|.\|.\fR ] 
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lproject\fR [ \fIlibrary \&.\|.\|.\fR ]
 #include <project.h>
 
 \fBint\fR \fBsetproject\fR(\fBconst char *\fR\fIproject_name\fR, \fBconst char *\fR\fIuser_name\fR,
@@ -65,23 +65,19 @@ The \fBsetproject()\fR function will fail during project assignment or task
 creation if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 The invoking task was created with the \fBTASK_FINAL\fR flag.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 10n
-.rt  
 A resource control limiting the number of LWPs or tasks in the target project
 or zone has been exceeded.
 .sp
@@ -90,12 +86,10 @@ A resource control on the given project would be exceeded.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The project ID associated with the given project is not within the range of
 valid project IDs, invalid flags were specified, or \fIuser_name\fR is
 \fINULL\fR.
@@ -103,23 +97,19 @@ valid project IDs, invalid flags were specified, or \fIuser_name\fR is
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective user of the calling process is not superuser.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified user is not a valid user of the given project, \fIuser_name\fR is
 not valid user name, or \fIproject_name\fR is not valid project name.
 .RE
@@ -129,34 +119,28 @@ not valid user name, or \fIproject_name\fR is not valid project name.
 The \fBsetproject()\fR function will fail during pool binding if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 10n
-.rt  
 No resource pool accepting default bindings exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective user of the calling process is not superuser.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBESRCH\fR\fR
 .ad
 .RS 10n
-.rt  
 The specified resource pool is unknown
 .RE
 
@@ -257,15 +241,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

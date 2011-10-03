@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcptab 4 "15 Mar 2002" "SunOS 5.11" "File Formats"
+.TH DHCPTAB 4 "Mar 15, 2002"
 .SH NAME
 dhcptab \- DHCP configuration parameter table
 .SH DESCRIPTION
@@ -32,12 +32,10 @@ it. However, any \fBdhcptab\fR must contain the following fields in each
 record:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBName\fR\fR
 .ad
 .RS 9n
-.rt  
 This field identifies the macro or symbol record and is used as a search key
 into the \fBdhcptab\fR table. The name of a macro or symbol must consist of
 \fBASCII\fR characters, with the length limited to 128 characters. Names can
@@ -46,33 +44,27 @@ include spaces, except at the end of the name. The name is not case-sensitive.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBType\fR\fR
 .ad
 .RS 9n
-.rt  
 This field specifies the type of record and is used as a search key into the
 \fBdhcptab\fR. Currently, there are only two legal values for \fBType\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 This record is a \fBDHCP\fR macro definition.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 This record is a \fBDHCP\fR symbol definition. It is used to define vendor and
 site-specific options.
 .RE
@@ -81,12 +73,10 @@ site-specific options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBValue\fR\fR
 .ad
 .RS 9n
-.rt  
 This field contains the value for the specified type of record. For the \fBm\fR
 type, the value will consist of a series of symbol=value pairs, separated by
 the colon (\fB:\fR) character. For the \fBs\fR type, the value will consist of
@@ -101,33 +91,27 @@ The Value field of a symbols definition contain the following fields describing
 the characteristics of a symbol:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBContext\fR\fR
 .ad
 .RS 15n
-.rt  
 This field defines the context in which the symbol definition is to be used. It
 can have one of the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSite\fR\fR
 .ad
 .RS 27n
-.rt  
 This symbol defines a site-specific option, codes 128-254.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBVendor=Client Class ...\fR\fR
 .ad
 .RS 27n
-.rt  
 This symbol defines a vendor-specific option, codes 1-254. The Vendor context
 takes \fBASCII\fR string arguments which identify the client class that this
 vendor option is associated with. Multiple client class names can be specified,
@@ -141,12 +125,10 @@ periods replacing commas.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCode\fR\fR
 .ad
 .RS 15n
-.rt  
 This field specifies the option code number associated with this symbol. Valid
 values are 128-254 for site-specific options, and 1-254 for vendor-specific
 options.
@@ -154,22 +136,18 @@ options.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBType\fR\fR
 .ad
 .RS 15n
-.rt  
 This field defines the type of data expected as a value for this symbol, and is
 not case-sensitive. Legal values are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBASCII\fR\fR
 .ad
 .RS 11n
-.rt  
 \fBNVT ASCII\fR text. Value is enclosed in double-quotes (\fB"\fR). Granularity
 setting has no effect on symbols of this type, since \fBASCII\fR strings have a
 natural granularity of one (1).
@@ -177,12 +155,10 @@ natural granularity of one (1).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBBOOLEAN\fR\fR
 .ad
 .RS 11n
-.rt  
 No value is associated with this data type. Presence of symbols of this type
 denote boolean \fBTRUE,\fR whereas absence denotes \fBFALSE.\fR Granularity and
 Miximum values have no meaning for symbols of this type.
@@ -190,24 +166,20 @@ Miximum values have no meaning for symbols of this type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP\fR\fR
 .ad
 .RS 11n
-.rt  
 Dotted decimal form of an Internet address. Multi-IP address granularity is
 supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNUMBER\fR\fR
 .ad
 .RS 11n
-.rt  
 An unsigned number with a supported granularity of \fB1\fR, \fB2\fR, \fB4\fR,
 and \fB8\fR octets.
 .sp
@@ -218,12 +190,10 @@ Valid \fBNUMBER\fR types are: \fBUNUMBER8\fR, \fBSNUMBER8\fR, \fBUNUMBER16\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBOCTET\fR\fR
 .ad
 .RS 11n
-.rt  
 Uninterpreted \fBASCII\fR representation of binary data. The client identifier
 is one example of an \fBOCTET\fR string. Valid characters are \fB0\fR-\fB9\fR,
 \fBa\fR-\fBf\fR, \fBA\fR-\fBF\fR. One \fBASCII\fR character represents one
@@ -240,8 +210,8 @@ as:
 .sp
 .in +2
 .nf
-slpparams 
-Macro 
+slpparams
+Macro
 :SLP_DA=00c0a80105c0a80085:
 .fi
 .in -2
@@ -252,12 +222,10 @@ Macro
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGranularity\fR\fR
 .ad
 .RS 15n
-.rt  
 This value specifies how many objects of \fBType\fR define a single
 \fBinstance\fR of the symbol value. For example, the static route option is
 defined to be a variable list of routes. Each route consists of two \fBIP\fR
@@ -268,12 +236,10 @@ affects the \fBIP\fR and \fBNUMBER\fR data types.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMaximum\fR\fR
 .ad
 .RS 15n
-.rt  
 This value specifies the maximum items of \fBGranularity\fR which are
 permissible in a definition using this symbol. For example, there can only be
 one \fBIP\fR address specified for a subnet mask, so the  \fBMaximum\fR number
@@ -335,12 +301,10 @@ determine the options that are returned to the requesting client.
 These macros are processed in the following order:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClient Class\fR\fR
 .ad
 .RS 21n
-.rt  
 A macro named using the \fBASCII\fR representation of the client class (e.g.
 \fBSUNW.Ultra-30\fR) is searched for in the \fBdhcptab\fR. If found, its
 symbol/value pairs will be selected for delivery to the client. This mechanism
@@ -350,12 +314,10 @@ returned to all clients of the same class.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNetwork\fR\fR
 .ad
 .RS 21n
-.rt  
 A macro named by the dotted Internet form of the network address of the
 client's network (for example, \fB10.0.0.0\fR) is searched for in the
 \fBdhcptab\fR. If found, its symbol/value pairs will be combined with those of
@@ -367,12 +329,10 @@ parameters to be returned to all clients on the same network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIP Address\fR\fR
 .ad
 .RS 21n
-.rt  
 This macro may be named anything, but must be specified in the \fBDHCP\fR
 network table for the IP address record assigned to the requesting client. If
 this macro is found in the \fBdhcptab\fR, then its symbol/value pairs will be
@@ -386,12 +346,10 @@ entries owned by a specific server.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBClient Identifier\fR\fR
 .ad
 .RS 21n
-.rt  
 A macro named by the \fBASCII\fR representation of the client's unique
 identifier as shown in the \fBDHCP\fR network table (see
 \fBdhcp_network\fR(4)). If found, its symbol/value pairs are combined to the

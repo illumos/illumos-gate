@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH mbrlen 3C "1 Nov 2003" "SunOS 5.11" "Standard C Library Functions"
+.TH MBRLEN 3C "Nov 1, 2003"
 .SH NAME
 mbrlen \- get number of bytes in a character (restartable)
 .SH SYNOPSIS
@@ -49,36 +49,30 @@ current locale.  See \fBenviron\fR(5).
 The \fBmbrlen()\fR function returns the first of the following that applies:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 17n
-.rt  
 If the next \fIn\fR or fewer bytes complete the character that corresponds to
 the null wide-character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpositive\fR\fR
 .ad
 .RS 17n
-.rt  
 If the next \fIn\fR or fewer bytes complete a valid character; the value
 returned is the number of bytes that complete the character.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(size_t)\(mi2\fR\fR
 .ad
 .RS 17n
-.rt  
 If the next \fIn\fR bytes contribute to an incomplete but potentially valid
 character, and all \fIn\fR bytes have been processed. When \fIn\fR has at least
 the value of the \fBMB_CUR_MAX\fR macro, this case can only occur if  \fIs\fR
@@ -88,12 +82,10 @@ state-dependent encodings).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB(size_t)\(mi1\fR\fR
 .ad
 .RS 17n
-.rt  
 If an encoding error occurs, in which case the next \fIn\fR or fewer bytes do
 not contribute to a complete and valid  character.  In this case, \fBEILSEQ\fR
 is stored in \fBerrno\fR and the conversion state is undefined.
@@ -105,24 +97,20 @@ is stored in \fBerrno\fR and the conversion state is undefined.
 The \fBmbrlen()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The \fIps\fR argument points to an object that contains an invalid conversion
 state.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 10n
-.rt  
 Invalid character sequence is detected.
 .RE
 
@@ -134,15 +122,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelSee NOTES below
+MT-Level	See NOTES below
 .TE
 
 .SH SEE ALSO

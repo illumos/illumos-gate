@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH xdr 3NSL "30 Dec 1996" "SunOS 5.11" "Networking Services Library Functions"
+.TH XDR 3NSL "Dec 30, 1996"
 .SH NAME
 xdr \- library routines for external data representation
 .SH DESCRIPTION
@@ -19,463 +19,379 @@ The following table lists \fBXDR\fR routines and the manual reference pages on
 which they are described:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBXDR Routine\fR\fR
 .ad
 .RS 22n
-.rt  
  \fBManual Reference Page\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_array\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_bool\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_bytes\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_char\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_control\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_destroy\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_double\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_enum\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_float\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_free\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_getpos\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_hyper\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_inline\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_int\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_long\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_longlong_t\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_opaque\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_pointer\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_quadruple\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_reference\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_setpos\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_short\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_sizeof\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_string\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_char\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_hyper\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_int\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_long\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_longlong_t\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_u_short\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_union\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_vector\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_void\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_simple\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdr_wrapstring\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_complex\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrmem_create\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrrec_create\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_create\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrrec_endofrecord\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrrec_eof\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrrec_readbytes\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrrec_skiprecord\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_admin\fR(3NSL)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBxdrstdio_create\fR\fR
 .ad
 .RS 22n
-.rt  
 \fBxdr_create\fR(3NSL)
 .RE
 
@@ -487,13 +403,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

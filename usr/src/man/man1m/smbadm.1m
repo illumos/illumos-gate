@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH smbadm 1M "8 Jan 2009" "SunOS 5.11" "System Administration Commands"
+.TH SMBADM 1M "Jan 8, 2009"
 .SH NAME
 smbadm \- configure and manage CIFS local groups and users, and manage domain
 membership
@@ -108,7 +108,6 @@ When the \fBCIFS\fR server is started, the following built-in groups are
 available:
 .sp
 .ne 2
-.mk
 .na
 \fBAdministrators\fR
 .ad
@@ -119,7 +118,6 @@ Group members can administer the system.
 
 .sp
 .ne 2
-.mk
 .na
 \fBBackup Operators\fR
 .ad
@@ -130,7 +128,6 @@ Group members can bypass file access controls to back up and restore files.
 
 .sp
 .ne 2
-.mk
 .na
 \fBPower Users\fR
 .ad
@@ -173,7 +170,6 @@ special characters, see the man page for your shell.
 The \fBsmbadm\fR command uses the following operands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdomain\fR\fR
 .ad
@@ -184,7 +180,6 @@ Specifies the name of an existing Windows domain to join.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIgroup\fR\fR
 .ad
@@ -195,7 +190,6 @@ Specifies the name of the \fBCIFS\fR local group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIusername\fR\fR
 .ad
@@ -210,7 +204,6 @@ Specifies the name of a Solaris local user.
 The \fBsmbadm\fR command includes these subcommands:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd-member\fR -m \fImember\fR [[-m \fImember\fR] \&.\|.\|.]
 \fIgroup\fR\fR
@@ -238,7 +231,6 @@ is the name of a user in the \fBsales\fR domain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcreate\fR [\fB-d\fR \fIdescription\fR] \fIgroup\fR\fR
 .ad
@@ -250,7 +242,6 @@ specify a description of the group by using the \fB-d\fR option.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR \fIgroup\fR\fR
 .ad
@@ -262,7 +253,6 @@ deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisable\fR \fIusername\fR\fR
 .ad
@@ -276,7 +266,6 @@ command to modify the user's SMB password until the user account is reenabled.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBenable\fR \fIusername\fR\fR
 .ad
@@ -294,7 +283,6 @@ configuration.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR [[\fB-p\fR \fIproperty\fR=\fIvalue\fR] \&.\|.\|.] \fIgroup\fR\fR
 .ad
@@ -306,7 +294,6 @@ all property values are shown.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjoin\fR \fB-u\fR \fIusername\fR \fIdomain\fR\fR
 .ad
@@ -346,7 +333,6 @@ domain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBjoin\fR \fB-w\fR \fIworkgroup\fR\fR
 .ad
@@ -360,7 +346,6 @@ when using the \fBjoin\fR subcommand.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlist\fR\fR
 .ad
@@ -374,45 +359,37 @@ domain names.
 Each entry in the ouput is identified by one of the following tags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB- [*] -\fR\fR
 .ad
 .RS 11n
-.rt  
 Primary domain
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB- [.] -\fR\fR
 .ad
 .RS 11n
-.rt  
 Local domain
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB- [-] -\fR\fR
 .ad
 .RS 11n
-.rt  
 Other domains
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB- [+] -\fR\fR
 .ad
 .RS 11n
-.rt  
 Selected domain controller
 .RE
 
@@ -420,7 +397,6 @@ Selected domain controller
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBremove-member\fR -m \fImember\fR [[-m \fImember\fR] \&.\|.\|.]
 \fIgroup\fR\fR
@@ -449,7 +425,6 @@ is the name of a user in the \fBsales\fR domain.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrename\fR \fIgroup\fR \fInew-group\fR\fR
 .ad
@@ -461,7 +436,6 @@ built-in groups cannot be renamed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBset\fR \fB-p\fR \fIproperty\fR=\fIvalue\fR [[\fB-p\fR
 \fIproperty\fR=\fIvalue\fR] \&.\|.\|.] \fIgroup\fR\fR
@@ -477,7 +451,6 @@ properties to be set on the specified group.
 The group-related properties are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbackup=[on|off]\fR\fR
 .ad
@@ -489,7 +462,6 @@ controls to back up file system objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdescription=\fR\fIdescription-text\fR\fR
 .ad
@@ -500,7 +472,6 @@ Specifies a text description for the \fBCIFS\fR local group.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestore=[on|off]\fR\fR
 .ad
@@ -512,7 +483,6 @@ controls to restore file system objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtake-ownership=[on|off]\fR\fR
 .ad
@@ -526,7 +496,6 @@ file system objects.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow\fR [\fB-m\fR] [\fB-p\fR] [\fIgroup\fR]\fR
 .ad
@@ -544,23 +513,19 @@ specified, the group privileges are also shown.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB0\fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>0\fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
@@ -573,17 +538,16 @@ attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Utility Name and OptionsUncommitted
+Utility Name and Options	Uncommitted
 _
-Utility Output FormatNot-An-Interface
+Utility Output Format	Not-An-Interface
 _
-\fBsmbadm join\fRObsolete
+\fBsmbadm join\fR	Obsolete
 .TE
 
 .SH SEE ALSO

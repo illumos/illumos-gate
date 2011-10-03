@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH p_online 2 "11 Jan 2009" "SunOS 5.11" "System Calls"
+.TH P_ONLINE 2 "Jan 11, 2009"
 .SH NAME
 p_online \- return or change processor operational status
 .SH SYNOPSIS
@@ -101,12 +101,10 @@ state remains unchanged, and  \fBerrno\fR is set to indicate the error.
 The \fBp_online()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fIflag\fR was \fBP_OFFLINE\fR or \fBP_SPARE\fR and the specified processor
 is the only on-line processor, there are currently  \fBLWPs\fR bound to the
 processor, or the processor performs some essential function that cannot be
@@ -122,12 +120,10 @@ platform- specific resource is not available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 11n
-.rt  
 A non-existent processor \fBID\fR was specified or  \fIflag\fR was invalid.
 .sp
 The caller is in a non-global zone, the pools facility is active, and the
@@ -136,24 +132,20 @@ processor is not a member of the zone's pool's processor set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 The specified processor is powered off, and the platform does not support power
 on of individual processors.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPERM\fR\fR
 .ad
 .RS 11n
-.rt  
 The flag was not \fBP_STATUS\fR and the {\fBPRIV_SYS_RES_CONFIG\fR} privilege
 is not asserted in the effective set of the calling process.
 .RE
@@ -197,13 +189,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

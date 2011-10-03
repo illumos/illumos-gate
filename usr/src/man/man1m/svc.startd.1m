@@ -1,21 +1,21 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2011, Joyent Inc 
+.\" Copyright 2011, Joyent Inc
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH svc.startd 1M "18 Mar 2011" "SunOS 5.11" "System Administration Commands"
+.TH SVC.STARTD 1M "Mar 18, 2011"
 .SH NAME
 svc.startd \- Service Management Facility master restarter
 .SH SYNOPSIS
 .LP
 .nf
-\fB/lib/svc/bin/svc.startd\fR 
+\fB/lib/svc/bin/svc.startd\fR
 .fi
 
 .LP
 .nf
-\fBsvc:/system/svc/restarter:default\fR 
+\fBsvc:/system/svc/restarter:default\fR
 .fi
 
 .SH DESCRIPTION
@@ -70,7 +70,6 @@ The following configuration variables in the \fBoptions\fR property group are
 available to developers and administrators:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBboot_messages\fR\fR
 .ad
@@ -88,7 +87,6 @@ service started to indicate success or failure. You can use the \fBboot\fR
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlogging\fR\fR
 .ad
@@ -114,7 +112,6 @@ global logfile, and a single message per service started to the console.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmilestone\fR\fR
 .ad
@@ -143,7 +140,6 @@ property is specified, it overrides any \fBinitdefault\fR setting in
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsystem/reconfigure\fR\fR
 .ad
@@ -180,7 +176,6 @@ to take action based on service instance health. The \fBsvcs\fR(1) command can
 be used to easily display these properties.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestarter/state\fR\fR
 .ad
@@ -195,7 +190,6 @@ The current and next (if currently in transition) state for an instance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestarter/auxiliary_state\fR\fR
 .ad
@@ -205,12 +199,10 @@ A caption detailing additional information about the current instance state.
 The auxiliary state available for services managed by \fBsvc.startd\fR is:
 .sp
 .ne 2
-.mk
 .na
 \fBmaintenance\fR
 .ad
 .RS 15n
-.rt  
 .sp
 .in +2
 .nf
@@ -227,7 +219,6 @@ administrative_request
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestarter/state_timestamp\fR\fR
 .ad
@@ -238,7 +229,6 @@ The time when the current state was reached.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrestarter/contract\fR\fR
 .ad
@@ -274,12 +264,10 @@ The general form of methods for the fork/exec model provided by
 are supported as required or optional by services managed by \fBsvc.startd\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrefresh\fR\fR
 .ad
 .RS 11n
-.rt  
 Reload any appropriate configuration parameters from the repository or
 \fBconfig\fR file, without interrupting service. This is often implemented
 using \fBSIGHUP\fR for system daemons. If the service is unable to recognize
@@ -290,12 +278,10 @@ This method is optional.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstart\fR\fR
 .ad
 .RS 11n
-.rt  
 Start the service. Return success only after the application is available to
 consumers. Fail if a conflicting instance is already running, or if the service
 is unable to start.
@@ -305,12 +291,10 @@ This method is required.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstop\fR\fR
 .ad
 .RS 11n
-.rt  
 Stop the service. In some cases, the stop method can be invoked when some or
 all of the service has already been stopped. Only return an error if the
 service is not entirely stopped on method return.
@@ -337,7 +321,6 @@ specific way in which these general properties interacts with \fBsvc.startd\fR
 follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgeneral/enabled\fR\fR
 .ad
@@ -350,7 +333,6 @@ disabled state, not running.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgeneral/restarter\fR\fR
 .ad
@@ -364,7 +346,6 @@ available) for managing the service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgeneral/single_instance\fR\fR
 .ad
@@ -380,9 +361,8 @@ Additionally, \fBsvc.startd\fR managed services can define the optional
 properties listed below in the \fBstartd\fR property group.
 .sp
 .ne 2
-.mk
 .na
-\fB\fBstartd/critical_failure_count\fR 
+\fB\fBstartd/critical_failure_count\fR
 .ad
 .br
 .na
@@ -400,7 +380,6 @@ service to maintenance.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstartd/duration\fR\fR
 .ad
@@ -413,7 +392,6 @@ The \fBduration\fR property defines the service's model. It can be set to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstartd/ignore_error\fR\fR
 .ad
@@ -426,7 +404,6 @@ ignored events. Legitimate string values in that list are \fBcore\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstartd/need_session\fR\fR
 .ad
@@ -438,7 +415,6 @@ should be launched in its own session. The default is not to do so.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstartd/utmpx_prefix\fR\fR
 .ad
@@ -527,7 +503,6 @@ numbers.
 The milestone to run-level mapping is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmilestone/single-user\fR\fR
 .ad
@@ -538,7 +513,6 @@ Single-user (\fBS\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmilestone/multi-user\fR\fR
 .ad
@@ -549,7 +523,6 @@ Multi-user (\fB2\fR)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmilestone/multi-user-server\fR\fR
 .ad
@@ -569,23 +542,19 @@ captured as a convenience for the administrator.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/svc/log\fR\fR
 .ad
 .RS 21n
-.rt  
 Directory where \fBsvc.startd\fR stores log files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/svc/volatile\fR\fR
 .ad
 .RS 21n
-.rt  
 Directory where \fBsvc.startd\fR stores log files in early stages of boot,
 before \fB/var\fR is mounted read-write.
 .RE

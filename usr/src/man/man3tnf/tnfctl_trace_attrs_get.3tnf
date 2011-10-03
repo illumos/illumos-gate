@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tnfctl_trace_attrs_get 3TNF "4 Mar 1997" "SunOS 5.11" "TNF Library Functions"
+.TH TNFCTL_TRACE_ATTRS_GET 3TNF "Mar 4, 1997"
 .SH NAME
 tnfctl_trace_attrs_get \- get the trace attributes from a tnfctl handle
 .SH SYNOPSIS
@@ -52,23 +52,19 @@ long               pad;
 The semantics of the individual members of \fIattrs\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtarg_pid\fR\fR
 .ad
 .RS 19n
-.rt  
 The process id of the target process.  This is not valid for kernel tracing.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace_file_name\fR\fR
 .ad
 .RS 19n
-.rt  
 The name of the trace file to which the target writes.  \fBtrace_file_name\fR
 will be \fBNULL\fR if no trace file exists or if kernel tracing is implemented.
 This pointer should not be used after calling other \fBlibtnfctl\fR interfaces.
@@ -78,35 +74,29 @@ The client should copy this string if it should be saved for the use of other
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace_buf_size\fR\fR
 .ad
 .RS 19n
-.rt  
 The size of the trace buffer or file in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace_min_size\fR\fR
 .ad
 .RS 19n
-.rt  
 The minimum size in bytes of the trace buffer that can be allocated by using
 the \fBtnfctl_buffer_alloc\fR(3TNF) interface.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace_buf_state\fR\fR
 .ad
 .RS 19n
-.rt  
 The state of the trace buffer. \fBTNFCTL_BUF_OK\fR indicates that a trace
 buffer has been allocated. \fBTNFCTL_BUF_NONE\fR indicates that no buffer has
 been allocated. \fBTNFCTL_BUF_BROKEN\fR indicates that there is an internal
@@ -119,12 +109,10 @@ kernel tracing, deallocate the existing buffer with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtrace_state\fR\fR
 .ad
 .RS 19n
-.rt  
 The global tracing state of the target. Probes that are enabled will not  write
 out data unless this state is on. This state is off by default for the kernel
 and can be changed by \fBtnfctl_trace_state_set\fR(3TNF). For a process, this
@@ -134,12 +122,10 @@ state is on by default and can only be changed by
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfilter_state\fR\fR
 .ad
 .RS 19n
-.rt  
 The state of process filtering.  For kernel probe control, it is possible to
 select a set of processes for which probes are enabled. See
 \fBtnfctl_filter_list_get\fR(3TNF), \fBtnfctl_filter_list_add\fR(3TNF), and
@@ -161,12 +147,10 @@ success.
 The \fBtnfctl_trace_attrs_get()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTNFCTL_ERR_INTERNAL\fR\fR
 .ad
 .RS 23n
-.rt  
 An internal error occurred.
 .RE
 
@@ -178,13 +162,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelMT-Safe
+MT Level	MT-Safe
 .TE
 
 .SH SEE ALSO

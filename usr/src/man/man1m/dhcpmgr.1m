@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dhcpmgr 1M "13 Mar 2001" "SunOS 5.11" "System Administration Commands"
+.TH DHCPMGR 1M "Mar 13, 2001"
 .SH NAME
 dhcpmgr \- graphical interface for managing DHCP service
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sadm/admin/bin/dhcpmgr\fR 
+\fB/usr/sadm/admin/bin/dhcpmgr\fR
 .fi
 
 .SH DESCRIPTION
@@ -27,7 +27,6 @@ contains detailed information about using the tool.
 You can perform the following tasks using \fBdhcpmgr\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBConfigure DHCP service\fR
 .ad
@@ -39,7 +38,6 @@ select the data store to use for storing network configuration tables..
 
 .sp
 .ne 2
-.mk
 .na
 \fBConfigure BOOTP relay service\fR
 .ad
@@ -50,7 +48,6 @@ Use \fBdhcpmgr\fR to configure the DHCP daemon as a \fBBOOTP\fR relay.
 
 .sp
 .ne 2
-.mk
 .na
 \fBManage DHCP or BOOTP relay service\fR
 .ad
@@ -62,7 +59,6 @@ service or \fBBOOTP\fR relay service, or change DHCP server parameters.
 
 .sp
 .ne 2
-.mk
 .na
 \fBManage DHCP addresses\fR
 .ad
@@ -74,7 +70,6 @@ Use \fBdhcpmgr\fR to add, modify, or delete \fBIP\fR addresses leased by the
 
 .sp
 .ne 2
-.mk
 .na
 \fBManage DHCP macros\fR
 .ad
@@ -86,7 +81,6 @@ parameters to \fBDHCP\fR clients.
 
 .sp
 .ne 2
-.mk
 .na
 \fBManage DHCP options\fR
 .ad
@@ -98,7 +92,6 @@ deliverable through \fBDHCP\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fBConvert to a new DHCP data store\fR
 .ad
@@ -110,7 +103,6 @@ and convert the DHCP data to the format used by the new data store.
 
 .sp
 .ne 2
-.mk
 .na
 \fBMove DHCP data to another server\fR
 .ad
@@ -126,23 +118,19 @@ onto another Solaris DHCP server.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 13n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnon-zero\fR \fR
 .ad
 .RS 13n
-.rt  
 An error occurred.
 .RE
 
@@ -154,13 +142,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

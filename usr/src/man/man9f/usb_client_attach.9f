@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH usb_client_attach 9F "5 Jan 2004" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH USB_CLIENT_ATTACH 9F "Jan 5, 2004"
 .SH NAME
 usb_client_attach, usb_client_detach \- USBA framework registration of client
 USB drivers
@@ -17,13 +17,13 @@ USB drivers
 
 
 
-\fBint\fR \fBusb_client_attach\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBint\fR \fBusb_client_attach\fR(\fBdev_info_t *\fR\fIdip\fR,
     \fBuint_t\fR \fIversion\fR, \fBusb_flags_t\fR \fIflags\fR);
 .fi
 
 .LP
 .nf
-\fBvoid\fR \fBusb_client_detach\fR(\fBdev_info_t *\fR\fIdip\fR, 
+\fBvoid\fR \fBusb_client_detach\fR(\fBdev_info_t *\fR\fIdip\fR,
     \fBusb_client_dev_data_t *\fR\fIdev_data\fR);
 .fi
 
@@ -37,34 +37,28 @@ Solaris DDI specific (Solaris DDI)
 For \fBusb_client_attach()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIversion\fR\fR
 .ad
 .RS 11n
-.rt  
 Must be set to USBDRV_VERSION. (See below.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 11n
-.rt  
 Not used.
 .RE
 
@@ -73,23 +67,19 @@ Not used.
 For \fBusb_client_detach()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the device's dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdev_data\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a usb_client_dev_data_t to free. Can be NULL.
 .RE
 
@@ -135,56 +125,46 @@ different releases have different USBA_[MAJOR|MINOR]_VER numbers.
 For \fBusb_client_attach()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_SUCCESS\fR
 .ad
 .RS 23n
-.rt  
 Registration is successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 \fIdip\fR is \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Called from interrupt context. Not called from an attach routine context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_VERSION\fR
 .ad
 .RS 23n
-.rt  
 Version passed in version is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_FAILURE\fR
 .ad
 .RS 23n
-.rt  
 Other internal error.
 .RE
 
@@ -193,23 +173,19 @@ Other internal error.
 For \fBusb_client_detach()\fR:
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_ARGS\fR
 .ad
 .RS 23n
-.rt  
 \fIdip\fR is \fBNULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUSB_INVALID_CONTEXT\fR
 .ad
 .RS 23n
-.rt  
 Not called from an attach routine context.
 .RE
 
@@ -229,7 +205,7 @@ or \fBdetach\fR(9E).
   if (usb_client_attach(dip, USBDRV_VERSION, 0) != USB_SUCCESS) {
             cmn_err (CE_WARN, "%s%d: Couldn't register USB device",
                 ddi_driver_name(dip), ddi_get_instance(dip));
-                
+
            return (USB_FAILURE);
    }
 
@@ -240,7 +216,7 @@ or \fBdetach\fR(9E).
 
            return (USB_FAILURE);
    }
-                
+
 .fi
 .in -2
 
@@ -252,15 +228,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-ArchitecturePCI-based systems
+Architecture	PCI-based systems
 _
-Interface stabilityCommitted
+Interface stability	Committed
 .TE
 
 .SH SEE ALSO

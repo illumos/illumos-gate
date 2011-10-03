@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH syncloop 1M "9 Mar 1993" "SunOS 5.11" "System Administration Commands"
+.TH SYNCLOOP 1M "Mar 9, 1993"
 .SH NAME
 syncloop \- synchronous serial loopback test program
 .SH SYNOPSIS
@@ -80,25 +80,23 @@ The options for \fBsyncloop\fR are described in the following table:
 
 .sp
 .TS
-tab();
-cw(.74i) cw(1.11i) cw(.78i) cw(2.87i) 
-lw(.74i) lw(1.11i) lw(.78i) lw(2.87i) 
-.
-\fBOption\fR\fBParameter\fR\fBDefault\fR\fBDescription\fR
-\fB-c\fR\fIpacket_count\fR100T{
+c c c c
+l l l l .
+\fBOption\fR	\fBParameter\fR	\fBDefault\fR	\fBDescription\fR
+\fB-c\fR	\fIpacket_count\fR	100	T{
 Specifies the number of packets to be sent in the multiple-packet phase.
 T}
-\fB-d\fR\fIhex_data_byte\fR\fIrandom\fRT{
+\fB-d\fR	\fIhex_data_byte\fR	\fIrandom\fR	T{
 Specifies that each packet will be filled with bytes with the value of \fIhex_data_byte\fR.
 T}
-\fB-l\fR\fIpacket_length\fR100T{
-Specifies the length of each packet in bytes.  
+\fB-l\fR	\fIpacket_length\fR	100	T{
+Specifies the length of each packet in bytes.
 T}
-\fB-s\fR\fIline_speed\fR9600Bit rate in bits per second.
-\fB-v\fRT{
+\fB-s\fR	\fIline_speed\fR	9600	Bit rate in bits per second.
+\fB-v\fR			T{
 Sets verbose mode.  If data errors occur, the expected and received data is displayed.
 T}
-\fB-t\fR\fItest_type\fR\fInone\fRT{
+\fB-t\fR	\fItest_type\fR	\fInone\fR	T{
 A number, from 1 to 4, that specifies which test to perform.  The values for \fItest_type\fR are as follows: \fB1\fR: Internal loopback test.  Port loopback is on.  Transmit and receive clock sources are internal (baud rate generator). \fB2\fR: External loopback test.  Port loopback is off.  Transmit and receive clock sources are internal.  Requires a loopback plug suitable to the port under test. \fB3\fR: External loopback test.  Port loopback is off.  Transmit and receive clock sources are external (modem).  Requires that one of the local modem, the remote modem, or the remote system be set in a loopback configuration. \fB4\fR: Test using predefined parameters.  User defines hardware configuration and may select port parameters using the \fBsyncinit\fR(1M) command.
 T}
 .TE
@@ -149,7 +147,6 @@ using 5000 packets and a bit rate of 56Kbps:
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdevice\fR\fB missing minor device number\fR\fR
 .ad
@@ -161,7 +158,6 @@ minor device number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinvalid packet length: \fR\fInnn\fR\fR
 .ad
@@ -172,7 +168,6 @@ The packet length was specified to be less than zero or greater than 4096.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpoll: nothing to read\fR\fR
 .ad
@@ -183,7 +178,6 @@ The packet length was specified to be less than zero or greater than 4096.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpoll: nothing to read or write.\fR\fR
 .ad
@@ -195,7 +189,6 @@ that output would be blocked if attempted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlen \fR\fIxxx\fR\fB should be \fR\fIyyy\fR\fR
 .ad
@@ -207,7 +200,6 @@ length of \fIxxx\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInnn\fR\fB packets lost in outbound queueing\fR\fR
 .ad
@@ -218,7 +210,6 @@ length of \fIxxx\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInnn\fR\fB packets lost in inbound queueing\fR\fR
 .ad

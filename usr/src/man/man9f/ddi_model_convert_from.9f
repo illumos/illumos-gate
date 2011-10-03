@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_model_convert_from 9F "8 Feb 2001" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_MODEL_CONVERT_FROM 9F "Feb 8, 2001"
 .SH NAME
 ddi_model_convert_from \- determine data model type mismatch
 .SH SYNOPSIS
@@ -22,12 +22,10 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fImodel\fR \fR
 .ad
 .RS 10n
-.rt  
 The data model type of the current thread.
 .RE
 
@@ -52,23 +50,19 @@ non-native data model.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_MODEL_ILP32\fR \fR
 .ad
 .RS 20n
-.rt  
 A conversion to/from \fBILP32\fR is necessary.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_MODEL_NONE\fR \fR
 .ad
 .RS 20n
-.rt  
 No conversion is necessary. Current thread and driver use the same data model.
 .RE
 
@@ -92,7 +86,7 @@ struct passargs32 {
         int len;
         caddr32_t addr;
 };
- 
+
 struct passargs {
         int len;
         caddr_t addr;
@@ -100,7 +94,7 @@ struct passargs {
 xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp) {
         struct passargs pa;
- 
+
         switch (ddi_model_convert_from(mode & FMODELS)) {
             case DDI_MODEL_ILP32:
             {

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH lockfs 1M "2 Jan 2008" "SunOS 5.11" "System Administration Commands"
+.TH LOCKFS 1M "Jan 2, 2008"
 .SH NAME
 lockfs \- change or report file system locks
 .SH SYNOPSIS
@@ -45,7 +45,6 @@ of \fB-a\fR, \fB-f\fR and \fB-v\fR.
 The following options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
@@ -57,7 +56,6 @@ ignored when \fB-a\fR is specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIstring\fR\fR
 .ad
@@ -70,7 +68,6 @@ affect when the lock is being set using the \fB-d\fR, \fB-h\fR, \fB-n\fR,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
@@ -82,7 +79,6 @@ access that could remove directory entries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
@@ -98,7 +94,6 @@ systems can be unmounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -117,7 +112,6 @@ of the locking options is more likely to be of general use.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
@@ -130,7 +124,6 @@ systems can be unmounted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
@@ -142,7 +135,6 @@ accesses that could change or remove existing directories entries.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR\fR
 .ad
@@ -154,7 +146,6 @@ accesses.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
@@ -165,7 +156,6 @@ Enable verbose output.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-w\fR\fR
 .ad
@@ -182,7 +172,6 @@ system is write-locked.
 The following operands are supported.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile-system\fR\fR
 .ad
@@ -228,13 +217,11 @@ example#  \fB/usr/sbin/lockfs -a\fR
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-FilesystemLocktype Comment
-/unlock
-/varunlock
+l l l
+l l l .
+Filesystem	Locktype	 Comment
+/	unlock	
+/var	unlock	
 .TE
 
 .sp
@@ -267,13 +254,11 @@ example#  \fB/usr/sbin/lockfs -a\fR
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-FilesystemLocktypeComment
-/unlock
-/varwritelockfs: write lock example
+l l l
+l l l .
+Filesystem	Locktype	Comment
+/	unlock	
+/var	write	lockfs: write lock example
 .TE
 
 .sp
@@ -305,12 +290,10 @@ example#  \fB/usr/sbin/lockfs /var\fR
 
 .sp
 .TS
-tab();
-lw(1.83i) lw(1.83i) lw(1.83i) 
-lw(1.83i) lw(1.83i) lw(1.83i) 
-.
-FilesystemLocktypeComment
-/varunlocklockfs: unlock example
+l l l
+l l l .
+Filesystem	Locktype	Comment
+/var	unlock	lockfs: unlock example
 .TE
 
 .sp
@@ -332,7 +315,6 @@ example#
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile system\fR\fB: Not owner\fR\fR
 .ad
@@ -343,7 +325,6 @@ You must be root to use this command.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile system\fR \fB:Deadlock condition detected/avoided\fR\fR
 .ad
@@ -354,7 +335,6 @@ A file is enabled for accounting or swapping, on \fIfile system\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfile system\fR\fB: Device busy\fR\fR
 .ad

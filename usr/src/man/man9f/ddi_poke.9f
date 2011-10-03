@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_poke 9F "16 Jan 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_POKE 9F "Jan 16, 2006"
 .SH NAME
 ddi_poke, ddi_poke8, ddi_poke16, ddi_poke32, ddi_poke64, ddi_pokec, ddi_pokes,
 ddi_pokel, ddi_poked \- write a value to a location
@@ -43,34 +43,28 @@ respectively, \fBddi_poke8()\fR, \fBddi_poke16()\fR, \fBddi_poke32()\fR, and
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 9n
-.rt  
 A pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaddr\fR\fR
 .ad
 .RS 9n
-.rt  
 Virtual address of the location to be written to.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvalue\fR\fR
 .ad
 .RS 9n
-.rt  
 Value to be written to the location.
 .RE
 
@@ -96,23 +90,19 @@ use the \fBddi_peek\fR(9F) routines instead if possible.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 The value was successfully written to the given virtual address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 An error occurred while trying to write to the location.
 .RE
 
@@ -138,14 +128,13 @@ name equivalents:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-\fBPrevious Name\fR\fBNew Name\fR
-\fBddi_pokec\fR\fBddi_poke8\fR
-\fBddi_pokes\fR\fBddi_poke16\fR
-\fBddi_pokel\fR\fBddi_poke32\fR
-\fBddi_poked\fR\fBddi_poke64\fR
+box;
+l l
+l l .
+\fBPrevious Name\fR	\fBNew Name\fR
+\fBddi_pokec\fR	\fBddi_poke8\fR
+\fBddi_pokes\fR	\fBddi_poke16\fR
+\fBddi_pokel\fR	\fBddi_poke32\fR
+\fBddi_poked\fR	\fBddi_poke64\fR
 .TE
 

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH insq 9F "23 Mar 2009" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH INSQ 9F "Mar 23, 2009"
 .SH NAME
 insq \- insert a message into a queue
 .SH SYNOPSIS
@@ -24,35 +24,29 @@ Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIq\fR\fR
 .ad
 .RS 7n
-.rt  
 Pointer to the queue containing message \fIemp\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIemp\fR\fR
 .ad
 .RS 7n
-.rt  
 Enqueued message before which the new message is to be inserted. \fBmblk_t\fR
 is an instance of the \fBmsgb\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInmp\fR\fR
 .ad
 .RS 7n
-.rt  
 Message to be inserted.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sfe 7D "12 Dec 2007" "SunOS 5.11" "Devices"
+.TH SFE 7D "Dec 12, 2007"
 .SH NAME
 sfe \- SiS900 series Fast Ethernet device driver
 .SH SYNOPSIS
@@ -80,7 +80,6 @@ The following properties  may  be  configured  using  either \fBndd\fR(1M) or
 the \fBsfe.conf\fR configuration file as described by \fBdriver.conf\fR(4):
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_100fdx_cap\fR\fR
 .ad
@@ -93,7 +92,6 @@ mode.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_100hdx_cap\fR\fR
 .ad
@@ -105,7 +103,6 @@ partner is a 100 Mbps hub.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_10fdx_cap\fR\fR
 .ad
@@ -117,7 +114,6 @@ is typically used when the link partner is a 10 Mbps switch.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadv_10hdx_cap\fR\fR
 .ad
@@ -136,19 +132,17 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability Committed
+Interface Stability 	Committed
 .TE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sfe\fR\fR
 .ad
@@ -159,7 +153,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sfe\fR\fR
 .ad
@@ -170,7 +163,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/sfe\fR\fR
 .ad
@@ -181,7 +173,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/sfe\fR\fR
 .ad
@@ -192,7 +183,6 @@ Special character device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sfe.conf\fR\fR
 .ad

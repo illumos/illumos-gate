@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH taskq 9F "1 Mar 2005" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH TASKQ 9F "Mar 1, 2005"
 .SH NAME
 taskq, ddi_taskq_create, ddi_taskq_destroy, ddi_taskq_dispatch, ddi_taskq_wait,
 ddi_taskq_suspend, taskq_suspended, ddi_taskq_resume \- Kernel task queue
@@ -25,7 +25,7 @@ operations
 
 .LP
 .nf
-\fBint\fR \fBddi_taskq_dispatch\fR(\fBddi_taskq_t *\fR\fItq\fR, \fBvoid (*\fR \fIfunc)\fR(void *), 
+\fBint\fR \fBddi_taskq_dispatch\fR(\fBddi_taskq_t *\fR\fItq\fR, \fBvoid (*\fR \fIfunc)\fR(void *),
      \fBvoid *\fR\fIarg\fR, \fBuint_t\fR \fIdflags\fR);
 .fi
 
@@ -56,36 +56,30 @@ Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to the device's dev_info structure. May be NULL for kernel
 modules that do not have an associated dev_info structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIname\fR\fR
 .ad
 .RS 12n
-.rt  
 Descriptive string. Only alphanumeric characters can be used            in name
 and spaces are not allowed. The name should be unique.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fInthreads\fR\fR
 .ad
 .RS 12n
-.rt  
 Number of threads servicing the task queue. Note that the request ordering is
 guaranteed (tasks are processed in the order scheduled) if the \fBtaskq\fR is
 created with a single servicing thread.
@@ -93,77 +87,63 @@ created with a single servicing thread.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpri\fR\fR
 .ad
 .RS 12n
-.rt  
 Priority of threads servicing the task queue. Drivers and modules should
 specify TASKQ_DEFAULTPRI.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Should pass 0 as flags.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIfunc\fR\fR
 .ad
 .RS 12n
-.rt  
 Callback function to call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 12n
-.rt  
 Argument to the callback function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdflags\fR\fR
 .ad
 .RS 12n
-.rt  
 Possible \fIdflags\fR are:
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_SLEEP\fR
 .ad
 .RS 15n
-.rt  
 Allow sleeping (blocking) until memory is available.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDDI_NOSLEEP\fR
 .ad
 .RS 15n
-.rt  
 Return DDI_FAILURE immediately if memory is not  available.
 .RE
 
@@ -171,23 +151,19 @@ Return DDI_FAILURE immediately if memory is not  available.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItq\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a task queue (ddi_taskq_t *).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItp\fR\fR
 .ad
 .RS 12n
-.rt  
 Pointer to a thread structure.
 .RE
 

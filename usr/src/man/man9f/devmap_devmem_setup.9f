@@ -3,28 +3,28 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH devmap_devmem_setup 9F "05 Jun 2006" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DEVMAP_DEVMEM_SETUP 9F "Jun 05, 2006"
 .SH NAME
 devmap_devmem_setup, devmap_umem_setup \- set driver memory mapping parameters
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h> 
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 
 
-\fBint\fR \fBdevmap_devmem_setup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_info_t *\fR\fIdip\fR, 
-     \fBstruct devmap_callback_ctl *\fR\fIcallbackops\fR, \fBuint_t\fR \fIrnumber\fR, 
-     \fBoffset_t\fR \fIroff\fR,  \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fImaxprot\fR, 
+\fBint\fR \fBdevmap_devmem_setup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_info_t *\fR\fIdip\fR,
+     \fBstruct devmap_callback_ctl *\fR\fIcallbackops\fR, \fBuint_t\fR \fIrnumber\fR,
+     \fBoffset_t\fR \fIroff\fR,  \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fImaxprot\fR,
      \fBuint_t\fR \fIflags\fR, \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR);
 .fi
 
 .LP
 .nf
-\fBint\fR \fBdevmap_umem_setup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_info_t *\fR\fIdip\fR, 
-     \fBstruct devmap_callback_ctl *\fR\fIcallbackops\fR, \fBddi_umem_cookie_t\fR \fIcookie\fR, 
-     \fBoffset_t\fR \fIkoff\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fImaxprot\fR, \fBuint_t\fR \fIflags\fR, 
+\fBint\fR \fBdevmap_umem_setup\fR(\fBdevmap_cookie_t\fR \fIdhp\fR, \fBdev_info_t *\fR\fIdip\fR,
+     \fBstruct devmap_callback_ctl *\fR\fIcallbackops\fR, \fBddi_umem_cookie_t\fR \fIcookie\fR,
+     \fBoffset_t\fR \fIkoff\fR, \fBsize_t\fR \fIlen\fR, \fBuint_t\fR \fImaxprot\fR, \fBuint_t\fR \fIflags\fR,
      \fBddi_device_acc_attr_t *\fR\fIaccattrp\fR);
 .fi
 
@@ -38,34 +38,28 @@ Solaris DDI specific (Solaris DDI).
 \fBdevmap_devmem_setup()\fR parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR\fR
 .ad
 .RS 15n
-.rt  
 An opaque mapping handle that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallbackops\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to a \fBdevmap_callback_ctl\fR(9S) structure. The structure contains
 pointers to device driver-supplied functions that manage events on the device
 mapping. The framework will copy the structure to the system private memory.
@@ -73,100 +67,82 @@ mapping. The framework will copy the structure to the system private memory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIrnumber\fR\fR
 .ad
 .RS 15n
-.rt  
 Index number to the register address space set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIroff\fR\fR
 .ad
 .RS 15n
-.rt  
 Offset into the register address space.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 15n
-.rt  
 Length (in bytes) of the mapping to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImaxprot\fR\fR
 .ad
 .RS 15n
-.rt  
 Maximum protection flag possible for attempted mapping. Some combinations of
 possible settings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR\fR
 .ad
 .RS 14n
-.rt  
 Read access is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR\fR
 .ad
 .RS 14n
-.rt  
 Write access is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 Execute access is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_USER\fR\fR
 .ad
 .RS 14n
-.rt  
 User-level access is allowed. The mapping is done as a result of a
 \fBmmap\fR(2) system call.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_ALL\fR\fR
 .ad
 .RS 14n
-.rt  
 All access is allowed.
 .RE
 
@@ -174,23 +150,19 @@ All access is allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 Used to determine the cache attribute.
 .sp
 Possible values of the cache attribute are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOMEM_DATA_CACHED\fR\fR
 .ad
 .RS 28n
-.rt  
 The CPU can cache the data it fetches and push it to memory at a later time.
 This is the default attribute that is used if no cache attributes are
 specified.
@@ -198,12 +170,10 @@ specified.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOMEM_DATA_UC_WR_COMBINE\fR\fR
 .ad
 .RS 28n
-.rt  
 The CPU never caches the data, but writes can occur out of order or can be
 combined. Reordering is implied.
 .sp
@@ -213,12 +183,10 @@ If \fBIOMEM_DATA_UC_WR_COMBINE\fR is specified but not supported,
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBIOMEM_DATA_UNCACHED\fR\fR
 .ad
 .RS 28n
-.rt  
 The CPU never caches data, but has uncacheable access to memory. Strict
 ordering is implied.
 .RE
@@ -230,12 +198,10 @@ meaningful. Others lead to a failure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaccattrp\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to a \fBddi_device_acc_attr()\fR structure of the device. See
 \fBddi_device_acc_attr\fR(9S). The value in \fBdevacc_attr_dataorder\fR is
 ignored in the current release. The value in \fBdevacc_attr_endian_flags\fR is
@@ -247,34 +213,28 @@ meaningful on the SPARC architecture only.
 \fBdevmap_umem_setup()\fR parameters:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdhp\fR\fR
 .ad
 .RS 15n
-.rt  
 An opaque data structure that the system uses to describe the mapping.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdip\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallbackops\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to a \fBdevmap_callback_ctl\fR(9S) structure. The structure contains
 pointers to device driver-supplied functions that manage events on the device
 mapping.
@@ -282,100 +242,82 @@ mapping.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookie\fR\fR
 .ad
 .RS 15n
-.rt  
 A kernel memory \fIcookie\fR (see \fBddi_umem_alloc\fR(9F)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIkoff\fR\fR
 .ad
 .RS 15n
-.rt  
 Offset into the kernel memory defined by \fIcookie\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlen\fR\fR
 .ad
 .RS 15n
-.rt  
 Length (in bytes) of the mapping to be mapped.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImaxprot\fR\fR
 .ad
 .RS 15n
-.rt  
 Maximum protection flag possible for attempted mapping. Some combinations of
 possible settings are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_READ\fR\fR
 .ad
 .RS 14n
-.rt  
 Read access is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_WRITE\fR\fR
 .ad
 .RS 14n
-.rt  
 Write access is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_EXEC\fR\fR
 .ad
 .RS 14n
-.rt  
 Execute access is allowed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_USER\fR\fR
 .ad
 .RS 14n
-.rt  
 User-level access is allowed (the mapping is being done as a result of a
 \fBmmap\fR(2) system call).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPROT_ALL\fR\fR
 .ad
 .RS 14n
-.rt  
 All access is allowed.
 .RE
 
@@ -383,23 +325,19 @@ All access is allowed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 15n
-.rt  
 Must be set to \fB0\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIaccattrp\fR\fR
 .ad
 .RS 15n
-.rt  
 Pointer to a \fBddi_device_acc_attr\fR(9S) structure. Ignored in the current
 release. Reserved for future use.
 .RE
@@ -422,46 +360,38 @@ notified of user events on the mappings via the entry points defined by
 events:
 .sp
 .ne 2
-.mk
 .na
 \fBMapping Setup\fR
 .ad
 .RS 17n
-.rt  
 User has called \fBmmap\fR(2) to create a mapping to the device memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBAccess\fR
 .ad
 .RS 17n
-.rt  
 User has accessed an address in the mapping that has no translations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBDuplication\fR
 .ad
 .RS 17n
-.rt  
 User has duplicated the mapping. Mappings are duplicated when the process calls
 \fBfork\fR(2).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBUnmapping\fR
 .ad
 .RS 17n
-.rt  
 User has called \fBmunmap\fR(2) on the mapping or is exiting, \fBexit\fR(2).
 .RE
 
@@ -510,23 +440,19 @@ cache incoherence if the mapping is not \fBMAP_FIXED.\fR
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-1\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 

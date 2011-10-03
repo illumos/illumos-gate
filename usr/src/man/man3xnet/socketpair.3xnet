@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH socketpair 3XNET "10 Jun 2002" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH SOCKETPAIR 3XNET "Jun 10, 2002"
 .SH NAME
 socketpair \- create a pair of connected sockets
 .SH SYNOPSIS
@@ -34,36 +34,30 @@ semantics of communications over the socket.  The socket types supported by the
 system are implementation-dependent.  Possible socket types include:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCK_STREAM\fR\fR
 .ad
 .RS 18n
-.rt  
 Provides sequenced, reliable, bidirectional, connection-mode byte streams, and
 may provide a transmission mechanism for out-of-band data.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCK_DGRAM\fR\fR
 .ad
 .RS 18n
-.rt  
 Provides datagrams, which are connectionless-mode, unreliable messages of fixed
 maximum length.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSOCK_SEQPACKET\fR\fR
 .ad
 .RS 18n
-.rt  
 Provides sequenced, reliable, bidirectional, connection-mode transmission path
 for records.  A record can be sent using one or more output operations and
 received using one or more input operations, but a single operation never
@@ -83,34 +77,28 @@ The process may need to have appropriate privileges to use the
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdomain\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the communications domain in which the sockets are to be created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItype\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies the type of sockets to be created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIprotocol\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies a particular protocol to be used with the sockets. Specifying a
 \fIprotocol\fR of 0 causes \fBsocketpair()\fR to use an unspecified default
 protocol appropriate for the requested socket type.
@@ -118,12 +106,10 @@ protocol appropriate for the requested socket type.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocket_vector\fR\fR
 .ad
 .RS 17n
-.rt  
 Specifies a 2-integer array to hold the file descriptors of the created socket
 pair.
 .RE
@@ -149,68 +135,56 @@ returned and \fBerrno\fR is set to indicate the error.
 The \fBsocketpair()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAFNOSUPPORT\fR\fR
 .ad
 .RS 19n
-.rt  
 The implementation does not support the specified address family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMFILE\fR\fR
 .ad
 .RS 19n
-.rt  
 No more file descriptors are available for this process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENFILE\fR\fR
 .ad
 .RS 19n
-.rt  
 No more file descriptors are available for the system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 19n
-.rt  
 The specified protocol does not permit creation of socket pairs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTONOSUPPORT\fR\fR
 .ad
 .RS 19n
-.rt  
 The protocol is not supported by the address family, or the protocol is not
 supported by the implementation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPROTOTYPE\fR\fR
 .ad
 .RS 19n
-.rt  
 The socket type is not supported by the protocol.
 .RE
 
@@ -219,45 +193,37 @@ The socket type is not supported by the protocol.
 The \fBsocketpair()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 11n
-.rt  
 The process does not have appropriate privileges.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 11n
-.rt  
 Insufficient resources were available in the system to perform the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOMEM\fR\fR
 .ad
 .RS 11n
-.rt  
 Insufficient memory was available to fulfill the request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 11n
-.rt  
 There were insufficient STREAMS resources available for the operation to
 complete.
 .RE
@@ -270,15 +236,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

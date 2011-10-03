@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH rename 2 "4 Oct 2007" "SunOS 5.11" "System Calls"
+.TH RENAME 2 "Oct 4, 2007"
 .SH NAME
 rename, renameat \- change the name of a file
 .SH SYNOPSIS
@@ -165,12 +165,10 @@ returned and \fBerrno\fR is set to indicate an error.
 The \fBrename()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of either path prefix denies search permission; one of the
 directories containing \fIold\fR and \fInew\fR denies write permissions; or
 write permission is denied by a directory pointed to by \fIold\fR or \fInew\fR.
@@ -178,71 +176,59 @@ write permission is denied by a directory pointed to by \fIold\fR or \fInew\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fInew\fR argument is a directory and the mount point for a mounted file
 system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDQUOT\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory where the new name entry is being placed cannot be extended
 because the user's quota of disk blocks on that file system has been exhausted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 The link named by \fInew\fR is a directory containing entries other than
 `\fB\&.\fR' (the directory itself) and `\fB\&..\fR' (the parent directory).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 Either \fIold\fR or \fInew\fR references an invalid address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The path argument includes non-UTF8 characters and the file system accepts only
 file names where all characters are part of the UTF-8 character codeset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fInew\fR argument directory pathname contains a path prefix that names the
 \fIold\fR directory, or an attempt was made to rename a regular file to an
 extended attribute or from an extended attribute to a regular file.
@@ -250,46 +236,38 @@ extended attribute or from an extended attribute to a regular file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurred while making or updating a directory entry.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEISDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fInew\fR argument points to a directory but \fIold\fR points to a file
 that is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links were encountered in translating the pathname.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of \fIold\fR or \fInew\fR exceeds  \fBPATH_MAX\fR, or a pathname
 component is longer than  \fBNAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is in
 effect.
@@ -297,24 +275,20 @@ effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMLINK\fR\fR
 .ad
 .RS 16n
-.rt  
 The file named by \fIold\fR is a directory, and the link count of  the parent
 directory of \fInew\fR would exceed  \fBLINK_MAX\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 The link named by \fIold\fR does not name an existing file, a component of the
 path prefix of \fInew\fR does not exist, or either \fIold\fR or \fInew\fR
 points to an empty string.
@@ -322,23 +296,19 @@ points to an empty string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory that would contain \fInew\fR cannot be extended.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of either path prefix is not a directory, or \fIold\fR names a
 directory and \fInew\fR names a file that is not a directory, or \fItofd\fR and
 \fIdirfd\fR in \fBrenameat()\fR do not reference a directory.
@@ -346,24 +316,20 @@ directory and \fInew\fR names a file that is not a directory, or \fItofd\fR and
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The requested operation requires writing in a directory on a read-only file
 system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEXDEV\fR\fR
 .ad
 .RS 16n
-.rt  
 The links named by \fIold\fR and \fInew\fR are on different file systems.
 .RE
 
@@ -372,12 +338,10 @@ The links named by \fIold\fR and \fInew\fR are on different file systems.
 The \fBrenameat()\fR functions will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSUP\fR\fR
 .ad
 .RS 11n
-.rt  
 An attempt was made to rename a regular file as an attribute file or to rename
 an attribute file as a regular file.
 .RE
@@ -390,17 +354,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardFor \fBrename()\fR, see \fBstandards\fR(5).
+Standard	For \fBrename()\fR, see \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

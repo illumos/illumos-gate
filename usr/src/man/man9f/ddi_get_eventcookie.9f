@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_get_eventcookie 9F "6 Nov 2003" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_GET_EVENTCOOKIE 9F "Nov 6, 2003"
 .SH NAME
 ddi_get_eventcookie \- retrieve a NDI event service cookie handle
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ ddi_get_eventcookie \- retrieve a NDI event service cookie handle
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
 
-\fBint\fR \fBddi_get_eventcookie\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR, 
+\fBint\fR \fBddi_get_eventcookie\fR(\fBdev_info_t *\fR\fIdip\fR, \fBchar *\fR\fIname\fR,
      \fBddi_eventcookie_t *\fR\fIevent_cookiep\fR);
 .fi
 
@@ -23,7 +23,6 @@ Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdev_info_t *\fR\fIdip\fR\fR
 .ad
@@ -34,7 +33,6 @@ Child device node requesting the cookie.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchar *\fR\fIname\fR\fR
 .ad
@@ -45,7 +43,6 @@ NULL-terminated string containing the name of the event.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_eventcookie_t *\fR\fIevent_cookiep\fR\fR
 .ad
@@ -69,23 +66,19 @@ handler, unregister a callback handler, or post an event.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Cookie handle is returned.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Request was not serviceable by any nexus driver in the driver's ancestral
 device tree hierarchy.
 .RE
@@ -103,13 +96,12 @@ See \fBattributes\fR(5) for a description of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-\fBATTRIBUTE TYPE\fR\fBATTRIBUTE VALUE\fR
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

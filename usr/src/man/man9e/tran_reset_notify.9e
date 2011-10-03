@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_reset_notify 9E "30 Aug 1995" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_RESET_NOTIFY 9E "Aug 30, 1995"
 .SH NAME
 tran_reset_notify \- request to notify SCSI target of bus reset
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ tran_reset_notify \- request to notify SCSI target of bus reset
 
 
 
-\fBint prefix\fR\fBtran_reset_notify\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIflag\fR, 
+\fBint prefix\fR\fBtran_reset_notify\fR(\fBstruct scsi_address *\fR\fIap\fR, \fBint\fR \fIflag\fR,
      \fBvoid (*\fR\fIcallback\fR, \fBcaddr_t),caddr_t\fR \fIarg\fR);
 .fi
 
@@ -24,45 +24,37 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR \fR
 .ad
 .RS 13n
-.rt  
 Pointer to the \fBscsi_address\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR \fR
 .ad
 .RS 13n
-.rt  
 A flag indicating registration or cancellation of a notification request.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR \fR
 .ad
 .RS 13n
-.rt  
 A pointer to the target driver's reset notification function.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR \fR
 .ad
 .RS 13n
-.rt  
 The callback function argument.
 .RE
 
@@ -83,23 +75,19 @@ The argument  \fIflag\fR is used to register or cancel the notification.  The
 supported values for  \fIflag\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_RESET_NOTIFY\fR \fR
 .ad
 .RS 22n
-.rt  
 Register \fIcallback\fR as the reset notification function for the target.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSCSI_RESET_CANCEL\fR \fR
 .ad
 .RS 22n
-.rt  
 Cancel the reset notification request for the target.
 .RE
 

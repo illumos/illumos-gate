@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH umem_alloc 3MALLOC "24 Mar 2008" "SunOS 5.11" "Memory Allocation Library Functions"
+.TH UMEM_ALLOC 3MALLOC "Mar 24, 2008"
 .SH NAME
 umem_alloc, umem_zalloc, umem_free, umem_nofail_callback \- fast, scalable
 memory allocation
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.\|.\fR ] 
+cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.\|.\fR ]
 #include <umem.h>
 
 \fBvoid *\fR\fBumem_alloc\fR(\fBsize_t\fR \fIsize\fR, \fBint\fR  \fIflags\fR);
@@ -71,23 +71,19 @@ determines the behavior of \fBumem_alloc()\fR if it is unable to fulfill the
 request. The \fIflags\fR argument can take the following values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_DEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 Return \fINULL\fR on failure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_NOFAIL\fR\fR
 .ad
 .RS 16n
-.rt  
 Call an optional \fIcallback\fR (set with \fBumem_nofail_callback()\fR) on
 failure. The \fIcallback\fR takes no arguments and can finish by:
 .RS +4
@@ -156,17 +152,14 @@ See \fBumem_debug\fR(3MALLOC) for environment variables that effect the
 debugging features of the \fBlibumem\fR library.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUMEM_OPTIONS\fR\fR
 .ad
 .RS 16n
-.rt  
 Contains a list of comma-separated options.  Unrecognized options are ignored.
 The options that are supported are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBbackend\fR=\fBsbrk\fR\fR
 .ad
@@ -175,7 +168,6 @@ The options that are supported are:
 \fB\fBbackend\fR=\fBmmap\fR\fR
 .ad
 .RS 16n
-.rt  
 Set the underlying function used to allocate memory. This option can be set to
 \fBsbrk\fR (the default) for an \fBsbrk\fR(2)-based source or \fBmmap\fR for an
 \fBmmap\fR(2)-based source. If set to a value that is not supported, \fBsbrk\fR
@@ -270,13 +262,13 @@ for (i = 0; i < 100; i++)
 #include <thread.h>
 #include <stdio.h>
 #include <umem.h>
- 
+
 void *
 start_func(void *the_arg)
 {
           int *info = (int *)the_arg;
           char *buf = umem_alloc(1024 * 1024, UMEM_NOFAIL);
- 
+
           /* does not need to check for buf == NULL */
           buf[0] = 0;
           ...
@@ -300,16 +292,16 @@ my_failure_handler(void)
 umem_nofail_callback(my_failure_handler);
 \&...
 int my_arg;
- 
+
 thread_t tid;
 void *status;
- 
+
 (void) thr_create(NULL, NULL, start_func, &my_arg, 0,
     NULL);
 \&...
 while (thr_join(0, &tid, &status) != 0)
           ;
- 
+
 if (status == NULL) {
     (void) fprintf(stderr, "thread %d ran out of memory\en",
              tid);
@@ -326,17 +318,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 _
-StandardSee below.
+Standard	See below.
 .TE
 
 .sp

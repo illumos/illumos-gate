@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH vmstat 1M "23 Mar 2009" "SunOS 5.11" "System Administration Commands"
+.TH VMSTAT 1M "Mar 23, 2009"
 .SH NAME
 vmstat \- report virtual memory statistics
 .SH SYNOPSIS
@@ -54,134 +54,110 @@ See \fI\fR for device naming conventions for disks.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 13n
-.rt  
 Report cache flushing statistics. This option is obsolete, and no longer
 meaningful. This option might be removed in a future version of Solaris.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 13n
-.rt  
 Report the number of interrupts per device. \fIcount\fR and \fIinterval\fR does
 not apply to the \fB-i\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 13n
-.rt  
 Report paging activity in details. This option will display the following,
 respectively:
 .sp
 .ne 2
-.mk
 .na
 \fBepi\fR
 .ad
 .RS 7n
-.rt  
 Executable page-ins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBepo\fR
 .ad
 .RS 7n
-.rt  
 Executable page-outs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBepf\fR
 .ad
 .RS 7n
-.rt  
 Executable page-frees.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBapi\fR
 .ad
 .RS 7n
-.rt  
 Anonymous page-ins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBapo\fR
 .ad
 .RS 7n
-.rt  
 Anonymous page-outs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBapf\fR
 .ad
 .RS 7n
-.rt  
 Anonymous page-frees.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfpi\fR
 .ad
 .RS 7n
-.rt  
 File system page-ins.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfpo\fR
 .ad
 .RS 7n
-.rt  
 File system page-outs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBfpf\fR
 .ad
 .RS 7n
-.rt  
 File system page-frees.
 .RE
 
@@ -192,35 +168,29 @@ above only report actitivity on the processors in the processor set of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 13n
-.rt  
 Suppress messages related to state changes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 13n
-.rt  
 Display the total number of various system events since boot. \fIcount\fR and
 \fIinterval\fR does not apply to the \fB-s\fR option.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 13n
-.rt  
 Report on swapping rather than paging activity. This option will change two
 fields in \fBvmstat\fR's ``paging'' display: rather than the ``re'' and ``mf''
 fields, \fBvmstat\fR will report ``si'' (swap-ins) and ``so'' (swap-outs).
@@ -228,12 +198,10 @@ fields, \fBvmstat\fR will report ``si'' (swap-ins) and ``so'' (swap-outs).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-T\fR \fBu\fR |  \fBd\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify \fBu\fR for a printed representation of the internal representation of
 time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 \fBdate\fR(1).
@@ -245,24 +213,20 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcount\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the number of times that the statistics are repeated. \fIcount\fR
 does not apply to the \fB-i\fR and \fB-s\fR options.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdisks\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies which disks are to be given priority in the output (only four disks
 fit on a line). Common disk names are \fBid\fR, \fBsd\fR, \fBxd\fR, or
 \fBxy,\fR followed by a number (for example, \fBsd2\fR, \fBxd0\fR, and so
@@ -271,12 +235,10 @@ forth).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIinterval\fR\fR
 .ad
 .RS 12n
-.rt  
 Specifies the last number of seconds over which \fBvmstat\fR summarizes
 activity. This number of seconds repeats forever. \fIinterval\fR does not apply
 to the \fB-i\fR and \fB-s\fR options.
@@ -319,44 +281,36 @@ The fields of \fBvmstat\fR's display are
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBkthr\fR\fR
 .ad
 .RS 10n
-.rt  
 Report the number of kernel threads in each of the three following states:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBr\fR\fR
 .ad
 .RS 5n
-.rt  
 the number of kernel threads in run queue
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBb\fR\fR
 .ad
 .RS 5n
-.rt  
 the number of blocked kernel threads that are waiting for resources \fBI/O,\fR
 paging, and so forth
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBw\fR\fR
 .ad
 .RS 5n
-.rt  
 the number of swapped out lightweight processes (LWPs) that are waiting for
 processing resources to finish.
 .RE
@@ -365,32 +319,26 @@ processing resources to finish.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmemory\fR\fR
 .ad
 .RS 10n
-.rt  
 Report on usage of virtual and real memory.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBswap\fR\fR
 .ad
 .RS 8n
-.rt  
 available swap space (Kbytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfree\fR\fR
 .ad
 .RS 8n
-.rt  
 size of the free list (Kbytes)
 .RE
 
@@ -398,88 +346,72 @@ size of the free list (Kbytes)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpage\fR\fR
 .ad
 .RS 10n
-.rt  
 Report information about page faults and paging activity. The information on
 each of the following activities is given in units per second.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBre\fR\fR
 .ad
 .RS 6n
-.rt  
 page reclaims \(em but see the \fB-S\fR option for how this field is modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmf\fR\fR
 .ad
 .RS 6n
-.rt  
 minor faults \(em but see the \fB-S\fR option for how this field is modified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpi\fR\fR
 .ad
 .RS 6n
-.rt  
 kilobytes paged in
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpo\fR\fR
 .ad
 .RS 6n
-.rt  
 kilobytes paged out
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfr\fR\fR
 .ad
 .RS 6n
-.rt  
 kilobytes freed
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBde\fR\fR
 .ad
 .RS 6n
-.rt  
 anticipated short-term memory shortfall (Kbytes)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsr\fR\fR
 .ad
 .RS 6n
-.rt  
 pages scanned by clock algorithm
 .RE
 
@@ -490,12 +422,10 @@ set of the \fBzone\fR's pool.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdisk\fR\fR
 .ad
 .RS 10n
-.rt  
 Report the number of disk operations per second. There are slots for up to four
 disks, labeled with a single letter and number. The letter indicates the type
 of disk (s = \fBSCSI\fR, i = \fBIPI\fR, and so forth); the number is the
@@ -504,43 +434,35 @@ logical unit number.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfaults\fR\fR
 .ad
 .RS 10n
-.rt  
 Report the trap/interrupt rates (per second).
 .sp
 .ne 2
-.mk
 .na
 \fB\fBin\fR\fR
 .ad
 .RS 6n
-.rt  
 interrupts
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsy\fR\fR
 .ad
 .RS 6n
-.rt  
 system calls
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcs\fR\fR
 .ad
 .RS 6n
-.rt  
 \fBCPU\fR context switches
 .RE
 
@@ -551,44 +473,36 @@ above only report actitivity on the processors in the processor set of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcpu\fR\fR
 .ad
 .RS 10n
-.rt  
 Give a breakdown of percentage usage of \fBCPU\fR time. On \fBMP\fR systems,
 this is an average across all processors.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBus\fR\fR
 .ad
 .RS 6n
-.rt  
 user time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsy\fR\fR
 .ad
 .RS 6n
-.rt  
 system time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBid\fR\fR
 .ad
 .RS 6n
-.rt  
 idle time
 .RE
 
@@ -605,13 +519,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

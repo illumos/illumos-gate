@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH tran_init_pkt 9E "11 Jan 2009" "SunOS 5.11" "Driver Entry Points"
+.TH TRAN_INIT_PKT 9E "Jan 11, 2009"
 .SH NAME
 tran_init_pkt, tran_destroy_pkt \- SCSI HBA packet preparation and deallocation
 .SH SYNOPSIS
@@ -12,7 +12,7 @@ tran_init_pkt, tran_destroy_pkt \- SCSI HBA packet preparation and deallocation
 #include <sys/scsi/scsi.h>
 
 \fBstruct scsi_pkt *prefix\fR\fBtran_init_pkt\fR(\fBstruct scsi_address *\fR\fIap\fR,
-     \fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct buf *\fR\fIbp\fR, \fBint\fR \fIcmdlen\fR, 
+     \fBstruct scsi_pkt *\fR\fIpkt\fR, \fBstruct buf *\fR\fIbp\fR, \fBint\fR \fIcmdlen\fR,
      \fBint\fR \fIstatuslen\fR, \fBint\fR \fItgtlen\fR, \fBint\fR\fIflags\fR, \fBint (*\fR\fIcallback\fR,
      \fBcaddr_t),caddr_t\fR \fIarg\fR);
 .fi
@@ -30,105 +30,87 @@ Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIap\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBscsi_address\fR(9S) structure.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpkt\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBscsi_pkt\fR(9S) structure allocated in an earlier call, or
 \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbp\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to a \fBbuf\fR(9S) structure if \fBDMA \fRresources are to be allocated
 for the \fIpkt\fR, or \fINULL\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcmdlen\fR\fR
 .ad
 .RS 13n
-.rt  
 The required length for the \fBSCSI \fRcommand descriptor block (\fBCDB\fR) in
 bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIstatuslen\fR\fR
 .ad
 .RS 13n
-.rt  
 The required length for the \fBSCSI \fRstatus completion block (\fBSCB\fR) in
 bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItgtlen\fR\fR
 .ad
 .RS 13n
-.rt  
 The length of the packet private area within the \fBscsi_pkt\fR to be allocated
 on behalf of the \fBSCSI \fRtarget driver.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 13n
-.rt  
 Flags for creating the packet.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcallback\fR\fR
 .ad
 .RS 13n
-.rt  
 Pointer to either \fBNULL_FUNC\fR or \fBSLEEP_FUNC\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIarg\fR\fR
 .ad
 .RS 13n
-.rt  
 Always \fINULL\fR.
 .RE
 
@@ -217,23 +199,19 @@ Note: \fItgtlen\fR, \fIstatuslen\fR, and \fIcmdlen\fR are used only when the
 are not available:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL_FUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Do not wait for resources. Return a \fINULL\fR pointer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSLEEP_FUNC\fR\fR
 .ad
 .RS 14n
-.rt  
 Wait indefinitely for resources.
 .RE
 

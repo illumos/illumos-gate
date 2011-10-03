@@ -4,14 +4,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH kpropd 1M "11 Jul 2005" "SunOS 5.11" "System Administration Commands"
+.TH KPROPD 1M "Jul 11, 2005"
 .SH NAME
 kpropd \- Kerberos propagation daemon for slave KDCs
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/krb5/kpropd\fR [\fB-d\fR] [\fB-f\fR \fItemp_dbfile\fR] [\fB-F\fR \fIdbfile\fR] 
-     [\fB-p\fR \fIkdb_util\fR] [\fB-P\fR \fIport_number\fR] [\fB-r\fR \fIrealm\fR] 
+\fB/usr/lib/krb5/kpropd\fR [\fB-d\fR] [\fB-f\fR \fItemp_dbfile\fR] [\fB-F\fR \fIdbfile\fR]
+     [\fB-p\fR \fIkdb_util\fR] [\fB-P\fR \fIport_number\fR] [\fB-r\fR \fIrealm\fR]
      [\fB-s\fR \fIsrv_tabfile\fR] [\fB-S\fR] [\fB-a\fR \fIacl_file\fR]
 .fi
 
@@ -39,7 +39,6 @@ kpropd is not configured for incremental database propagation by default. These
 settings can be changed in the \fBkdc.conf\fR(4) file:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_enable = [true | false]\fR\fR
 .ad
@@ -50,7 +49,6 @@ Enables or disables incremental database propagation. Default is \fBfalse\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsunw_dbprop_slave_poll = N[s, m, h]\fR\fR
 .ad
@@ -73,107 +71,89 @@ resides.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 18n
-.rt  
 Enable debug mode. Default is debug mode disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR \fItemp_dbfile\fR\fR
 .ad
 .RS 18n
-.rt  
 The location of the slave's temporary principal database file. Default is
 \fB/var/krb5/from_master\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIdbfile\fR\fR
 .ad
 .RS 18n
-.rt  
 The location of the slave's principal database file. Default is
 \fB/var/krb5/principal\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIkdb_util\fR\fR
 .ad
 .RS 18n
-.rt  
 The location of the Kerberos database utility used for loading principal
 databases. Default is \fB/usr/sbin/kdb5_util\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR \fIport_number\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the port number on which \fBkpropd\fR will listen. Default is 754
 (service name: \fBkrb5_prop\fR).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR \fIrealm\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies from which Kerberos realm kpropd will receive information. Default is
 specified in \fB/etc/krb5/krb5.conf\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsrv_tabfile\fR\fR
 .ad
 .RS 18n
-.rt  
 The location of the service table file used to authenticate the \fBkpropd\fR
 daemon.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-S\fR\fR
 .ad
 .RS 18n
-.rt  
 Run the daemon in standalone mode, instead of having \fBinetd\fR listen for
 requests. Default is non-standalone mode.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR \fIacl_file\fR\fR
 .ad
 .RS 18n
-.rt  
 The location of the \fBkpropd\fR's access control list to verify if this server
 can run the \fBkpropd\fR daemon. The file contains a list of principal name(s)
 that will be receiving updates. Default is \fB/etc/krb5/kpropd.acl\fR.
@@ -182,56 +162,46 @@ that will be receiving updates. Default is \fB/etc/krb5/kpropd.acl\fR.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal\fR\fR
 .ad
 .RS 28n
-.rt  
 Kerberos principal database.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/principal.ulog\fR\fR
 .ad
 .RS 28n
-.rt  
 The update log file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kdc.conf\fR\fR
 .ad
 .RS 28n
-.rt  
 KDC configuration information.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/krb5/kpropd.acl\fR\fR
 .ad
 .RS 28n
-.rt  
 List of principals of all the KDCs; resides on each slave KDC.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/krb5/from_master\fR\fR
 .ad
 .RS 28n
-.rt  
 Temporary file used by kpropd before loading this to the principal database.
 .RE
 
@@ -243,13 +213,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

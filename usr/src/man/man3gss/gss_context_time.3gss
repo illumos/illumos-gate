@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH gss_context_time 3GSS "15 Jan 2003" "SunOS 5.11" "Generic Security Services API Library Functions"
+.TH GSS_CONTEXT_TIME 3GSS "Jan 15, 2003"
 .SH NAME
 gss_context_time \- determine how long a context will remain valid
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ] 
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lgss\fR  [ \fIlibrary\fR... ]
 #include <gssapi/gssapi.h>
 
 \fBOM_uint32\fR \fBgss_context_time\fR(\fBOM_uint32 *\fR\fIminor_status\fR,
@@ -27,34 +27,28 @@ which the specified context will remain valid.
 The parameter descriptions for \fBgss_context_time()\fR are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIminor_status\fR\fR
 .ad
 .RS 18n
-.rt  
 A mechanism-specific status code.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontext_handle\fR\fR
 .ad
 .RS 18n
-.rt  
 A read-only value. Identifies the context to be interrogated.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fItime_rec\fR\fR
 .ad
 .RS 18n
-.rt  
 Modifies the number of seconds that the context remains valid.  If the context
 has already expired, returns zero.
 .RE
@@ -66,45 +60,37 @@ The \fBgss_context_time()\fR function returns one of the following status
 codes:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_COMPLETE\fR\fR
 .ad
 .RS 25n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_CONTEXT_EXPIRED\fR\fR
 .ad
 .RS 25n
-.rt  
 The context has already expired.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_NO_CONTEXT\fR\fR
 .ad
 .RS 25n
-.rt  
 The \fIcontext_handle\fR parameter did not identify a valid context.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBGSS_S_FAILURE\fR\fR
 .ad
 .RS 25n
-.rt  
 The underlying mechanism detected an error for which no specific \fBGSS\fR
 status code is defined.  The mechanism-specific status code reported by means
 of the \fIminor_status\fR parameter details the error condition.
@@ -118,13 +104,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT LevelSafe
+MT Level	Safe
 .TE
 
 .SH SEE ALSO

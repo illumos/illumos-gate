@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sysdef 1M "25 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH SYSDEF 1M "Feb 25, 2009"
 .SH NAME
 sysdef \- output system definition
 .SH SYNOPSIS
@@ -34,12 +34,10 @@ The default system \fInamelist\fR is \fB/dev/kmem\fR.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints the configuration information from \fB/dev/kmem\fR. This is the default
 and only needs to be specified if the configuration information from both
 \fB/dev/kmem\fR and the system file specified with the "\fB-n\fR
@@ -48,24 +46,20 @@ and only needs to be specified if the configuration information from both
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInamelist\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies a \fInamelist\fR other than the default (\fB/dev/kmem\fR). The
 \fInamelist\fR specified must be a valid bootable operating system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints the identifier of the current host in hexadecimal. If \fBsysdef\fR
 \fB-h\fR is executed  within a non-global zone and the zone emulates a host
 identifier, then the zone's host identifier is printed. This numeric value is
@@ -74,24 +68,20 @@ not guaranteed to be unique.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 The output includes the configuration of system peripherals formatted as a
 device tree.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 15n
-.rt  
 For each system peripheral in the device tree, display the name of the device
 driver used to manage the peripheral.
 .RE
@@ -156,12 +146,10 @@ Node 'SUNW,Ultra-5_10', unit #-1
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/kmem\fR\fR
 .ad
 .RS 13n
-.rt  
 default operating system image
 .RE
 

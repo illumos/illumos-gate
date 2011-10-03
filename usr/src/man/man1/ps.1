@@ -10,15 +10,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ps 1 "16 Aug 2009" "SunOS 5.11" "User Commands"
+.TH PS 1 "Aug 16, 2009"
 .SH NAME
 ps \- report process status
 .SH SYNOPSIS
 .LP
 .nf
-\fBps\fR [\fB-aAcdefjHlLPyZ\fR] [\fB-g\fR \fIgrplist\fR] [\fB-h\fR \fIlgrplist\fR] 
-     [\fB-n\fR \fInamelist\fR] [\fB-o\fR \fIformat\fR]... [\fB-p\fR \fIproclist\fR] 
-     [\fB-s\fR \fIsidlist\fR] [\fB-t\fR \fIterm\fR] [\fB-u\fR \fIuidlist\fR] [\fB-U\fR \fIuidlist\fR] 
+\fBps\fR [\fB-aAcdefjHlLPyZ\fR] [\fB-g\fR \fIgrplist\fR] [\fB-h\fR \fIlgrplist\fR]
+     [\fB-n\fR \fInamelist\fR] [\fB-o\fR \fIformat\fR]... [\fB-p\fR \fIproclist\fR]
+     [\fB-s\fR \fIsidlist\fR] [\fB-t\fR \fIterm\fR] [\fB-u\fR \fIuidlist\fR] [\fB-U\fR \fIuidlist\fR]
      [\fB-G\fR \fIgidlist\fR] [\fB-z\fR \fIzonelist\fR]
 .fi
 
@@ -42,35 +42,29 @@ for \fIproclist\fR and \fIgrplist\fR must be numeric.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information about \fBa\fRll processes most frequently requested: all
 those except session leaders and processes not associated with a terminal.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-A\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information for all processes. Identical to \fB-e\fR, below.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints information in a format that reflects scheduler properties as described
 in \fBpriocntl\fR(1). The \fB-c\fR option affects the output of the \fB-f\fR
 and \fB-l\fR options, as described below.
@@ -78,23 +72,19 @@ and \fB-l\fR options, as described below.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information about all processes except session leaders.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information about \fBe\fRvery process now running.
 .sp
 When the \fB-e\fRoption is specified, options \fB-z\fR, \fB-t\fR, \fB-u\fR,
@@ -104,24 +94,20 @@ have no effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Generates a \fBf\fRull listing. (See below for significance of columns in a
 full listing.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-g\fR \fIgrplist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists only process data whose group leader's \fBID\fR number(s) appears in
 \fIgrplist\fR. (A group leader is a process whose process \fBID\fR number is
 identical to its process group \fBID\fR number.)
@@ -129,12 +115,10 @@ identical to its process group \fBID\fR number.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-G\fR \fIgidlist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information for processes whose real group ID numbers are given in
 \fIgidlist\fR. The \fIgidlist\fR must be a single argument in the form of a
 blank- or comma-separated list.
@@ -142,81 +126,67 @@ blank- or comma-separated list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIlgrplist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists only the processes homed to the specified \fIlgrplist\fR. Nothing is
 listed for any invalid group specified in \fIlgrplist\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-H\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints the home lgroup of the process under an additional column header, LGRP.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-j\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints session \fBID\fR and process group \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 15n
-.rt  
 Generates a \fBl\fRong listing. (See below.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-L\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints information about each light weight process (\fIlwp\fR) in each selected
 process. (See below.)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInamelist\fR\fR
 .ad
 .RS 15n
-.rt  
 Specifies the name of an alternative system \fInamelist\fR file in place of the
 default. This option is accepted for compatibility, but is ignored.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIformat\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints information according to the format specification given in \fIformat\fR.
 This is fully described in \fBDISPLAY FORMATS\fR. Multiple \fB-o\fR options can
 be specified; the format specification is interpreted as the
@@ -226,48 +196,40 @@ option-arguments.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR \fIproclist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists only process data whose process \fBID\fR numbers are given in
 \fIproclist\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-P\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints the number of the processor to which the process or lwp is bound, if
 any, under an additional column header, \fBPSR\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIsidlist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information on all session leaders whose \fBID\fRs appear in
 \fIsidlist\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIterm\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists only process data associated with \fIterm\fR. Terminal identifiers are
 specified as a device file name, and an identifier. For example, \fBterm/a\fR,
 or \fBpts/0\fR.
@@ -275,12 +237,10 @@ or \fBpts/0\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-u\fR \fIuidlist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists only process data whose effective user \fBID\fR number or login name is
 given in \fIuidlist\fR. In the listing, the numerical user \fBID\fR is printed
 unless you give the \fB-f\fR option, which prints the login name.
@@ -288,12 +248,10 @@ unless you give the \fB-f\fR option, which prints the login name.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-U\fR \fIuidlist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists information for processes whose real user \fBID\fR numbers or login names
 are given in \fIuidlist\fR. The \fIuidlist\fR must be a single argument in the
 form of a blank- or comma-separated list.
@@ -301,12 +259,10 @@ form of a blank- or comma-separated list.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-y\fR\fR
 .ad
 .RS 15n
-.rt  
 Under a long listing (\fB-l\fR), omits the obsolete \fBF\fR and \fBADDR\fR
 columns and includes an \fBRSS\fR column to report the resident set size of the
 process. Under the \fB-y\fR option, both \fBRSS\fR and \fBSZ\fR (see below) is
@@ -315,24 +271,20 @@ reported in units of kilobytes instead of pages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-z\fR \fIzonelist\fR\fR
 .ad
 .RS 15n
-.rt  
 Lists only processes in the specified zones. Zones can be specified either by
 name or ID. This option is only useful when executed in the global zone.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-Z\fR\fR
 .ad
 .RS 15n
-.rt  
 Prints the name of the zone with which the process is associated under an
 additional column header, \fBZONE\fR. The \fBZONE\fR column width is limited to
 8 characters. Use \fBps\fR \fB-eZ\fR for a quick way to see information about
@@ -370,12 +322,10 @@ determine only what information is provided for a process; they do not
 determine which processes are listed.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBF\fR(l)\fR
 .ad
 .RS 14n
-.rt  
 Flags (hexadecimal and additive) associated with the process. These flags are
 available for historical purposes; no meaning should be currently ascribed to
 them.
@@ -383,78 +333,64 @@ them.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBS\fR (l)\fR
 .ad
 .RS 14n
-.rt  
 The state of the process:
 .sp
 .ne 2
-.mk
 .na
 \fBO\fR
 .ad
 .RS 5n
-.rt  
 Process is running on a processor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBS\fR
 .ad
 .RS 5n
-.rt  
 Sleeping: process is waiting for an event to complete.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBR\fR
 .ad
 .RS 5n
-.rt  
 Runnable: process is on run queue.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBT\fR
 .ad
 .RS 5n
-.rt  
 Process is stopped, either by a job control signal or because it is being
 traced.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBW\fR
 .ad
 .RS 5n
-.rt  
 Waiting: process is waiting for CPU usage to drop to the CPU-caps enforced
 limits.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBZ\fR
 .ad
 .RS 5n
-.rt  
 Zombie state: process terminated and parent not waiting.
 .RE
 
@@ -462,129 +398,107 @@ Zombie state: process terminated and parent not waiting.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBUID\fR (f,l)\fR
 .ad
 .RS 14n
-.rt  
 The effective user \fBID\fR number of the process (the login name is printed
 under the \fB-f\fR option).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPID\fR(all)\fR
 .ad
 .RS 14n
-.rt  
 The process \fBID\fR of the process (this datum is necessary in order to kill a
 process).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPPID\fR(f,l)\fR
 .ad
 .RS 14n
-.rt  
 The process \fBID\fR of the parent process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBC\fR(f,l)\fR
 .ad
 .RS 14n
-.rt  
 Processor utilization for scheduling (obsolete). Not printed when the \fB-c\fR
 option is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCLS\fR(f,l)\fR
 .ad
 .RS 14n
-.rt  
 Scheduling class. Printed only when the \fB-c\fR option is used.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPRI\fR(l)\fR
 .ad
 .RS 14n
-.rt  
 The priority of the process. Without the \fB-c\fR option, higher numbers mean
 lower priority. With the \fB-c\fR option, higher numbers mean higher priority.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNI\fR(l)\fR
 .ad
 .RS 14n
-.rt  
 Nice value, used in priority computation. Not printed when the \fB-c\fR option
 is used. Only processes in the certain scheduling classes have a nice value.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBADDR\fR(l)\fR
 .ad
 .RS 14n
-.rt  
 The memory address of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSZ\fR(l)\fR
 .ad
 .RS 14n
-.rt  
 The total size of the process in virtual memory, including all mapped files and
 devices, in pages. See \fBpagesize\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBWCHAN\fR(l)\fR
 .ad
 .RS 14n
-.rt  
 The address of an event for which the process is sleeping (if blank, the
 process is running).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSTIME\fR(f)\fR
 .ad
 .RS 14n
-.rt  
 The starting time of the process, given in hours, minutes, and seconds. (A
 process begun more than twenty-four hours before the \fBps\fR inquiry is
 executed is given in months and days.)
@@ -592,46 +506,38 @@ executed is given in months and days.)
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTTY\fR(all)\fR
 .ad
 .RS 14n
-.rt  
 The controlling terminal for the process (the message, \fB?\fR, is printed when
 there is no controlling terminal).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBTIME\fR(all)\fR
 .ad
 .RS 14n
-.rt  
 The cumulative execution time for the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLTIME\fR(all)\fR
 .ad
 .RS 14n
-.rt  
 The execution time for the lwp being reported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCMD\fR(all)\fR
 .ad
 .RS 14n
-.rt  
 The command name (the full command name and its arguments, up to a limit of 80
 characters, are printed under the \fB-f\fR option).
 .RE
@@ -642,23 +548,19 @@ The following two additional columns are printed when the \fB-j\fR option is
 specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPGID\fR\fR
 .ad
 .RS 8n
-.rt  
 The process ID of the process group leader.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSID\fR\fR
 .ad
 .RS 8n
-.rt  
 The process ID of the session leader.
 .RE
 
@@ -668,23 +570,19 @@ The following two additional columns are printed when the \fB-L\fR option is
 specified:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLWP\fR\fR
 .ad
 .RS 8n
-.rt  
 The lwp ID of the lwp being reported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNLWP\fR\fR
 .ad
 .RS 8n
-.rt  
 The number of lwps in the process (if \fB-f\fR is also specified).
 .RE
 
@@ -720,12 +618,10 @@ text fields are null, no header line is written.
 The following names are recognized in the POSIX locale:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective user \fBID\fR of the process. This is the textual user \fBID\fR,
 if it can be obtained and the field width permits, or a decimal representation
 otherwise.
@@ -733,12 +629,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBruser\fR\fR
 .ad
 .RS 10n
-.rt  
 The real user \fBID\fR of the process. This is the textual user \fBID\fR, if it
 can be obtained and the field width permits, or a decimal representation
 otherwise.
@@ -746,12 +640,10 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup\fR\fR
 .ad
 .RS 10n
-.rt  
 The effective group \fBID\fR of the process. This is the textual group
 \fBID,\fR if it can be obtained and the field width permits, or a decimal
 representation otherwise.
@@ -759,12 +651,10 @@ representation otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrgroup\fR\fR
 .ad
 .RS 10n
-.rt  
 The real group \fBID\fR of the process. This is the textual group \fBID,\fR if
 it can be obtained and the field width permits, or a decimal representation
 otherwise.
@@ -772,45 +662,37 @@ otherwise.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpid\fR\fR
 .ad
 .RS 10n
-.rt  
 The decimal value of the process \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBppid\fR\fR
 .ad
 .RS 10n
-.rt  
 The decimal value of the parent process \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpgid\fR\fR
 .ad
 .RS 10n
-.rt  
 The decimal value of the process group \fBID.\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpcpu\fR\fR
 .ad
 .RS 10n
-.rt  
 The ratio of CPU time used recently to CPU time available in the same period,
 expressed as a percentage. The meaning of ``recently'' in this context is
 unspecified. The CPU time available is determined in an unspecified manner.
@@ -818,35 +700,29 @@ unspecified. The CPU time available is determined in an unspecified manner.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvsz\fR\fR
 .ad
 .RS 10n
-.rt  
 The total size of the process in virtual memory, in kilobytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnice\fR\fR
 .ad
 .RS 10n
-.rt  
 The decimal value of the system scheduling priority of the process. See
 \fBnice\fR(1).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBetime\fR\fR
 .ad
 .RS 10n
-.rt  
 In the POSIX locale, the elapsed time since the process was started, in the
 form:
 .sp
@@ -855,45 +731,37 @@ form:
 where
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdd\fR\fR
 .ad
 .RS 6n
-.rt  
 is the number of days
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIhh\fR\fR
 .ad
 .RS 6n
-.rt  
 is the number of hours
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fImm\fR\fR
 .ad
 .RS 6n
-.rt  
 is the number of minutes
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIss\fR\fR
 .ad
 .RS 6n
-.rt  
 is the number of seconds
 .RE
 
@@ -903,12 +771,10 @@ fields is two-digit decimal integers padded on the left with zeros.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtime\fR\fR
 .ad
 .RS 10n
-.rt  
 In the POSIX locale, the cumulative CPU time of the process in the form:
 .sp
 \fB[\fR\fIdd\fR-\fB]\fR\fIhh\fR:\fImm\fR:\fIss\fR
@@ -919,35 +785,29 @@ The \fIdd\fR, \fIhh\fR, \fImm\fR, and \fIss\fR fields is as described in the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtty\fR\fR
 .ad
 .RS 10n
-.rt  
 The name of the controlling terminal of the process (if any) in the same format
 used by the \fBwho\fR(1) command.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBcomm\fR\fR
 .ad
 .RS 10n
-.rt  
 The name of the command being executed (\fBargv[0]\fR value) as a string.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBargs\fR\fR
 .ad
 .RS 10n
-.rt  
 The command with all its arguments as a string. The implementation might
 truncate this value to the field width; it is implementation-dependent whether
 any further truncation occurs. It is unspecified whether the string represented
@@ -965,280 +825,230 @@ started.
 The following names are recognized in the Solaris implementation:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBf\fR\fR
 .ad
 .RS 11n
-.rt  
 Flags (hexadecimal and additive) associated with the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 11n
-.rt  
 The state of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBc\fR\fR
 .ad
 .RS 11n
-.rt  
 Processor utilization for scheduling (obsolete).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuid\fR\fR
 .ad
 .RS 11n
-.rt  
 The effective user \fBID\fR number of the process as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBruid\fR\fR
 .ad
 .RS 11n
-.rt  
 The real user \fBID\fR number of the process as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgid\fR\fR
 .ad
 .RS 11n
-.rt  
 The effective group \fBID\fR number of the process as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrgid\fR\fR
 .ad
 .RS 11n
-.rt  
 The real group \fBID\fR number of the process as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBprojid\fR\fR
 .ad
 .RS 11n
-.rt  
 The project \fBID\fR number of the process as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBproject\fR\fR
 .ad
 .RS 11n
-.rt  
 The project \fBID\fR of the process as a textual value if that value can be
 obtained; otherwise, as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzoneid\fR\fR
 .ad
 .RS 11n
-.rt  
 The zone \fBID\fR number of the process as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBzone\fR\fR
 .ad
 .RS 11n
-.rt  
 The zone \fBID\fR of the process as a textual value if that value can be
 obtained; otherwise, as a decimal integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBsid\fR\fR
 .ad
 .RS 11n
-.rt  
 The process ID of the session leader.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBtaskid\fR\fR
 .ad
 .RS 11n
-.rt  
 The task \fBID\fR of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclass\fR\fR
 .ad
 .RS 11n
-.rt  
 The scheduling class of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpri\fR\fR
 .ad
 .RS 11n
-.rt  
 The priority of the process. Higher numbers mean higher priority.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBopri\fR\fR
 .ad
 .RS 11n
-.rt  
 The obsolete priority of the process. Lower numbers mean higher priority.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlwp\fR\fR
 .ad
 .RS 11n
-.rt  
 The decimal value of the lwp \fBID\fR. Requesting this formatting option causes
 one line to be printed for each lwp in the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnlwp\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of lwps in the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpsr\fR\fR
 .ad
 .RS 11n
-.rt  
 The number of the processor to which the process or lwp is bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpset\fR\fR
 .ad
 .RS 11n
-.rt  
 The \fBID\fR of the processor set to which the process or lwp is bound.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBaddr\fR\fR
 .ad
 .RS 11n
-.rt  
 The memory address of the process.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBosz\fR\fR
 .ad
 .RS 11n
-.rt  
 The total size of the process in virtual memory, in pages.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwchan\fR\fR
 .ad
 .RS 11n
-.rt  
 The address of an event for which the process is sleeping (if \(mi, the process
 is running).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBstime\fR\fR
 .ad
 .RS 11n
-.rt  
 The starting time or date of the process, printed with no blanks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrss\fR\fR
 .ad
 .RS 11n
-.rt  
 The resident set size of the process, in kilobytes. The \fBrss\fR value
 reported by \fBps\fR is an estimate provided by \fBproc\fR(4) that might
 underestimate the actual resident set size. Users who wish to get more accurate
@@ -1248,47 +1058,39 @@ instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpmem\fR\fR
 .ad
 .RS 11n
-.rt  
 The ratio of the process's resident set size to the physical memory on the
 machine, expressed as a percentage.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfname\fR\fR
 .ad
 .RS 11n
-.rt  
 The first 8 bytes of the base name of the process's executable file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBctid\fR\fR
 .ad
 .RS 11n
-.rt  
 The contract ID of the process contract the process is a member of as a decimal
 integer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlgrp\fR\fR
 .ad
 .RS 11n
-.rt  
 The home lgroup of the process.
 .RE
 
@@ -1304,21 +1106,20 @@ corresponding to each format specifier.
 
 .sp
 .TS
-tab() box;
-cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i) 
-cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i) 
-.
-FormatDefaultFormatDefault
-SpecifierHeaderSpecifierHeader
+box;
+c c c c
+c c c c .
+Format	Default	Format	Default
+Specifier	Header	Specifier	Header
 _
-argsCOMMANDppidPPID
-commCOMMANDrgroupRGROUP
-etimeELAPSEDruserRUSER
-groupGROUPtimeTIME
-niceNIttyTT
-pcpu%CPUuserUSER
-pgidPGIDvszVSZ
-pidPID
+args	COMMAND	ppid	PPID
+comm	COMMAND	rgroup	RGROUP
+etime	ELAPSED	ruser	RUSER
+group	GROUP	time	TIME
+nice	NI	tty	TT
+pcpu	%CPU	user	USER
+pgid	PGID	vsz	VSZ
+pid	PID		
 .TE
 
 .sp
@@ -1329,27 +1130,26 @@ default header used with each.
 
 .sp
 .TS
-tab() box;
-cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i) 
-cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i) 
-.
-FormatDefaultFormatDefault
-SpecifierHeaderSpecifierHeader
+box;
+c c c c
+c c c c .
+Format	Default	Format	Default
+Specifier	Header	Specifier	Header
 _
-addrADDRprojidPROJID
-cCprojectPROJECT
-classCLSpsrPSR
-fFrgidRGID
-fnameCOMMANDrssRSS
-gidGIDruidRUID
-lgrpLGRPsS
-lwpLWPsidSID
-nlwpNLWPstimeSTIME
-opriPRItaskidTASKID
-oszSZuidUID
-pmem%MEMwchanWCHAN
-priPRIzoneZONE
-ctidCTIDzoneidZONEID
+addr	ADDR	projid	PROJID
+c	C	project	PROJECT
+class	CLS	psr	PSR
+f	F	rgid	RGID
+fname	COMMAND	rss	RSS
+gid	GID	ruid	RUID
+lgrp	LGRP	s	S
+lwp	LWP	sid	SID
+nlwp	NLWP	stime	STIME
+opri	PRI	taskid	TASKID
+osz	SZ	uid	UID
+pmem	%MEM	wchan	WCHAN
+pri	PRI	zone	ZONE
+ctid	CTID	zoneid	ZONEID
 .TE
 
 .SH EXAMPLES
@@ -1393,12 +1193,10 @@ that affect the execution of \fBps\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBCOLUMNS\fR\fR
 .ad
 .RS 11n
-.rt  
 Override the system-selected horizontal screen size, used to determine the
 number of text columns to display.
 .RE
@@ -1409,68 +1207,56 @@ number of text columns to display.
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB>0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/pts/*\fR\fR
 .ad
 .RS 15n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/term/*\fR\fR
 .ad
 .RS 15n
-.rt  
 terminal (``tty'') names searcher files
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/passwd\fR\fR
 .ad
 .RS 15n
-.rt  
 \fBUID\fR information supplier
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/proc/*\fR\fR
 .ad
 .RS 15n
-.rt  
 process control files
 .RE
 
@@ -1482,17 +1268,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-CSIEnabled (see USAGE)
+CSI	Enabled (see USAGE)
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

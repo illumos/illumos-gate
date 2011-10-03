@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pppoed 1M "6 Jan 2003" "SunOS 5.11" "System Administration Commands"
+.TH PPPOED 1M "Jan 6, 2003"
 .SH NAME
 pppoed \- PPPoE server daemon
 .SH SYNOPSIS
@@ -60,7 +60,6 @@ files has no effect on this.
 The \fBpppoed\fR daemon supports the following options:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBclient\fR [\fBexcept\fR] \fIclient-list\fR\fR
 .ad
@@ -94,7 +93,6 @@ manufacturer assigned block \fB40:0:1a\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
@@ -111,7 +109,6 @@ When specified on the command line or in the global context of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdevice\fR \fIdevice-list\fR\fR
 .ad
@@ -125,7 +122,6 @@ per-device \fB/etc/ppp/pppoe.\fIdevice\fR\fR files.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBextra\fR \fIstring\fR\fR
 .ad
@@ -137,7 +133,6 @@ directtty\fR" and usually does not need to be overridden.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBfile\fR \fIpath\fR\fR
 .ad
@@ -159,7 +154,6 @@ by specifying \fBfile /dev/null\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBgroup\fR \fIname\fR\fR
 .ad
@@ -171,7 +165,6 @@ executed. If \fBpppoed\fR is not run as root, this option is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBlog\fR \fIpath\fR\fR
 .ad
@@ -186,7 +179,6 @@ daemon's default (non-service-related) log file.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnodebug\fR\fR
 .ad
@@ -199,7 +191,6 @@ also sets the daemon's default (non-service-related) detail level.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnowildcard\fR\fR
 .ad
@@ -214,7 +205,6 @@ wildcard service requests.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpath\fR \fIpath\fR\fR
 .ad
@@ -226,7 +216,6 @@ Specifies the path to the \fBpppd\fR executable. Defaults to
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBpppd\fR \fIstring\fR\fR
 .ad
@@ -239,7 +228,6 @@ string.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBserver\fR \fIstring\fR\fR
 .ad
@@ -251,7 +239,6 @@ defaults to "Solaris PPPoE".
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBservice\fR \fIname\fR\fR
 .ad
@@ -265,7 +252,6 @@ during parsing overrides all previous definitions.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBuser\fR \fIname\fR\fR
 .ad
@@ -277,7 +263,6 @@ If \fBpppoed\fR is not run as root, this option is ignored.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBwildcard\fR\fR
 .ad
@@ -334,24 +319,20 @@ interface \fBeri0\fR, and offering only service "debugging" on interface
 The \fBpppoed\fR daemon responds to the following signals:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGHUP\fR\fR
 .ad
 .RS 10n
-.rt  
 Causes \fBpppoed\fR to reparse the original command line and all configuration
 files, and close and reopen any log files.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSIGINT\fR\fR
 .ad
 .RS 10n
-.rt  
 Causes a snapshot of the state of the \fBpppoed\fR daemon to be written to
 \fB/tmp/pppoed.\fIpid\fR\fR (where \fIpid\fR is the decimal process ID of the
 daemon).
@@ -360,78 +341,64 @@ daemon).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/inet/pppoed\fR \fR
 .ad
 .RS 25n
-.rt  
 executable command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/sppptun\fR\fR
 .ad
 .RS 25n
-.rt  
 Solaris PPP tunneling device driver
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/pppoe\fR\fR
 .ad
 .RS 25n
-.rt  
 main configuration option file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/pppoe.\fIdevice\fR\fR\fR
 .ad
 .RS 25n
-.rt  
 per-device configuration option file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/pppoe-errors\fR\fR
 .ad
 .RS 25n
-.rt  
 location of output from \fBpppd\fR's stderr
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/ppp/pppoe.if\fR\fR
 .ad
 .RS 25n
-.rt  
 list of Ethernet interfaces to be plumbed at boot time
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/tmp/pppoed.\fIpid\fR\fR\fR
 .ad
 .RS 25n
-.rt  
 ASCII text file containing dumped \fBpppoed\fR state information
 .RE
 

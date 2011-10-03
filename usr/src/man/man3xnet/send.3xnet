@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH send 3XNET "1 Nov 2003" "SunOS 5.11" "X/Open Networking Services Library Functions"
+.TH SEND 3XNET "Nov 1, 2003"
 .SH NAME
 send \- send a message on a socket
 .SH SYNOPSIS
@@ -22,66 +22,54 @@ send \- send a message on a socket
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsocket\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the socket file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIbuffer\fR\fR
 .ad
 .RS 10n
-.rt  
 Points to the buffer containing the message to send.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIlength\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the length of the message in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflags\fR\fR
 .ad
 .RS 10n
-.rt  
 Specifies the type of message transmission. Values of this argument are formed
 by logically OR'ing zero or more of the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_EOR\fR\fR
 .ad
 .RS 11n
-.rt  
 Terminates a record (if supported by the protocol)
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMSG_OOB\fR\fR
 .ad
 .RS 11n
-.rt  
 Sends out-of-band data on sockets that support out-of-band communications. The
 significance and semantics of out-of-band data are protocol-specific.
 .RE
@@ -133,7 +121,6 @@ Otherwise, \(mi1 is returned and \fBerrno\fR is set to indicate the error.
 The \fBsend()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEAGAIN\fR \fR
 .ad
@@ -142,119 +129,98 @@ The \fBsend()\fR function will fail if:
 \fB\fBEWOULDBLOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket's file descriptor is marked \fBO_NONBLOCK\fR and the requested
 operation would block.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument is not a valid file descriptor.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBECONNRESET\fR\fR
 .ad
 .RS 16n
-.rt  
 A connection was forcibly closed by a peer.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDESTADDRREQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is not connection-mode and no peer address is set.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The  \fIbuffer\fR parameter can not be accessed.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-.rt  
 A signal interrupted \fBsend()\fR before any data was transmitted.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEMSGSIZE\fR\fR
 .ad
 .RS 16n
-.rt  
 The message is too large be sent all at once, as the socket requires.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTCONN\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is not connected or otherwise has not had the peer prespecified.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTSOCK\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument does not refer to a socket.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEOPNOTSUPP\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIsocket\fR argument is associated with a socket that does not support one
 or more of the values set in \fIflags\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEPIPE\fR\fR
 .ad
 .RS 16n
-.rt  
 The socket is shut down for writing, or the socket is connection-mode and is no
 longer connected. In the latter case, and if the socket is of type
 \fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread.
@@ -265,67 +231,55 @@ longer connected. In the latter case, and if the socket is of type
 The \fBsend()\fR function may fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 15n
-.rt  
 The calling process does not have the appropriate privileges.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 15n
-.rt  
 An I/O error occurred while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETDOWN\fR\fR
 .ad
 .RS 15n
-.rt  
 The local interface used to reach the destination is down.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENETUNREACH\fR\fR
 .ad
 .RS 15n
-.rt  
 No route to the network is present.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOBUFS\fR\fR
 .ad
 .RS 15n
-.rt  
 Insufficient resources were available in the system to perform the operation.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSR\fR\fR
 .ad
 .RS 15n
-.rt  
 There were insufficient STREAMS resources available for the operation to
 complete.
 .RE
@@ -338,15 +292,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

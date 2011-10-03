@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH symlink 2 "18 May 2007" "SunOS 5.11" "System Calls"
+.TH SYMLINK 2 "May 18, 2007"
 .SH NAME
 symlink \- make a symbolic link to a file
 .SH SYNOPSIS
@@ -42,23 +42,19 @@ not made.
 The \fBsymlink()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-.rt  
 Search permission is denied for a component of the path prefix of \fIname2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEDQUOT\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory where the entry for the new symbolic link is being placed cannot
 be extended because the user's quota of disk blocks on that file system has
 been exhausted; the new symbolic link cannot be created because the user's
@@ -69,68 +65,56 @@ exhausted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEEXIST\fR\fR
 .ad
 .RS 16n
-.rt  
 The file referred to by \fIname2\fR already exists.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-.rt  
 The \fIname1\fR or \fIname2\fR argument points to an illegal address.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEILSEQ\fR\fR
 .ad
 .RS 16n
-.rt  
 The path argument includes non-UTF8 characters and the file system accepts only
 file names where all characters are part of the UTF-8 character codeset.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEIO\fR\fR
 .ad
 .RS 16n
-.rt  
 An I/O error occurs while reading from or writing to the file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBELOOP\fR\fR
 .ad
 .RS 16n
-.rt  
 Too many symbolic links are encountered in translating \fIname2\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-.rt  
 The length of the \fIname2\fR argument exceeds \fBPATH_MAX\fR, or the length of
 a \fIname2\fR component exceeds \fBNAME_MAX\fR while \fB_POSIX_NO_TRUNC\fR is
 in effect.
@@ -138,23 +122,19 @@ in effect.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOENT\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of \fIname2\fR does not exist.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSPC\fR\fR
 .ad
 .RS 16n
-.rt  
 The directory in which the entry for the new symbolic link is being placed
 cannot be extended because no space is left on the file system containing the
 directory; the new symbolic link cannot be created because no space is left on
@@ -164,34 +144,28 @@ file system on which the file is being created.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOSYS\fR\fR
 .ad
 .RS 16n
-.rt  
 The file system does not support symbolic links.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-.rt  
 A component of the path prefix of \fIname2\fR is not a directory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEROFS\fR\fR
 .ad
 .RS 16n
-.rt  
 The file \fIname2\fR would reside on a read-only file system.
 .RE
 
@@ -203,13 +177,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 .TE
 
 .SH SEE ALSO

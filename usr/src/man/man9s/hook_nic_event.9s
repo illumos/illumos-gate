@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH hook_nic_event 9S "1 May 2008" "SunOS 5.11" "Data Structures for Drivers"
+.TH HOOK_NIC_EVENT 9S "May 1, 2008"
 .SH NAME
 hook_nic_event \- data structure describing events related to network
 interfaces
@@ -33,13 +33,13 @@ A callback may not alter any of the fields in this structure.
 .sp
 .in +2
 .nf
-net_data_t           hne_family;      
-phy_if_t             pkt_private;              
-lif_if_t             hne_lif; 
+net_data_t           hne_family;
+phy_if_t             pkt_private;
+lif_if_t             hne_lif;
 nic_event_t          hne_event;
 nic_event_data_t     hne_data;
 size_t               hne_datalen;
- 
+
 .fi
 .in -2
 
@@ -48,91 +48,75 @@ size_t               hne_datalen;
 The following fields are set for each event:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhne_family\fR\fR
 .ad
 .RS 14n
-.rt  
 A valid reference for the network protocol that owns this network interface and
 can be in calls to other \fBnetinfo\fR(9F) functions.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhne_nic\fR\fR
 .ad
 .RS 14n
-.rt  
 The physical interface to which an event belongs.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBhne_event\fR\fR
 .ad
 .RS 14n
-.rt  
 A value that indicates the respective event. The current list of available
 events is:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNE_PLUMB\fR\fR
 .ad
 .RS 21n
-.rt  
 an interface has just been created.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNE_UNPLUMB\fR\fR
 .ad
 .RS 21n
-.rt  
 an interface has just been destroyed and no more events should be received for
 it.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNE_UP\fR\fR
 .ad
 .RS 21n
-.rt  
 an interface has changed the state to "up" and may now generate packet events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNE_DOWN\fR\fR
 .ad
 .RS 21n
-.rt  
 an interface has changed the state to "down" and will no longer generate packet
 events.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNE_ADDRESS_CHANGE\fR\fR
 .ad
 .RS 21n
-.rt  
 an address on an interface has changed. \fBhne_lif\fR refers to the logical
 interface for which the change is occurring, \fBhne_data\fR is a pointer to a
 \fBsockaddr\fR structure that is \fBhne_datalen\fR bytes long and contains the
@@ -149,13 +133,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 .TE
 
 .SH SEE ALSO

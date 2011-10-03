@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH addnwstr 3XCURSES "5 Jun 2002" "SunOS 5.11" "X/Open Curses Library Functions"
+.TH ADDNWSTR 3XCURSES "Jun 5, 2002"
 .SH NAME
 addnwstr, addwstr, mvaddnwstr, mvaddwstr, mvwaddnwstr, mvwaddwstr, waddnwstr,
 waddwstr \- add a wide-character string to a window
@@ -14,7 +14,7 @@ waddwstr \- add a wide-character string to a window
 \fB -R \fR /usr/xpg4/lib \fB -lcurses \fR [ \fIlibrary\fR... ]
 
 \fBc89\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR ... ]
- 
+
 #include <curses.h>
 
 \fBint\fR \fBaddnwstr\fR(\fBconst wchar_t *\fR\fIwstr\fR, \fBint\fR \fIn\fR);
@@ -92,58 +92,48 @@ character  with the foreground and background attributes of the window).
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwstr\fR\fR
 .ad
 .RS 8n
-.rt  
 Is a pointer to the wide-character string that is to be written to the window.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIn\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the maximum number of characters to be copied from \fIwstr\fR. If \fIn\fR is
 less than 0, the entire string is written or as much of it as fits on the line.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIy\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the y (row) coordinate of the starting position of \fIwstr\fR in the window.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIx\fR\fR
 .ad
 .RS 8n
-.rt  
 Is the x (column) coordinate of the starting position of \fIwstr\fR in  the
 window.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIwin\fR\fR
 .ad
 .RS 8n
-.rt  
 Is a pointer to the window in which the string is to be written.
 .RE
 
@@ -163,15 +153,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard
+Interface Stability	Standard
 _
-MT-LevelUnsafe
+MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO

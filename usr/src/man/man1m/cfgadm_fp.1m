@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH cfgadm_fp 1M "10 Jan 2008" "SunOS 5.11" "System Administration Commands"
+.TH CFGADM_FP 1M "Jan 10, 2008"
 .SH NAME
 cfgadm_fp \- driver specific commands for cfgadm
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ cfgadm_fp \- driver specific commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-a\fR] [\fB-s\fR \fIlisting_options\fR] 
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-a\fR] [\fB-s\fR \fIlisting_options\fR]
      [\fB-o\fR \fIhardware_options\fR] [\fB-l\fR [\fIap_id\fR]]
 .fi
 
@@ -194,7 +194,6 @@ The receptacle and occupant state for attachment points at the \fBfp\fR port
 have the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
@@ -205,7 +204,6 @@ One or more devices configured on the \fBfp\fR port
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
@@ -216,7 +214,6 @@ One or more devices configured on the \fBfp\fR port
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
@@ -227,7 +224,6 @@ One or more devices configured on the \fBfp\fR port
 
 .sp
 .ne 2
-.mk
 .na
 \fBempty\fR
 .ad
@@ -238,7 +234,6 @@ Not applicable
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
@@ -252,7 +247,6 @@ No devices configured on the \fBfp\fR port
 The state for individual Fibre Channel devices on an \fBfp\fR port:
 .sp
 .ne 2
-.mk
 .na
 \fBconfigured\fR
 .ad
@@ -263,7 +257,6 @@ Device is configured into Solaris and is available for use
 
 .sp
 .ne 2
-.mk
 .na
 \fBconnected\fR
 .ad
@@ -274,7 +267,6 @@ Device is configured into Solaris and is available for use
 
 .sp
 .ne 2
-.mk
 .na
 \fBdisconnected\fR
 .ad
@@ -285,7 +277,6 @@ Device is configured into Solaris and is available for use
 
 .sp
 .ne 2
-.mk
 .na
 \fBunconfigured\fR
 .ad
@@ -300,7 +291,6 @@ The \fBcondition\fR field for attachment points at the \fBfp\fR port has the
 following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
@@ -316,7 +306,6 @@ The \fBcondition\fR field for individual Fibre Channel devices on an \fBfp\fR
 port has the following meanings:
 .sp
 .ne 2
-.mk
 .na
 \fBfailed\fR
 .ad
@@ -327,7 +316,6 @@ An error is encountered while probing a device on Fabric.
 
 .sp
 .ne 2
-.mk
 .na
 \fBfailing\fR
 .ad
@@ -341,7 +329,6 @@ the local port through which the device was configured.
 
 .sp
 .ne 2
-.mk
 .na
 \fBunusable\fR
 .ad
@@ -367,7 +354,6 @@ obtaining configuration administration help messages (\fB-h\fR).
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR \fIfunction\fR\fR
 .ad
@@ -381,7 +367,6 @@ port attachment point, the following configuration state change operations are
 supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBconfigure\fR\fR
 .ad
@@ -404,7 +389,6 @@ connected through. Refer to \fBfp\fR(7D) for additional details on the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunconfigure\fR\fR
 .ad
@@ -433,7 +417,6 @@ the same way it is applied to a Fabric device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
@@ -446,7 +429,6 @@ Force the \fBconfigure\fR change state operation to occur irrespective of the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR \fIap_id\fR\fR
 .ad
@@ -458,7 +440,6 @@ point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIhardware_options\fR\fR
 .ad
@@ -467,7 +448,6 @@ point.
 The following hardware options are supported.
 .sp
 .ne 2
-.mk
 .na
 \fBshow_SCSI_LUN\fR
 .ad
@@ -504,7 +484,6 @@ You can specify the following commands with the \fB-c\fR option to control the
 update behavior of the repository:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBforce_update\fR\fR
 .ad
@@ -517,7 +496,6 @@ deleted.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBno_update\fR\fR
 .ad
@@ -536,7 +514,6 @@ following option with the \fB-c\fR unconfigure command removes only Solaris
 devices with the unusable condition for a Fibre Channel device.
 .sp
 .ne 2
-.mk
 .na
 \fB\fBunusable_SCSI_LUN\fR\fR
 .ad
@@ -550,7 +527,6 @@ is removed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIlisting_options\fR\fR
 .ad
@@ -561,7 +537,6 @@ Refer to \fBcfgadm\fR(1M) for usage information.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-t\fR \fIap_id\fR\fR
 .ad
@@ -572,7 +547,6 @@ No test commands are available at present.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR \fIhardware_function\fR\fR
 .ad
@@ -680,7 +654,6 @@ device:
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/cfgadm/fp.so.1\fR\fR
 .ad
@@ -691,7 +664,6 @@ Hardware-specific library for Fibre Channel Fabric device node management.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/cfg/fp/fabric_WWN_map\fR\fR
 .ad
@@ -705,7 +677,6 @@ file is set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/rcS.d/fdevattach\fR\fR
 .ad

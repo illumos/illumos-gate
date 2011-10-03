@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ddi_umem_alloc 9F "19 Mar 2002" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH DDI_UMEM_ALLOC 9F "Mar 19, 2002"
 .SH NAME
 ddi_umem_alloc, ddi_umem_free \- allocate and free page-aligned kernel memory
 .SH SYNOPSIS
@@ -30,23 +30,19 @@ Solaris DDI specific (Solaris DDI).
 .SS "ddi_umem_alloc()"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIsize\fR\fR
 .ad
 .RS 11n
-.rt  
 Number of bytes to allocate.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIflag\fR\fR
 .ad
 .RS 11n
-.rt  
 Used to determine the sleep and pageable conditions.
 .sp
 Possible sleep flags are \fBDDI_UMEM_SLEEP\fR, which allows sleeping until
@@ -59,24 +55,20 @@ allocate pageable memory using the \fBDDI_UMEM_PAGEABLE\fR flag.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookiep\fR\fR
 .ad
 .RS 11n
-.rt  
 Pointer to a kernel memory cookie.
 .RE
 
 .SS "ddi_umem_free()"
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcookie\fR\fR
 .ad
 .RS 10n
-.rt  
 A kernel memory cookie allocated in \fBddi_umem_alloc()\fR.
 .RE
 
@@ -111,24 +103,20 @@ entire buffer.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNon-null\fR\fR
 .ad
 .RS 12n
-.rt  
 Successful completion. \fBddi_umem_alloc()\fR returns a pointer to the
 allocated memory.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNULL\fR\fR
 .ad
 .RS 12n
-.rt  
 Memory cannot be allocated by \fBddi_umem_alloc()\fR because
 \fBDDI_UMEM_NOSLEEP\fR is set and the system is out of resources.
 .RE

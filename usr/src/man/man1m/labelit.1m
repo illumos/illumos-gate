@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH labelit 1M "31 Oct 2000" "SunOS 5.11" "System Administration Commands"
+.TH LABELIT 1M "Oct 31, 2000"
 .SH NAME
 labelit \- list or provide labels for file systems
 .SH SYNOPSIS
 .LP
 .nf
-\fBlabelit\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fB-o\fR \fIFSType-specific-options\fR] \fIspecial\fR 
+\fBlabelit\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fB-o\fR \fIFSType-specific-options\fR] \fIspecial\fR
      [\fIoperands\fR]
 .fi
 
@@ -25,12 +25,10 @@ file systems.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-F\fR \fIFSType\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify the \fIFSType\fR on which to operate. The \fIFSType\fR should either be
 specified here or be determinable from \fB/etc/vfstab\fR by matching the
 \fIspecial\fR with an entry in the table. If no matching entry is found, the
@@ -39,12 +37,10 @@ default file system type specified in \fB/etc/default/fs\fR will be used.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-V\fR\fR
 .ad
 .RS 13n
-.rt  
 Echo complete command line. This option may be used to verify and validate the
 command line. Additional information obtained using a \fB/etc/vfstab\fR lookup
 is included in the output. The command is not executed.
@@ -52,12 +48,10 @@ is included in the output. The command is not executed.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 13n
-.rt  
 Specify \fIFSType\fR-specific options. See the manual page for the
 \fBlabelit\fR module specific to the file system type.
 .RE
@@ -69,24 +63,20 @@ The following operands are supported. If no operands are specified,
 \fBlabelit\fR will display the value of the labels.
 .sp
 .ne 2
-.mk
 .na
 \fB\fIspecial\fR\fR
 .ad
 .RS 12n
-.rt  
 The disk partition (for example, \fB/dev/rdsk/c0t3d0s6\fR). The device may not
 be on a remote machine.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIoperands\fR\fR
 .ad
 .RS 12n
-.rt  
 \fIFSType\fR-specific operands. Consult the manual page of the
 \fIFSType\fR-specific \fBlabelit\fR command for detailed descriptions.
 .RE
@@ -102,51 +92,42 @@ when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 12n
-.rt  
 Write or display of labels was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBnon-zero\fR
 .ad
 .RS 12n
-.rt  
 An error occurred.
 .RE
 
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
 .RS 19n
-.rt  
 List of default parameters for each file system.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/default/fs\fR\fR
 .ad
 .RS 19n
-.rt  
 Default local file system type. Default values can be set for the following
 flags in \fB/etc/default/fs\fR. For example:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBLOCAL=ufs\fR\fR
 .ad
@@ -155,7 +136,6 @@ flags in \fB/etc/default/fs\fR. For example:
 \fB\fBLOCAL\fR\fR
 .ad
 .RS 13n
-.rt  
 The default partition for a command if no \fIFSType\fR is specified.
 .RE
 

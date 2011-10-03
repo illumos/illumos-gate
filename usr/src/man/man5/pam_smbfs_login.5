@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH pam_smbfs_login 5 "25 Sep 2008" "SunOS 5.11" "Standards, Environments, and Macros"
+.TH PAM_SMBFS_LOGIN 5 "Sep 25, 2008"
 .SH NAME
 pam_smbfs_login \- PAM user credential authentication module for SMB/CIFS
 client login
@@ -69,7 +69,6 @@ Authentication service modules must implement both
 The \fBpam_sm_setcred\fR(3PAM) function accepts the following flags:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_REFRESH_CRED\fR\fR
 .ad
@@ -80,7 +79,6 @@ Returns PAM_IGNORE.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SILENT\fR\fR
 .ad
@@ -91,7 +89,6 @@ Suppresses messages.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_ESTABLISH_CRED\fR\fR
 .ad
@@ -107,7 +104,6 @@ Stores the authentication token for PAM_USER in the same manner as the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_DELETE_CRED\fR\fR
 .ad
@@ -122,7 +118,6 @@ Deletes the stored password for PAM_USER in the same manner as the
 The following options can be passed to the \fBpam_smbfs_login\fR module:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdebug\fR\fR
 .ad
@@ -134,7 +129,6 @@ level.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnowarn\fR\fR
 .ad
@@ -146,12 +140,10 @@ Suppresses warning messages.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB$HOME/.nsmbrc\fR\fR
 .ad
 .RS 28n
-.rt  
 Find default domain, if present.
 .RE
 
@@ -162,7 +154,6 @@ Upon successful completion of \fBpam_sm_setcred\fR(3PAM), \fBPAM_SUCCESS\fR is
 returned. The  following  error codes are returned upon error:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_USER_UNKNOWN\fR\fR
 .ad
@@ -173,7 +164,6 @@ User is unknown.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTHTOK_ERR\fR\fR
 .ad
@@ -184,7 +174,6 @@ Password is bad.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_AUTH_ERR\fR\fR
 .ad
@@ -195,7 +184,6 @@ Domain is bad.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
@@ -212,15 +200,14 @@ See \fBattributes\fR(5) for descriptions of the following attribute:
 
 .sp
 .TS
-tab() box;
-cw(2.76i) |cw(2.74i) 
-lw(2.76i) |lw(2.74i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT LevelMT-Safe with exceptions
+MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO

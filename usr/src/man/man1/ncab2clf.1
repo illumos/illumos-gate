@@ -3,13 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ncab2clf 1 "28 Sep 2001" "SunOS 5.11" "User Commands"
+.TH NCAB2CLF 1 "Sep 28, 2001"
 .SH NAME
 ncab2clf \- convert binary log file to Common Log File format
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/ncab2clf\fR [\fB-Dhv\fR] [\fB-i\fR \fIinput-file\fR] [\fB-o\fR \fIoutput-file\fR] 
+\fB/usr/bin/ncab2clf\fR [\fB-Dhv\fR] [\fB-i\fR \fIinput-file\fR] [\fB-o\fR \fIoutput-file\fR]
      [\fB-b\fR \fIsize\fR] [\fB-n\fR \fInumber\fR] [\fB-s\fR \fIdatetime\fR]
 .fi
 
@@ -24,78 +24,64 @@ output goes to \fBstdout\fR.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-b\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the binary-log-file blocking in kilobytes; the default is 64 Kbyte.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-D\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies that direct \fBI/O\fR be disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-h\fR\fR
 .ad
 .RS 18n
-.rt  
 Prints usage message.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR \fIinput-file\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the input file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR \fInumber\fR\fR
 .ad
 .RS 18n
-.rt  
 Output \fInumber\fR CLF records.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR \fIoutput-file\fR\fR
 .ad
 .RS 18n
-.rt  
 Specifies the output file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR \fIdatetime\fR\fR
 .ad
 .RS 18n
-.rt  
 Skip any records before the date and time specified in \fIdatetime\fR. You can
 specify the date and time in CLF format or in the format specified by the
 \fBtouch\fR(1) utility. CLF format is the dominant format, so \fBncab2clf\fR
@@ -104,12 +90,10 @@ first analyzes \fIdatetime\fR assuming CLF.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 18n
-.rt  
 Provides verbose output.
 .RE
 
@@ -170,23 +154,19 @@ example% ncab2clf -s '10/Apr/2001:09:23:13' -n 100 < /dev/dsk/c2t1d0s6
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR \fR
 .ad
 .RS 6n
-.rt  
 The file converted successfully
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB>\fB0\fR\fR
 .ad
 .RS 6n
-.rt  
 An error occurred.
 .RE
 
@@ -198,13 +178,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

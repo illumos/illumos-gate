@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ctwatch 1 "14 Jul 2004" "SunOS 5.11" "User Commands"
+.TH CTWATCH 1 "Jul 14, 2004"
 .SH NAME
 ctwatch \- watch events in a contract or group of contracts
 .SH SYNOPSIS
@@ -24,12 +24,10 @@ contracts.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-.rt  
 Report events starting at the front of the event queue. Normally, \fBctwatch\fR
 reports only events which occur after it has been invoked. With the \fB-f\fR
 option, any events that still exist in the contracts' event queues when
@@ -39,12 +37,10 @@ reported.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
-.rt  
 Reliably watches all messages. Normally, the system may drop informative events
 and acknowledged critical events at any time, so \fBctwatch\fR isn't guaranteed
 to see them all. This option may only be used if the \fBctwatch\fR is invoked
@@ -53,12 +49,10 @@ with the \fB{PRIV_CONTRACT_EVENT}\fR privilege asserted in its effective set.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Request verbose event descriptions.
 .RE
 
@@ -68,21 +62,17 @@ Request verbose event descriptions.
 The following operands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontract-type\fR\fR
 .ad
 .RS 17n
-.rt  
 Valid contract types are:
 .sp
 .ne 2
-.mk
 .na
 \fBprocess\fR
 .ad
 .RS 11n
-.rt  
 Process contracts.
 .RE
 
@@ -90,12 +80,10 @@ Process contracts.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIcontract-id\fR\fR
 .ad
 .RS 17n
-.rt  
 A valid contract id.
 .RE
 
@@ -106,68 +94,56 @@ The following list defines the column headings and the meanings of a
 \fBctwatch\fR report:
 .sp
 .ne 2
-.mk
 .na
 \fBCTID\fR
 .ad
 .RS 11n
-.rt  
 The contract \fBID\fR generating the event.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBEVID\fR
 .ad
 .RS 11n
-.rt  
 The event \fBID\fR.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCRIT\fR
 .ad
 .RS 11n
-.rt  
 Whether the event is informative, critical, or initiates an exit negotiation.
 Values are \fBinfo\fR, \fBcrit\fR, or \fBneg\fR, respectively.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBACK\fR
 .ad
 .RS 11n
-.rt  
 The event has been acknowledged. Values are \fByes\fR or "\fBno\fR".
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBCTTYPE\fR
 .ad
 .RS 11n
-.rt  
 The contract type.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fBSUMMARY\fR
 .ad
 .RS 11n
-.rt  
 A type-specific summary of the event.
 .RE
 
@@ -195,34 +171,28 @@ CTID    EVID    CRIT ACK CTTYPE  SUMMARY
 The following exit values are returned:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 5n
-.rt  
 Successful completion.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB1\fR\fR
 .ad
 .RS 5n
-.rt  
 An error occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB2\fR\fR
 .ad
 .RS 5n
-.rt  
 Invalid arguments.
 .RE
 
@@ -238,13 +208,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 .TE
 
 .sp

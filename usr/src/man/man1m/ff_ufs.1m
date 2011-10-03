@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ff_ufs 1M "10 Feb 1997" "SunOS 5.11" "System Administration Commands"
+.TH FF_UFS 1M "Feb 10, 1997"
 .SH NAME
 ff_ufs \- list file names and statistics for a ufs file system
 .SH SYNOPSIS
@@ -27,45 +27,37 @@ See  \fBff\fR(1M) for information regarding the \fBff\fR command. See
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 Specify \fBufs\fR file system specific options. The following options available
 are:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBa\fR\fR
 .ad
 .RS 5n
-.rt  
 Print the `\fI\&.\fR' and `\fI\&.\|.\fR' directory entries.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBm\fR\fR
 .ad
 .RS 5n
-.rt  
 Print mode information.  This option must be specified in conjunction with the
 \fB\fR\fB-i\fR\fB \fR\fIi-node-list\fR option (see \fBff\fR(1M)).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBs\fR\fR
 .ad
 .RS 5n
-.rt  
 Print only special files and files with set-user-ID mode.
 .RE
 

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH acctsh 1M "15 Mar 2002" "SunOS 5.11" "System Administration Commands"
+.TH ACCTSH 1M "Mar 15, 2002"
 .SH NAME
 acctsh, chargefee, ckpacct, dodisk, lastlogin, monacct, nulladm, prctmp,
 prdaily, prtacct, shutacct, startup, turnacct \- shell procedures for
@@ -26,7 +26,7 @@ accounting
 
 .LP
 .nf
-\fB/usr/lib/acct/lastlogin\fR 
+\fB/usr/lib/acct/lastlogin\fR
 .fi
 
 .LP
@@ -61,7 +61,7 @@ accounting
 
 .LP
 .nf
-\fB/usr/lib/acct/startup\fR 
+\fB/usr/lib/acct/startup\fR
 .fi
 
 .LP
@@ -164,24 +164,20 @@ accounting.
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fR
 .ad
 .RS 6n
-.rt  
 This option prints a report of exceptional resource usage by command, and may
 be used on current day's accounting data only.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-l\fR\fR
 .ad
 .RS 6n
-.rt  
 This option prints a report of exceptional usage by login id for the specified
 date. Previous daily reports are cleaned up and therefore inaccessible after
 each invocation of \fBmonacct\fR.
@@ -189,12 +185,10 @@ each invocation of \fBmonacct\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-o\fR\fR
 .ad
 .RS 6n
-.rt  
 This option uses \fBacctdusg\fR (see \fBacct\fR(1M)) to do a slower version of
 disk accounting by login directory. \fIfilename\fRs specifies the one or more
 filesystem names where disk accounting will be done.  If \fIfilename\fRs are
@@ -207,134 +201,110 @@ names of mountable filesystems.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/logadm.conf\fR\fR
 .ad
 .RS 30n
-.rt  
 Configuration file for the \fBlogadm\fR(1M) command
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/acct\fR\fR
 .ad
 .RS 30n
-.rt  
 Holds all accounting commands listed in section \fB1M\fR of this manual
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/acct/ptecms.awk\fR\fR
 .ad
 .RS 30n
-.rt  
 Contains the limits for exceptional usage by command name
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/usr/lib/acct/ptelus.awk\fR\fR
 .ad
 .RS 30n
-.rt  
 Contains the limits for exceptional usage by login \fBID\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/fiscal\fR\fR
 .ad
 .RS 30n
-.rt  
 Fiscal reports directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/nite\fR\fR
 .ad
 .RS 30n
-.rt  
 Working directory
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/sum\fR\fR
 .ad
 .RS 30n
-.rt  
 Summary directory that contains information for \fBmonacct\fR
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/acct/sum/loginlog\fR\fR
 .ad
 .RS 30n
-.rt  
 File updated by last login
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/fee\fR\fR
 .ad
 .RS 30n
-.rt  
 Accumulator for fees
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/pacct\fR\fR
 .ad
 .RS 30n
-.rt  
 Current file for per-process accounting
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/pacct\fR\fIincr\fR\fR
 .ad
 .RS 30n
-.rt  
 Used if \fBpacct\fR gets large and during execution of daily accounting
 procedure
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
 .ad
 .RS 30n
-.rt  
 History of user access and administration information
 .RE
 

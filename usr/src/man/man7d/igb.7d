@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH igb 7D "20 Jul 2007" "SunOS 5.11" "Devices"
+.TH IGB 7D "Jul 20, 2007"
 .SH NAME
 igb \- Intel 82575 1Gb PCI Express NIC Driver
 .SH SYNOPSIS
@@ -34,7 +34,7 @@ requiring no manual configuration. The \fBigb\fR driver also allows you to
 configure the advertised capabilities to less than the maximum (where the full
 speed  of  the interface is not required), or to force a specific mode of
 operation, irrespective of  the  link  partner's  advertised capabilities.
-.SH APPLICATION PROGRAMMING INTERFACE 
+.SH APPLICATION PROGRAMMING INTERFACE
 .sp
 .LP
 The cloning character-special device, \fB /dev/igb\fR, is used to access all
@@ -156,56 +156,46 @@ link speed/duplex using the newly changed capabilities.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/dev/igb*\fR\fR
 .ad
 .RS 27n
-.rt  
 Special character device.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/igb\fR\fR
 .ad
 .RS 27n
-.rt  
 32-bit device driver (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/amd64/igb\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit device driver (x86).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/sparcv9/igb\fR\fR
 .ad
 .RS 27n
-.rt  
 64-bit device driver (SPARC).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/kernel/drv/igb.conf\fR\fR
 .ad
 .RS 27n
-.rt  
 Configuration file.
 .RE
 

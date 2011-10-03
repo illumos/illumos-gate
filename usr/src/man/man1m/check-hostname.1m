@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH check-hostname 1M "8 Mar 2006" "SunOS 5.11" "System Administration Commands"
+.TH CHECK-HOSTNAME 1M "Mar 8, 2006"
 .SH NAME
 check-hostname \- check if sendmail can determine the system's fully-qualified
 host name
 .SH SYNOPSIS
 .LP
 .nf
-\fB /usr/sbin/check-hostname\fR 
+\fB /usr/sbin/check-hostname\fR
 .fi
 
 .SH DESCRIPTION
@@ -25,34 +25,28 @@ determine the \fBFQHN\fR of the local host, it reports success. Otherwise,
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 22n
-.rt  
 Host name database
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 Name service switch configuration file
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/resolv.conf\fR\fR
 .ad
 .RS 22n
-.rt  
 Configuration file for name server routines
 .RE
 
@@ -64,13 +58,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

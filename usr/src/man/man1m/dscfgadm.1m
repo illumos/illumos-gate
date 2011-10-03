@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dscfgadm 1M "2 Oct 2007" "SunOS 5.11" "System Administration Commands"
+.TH DSCFGADM 1M "Oct 2, 2007"
 .SH NAME
 dscfgadm \- administration command for the Availability Suite configuration
 location and services
@@ -46,7 +46,6 @@ criteria such as size and file type before it is initialized for use.
 The \fBdscfgadm\fR command supports the following options.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR [\fB-r\fR ]\fR
 .ad
@@ -59,7 +58,6 @@ options, the \fB-d\fR option disables all Availability Suite services. This
 setting is persistent across system boots.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -73,7 +71,6 @@ services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-e\fR [\fB-r\fR ] [\fB-p\fR]\fR
 .ad
@@ -86,7 +83,6 @@ additional options, the \fB-e\fR option enables all Availability Suite
 services. This setting is persistent across system boots.
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fR
 .ad
@@ -98,7 +94,6 @@ services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
@@ -112,7 +107,6 @@ service.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fR
 .ad
@@ -123,7 +117,6 @@ Displays information on the Availability Suite SMF services.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fR
 .ad
@@ -135,7 +128,6 @@ information specific to Sun Cluster configurations.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fR
 .ad
@@ -152,13 +144,12 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityEvolving
+Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO

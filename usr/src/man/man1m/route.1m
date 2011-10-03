@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH route 1M "3 Feb 2009" "SunOS 5.11" "System Administration Commands"
+.TH ROUTE 1M "Feb 3, 2009"
 .SH NAME
 route \- manually manipulate the routing tables
 .SH SYNOPSIS
@@ -14,13 +14,13 @@ route \- manually manipulate the routing tables
 
 .LP
 .nf
-\fBroute\fR [\fB-fnvq\fR] [\fB-p\fR [\fB-R\fR \fIroot-dir\fR]] add | delete [\fImodifiers\fR] \fIdestination\fR \fIgateway\fR 
+\fBroute\fR [\fB-fnvq\fR] [\fB-p\fR [\fB-R\fR \fIroot-dir\fR]] add | delete [\fImodifiers\fR] \fIdestination\fR \fIgateway\fR
      [\fIargs\fR]
 .fi
 
 .LP
 .nf
-\fBroute\fR [\fB-fnvq\fR] change | get [\fImodifiers\fR] \fIdestination\fR 
+\fBroute\fR [\fB-fnvq\fR] change | get [\fImodifiers\fR] \fIdestination\fR
      [\fIgateway\fR [\fIargs\fR]]
 .fi
 
@@ -59,12 +59,10 @@ non-privileged users.
 .SH OPTIONS
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 15n
-.rt  
 Flush the routing tables of all gateway entries. If you use the \fB-f\fR option
 in conjunction with any of the \fBroute\fR sub-commands, \fBroute\fR flushes
 the gateways before performing the sub-command. Specify the table to flush by
@@ -74,24 +72,20 @@ option. If unspecified, flushing IPv4 (\fBinet\fR) routes is the default.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-n\fR\fR
 .ad
 .RS 15n
-.rt  
 Prevent attempts to print host and network names symbolically when reporting
 actions. This option is useful when name servers are unavailable.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-p\fR\fR
 .ad
 .RS 15n
-.rt  
 Make changes to the network route tables persistent across system restarts. The
 operation is applied to the network routing tables first and, if successful, is
 then applied to the list of saved routes used at system startup. In determining
@@ -104,23 +98,19 @@ routes are added at startup.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-q\fR\fR
 .ad
 .RS 15n
-.rt  
 Suppress all output.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-R\fR \fIroot-dir\fR\fR
 .ad
 .RS 15n
-.rt  
 Specify an alternate root directory where \fBroute\fR applies changes. This
 option is ignored unless used in conjunction with the \fB-p\fR option. When
 \fB-R\fR is specified, route changes are applied only to the list of saved
@@ -133,12 +123,10 @@ than \fB/\fR.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
-.rt  
 Print additional details in verbose mode.
 .RE
 
@@ -148,79 +136,65 @@ Print additional details in verbose mode.
 The following subcommands are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR\fR
 .ad
 .RS 11n
-.rt  
 Add a route.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBchange\fR\fR
 .ad
 .RS 11n
-.rt  
 Change aspects of a route (such as its gateway).
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR\fR
 .ad
 .RS 11n
-.rt  
 Delete a specific route.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBflush\fR\fR
 .ad
 .RS 11n
-.rt  
 Remove all gateway entries from the routing table.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBget\fR\fR
 .ad
 .RS 11n
-.rt  
 Look up and display the route for a destination.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBmonitor\fR\fR
 .ad
 .RS 11n
-.rt  
 Continuously report any changes to the routing information base, routing lookup
 misses, or suspected network partitionings.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBshow\fR\fR
 .ad
 .RS 11n
-.rt  
 Display the list of routes to be applied at system startup. Can be used only in
 conjunction with the \fB-p\fR option.
 .RE
@@ -291,24 +265,20 @@ how the \fBroute\fR sub-command interprets it.
 The following modifiers are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-inet\fR\fR
 .ad
 .RS 10n
-.rt  
 Force the address to be interpreted as an IPv4 address, that is, under the
 \fBAF_INET\fR address family.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-inet6\fR\fR
 .ad
 .RS 10n
-.rt  
 Force the address to be interpreted as an IPv6 address, that is, under the
 \fBAF_INET6\fR address family.
 .RE
@@ -326,23 +296,19 @@ a network; otherwise, it is presumed to be a route to a host.
 You can force this selection by using one of the following modifiers:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-host\fR\fR
 .ad
 .RS 9n
-.rt  
 Force the destination to be interpreted as a host.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-net\fR\fR
 .ad
 .RS 9n
-.rt  
 Force the destination to be interpreted as a network.
 .RE
 
@@ -353,16 +319,14 @@ For example:
 
 .sp
 .TS
-tab();
-cw(2.75i) cw(2.75i) 
-lw(2.75i) lw(2.75i) 
-.
-DestinationDestination Equivalent
+c c
+l l .
+Destination	Destination Equivalent
 _
-\fB128.32\fR\fB-host\fR \fB128.0.0.32\fR
-\fB128.32.130\fR\fB-host\fR \fB128.32.0.130\fR
-\fB-net\fR \fB128.32\fR\fB128.32.0.0\fR
-\fB-net\fR \fB128.32.130\fR\fB\fR\fB128.32.130.0\fR
+\fB128.32\fR	\fB-host\fR \fB128.0.0.32\fR
+\fB128.32.130\fR	\fB-host\fR \fB128.32.0.130\fR
+\fB-net\fR \fB128.32\fR	\fB128.32.0.0\fR
+\fB-net\fR \fB128.32.130\fR	\fB\fR\fB128.32.130.0\fR
 .TE
 
 .sp
@@ -405,7 +369,7 @@ also be specified by placing a \fB0\fR after the gateway address:
 .sp
 .in +2
 .nf
-example# route add default \fIhostname\fR 0 
+example# route add default \fIhostname\fR 0
 .fi
 .in -2
 .sp
@@ -494,25 +458,23 @@ on the command line:
 
 .sp
 .TS
-tab();
-cw(1.32i) cw(1.24i) cw(2.94i) 
-lw(1.32i) lw(1.24i) lw(2.94i) 
-.
-ModifierFlagDescription
+c c c
+l l l .
+Modifier	Flag	Description
 _
-\fB-interface\fR\fB~RTF_GATEWAY\fRDestination is directly reachable 
-\fB-iface\fR\fB~RTF_GATEWAY\fRAlias for interface modifier
-\fB-static\fR\fBRTF_STATIC\fRManually added route
-\fB-nostatic\fR\fB~RTF_STATIC\fRT{
+\fB-interface\fR	\fB~RTF_GATEWAY\fR	Destination is directly reachable
+\fB-iface\fR	\fB~RTF_GATEWAY\fR	Alias for interface modifier
+\fB-static\fR	\fBRTF_STATIC\fR	Manually added route
+\fB-nostatic\fR	\fB~RTF_STATIC\fR	T{
 Pretend route was added by kernel or routing daemon
 T}
-\fB-reject\fR\fBRTF_REJECT\fREmit an ICMP unreachable when matched
-\fB-blackhole\fR\fBRTF_BLACKHOLE\fRSilently discard packets duing updates
-\fB-proto1\fR\fBRTF_PROTO1\fRSet protocol specific routing flag #1
-\fB-proto2\fR\fBRTF_PROTO2\fRSet protocol specific routing flag #2
-\fB-private\fR\fBRTF_PRIVATE\fRDo not advertise this route
-\fB-multirt\fR\fBRTF_MULTIRT\fRCreates the specified redundant route
-\fB-setsrc\fR\fBRTF_SETSRC\fRAssigns the default source address
+\fB-reject\fR	\fBRTF_REJECT\fR	Emit an ICMP unreachable when matched
+\fB-blackhole\fR	\fBRTF_BLACKHOLE\fR	Silently discard packets duing updates
+\fB-proto1\fR	\fBRTF_PROTO1\fR	Set protocol specific routing flag #1
+\fB-proto2\fR	\fBRTF_PROTO2\fR	Set protocol specific routing flag #2
+\fB-private\fR	\fBRTF_PRIVATE\fR	Do not advertise this route
+\fB-multirt\fR	\fBRTF_MULTIRT\fR	Creates the specified redundant route
+\fB-setsrc\fR	\fBRTF_SETSRC\fR	Assigns the default source address
 .TE
 
 .sp
@@ -530,100 +492,82 @@ Some transport layer protocols can support only some of these metrics. The
 following optional modifiers are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-expire\fR\fR
 .ad
 .RS 13n
-.rt  
 Lifetime for the entry. This optional modifier is not currently supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-hopcount\fR\fR
 .ad
 .RS 13n
-.rt  
 Maximum hop count. This optional modifier is not currently supported.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-mtu\fR\fR
 .ad
 .RS 13n
-.rt  
 Maximum MTU in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-recvpipe\fR\fR
 .ad
 .RS 13n
-.rt  
 Receive pipe size in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-rtt\fR\fR
 .ad
 .RS 13n
-.rt  
 Round trip time in microseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-rttvar\fR\fR
 .ad
 .RS 13n
-.rt  
 Round trip time variance in microseconds.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-sendpipe\fR\fR
 .ad
 .RS 13n
-.rt  
 Send pipe size in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-ssthresh\fR\fR
 .ad
 .RS 13n
-.rt  
 Send pipe size threshold in bytes.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-secattr\fR\fR
 .ad
 .RS 13n
-.rt  
 Security attributes of the route. This modifier is available only if the system
 is configured with the Solaris Trusted Extensions feature.
 .sp
@@ -673,14 +617,12 @@ but have no effect.
 
 .sp
 .TS
-tab();
-cw(2.84i) cw(2.66i) 
-lw(2.84i) lw(2.66i) 
-.
-ModifierFlag
+c c
+l l .
+Modifier	Flag
 _
-\fB-cloning\fRRTF_CLONING
-\fB-xresolve\fRRTF_XRESOLVE
+\fB-cloning\fR	RTF_CLONING
+\fB-xresolve\fR	RTF_XRESOLVE
 .TE
 
 .sp
@@ -690,34 +632,28 @@ effect.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/defaultrouter\fR\fR
 .ad
 .RS 22n
-.rt  
 List of default routers
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/hosts\fR\fR
 .ad
 .RS 22n
-.rt  
 List of host names and net addresses
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/networks\fR\fR
 .ad
 .RS 22n
-.rt  
 List of network names and addresses
 .RE
 
@@ -732,7 +668,6 @@ List of network names and addresses
 .SH DIAGNOSTICS
 .sp
 .ne 2
-.mk
 .na
 \fB\fBadd\fR [ \fBhost\fR\||\ \fBnetwork\|]\fR \fIdestination\fR:\fIgateway\fR
 \fIflags\fR\fR
@@ -748,7 +683,6 @@ as well as symbolically.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBdelete\fR [ \fBhost\fR\||\ \fBnetwork\fR\|]
 \fIdestination\fR:\fIgateway\fR \fIflags\fR\fR
@@ -765,7 +699,6 @@ As \fBadd\fR, but when deleting or changing an entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIdestination\fR \fBdone\fR\fR
 .ad
@@ -777,7 +710,6 @@ each routing table entry deleted is indicated with a message of this form.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBNetwork is unreachable\fR\fR
 .ad
@@ -789,7 +721,6 @@ directly-connected network. Give the next-hop gateway instead.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBnot in table\fR\fR
 .ad
@@ -800,7 +731,6 @@ A \fBdelete\fR operation was attempted for an entry that is not in the table.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBentry exists\fR\fR
 .ad
@@ -812,7 +742,6 @@ kernel.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBrouting table overflow\fR\fR
 .ad
@@ -824,7 +753,6 @@ create the new entry.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBinsufficient privileges\fR\fR
 .ad

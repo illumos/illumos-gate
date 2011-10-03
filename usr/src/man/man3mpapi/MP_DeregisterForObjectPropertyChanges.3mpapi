@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MP_DeregisterForObjectPropertyChanges 3MPAPI "15 Feb 2006" "SunOS 5.11" "Common Multipath Management Library Functions"
+.TH MP_DEREGISTERFOROBJECTPROPERTYCHANGES 3MPAPI "Feb 15, 2006"
 .SH NAME
 MP_DeregisterForObjectPropertyChanges \- deregister a previously registered
 client function
@@ -22,12 +22,10 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lMPAPI\fR [ \fIlibrary\fR\&.\
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpClientFn\fR\fR
 .ad
 .RS 14n
-.rt  
 A pointer to an object ID that has type \fBMP_OBJECT_PROPERTY_FN\fR function
 defined by the client that was previously registered using the
 \fBMP_RegisterForObjectPropertyChanges\fR(3MPAPI) API. With a successful return
@@ -37,24 +35,20 @@ changes.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIobjectType\fR\fR
 .ad
 .RS 14n
-.rt  
 The type of object the client wants to deregister for property change
 callbacks.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpluginOid\fR\fR
 .ad
 .RS 14n
-.rt  
 If this is a valid plugin object ID, then registration will be removed from
 that plugin. If this is zero, then registration is removed for all plugins.
 .RE
@@ -76,7 +70,6 @@ object's property changes.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_OBJECT_TYPE\fR\fR
 .ad
@@ -88,7 +81,6 @@ most likely to happen if an uninitialized object ID is passed to the API.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_INVALID_PARAMETER\fR\fR
 .ad
@@ -100,7 +92,6 @@ The \fIpluginOid\fR parmeter is not zero and has a type subfield other than
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_OBJECT_NOT_FOUND\fR\fR
 .ad
@@ -111,7 +102,6 @@ The \fIpluginOid\fR owner ID or object sequence number is invalid.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_UNKNOWN_FN\fR\fR
 .ad
@@ -123,7 +113,6 @@ function.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_SUCCESS\fR\fR
 .ad
@@ -134,7 +123,6 @@ The \fIpClientFn\fR parmeter is deregistered successfully.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBMP_STATUS_FAILED\fR\fR
 .ad
@@ -151,17 +139,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityT{
+Interface Stability	T{
 Standard: ANSI INCITS 412 Multipath Management API
 T}
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO

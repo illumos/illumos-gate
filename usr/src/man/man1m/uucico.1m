@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH uucico 1M "19 May 1993" "SunOS 5.11" "System Administration Commands"
+.TH UUCICO 1M "May 19, 1993"
 .SH NAME
 uucico \- file transport program for the uucp system
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/uucp/uucico\fR [\fB-f\fR] [\fB-c\fR \fItype\fR] [\fB-d\fR \fIspool-directory\fR] 
-     [\fB-i\fR \fIinterface\fR] [\fB-r\fR \fIrole-number\fR] [\fB-s\fR \fIsystem-name\fR] 
+\fB/usr/lib/uucp/uucico\fR [\fB-f\fR] [\fB-c\fR \fItype\fR] [\fB-d\fR \fIspool-directory\fR]
+     [\fB-i\fR \fIinterface\fR] [\fB-r\fR \fIrole-number\fR] [\fB-s\fR \fIsystem-name\fR]
      [\fB-x\fR \fIdebug-level\fR]
 .fi
 
@@ -24,24 +24,20 @@ uucico \- file transport program for the uucp system
 The following options are supported:
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-f\fR\fR
 .ad
 .RS 22n
-.rt  
 This option is used to "force execution" of \fBuucico\fR by ignoring the limit
 on the maximum number of uucicos defined in the \fB/etc/uucp/Limits\fR file.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-c\fR\fI type\fR\fR
 .ad
 .RS 22n
-.rt  
 The first field in the \fBDevices\fR file is the "Type" field.  The \fB-c\fR
 option forces \fBuucico\fR to only use entries in the "Type" field that match
 the user specified \fBtype\fR. The specified \fBtype\fR is usually the name of
@@ -50,12 +46,10 @@ a local area network.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-d\fR\fI spool-directory\fR\fR
 .ad
 .RS 22n
-.rt  
 This option specifies the directory \fIspool-directory\fR that contains the
 \fBuucp\fR work files to be transferred.  The default spool directory is
 \fB/var/spool/uucp\fR.
@@ -63,12 +57,10 @@ This option specifies the directory \fIspool-directory\fR that contains the
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-i\fR\fI interface\fR\fR
 .ad
 .RS 22n
-.rt  
 This option defines the \fIinterface\fR used with \fBuucico\fR. The interface
 only affects slave mode.  Known interfaces are UNIX (default), TLI (basic
 Transport Layer Interface), and TLIS (Transport Layer Interface with Streams
@@ -77,12 +69,10 @@ modules, read/write).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-r\fR\fI role-number\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fIrole-number\fR \fB1\fR is used for master mode. \fIrole-number\fR
 \fB0\fR is used for slave mode (default).  When \fBuucico\fR is started by a
 program or \fBcron\fR, \fIrole-number\fR \fB1\fR should be used for master
@@ -91,12 +81,10 @@ mode.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-s\fR\fI system-name\fR\fR
 .ad
 .RS 22n
-.rt  
 The \fB-s\fR option defines the remote system (\fIsystem-name\fR) that
 \fBuucico\fR will try to contact.  It is required when the role is master;
 \fIsystem-name\fR must be defined in the \fBSystems\fR file.
@@ -104,12 +92,10 @@ The \fB-s\fR option defines the remote system (\fIsystem-name\fR) that
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-x\fR\fI debug-level\fR\fR
 .ad
 .RS 22n
-.rt  
 Both \fBuux\fR and \fBuucp\fR queue jobs that will be transferred by
 \fBuucico\fR. These jobs are normally started by the \fBuusched\fR scheduler,
 for debugging purposes, and can be started manually. For example, the shell
@@ -121,100 +107,82 @@ debugging information.
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Devconfig\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Devices\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Limits\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Permissions\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Sysfiles\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/uucp/Systems\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/locks/*\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucp/*\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/var/spool/uucppublic/*\fR\fR
 .ad
 .RS 27n
-.rt  
 
 .RE
 

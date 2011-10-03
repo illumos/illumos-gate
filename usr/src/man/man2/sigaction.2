@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH sigaction 2 "23 Mar 2005" "SunOS 5.11" "System Calls"
+.TH SIGACTION 2 "Mar 23, 2005"
 .SH NAME
 sigaction \- detailed signal management
 .SH SYNOPSIS
@@ -76,12 +76,10 @@ of the signal. It is formed by a logical \fBOR\fR of any of the following
 values:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_ONSTACK\fR\fR
 .ad
 .RS 16n
-.rt  
 If set and the signal is caught, and if the thread that is chosen to processes
 a delivered signal has an alternate signal stack declared with
 \fBsigaltstack\fR(2), then it will process the signal on that stack. Otherwise,
@@ -90,12 +88,10 @@ the signal is delivered on the thread's normal stack.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_RESETHAND\fR\fR
 .ad
 .RS 16n
-.rt  
 If set and the signal is caught, the disposition of the signal is reset to
 \fBSIG_DFL\fR and the signal will not be blocked on entry to the signal handler
 (\fBSIGILL\fR, \fBSIGTRAP\fR, and \fBSIGPWR\fR cannot be  automatically reset
@@ -104,24 +100,20 @@ when delivered; the system silently enforces this restriction).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_NODEFER\fR\fR
 .ad
 .RS 16n
-.rt  
 If set and the signal is caught, the signal will not be automatically blocked
 by the kernel while it is being caught.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_RESTART\fR\fR
 .ad
 .RS 16n
-.rt  
 If set and the signal is caught, functions that are interrupted by the
 execution of this signal's handler are transparently restarted by the system,
 namely \fBfcntl\fR(2), \fBioctl\fR(2), \fBwait\fR(3C), \fBwaitid\fR(2), and the
@@ -137,12 +129,10 @@ error.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_SIGINFO\fR\fR
 .ad
 .RS 16n
-.rt  
 If cleared and the signal is caught, \fIsig\fR is passed as the only argument
 to the signal-catching function. If set and the signal is caught,  two
 additional arguments are passed to the signal-catching function.  If the second
@@ -155,12 +145,10 @@ delivered (see \fBucontext.h\fR(3HEAD)).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_NOCLDWAIT\fR\fR
 .ad
 .RS 16n
-.rt  
 If set and \fIsig\fR equals  \fBSIGCHLD\fR, the system will not create zombie
 processes when children of the calling process exit. If the calling process
 subsequently issues a \fBwait\fR(3C), it blocks until all of the calling
@@ -170,12 +158,10 @@ process's child processes terminate, and then returns \fB\(mi1\fR with
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBSA_NOCLDSTOP\fR\fR
 .ad
 .RS 16n
-.rt  
 If set and \fIsig\fR equals \fBSIGCHLD\fR, \fBSIGCHLD\fR will not be sent to
 the calling process when its child processes stop or continue.
 .RE
@@ -192,12 +178,10 @@ is installed.
 The \fBsigaction()\fR function will fail if:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-.rt  
 The value of the \fIsig\fR argument is not a valid signal number or is equal to
 \fBSIGKILL\fR or \fBSIGSTOP\fR. In addition, if in a multithreaded process, it
 is equal to \fBSIGWAITING\fR, \fBSIGCANCEL\fR, or \fBSIGLWP\fR.
@@ -211,17 +195,16 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityCommitted
+Interface Stability	Committed
 _
-MT-LevelAsync-Signal-Safe
+MT-Level	Async-Signal-Safe
 _
-StandardSee \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO

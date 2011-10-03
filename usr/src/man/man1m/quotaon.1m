@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH quotaon 1M "16 Sep 1996" "SunOS 5.11" "System Administration Commands"
+.TH QUOTAON 1M "Sep 16, 1996"
 .SH NAME
 quotaon, quotaoff \- turn ufs file system quotas on and off
 .SH SYNOPSIS
@@ -57,12 +57,10 @@ device on which the file system resides.
 .SS "quotaon"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 This option is normally used at boot time to enable quotas. It applies only to
 those file systems in \fB/etc/vfstab\fR which have ``rq'' in the \fBmntopts\fR
 field, are currently mounted ``rw'', and have a \fBquotas\fR file in the root
@@ -71,35 +69,29 @@ directory.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Display a message for each file system after quotas are turned on.
 .RE
 
 .SS "quotaoff"
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-a\fR\fR
 .ad
 .RS 6n
-.rt  
 Force all file systems in \fB/etc/mnttab\fR to have their quotas disabled.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB-v\fR\fR
 .ad
 .RS 6n
-.rt  
 Display a message for each file system affected.
 .RE
 
@@ -112,23 +104,19 @@ bytes).
 .SH FILES
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/mnttab\fR\fR
 .ad
 .RS 15n
-.rt  
 mounted file systems
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fB/etc/vfstab\fR\fR
 .ad
 .RS 15n
-.rt  
 list of default parameters for each file system
 .RE
 

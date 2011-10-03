@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ldi_add_event_handler 9F "21 Aug 2007" "SunOS 5.11" "Kernel Functions for Drivers"
+.TH LDI_ADD_EVENT_HANDLER 9F "Aug 21, 2007"
 .SH NAME
 ldi_add_event_handler \- add NDI event service callback handler
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ ldi_add_event_handler \- add NDI event service callback handler
 .nf
 #include <sys/ddi_obsolete.h>
 
-\fBint\fR \fBldi_add_event_handler\fR(\fBldi_handle_t\fR \fIlh\fR, \fIddi_eventcookie_t ec\fR, 
+\fBint\fR \fBldi_add_event_handler\fR(\fBldi_handle_t\fR \fIlh\fR, \fIddi_eventcookie_t ec\fR,
      \fBvoid (*handler)(\fR\fIldi_handle_t\fR, \fIddi_eventcookie_t\fR,
      \fBvoid *, void *) void *arg,\fR \fIldi_callback_id_t *id\fR);
 .fi
@@ -23,7 +23,6 @@ Obsolete
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_handle_t lh\fR\fR
 .ad
@@ -34,7 +33,6 @@ Layered handle representing event notification device.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIddi_eventcookie_t ec\fR\fR
 .ad
@@ -45,7 +43,6 @@ Cookie returned from call to \fBldi_get_eventcookie\fR(9F).
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvoid (*handler)(ldi_handle_t, ddi_eventcookie_t, void *, void *)\fR\fR
 .ad
@@ -56,7 +53,6 @@ Callback handler for NDI event service notification.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIvoid *arg\fR\fR
 .ad
@@ -68,7 +64,6 @@ layered driver's softstate structure.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIldi_callback_id_t *id\fR\fR
 .ad
@@ -103,46 +98,38 @@ be assumed to be random.
 The routine handler is invoked with the following arguments:
 .sp
 .ne 2
-.mk
 .na
 \fB\fBldi_handle_t\fR \fIlh\fR\fR
 .ad
 .RS 24n
-.rt  
 Layered handle representing the device for which the event notification is
 requested.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBddi_eventcookie_t\fR \fIec\fR\fR
 .ad
 .RS 24n
-.rt  
 Structure describing event that occurred.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fR\fIarg\fR\fR
 .ad
 .RS 24n
-.rt  
 Opaque data pointer provided by the driver during callback registration.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBvoid *\fR\fIimpl_data\fR\fR
 .ad
 .RS 24n
-.rt  
 Pointer to event specific data defined by the framework that invokes the
 callback function.
 .RE
@@ -150,23 +137,19 @@ callback function.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_SUCCESS\fR\fR
 .ad
 .RS 15n
-.rt  
 Callback handler registered successfully.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDDI_FAILURE\fR\fR
 .ad
 .RS 15n
-.rt  
 Failed to register callback handler. Possible reasons include lack of resources
 or a bad cookie.
 .RE

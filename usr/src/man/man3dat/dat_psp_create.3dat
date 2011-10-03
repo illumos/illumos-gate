@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH dat_psp_create 3DAT "16 Jul 2004" "SunOS 5.11" "Direct Access Transport Library Functions"
+.TH DAT_PSP_CREATE 3DAT "Jul 16, 2004"
 .SH NAME
 dat_psp_create \- create a persistent Public Service Point
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ] 
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
 
 DAT_RETURN
@@ -26,34 +26,28 @@ DAT_RETURN
 .SH PARAMETERS
 .sp
 .ne 2
-.mk
 .na
 \fB\fIia_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle for an instance of DAT IA.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIconn_qual\fR\fR
 .ad
 .RS 14n
-.rt  
 Connection Qualifier of the IA on which the Public Service Point is listening.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIevd_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Event Dispatcher that provides the Connection Requested Events to the Consumer.
 The size of the event queue for the Event Dispatcher controls the size of the
 backlog for the created Public Service Point.
@@ -61,12 +55,10 @@ backlog for the created Public Service Point.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpsp_flags\fR\fR
 .ad
 .RS 14n
-.rt  
 Flag that indicates whether the Provider or Consumer creates an Endpoint per
 arrived Connection Request. The value of \fBDAT_PSP_PROVIDER\fR indicates that
 the Consumer wants to get an Endpoint from the Provider; a value of
@@ -76,12 +68,10 @@ an Endpoint for each arrived Connection Request.
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fIpsp_handle\fR\fR
 .ad
 .RS 14n
-.rt  
 Handle to an opaque Public Service Point.
 .RE
 
@@ -120,67 +110,55 @@ connection request acceptance with the Endpoint.
 .SH RETURN VALUES
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_SUCCESS\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation was successful.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INSUFFICIENT_RESOURCES\fR\fR
 .ad
 .RS 30n
-.rt  
 The operation failed due to resource limitations.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_HANDLE\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIia_handle\fR or \fIevd_handle\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_INVALID_PARAMETER\fR\fR
 .ad
 .RS 30n
-.rt  
 The \fIconn_qual\fR or \fIpsp_flags\fR parameter is invalid.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_CONN_QUAL_IN_USE\fR\fR
 .ad
 .RS 30n
-.rt  
 The specified Connection Qualifier was in use.
 .RE
 
 .sp
 .ne 2
-.mk
 .na
 \fB\fBDAT_MODEL_NOT_SUPPORTED\fR\fR
 .ad
 .RS 30n
-.rt  
 The requested Model was not supported by the Provider.
 .RE
 
@@ -190,12 +168,10 @@ The requested Model was not supported by the Provider.
 Two uses of a Public Service Point are as follows:
 .sp
 .ne 2
-.mk
 .na
 \fBModel 1\fR
 .ad
 .RS 11n
-.rt  
 For this model, the Provider manipulates a pool of Endpoints for a Public
 Service Point. The Provider can use the same pool for more than one Public
 Service Point.
@@ -274,12 +250,10 @@ Provider and its \fIep_handle\fR is no longer usable by the Consumer.
 
 .sp
 .ne 2
-.mk
 .na
 \fBModel 2\fR
 .ad
 .RS 11n
-.rt  
 For this model, the Consumer manipulates a pool of Endpoints. Consumers can use
 the same pool for more than one Service Point.
 .RS +4
@@ -369,15 +343,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
-.
-ATTRIBUTE TYPEATTRIBUTE VALUE
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilityStandard: uDAPL, 1.1, 1.2
+Interface Stability	Standard: uDAPL, 1.1, 1.2
 _
-MT-LevelSafe
+MT-Level	Safe
 .TE
 
 .SH SEE ALSO
