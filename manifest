@@ -3233,7 +3233,6 @@ f usr/include/smbsrv/libmlrpc.h 0644 root bin
 f usr/include/smbsrv/libmlsvc.h 0644 root bin
 f usr/include/smbsrv/libsmb.h 0644 root bin
 f usr/include/smbsrv/libsmbns.h 0644 root bin
-f usr/include/smbsrv/libsmbrdr.h 0644 root bin
 f usr/include/smbsrv/mac_cifs.h 0644 root bin
 f usr/include/smbsrv/mailslot.h 0644 root bin
 f usr/include/smbsrv/mbuf.h 0644 root bin
@@ -7095,8 +7094,6 @@ f usr/lib/smbsrv/amd64/libsmb.so.1 0755 root bin
 s usr/lib/smbsrv/amd64/libsmb.so=libsmb.so.1
 f usr/lib/smbsrv/amd64/libsmbns.so.1 0755 root bin
 s usr/lib/smbsrv/amd64/libsmbns.so=libsmbns.so.1
-f usr/lib/smbsrv/amd64/libsmbrdr.so.1 0755 root bin
-s usr/lib/smbsrv/amd64/libsmbrdr.so=libsmbrdr.so.1
 d usr/lib/smbsrv/dtrace 0755 root bin
 f usr/lib/smbsrv/libmlrpc.so.1 0755 root bin
 s usr/lib/smbsrv/libmlrpc.so=libmlrpc.so.1
@@ -7106,8 +7103,6 @@ f usr/lib/smbsrv/libsmb.so.1 0755 root bin
 s usr/lib/smbsrv/libsmb.so=libsmb.so.1
 f usr/lib/smbsrv/libsmbns.so.1 0755 root bin
 s usr/lib/smbsrv/libsmbns.so=libsmbns.so.1
-f usr/lib/smbsrv/libsmbrdr.so.1 0755 root bin
-s usr/lib/smbsrv/libsmbrdr.so=libsmbrdr.so.1
 f usr/lib/smbsrv/libsqlite.so.1 0755 root bin
 s usr/lib/smbsrv/libsqlite.so=libsqlite.so.1
 d usr/lib/smedia 0755 root bin
@@ -7858,11 +7853,8 @@ f usr/share/lib/tabset/xerox1720 0644 root bin
 f usr/share/lib/termcap 0644 root bin
 d usr/share/lib/terminfo 0755 root bin
 d usr/share/lib/terminfo/3 0755 root bin
-f usr/share/lib/terminfo/3/386AT 0644 root bin
 f usr/share/lib/terminfo/3/386at 0644 root bin
-f usr/share/lib/terminfo/3/386at-m 0644 root bin
 d usr/share/lib/terminfo/A 0755 root bin
-f usr/share/lib/terminfo/A/AT386 0644 root bin
 d usr/share/lib/terminfo/a 0755 root bin
 f usr/share/lib/terminfo/a/ansi 0644 root bin
 f usr/share/lib/terminfo/a/ansi+arrows 0644 root bin
@@ -7876,8 +7868,6 @@ d usr/share/lib/terminfo/u 0755 root bin
 f usr/share/lib/terminfo/u/unknown 0644 root bin
 d usr/share/lib/terminfo/v 0755 root bin
 f usr/share/lib/terminfo/v/vt100 0644 root bin
-f usr/share/lib/terminfo/v/vt100s 0644 root bin
-f usr/share/lib/terminfo/v/vt100w 0644 root bin
 f usr/share/lib/terminfo/v/vt220 0644 root bin
 d usr/share/lib/terminfo/x 0755 root bin
 f usr/share/lib/terminfo/x/xterm 0644 root bin
@@ -12046,7 +12036,6 @@ f usr/share/man/man4/driver.conf.4 0444 root bin
 f usr/share/man/man4/ds.log.4 0444 root bin
 f usr/share/man/man4/ethers.4 0444 root bin
 f usr/share/man/man4/exec_attr.4 0444 root bin
-f usr/share/man/man4/fd.4 0444 root bin
 f usr/share/man/man4/fdi.4 0444 root bin
 f usr/share/man/man4/format.dat.4 0444 root bin
 f usr/share/man/man4/fspec.4 0444 root bin
@@ -12204,7 +12193,6 @@ f usr/share/man/man4/yppasswdd.4 0444 root bin
 f usr/share/man/man4/ypserv.4 0444 root bin
 f usr/share/man/man4/zoneinfo.4 0444 root bin
 d usr/share/man/man4b 0755 root bin
-f usr/share/man/man4b/plot.4b 0444 root bin
 d usr/share/man/man5 0755 root bin
 f usr/share/man/man5/Intro.5 0444 root bin
 f usr/share/man/man5/acl.5 0444 root bin

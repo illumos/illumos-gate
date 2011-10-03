@@ -3551,8 +3551,6 @@ just_mem:
 			break;
 		}
 		/*FALLTHROUGH*/
-<<<<<<< HEAD
-=======
 	case SVM:
 		if (mode == 3) {
 #if DIS_TEXT
@@ -3591,7 +3589,6 @@ just_mem:
 			break;
 		}
 		/*FALLTHROUGH*/
->>>>>>> ed22c7109fc5dd9e1b7a5d0333bdc7ad2718e2ab
 	case MONITOR_MWAIT:
 		if (mode == 3) {
 			if (r_m == 0) {
