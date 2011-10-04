@@ -10,7 +10,7 @@ libsysevent \- system event interface library
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... \fB-lsysevent\fR [ \fIlibrary\fR... ] 
-#include <\fBsysevent.h\fR>
+#include <\fBlibsysevent.h\fR>
 .fi
 
 .SH DESCRIPTION
