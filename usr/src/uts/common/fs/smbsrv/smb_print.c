@@ -109,7 +109,8 @@ smb_com_open_print_file(smb_request_t *sr)
 	smb_kshare_t 	*si;
 	struct open_param *op = &sr->arg.open;
 
-	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
+	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		cmn_err(CE_WARN, "smb_com_open_print_file: bad device");
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
@@ -182,7 +183,8 @@ smb_com_close_print_file(smb_request_t *sr)
 {
 	smb_sdrc_t rc;
 
-	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
+	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		cmn_err(CE_WARN, "smb_com_close_print_file: SDRC_ERROR");
@@ -269,7 +271,8 @@ smb_com_write_print_file(smb_request_t *sr)
 	smb_attr_t	attr;
 	int		rc;
 
-	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+	if (sr->sr_server->sv_cfg.skc_print_enable == 0 ||
+	    !STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		return (SDRC_ERROR);

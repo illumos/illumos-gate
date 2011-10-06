@@ -754,6 +754,11 @@ smb_server_spooldoc(smb_ioc_spooldoc_t *ioc)
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
+	if (sv->sv_cfg.skc_print_enable == 0) {
+		rc = ENOTTY;
+		goto out;
+	}
+
 	mutex_enter(&sv->sv_mutex);
 	for (;;) {
 		if (sv->sv_state != SMB_SERVER_STATE_RUNNING) {
@@ -770,22 +775,24 @@ smb_server_spooldoc(smb_ioc_spooldoc_t *ioc)
 		}
 	}
 	mutex_exit(&sv->sv_mutex);
-	if (rc == 0) {
-		spdoc = kmem_zalloc(sizeof (*spdoc), KM_SLEEP);
-		if (smb_spool_lookup_doc_byfid(sv, fid, spdoc)) {
-			ioc->spool_num = spdoc->sd_spool_num;
-			ioc->ipaddr = spdoc->sd_ipaddr;
-			(void) strlcpy(ioc->path, spdoc->sd_path,
-			    MAXPATHLEN);
-			(void) strlcpy(ioc->username,
-			    spdoc->sd_username, MAXNAMELEN);
-		} else {
-			/* Did not find that print job. */
-			rc = EAGAIN;
-		}
-		kmem_free(spdoc, sizeof (*spdoc));
-	}
+	if (rc != 0)
+		goto out;
 
+	spdoc = kmem_zalloc(sizeof (*spdoc), KM_SLEEP);
+	if (smb_spool_lookup_doc_byfid(sv, fid, spdoc)) {
+		ioc->spool_num = spdoc->sd_spool_num;
+		ioc->ipaddr = spdoc->sd_ipaddr;
+		(void) strlcpy(ioc->path, spdoc->sd_path,
+		    MAXPATHLEN);
+		(void) strlcpy(ioc->username,
+		    spdoc->sd_username, MAXNAMELEN);
+	} else {
+		/* Did not find that print job. */
+		rc = EAGAIN;
+	}
+	kmem_free(spdoc, sizeof (*spdoc));
+
+out:
 	smb_server_release(sv);
 	return (rc);
 }
