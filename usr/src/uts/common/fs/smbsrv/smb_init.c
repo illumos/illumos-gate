@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -64,7 +65,7 @@ int	smb_oplock_min_timeout = OPLOCK_MIN_TIMEOUT;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_sign_debug = 0;
-int	smb_raw_mode = 1;
+int	smb_raw_mode = 0;
 int	smb_shortnames = 1;
 uint_t	smb_audit_flags =
 #ifdef	DEBUG
